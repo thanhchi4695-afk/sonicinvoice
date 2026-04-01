@@ -17,6 +17,7 @@ import QuickCapture from "@/components/QuickCapture";
 import OrderFormFlow from "@/components/OrderFormFlow";
 import SeasonManager from "@/components/SeasonManager";
 import ReorderPanel from "@/components/ReorderPanel";
+import SupplierPanel from "@/components/SupplierPanel";
 import HelpCentre from "@/components/HelpCentre";
 import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";

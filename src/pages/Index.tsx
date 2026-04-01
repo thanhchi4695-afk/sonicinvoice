@@ -38,6 +38,7 @@ const Index = () => {
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
+  const { isEmbedded } = useShopifyEmbedded();
 
   // Handle Shopify OAuth callback redirect
   useEffect(() => {

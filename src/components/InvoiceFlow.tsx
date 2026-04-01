@@ -479,6 +479,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         price: 45.00,
         rrp: 109.95,
         status: "ready",
+        colour: "Navy",
+        size: "One Size",
         metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" },
         isGrouped: false,
         barcode: "9350987654321",

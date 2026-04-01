@@ -384,3 +384,38 @@ function ApiKeysSection() {
     </Section>
   );
 }
+
+// ── Default AI Instructions Section ────────────────────────
+const DEFAULT_INSTRUCTIONS_KEY = 'default_ai_instructions_skupilot';
+
+function DefaultInstructionsSection() {
+  const [instructions, setInstructions] = useState(() => {
+    try { return localStorage.getItem(DEFAULT_INSTRUCTIONS_KEY) || ''; } catch { return ''; }
+  });
+
+  const handleSave = () => {
+    localStorage.setItem(DEFAULT_INSTRUCTIONS_KEY, instructions);
+  };
+
+  return (
+    <Section title="🤖 Default AI instructions">
+      <p className="text-xs text-muted-foreground -mt-1 mb-2">
+        These instructions apply to ALL invoices unless overridden at the invoice level.
+      </p>
+      <textarea
+        value={instructions}
+        onChange={e => setInstructions(e.target.value)}
+        rows={4}
+        maxLength={2000}
+        placeholder={"Instructions here apply to ALL invoices.\nExample: 'Always use title case for product names.\nAlways add my store name to the vendor field.'"}
+        className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm resize-none leading-relaxed placeholder:text-muted-foreground/50"
+      />
+      <div className="flex items-center justify-between mt-1">
+        <p className="text-xs text-muted-foreground">{instructions.length} / 2000</p>
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSave}>
+          <Save className="w-3 h-3 mr-1" /> Save default instructions
+        </Button>
+      </div>
+    </Section>
+  );
+}

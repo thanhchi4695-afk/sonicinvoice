@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStoreMode } from "@/hooks/use-store-mode";
+import Papa from "papaparse";
 
 interface InvoiceFlowProps {
   onBack: () => void;

@@ -51,36 +51,41 @@ const AccountScreen = () => {
         setShopName(conn.shop_name || conn.store_url);
         setDefaultLocation(conn.default_location_id || "");
         setProductStatus(conn.product_status || "draft");
-        setShopifyVersion(conn.api_version || "2024-10");
       }
     });
+
+    // Check if returning from OAuth
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("shopify_connected") === "1") {
+      window.history.replaceState({}, "", window.location.pathname);
+      getConnection().then((conn) => {
+        if (conn) {
+          setShopifyUrl(conn.store_url);
+          setShopifyConnected(true);
+          setShopName(conn.shop_name || conn.store_url);
+        }
+      });
+    }
   }, []);
 
-  const handleTestConnection = async () => {
-    if (!shopifyUrl || !shopifyToken) {
+  const handleOAuthConnect = async () => {
+    if (!shopifyUrl) {
       setTestStatus("error");
-      setTestMessage("Enter both store URL and access token");
+      setTestMessage("Enter your store URL first");
       return;
     }
-    setTestStatus("testing");
+    setOauthLoading(true);
+    setTestStatus("idle");
     try {
-      await saveConnection(shopifyUrl, shopifyToken, shopifyVersion);
-      const result = await testConnection();
-      setTestStatus("success");
-      setTestMessage(`Connected to: ${result.shopName}`);
-      setShopName(result.shopName);
-      setShopifyConnected(true);
-      // Load locations
-      try {
-        const locs = await getLocations();
-        setLocations(locs.filter((l) => l.active));
-        if (locs.length > 0 && !defaultLocation) {
-          setDefaultLocation(String(locs[0].id));
-        }
-      } catch {}
+      const url = shopifyUrl.includes(".myshopify.com")
+        ? shopifyUrl
+        : `${shopifyUrl}.myshopify.com`;
+      const installUrl = await initiateOAuth(url);
+      window.location.href = installUrl;
     } catch (err) {
       setTestStatus("error");
-      setTestMessage(err instanceof Error ? err.message : "Connection failed");
+      setTestMessage(err instanceof Error ? err.message : "OAuth failed");
+      setOauthLoading(false);
     }
   };
 
@@ -88,7 +93,6 @@ const AccountScreen = () => {
     await deleteConnection();
     setShopifyConnected(false);
     setShopifyUrl("");
-    setShopifyToken("");
     setShopName("");
     setTestStatus("idle");
     setTestMessage("");
@@ -105,10 +109,6 @@ const AccountScreen = () => {
     } catch {}
     setSaving(false);
   };
-
-  const maskedToken = shopifyToken
-    ? "••••••••••••" + shopifyToken.slice(-4)
-    : "";
 
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">

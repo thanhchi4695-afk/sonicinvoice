@@ -37,6 +37,8 @@ const FORMAT_CARDS: { id: ExportFormat; icon: React.ReactNode; label: string; de
   { id: "tags_only", icon: <Tag className="w-5 h-5 text-primary" />, label: "Tags only CSV", desc: "CSV with title and tags only. For updating tags on products already in Shopify.", best: "Tag cleanup on existing catalog" },
   { id: "xlsx", icon: <FileSpreadsheet className="w-5 h-5 text-primary" />, label: "Excel (.xlsx)", desc: "Same data as Shopify CSV but in Excel format. Useful for manual review or sharing with your accountant.", best: "Finance review, manual checking" },
   { id: "summary_pdf", icon: <FileText className="w-5 h-5 text-secondary" />, label: "Summary PDF", desc: "A printable summary of the invoice — supplier, date, products, quantities, costs, and totals.", best: "Filing, accounting, manager review" },
+  { id: "google_xml", icon: <ShoppingCart className="w-5 h-5 text-primary" />, label: "Google Shopping feed (XML)", desc: "Google Merchant Center-ready XML product feed with categories, gender, age group, and custom labels.", best: "Google Shopping ads, Merchant Center" },
+  { id: "google_tsv", icon: <ShoppingCart className="w-5 h-5 text-primary" />, label: "Google Shopping feed (TSV)", desc: "Tab-separated feed for Google Merchant Center. Same data as XML but in spreadsheet-friendly format.", best: "Google Merchant Center bulk upload" },
 ];
 
 function generateFilename(supplier: string, format: ExportFormat): string {

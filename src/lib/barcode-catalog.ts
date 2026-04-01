@@ -116,3 +116,15 @@ export function extractSizeFromTitle(title: string): string {
   const sizeMatch = title.match(/\b(AU\d+|US\d+|XS|XXS|S|M|L|XL|XXL|XXXL|One\s*Size|OS|Free\s*Size)\b/i);
   return sizeMatch ? sizeMatch[1] : '';
 }
+
+// ── GTIN validation ────────────────────────────────────────
+export function validateGTIN(value: string): string {
+  if (!value) return '';
+  const digits = String(value).replace(/\D/g, '');
+  if (![8, 12, 13].includes(digits.length)) return '';
+  const arr = digits.split('').map(Number);
+  const check = arr.pop()!;
+  const sum = arr.reverse().reduce((acc, n, i) => acc + (i % 2 === 0 ? n * 3 : n), 0);
+  const calculated = (10 - (sum % 10)) % 10;
+  return calculated === check ? digits : '';
+}

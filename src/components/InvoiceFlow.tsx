@@ -534,7 +534,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   // Flatten for backward-compat with cost tracking etc.
   const mockProducts = productGroups.map(g => ({
     name: g.name,
-    sku: g.variants[0]?.sku || "",
+    sku: g.variants[0]?.sku || g.vendorCode || "",
+    barcode: g.barcode || "",
     brand: g.brand,
     type: g.type,
     colour: g.colour || "",
@@ -1885,7 +1886,7 @@ const VariantGroupCard = ({ group, onSplit, onPreview }: {
   );
 };
 
-const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; barcode?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
+const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [savedToBarcodeCatalog, setSavedToBarcodeCatalog] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
@@ -1975,6 +1976,16 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
           <div className="grid grid-cols-2 gap-3">
             <input defaultValue={product.colour || ""} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Colour" />
             <input defaultValue={product.size || ""} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Size" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">SKU / Style Code</label>
+              <input defaultValue={product.sku || ""} className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm font-mono-data" placeholder="e.g. JA81520" />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Barcode (GTIN)</label>
+              <input defaultValue={product.barcode || ""} className={`w-full h-10 rounded-md bg-input border border-border px-3 text-sm font-mono-data ${product.barcode ? "text-success" : ""}`} placeholder="EAN-13 / UPC" />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <input type="number" defaultValue={product.price} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Cost" />

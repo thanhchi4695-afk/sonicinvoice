@@ -13,6 +13,8 @@ export interface ExportProduct {
   type: string;
   colour?: string;
   size?: string;
+  sku?: string;
+  barcode?: string;
   price: number;
   rrp: number;
   status: string;
@@ -128,7 +130,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
           Handle: handle, Title: `${p.brand} ${p.name}`, "Body (HTML)": `<p>${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.</p>`,
           Vendor: p.brand, Type: p.type, Tags: `${p.brand}, ${p.type}, New Arrival`,
           Published: "TRUE", "Variant Price": p.rrp.toFixed(2), "Variant Compare At Price": "",
-          "Variant SKU": "", "Image Src": "", Status: "draft",
+          "Variant SKU": p.sku || "", "Variant Barcode": p.barcode || "", "Image Src": "", Status: "draft",
           "SEO Title": `${p.name} | ${p.brand}`.slice(0, 70),
           "SEO Description": `Shop ${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.`.slice(0, 160),
         };
@@ -143,18 +145,18 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
       const metaColsToInclude = enabledMeta
         .filter(mf => rows.some(r => r[mf.shopifyColumn]?.trim()))
         .map(mf => mf.shopifyColumn);
-      const baseColumns = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Variant Price", "Variant Compare At Price", "Variant SKU", "Image Src", "Status", "SEO Title", "SEO Description"];
+      const baseColumns = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Variant SKU", "Variant Barcode", "Variant Price", "Variant Compare At Price", "Image Src", "Status", "SEO Title", "SEO Description"];
       downloadFile("\uFEFF" + Papa.unparse(rows, { columns: [...baseColumns, ...metaColsToInclude] }), filename);
     } else if (selectedFormat === "shopify_inventory") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        "Variant SKU": "", Barcode: "", "Variant Inventory Qty": "1", "Variant Inventory Policy": "deny",
+        "Variant SKU": p.sku || "", Barcode: p.barcode || "", "Variant Inventory Qty": "1", "Variant Inventory Policy": "deny",
       }));
       downloadFile("\uFEFF" + Papa.unparse(rows), filename);
     } else if (selectedFormat === "shopify_price") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        "Variant SKU": "", "Variant Price": p.rrp.toFixed(2), "Variant Compare At Price": "",
+        "Variant SKU": p.sku || "", "Variant Price": p.rrp.toFixed(2), "Variant Compare At Price": "",
       }));
       downloadFile("\uFEFF" + Papa.unparse(rows), filename);
     } else if (selectedFormat === "tags_only") {
@@ -166,14 +168,14 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
     } else if (selectedFormat === "google_xml") {
       const xml = generateGoogleFeedXML(prods.map(p => ({
         name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
-        colour: p.colour, size: p.size,
+        colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
         tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
       })), supplierName);
       downloadFile(xml, filename, "application/xml;charset=utf-8");
     } else if (selectedFormat === "google_tsv") {
       const tsv = generateGoogleFeedTSV(prods.map(p => ({
         name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
-        colour: p.colour, size: p.size,
+        colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
         tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
       })));
       downloadFile("\uFEFF" + tsv, filename, "text/tab-separated-values;charset=utf-8");

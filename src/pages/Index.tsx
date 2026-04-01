@@ -25,6 +25,7 @@ const Index = () => {
   const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
+  const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
 
   if (!authed) {
     return <AuthScreen onAuth={() => setAuthed(true)} />;

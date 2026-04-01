@@ -162,7 +162,7 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
       </div>
 
       {/* Stat tiles */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-card rounded-lg border border-border p-4 text-center">
           <p className="text-2xl font-bold font-display">3</p>
           <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Lightspeed imports' : 'CSV exports'}</p>
@@ -172,6 +172,57 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
           <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Products ready for Lightspeed' : 'Products imported to Shopify'}</p>
         </div>
       </div>
+
+      {/* Performance metrics card */}
+      {(() => {
+        const history: { lines: number; processingTime: number; matchRate: number }[] = (() => {
+          try { return JSON.parse(localStorage.getItem("processing_history") || "[]"); } catch { return []; }
+        })();
+        const totalInvoices = history.length || 3;
+        const totalLines = history.reduce((s, h) => s + (h.lines || 0), 0) || 84;
+        const totalProcTime = history.reduce((s, h) => s + (h.processingTime || 0), 0) || 312;
+        const avgTime = Math.round(totalProcTime / Math.max(totalInvoices, 1));
+        const avgMatch = Math.round(history.reduce((s, h) => s + (h.matchRate || 94), 0) / Math.max(totalInvoices, 1)) || 94;
+        const manualMinutes = totalLines * 8;
+        const savedMinutes = manualMinutes - Math.round(totalProcTime / 60);
+        const savedHours = (savedMinutes / 60).toFixed(1);
+
+        return (
+          <div className="bg-card rounded-lg border border-border p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Zap className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Performance</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-lg font-bold font-display">{avgTime < 60 ? `${avgTime}s` : `${Math.floor(avgTime / 60)}m ${avgTime % 60}s`}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Avg processing<br/>per invoice</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold font-display text-success">{avgMatch}%</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Avg match rate<br/>this month</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold font-display text-primary">{savedHours}h</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Total saved<br/>vs manual</p>
+              </div>
+            </div>
+
+            {/* Time saved detail */}
+            <div className="bg-muted/50 rounded-lg p-3 mt-3 text-xs">
+              <p className="font-semibold mb-1.5 flex items-center gap-1"><Clock className="w-3 h-3" /> How much time has SkuPilot saved you?</p>
+              <div className="grid grid-cols-2 gap-y-1 text-muted-foreground">
+                <span>Invoices processed:</span><span className="font-mono-data text-foreground">{totalInvoices}</span>
+                <span>Total product lines:</span><span className="font-mono-data text-foreground">{totalLines}</span>
+                <span>Manual time estimate:</span><span className="font-mono-data text-foreground">~{Math.round(manualMinutes / 60)}h</span>
+                <span>SkuPilot time:</span><span className="font-mono-data text-foreground">~{(totalProcTime / 60).toFixed(0)}m</span>
+                <span>Time saved:</span><span className="font-mono-data text-success font-semibold">~{savedHours} hours ✅</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground/70 mt-2">Based on 8 min/product for manual entry (industry average for fashion boutiques)</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Recent Activity */}
       <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recent activity</h3>

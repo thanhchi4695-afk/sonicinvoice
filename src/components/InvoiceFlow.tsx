@@ -447,6 +447,30 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
+          {/* Processing time banner */}
+          {processingDone && finalProcessingTime > 0 && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 mb-3 flex items-center gap-2">
+              <span className="text-xs text-primary font-medium font-mono-data">
+                ✅ {mockProducts.length} lines enriched in {finalProcessingTime < 60 ? `${finalProcessingTime}s` : `${Math.floor(finalProcessingTime / 60)}m ${finalProcessingTime % 60}s`}
+              </span>
+            </div>
+          )}
+
+          {/* Speed tips */}
+          {showSpeedTips && (
+            <div className="bg-muted/50 border border-border rounded-lg p-3 mb-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-semibold">💡 Speed tips for faster processing</p>
+                <button onClick={() => setShowSpeedTips(false)} className="text-muted-foreground"><X className="w-3.5 h-3.5" /></button>
+              </div>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>• Upload your supplier catalog to catalog memory — next time, products will match in seconds without web search</p>
+                <p>• Save barcodes after each invoice — barcode matching is 10× faster than name matching</p>
+                <p>• Turn off image search for restock orders — you already have photos for existing products</p>
+              </div>
+            </div>
+          )}
+
           {/* Custom rules applied feedback */}
           {appliedRules.length > 0 && (
             <div className="bg-success/10 border border-success/20 rounded-lg p-3 mb-3">

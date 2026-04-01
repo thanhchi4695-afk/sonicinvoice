@@ -71,7 +71,9 @@ const HistoryScreen = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.label}</p>
                   <div className="flex items-center gap-2">
-                    <p className="text-xs text-muted-foreground font-mono-data">{item.count} products · {item.date}</p>
+                    <p className="text-xs text-muted-foreground font-mono-data">
+                      {item.count} products · {item.date} · ⏱ {item.processingTime < 60 ? `${item.processingTime}s` : `${Math.floor(item.processingTime / 60)}m ${item.processingTime % 60}s`}
+                    </p>
                     {exportCount > 0 && (
                       <span className="text-[10px] text-primary font-medium" title={lastExport ? `Last exported: ${new Date(lastExport.date).toLocaleDateString()} · ${FORMAT_LABELS[lastExport.format] || lastExport.format}` : ""}>
                         {exportCount} export{exportCount > 1 ? "s" : ""}

@@ -1,5 +1,6 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useStoreMode } from "@/hooks/use-store-mode";
 
 interface HomeScreenProps {
   onStartInvoice: () => void;
@@ -8,16 +9,61 @@ interface HomeScreenProps {
   onStartPriceAdjust: () => void;
 }
 
-const recentActivity = [
-  { type: "invoice" as const, label: "Jantzen Mar26", count: 18, time: "2 days ago" },
-  { type: "sale" as const, label: "Baku 30% off", count: 48, time: "5 days ago" },
-];
-
 const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust }: HomeScreenProps) => {
+  const mode = useStoreMode();
+
+  const recentActivity = [
+    {
+      type: "invoice" as const,
+      label: mode.isLightspeed ? "Lightspeed CSV downloaded — 18 products (Jantzen Mar26)" : "CSV exported — Jantzen Mar26 — 18 products",
+      time: "2 days ago",
+    },
+    {
+      type: "sale" as const,
+      label: mode.isLightspeed ? "Ready to import to Lightspeed POS" : "Baku 30% off — 48 products",
+      time: "5 days ago",
+    },
+  ];
+
   return (
-    <div className="px-4 pt-6 pb-24 animate-fade-in">
+    <div className="px-4 pt-2 pb-24 animate-fade-in">
       <h1 className="text-2xl font-bold font-display mb-1">SkuPilot</h1>
-      <p className="text-muted-foreground text-sm mb-6">Invoice → Shopify in minutes</p>
+      <p className="text-muted-foreground text-sm mb-6">
+        {mode.isLightspeed
+          ? `Invoice → ${mode.targetPlatform} in minutes`
+          : "Invoice → Shopify in minutes"}
+      </p>
+
+      {/* Lightspeed workflow card */}
+      {mode.isLightspeed && (
+        <div className="bg-card rounded-lg border border-purple-500/20 p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Monitor className="w-4 h-4 text-purple-400" />
+            <span className="text-sm font-semibold">Your workflow</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-muted/50 rounded-lg p-2.5 text-center">
+              <span className="text-base block mb-0.5">📄</span>
+              <span className="font-medium">1. Upload invoice</span>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-2.5 text-center">
+              <span className="text-base block mb-0.5">✨</span>
+              <span className="font-medium">2. AI enrich</span>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-2.5 text-center">
+              <span className="text-base block mb-0.5">📥</span>
+              <span className="font-medium">3. Export to {mode.exportLabel}</span>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-2.5 text-center">
+              <span className="text-base block mb-0.5">🖥️</span>
+              <span className="font-medium">4. Import to Lightspeed</span>
+              {mode.isLightspeedShopify && (
+                <span className="text-muted-foreground block text-[10px]">(syncs to Shopify auto)</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Import Invoice Card */}
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
@@ -28,7 +74,7 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold font-display">Import invoice</h2>
             <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Upload a supplier invoice and get a Shopify-ready product file in minutes.
+              Upload a supplier invoice and get a {mode.isLightspeed ? 'Lightspeed' : 'Shopify'}-ready product file in minutes.
             </p>
             <p className="text-xs text-muted-foreground mt-2 font-mono-data">PDF · Excel · CSV · Word</p>
           </div>
@@ -47,9 +93,9 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold font-display">Bulk sale pricing</h2>
             <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Put a collection on sale or restore original prices. Upload your Shopify export.
+              Put a collection on sale or restore original prices. Upload your {mode.isLightspeed ? 'Lightspeed' : 'Shopify'} export.
             </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Upload Shopify product export</p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Upload {mode.isLightspeed ? 'Lightspeed' : 'Shopify'} product export</p>
           </div>
         </div>
         <Button variant="amber" className="w-full mt-4 h-12 text-base" onClick={onStartSale}>
@@ -87,12 +133,24 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
             <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
               Find size holes and sold-out items. Generate JOOR reorder files instantly.
             </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Upload Shopify or JOOR inventory</p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Upload {mode.isLightspeed ? 'Lightspeed' : 'Shopify'} or JOOR inventory</p>
           </div>
         </div>
         <Button variant="outline" className="w-full mt-4 h-12 text-base border-destructive/30 text-destructive hover:bg-destructive/10" onClick={onStartRestock}>
           Start <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
+      </div>
+
+      {/* Stat tiles */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="bg-card rounded-lg border border-border p-4 text-center">
+          <p className="text-2xl font-bold font-display">3</p>
+          <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Lightspeed imports' : 'CSV exports'}</p>
+        </div>
+        <div className="bg-card rounded-lg border border-border p-4 text-center">
+          <p className="text-2xl font-bold font-display">84</p>
+          <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Products ready for Lightspeed' : 'Products imported to Shopify'}</p>
+        </div>
       </div>
 
       {/* Recent Activity */}
@@ -110,9 +168,7 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
               {item.type === "invoice" ? "Invoice" : "Sale"}
             </span>
             <span className="text-sm flex-1 truncate">{item.label}</span>
-            <span className="text-xs text-muted-foreground font-mono-data">
-              {item.count} products · {item.time}
-            </span>
+            <span className="text-xs text-muted-foreground font-mono-data">{item.time}</span>
           </div>
         ))}
       </div>

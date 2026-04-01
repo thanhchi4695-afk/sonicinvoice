@@ -115,7 +115,7 @@ export default function OrderFormFlow({ onBack }: { onBack: () => void }) {
         onBack={() => { setView("list"); setEditingOrder(null); }}
         storeName={cfg.name}
         currencySymbol={currSym}
-        industrySizes={industryCfg?.variantAttributes?.[0] === "Shade" ? [] : undefined}
+        industrySizes={undefined}
       />
     );
   }

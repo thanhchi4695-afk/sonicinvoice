@@ -67,6 +67,10 @@ const Index = () => {
     return <SeasonManager onBack={() => setActiveFlow(null)} />;
   }
 
+  if (activeFlow === "reorder") {
+    return <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Top bar */}

@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Download, Check, AlertTriangle, FileSpreadsheet, FileText, Tag, Package, DollarSign, ChevronLeft, ShoppingCart } from "lucide-react";
+import { Download, Check, AlertTriangle, FileSpreadsheet, FileText, Tag, Package, DollarSign, ChevronLeft, ShoppingCart, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { getEnabledMetafields } from "@/lib/metafields";
 import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed";
+import ShopifyPushFlow from "@/components/ShopifyPushFlow";
+import type { PushProduct } from "@/lib/shopify-api";
 
 export interface ExportProduct {
   name: string;

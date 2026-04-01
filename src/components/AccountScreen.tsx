@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText } from "lucide-react";
+import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList } from "lucide-react";
 import { getCollectionRules, saveCollectionRules, resetCollectionRules, type CollectionRule } from "@/lib/collection-engine";
 import {
   saveConnection, testConnection, getConnection, deleteConnection,
@@ -15,6 +15,7 @@ import { useStoreMode } from "@/hooks/use-store-mode";
 import { loadPreferences, savePreferences, type NotificationPreferences } from "@/hooks/use-notifications";
 import { Switch } from "@/components/ui/switch";
 import { getFormatTemplates, deleteFormatTemplate, SHARED_AU_TEMPLATES, getTemplateQuality, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
+import { getMetafieldConfig, saveMetafieldConfig, type MetafieldDefinition } from "@/lib/metafields";
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");
@@ -322,6 +323,9 @@ const AccountScreen = () => {
 
       {/* Invoice Templates */}
       <InvoiceTemplatesSection />
+
+      {/* Metafields */}
+      <MetafieldsSection />
 
       <Button variant="teal" className="w-full mt-4 h-12 text-base">Save settings</Button>
 
@@ -796,6 +800,80 @@ function InvoiceTemplatesSection() {
             </div>
           ))}
         </div>
+      </div>
+    </Section>
+  );
+}
+
+// ── Metafields Section ─────────────────────────────────────
+function MetafieldsSection() {
+  const [config, setConfig] = useState<MetafieldDefinition[]>(getMetafieldConfig);
+  const [newKey, setNewKey] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+
+  const toggle = (key: string) => {
+    const updated = config.map(m => m.key === key ? { ...m, enabled: !m.enabled } : m);
+    setConfig(updated);
+    saveMetafieldConfig(updated);
+  };
+
+  const addCustom = () => {
+    if (!newKey.trim() || !newLabel.trim()) return;
+    const cleanKey = newKey.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+    if (config.some(m => m.key === cleanKey)) return;
+    const updated = [...config, {
+      key: cleanKey,
+      label: newLabel.trim(),
+      shopifyColumn: `Metafield: custom.${cleanKey} [string]`,
+      enabled: true,
+      isCustom: true,
+    }];
+    setConfig(updated);
+    saveMetafieldConfig(updated);
+    setNewKey("");
+    setNewLabel("");
+  };
+
+  const removeCustom = (key: string) => {
+    const updated = config.filter(m => m.key !== key);
+    setConfig(updated);
+    saveMetafieldConfig(updated);
+  };
+
+  return (
+    <Section title="📋 Metafields">
+      <p className="text-xs text-muted-foreground -mt-1 mb-3">
+        Extra product data fields exported as Shopify metafield columns. Disable fields you don't need to keep exports clean.
+      </p>
+      <div className="space-y-2">
+        {config.map(mf => (
+          <div key={mf.key} className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2.5">
+              <Switch checked={mf.enabled} onCheckedChange={() => toggle(mf.key)} />
+              <div>
+                <p className="text-xs font-medium">{mf.label}</p>
+                <p className="text-[10px] text-muted-foreground font-mono-data">{mf.shopifyColumn}</p>
+              </div>
+            </div>
+            {mf.isCustom && (
+              <button onClick={() => removeCustom(mf.key)} className="text-destructive">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add custom metafield */}
+      <div className="mt-3 pt-3 border-t border-border">
+        <p className="text-xs font-medium mb-2 flex items-center gap-1"><Plus className="w-3 h-3" /> Add custom metafield</p>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <input value={newKey} onChange={e => setNewKey(e.target.value)} placeholder="Field key (e.g. warranty)" className="h-8 rounded-md bg-input border border-border px-2 text-xs" />
+          <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Display label" className="h-8 rounded-md bg-input border border-border px-2 text-xs" />
+        </div>
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addCustom} disabled={!newKey.trim() || !newLabel.trim()}>
+          <Plus className="w-3 h-3 mr-1" /> Add metafield
+        </Button>
       </div>
     </Section>
   );

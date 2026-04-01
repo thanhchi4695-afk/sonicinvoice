@@ -250,10 +250,10 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   ] : [];
 
   const mockProducts = [
-    { name: "Bond Eye Mara One Piece - Black", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready" },
-    { name: "Seafolly Collective Bikini Top - Navy", brand: "Seafolly", type: "Bikini Tops", price: 45.00, rrp: 109.95, status: "ready" },
-    { name: "Baku Riviera High Waist Pant - Ivory", brand: "Baku", type: "Bikini Bottoms", price: 38.00, rrp: 89.95, status: "review" },
-    { name: "Jantzen Retro Racerback - Coral", brand: "Jantzen", type: "One Piece", price: 65.00, rrp: 159.95, status: "ready" },
+    { name: "Bond Eye Mara One Piece - Black", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready", metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" } },
+    { name: "Seafolly Collective Bikini Top - Navy", brand: "Seafolly", type: "Bikini Tops", price: 45.00, rrp: 109.95, status: "ready", metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" } },
+    { name: "Baku Riviera High Waist Pant - Ivory", brand: "Baku", type: "Bikini Bottoms", price: 38.00, rrp: 89.95, status: "review", metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" } },
+    { name: "Jantzen Retro Racerback - Coral", brand: "Jantzen", type: "One Piece", price: 65.00, rrp: 159.95, status: "ready", metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" } },
   ];
 
   return (
@@ -879,8 +879,12 @@ function LightspeedRestockSection({ products, supplierName }: {
   );
 }
 
-const ProductCard = ({ product, onPreview }: { product: { name: string; brand: string; type: string; price: number; rrp: number; status: string }; onPreview?: () => void }) => {
+const ProductCard = ({ product, onPreview }: { product: { name: string; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string> }; onPreview?: () => void }) => {
   const [expanded, setExpanded] = useState(false);
+  const [showMeta, setShowMeta] = useState(false);
+  const enabledMeta = (() => { try { return (JSON.parse(localStorage.getItem("metafield_config") || "[]") as { key: string; label: string; enabled: boolean }[]).filter(m => m.enabled); } catch { return []; } })();
+  const meta = product.metafields || {};
+
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       <button onClick={() => setExpanded(!expanded)} className="w-full px-4 py-3 text-left">
@@ -922,6 +926,31 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; brand: s
             <input type="number" defaultValue={product.rrp} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="RRP" />
           </div>
           <textarea defaultValue="Stylish swimwear piece perfect for summer." className="w-full h-20 rounded-md bg-input border border-border px-3 py-2 text-sm resize-none" placeholder="Description" />
+
+          {/* Metafields section */}
+          {enabledMeta.length > 0 && (
+            <div>
+              <button onClick={() => setShowMeta(!showMeta)} className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+                <ChevronDown className={`w-3 h-3 transition-transform ${showMeta ? "rotate-180" : ""}`} />
+                📋 Product details ({Object.values(meta).filter(Boolean).length}/{enabledMeta.length} fields)
+              </button>
+              {showMeta && (
+                <div className="space-y-2 bg-muted/30 rounded-lg p-3">
+                  {enabledMeta.map(mf => (
+                    <div key={mf.key}>
+                      <label className="text-[10px] text-muted-foreground mb-0.5 block">{mf.label}</label>
+                      <input
+                        defaultValue={meta[mf.key] || ""}
+                        placeholder={`Enter ${mf.label.toLowerCase()}`}
+                        className="w-full h-8 rounded-md bg-input border border-border px-2 text-xs"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2">
             {onPreview && <Button variant="outline" size="sm" onClick={onPreview}><Eye className="w-3.5 h-3.5 mr-1" /> Preview</Button>}
             <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>

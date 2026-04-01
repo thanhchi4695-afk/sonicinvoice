@@ -142,6 +142,26 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* Order Form Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <FileText className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Order forms</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Create professional wholesale order forms to send to your suppliers.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">PDF · CSV · email text</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartOrderForm}>
+          Start <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+      </div>
+
       {/* Stat tiles */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         <div className="bg-card rounded-lg border border-border p-4 text-center">

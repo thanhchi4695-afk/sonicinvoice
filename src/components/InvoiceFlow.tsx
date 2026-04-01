@@ -537,6 +537,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     sku: g.variants[0]?.sku || "",
     brand: g.brand,
     type: g.type,
+    colour: g.colour || "",
+    size: g.size || "",
     price: g.price,
     rrp: g.rrp,
     status: g.status,

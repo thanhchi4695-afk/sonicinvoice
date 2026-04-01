@@ -204,6 +204,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* Supplier Performance Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Users className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Supplier performance</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Track invoices, match rates, and cost history per supplier.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Invoices · products · pricing trends</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartSuppliers}>
+          View suppliers <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
       {/* Stock by Location */}
       {(() => {
         const locs = getStoreLocations();

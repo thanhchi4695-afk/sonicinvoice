@@ -130,7 +130,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
           Handle: handle, Title: `${p.brand} ${p.name}`, "Body (HTML)": `<p>${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.</p>`,
           Vendor: p.brand, Type: p.type, Tags: `${p.brand}, ${p.type}, New Arrival`,
           Published: "TRUE", "Variant Price": p.rrp.toFixed(2), "Variant Compare At Price": "",
-          "Variant SKU": "", "Image Src": "", Status: "draft",
+          "Variant SKU": p.sku || "", "Variant Barcode": p.barcode || "", "Image Src": "", Status: "draft",
           "SEO Title": `${p.name} | ${p.brand}`.slice(0, 70),
           "SEO Description": `Shop ${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.`.slice(0, 160),
         };

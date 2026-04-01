@@ -291,6 +291,43 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
+          {/* Template recognition banner */}
+          {matchedTemplate && showDetails && useTemplate === null && (
+            <div className="mt-3 bg-primary/5 border border-primary/20 rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-4 h-4 text-primary" />
+                <span className="text-xs font-semibold text-primary">
+                  {matchedTemplate.isShared ? "🇦🇺 AU shared template" : "Saved template"} recognised
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">
+                {matchedTemplate.supplier} template found — parsing with saved format
+                {matchedTemplate.successCount > 0 ? ` (${matchedTemplate.successCount} successful uses)` : ""}.
+              </p>
+              <div className="grid grid-cols-2 gap-1 text-[11px] bg-muted/50 rounded-md p-2 mb-2">
+                <span className="text-muted-foreground">File type:</span><span>{matchedTemplate.fileType.toUpperCase()}</span>
+                <span className="text-muted-foreground">Header row:</span><span>Row {matchedTemplate.headerRow}</span>
+                {Object.entries(matchedTemplate.columns).filter(([, v]) => v).map(([k, v]) => (
+                  <><span key={k} className="text-muted-foreground">{COLUMN_LABELS[k as keyof ColumnMapping] || k}:</span><span>Column {v}</span></>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" className="h-7 text-xs" onClick={() => setUseTemplate(true)}>
+                  <Zap className="w-3 h-3 mr-1" /> Use template
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setUseTemplate(false)}>
+                  Parse fresh instead
+                </Button>
+              </div>
+            </div>
+          )}
+          {useTemplate === true && matchedTemplate && (
+            <div className="mt-2 bg-primary/5 border border-primary/20 rounded-lg p-2 flex items-center gap-2">
+              <Zap className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs text-primary font-medium">⚡ Using {matchedTemplate.supplier} template — expected ~40% faster</span>
+            </div>
+          )}
+
           {/* Custom AI Instructions */}
           <CustomInstructionsField
             value={customInstructions}

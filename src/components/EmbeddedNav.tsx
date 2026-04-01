@@ -32,6 +32,7 @@ const navSections = [
     title: "Settings",
     items: [
       { id: "tools", label: "Tools & Feeds", icon: Wrench, type: "tab" as const },
+      { id: "google_ads", label: "Google Ads Guide", icon: Megaphone, type: "tab" as const },
       { id: "help", label: "Help Centre", icon: HelpCircle, type: "tab" as const },
       { id: "account", label: "Account", icon: User, type: "tab" as const },
     ],

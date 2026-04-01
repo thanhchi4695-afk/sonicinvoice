@@ -527,7 +527,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       rrp: g.rrp,
       seoTitle: g.status !== "pending" ? `${g.name} | ${g.brand}` : undefined,
       hasTags: g.status !== "pending",
-      matchSource: g.variants[0]?.sku ? "sku" : "name",
+      matchSource: g.matchSource || (g.barcode ? "barcode" : g.variants[0]?.sku ? "sku" : "name"),
       isPending: g.status === "pending",
     });
   });

@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
-import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor } from "lucide-react";
+import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PriceLookup from "@/components/PriceLookup";
+import SupplierEmails from "@/components/SupplierEmails";
 import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
@@ -18,6 +19,7 @@ import {
 
 const tools = [
   { id: "price_lookup", icon: DollarSign, label: "Price lookup", desc: "Look up retail prices via APIs", color: "text-success" },
+  { id: "supplier_emails", icon: Mail, label: "Supplier emails", desc: "Email templates for suppliers", color: "text-primary" },
   { id: "tags", icon: Tag, label: "Tag builder", desc: "Build Shopify tags manually", color: "text-primary" },
   { id: "seo", icon: Search, label: "SEO writer", desc: "Generate SEO title + meta description", color: "text-primary" },
   { id: "brands", icon: Globe, label: "Brand reference", desc: "Brand website directory", color: "text-primary" },
@@ -641,6 +643,7 @@ const ToolsScreen = () => {
   const [instructions, setInstructions] = useState("");
 
   if (activeTool === "price_lookup") return <PriceLookup onBack={() => setActiveTool(null)} />;
+  if (activeTool === "supplier_emails") return <SupplierEmails onBack={() => setActiveTool(null)} />;
   if (activeTool === "seo") return <SeoWriterPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "tags") return <TagBuilderPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "brands") return <BrandDirectoryPanel onBack={() => setActiveTool(null)} />;

@@ -1,4 +1,4 @@
-import { Home, FolderOpen, Wrench, User, Monitor, BarChart3, HelpCircle } from "lucide-react";
+import { Home, FolderOpen, Wrench, User, Monitor, BarChart3, HelpCircle, Megaphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoreMode } from "@/hooks/use-store-mode";
 

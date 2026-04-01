@@ -193,7 +193,9 @@ export function generateGoogleFeedXML(products: GoogleFeedProduct[], storeName?:
       <g:color>${escXml(item.color)}</g:color>` : ''}${item.size ? `
       <g:size>${escXml(item.size)}</g:size>` : ''}
       <g:gender>${item.gender}</g:gender>
-      <g:age_group>${item.age_group}</g:age_group>
+      <g:age_group>${item.age_group}</g:age_group>${item.cost_of_goods_sold ? `
+      <g:cost_of_goods_sold>${escXml(item.cost_of_goods_sold)}</g:cost_of_goods_sold>` : ''}${item.auto_pricing_min_price ? `
+      <g:auto_pricing_min_price>${escXml(item.auto_pricing_min_price)}</g:auto_pricing_min_price>` : ''}
       <g:custom_label_0>${escXml(item.custom_label_0)}</g:custom_label_0>
       <g:custom_label_1>${escXml(item.custom_label_1)}</g:custom_label_1>
       <g:custom_label_2>${escXml(item.custom_label_2)}</g:custom_label_2>

@@ -110,17 +110,7 @@ export function generateSeoTitle(
 }
 
 // ── SEO Description Generator ──────────────────────────────
-const DESC_TEMPLATES: Record<string, string> = {
-  swimwear: 'Shop the {product} by {brand}. {features}New arrivals at {store} {city}.',
-  beauty: 'Discover {product} by {brand}. {features}Shop now at {store} with free delivery.',
-  fashion: '{brand} {product}. {features}Shop the latest at {store}.',
-  clothing: '{brand} {product}. {features}Shop the latest at {store}.',
-  jewellery: '{brand} {product}. {features}Beautiful jewellery at {store}.',
-  electronics: '{product} by {brand}. {features}Shop at {store} — fast delivery.',
-  health: '{product} by {brand}. {features}Shop at {store}.',
-  home: '{product} by {brand}. {features}Shop homewares at {store}.',
-  general: '{product} by {brand}. {features}{cta} at {store}.',
-};
+// DESC_TEMPLATES now derived from industry-config
 
 export function getDefaultDescTemplate(industry: string): string {
   return DESC_TEMPLATES[industry] || DESC_TEMPLATES.general;

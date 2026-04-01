@@ -1,6 +1,8 @@
 // Dynamic AI Prompt Builder — replaces all hardcoded store/industry references
 
 // ── Store Config ───────────────────────────────────────────
+export type StoreType = 'shopify' | 'lightspeed_shopify' | 'lightspeed' | 'other';
+
 export interface StoreConfig {
   name: string;
   url: string;
@@ -10,6 +12,7 @@ export interface StoreConfig {
   currencySymbol: string;
   locale: string;
   industry: string;
+  storeType: StoreType;
   seoTitleTemplate: string;
   seoDescriptionTemplate: string;
   enrichmentSources: string[];
@@ -57,6 +60,7 @@ const DEFAULT_STORE: StoreConfig = {
   currencySymbol: '$',
   locale: 'AU',
   industry: 'general',
+  storeType: 'shopify',
   seoTitleTemplate: '{product} | {brand} | {store_name}',
   seoDescriptionTemplate: 'Shop {product} by {brand} at {store_name}. Free shipping on orders over $100.',
   enrichmentSources: [],

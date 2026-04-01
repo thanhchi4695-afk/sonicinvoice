@@ -7,13 +7,15 @@ import {
   getLocations, updateConnectionSettings, ShopifyConnection,
 } from "@/lib/shopify-api";
 import { getApiKeys, saveApiKeys, getCacheStats, clearCache, type PriceApiKeys } from "@/lib/price-intelligence";
-import { getStoreConfig, saveStoreConfig, getIndustryConfig } from "@/lib/prompt-builder";
+import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType } from "@/lib/prompt-builder";
 import { SEO_TITLE_PRESETS, getCtaPhrases, saveCtaPhrases, generateSeoTitle, generateSeoDescription } from "@/lib/seo-engine";
 import { CURRENCIES, LOCALES } from "@/lib/i18n";
+import { useStoreMode } from "@/hooks/use-store-mode";
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");
   const [currency, setCurrency] = useState("AUD");
+  const [storeType, setStoreType] = useState<StoreType>("shopify");
   const [markup, setMarkup] = useState("2.35");
   const [rounding, setRounding] = useState("nearest_05");
 
@@ -33,6 +35,11 @@ const AccountScreen = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    const cfg = getStoreConfig();
+    setStoreName(cfg.name || '');
+    setCurrency(cfg.currency || 'AUD');
+    setStoreType(cfg.storeType || 'shopify');
+
     getConnection().then((conn) => {
       if (conn) {
         setShopifyUrl(conn.store_url);
@@ -116,6 +123,14 @@ const AccountScreen = () => {
             options={LOCALES.map(l => ({ v: l.id, l: `${l.flag} ${l.country}` }))}
           />
         </div>
+        <SelectField label="Store type / POS" value={storeType} onChange={(v) => { setStoreType(v as StoreType); saveStoreConfig({ storeType: v as StoreType }); }}
+          options={[
+            { v: "shopify", l: "🛍️ Shopify only" },
+            { v: "lightspeed_shopify", l: "🖥️ Lightspeed + Shopify" },
+            { v: "lightspeed", l: "🖥️ Lightspeed POS only" },
+            { v: "other", l: "📦 Other / Not sure" },
+          ]}
+        />
       </Section>
 
       {/* Pricing Rules */}

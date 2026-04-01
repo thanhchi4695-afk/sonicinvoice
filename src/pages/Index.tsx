@@ -11,12 +11,14 @@ import BulkSaleFlow from "@/components/BulkSaleFlow";
 import RestockAnalytics from "@/components/RestockAnalytics";
 import PriceAdjustmentPanel from "@/components/PriceAdjustmentPanel";
 import PriceLookup from "@/components/PriceLookup";
+import { useStoreMode } from "@/hooks/use-store-mode";
 
 const Index = () => {
   const [authed, setAuthed] = useState(false);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
   const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | null>(null);
+  const mode = useStoreMode();
 
   if (!authed) {
     return <AuthScreen onAuth={() => setAuthed(true)} />;
@@ -48,6 +50,17 @@ const Index = () => {
 
   return (
     <div className="min-h-screen">
+      {/* Mode badge top bar */}
+      <div className="flex items-center justify-end px-4 pt-3 pb-0">
+        <button
+          onClick={() => setActiveTab("account")}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${mode.modeBadge.color}`}
+        >
+          <span>{mode.modeBadge.emoji}</span>
+          {mode.modeBadge.label}
+        </button>
+      </div>
+
       {activeTab === "home" && (
         <HomeScreen
           onStartInvoice={() => setActiveFlow("invoice")}

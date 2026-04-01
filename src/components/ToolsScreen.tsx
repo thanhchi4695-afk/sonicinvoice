@@ -1,8 +1,9 @@
 import { useState, useRef } from "react";
-import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download } from "lucide-react";
+import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PriceLookup from "@/components/PriceLookup";
 import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
+import { useStoreMode } from "@/hooks/use-store-mode";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
 import {
   getTagConfig, saveTagConfig, resetTagConfig, getIndustryTagDefaults,
@@ -66,6 +67,14 @@ function TagPreview({ config, onBack, onNavigate, onReset }: {
         <button onClick={onBack} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
         <h2 className="text-lg font-semibold font-display">🏷️ Tag Builder</h2>
       </div>
+
+      {/* Lightspeed tag note */}
+      {(() => { const m = getStoreConfig(); const isLS = m.storeType === 'lightspeed' || m.storeType === 'lightspeed_shopify'; return isLS ? (
+        <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 mb-4 flex items-start gap-2">
+          <Monitor className="w-4 h-4 text-purple-400 mt-0.5 shrink-0" />
+          <p className="text-xs text-muted-foreground">Tags generated here will appear in Lightspeed POS.{m.storeType === 'lightspeed_shopify' ? ' The same tags will sync to Shopify automatically.' : ''}</p>
+        </div>
+      ) : null; })()}
 
       <div className="flex gap-2 mb-4 overflow-x-auto">
         {([

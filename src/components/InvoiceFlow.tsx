@@ -844,7 +844,6 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; brand: s
                 </div>
               ) : null;
             })()}
-            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />

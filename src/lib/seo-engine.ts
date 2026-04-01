@@ -36,7 +36,7 @@ export function getCtaPhrases(industry?: string): string[] {
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch {}
-  return INDUSTRY_CTA_DEFAULTS[industry || 'general'] || INDUSTRY_CTA_DEFAULTS.general;
+  return getIndustryCtas(industry || 'general');
 }
 
 export function saveCtaPhrases(phrases: string[]) {

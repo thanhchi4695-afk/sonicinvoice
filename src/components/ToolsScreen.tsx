@@ -68,6 +68,14 @@ function TagPreview({ config, onBack, onNavigate, onReset }: {
         <h2 className="text-lg font-semibold font-display">🏷️ Tag Builder</h2>
       </div>
 
+      {/* Lightspeed tag note */}
+      {(() => { const m = getStoreConfig(); const isLS = m.storeType === 'lightspeed' || m.storeType === 'lightspeed_shopify'; return isLS ? (
+        <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 mb-4 flex items-start gap-2">
+          <Monitor className="w-4 h-4 text-purple-400 mt-0.5 shrink-0" />
+          <p className="text-xs text-muted-foreground">Tags generated here will appear in Lightspeed POS.{m.storeType === 'lightspeed_shopify' ? ' The same tags will sync to Shopify automatically.' : ''}</p>
+        </div>
+      ) : null; })()}
+
       <div className="flex gap-2 mb-4 overflow-x-auto">
         {([
           { key: 'types' as const, label: 'Product Types', count: config.productTypes.length },

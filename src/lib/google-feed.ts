@@ -193,8 +193,8 @@ ${xmlItems}
 </rss>`;
 }
 
-export function generateGoogleFeedTSV(products: GoogleFeedProduct[]): string {
-  const items = products.map(p => buildGoogleFeedItem(p));
+export function generateGoogleFeedTSV(products: GoogleFeedProduct[], saleDateStr?: string): string {
+  const items = products.map(p => buildGoogleFeedItem(p, saleDateStr));
   const headers = [
     'id', 'title', 'description', 'link', 'image_link',
     'price', 'sale_price', 'availability', 'condition',

@@ -11,6 +11,8 @@ export interface ExportProduct {
   name: string;
   brand: string;
   type: string;
+  colour?: string;
+  size?: string;
   price: number;
   rrp: number;
   status: string;
@@ -164,12 +166,14 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
     } else if (selectedFormat === "google_xml") {
       const xml = generateGoogleFeedXML(prods.map(p => ({
         name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
+        colour: p.colour, size: p.size,
         tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
       })), supplierName);
       downloadFile(xml, filename, "application/xml;charset=utf-8");
     } else if (selectedFormat === "google_tsv") {
       const tsv = generateGoogleFeedTSV(prods.map(p => ({
         name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
+        colour: p.colour, size: p.size,
         tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
       })));
       downloadFile("\uFEFF" + tsv, filename, "text/tab-separated-values;charset=utf-8");

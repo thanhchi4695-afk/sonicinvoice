@@ -432,6 +432,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     name: string;
     brand: string;
     type: string;
+    colour: string;
+    size: string;
     price: number;
     rrp: number;
     status: string;
@@ -454,6 +456,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         price: 89.95,
         rrp: 219.95,
         status: "ready",
+        colour: "Black / Navy",
+        size: "8-12",
         metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" },
         isGrouped: true,
         barcode: "9350444555666",
@@ -475,6 +479,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         price: 45.00,
         rrp: 109.95,
         status: "ready",
+        colour: "Navy",
+        size: "One Size",
         metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" },
         isGrouped: false,
         barcode: "9350987654321",
@@ -489,6 +495,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         price: 38.00,
         rrp: 89.95,
         status: "review",
+        colour: "Ivory",
+        size: "One Size",
         metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" },
         isGrouped: false,
         barcode: "",
@@ -503,6 +511,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         price: 65.00,
         rrp: 159.95,
         status: "ready",
+        colour: "Coral",
+        size: "8-12",
         metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" },
         isGrouped: true,
         barcode: "9351234567890",
@@ -527,6 +537,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     sku: g.variants[0]?.sku || "",
     brand: g.brand,
     type: g.type,
+    colour: g.colour || "",
+    size: g.size || "",
     price: g.price,
     rrp: g.rrp,
     status: g.status,
@@ -607,6 +619,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       name: `${group.name} - ${v.option2Value || v.option1Value}`,
       brand: group.brand,
       type: group.type,
+      colour: v.option2Value || group.colour || "",
+      size: v.option1Value || group.size || "",
       price: v.price,
       rrp: v.rrp,
       status: group.status,
@@ -632,6 +646,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       name: base.name.replace(/\s*-\s*(Black|Navy|Ivory|Coral|White|Red|Blue|Green|Pink|S|M|L|XL|8|10|12|14|16).*$/i, "").trim(),
       brand: base.brand,
       type: base.type,
+      colour: selected.map(s => s.colour).filter(Boolean).join(" / ") || "",
+      size: selected.map(s => s.size).filter(Boolean).join(", ") || "",
       price: base.price,
       rrp: base.rrp,
       status: base.status,
@@ -1869,7 +1885,7 @@ const VariantGroupCard = ({ group, onSplit, onPreview }: {
   );
 };
 
-const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; barcode?: string; matchSource?: MatchSource; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
+const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; barcode?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [savedToBarcodeCatalog, setSavedToBarcodeCatalog] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
@@ -1895,7 +1911,10 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate">{product.name}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {product.brand} · {product.type} · ${product.rrp.toFixed(2)}
+              {product.brand} · {product.type}
+              {product.colour && <> · <span className="text-foreground">{product.colour}</span></>}
+              {product.size && <> · <span className="font-mono-data">{product.size}</span></>}
+              {" · "}${product.rrp.toFixed(2)}
               {product.sku && <> · <span className="font-mono-data">{product.sku}</span></>}
             </p>
             {/* Barcode display */}
@@ -1952,6 +1971,10 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
           <div className="grid grid-cols-2 gap-3">
             <input defaultValue={product.brand} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Brand" />
             <input defaultValue={product.type} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Type" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <input defaultValue={product.colour || ""} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Colour" />
+            <input defaultValue={product.size || ""} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Size" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <input type="number" defaultValue={product.price} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Cost" />

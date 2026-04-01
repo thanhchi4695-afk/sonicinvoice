@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Download, Check, AlertTriangle, FileSpreadsheet, FileText, Tag, Package, DollarSign, ChevronLeft } from "lucide-react";
+import { Download, Check, AlertTriangle, FileSpreadsheet, FileText, Tag, Package, DollarSign, ChevronLeft, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { getEnabledMetafields } from "@/lib/metafields";
+import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed";
 
 export interface ExportProduct {
   name: string;
@@ -27,7 +28,7 @@ interface ExportReviewScreenProps {
   onBack: () => void;
 }
 
-type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "tags_only" | "xlsx" | "summary_pdf";
+type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "tags_only" | "xlsx" | "summary_pdf" | "google_xml" | "google_tsv";
 
 const FORMAT_CARDS: { id: ExportFormat; icon: React.ReactNode; label: string; desc: string; best: string }[] = [
   { id: "shopify_full", icon: <FileText className="w-5 h-5 text-primary" />, label: "Shopify CSV (Full)", desc: "Complete CSV with all fields for Shopify bulk import. Includes: title, description, type, vendor, tags, SEO, price, compare-at price, cost, images.", best: "New products, full product setup" },
@@ -36,6 +37,8 @@ const FORMAT_CARDS: { id: ExportFormat; icon: React.ReactNode; label: string; de
   { id: "tags_only", icon: <Tag className="w-5 h-5 text-primary" />, label: "Tags only CSV", desc: "CSV with title and tags only. For updating tags on products already in Shopify.", best: "Tag cleanup on existing catalog" },
   { id: "xlsx", icon: <FileSpreadsheet className="w-5 h-5 text-primary" />, label: "Excel (.xlsx)", desc: "Same data as Shopify CSV but in Excel format. Useful for manual review or sharing with your accountant.", best: "Finance review, manual checking" },
   { id: "summary_pdf", icon: <FileText className="w-5 h-5 text-secondary" />, label: "Summary PDF", desc: "A printable summary of the invoice — supplier, date, products, quantities, costs, and totals.", best: "Filing, accounting, manager review" },
+  { id: "google_xml", icon: <ShoppingCart className="w-5 h-5 text-primary" />, label: "Google Shopping feed (XML)", desc: "Google Merchant Center-ready XML product feed with categories, gender, age group, and custom labels.", best: "Google Shopping ads, Merchant Center" },
+  { id: "google_tsv", icon: <ShoppingCart className="w-5 h-5 text-primary" />, label: "Google Shopping feed (TSV)", desc: "Tab-separated feed for Google Merchant Center. Same data as XML but in spreadsheet-friendly format.", best: "Google Merchant Center bulk upload" },
 ];
 
 function generateFilename(supplier: string, format: ExportFormat): string {
@@ -50,8 +53,10 @@ function generateFilename(supplier: string, format: ExportFormat): string {
     tags_only: "tags",
     xlsx: "review",
     summary_pdf: "summary",
+    google_xml: "google_feed",
+    google_tsv: "google_feed",
   };
-  const ext = format === "xlsx" ? "xlsx" : format === "summary_pdf" ? "pdf" : "csv";
+  const ext = format === "xlsx" ? "xlsx" : format === "summary_pdf" ? "pdf" : format === "google_xml" ? "xml" : format === "google_tsv" ? "tsv" : "csv";
   return `${tag}_${month}_${typeMap[format]}_${date}.${ext}`;
 }
 
@@ -156,6 +161,18 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
         Title: `${p.brand} ${p.name}`, Tags: `${p.brand}, ${p.type}, New Arrival`,
       }));
       downloadFile("\uFEFF" + Papa.unparse(rows), filename);
+    } else if (selectedFormat === "google_xml") {
+      const xml = generateGoogleFeedXML(prods.map(p => ({
+        name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
+        tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
+      })), supplierName);
+      downloadFile(xml, filename, "application/xml;charset=utf-8");
+    } else if (selectedFormat === "google_tsv") {
+      const tsv = generateGoogleFeedTSV(prods.map(p => ({
+        name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
+        tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
+      })));
+      downloadFile("\uFEFF" + tsv, filename, "text/tab-separated-values;charset=utf-8");
     } else if (selectedFormat === "xlsx" || selectedFormat === "summary_pdf") {
       // Fallback to CSV for now
       const rows = prods.map(p => ({

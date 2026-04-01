@@ -22,7 +22,7 @@ export interface SeoResult {
 }
 
 // ── CTA Storage ────────────────────────────────────────────
-const CTA_KEY = 'seo_cta_phrases_skupilot';
+const CTA_KEY = 'seo_cta_phrases_sonic_invoice';
 
 function getIndustryCtas(industry: string): string[] {
   return getIndustryDefinition(industry).seoCtas;

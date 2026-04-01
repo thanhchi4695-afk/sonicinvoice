@@ -45,7 +45,7 @@ const quickStartGuides = [
   {
     title: "How RRP lookup works",
     steps: [
-      "For each product, SkuPilot searches the brand's official website",
+      "For each product, Sonic Invoice searches the brand's official website",
       "Then checks trusted retail aggregators for your region",
       "It always uses local currency prices matching your store config",
       "Amazon and eBay are never used as RRP sources",
@@ -67,7 +67,7 @@ const quickStartGuides = [
 const faqItems = [
   {
     q: "Does this replace Stocky?",
-    a: "Yes. SkuPilot replaces Stocky's inventory receiving workflow and adds AI invoice scanning, RRP lookup, SEO generation, and Shopify tag automation that Stocky never had.",
+    a: "Yes. Sonic Invoice replaces Stocky's inventory receiving workflow and adds AI invoice scanning, RRP lookup, SEO generation, and Shopify tag automation that Stocky never had.",
   },
   {
     q: "Will anything push to Shopify automatically?",
@@ -79,7 +79,7 @@ const faqItems = [
   },
   {
     q: "How does the RRP lookup work?",
-    a: "For each product, SkuPilot searches the brand's official website, then trusted retail aggregators for your region. It always uses local currency prices and never Amazon or eBay.",
+    a: "For each product, Sonic Invoice searches the brand's official website, then trusted retail aggregators for your region. It always uses local currency prices and never Amazon or eBay.",
   },
   {
     q: "How accurate is the tag generation?",
@@ -211,17 +211,17 @@ const HelpCentre = () => {
       <section className="mb-6">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Contact & support</h2>
         <div className="space-y-2">
-          <a href="mailto:support@skupilot.app" className="flex items-center gap-3 bg-card rounded-lg border border-border px-4 py-3 text-sm hover:bg-muted/50 transition-colors">
+          <a href="mailto:support@sonic_invoice.app" className="flex items-center gap-3 bg-card rounded-lg border border-border px-4 py-3 text-sm hover:bg-muted/50 transition-colors">
             <Mail className="w-4 h-4 text-primary" />
             <span>Contact support</span>
             <ExternalLink className="w-3 h-3 text-muted-foreground ml-auto" />
           </a>
-          <a href="mailto:demo@skupilot.app?subject=Demo%20request" className="flex items-center gap-3 bg-card rounded-lg border border-border px-4 py-3 text-sm hover:bg-muted/50 transition-colors">
+          <a href="mailto:demo@sonic_invoice.app?subject=Demo%20request" className="flex items-center gap-3 bg-card rounded-lg border border-border px-4 py-3 text-sm hover:bg-muted/50 transition-colors">
             <Calendar className="w-4 h-4 text-primary" />
             <span>Book a demo</span>
             <ExternalLink className="w-3 h-3 text-muted-foreground ml-auto" />
           </a>
-          <a href="mailto:bugs@skupilot.app?subject=Bug%20report%20-%20SkuPilot" className="flex items-center gap-3 bg-card rounded-lg border border-border px-4 py-3 text-sm hover:bg-muted/50 transition-colors">
+          <a href="mailto:bugs@sonic_invoice.app?subject=Bug%20report%20-%20Sonic Invoice" className="flex items-center gap-3 bg-card rounded-lg border border-border px-4 py-3 text-sm hover:bg-muted/50 transition-colors">
             <Bug className="w-4 h-4 text-destructive" />
             <span>Report a bug</span>
             <ExternalLink className="w-3 h-3 text-muted-foreground ml-auto" />
@@ -230,7 +230,7 @@ const HelpCentre = () => {
       </section>
 
       <p className="text-center text-[10px] text-muted-foreground/50 mt-8">
-        SkuPilot v1.0 · Built for fashion retail
+        Sonic Invoice v1.0 · Built for fashion retail
       </p>
     </div>
   );

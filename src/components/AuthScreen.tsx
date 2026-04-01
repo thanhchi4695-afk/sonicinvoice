@@ -19,7 +19,7 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 animate-fade-in">
       <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-bold font-display text-center mb-1">SkuPilot</h1>
+        <h1 className="text-3xl font-bold font-display text-center mb-1">Sonic Invoice</h1>
         <p className="text-muted-foreground text-sm text-center mb-8">Invoice → Shopify in minutes</p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -51,7 +51,7 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
         )}
 
         <button onClick={() => setIsSignUp(!isSignUp)} className="w-full mt-6 text-sm text-primary text-center font-medium">
-          {isSignUp ? "Already have an account? Sign in" : "New to SkuPilot? Create account"}
+          {isSignUp ? "Already have an account? Sign in" : "New to Sonic Invoice? Create account"}
         </button>
       </div>
     </div>

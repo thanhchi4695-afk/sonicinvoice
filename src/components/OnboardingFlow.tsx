@@ -103,13 +103,13 @@ const sampleInvoices: Record<string, { vendor: string; lines: { name: string; va
 };
 
 const doneMessages: Record<string, { emoji: string; text: string }> = {
-  swimwear: { emoji: "🏄", text: "SkuPilot knows your brands, your tags, and your pricing sources. Let's go." },
-  beauty: { emoji: "✨", text: "SkuPilot knows your shades, your formulas, and your beauty brands. Let's go." },
-  fashion: { emoji: "👗", text: "SkuPilot knows your sizing, your styles, and your fashion brands. Let's go." },
-  electronics: { emoji: "📱", text: "SkuPilot knows your specs, your models, and your tech brands. Let's go." },
-  health: { emoji: "💪", text: "SkuPilot knows your supplements, your ingredients, and your health brands. Let's go." },
-  home: { emoji: "🏠", text: "SkuPilot knows your décor styles, your materials, and your home brands. Let's go." },
-  general: { emoji: "🛍️", text: "SkuPilot is configured for your store. Process your first invoice to get started." },
+  swimwear: { emoji: "🏄", text: "Sonic Invoice knows your brands, your tags, and your pricing sources. Let's go." },
+  beauty: { emoji: "✨", text: "Sonic Invoice knows your shades, your formulas, and your beauty brands. Let's go." },
+  fashion: { emoji: "👗", text: "Sonic Invoice knows your sizing, your styles, and your fashion brands. Let's go." },
+  electronics: { emoji: "📱", text: "Sonic Invoice knows your specs, your models, and your tech brands. Let's go." },
+  health: { emoji: "💪", text: "Sonic Invoice knows your supplements, your ingredients, and your health brands. Let's go." },
+  home: { emoji: "🏠", text: "Sonic Invoice knows your décor styles, your materials, and your home brands. Let's go." },
+  general: { emoji: "🛍️", text: "Sonic Invoice is configured for your store. Process your first invoice to get started." },
 };
 
 const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
@@ -157,7 +157,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
         {/* ── Step 1: Industry ──────────────────────────── */}
         {step === 1 && (
           <div className="pt-4">
-            <h1 className="text-2xl font-bold font-display text-center mb-1">Welcome to SkuPilot 👋</h1>
+            <h1 className="text-2xl font-bold font-display text-center mb-1">Welcome to Sonic Invoice 👋</h1>
             <p className="text-muted-foreground text-sm text-center mb-6">What kind of store do you run?</p>
             <div className="grid grid-cols-3 gap-2.5">
               {industries.map(ind => (

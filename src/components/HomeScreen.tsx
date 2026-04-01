@@ -57,7 +57,7 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4 flex items-start gap-3">
           <span className="text-lg shrink-0">🛍</span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">SkuPilot is coming to the Shopify App Store.</p>
+            <p className="text-sm font-medium">Sonic Invoice is coming to the Shopify App Store.</p>
             <p className="text-xs text-muted-foreground mt-0.5">Install directly from Shopify for automatic connection and one-click setup.</p>
             <button className="text-xs text-primary font-medium mt-1.5 hover:underline">Join the waitlist →</button>
           </div>
@@ -67,7 +67,7 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </div>
       )}
 
-      <h1 className="text-2xl font-bold font-display mb-1">SkuPilot</h1>
+      <h1 className="text-2xl font-bold font-display mb-1">Sonic Invoice</h1>
       <p className="text-muted-foreground text-sm mb-4">
         {mode.isLightspeed
           ? `Invoice → ${mode.targetPlatform} in minutes`
@@ -409,12 +409,12 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
 
             {/* Time saved detail */}
             <div className="bg-muted/50 rounded-lg p-3 mt-3 text-xs">
-              <p className="font-semibold mb-1.5 flex items-center gap-1"><Clock className="w-3 h-3" /> How much time has SkuPilot saved you?</p>
+              <p className="font-semibold mb-1.5 flex items-center gap-1"><Clock className="w-3 h-3" /> How much time has Sonic Invoice saved you?</p>
               <div className="grid grid-cols-2 gap-y-1 text-muted-foreground">
                 <span>Invoices processed:</span><span className="font-mono-data text-foreground">{totalInvoices}</span>
                 <span>Total product lines:</span><span className="font-mono-data text-foreground">{totalLines}</span>
                 <span>Manual time estimate:</span><span className="font-mono-data text-foreground">~{Math.round(manualMinutes / 60)}h</span>
-                <span>SkuPilot time:</span><span className="font-mono-data text-foreground">~{(totalProcTime / 60).toFixed(0)}m</span>
+                <span>Sonic Invoice time:</span><span className="font-mono-data text-foreground">~{(totalProcTime / 60).toFixed(0)}m</span>
                 <span>Time saved:</span><span className="font-mono-data text-success font-semibold">~{savedHours} hours ✅</span>
               </div>
               <p className="text-[10px] text-muted-foreground/70 mt-2">Based on 8 min/product for manual entry (industry average for fashion boutiques)</p>

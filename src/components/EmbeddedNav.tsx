@@ -41,7 +41,7 @@ const EmbeddedNav = ({ activeTab, onTabChange, onFlowChange }: EmbeddedNavProps)
   return (
     <aside className="w-56 shrink-0 border-r border-border bg-card/50 h-full overflow-y-auto">
       <div className="px-4 py-4">
-        <h2 className="text-sm font-bold font-display text-foreground">SkuPilot</h2>
+        <h2 className="text-sm font-bold font-display text-foreground">Sonic Invoice</h2>
         <p className="text-[10px] text-muted-foreground">Shopify Embedded</p>
       </div>
       <nav className="px-2 pb-4 space-y-4">
@@ -78,7 +78,7 @@ const EmbeddedNav = ({ activeTab, onTabChange, onFlowChange }: EmbeddedNavProps)
         ))}
       </nav>
       <div className="px-4 pb-4 mt-auto border-t border-border pt-3">
-        <p className="text-[9px] text-muted-foreground">SkuPilot v1.0</p>
+        <p className="text-[9px] text-muted-foreground">Sonic Invoice v1.0</p>
         <p className="text-[9px] text-muted-foreground">Built for AU fashion boutiques</p>
       </div>
     </aside>

@@ -3,6 +3,8 @@ import {
   ChevronLeft, Upload, Download, ChevronDown, ChevronUp,
   Tag, Factory, Layers, Search, Check, AlertTriangle, Copy, Eye, X, Save, Trash2
 } from "lucide-react";
+import ShopifyPushFlow from "@/components/ShopifyPushFlow";
+import type { PushProduct } from "@/lib/shopify-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";

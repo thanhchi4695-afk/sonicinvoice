@@ -1907,7 +1907,10 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate">{product.name}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {product.brand} · {product.type} · ${product.rrp.toFixed(2)}
+              {product.brand} · {product.type}
+              {product.colour && <> · <span className="text-foreground">{product.colour}</span></>}
+              {product.size && <> · <span className="font-mono-data">{product.size}</span></>}
+              {" · "}${product.rrp.toFixed(2)}
               {product.sku && <> · <span className="font-mono-data">{product.sku}</span></>}
             </p>
             {/* Barcode display */}

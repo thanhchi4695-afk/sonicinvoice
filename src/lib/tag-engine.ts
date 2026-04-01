@@ -1,6 +1,7 @@
 // Tag Configuration Engine — industry-aware, fully configurable
 
-import { getStoreConfig, getIndustryConfig } from './prompt-builder';
+import { getStoreConfig } from './prompt-builder';
+import { getIndustryDefinition } from './industry-config';
 
 // ── Types ──────────────────────────────────────────────────
 export interface ProductTypeEntry {

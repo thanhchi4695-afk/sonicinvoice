@@ -21,6 +21,9 @@ const quickInserts = [
 const ToolsScreen = () => {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");
+  if (activeTool === "price_lookup") {
+    return <PriceLookup onBack={() => setActiveTool(null)} />;
+  }
 
   if (activeTool === "ai") {
     return (

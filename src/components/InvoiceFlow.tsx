@@ -1344,18 +1344,50 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
       {/* Step 4: Export Review */}
       {step === 4 && (
-        <ExportReviewScreen
-          products={mockProducts.map(p => ({
-            ...p,
-            hasImage: p.status === "ready",
-            hasSeo: true,
-            hasTags: true,
-            confidence: p.status === "ready" ? "high" as const : "medium" as const,
-            isNew: true,
-          }))}
-          supplierName={supplierName}
-          onBack={() => setStep(3)}
-        />
+        <div className="px-4 pt-4 pb-24 animate-fade-in">
+          {/* Confidence gate warning */}
+          {confCounts.low > 0 && (
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 mb-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-destructive">⚠ {confCounts.low} line{confCounts.low > 1 ? "s need" : " needs"} attention before export</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {confCounts.high} lines ready to export · {confCounts.medium} lines need review · {confCounts.low} line{confCounts.low > 1 ? "s have" : " has"} issues
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStep(3)}>
+                      Review issues first
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground">
+                      Export all anyway
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {confCounts.low === 0 && (
+            <div className="bg-success/10 border border-success/20 rounded-lg p-2 mb-4 flex items-center gap-2">
+              <Check className="w-3.5 h-3.5 text-success shrink-0" />
+              <span className="text-xs text-success font-medium">
+                {confCounts.high} lines ready · {confCounts.medium} need review · All products exportable
+              </span>
+            </div>
+          )}
+          <ExportReviewScreen
+            products={mockProducts.map((p, i) => ({
+              ...p,
+              hasImage: p.status === "ready",
+              hasSeo: true,
+              hasTags: true,
+              confidence: groupConfidences[i]?.level === "high" ? "high" as const : groupConfidences[i]?.level === "low" ? "low" as const : "medium" as const,
+              isNew: true,
+            }))}
+            supplierName={supplierName}
+            onBack={() => setStep(3)}
+          />
+        </div>
       )}
     </div>
   );

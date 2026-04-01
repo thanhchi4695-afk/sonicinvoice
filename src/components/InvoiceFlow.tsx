@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface InvoiceFlowProps {
@@ -10,17 +10,171 @@ type Step = 1 | 2 | 3 | 4;
 
 const stepLabels = ["Upload", "Reading", "Review", "Download"];
 
+// ── Instruction snippets ───────────────────────────────────
+const quickInserts = [
+  { label: "+ Brand prefix", text: "Add '[BRAND NAME]' at the start of every product name." },
+  { label: "+ Title case", text: "Capitalise only the first letter of each word in product names (title case)." },
+  { label: "+ ALL CAPS", text: "Convert all product names to ALL CAPITALS." },
+  { label: "+ Remove brand", text: "Remove the brand name from the start of each product name." },
+  { label: "+ Map price cols", text: "The first price column is the cost price (what I paid). The second price column is the retail price (RRP)." },
+  { label: "+ Map QTY", text: "The column labelled '[COLUMN NAME]' contains the quantity." },
+  { label: "+ Map SKU", text: "The column labelled '[COLUMN NAME]' is the product SKU." },
+  { label: "+ Abbreviation", text: "Replace '[ABBREVIATION]' with '[FULL WORD]' in all product names." },
+];
+
+// ── localStorage helpers ───────────────────────────────────
+const HISTORY_KEY = 'custom_instructions_history';
+const TEMPLATES_KEY = 'invoice_templates';
+
+function getHistory(): { text: string; label: string }[] {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+}
+function addHistory(text: string, supplier: string) {
+  if (!text.trim()) return;
+  const history = getHistory().filter(h => h.text !== text);
+  history.unshift({ text, label: supplier || text.slice(0, 50) + '...' });
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 10)));
+}
+function getTemplates(): Record<string, { instructions: string; savedAt: string; useCount: number }> {
+  try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '{}'); } catch { return {}; }
+}
+function saveTemplate(supplier: string, instructions: string) {
+  const t = getTemplates();
+  t[supplier] = { instructions, savedAt: new Date().toISOString(), useCount: (t[supplier]?.useCount || 0) + 1 };
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t));
+}
+
+// ── Custom Instructions Component ──────────────────────────
+const CustomInstructionsField = ({
+  value, onChange, supplierName,
+}: {
+  value: string; onChange: (v: string) => void; supplierName: string;
+}) => {
+  const [showHistory, setShowHistory] = useState(false);
+  const [saveForSupplier, setSaveForSupplier] = useState(false);
+  const [templateSupplier, setTemplateSupplier] = useState(supplierName);
+  const [loadedTemplate, setLoadedTemplate] = useState<string | null>(null);
+  const history = getHistory();
+
+  // Auto-load saved template when supplier changes
+  useEffect(() => {
+    setTemplateSupplier(supplierName);
+    if (supplierName) {
+      const templates = getTemplates();
+      const match = templates[supplierName];
+      if (match && !value) {
+        onChange(match.instructions);
+        setLoadedTemplate(supplierName);
+      }
+    }
+  }, [supplierName]);
+
+  const handleInsert = (text: string) => {
+    onChange(value ? value + '\n' + text : text);
+  };
+
+  return (
+    <div className="bg-card rounded-lg border border-border p-4 mt-4">
+      <div className="flex items-center gap-2 mb-1">
+        <Bot className="w-4 h-4 text-primary" />
+        <h3 className="text-sm font-semibold">Custom AI Instructions</h3>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">
+        Tell the AI exactly how to process this invoice. Plain English — no code needed.
+      </p>
+
+      {loadedTemplate && (
+        <div className="bg-primary/10 border border-primary/20 rounded-md p-2 mb-2 flex items-center justify-between">
+          <p className="text-xs text-primary">💡 Loaded saved instructions for {loadedTemplate}</p>
+          <button onClick={() => { onChange(''); setLoadedTemplate(null); }} className="text-xs text-primary font-medium ml-2">Clear</button>
+        </div>
+      )}
+
+      <textarea
+        value={value}
+        onChange={e => { onChange(e.target.value); setLoadedTemplate(null); }}
+        rows={5}
+        maxLength={2000}
+        placeholder={`Examples:\n• QTY means quantity, first price is cost, second is retail\n• Add supplier name at the start of every product name\n• Replace 'nk' with Necklace, 'br' with Bracelet\n• All names should have first letter capitalised only\n• The SKU column is called 'Style No' in this invoice`}
+        className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm resize-none leading-relaxed placeholder:text-muted-foreground/50"
+      />
+      <p className="text-xs text-muted-foreground text-right mt-1">{value.length} / 2000</p>
+
+      {/* Quick add buttons */}
+      <p className="text-xs text-muted-foreground mt-2 mb-1.5">Quick add:</p>
+      <div className="flex flex-wrap gap-1.5">
+        {quickInserts.map(qi => (
+          <button
+            key={qi.label}
+            onClick={() => handleInsert(qi.text)}
+            className="px-2.5 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground active:bg-accent transition-colors"
+          >
+            {qi.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Recent instructions */}
+      {history.length > 0 && (
+        <div className="mt-3">
+          <button onClick={() => setShowHistory(!showHistory)} className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Clock className="w-3 h-3" />
+            📋 Recent instructions {showHistory ? '▲' : '▼'}
+          </button>
+          {showHistory && (
+            <div className="mt-1.5 space-y-1">
+              {history.map((h, i) => (
+                <button key={i} onClick={() => { onChange(h.text); setShowHistory(false); }}
+                  className="w-full text-left text-xs bg-muted/50 rounded-md px-3 py-2 truncate text-muted-foreground hover:bg-muted">
+                  {h.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Save for supplier */}
+      <div className="mt-3 flex items-center gap-2">
+        <input type="checkbox" id="save-supplier" checked={saveForSupplier} onChange={e => setSaveForSupplier(e.target.checked)}
+          className="w-4 h-4 rounded border-border accent-primary" />
+        <label htmlFor="save-supplier" className="text-xs text-muted-foreground">Save for future invoices from this supplier</label>
+      </div>
+      {saveForSupplier && (
+        <input value={templateSupplier} onChange={e => setTemplateSupplier(e.target.value)}
+          placeholder="Supplier name"
+          className="w-full h-9 rounded-md bg-input border border-border px-3 text-xs mt-2" />
+      )}
+    </div>
+  );
+};
+
 const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [step, setStep] = useState<Step>(1);
   const [showDetails, setShowDetails] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [customInstructions, setCustomInstructions] = useState("");
+  const [supplierName, setSupplierName] = useState("");
 
   const handleFileSelect = () => {
-    // Simulate file selection
+    // Save instructions to history
+    if (customInstructions.trim()) {
+      addHistory(customInstructions, supplierName);
+      // Save template if toggled
+      const saveCheckbox = document.getElementById('save-supplier') as HTMLInputElement;
+      if (saveCheckbox?.checked && supplierName) {
+        saveTemplate(supplierName, customInstructions);
+      }
+    }
     setFileName("invoice_jantzen_mar26.pdf");
     setTimeout(() => setStep(2), 300);
     setTimeout(() => setStep(3), 3000);
   };
+
+  // Simulated rules-applied feedback
+  const appliedRules = customInstructions.trim() ? [
+    { applied: true, text: 'Custom AI instructions applied to all products' },
+  ] : [];
 
   const mockProducts = [
     { name: "Bond Eye Mara One Piece - Black", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready" },
@@ -84,7 +238,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           </button>
           {showDetails && (
             <div className="mt-3 space-y-3">
-              <input type="text" placeholder="Supplier name" className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm" />
+              <input type="text" placeholder="Supplier name" value={supplierName} onChange={e => setSupplierName(e.target.value)}
+                className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm" />
               <select className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm text-foreground">
                 <option value="">Arrival month</option>
                 <option>Mar 2026</option>
@@ -99,6 +254,13 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
+          {/* Custom AI Instructions */}
+          <CustomInstructionsField
+            value={customInstructions}
+            onChange={setCustomInstructions}
+            supplierName={supplierName}
+          />
+
           <button className="mt-6 text-sm text-primary font-medium">
             Or enter products manually →
           </button>
@@ -111,12 +273,25 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin-slow mb-6" />
           <h3 className="text-lg font-semibold font-display mb-2">Reading your invoice...</h3>
           <p className="text-sm text-muted-foreground text-center">Extracting product names, prices, and quantities</p>
+          {customInstructions.trim() && (
+            <p className="text-xs text-primary mt-3">🤖 Applying your custom instructions...</p>
+          )}
         </div>
       )}
 
       {/* Step 3: Review */}
       {step === 3 && (
         <div className="px-4 pt-4">
+          {/* Custom rules applied feedback */}
+          {appliedRules.length > 0 && (
+            <div className="bg-success/10 border border-success/20 rounded-lg p-3 mb-3">
+              <p className="text-xs font-semibold text-success mb-1">🤖 Custom instructions applied to all {mockProducts.length} products:</p>
+              {appliedRules.map((r, i) => (
+                <p key={i} className="text-xs text-success">✓ {r.text}</p>
+              ))}
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-medium">{mockProducts.length} products found</p>
             <div className="flex gap-2">

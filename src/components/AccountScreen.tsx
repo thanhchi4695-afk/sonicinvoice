@@ -16,6 +16,7 @@ import { loadPreferences, savePreferences, type NotificationPreferences } from "
 import { Switch } from "@/components/ui/switch";
 import { getFormatTemplates, deleteFormatTemplate, SHARED_AU_TEMPLATES, getTemplateQuality, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
 import { getMetafieldConfig, saveMetafieldConfig, type MetafieldDefinition } from "@/lib/metafields";
+import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");

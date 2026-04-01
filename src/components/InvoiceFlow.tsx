@@ -499,6 +499,44 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const standaloneCount = productGroups.filter(g => !g.isGrouped).length;
   const totalQty = productGroups.reduce((s, g) => s + g.variants.reduce((v, l) => v + l.qty, 0), 0);
 
+  // ── Inventory update mode per product group ──────────────
+  type LineMode = "new" | "update";
+  const [lineModes, setLineModes] = useState<Record<number, LineMode>>(() => {
+    const modes: Record<number, LineMode> = {};
+    productGroups.forEach((g, i) => {
+      const mainSku = g.variants[0]?.sku || "";
+      const existing = lookupInventory(mainSku);
+      modes[i] = existing ? "update" : "new";
+    });
+    return modes;
+  });
+  const [reviewTab, setReviewTab] = useState<"new" | "update">("new");
+  const [inventoryApplied, setInventoryApplied] = useState(false);
+  const [inventoryApplyCount, setInventoryApplyCount] = useState(0);
+
+  const toggleLineMode = (idx: number) => {
+    setLineModes(prev => ({ ...prev, [idx]: prev[idx] === "new" ? "update" : "new" }));
+  };
+
+  const newProductGroups = productGroups.filter((_, i) => lineModes[i] === "new");
+  const updateProductGroups = productGroups.map((g, i) => ({ ...g, _idx: i })).filter((_, i) => lineModes[i] === "update");
+
+  const handleApplyInventoryUpdates = () => {
+    let count = 0;
+    updateProductGroups.forEach(g => {
+      g.variants.forEach(v => {
+        const loc = receivingLocation || storeLocations[0]?.name || "Main store";
+        updateStock(v.sku, v.qty, loc);
+        count++;
+      });
+      addAuditEntry("Inventory", `Inventory update: ${g.name} +${g.variants.reduce((s, v) => s + v.qty, 0)} units at ${receivingLocation || "Main store"}`);
+    });
+    incrementStockUpdates(count);
+    setInventoryApplied(true);
+    setInventoryApplyCount(count);
+    addAuditEntry("Inventory", `${count} inventory updates applied`);
+  };
+
   // Split / ungroup a grouped product into individual rows
   const handleSplitGroup = (idx: number) => {
     const group = productGroups[idx];

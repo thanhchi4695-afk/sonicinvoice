@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail } from "lucide-react";
+import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PriceLookup from "@/components/PriceLookup";
 import SupplierEmails from "@/components/SupplierEmails";

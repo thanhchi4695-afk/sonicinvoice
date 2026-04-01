@@ -105,6 +105,7 @@ const Index = () => {
           onStartPurchaseOrders={() => setActiveFlow("purchase_orders")}
           onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
           onStartEmailInbox={() => setActiveFlow("email_inbox")}
+          onStartCollabSEO={() => setActiveFlow("collab_seo")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

@@ -258,7 +258,19 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     if (useTemplate && matchedTemplate) {
       incrementTemplateUse(supplierName);
     }
-    setFileName("invoice_jantzen_mar26.pdf");
+    // Simulate file type detection for demo
+    const fName = "invoice_jantzen_mar26.pdf";
+    setFileName(fName);
+    const ext = fName.split(".").pop()?.toLowerCase() || "";
+    if (["jpg", "jpeg", "png", "heic", "webp"].includes(ext)) {
+      setFileParseMode("photo");
+    } else if (ext === "pdf") {
+      // Simulate: check if text layer is substantial (>50 chars)
+      const hasTextLayer = true; // In real impl, try text extraction first
+      setFileParseMode(hasTextLayer ? "pdf_text" : "pdf_scan");
+    } else {
+      setFileParseMode("spreadsheet");
+    }
     setProcessStartTime(Date.now());
     setProcessingDone(false);
     setProcessingElapsed(0);

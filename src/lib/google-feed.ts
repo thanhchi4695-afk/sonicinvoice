@@ -93,7 +93,7 @@ function escXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
-export function buildGoogleFeedItem(p: GoogleFeedProduct): GoogleFeedItem {
+export function buildGoogleFeedItem(p: GoogleFeedProduct, saleDateStr?: string): GoogleFeedItem {
   const handle = `${p.name}-${p.brand}`
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')

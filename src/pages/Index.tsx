@@ -116,6 +116,76 @@ const Index = () => {
     return <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />;
   }
 
+  const mainContent = (
+    <>
+      {activeTab === "home" && (
+        <HomeScreen
+          onStartInvoice={() => setActiveFlow("invoice")}
+          onStartSale={() => setActiveFlow("sale")}
+          onStartRestock={() => setActiveFlow("restock")}
+          onStartPriceAdjust={() => setActiveFlow("price_adjust")}
+          onStartOrderForm={() => setActiveFlow("order_form")}
+          onStartReorder={() => setActiveFlow("reorder")}
+          onStartSuppliers={() => setActiveFlow("suppliers")}
+          onOpenAuditLog={() => setActiveFlow("audit_log")}
+          onStartPurchaseOrders={() => setActiveFlow("purchase_orders")}
+          onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
+          onStartEmailInbox={() => setActiveFlow("email_inbox")}
+        />
+      )}
+      {activeTab === "analytics" && <AnalyticsPanel />}
+      {activeTab === "history" && <HistoryScreen />}
+      {activeTab === "tools" && <ToolsScreen />}
+      {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
+      {activeTab === "help" && <HelpCentre />}
+      {activeTab === "account" && <AccountScreen />}
+    </>
+  );
+
+  // ─── Embedded layout (inside Shopify Admin) ───
+  if (isEmbedded) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-background">
+        <EmbeddedNav
+          activeTab={activeFlow ? "" : activeTab}
+          onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
+          onFlowChange={(flow) => setActiveFlow(flow as any)}
+        />
+        <main className="flex-1 overflow-y-auto">
+          <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-0 border-b border-border mb-0">
+            <div className="flex items-center gap-2">
+              {activeFlow && (
+                <button
+                  onClick={() => setActiveFlow(null)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  ← Back
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 pb-2">
+              <NotificationBell
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkRead={markRead}
+                onMarkAllRead={markAllRead}
+                onNavigate={(link) => {
+                  if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
+                    setActiveFlow(link as any);
+                  } else {
+                    setActiveTab(link);
+                  }
+                }}
+              />
+            </div>
+          </div>
+          {activeFlow ? renderFlow() : mainContent}
+        </main>
+      </div>
+    );
+  }
+
+  // ─── Standalone layout (original mobile-first) ───
   return (
     <div className="min-h-screen">
       {/* Top bar */}
@@ -142,27 +212,7 @@ const Index = () => {
         </button>
       </div>
 
-      {activeTab === "home" && (
-        <HomeScreen
-          onStartInvoice={() => setActiveFlow("invoice")}
-          onStartSale={() => setActiveFlow("sale")}
-          onStartRestock={() => setActiveFlow("restock")}
-          onStartPriceAdjust={() => setActiveFlow("price_adjust")}
-          onStartOrderForm={() => setActiveFlow("order_form")}
-          onStartReorder={() => setActiveFlow("reorder")}
-          onStartSuppliers={() => setActiveFlow("suppliers")}
-          onOpenAuditLog={() => setActiveFlow("audit_log")}
-          onStartPurchaseOrders={() => setActiveFlow("purchase_orders")}
-          onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
-          onStartEmailInbox={() => setActiveFlow("email_inbox")}
-        />
-      )}
-      {activeTab === "analytics" && <AnalyticsPanel />}
-      {activeTab === "history" && <HistoryScreen />}
-      {activeTab === "tools" && <ToolsScreen />}
-      {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
-      {activeTab === "help" && <HelpCentre />}
-      {activeTab === "account" && <AccountScreen />}
+      {mainContent}
       <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Floating Quick Capture button — mobile only */}

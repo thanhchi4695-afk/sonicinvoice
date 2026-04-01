@@ -86,3 +86,33 @@ export function matchProduct(barcode?: string, sku?: string, name?: string): Mat
   };
   saveBarcodeCatalog(seed);
 })();
+
+// ── Colour extraction from titles ──────────────────────────
+export const COLOUR_ABBR: Record<string, string> = {
+  'BLK': 'Black', 'WHT': 'White', 'NVY': 'Navy', 'IVY': 'Ivory',
+  'RD': 'Red', 'GRN': 'Green', 'BLU': 'Blue', 'MLT': 'Multi',
+  'ARM': 'Army', 'KHK': 'Khaki', 'PNK': 'Pink', 'GLD': 'Gold',
+  'SIL': 'Silver', 'BRN': 'Brown', 'PRP': 'Purple',
+  'YLW': 'Yellow', 'ORG': 'Orange', 'TRQ': 'Turquoise',
+  'PRT': 'Print', 'CRM': 'Cream', 'GRY': 'Grey',
+  'EMR': 'Emerald', 'CRL': 'Coral', 'RST': 'Rust',
+  'NAV': 'Navy', 'BLU': 'Blue',
+};
+
+export function extractColourFromTitle(title: string): string {
+  if (!title) return '';
+  const dashMatch = title.match(/[-\/]\s*([^-\/]+)$/);
+  if (!dashMatch) return '';
+  const candidate = dashMatch[1].trim();
+  const upper = candidate.toUpperCase();
+  if (COLOUR_ABBR[upper]) return COLOUR_ABBR[upper];
+  const sizePattern = /^(AU\d+|US\d+|XS|S|M|L|XL|XXL|OS|\d+)$/i;
+  if (sizePattern.test(candidate)) return '';
+  return candidate;
+}
+
+export function extractSizeFromTitle(title: string): string {
+  if (!title) return '';
+  const sizeMatch = title.match(/\b(AU\d+|US\d+|XS|XXS|S|M|L|XL|XXL|XXXL|One\s*Size|OS|Free\s*Size)\b/i);
+  return sizeMatch ? sizeMatch[1] : '';
+}

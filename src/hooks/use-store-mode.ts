@@ -1,0 +1,49 @@
+// Hook for store mode (Shopify vs Lightspeed) awareness
+import { getStoreConfig, type StoreType } from '@/lib/prompt-builder';
+
+export interface StoreMode {
+  storeType: StoreType;
+  isLightspeed: boolean;
+  isShopifyOnly: boolean;
+  isLightspeedOnly: boolean;
+  isLightspeedShopify: boolean;
+  modeBadge: { label: string; emoji: string; color: string };
+  /** Label for the target POS/platform */
+  targetPlatform: string;
+  /** What we call "Compare At Price" */
+  compareAtLabel: string;
+  /** CSV export label */
+  exportLabel: string;
+}
+
+export function getStoreMode(): StoreMode {
+  const config = getStoreConfig();
+  const st = config.storeType || 'shopify';
+
+  const isLightspeed = st === 'lightspeed' || st === 'lightspeed_shopify';
+  const isShopifyOnly = st === 'shopify' || st === 'other';
+  const isLightspeedOnly = st === 'lightspeed';
+  const isLightspeedShopify = st === 'lightspeed_shopify';
+
+  const modeBadge = isLightspeedShopify
+    ? { label: 'Lightspeed + Shopify', emoji: '🖥️', color: 'bg-purple-500/15 text-purple-400 border-purple-500/30' }
+    : isLightspeedOnly
+    ? { label: 'Lightspeed POS', emoji: '🖥️', color: 'bg-muted text-muted-foreground border-border' }
+    : { label: 'Shopify mode', emoji: '🛍️', color: 'bg-primary/15 text-primary border-primary/30' };
+
+  return {
+    storeType: st,
+    isLightspeed,
+    isShopifyOnly,
+    isLightspeedOnly,
+    isLightspeedShopify,
+    modeBadge,
+    targetPlatform: isLightspeed ? 'Lightspeed' : 'Shopify',
+    compareAtLabel: isLightspeed ? 'RRP / Retail price' : 'Compare-at price',
+    exportLabel: isLightspeed ? 'Lightspeed CSV' : 'Shopify CSV',
+  };
+}
+
+export function useStoreMode(): StoreMode {
+  return getStoreMode();
+}

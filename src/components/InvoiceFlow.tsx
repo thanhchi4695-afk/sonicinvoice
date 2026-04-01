@@ -9,6 +9,8 @@ import Papa from "papaparse";
 import { generateXSeriesCSV, getXSeriesSettings, saveXSeriesSettings, type XSeriesSettings, type XSeriesProduct } from "@/lib/lightspeed-xseries";
 import { findTemplate, saveFormatTemplate, incrementTemplateUse, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
 import { getStoreLocations } from "@/components/AccountScreen";
+import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCount, type InventoryItem } from "@/lib/inventory-sim";
+import { addAuditEntry } from "@/lib/audit-log";
 
 interface InvoiceFlowProps {
   onBack: () => void;

@@ -271,6 +271,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* Catalog Memory Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <BookOpen className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Catalog memory</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Upload supplier catalogs so future invoices match instantly — no web search needed.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">{getTotalCatalogProducts()} products learned</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartCatalogMemory}>
+          Manage catalogs <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
       {/* Stock by Location */}
       {(() => {
         const locs = getStoreLocations();

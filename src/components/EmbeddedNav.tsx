@@ -26,6 +26,7 @@ const navSections = [
       { id: "catalog_memory", label: "Catalog Memory", icon: BookOpen, type: "flow" as const },
       { id: "restock", label: "Restock Analytics", icon: Package, type: "flow" as const },
       { id: "collab_seo", label: "Collab SEO", icon: Link, type: "flow" as const },
+      { id: "google_ads_setup", label: "Google Ads Setup", icon: Megaphone, type: "flow" as const },
     ],
   },
   {

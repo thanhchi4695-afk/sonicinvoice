@@ -28,6 +28,7 @@ import EmailInboxPanel from "@/components/EmailInboxPanel";
 import CollabSEOFlow from "@/components/CollabSEOFlow";
 import NotificationBell from "@/components/NotificationBell";
 import GoogleAdsGuide from "@/components/GoogleAdsGuide";
+import GoogleAdsSetupWizard from "@/components/GoogleAdsSetupWizard";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -36,7 +37,7 @@ const Index = () => {
   const [authed, setAuthed] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
@@ -82,6 +83,7 @@ const Index = () => {
       case "catalog_memory": return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
       case "email_inbox": return <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />;
       case "collab_seo": return <CollabSEOFlow onBack={() => setActiveFlow(null)} />;
+      case "google_ads_setup": return <GoogleAdsSetupWizard onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };
@@ -107,6 +109,7 @@ const Index = () => {
           onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
           onStartEmailInbox={() => setActiveFlow("email_inbox")}
           onStartCollabSEO={() => setActiveFlow("collab_seo")}
+          onStartGoogleAdsSetup={() => setActiveFlow("google_ads_setup")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

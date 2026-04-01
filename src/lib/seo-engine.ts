@@ -188,17 +188,11 @@ export const SEO_TITLE_PRESETS = [
   { label: 'Dash style', template: '{product} — {brand} at {store}' },
 ];
 
-export const SEO_DESC_PRESETS: Record<string, { label: string; template: string }[]> = {
-  swimwear: [
-    { label: 'Default', template: 'Shop the {product} by {brand}. {features}New arrivals at {store} {city}.' },
+export function getSeoDescPresets(industry: string): { label: string; template: string }[] {
+  const def = getIndustryDefinition(industry);
+  return [
+    { label: 'Default', template: def.seoDescTemplate },
     { label: 'Simple', template: '{product} by {brand}. {features}Shop at {store}.' },
-  ],
-  beauty: [
-    { label: 'Default', template: 'Discover {product} by {brand}. {features}Shop now at {store} with free delivery.' },
-    { label: 'Simple', template: '{product} by {brand}. {features}Shop at {store}.' },
-  ],
-  general: [
-    { label: 'Default', template: '{product} by {brand}. {features}{cta} at {store}.' },
     { label: 'With city', template: 'Shop {product} by {brand} at {store} {city}. {features}' },
-  ],
-};
+  ];
+}

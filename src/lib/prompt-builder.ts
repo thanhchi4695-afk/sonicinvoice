@@ -91,11 +91,11 @@ function industryToConfig(id: string): IndustryConfig {
 }
 
 export function getIndustryConfig(industry: string): IndustryConfig {
-  return INDUSTRIES[industry] || INDUSTRIES.general;
+  return industryToConfig(industry);
 }
 
 export function getIndustryList(): { id: string; name: string }[] {
-  return Object.entries(INDUSTRIES).map(([id, c]) => ({ id, name: c.displayName }));
+  return getIndustryListFromConfig().map(i => ({ id: i.id, name: i.displayName }));
 }
 
 // ── Brand Directory ────────────────────────────────────────

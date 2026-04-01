@@ -78,17 +78,36 @@ function toTag(name: string): string {
 
 export function getIndustryTagDefaults(): TagConfig {
   const store = getStoreConfig();
-  const industry = getIndustryConfig(store.industry);
-  const types: ProductTypeEntry[] = industry.productTypes.map(t => ({
+  const def = getIndustryDefinition(store.industry);
+
+  const types: ProductTypeEntry[] = def.productTypes.map(t => ({
     name: t.name,
-    tag: toTag(t.name),
-    department: industry.displayName.split(' ')[0],
+    tag: t.tag || toTag(t.name),
+    department: t.department || def.displayName.split(' ')[0],
   }));
-  return {
-    layers: DEFAULT_LAYERS.map(l => ({ ...l, id: uid() })),
-    productTypes: types,
-    specialRules: (INDUSTRY_SPECIAL_RULES[store.industry] || []).map(r => ({ ...r, id: uid() })),
-  };
+
+  const layers: TagLayer[] = def.tagLayers.map(l => ({
+    id: uid(),
+    name: l.name,
+    description: l.description,
+    type: l.type,
+    values: l.values,
+    active: true,
+    order: l.order,
+  }));
+
+  const specialRules: SpecialRule[] = def.specialRules.map(r => ({
+    id: uid(),
+    keyword: r.keyword,
+    tag: r.tag,
+    caseSensitive: r.caseSensitive,
+    matchType: r.matchType,
+    searchTitle: true,
+    searchDescription: true,
+    active: true,
+  }));
+
+  return { layers, productTypes: types, specialRules };
 }
 
 // ── Tag Generation ─────────────────────────────────────────

@@ -150,8 +150,8 @@ export function buildGoogleFeedItem(p: GoogleFeedProduct, saleDateStr?: string):
   };
 }
 
-export function generateGoogleFeedXML(products: GoogleFeedProduct[], storeName?: string): string {
-  const items = products.map(p => buildGoogleFeedItem(p));
+export function generateGoogleFeedXML(products: GoogleFeedProduct[], storeName?: string, saleDateStr?: string): string {
+  const items = products.map(p => buildGoogleFeedItem(p, saleDateStr));
   const title = storeName || 'Product Feed';
   const domain = localStorage.getItem('shopify_store_url') || 'yourstore.com.au';
 

@@ -1,9 +1,10 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList, BookOpen } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList, BookOpen, Mail } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
 import { getStockUpdatesCount } from "@/lib/inventory-sim";
 import { getTotalCatalogProducts } from "@/lib/catalog-memory";
+import { getUnprocessedInboxCount } from "@/components/EmailInboxPanel";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";
 
@@ -18,9 +19,10 @@ interface HomeScreenProps {
   onOpenAuditLog?: () => void;
   onStartPurchaseOrders?: () => void;
   onStartCatalogMemory?: () => void;
+  onStartEmailInbox?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -138,7 +140,29 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
-      {/* Bulk Sale Card */}
+      {/* Email Inbox Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Mail className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold font-display">Email inbox</h2>
+              {getUnprocessedInboxCount() > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary text-primary-foreground">{getUnprocessedInboxCount()}</span>
+              )}
+            </div>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Suppliers email invoices directly. Process them without uploading.
+            </p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartEmailInbox}>
+          Open inbox <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">

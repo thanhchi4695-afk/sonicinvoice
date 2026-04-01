@@ -727,38 +727,171 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         </div>
       )}
 
-      {/* Step 2: Reading */}
+      {/* Step 2: Enrichment with live progress */}
       {step === 2 && (
-        <div className="flex flex-col items-center justify-center px-4 pt-24">
-          <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin-slow mb-6" />
-          <h3 className="text-lg font-semibold font-display mb-2">
-            {fileParseMode === "photo" ? "Reading your invoice photo..." : fileParseMode === "pdf_scan" ? "Scanning your PDF..." : "Reading your invoice..."}
-          </h3>
-          <p className="text-sm text-muted-foreground text-center">
-            {(fileParseMode === "photo" || fileParseMode === "pdf_scan")
-              ? "Using AI image recognition to extract product data"
-              : "Extracting product names, prices, and quantities"}
-          </p>
-          {fileParseMode && (
-            <p className="text-xs text-muted-foreground mt-2">
-              {fileParseMode === "pdf_text" && "📄 Digital PDF — text layer detected"}
-              {fileParseMode === "pdf_scan" && "🔍 Scanned PDF — OCR in progress"}
-              {fileParseMode === "photo" && "📷 Photo — AI vision processing"}
-              {fileParseMode === "spreadsheet" && "📊 Spreadsheet — parsing rows"}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground mt-3 font-mono-data">
-            ⏱ {Math.floor(processingElapsed / 60)}:{String(processingElapsed % 60).padStart(2, "0")} elapsed
-            {useTemplate ? " · ~0:02 remaining" : " · ~0:03 remaining"}
-          </p>
-          {useTemplate && matchedTemplate && (
-            <p className="text-xs text-primary mt-2 flex items-center gap-1">
-              <Zap className="w-3 h-3" /> Using {matchedTemplate.supplier} template — faster parsing
-            </p>
-          )}
-          {customInstructions.trim() && (
-            <p className="text-xs text-primary mt-2">🤖 Applying your custom instructions...</p>
-          )}
+        <div className="px-4 pt-4">
+          {(() => {
+            const total = enrichLines.length;
+            const done = enrichLines.filter(l => l.status === "done" || l.status === "review" || l.status === "not_found").length;
+            const inProgress = enrichLines.filter(l => l.status === "searching" || l.status === "extracting").length;
+            const waiting = enrichLines.filter(l => l.status === "waiting").length;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            const avgPerLine = processingElapsed > 0 && done > 0 ? processingElapsed / done : 3;
+            const remaining = Math.max(0, Math.round(avgPerLine * (total - done)));
+            const fmtTime = (s: number) => s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+
+            return (
+              <>
+                {/* Completion summary overlay */}
+                {showCompletionSummary && (
+                  <div className="bg-card rounded-lg border border-border p-5 mb-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Check className="w-5 h-5 text-success" />
+                      <h3 className="text-lg font-semibold font-display">Processing complete</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {total} lines processed in {fmtTime(finalProcessingTime)}
+                    </p>
+                    <div className="bg-muted/50 rounded-lg border border-border divide-y divide-border overflow-hidden mb-4">
+                      <div className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-sm flex items-center gap-2"><Check className="w-3.5 h-3.5 text-success" /> Ready to export</span>
+                        <span className="text-sm font-mono-data">{enrichLines.filter(l => l.status === "done").length} lines ({total > 0 ? Math.round(enrichLines.filter(l => l.status === "done").length / total * 100) : 0}%)</span>
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-sm flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5 text-secondary" /> Review recommended</span>
+                        <span className="text-sm font-mono-data">{enrichLines.filter(l => l.status === "review").length} lines ({total > 0 ? Math.round(enrichLines.filter(l => l.status === "review").length / total * 100) : 0}%)</span>
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-sm flex items-center gap-2"><X className="w-3.5 h-3.5 text-destructive" /> Not found</span>
+                        <span className="text-sm font-mono-data">{enrichLines.filter(l => l.status === "not_found").length} lines ({total > 0 ? Math.round(enrichLines.filter(l => l.status === "not_found").length / total * 100) : 0}%)</span>
+                      </div>
+                    </div>
+                    {enrichLines.some(l => l.status === "review" || l.status === "not_found") && (
+                      <p className="text-xs text-muted-foreground mb-4">
+                        {enrichLines.filter(l => l.status === "review" || l.status === "not_found").length} product{enrichLines.filter(l => l.status === "review" || l.status === "not_found").length > 1 ? "s" : ""} tagged NEEDS-ENRICHMENT — search manually before importing.
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <Button variant="teal" className="flex-1 h-11" onClick={handleProceedToReview}>
+                        → Review & export
+                      </Button>
+                      {enrichLines.some(l => l.status === "review" || l.status === "not_found") && (
+                        <Button variant="outline" className="flex-1 h-11 text-xs" onClick={() => { setFilterReviewOnly(true); handleProceedToReview(); }}>
+                          Review issues first
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cancelled state */}
+                {processingCancelled && !showCompletionSummary && (
+                  <div className="bg-secondary/10 border border-secondary/20 rounded-lg p-4 mb-4">
+                    <p className="text-sm font-medium mb-1">⏹ Processing stopped</p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {done}/{total} lines enriched.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="h-8 text-xs" onClick={handleResumeProcessing}>
+                        <RotateCcw className="w-3 h-3 mr-1" /> Resume
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleProceedToReview}>
+                        Review partial results →
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status overview bar */}
+                {!showCompletionSummary && (
+                  <div className="bg-card rounded-lg border border-border p-4 mb-4">
+                    <div className="flex items-center justify-between text-xs mb-3">
+                      <div className="flex gap-3">
+                        <span className="text-muted-foreground">{total} lines</span>
+                        <span className="text-success">✓ {done} enriched</span>
+                        {inProgress > 0 && <span className="text-primary">⚙ {inProgress} in progress</span>}
+                        {waiting > 0 && <span className="text-muted-foreground">○ {waiting} pending</span>}
+                      </div>
+                      <span className="text-muted-foreground font-mono-data">
+                        {processingDone
+                          ? `✅ Complete in ${fmtTime(finalProcessingTime)}`
+                          : `~${fmtTime(remaining)} remaining`}
+                      </span>
+                    </div>
+                    <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <span className="text-xs font-semibold text-primary">{pct}%</span>
+                      <span className="text-[10px] text-muted-foreground font-mono-data">
+                        ⏱ {fmtTime(processingElapsed)} elapsed
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Line-by-line status table */}
+                {!showCompletionSummary && (
+                  <div className="bg-card rounded-lg border border-border overflow-hidden mb-4">
+                    <div className="px-3 py-2 border-b border-border bg-muted/30">
+                      <div className="grid grid-cols-[24px_1fr_90px_1fr_50px] gap-2 text-[10px] font-semibold text-muted-foreground uppercase">
+                        <span>#</span>
+                        <span>Product</span>
+                        <span>Status</span>
+                        <span>Current action</span>
+                        <span>Conf.</span>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {enrichLines.map((line, i) => (
+                        <div key={i} className="grid grid-cols-[24px_1fr_90px_1fr_50px] gap-2 items-center px-3 py-2 text-xs">
+                          <span className="text-muted-foreground">{i + 1}</span>
+                          <span className="truncate font-medium">{line.name}</span>
+                          <span className={`flex items-center gap-1 text-[11px] font-medium ${
+                            line.status === "waiting" ? "text-muted-foreground" :
+                            line.status === "searching" || line.status === "extracting" ? "text-primary" :
+                            line.status === "done" ? "text-success" :
+                            line.status === "review" ? "text-secondary" :
+                            "text-destructive"
+                          }`}>
+                            {line.status === "waiting" && "○ Waiting"}
+                            {line.status === "searching" && <><Loader2 className="w-3 h-3 animate-spin" /> Searching</>}
+                            {line.status === "extracting" && <><Loader2 className="w-3 h-3 animate-spin" /> Extracting</>}
+                            {line.status === "done" && "✓ Done"}
+                            {line.status === "review" && "⚠ Review"}
+                            {line.status === "not_found" && "✗ Not found"}
+                          </span>
+                          <span className="text-muted-foreground truncate text-[11px]">{line.action}</span>
+                          <span className={`font-mono-data text-[11px] ${
+                            line.confidence >= 90 ? "text-success" :
+                            line.confidence >= 70 ? "text-secondary" :
+                            line.confidence > 0 ? "text-destructive" :
+                            "text-muted-foreground"
+                          }`}>
+                            {line.confidence > 0 ? `${line.confidence}%` : "—"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cancel button */}
+                {!processingDone && !processingCancelled && (
+                  <Button
+                    variant="ghost"
+                    className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 h-10"
+                    onClick={handleCancelProcessing}
+                  >
+                    ⏹ Cancel processing
+                  </Button>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 

@@ -11,11 +11,11 @@ interface ExportEntry {
 }
 
 const historyItems = [
-  { type: "invoice" as const, label: "Jantzen Mar26", count: 18, date: "30 Mar 2026", supplier: "jantzen" },
-  { type: "sale" as const, label: "Baku 30% off", count: 48, date: "28 Mar 2026", supplier: "baku" },
-  { type: "invoice" as const, label: "Seafolly Feb26", count: 24, date: "15 Feb 2026", supplier: "seafolly" },
-  { type: "sale" as const, label: "Summer clearance 50%", count: 92, date: "10 Feb 2026", supplier: "mixed" },
-  { type: "invoice" as const, label: "Bond Eye Jan26", count: 12, date: "5 Jan 2026", supplier: "bond-eye" },
+  { type: "invoice" as const, label: "Jantzen Mar26", count: 18, date: "30 Mar 2026", supplier: "jantzen", processingTime: 83 },
+  { type: "sale" as const, label: "Baku 30% off", count: 48, date: "28 Mar 2026", supplier: "baku", processingTime: 127 },
+  { type: "invoice" as const, label: "Seafolly Feb26", count: 24, date: "15 Feb 2026", supplier: "seafolly", processingTime: 96 },
+  { type: "sale" as const, label: "Summer clearance 50%", count: 92, date: "10 Feb 2026", supplier: "mixed", processingTime: 215 },
+  { type: "invoice" as const, label: "Bond Eye Jan26", count: 12, date: "5 Jan 2026", supplier: "bond-eye", processingTime: 54 },
 ];
 
 function getExportHistory(): ExportEntry[] {

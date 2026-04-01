@@ -16,6 +16,7 @@ import LightspeedGuide from "@/components/LightspeedGuide";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
 import QuickCapture from "@/components/QuickCapture";
 import OrderFormFlow from "@/components/OrderFormFlow";
+import PurchaseOrderPanel from "@/components/PurchaseOrderPanel";
 import SeasonManager from "@/components/SeasonManager";
 import ReorderPanel from "@/components/ReorderPanel";
 import SupplierPanel from "@/components/SupplierPanel";
@@ -29,7 +30,7 @@ const Index = () => {
   const [authed, setAuthed] = useState(false);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
@@ -87,6 +88,10 @@ const Index = () => {
     return <AuditLogPanel onBack={() => setActiveFlow(null)} />;
   }
 
+  if (activeFlow === "purchase_orders") {
+    return <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Top bar */}
@@ -123,6 +128,7 @@ const Index = () => {
           onStartReorder={() => setActiveFlow("reorder")}
           onStartSuppliers={() => setActiveFlow("suppliers")}
           onOpenAuditLog={() => setActiveFlow("audit_log")}
+          onStartPurchaseOrders={() => setActiveFlow("purchase_orders")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

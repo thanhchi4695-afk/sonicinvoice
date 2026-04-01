@@ -11,7 +11,6 @@ import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType } fr
 import { SEO_TITLE_PRESETS, getCtaPhrases, saveCtaPhrases, generateSeoTitle, generateSeoDescription } from "@/lib/seo-engine";
 import { CURRENCIES, LOCALES } from "@/lib/i18n";
 import { useStoreMode } from "@/hooks/use-store-mode";
-import { CURRENCIES, LOCALES } from "@/lib/i18n";
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");

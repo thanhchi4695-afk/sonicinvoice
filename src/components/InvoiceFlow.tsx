@@ -471,6 +471,99 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   );
 };
 
+// ── Lightspeed Export Download Section ─────────────────────
+import type { StoreMode } from '@/hooks/use-store-mode';
+
+function LightspeedExportDownload({ exportFormat, products, supplierName, lsSettings, mode }: {
+  exportFormat: 'shopify' | 'lightspeed_x' | 'xlsx';
+  products: { name: string; brand: string; type: string; price: number; rrp: number; status: string }[];
+  supplierName: string;
+  lsSettings: XSeriesSettings;
+  mode: StoreMode;
+}) {
+  const downloadFile = (content: string, filename: string, mime = 'text/csv') => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const month = new Date().toLocaleString('en', { month: 'short', year: '2-digit' }).replace(' ', '');
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const tag = (supplierName || 'products').toLowerCase().replace(/\s+/g, '-');
+
+  if (exportFormat === 'lightspeed_x') {
+    const xProducts: XSeriesProduct[] = products.map(p => ({
+      title: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
+      tags: `${p.brand}, ${p.type}, New Arrival`,
+    }));
+    const { csv, errors, rowCount } = generateXSeriesCSV(xProducts, lsSettings);
+    const hasErrors = errors.filter(e => e.severity === 'error').length > 0;
+    const warnings = errors.filter(e => e.severity === 'warning');
+
+    return (
+      <div className="space-y-3">
+        {/* Validation */}
+        {!hasErrors && (
+          <div className="bg-success/10 border border-success/20 rounded-lg p-3 flex items-center gap-2">
+            <Check className="w-4 h-4 text-success" />
+            <span className="text-xs text-success font-medium">✅ {products.length} products ready for Lightspeed import ({rowCount} rows)</span>
+          </div>
+        )}
+        {hasErrors && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+            <p className="text-xs text-destructive font-medium mb-1">⚠ {errors.filter(e => e.severity === 'error').length} issues found:</p>
+            {errors.filter(e => e.severity === 'error').slice(0, 5).map((e, i) => (
+              <p key={i} className="text-xs text-destructive">{e.field}: {e.message}</p>
+            ))}
+          </div>
+        )}
+        {warnings.length > 0 && (
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+            {warnings.map((w, i) => (
+              <p key={i} className="text-xs text-amber-400 flex items-start gap-1">
+                <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" /> {w.message}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {/* Step 1: Download Lightspeed CSV */}
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs font-semibold mb-1 flex items-center gap-1.5">📥 Step 1: Download Lightspeed X-Series CSV</p>
+          <p className="text-[11px] text-muted-foreground mb-3">Import this into Lightspeed POS first</p>
+          <Button variant="success" className="w-full h-12 text-sm"
+            onClick={() => downloadFile(csv, `${tag}_${month}_lightspeed_${date}.csv`)}>
+            <Download className="w-4 h-4 mr-2" /> Download Lightspeed CSV — {products.length} products
+          </Button>
+        </div>
+
+        <p className="text-[10px] text-muted-foreground text-center px-4">
+          Wait until Lightspeed has synced your products to Shopify before importing the SEO Update file.
+        </p>
+
+        {/* Step 2: SEO Update */}
+        <ShopifySeoUpdateSection products={products} supplierName={supplierName} />
+      </div>
+    );
+  }
+
+  // Shopify / XLSX mode
+  return (
+    <div className="flex flex-col items-center">
+      <div className="w-20 h-20 rounded-full bg-success/15 flex items-center justify-center mb-6">
+        <Check className="w-10 h-10 text-success" />
+      </div>
+      <h3 className="text-xl font-bold font-display mb-2">Your file is ready</h3>
+      <p className="text-sm text-muted-foreground mb-6">{products.length} products, {exportFormat === 'xlsx' ? 'Excel' : 'Shopify'}-ready format</p>
+      <Button variant="success" className="w-full max-w-xs h-14 text-base">
+        <Download className="w-5 h-5 mr-2" /> Download {exportFormat === 'xlsx' ? 'Excel file' : mode.exportLabel}
+      </Button>
+    </div>
+  );
+}
+
 // ── Shopify SEO Update Companion Export ────────────────────
 function ShopifySeoUpdateSection({ products, supplierName }: {
   products: { name: string; brand: string; type: string; price: number; rrp: number; status: string }[];

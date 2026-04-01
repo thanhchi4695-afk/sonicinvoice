@@ -7,7 +7,7 @@ import {
   getLocations, updateConnectionSettings, ShopifyConnection,
 } from "@/lib/shopify-api";
 import { getApiKeys, saveApiKeys, getCacheStats, clearCache, type PriceApiKeys } from "@/lib/price-intelligence";
-import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType } from "@/lib/prompt-builder";
+import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType, type LightspeedVersion } from "@/lib/prompt-builder";
 import { SEO_TITLE_PRESETS, getCtaPhrases, saveCtaPhrases, generateSeoTitle, generateSeoDescription } from "@/lib/seo-engine";
 import { CURRENCIES, LOCALES } from "@/lib/i18n";
 import { useStoreMode } from "@/hooks/use-store-mode";

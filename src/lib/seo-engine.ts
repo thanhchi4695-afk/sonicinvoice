@@ -1,5 +1,6 @@
 // SEO Engine — dynamic title, description, feature detection, CTA rotation
-import { getStoreConfig, getIndustryConfig, type StoreConfig } from './prompt-builder';
+import { getStoreConfig, type StoreConfig } from './prompt-builder';
+import { getIndustryDefinition } from './industry-config';
 
 // ── Types ──────────────────────────────────────────────────
 export interface SeoProduct {

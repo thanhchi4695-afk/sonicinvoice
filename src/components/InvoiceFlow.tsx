@@ -176,6 +176,23 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [savedTemplate, setSavedTemplate] = useState(false);
 
+  // Processing timer state
+  const [processStartTime, setProcessStartTime] = useState<number | null>(null);
+  const [processingElapsed, setProcessingElapsed] = useState(0);
+  const [processingDone, setProcessingDone] = useState(false);
+  const [finalProcessingTime, setFinalProcessingTime] = useState(0);
+  const [showSpeedTips, setShowSpeedTips] = useState(false);
+
+  // Timer tick
+  useEffect(() => {
+    if (processStartTime && !processingDone) {
+      const interval = setInterval(() => {
+        setProcessingElapsed(Math.floor((Date.now() - processStartTime) / 1000));
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [processStartTime, processingDone]);
+
   // Check for template match when supplier changes
   useEffect(() => {
     if (supplierName.trim()) {
@@ -199,14 +216,32 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       incrementTemplateUse(supplierName);
     }
     setFileName("invoice_jantzen_mar26.pdf");
+    setProcessStartTime(Date.now());
+    setProcessingDone(false);
+    setProcessingElapsed(0);
     setTimeout(() => setStep(2), 300);
+    const duration = useTemplate ? 1500 : 3000;
     setTimeout(() => {
+      const elapsed = Math.round(duration / 1000);
+      setProcessingDone(true);
+      setFinalProcessingTime(elapsed);
       setStep(3);
+      if (elapsed > 3) setShowSpeedTips(true);
       // Show save-template prompt if no existing template
       if (!matchedTemplate && supplierName.trim()) {
         setShowSaveTemplate(true);
       }
-    }, useTemplate ? 1500 : 3000); // Faster with template
+      // Save to processing history
+      const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
+      history.unshift({
+        supplier: supplierName || "Unknown",
+        lines: 4,
+        processingTime: elapsed,
+        matchRate: 94,
+        date: new Date().toISOString(),
+      });
+      localStorage.setItem("processing_history", JSON.stringify(history.slice(0, 100)));
+    }, duration);
   };
 
   // Simulated rules-applied feedback
@@ -348,13 +383,17 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin-slow mb-6" />
           <h3 className="text-lg font-semibold font-display mb-2">Reading your invoice...</h3>
           <p className="text-sm text-muted-foreground text-center">Extracting product names, prices, and quantities</p>
+          <p className="text-xs text-muted-foreground mt-3 font-mono-data">
+            ⏱ {Math.floor(processingElapsed / 60)}:{String(processingElapsed % 60).padStart(2, "0")} elapsed
+            {useTemplate ? " · ~0:02 remaining" : " · ~0:03 remaining"}
+          </p>
           {useTemplate && matchedTemplate && (
-            <p className="text-xs text-primary mt-3 flex items-center gap-1">
+            <p className="text-xs text-primary mt-2 flex items-center gap-1">
               <Zap className="w-3 h-3" /> Using {matchedTemplate.supplier} template — faster parsing
             </p>
           )}
           {customInstructions.trim() && (
-            <p className="text-xs text-primary mt-3">🤖 Applying your custom instructions...</p>
+            <p className="text-xs text-primary mt-2">🤖 Applying your custom instructions...</p>
           )}
         </div>
       )}
@@ -405,6 +444,30 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             <div className="bg-success/10 border border-success/20 rounded-lg p-2 mb-3 flex items-center gap-2">
               <Check className="w-3.5 h-3.5 text-success" />
               <span className="text-xs text-success font-medium">Template saved — future {supplierName} invoices will parse faster</span>
+            </div>
+          )}
+
+          {/* Processing time banner */}
+          {processingDone && finalProcessingTime > 0 && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 mb-3 flex items-center gap-2">
+              <span className="text-xs text-primary font-medium font-mono-data">
+                ✅ {mockProducts.length} lines enriched in {finalProcessingTime < 60 ? `${finalProcessingTime}s` : `${Math.floor(finalProcessingTime / 60)}m ${finalProcessingTime % 60}s`}
+              </span>
+            </div>
+          )}
+
+          {/* Speed tips */}
+          {showSpeedTips && (
+            <div className="bg-muted/50 border border-border rounded-lg p-3 mb-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-semibold">💡 Speed tips for faster processing</p>
+                <button onClick={() => setShowSpeedTips(false)} className="text-muted-foreground"><X className="w-3.5 h-3.5" /></button>
+              </div>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>• Upload your supplier catalog to catalog memory — next time, products will match in seconds without web search</p>
+                <p>• Save barcodes after each invoice — barcode matching is 10× faster than name matching</p>
+                <p>• Turn off image search for restock orders — you already have photos for existing products</p>
+              </div>
             </div>
           )}
 

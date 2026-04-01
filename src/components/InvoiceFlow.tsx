@@ -427,67 +427,83 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     matchSource?: MatchSource;
   }
 
-  const [productGroups, setProductGroups] = useState<ProductGroup[]>([
-    {
-      styleGroup: "Mara One Piece",
-      name: "Bond Eye Mara One Piece",
-      brand: "Bond Eye",
-      type: "One Piece",
-      price: 89.95,
-      rrp: 219.95,
-      status: "ready",
-      metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" },
-      isGrouped: true,
-      variants: [
-        { sku: "BE2204-BLK-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
-        { sku: "BE2204-BLK-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Black", qty: 3, price: 89.95, rrp: 219.95 },
-        { sku: "BE2204-BLK-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
-        { sku: "BE2204-NAV-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Navy", qty: 1, price: 89.95, rrp: 219.95 },
-        { sku: "BE2204-NAV-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Navy", qty: 3, price: 89.95, rrp: 219.95 },
-        { sku: "BE2204-NAV-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Navy", qty: 2, price: 89.95, rrp: 219.95 },
-      ],
-    },
-    {
-      styleGroup: null as any,
-      name: "Seafolly Collective Bikini Top - Navy",
-      brand: "Seafolly",
-      type: "Bikini Tops",
-      price: 45.00,
-      rrp: 109.95,
-      status: "ready",
-      metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" },
-      isGrouped: false,
-      variants: [{ sku: "SF10023", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 6, price: 45.00, rrp: 109.95 }],
-    },
-    {
-      styleGroup: null as any,
-      name: "Baku Riviera High Waist Pant - Ivory",
-      brand: "Baku",
-      type: "Bikini Bottoms",
-      price: 38.00,
-      rrp: 89.95,
-      status: "review",
-      metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" },
-      isGrouped: false,
-      variants: [{ sku: "BK20015", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 4, price: 38.00, rrp: 89.95 }],
-    },
-    {
-      styleGroup: "Retro Racerback",
-      name: "Jantzen Retro Racerback",
-      brand: "Jantzen",
-      type: "One Piece",
-      price: 65.00,
-      rrp: 159.95,
-      status: "ready",
-      metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" },
-      isGrouped: true,
-      variants: [
-        { sku: "JA81520-COR-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
-        { sku: "JA81520-COR-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Coral", qty: 3, price: 65.00, rrp: 159.95 },
-        { sku: "JA81520-COR-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
-      ],
-    },
-  ]);
+  const [productGroups, setProductGroups] = useState<ProductGroup[]>(() => {
+    // Run barcode matching on init to determine match sources
+    const groups: ProductGroup[] = [
+      {
+        styleGroup: "Mara One Piece",
+        name: "Bond Eye Mara One Piece",
+        brand: "Bond Eye",
+        type: "One Piece",
+        price: 89.95,
+        rrp: 219.95,
+        status: "ready",
+        metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" },
+        isGrouped: true,
+        barcode: "9350444555666",
+        vendorCode: "BE2204",
+        variants: [
+          { sku: "BE2204-BLK-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
+          { sku: "BE2204-BLK-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Black", qty: 3, price: 89.95, rrp: 219.95 },
+          { sku: "BE2204-BLK-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
+          { sku: "BE2204-NAV-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Navy", qty: 1, price: 89.95, rrp: 219.95 },
+          { sku: "BE2204-NAV-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Navy", qty: 3, price: 89.95, rrp: 219.95 },
+          { sku: "BE2204-NAV-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Navy", qty: 2, price: 89.95, rrp: 219.95 },
+        ],
+      },
+      {
+        styleGroup: null as any,
+        name: "Seafolly Collective Bikini Top - Navy",
+        brand: "Seafolly",
+        type: "Bikini Tops",
+        price: 45.00,
+        rrp: 109.95,
+        status: "ready",
+        metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" },
+        isGrouped: false,
+        barcode: "9350987654321",
+        vendorCode: "SF-COL-BK",
+        variants: [{ sku: "SF10023", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 6, price: 45.00, rrp: 109.95 }],
+      },
+      {
+        styleGroup: null as any,
+        name: "Baku Riviera High Waist Pant - Ivory",
+        brand: "Baku",
+        type: "Bikini Bottoms",
+        price: 38.00,
+        rrp: 89.95,
+        status: "review",
+        metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" },
+        isGrouped: false,
+        barcode: "",
+        vendorCode: "BK-RIV-HW",
+        variants: [{ sku: "BK20015", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 4, price: 38.00, rrp: 89.95 }],
+      },
+      {
+        styleGroup: "Retro Racerback",
+        name: "Jantzen Retro Racerback",
+        brand: "Jantzen",
+        type: "One Piece",
+        price: 65.00,
+        rrp: 159.95,
+        status: "ready",
+        metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" },
+        isGrouped: true,
+        barcode: "9351234567890",
+        vendorCode: "JA-RR-26",
+        variants: [
+          { sku: "JA81520-COR-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
+          { sku: "JA81520-COR-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Coral", qty: 3, price: 65.00, rrp: 159.95 },
+          { sku: "JA81520-COR-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
+        ],
+      },
+    ];
+    // Run matching for each group
+    return groups.map(g => {
+      const result = matchProduct(g.barcode, g.variants[0]?.sku, g.name);
+      return { ...g, matchSource: result.source };
+    });
+  });
 
   // Flatten for backward-compat with cost tracking etc.
   const mockProducts = productGroups.map(g => ({

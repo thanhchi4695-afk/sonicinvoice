@@ -464,158 +464,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         </div>
       )}
 
-      {/* Step 4: Download */}
+      {/* Step 4: Export Review */}
       {step === 4 && (
-        <div className="px-4 pt-6 pb-24">
-          {/* Export format selector */}
-          <div className="mb-6">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Select export format</p>
-            <div className="space-y-2">
-              {[
-                { id: 'shopify' as const, label: '🛍️ Shopify CSV', desc: 'Standard Shopify product import' },
-                { id: 'lightspeed_x' as const, label: '🖥️ Lightspeed X-Series', desc: 'For Lightspeed POS → Shopify workflow' },
-                { id: 'xlsx' as const, label: '📊 Excel (.xlsx)', desc: 'For manual review' },
-              ].map(fmt => (
-                <button
-                  key={fmt.id}
-                  onClick={() => setExportFormat(fmt.id)}
-                  className={`w-full rounded-lg border-2 p-3 text-left transition-all flex items-center gap-3 ${
-                    exportFormat === fmt.id ? 'border-primary bg-primary/5' : 'border-border bg-card'
-                  }`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold">{fmt.label}</p>
-                    <p className="text-xs text-muted-foreground">{fmt.desc}</p>
-                  </div>
-                  {exportFormat === fmt.id && <Check className="w-4 h-4 text-primary shrink-0" />}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Lightspeed X-Series settings */}
-          {exportFormat === 'lightspeed_x' && (
-            <div className="mb-6">
-              <button onClick={() => setShowLsSettings(!showLsSettings)}
-                className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                <Settings className="w-3.5 h-3.5" />
-                <span className="font-medium">Lightspeed export settings</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${showLsSettings ? 'rotate-180' : ''}`} />
-              </button>
-              {showLsSettings && (
-                <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Outlet name (exactly as in Lightspeed)</label>
-                    <input value={lsSettings.outletName} onChange={e => { const v = e.target.value; setLsSettings(s => ({ ...s, outletName: v })); }}
-                      placeholder="Main_Store" className="w-full h-9 rounded-md bg-input border border-border px-3 text-xs font-mono-data" />
-                    <p className="text-[10px] text-muted-foreground mt-1">Use underscores instead of spaces. Find in Lightspeed → Setup → Outlets.</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Tax name</label>
-                    <input value={lsSettings.taxName} onChange={e => { const v = e.target.value; setLsSettings(s => ({ ...s, taxName: v })); }}
-                      placeholder="GST" className="w-full h-9 rounded-md bg-input border border-border px-3 text-xs" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Name format</label>
-                    <div className="flex gap-2">
-                      {(['brand_first', 'product_only'] as const).map(nf => (
-                        <button key={nf} onClick={() => setLsSettings(s => ({ ...s, nameFormat: nf }))}
-                          className={`flex-1 rounded-md border p-2 text-xs text-center ${lsSettings.nameFormat === nf ? 'border-primary bg-primary/5' : 'border-border'}`}>
-                          {nf === 'brand_first' ? 'Brand + Product' : 'Product only'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Attribute order</label>
-                    <div className="flex gap-2">
-                      {(['size_first', 'colour_first'] as const).map(ao => (
-                        <button key={ao} onClick={() => setLsSettings(s => ({ ...s, attributeOrder: ao }))}
-                          className={`flex-1 rounded-md border p-2 text-xs text-center ${lsSettings.attributeOrder === ao ? 'border-primary bg-primary/5' : 'border-border'}`}>
-                          {ao === 'size_first' ? 'Size → Colour' : 'Colour → Size'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" checked={lsSettings.useReorderPoints}
-                      onChange={e => setLsSettings(s => ({ ...s, useReorderPoints: e.target.checked }))}
-                      className="w-4 h-4 rounded border-border accent-primary" />
-                    <span className="text-xs text-muted-foreground">Set reorder points</span>
-                  </div>
-                  {lsSettings.useReorderPoints && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] text-muted-foreground mb-0.5 block">Reorder point</label>
-                        <input type="number" value={lsSettings.reorderPoint}
-                          onChange={e => setLsSettings(s => ({ ...s, reorderPoint: Number(e.target.value) }))}
-                          className="w-full h-8 rounded-md bg-input border border-border px-2 text-xs" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-muted-foreground mb-0.5 block">Reorder amount</label>
-                        <input type="number" value={lsSettings.reorderAmount}
-                          onChange={e => setLsSettings(s => ({ ...s, reorderAmount: Number(e.target.value) }))}
-                          className="w-full h-8 rounded-md bg-input border border-border px-2 text-xs" />
-                      </div>
-                    </div>
-                  )}
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => { saveXSeriesSettings(lsSettings); }}>
-                    <Save className="w-3.5 h-3.5 mr-1" /> Save Lightspeed settings
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Download area */}
-          <LightspeedExportDownload
-            exportFormat={exportFormat}
-            products={mockProducts}
-            supplierName={supplierName}
-            lsSettings={lsSettings}
-            mode={mode}
-          />
-
-          {/* R-Series import note */}
-          {mode.isRSeries && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 mt-4">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                <div className="text-xs space-y-2">
-                  <p className="font-semibold text-amber-300">R-Series Import Note</p>
-                  <p className="text-muted-foreground">For large imports (100+ products), Lightspeed recommends submitting to their Retail Imports Team. Allow 3–5 business days for processing.</p>
-                  <p className="text-muted-foreground">For small imports (&lt;100 products): go to Inventory → Import Items → New Import in R-Series. Select "Create new items only".</p>
-                  <p className="text-amber-400 font-medium">⚠ The System ID column must be BLANK for new products. Never enter a number in the System ID column.</p>
-                  <p className="text-muted-foreground">⚠ QOH (Quantity on Hand) ADDS to existing inventory — it does not replace it.</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Lightspeed Stock Order restock option */}
-          {mode.isLightspeed && (
-            <LightspeedRestockSection products={mockProducts} supplierName={supplierName} />
-          )}
-
-          {/* Lightspeed sync rules reminder */}
-          {(exportFormat === 'lightspeed_x' || mode.isLightspeed) && (
-            <div className="bg-card border border-purple-500/20 rounded-lg p-4 mt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Monitor className="w-4 h-4 text-purple-400" />
-                <span className="text-xs font-semibold">After importing into Lightspeed</span>
-              </div>
-              <div className="text-xs space-y-1.5 text-muted-foreground">
-                <p>✅ <span className="text-foreground">DO in Shopify:</span> Add photos, SEO titles, collections</p>
-                <p>❌ <span className="text-foreground">DON'T in Shopify:</span> Edit name, price, SKU, description</p>
-                <p className="text-[10px] mt-2 text-muted-foreground/70">Editing product details in Shopify will break the sync with Lightspeed. Always edit products in Lightspeed POS.</p>
-              </div>
-            </div>
-          )}
-
-          <button onClick={onBack} className="w-full mt-6 text-sm text-primary font-medium text-center">
-            Import another invoice
-          </button>
-        </div>
+        <ExportReviewScreen
+          products={mockProducts.map(p => ({
+            ...p,
+            hasImage: p.status === "ready",
+            hasSeo: true,
+            hasTags: true,
+            confidence: p.status === "ready" ? "high" as const : "medium" as const,
+            isNew: true,
+          }))}
+          supplierName={supplierName}
+          onBack={() => setStep(3)}
+        />
       )}
     </div>
   );

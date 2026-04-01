@@ -309,7 +309,7 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
       })()}
 
       {/* Stat tiles */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="bg-card rounded-lg border border-border p-4 text-center">
           <p className="text-2xl font-bold font-display">3</p>
           <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Lightspeed imports' : 'CSV exports'}</p>
@@ -321,6 +321,11 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         <div className="bg-card rounded-lg border border-border p-4 text-center">
           <p className="text-2xl font-bold font-display">{getStockUpdatesCount()}</p>
           <p className="text-xs text-muted-foreground mt-1">📦 Stock updates</p>
+        </div>
+        <div className="bg-card rounded-lg border border-border p-4 text-center cursor-pointer hover:border-primary/30 transition-colors" onClick={onStartCatalogMemory}>
+          <p className="text-2xl font-bold font-display">{getTotalCatalogProducts()}</p>
+          <p className="text-xs text-muted-foreground mt-1">📚 Catalog products</p>
+          <p className="text-[9px] text-muted-foreground/60 mt-0.5">More catalogs = faster matching</p>
         </div>
       </div>
 

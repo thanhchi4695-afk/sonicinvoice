@@ -1,5 +1,6 @@
 // SEO Engine — dynamic title, description, feature detection, CTA rotation
-import { getStoreConfig, getIndustryConfig, type StoreConfig } from './prompt-builder';
+import { getStoreConfig, type StoreConfig } from './prompt-builder';
+import { getIndustryDefinition } from './industry-config';
 
 // ── Types ──────────────────────────────────────────────────
 export interface SeoProduct {
@@ -23,53 +24,9 @@ export interface SeoResult {
 // ── CTA Storage ────────────────────────────────────────────
 const CTA_KEY = 'seo_cta_phrases_skupilot';
 
-const INDUSTRY_CTA_DEFAULTS: Record<string, string[]> = {
-  swimwear: [
-    'Shop the full collection at {store}',
-    'New arrivals at {store} {city}',
-    'Free shipping over {threshold} at {store}',
-  ],
-  beauty: [
-    'Shop {brand} at {store} — free delivery over {threshold}',
-    'Discover your new favourite at {store}',
-    'Authentic {brand} with fast shipping at {store}',
-  ],
-  fashion: [
-    'Shop the latest from {brand} at {store}',
-    'New season arrivals — shop now at {store}',
-    'Style meets value at {store}',
-  ],
-  clothing: [
-    'Shop the latest from {brand} at {store}',
-    'New season arrivals — shop now at {store}',
-    'Style meets value at {store}',
-  ],
-  jewellery: [
-    'Beautiful {brand} jewellery at {store}',
-    'Free gift wrapping at {store}',
-    'Shop {brand} at {store} — perfect for gifting',
-  ],
-  electronics: [
-    'Shop {brand} at {store} — fast delivery',
-    'Latest tech at {store}',
-    'Free shipping over {threshold} at {store}',
-  ],
-  health: [
-    'Shop {brand} supplements at {store}',
-    'Fast delivery from {store}',
-    'Quality {brand} at {store}',
-  ],
-  home: [
-    'Shop {brand} homewares at {store}',
-    'Transform your space with {store}',
-    'Free shipping over {threshold} at {store}',
-  ],
-  general: [
-    'Shop now at {store}',
-    'Free shipping over {threshold} at {store}',
-    'New arrivals at {store}',
-  ],
-};
+function getIndustryCtas(industry: string): string[] {
+  return getIndustryDefinition(industry).seoCtas;
+}
 
 export function getCtaPhrases(industry?: string): string[] {
   try {
@@ -79,7 +36,7 @@ export function getCtaPhrases(industry?: string): string[] {
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch {}
-  return INDUSTRY_CTA_DEFAULTS[industry || 'general'] || INDUSTRY_CTA_DEFAULTS.general;
+  return getIndustryCtas(industry || 'general');
 }
 
 export function saveCtaPhrases(phrases: string[]) {
@@ -87,55 +44,12 @@ export function saveCtaPhrases(phrases: string[]) {
 }
 
 // ── Feature Phrase Detection ───────────────────────────────
-const INDUSTRY_FEATURES: Record<string, { pattern: RegExp; phrase: string }[]> = {
-  swimwear: [
-    { pattern: /underwire/i, phrase: 'With underwire support.' },
-    { pattern: /chlorine\s*resist/i, phrase: 'Chlorine resistant fabric.' },
-    { pattern: /plus\s*size|extended\s*siz/i, phrase: 'Available in extended sizing.' },
-    { pattern: /[d-g]\s*cup|full\s*bust/i, phrase: 'Full bust support in D-G cup.' },
-    { pattern: /upf|sun\s*protect/i, phrase: 'UPF 50+ sun protection.' },
-  ],
-  beauty: [
-    { pattern: /cruelty[\s-]*free/i, phrase: 'Cruelty-free formula.' },
-    { pattern: /\bvegan\b/i, phrase: '100% vegan.' },
-    { pattern: /\bspf\b/i, phrase: 'With SPF sun protection.' },
-    { pattern: /\bnatural\b/i, phrase: 'Made with natural ingredients.' },
-    { pattern: /anti[\s-]*age?ing/i, phrase: 'Anti-ageing formula.' },
-  ],
-  fashion: [
-    { pattern: /sustainab/i, phrase: 'Made from sustainable materials.' },
-    { pattern: /organic\s*cotton/i, phrase: '100% organic cotton.' },
-    { pattern: /plus\s*size|extended\s*siz/i, phrase: 'Available in extended sizes.' },
-  ],
-  clothing: [
-    { pattern: /sustainab/i, phrase: 'Made from sustainable materials.' },
-    { pattern: /organic\s*cotton/i, phrase: '100% organic cotton.' },
-    { pattern: /plus\s*size|extended\s*siz/i, phrase: 'Available in extended sizes.' },
-  ],
-  jewellery: [
-    { pattern: /sterling\s*silver/i, phrase: 'Sterling silver.' },
-    { pattern: /gold\s*plated/i, phrase: 'Gold plated.' },
-    { pattern: /hypoallergenic/i, phrase: 'Hypoallergenic.' },
-  ],
-  electronics: [
-    { pattern: /\bwireless\b/i, phrase: 'Wireless connectivity.' },
-    { pattern: /\busb[\s-]*c\b/i, phrase: 'USB-C compatible.' },
-    { pattern: /\bbluetooth\b/i, phrase: 'Bluetooth enabled.' },
-  ],
-  health: [
-    { pattern: /\bvegan\b/i, phrase: 'Vegan-friendly formula.' },
-    { pattern: /gluten[\s-]*free/i, phrase: 'Gluten-free.' },
-    { pattern: /dairy[\s-]*free/i, phrase: 'Dairy-free.' },
-  ],
-  home: [
-    { pattern: /handmade/i, phrase: 'Handmade.' },
-    { pattern: /sustainab/i, phrase: 'Made from sustainable materials.' },
-  ],
-  general: [],
-};
+function getIndustryFeatures(industry: string): { pattern: RegExp; phrase: string }[] {
+  return getIndustryDefinition(industry).featureRules;
+}
 
 export function detectFeatures(product: SeoProduct, industry: string): string {
-  const rules = INDUSTRY_FEATURES[industry] || [];
+  const rules = getIndustryFeatures(industry);
   const searchText = `${product.title} ${product.description || ''} ${(product.tags || []).join(' ')}`;
   const found: string[] = [];
   for (const rule of rules) {
@@ -196,20 +110,10 @@ export function generateSeoTitle(
 }
 
 // ── SEO Description Generator ──────────────────────────────
-const DESC_TEMPLATES: Record<string, string> = {
-  swimwear: 'Shop the {product} by {brand}. {features}New arrivals at {store} {city}.',
-  beauty: 'Discover {product} by {brand}. {features}Shop now at {store} with free delivery.',
-  fashion: '{brand} {product}. {features}Shop the latest at {store}.',
-  clothing: '{brand} {product}. {features}Shop the latest at {store}.',
-  jewellery: '{brand} {product}. {features}Beautiful jewellery at {store}.',
-  electronics: '{product} by {brand}. {features}Shop at {store} — fast delivery.',
-  health: '{product} by {brand}. {features}Shop at {store}.',
-  home: '{product} by {brand}. {features}Shop homewares at {store}.',
-  general: '{product} by {brand}. {features}{cta} at {store}.',
-};
+// DESC_TEMPLATES now derived from industry-config
 
 export function getDefaultDescTemplate(industry: string): string {
-  return DESC_TEMPLATES[industry] || DESC_TEMPLATES.general;
+  return getIndustryDefinition(industry).seoDescTemplate;
 }
 
 export function generateSeoDescription(
@@ -284,17 +188,11 @@ export const SEO_TITLE_PRESETS = [
   { label: 'Dash style', template: '{product} — {brand} at {store}' },
 ];
 
-export const SEO_DESC_PRESETS: Record<string, { label: string; template: string }[]> = {
-  swimwear: [
-    { label: 'Default', template: 'Shop the {product} by {brand}. {features}New arrivals at {store} {city}.' },
+export function getSeoDescPresets(industry: string): { label: string; template: string }[] {
+  const def = getIndustryDefinition(industry);
+  return [
+    { label: 'Default', template: def.seoDescTemplate },
     { label: 'Simple', template: '{product} by {brand}. {features}Shop at {store}.' },
-  ],
-  beauty: [
-    { label: 'Default', template: 'Discover {product} by {brand}. {features}Shop now at {store} with free delivery.' },
-    { label: 'Simple', template: '{product} by {brand}. {features}Shop at {store}.' },
-  ],
-  general: [
-    { label: 'Default', template: '{product} by {brand}. {features}{cta} at {store}.' },
     { label: 'With city', template: 'Shop {product} by {brand} at {store} {city}. {features}' },
-  ],
-};
+  ];
+}

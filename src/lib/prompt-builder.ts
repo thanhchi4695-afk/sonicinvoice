@@ -24,6 +24,7 @@ export interface IndustryConfig {
   descriptionFeatures: string;
   productTypes: { name: string }[];
   defaultType: string;
+  icon?: string;
 }
 
 export interface BrandEntry {
@@ -73,102 +74,28 @@ export function saveStoreConfig(c: Partial<StoreConfig>) {
   localStorage.setItem(STORE_CONFIG_KEY, JSON.stringify({ ...current, ...c }));
 }
 
-// ── Industry presets ───────────────────────────────────────
-const INDUSTRIES: Record<string, IndustryConfig> = {
-  swimwear: {
-    displayName: 'Swimwear & Resort',
-    descriptionLength: '2-3',
-    descriptionStyle: 'Write in a friendly, beach-lifestyle tone.',
-    descriptionFeatures: 'Mention: fabric, support, cut, who it suits.',
-    productTypes: [
-      { name: 'One Piece' }, { name: 'Bikini Tops' }, { name: 'Bikini Bottoms' },
-      { name: 'Kaftan' }, { name: 'Sarong' }, { name: 'Rashguard' }, { name: 'Board Shorts' },
-      { name: 'Cover Up' }, { name: 'Beach Towel' }, { name: 'Accessories' },
-    ],
-    defaultType: 'Swimwear',
-  },
-  beauty: {
-    displayName: 'Beauty & Skincare',
-    descriptionLength: '2-3',
-    descriptionStyle: 'Write in a confident, aspirational beauty tone.',
-    descriptionFeatures: 'Mention: key ingredients, skin type, finish.',
-    productTypes: [
-      { name: 'Cleanser' }, { name: 'Moisturiser' }, { name: 'Serum' }, { name: 'Sunscreen' },
-      { name: 'Foundation' }, { name: 'Lipstick' }, { name: 'Mascara' }, { name: 'Fragrance' },
-    ],
-    defaultType: 'Beauty',
-  },
-  fashion: {
-    displayName: 'Fashion & Clothing',
-    descriptionLength: '2-3',
-    descriptionStyle: 'Write in a stylish, trend-aware tone.',
-    descriptionFeatures: 'Mention: fabric, fit, occasion, styling suggestions.',
-    productTypes: [
-      { name: 'Dress' }, { name: 'Top' }, { name: 'Pants' }, { name: 'Skirt' },
-      { name: 'Jacket' }, { name: 'Knitwear' }, { name: 'Accessories' }, { name: 'Shoes' },
-    ],
-    defaultType: 'Clothing',
-  },
-  jewellery: {
-    displayName: 'Jewellery & Accessories',
-    descriptionLength: '2-3',
-    descriptionStyle: 'Write in an elegant, gift-worthy tone.',
-    descriptionFeatures: 'Mention: material, finish, dimensions, occasion.',
-    productTypes: [
-      { name: 'Necklace' }, { name: 'Bracelet' }, { name: 'Ring' }, { name: 'Earrings' },
-      { name: 'Bangle' }, { name: 'Pendant' }, { name: 'Watch' }, { name: 'Anklet' },
-    ],
-    defaultType: 'Jewellery',
-  },
-  electronics: {
-    displayName: 'Electronics & Tech',
-    descriptionLength: '3-4',
-    descriptionStyle: 'Focus on specs, compatibility, and use cases.',
-    descriptionFeatures: 'Mention: key specs, compatibility, dimensions, use case.',
-    productTypes: [
-      { name: 'Phone' }, { name: 'Laptop' }, { name: 'Tablet' }, { name: 'Headphones' },
-      { name: 'Speaker' }, { name: 'Camera' }, { name: 'Accessory' }, { name: 'Cable' },
-    ],
-    defaultType: 'Electronics',
-  },
-  health: {
-    displayName: 'Health & Wellness',
-    descriptionLength: '2-3',
-    descriptionStyle: 'Focus on key ingredients and health benefits.',
-    descriptionFeatures: 'Mention: key nutrients, serving size, flavour.',
-    productTypes: [
-      { name: 'Supplement' }, { name: 'Protein' }, { name: 'Vitamin' }, { name: 'Snack' },
-      { name: 'Drink' }, { name: 'Equipment' },
-    ],
-    defaultType: 'Health',
-  },
-  home: {
-    displayName: 'Home & Living',
-    descriptionLength: '2-3',
-    descriptionStyle: 'Describe the aesthetic, material, and use.',
-    descriptionFeatures: 'Mention: material, dimensions, care instructions, styling.',
-    productTypes: [
-      { name: 'Cushion' }, { name: 'Throw' }, { name: 'Candle' }, { name: 'Vase' },
-      { name: 'Frame' }, { name: 'Tableware' }, { name: 'Storage' },
-    ],
-    defaultType: 'Homeware',
-  },
-  general: {
-    displayName: 'General Retail',
-    descriptionLength: '2-3',
-    descriptionStyle: 'Write in a helpful, informative retail tone.',
-    descriptionFeatures: 'Mention: key features, material, and use case.',
-    productTypes: [{ name: 'General' }],
-    defaultType: 'General',
-  },
-};
+// ── Industry presets (delegated to industry-config) ───────
+import { getIndustryDefinition, getIndustryList as getIndustryListFromConfig } from './industry-config';
+
+function industryToConfig(id: string): IndustryConfig {
+  const def = getIndustryDefinition(id);
+  return {
+    displayName: def.displayName,
+    descriptionLength: def.descriptionLength,
+    descriptionStyle: def.descriptionStyle,
+    descriptionFeatures: def.descriptionFeatures,
+    productTypes: def.productTypes.map(t => ({ name: t.name })),
+    defaultType: def.defaultType,
+    icon: def.icon,
+  };
+}
 
 export function getIndustryConfig(industry: string): IndustryConfig {
-  return INDUSTRIES[industry] || INDUSTRIES.general;
+  return industryToConfig(industry);
 }
 
 export function getIndustryList(): { id: string; name: string }[] {
-  return Object.entries(INDUSTRIES).map(([id, c]) => ({ id, name: c.displayName }));
+  return getIndustryListFromConfig().map(i => ({ id: i.id, name: i.name }));
 }
 
 // ── Brand Directory ────────────────────────────────────────

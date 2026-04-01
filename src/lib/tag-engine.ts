@@ -1,6 +1,7 @@
 // Tag Configuration Engine — industry-aware, fully configurable
 
-import { getStoreConfig, getIndustryConfig } from './prompt-builder';
+import { getStoreConfig } from './prompt-builder';
+import { getIndustryDefinition } from './industry-config';
 
 // ── Types ──────────────────────────────────────────────────
 export interface ProductTypeEntry {
@@ -71,73 +72,42 @@ function toTag(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
-const DEFAULT_LAYERS: TagLayer[] = [
-  { id: uid(), name: 'Gender', description: 'One tag per product', type: 'single', values: ['Womens', 'Mens', 'Kids', 'Unisex'], active: true, order: 1 },
-  { id: uid(), name: 'Department', description: 'Product department', type: 'auto', values: [], active: true, order: 2 },
-  { id: uid(), name: 'Product Type', description: 'From product type list', type: 'auto', values: [], active: true, order: 3 },
-  { id: uid(), name: 'Brand', description: 'Vendor/brand name', type: 'auto', values: [], active: true, order: 4 },
-  { id: uid(), name: 'Arrival Month', description: 'Month product arrived', type: 'date', values: [], active: true, order: 5 },
-  { id: uid(), name: 'Price Status', description: 'Full price or on sale', type: 'single', values: ['full_price', 'sale'], active: true, order: 6 },
-  { id: uid(), name: 'Special Properties', description: 'Detected from keywords', type: 'multiple', values: [], active: true, order: 7 },
-];
+// DEFAULT_LAYERS removed — now derived from industry-config
 
-const INDUSTRY_SPECIAL_RULES: Record<string, SpecialRule[]> = {
-  swimwear: [
-    { id: uid(), keyword: 'chlorine resist', tag: 'chlorine-resist', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'underwire', tag: 'underwire', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'plus size', tag: 'plus-size', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'UPF', tag: 'upf-protection', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  beauty: [
-    { id: uid(), keyword: 'cruelty-free', tag: 'cruelty-free', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'vegan', tag: 'vegan', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'SPF', tag: 'spf', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'natural', tag: 'natural', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  fashion: [
-    { id: uid(), keyword: 'sustainable', tag: 'sustainable', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'organic cotton', tag: 'organic-cotton', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'plus size', tag: 'plus-size', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  clothing: [
-    { id: uid(), keyword: 'sustainable', tag: 'sustainable', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'organic cotton', tag: 'organic-cotton', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  electronics: [
-    { id: uid(), keyword: 'wireless', tag: 'wireless', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'USB-C', tag: 'usb-c', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'Bluetooth', tag: 'bluetooth', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  health: [
-    { id: uid(), keyword: 'vegan', tag: 'vegan', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'gluten-free', tag: 'gluten-free', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'dairy-free', tag: 'dairy-free', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  jewellery: [
-    { id: uid(), keyword: 'sterling silver', tag: 'sterling-silver', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'gold plated', tag: 'gold-plated', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'hypoallergenic', tag: 'hypoallergenic', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  home: [
-    { id: uid(), keyword: 'handmade', tag: 'handmade', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'sustainable', tag: 'sustainable', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  general: [],
-};
+// INDUSTRY_SPECIAL_RULES removed — now derived from industry-config
 
 export function getIndustryTagDefaults(): TagConfig {
   const store = getStoreConfig();
-  const industry = getIndustryConfig(store.industry);
-  const types: ProductTypeEntry[] = industry.productTypes.map(t => ({
+  const def = getIndustryDefinition(store.industry);
+
+  const types: ProductTypeEntry[] = def.productTypes.map(t => ({
     name: t.name,
-    tag: toTag(t.name),
-    department: industry.displayName.split(' ')[0],
+    tag: t.tag || toTag(t.name),
+    department: t.department || def.displayName.split(' ')[0],
   }));
-  return {
-    layers: DEFAULT_LAYERS.map(l => ({ ...l, id: uid() })),
-    productTypes: types,
-    specialRules: (INDUSTRY_SPECIAL_RULES[store.industry] || []).map(r => ({ ...r, id: uid() })),
-  };
+
+  const layers: TagLayer[] = def.tagLayers.map(l => ({
+    id: uid(),
+    name: l.name,
+    description: l.description,
+    type: l.type,
+    values: l.values,
+    active: true,
+    order: l.order,
+  }));
+
+  const specialRules: SpecialRule[] = def.specialRules.map(r => ({
+    id: uid(),
+    keyword: r.keyword,
+    tag: r.tag,
+    caseSensitive: r.caseSensitive,
+    matchType: r.matchType,
+    searchTitle: true,
+    searchDescription: true,
+    active: true,
+  }));
+
+  return { layers, productTypes: types, specialRules };
 }
 
 // ── Tag Generation ─────────────────────────────────────────

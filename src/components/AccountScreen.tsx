@@ -27,18 +27,15 @@ const AccountScreen = () => {
 
   // Shopify connection
   const [shopifyUrl, setShopifyUrl] = useState("");
-  const [shopifyToken, setShopifyToken] = useState("");
-  const [shopifyVersion, setShopifyVersion] = useState("2024-10");
   const [shopifyConnected, setShopifyConnected] = useState(false);
   const [shopName, setShopName] = useState("");
-  const [showToken, setShowToken] = useState(false);
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [testMessage, setTestMessage] = useState("");
-  const [showGuide, setShowGuide] = useState(false);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [defaultLocation, setDefaultLocation] = useState("");
   const [productStatus, setProductStatus] = useState("draft");
   const [saving, setSaving] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
 
   useEffect(() => {
     const cfg = getStoreConfig();

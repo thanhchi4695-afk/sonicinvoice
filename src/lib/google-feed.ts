@@ -65,6 +65,7 @@ export interface GoogleFeedItem {
   image_link: string;
   price: string;
   sale_price: string;
+  sale_price_effective_date: string;
   availability: string;
   condition: string;
   brand: string;

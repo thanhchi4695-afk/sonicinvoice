@@ -79,3 +79,16 @@
     font-family: var(--font-mono);
   }
 }
+
+/* Mobile-first responsive improvements */
+@media (max-width: 767px) {
+  /* Touch-friendly buttons */
+  button, [role="button"], a[href] {
+    min-height: 44px;
+  }
+  /* Touch-friendly inputs */
+  input, select, textarea {
+    min-height: 44px;
+    font-size: 16px; /* prevents iOS zoom */
+  }
+}

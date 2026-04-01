@@ -814,6 +814,26 @@ const BulkSaleFlow = ({ onBack, onNavigateToGoogleFeed }: BulkSaleFlowProps) => 
                 </Button>
               )}
 
+              {downloaded && direction === 'apply' && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <h4 className="text-sm font-semibold mb-1">Google Promotions feed</h4>
+                  <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                    Show a "Special Offer" badge on these products in Google Shopping. Download and submit to Google Merchant Center → Promotions.
+                  </p>
+                  <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5" onClick={() => {
+                    const xml = generatePromotionsFeed();
+                    if (!xml) return;
+                    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = 'google_promotions_feed.xml'; a.click();
+                    URL.revokeObjectURL(url);
+                  }}>
+                    <Download className="w-3.5 h-3.5" /> Download promotions feed
+                  </Button>
+                </div>
+              )}
+
               {/* Post-download: import guide */}
               {downloaded && (
                 <div className="mt-6">

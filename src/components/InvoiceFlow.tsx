@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import { Button } from "@/components/ui/button";
+import { matchCollectionsWithBrand, checkCoverage } from "@/lib/collection-engine";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { generateXSeriesCSV, getXSeriesSettings, saveXSeriesSettings, type XSeriesSettings, type XSeriesProduct } from "@/lib/lightspeed-xseries";

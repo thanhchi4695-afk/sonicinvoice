@@ -1,9 +1,10 @@
-import { FilePlus, Percent, ChevronRight } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface HomeScreenProps {
   onStartInvoice: () => void;
   onStartSale: () => void;
+  onStartRestock: () => void;
 }
 
 const recentActivity = [
@@ -11,7 +12,7 @@ const recentActivity = [
   { type: "sale" as const, label: "Baku 30% off", count: 48, time: "5 days ago" },
 ];
 
-const HomeScreen = ({ onStartInvoice, onStartSale }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock }: HomeScreenProps) => {
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
       <h1 className="text-2xl font-bold font-display mb-1">SkuPilot</h1>
@@ -37,7 +38,7 @@ const HomeScreen = ({ onStartInvoice, onStartSale }: HomeScreenProps) => {
       </div>
 
       {/* Bulk Sale Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
             <Percent className="w-5 h-5 text-secondary" />
@@ -51,6 +52,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale }: HomeScreenProps) => {
           </div>
         </div>
         <Button variant="amber" className="w-full mt-4 h-12 text-base" onClick={onStartSale}>
+          Start <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Restock Analytics Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-destructive/15 flex items-center justify-center shrink-0">
+            <BarChart3 className="w-5 h-5 text-destructive" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Restock analytics</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Find size holes and sold-out items. Generate JOOR reorder files instantly.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Upload Shopify or JOOR inventory</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base border-destructive/30 text-destructive hover:bg-destructive/10" onClick={onStartRestock}>
           Start <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>

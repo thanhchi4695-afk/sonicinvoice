@@ -33,6 +33,25 @@ const quickInserts = [
 // ── localStorage helpers ───────────────────────────────────
 const HISTORY_KEY = 'custom_instructions_history';
 const TEMPLATES_KEY = 'invoice_templates';
+const COST_HISTORY_KEY = 'cost_history';
+
+interface CostEntry { date: string; cost: number; supplier: string; invoice: string; }
+type CostHistoryMap = Record<string, CostEntry[]>;
+
+export function getCostHistory(): CostHistoryMap {
+  try { return JSON.parse(localStorage.getItem(COST_HISTORY_KEY) || "{}"); } catch { return {}; }
+}
+
+export function saveCostHistory(h: CostHistoryMap) {
+  localStorage.setItem(COST_HISTORY_KEY, JSON.stringify(h));
+}
+
+export function addCostEntry(sku: string, entry: CostEntry) {
+  const h = getCostHistory();
+  if (!h[sku]) h[sku] = [];
+  h[sku].push(entry);
+  saveCostHistory(h);
+}
 
 function getHistory(): { text: string; label: string }[] {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }

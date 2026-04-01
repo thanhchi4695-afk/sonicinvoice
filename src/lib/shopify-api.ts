@@ -48,6 +48,15 @@ async function callProxy(body: Record<string, unknown>) {
   return data;
 }
 
+export async function initiateOAuth(shop: string): Promise<string> {
+  const { data, error } = await supabase.functions.invoke("shopify-oauth", {
+    body: { shop },
+  });
+  if (error) throw new Error(error.message || "Failed to start OAuth");
+  if (data?.error) throw new Error(data.error);
+  return data.install_url;
+}
+
 export async function testConnection(): Promise<{ shopName: string; storeUrl: string }> {
   const data = await callProxy({ action: "test" });
   return {

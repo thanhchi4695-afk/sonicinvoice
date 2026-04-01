@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2 } from "lucide-react";
+import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink } from "lucide-react";
 import { getCollectionRules, saveCollectionRules, resetCollectionRules, type CollectionRule } from "@/lib/collection-engine";
 import {
   saveConnection, testConnection, getConnection, deleteConnection,
-  getLocations, updateConnectionSettings, ShopifyConnection,
+  getLocations, updateConnectionSettings, ShopifyConnection, initiateOAuth,
 } from "@/lib/shopify-api";
 import { getApiKeys, saveApiKeys, getCacheStats, clearCache, type PriceApiKeys } from "@/lib/price-intelligence";
 import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType, type LightspeedVersion } from "@/lib/prompt-builder";
@@ -27,18 +27,15 @@ const AccountScreen = () => {
 
   // Shopify connection
   const [shopifyUrl, setShopifyUrl] = useState("");
-  const [shopifyToken, setShopifyToken] = useState("");
-  const [shopifyVersion, setShopifyVersion] = useState("2024-10");
   const [shopifyConnected, setShopifyConnected] = useState(false);
   const [shopName, setShopName] = useState("");
-  const [showToken, setShowToken] = useState(false);
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [testMessage, setTestMessage] = useState("");
-  const [showGuide, setShowGuide] = useState(false);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [defaultLocation, setDefaultLocation] = useState("");
   const [productStatus, setProductStatus] = useState("draft");
   const [saving, setSaving] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
 
   useEffect(() => {
     const cfg = getStoreConfig();
@@ -54,36 +51,41 @@ const AccountScreen = () => {
         setShopName(conn.shop_name || conn.store_url);
         setDefaultLocation(conn.default_location_id || "");
         setProductStatus(conn.product_status || "draft");
-        setShopifyVersion(conn.api_version || "2024-10");
       }
     });
+
+    // Check if returning from OAuth
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("shopify_connected") === "1") {
+      window.history.replaceState({}, "", window.location.pathname);
+      getConnection().then((conn) => {
+        if (conn) {
+          setShopifyUrl(conn.store_url);
+          setShopifyConnected(true);
+          setShopName(conn.shop_name || conn.store_url);
+        }
+      });
+    }
   }, []);
 
-  const handleTestConnection = async () => {
-    if (!shopifyUrl || !shopifyToken) {
+  const handleOAuthConnect = async () => {
+    if (!shopifyUrl) {
       setTestStatus("error");
-      setTestMessage("Enter both store URL and access token");
+      setTestMessage("Enter your store URL first");
       return;
     }
-    setTestStatus("testing");
+    setOauthLoading(true);
+    setTestStatus("idle");
     try {
-      await saveConnection(shopifyUrl, shopifyToken, shopifyVersion);
-      const result = await testConnection();
-      setTestStatus("success");
-      setTestMessage(`Connected to: ${result.shopName}`);
-      setShopName(result.shopName);
-      setShopifyConnected(true);
-      // Load locations
-      try {
-        const locs = await getLocations();
-        setLocations(locs.filter((l) => l.active));
-        if (locs.length > 0 && !defaultLocation) {
-          setDefaultLocation(String(locs[0].id));
-        }
-      } catch {}
+      const url = shopifyUrl.includes(".myshopify.com")
+        ? shopifyUrl
+        : `${shopifyUrl}.myshopify.com`;
+      const installUrl = await initiateOAuth(url);
+      window.location.href = installUrl;
     } catch (err) {
       setTestStatus("error");
-      setTestMessage(err instanceof Error ? err.message : "Connection failed");
+      setTestMessage(err instanceof Error ? err.message : "OAuth failed");
+      setOauthLoading(false);
     }
   };
 
@@ -91,7 +93,6 @@ const AccountScreen = () => {
     await deleteConnection();
     setShopifyConnected(false);
     setShopifyUrl("");
-    setShopifyToken("");
     setShopName("");
     setTestStatus("idle");
     setTestMessage("");
@@ -108,10 +109,6 @@ const AccountScreen = () => {
     } catch {}
     setSaving(false);
   };
-
-  const maskedToken = shopifyToken
-    ? "••••••••••••" + shopifyToken.slice(-4)
-    : "";
 
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
@@ -193,79 +190,40 @@ const AccountScreen = () => {
           </div>
         )}
 
-        <Field
-          label="Store URL"
-          value={shopifyUrl}
-          onChange={setShopifyUrl}
-          placeholder="yourstore.myshopify.com"
-        />
-
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Access token</label>
-          <div className="relative">
-            <input
-              type={showToken ? "text" : "password"}
-              value={shopifyToken}
-              onChange={(e) => setShopifyToken(e.target.value)}
-              placeholder="shpat_xxxxx"
-              className="w-full h-10 rounded-md bg-input border border-border px-3 pr-10 text-sm"
+        {!shopifyConnected && (
+          <>
+            <Field
+              label="Store URL"
+              value={shopifyUrl}
+              onChange={setShopifyUrl}
+              placeholder="yourstore.myshopify.com"
             />
-            <button
-              onClick={() => setShowToken(!showToken)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+
+            <Button
+              variant="outline"
+              className="w-full h-10"
+              onClick={handleOAuthConnect}
+              disabled={oauthLoading}
             >
-              {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          {shopifyConnected && !shopifyToken && (
-            <p className="text-xs text-muted-foreground mt-1">{maskedToken || "Token saved securely"}</p>
-          )}
-        </div>
+              {oauthLoading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <ExternalLink className="w-4 h-4 mr-2" />
+              )}
+              {oauthLoading ? "Redirecting to Shopify..." : "Connect to Shopify"}
+            </Button>
 
-        <SelectField
-          label="API Version"
-          value={shopifyVersion}
-          onChange={setShopifyVersion}
-          options={[
-            { v: "2024-10", l: "2024-10" },
-            { v: "2024-07", l: "2024-07" },
-            { v: "2024-04", l: "2024-04" },
-            { v: "2024-01", l: "2024-01" },
-          ]}
-        />
-
-        {/* How to get token guide */}
-        <button
-          onClick={() => setShowGuide(!showGuide)}
-          className="flex items-center gap-1 text-xs text-muted-foreground mt-1"
-        >
-          {showGuide ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          How to get your access token
-        </button>
-        {showGuide && (
-          <ol className="text-xs text-muted-foreground mt-2 space-y-1.5 pl-4 list-decimal">
-            <li>In Shopify Admin → Settings → Apps and sales channels</li>
-            <li>Click "Develop apps" (top right)</li>
-            <li>Click "Create an app" → name it "SkuPilot"</li>
-            <li>Click "Configure Admin API scopes"</li>
-            <li className="font-medium text-foreground">
-              Enable: write_products, read_products, write_inventory, read_inventory, read_locations
-            </li>
-            <li>Click Save → Install app → Reveal token once</li>
-            <li>Copy and paste the token here</li>
-          </ol>
+            <p className="text-[11px] text-muted-foreground">
+              You'll be redirected to Shopify to authorize access. No manual tokens needed.
+            </p>
+          </>
         )}
 
-        {/* Test button */}
-        <Button
-          variant="outline"
-          className="w-full h-10"
-          onClick={handleTestConnection}
-          disabled={testStatus === "testing"}
-        >
-          {testStatus === "testing" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          {testStatus === "testing" ? "Testing..." : "Test connection"}
-        </Button>
+        {testStatus === "error" && (
+          <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+            <X className="w-3 h-3" /> {testMessage}
+          </p>
+        )}
 
         {testStatus === "success" && (
           <p className="text-xs text-success flex items-center gap-1 mt-1">

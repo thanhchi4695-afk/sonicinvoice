@@ -53,6 +53,30 @@ export type Database = {
         }
         Relationships: []
       }
+      shopify_oauth_states: {
+        Row: {
+          created_at: string
+          id: string
+          nonce: string
+          shop: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nonce: string
+          shop: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nonce?: string
+          shop?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       shopify_push_history: {
         Row: {
           created_at: string

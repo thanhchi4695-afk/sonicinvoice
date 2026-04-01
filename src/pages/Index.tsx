@@ -37,6 +37,15 @@ const Index = () => {
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
 
+  // Handle Shopify OAuth callback redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("shopify_connected") === "1") {
+      window.history.replaceState({}, "", window.location.pathname);
+      setActiveTab("account");
+    }
+  }, []);
+
   const handleAuth = () => {
     setAuthed(true);
     addAuditEntry("Login", `User logged in`);

@@ -54,11 +54,13 @@ const Index = () => {
     addAuditEntry("Login", `User logged in`);
   };
 
-  if (!authed) {
+  // When embedded in Shopify, skip standalone auth/onboarding
+  // (Shopify handles auth via OAuth install flow)
+  if (!isEmbedded && !authed) {
     return <AuthScreen onAuth={handleAuth} />;
   }
 
-  if (!onboarded) {
+  if (!isEmbedded && !onboarded) {
     return <OnboardingFlow onComplete={() => setOnboarded(true)} />;
   }
 

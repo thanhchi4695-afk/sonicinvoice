@@ -53,8 +53,10 @@ function generateFilename(supplier: string, format: ExportFormat): string {
     tags_only: "tags",
     xlsx: "review",
     summary_pdf: "summary",
+    google_xml: "google_feed",
+    google_tsv: "google_feed",
   };
-  const ext = format === "xlsx" ? "xlsx" : format === "summary_pdf" ? "pdf" : "csv";
+  const ext = format === "xlsx" ? "xlsx" : format === "summary_pdf" ? "pdf" : format === "google_xml" ? "xml" : format === "google_tsv" ? "tsv" : "csv";
   return `${tag}_${month}_${typeMap[format]}_${date}.${ext}`;
 }
 

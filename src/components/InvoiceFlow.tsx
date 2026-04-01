@@ -156,6 +156,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [fileName, setFileName] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
   const [supplierName, setSupplierName] = useState("");
+  const mode = useStoreMode();
 
   const handleFileSelect = () => {
     // Save instructions to history

@@ -831,6 +831,20 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; brand: s
             <p className="text-xs text-muted-foreground mt-0.5">
               {product.brand} · {product.type} · ${product.rrp.toFixed(2)}
             </p>
+            {/* Collection pills */}
+            {(() => {
+              const tags = [product.type, product.brand, "new arrivals", "Womens", "Swimwear", "full_price"].filter(Boolean);
+              const cols = matchCollectionsWithBrand(tags, product.brand);
+              return cols.length > 0 ? (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {cols.slice(0, 4).map(c => (
+                    <span key={c} className="px-1.5 py-0.5 rounded text-[9px] bg-primary/10 text-primary border border-primary/20">{c}</span>
+                  ))}
+                  {cols.length > 4 && <span className="text-[9px] text-muted-foreground">+{cols.length - 4}</span>}
+                </div>
+              ) : null;
+            })()}
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />

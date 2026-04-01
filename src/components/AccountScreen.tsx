@@ -16,6 +16,7 @@ import { CURRENCIES, LOCALES } from "@/lib/i18n";
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");
   const [currency, setCurrency] = useState("AUD");
+  const [storeType, setStoreType] = useState<StoreType>("shopify");
   const [markup, setMarkup] = useState("2.35");
   const [rounding, setRounding] = useState("nearest_05");
 

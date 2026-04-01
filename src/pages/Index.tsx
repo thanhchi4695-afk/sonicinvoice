@@ -23,6 +23,7 @@ import SupplierPanel from "@/components/SupplierPanel";
 import HelpCentre from "@/components/HelpCentre";
 import AuditLogPanel from "@/components/AuditLogPanel";
 import CatalogMemoryPanel from "@/components/CatalogMemoryPanel";
+import EmailInboxPanel from "@/components/EmailInboxPanel";
 import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -31,7 +32,7 @@ const Index = () => {
   const [authed, setAuthed] = useState(false);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
@@ -95,6 +96,10 @@ const Index = () => {
 
   if (activeFlow === "catalog_memory") {
     return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
+  }
+
+  if (activeFlow === "email_inbox") {
+    return <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />;
   }
 
   return (

@@ -1200,6 +1200,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                       {isUpdate && (
                         <span className="text-[10px] text-success ml-1">→ Will update existing stock</span>
                       )}
+                      <span className="ml-auto"><ConfidenceBadge breakdown={conf} /></span>
                     </div>
                     {group.isGrouped ? (
                       <VariantGroupCard

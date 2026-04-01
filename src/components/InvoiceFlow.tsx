@@ -1978,6 +1978,16 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
             <input defaultValue={product.size || ""} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Size" />
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">SKU / Style Code</label>
+              <input defaultValue={product.sku || ""} className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm font-mono-data" placeholder="e.g. JA81520" />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Barcode (GTIN)</label>
+              <input defaultValue={product.barcode || ""} className={`w-full h-10 rounded-md bg-input border border-border px-3 text-sm font-mono-data ${product.barcode ? "text-success" : ""}`} placeholder="EAN-13 / UPC" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <input type="number" defaultValue={product.price} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Cost" />
             <input type="number" defaultValue={product.rrp} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="RRP" />
           </div>

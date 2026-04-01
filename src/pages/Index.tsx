@@ -36,6 +36,10 @@ const Index = () => {
     return <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />;
   }
 
+  if (activeFlow === "price_lookup") {
+    return <PriceLookup onBack={() => setActiveFlow(null)} />;
+  }
+
   return (
     <div className="min-h-screen">
       {activeTab === "home" && (

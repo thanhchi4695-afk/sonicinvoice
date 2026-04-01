@@ -61,6 +61,10 @@ const Index = () => {
     return <OrderFormFlow onBack={() => setActiveFlow(null)} />;
   }
 
+  if (activeFlow === "seasons") {
+    return <SeasonManager onBack={() => setActiveFlow(null)} />;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Top bar */}

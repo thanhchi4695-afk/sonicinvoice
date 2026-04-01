@@ -253,6 +253,9 @@ const AccountScreen = () => {
       {/* Price Intelligence API Keys */}
       <ApiKeysSection />
 
+      {/* Default AI Instructions */}
+      <DefaultInstructionsSection />
+
       <Button variant="teal" className="w-full mt-4 h-12 text-base">Save settings</Button>
 
       <Button variant="ghost" className="w-full mt-6 text-destructive h-12">

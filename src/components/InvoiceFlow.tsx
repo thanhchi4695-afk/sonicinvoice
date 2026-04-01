@@ -1969,6 +1969,10 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
             <input defaultValue={product.type} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Type" />
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <input defaultValue={product.colour || ""} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Colour" />
+            <input defaultValue={product.size || ""} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Size" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <input type="number" defaultValue={product.price} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Cost" />
             <input type="number" defaultValue={product.rrp} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="RRP" />
           </div>

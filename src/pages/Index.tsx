@@ -140,6 +140,7 @@ const Index = () => {
           onOpenAuditLog={() => setActiveFlow("audit_log")}
           onStartPurchaseOrders={() => setActiveFlow("purchase_orders")}
           onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
+          onStartEmailInbox={() => setActiveFlow("email_inbox")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

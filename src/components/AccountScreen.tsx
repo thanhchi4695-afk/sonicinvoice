@@ -9,6 +9,7 @@ import {
 import { getApiKeys, saveApiKeys, getCacheStats, clearCache, type PriceApiKeys } from "@/lib/price-intelligence";
 import { getStoreConfig, saveStoreConfig, getIndustryConfig } from "@/lib/prompt-builder";
 import { SEO_TITLE_PRESETS, getCtaPhrases, saveCtaPhrases, generateSeoTitle, generateSeoDescription } from "@/lib/seo-engine";
+import { CURRENCIES, LOCALES } from "@/lib/i18n";
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");

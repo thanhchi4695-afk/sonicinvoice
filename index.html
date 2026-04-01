@@ -18,8 +18,17 @@
     <meta name="twitter:description" content="Invoice processing and product management for AU fashion boutiques">
     <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5f4701f7-d829-446d-924f-07082cde721e/id-preview-de3297ae--ed921f87-40d3-4abb-9b71-c7f63c3b06fb.lovable.app-1775011611691.png">
 
-    <!-- Shopify App Bridge v4 CDN — only activates when embedded -->
-    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+    <!-- Shopify App Bridge v4 CDN — loaded dynamically only when embedded -->
+    <script>
+      (function() {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('shop') && params.get('host')) {
+          var s = document.createElement('script');
+          s.src = 'https://cdn.shopify.com/shopifycloud/app-bridge.js';
+          document.head.appendChild(s);
+        }
+      })();
+    </script>
   </head>
 
   <body>

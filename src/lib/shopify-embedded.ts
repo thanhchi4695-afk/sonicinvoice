@@ -7,15 +7,13 @@
 /** Check if the app is running inside a Shopify Admin iframe */
 export function isShopifyEmbedded(): boolean {
   try {
-    // Shopify adds `shop` and `host` params when loading embedded apps
+    // Only consider embedded when Shopify's shop + host params are present
     const params = new URLSearchParams(window.location.search);
     const hasShopParam = !!params.get("shop");
     const hasHostParam = !!params.get("host");
-    const inIframe = window.self !== window.top;
-    return (hasShopParam && hasHostParam) || inIframe;
+    return hasShopParam && hasHostParam;
   } catch {
-    // Cross-origin iframe access throws — means we're embedded
-    return true;
+    return false;
   }
 }
 

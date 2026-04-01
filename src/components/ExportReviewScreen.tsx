@@ -177,6 +177,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
     } else if (selectedFormat === "google_tsv") {
       const tsv = generateGoogleFeedTSV(prods.map(p => ({
         name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
+        cogs: p.cogs,
         colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
         tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
       })));

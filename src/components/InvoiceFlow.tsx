@@ -162,6 +162,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [exportFormat, setExportFormat] = useState<'shopify' | 'lightspeed_x' | 'xlsx'>('shopify');
   const [showLsSettings, setShowLsSettings] = useState(false);
   const [lsSettings, setLsSettings] = useState<XSeriesSettings>(getXSeriesSettings);
+  const [previewProduct, setPreviewProduct] = useState<any>(null);
+  const [previewAll, setPreviewAll] = useState(false);
+  const [previewIdx, setPreviewIdx] = useState(0);
   const mode = useStoreMode();
 
   const handleFileSelect = () => {

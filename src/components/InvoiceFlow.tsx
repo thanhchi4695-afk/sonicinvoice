@@ -816,16 +816,59 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           )}
 
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium">{mockProducts.length} products found</p>
+            <div>
+              <p className="text-sm font-medium">{productGroups.length} products found</p>
+              <p className="text-[10px] text-muted-foreground">{totalVariantLines} lines → {groupedCount} grouped + {standaloneCount} standalone</p>
+            </div>
             <div className="flex gap-2">
+              {mergeSelection.length >= 2 ? (
+                <Button variant="outline" size="sm" onClick={handleMergeSelected} className="gap-1 text-primary border-primary">
+                  <Link className="w-3.5 h-3.5" /> Group {mergeSelection.length} as variants
+                </Button>
+              ) : mergeSelection.length > 0 ? (
+                <span className="text-[10px] text-muted-foreground self-center">Select {2 - mergeSelection.length} more to group</span>
+              ) : null}
               <Button variant="outline" size="sm" onClick={() => setPreviewAll(true)} className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview all</Button>
               <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
               <Button variant="teal" size="sm" onClick={() => setStep(4)}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>
           </div>
           <div className="space-y-2">
-            {costChanges.map((p, i) => (
-              <ProductCard key={i} product={p} onPreview={() => setPreviewProduct(p)} />
+            {productGroups.map((group, i) => (
+              group.isGrouped ? (
+                <VariantGroupCard
+                  key={`g-${i}`}
+                  group={group}
+                  onSplit={() => handleSplitGroup(i)}
+                  onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
+                />
+              ) : (
+                <div key={`s-${i}`} className="relative">
+                  {/* Merge selection checkbox */}
+                  <div className="absolute top-3 right-12 z-10">
+                    <input
+                      type="checkbox"
+                      checked={mergeSelection.includes(i)}
+                      onChange={e => {
+                        if (e.target.checked) setMergeSelection([...mergeSelection, i]);
+                        else setMergeSelection(mergeSelection.filter(x => x !== i));
+                      }}
+                      title="Select to group as variants"
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                  </div>
+                  <ProductCard
+                    product={{
+                      ...mockProducts.find(p => p.name === group.name) || { name: group.name, brand: group.brand, type: group.type, price: group.price, rrp: group.rrp, status: group.status },
+                      sku: group.variants[0]?.sku,
+                      metafields: group.metafields,
+                      costChange: costChanges.find(c => c.name === group.name)?.costChange || null,
+                      isNew: costChanges.find(c => c.name === group.name)?.isNew,
+                    }}
+                    onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
+                  />
+                </div>
+              )
             ))}
           </div>
 

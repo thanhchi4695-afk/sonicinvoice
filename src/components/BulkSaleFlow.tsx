@@ -3,6 +3,8 @@ import {
   ChevronLeft, Upload, Download, ChevronDown, ChevronUp,
   Tag, Factory, Layers, Search, Check, AlertTriangle, Copy, Eye, X, Save, Trash2
 } from "lucide-react";
+import ShopifyPushFlow from "@/components/ShopifyPushFlow";
+import type { PushProduct } from "@/lib/shopify-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -719,11 +721,37 @@ const BulkSaleFlow = ({ onBack }: BulkSaleFlowProps) => {
               </section>
             )}
 
-            {/* ═══ STEP 4 — DOWNLOAD ═══ */}
+            {/* ═══ STEP 4 — PUSH / DOWNLOAD ═══ */}
             <section>
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                Step 4 — Download your updated file
+                Step 4 — Export your updated file
               </h3>
+
+              {/* Shopify Push (shown when connected) */}
+              <div className="mb-4">
+                <ShopifyPushFlow
+                  products={selectedProducts.map((p): PushProduct => {
+                    const r = calculateNewPrice(
+                      p.currentPrice, p.compareAtPrice, direction,
+                      discountType, discountValue, rounding,
+                      priceFloor ? parseFloat(priceFloor) : undefined
+                    );
+                    return {
+                      title: p.title,
+                      vendor: p.vendor,
+                      product_type: p.type,
+                      tags: p.tags.join(", "),
+                      variants: [{
+                        price: r.newPrice.toFixed(2),
+                        compare_at_price: r.newCompare ? r.newCompare.toFixed(2) : undefined,
+                        inventory_management: "shopify",
+                      }],
+                    };
+                  })}
+                  source="bulk_sale"
+                  onFallbackCSV={handleDownload}
+                />
+              </div>
 
               {/* Save template */}
               <div className="mb-4">

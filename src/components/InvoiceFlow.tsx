@@ -225,6 +225,19 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [processingDone, setProcessingDone] = useState(false);
   const [finalProcessingTime, setFinalProcessingTime] = useState(0);
   const [showSpeedTips, setShowSpeedTips] = useState(false);
+  const [processingCancelled, setProcessingCancelled] = useState(false);
+  const [showCompletionSummary, setShowCompletionSummary] = useState(false);
+  const [filterReviewOnly, setFilterReviewOnly] = useState(false);
+
+  // Line-by-line enrichment status
+  type LineStatus = "waiting" | "searching" | "extracting" | "done" | "review" | "not_found";
+  interface EnrichLine {
+    name: string;
+    status: LineStatus;
+    action: string;
+    confidence: number;
+  }
+  const [enrichLines, setEnrichLines] = useState<EnrichLine[]>([]);
 
   // Timer tick
   useEffect(() => {
@@ -247,6 +260,77 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     }
   }, [supplierName]);
 
+  // Simulated enrichment line progression
+  const lineNames = [
+    "Bond Eye Mara One Piece",
+    "Seafolly Collective Bikini Top",
+    "Baku Riviera High Waist Pant",
+    "Jantzen Retro Racerback",
+  ];
+  const actionSequence = [
+    "Searching jantzen.com.au...",
+    "Extracting description...",
+    "Finding image URL...",
+    "Generating SEO title...",
+    "Building tags...",
+    "Done ✓",
+  ];
+
+  const runEnrichmentSim = (cancelled: { current: boolean }) => {
+    const lines: EnrichLine[] = lineNames.map(name => ({
+      name, status: "waiting" as LineStatus, action: "○ Waiting", confidence: 0,
+    }));
+    setEnrichLines([...lines]);
+
+    let lineIdx = 0;
+    const processNextLine = () => {
+      if (cancelled.current || lineIdx >= lines.length) {
+        if (!cancelled.current) {
+          setProcessingDone(true);
+          setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
+          setShowCompletionSummary(true);
+          // Save to processing history
+          const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
+          history.unshift({
+            supplier: supplierName || "Unknown",
+            lines: lines.length,
+            processingTime: Math.floor((Date.now() - (processStartTime || Date.now())) / 1000),
+            matchRate: 94,
+            date: new Date().toISOString(),
+          });
+          localStorage.setItem("processing_history", JSON.stringify(history.slice(0, 100)));
+        }
+        return;
+      }
+      const i = lineIdx;
+      let actionIdx = 0;
+      // searching
+      lines[i] = { ...lines[i], status: "searching", action: `Searching ${lineNames[i].split(" ")[0].toLowerCase()}.com.au...` };
+      setEnrichLines([...lines]);
+
+      const stepAction = () => {
+        if (cancelled.current) return;
+        actionIdx++;
+        if (actionIdx < actionSequence.length - 1) {
+          lines[i] = { ...lines[i], status: "extracting", action: actionSequence[actionIdx] };
+          setEnrichLines([...lines]);
+          setTimeout(stepAction, 300 + Math.random() * 400);
+        } else {
+          // Done — assign final status
+          const finalStatus: LineStatus = i === 2 ? "review" : "done";
+          lines[i] = { ...lines[i], status: finalStatus, action: "Done ✓", confidence: finalStatus === "review" ? 72 : 95 };
+          setEnrichLines([...lines]);
+          lineIdx++;
+          setTimeout(processNextLine, 200);
+        }
+      };
+      setTimeout(stepAction, 500 + Math.random() * 500);
+    };
+    processNextLine();
+  };
+
+  const cancelledRef = { current: false };
+
   const handleFileSelect = () => {
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
@@ -258,45 +342,50 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     if (useTemplate && matchedTemplate) {
       incrementTemplateUse(supplierName);
     }
-    // Simulate file type detection for demo
     const fName = "invoice_jantzen_mar26.pdf";
     setFileName(fName);
     const ext = fName.split(".").pop()?.toLowerCase() || "";
     if (["jpg", "jpeg", "png", "heic", "webp"].includes(ext)) {
       setFileParseMode("photo");
     } else if (ext === "pdf") {
-      // Simulate: check if text layer is substantial (>50 chars)
-      const hasTextLayer = true; // In real impl, try text extraction first
+      const hasTextLayer = true;
       setFileParseMode(hasTextLayer ? "pdf_text" : "pdf_scan");
     } else {
       setFileParseMode("spreadsheet");
     }
     setProcessStartTime(Date.now());
     setProcessingDone(false);
+    setProcessingCancelled(false);
     setProcessingElapsed(0);
-    setTimeout(() => setStep(2), 300);
-    const duration = useTemplate ? 1500 : 3000;
+    setShowCompletionSummary(false);
+    cancelledRef.current = false;
     setTimeout(() => {
-      const elapsed = Math.round(duration / 1000);
-      setProcessingDone(true);
-      setFinalProcessingTime(elapsed);
-      setStep(3);
-      if (elapsed > 3) setShowSpeedTips(true);
-      // Show save-template prompt if no existing template
-      if (!matchedTemplate && supplierName.trim()) {
-        setShowSaveTemplate(true);
-      }
-      // Save to processing history
-      const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
-      history.unshift({
-        supplier: supplierName || "Unknown",
-        lines: 4,
-        processingTime: elapsed,
-        matchRate: 94,
-        date: new Date().toISOString(),
-      });
-      localStorage.setItem("processing_history", JSON.stringify(history.slice(0, 100)));
-    }, duration);
+      setStep(2);
+      runEnrichmentSim(cancelledRef);
+    }, 300);
+  };
+
+  const handleCancelProcessing = () => {
+    cancelledRef.current = true;
+    setProcessingCancelled(true);
+    setProcessingDone(true);
+    const elapsed = Math.floor((Date.now() - (processStartTime || Date.now())) / 1000);
+    setFinalProcessingTime(elapsed);
+  };
+
+  const handleResumeProcessing = () => {
+    setProcessingCancelled(false);
+    setProcessingDone(false);
+    cancelledRef.current = false;
+    runEnrichmentSim(cancelledRef);
+  };
+
+  const handleProceedToReview = () => {
+    setShowCompletionSummary(false);
+    setStep(3);
+    if (!matchedTemplate && supplierName.trim()) {
+      setShowSaveTemplate(true);
+    }
   };
 
   // Simulated rules-applied feedback

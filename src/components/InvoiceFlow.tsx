@@ -225,6 +225,19 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [processingDone, setProcessingDone] = useState(false);
   const [finalProcessingTime, setFinalProcessingTime] = useState(0);
   const [showSpeedTips, setShowSpeedTips] = useState(false);
+  const [processingCancelled, setProcessingCancelled] = useState(false);
+  const [showCompletionSummary, setShowCompletionSummary] = useState(false);
+  const [filterReviewOnly, setFilterReviewOnly] = useState(false);
+
+  // Line-by-line enrichment status
+  type LineStatus = "waiting" | "searching" | "extracting" | "done" | "review" | "not_found";
+  interface EnrichLine {
+    name: string;
+    status: LineStatus;
+    action: string;
+    confidence: number;
+  }
+  const [enrichLines, setEnrichLines] = useState<EnrichLine[]>([]);
 
   // Timer tick
   useEffect(() => {
@@ -247,6 +260,77 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     }
   }, [supplierName]);
 
+  // Simulated enrichment line progression
+  const lineNames = [
+    "Bond Eye Mara One Piece",
+    "Seafolly Collective Bikini Top",
+    "Baku Riviera High Waist Pant",
+    "Jantzen Retro Racerback",
+  ];
+  const actionSequence = [
+    "Searching jantzen.com.au...",
+    "Extracting description...",
+    "Finding image URL...",
+    "Generating SEO title...",
+    "Building tags...",
+    "Done ✓",
+  ];
+
+  const runEnrichmentSim = (cancelled: { current: boolean }) => {
+    const lines: EnrichLine[] = lineNames.map(name => ({
+      name, status: "waiting" as LineStatus, action: "○ Waiting", confidence: 0,
+    }));
+    setEnrichLines([...lines]);
+
+    let lineIdx = 0;
+    const processNextLine = () => {
+      if (cancelled.current || lineIdx >= lines.length) {
+        if (!cancelled.current) {
+          setProcessingDone(true);
+          setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
+          setShowCompletionSummary(true);
+          // Save to processing history
+          const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
+          history.unshift({
+            supplier: supplierName || "Unknown",
+            lines: lines.length,
+            processingTime: Math.floor((Date.now() - (processStartTime || Date.now())) / 1000),
+            matchRate: 94,
+            date: new Date().toISOString(),
+          });
+          localStorage.setItem("processing_history", JSON.stringify(history.slice(0, 100)));
+        }
+        return;
+      }
+      const i = lineIdx;
+      let actionIdx = 0;
+      // searching
+      lines[i] = { ...lines[i], status: "searching", action: `Searching ${lineNames[i].split(" ")[0].toLowerCase()}.com.au...` };
+      setEnrichLines([...lines]);
+
+      const stepAction = () => {
+        if (cancelled.current) return;
+        actionIdx++;
+        if (actionIdx < actionSequence.length - 1) {
+          lines[i] = { ...lines[i], status: "extracting", action: actionSequence[actionIdx] };
+          setEnrichLines([...lines]);
+          setTimeout(stepAction, 300 + Math.random() * 400);
+        } else {
+          // Done — assign final status
+          const finalStatus: LineStatus = i === 2 ? "review" : "done";
+          lines[i] = { ...lines[i], status: finalStatus, action: "Done ✓", confidence: finalStatus === "review" ? 72 : 95 };
+          setEnrichLines([...lines]);
+          lineIdx++;
+          setTimeout(processNextLine, 200);
+        }
+      };
+      setTimeout(stepAction, 500 + Math.random() * 500);
+    };
+    processNextLine();
+  };
+
+  const cancelledRef = { current: false };
+
   const handleFileSelect = () => {
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
@@ -258,45 +342,50 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     if (useTemplate && matchedTemplate) {
       incrementTemplateUse(supplierName);
     }
-    // Simulate file type detection for demo
     const fName = "invoice_jantzen_mar26.pdf";
     setFileName(fName);
     const ext = fName.split(".").pop()?.toLowerCase() || "";
     if (["jpg", "jpeg", "png", "heic", "webp"].includes(ext)) {
       setFileParseMode("photo");
     } else if (ext === "pdf") {
-      // Simulate: check if text layer is substantial (>50 chars)
-      const hasTextLayer = true; // In real impl, try text extraction first
+      const hasTextLayer = true;
       setFileParseMode(hasTextLayer ? "pdf_text" : "pdf_scan");
     } else {
       setFileParseMode("spreadsheet");
     }
     setProcessStartTime(Date.now());
     setProcessingDone(false);
+    setProcessingCancelled(false);
     setProcessingElapsed(0);
-    setTimeout(() => setStep(2), 300);
-    const duration = useTemplate ? 1500 : 3000;
+    setShowCompletionSummary(false);
+    cancelledRef.current = false;
     setTimeout(() => {
-      const elapsed = Math.round(duration / 1000);
-      setProcessingDone(true);
-      setFinalProcessingTime(elapsed);
-      setStep(3);
-      if (elapsed > 3) setShowSpeedTips(true);
-      // Show save-template prompt if no existing template
-      if (!matchedTemplate && supplierName.trim()) {
-        setShowSaveTemplate(true);
-      }
-      // Save to processing history
-      const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
-      history.unshift({
-        supplier: supplierName || "Unknown",
-        lines: 4,
-        processingTime: elapsed,
-        matchRate: 94,
-        date: new Date().toISOString(),
-      });
-      localStorage.setItem("processing_history", JSON.stringify(history.slice(0, 100)));
-    }, duration);
+      setStep(2);
+      runEnrichmentSim(cancelledRef);
+    }, 300);
+  };
+
+  const handleCancelProcessing = () => {
+    cancelledRef.current = true;
+    setProcessingCancelled(true);
+    setProcessingDone(true);
+    const elapsed = Math.floor((Date.now() - (processStartTime || Date.now())) / 1000);
+    setFinalProcessingTime(elapsed);
+  };
+
+  const handleResumeProcessing = () => {
+    setProcessingCancelled(false);
+    setProcessingDone(false);
+    cancelledRef.current = false;
+    runEnrichmentSim(cancelledRef);
+  };
+
+  const handleProceedToReview = () => {
+    setShowCompletionSummary(false);
+    setStep(3);
+    if (!matchedTemplate && supplierName.trim()) {
+      setShowSaveTemplate(true);
+    }
   };
 
   // Simulated rules-applied feedback
@@ -638,38 +727,171 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         </div>
       )}
 
-      {/* Step 2: Reading */}
+      {/* Step 2: Enrichment with live progress */}
       {step === 2 && (
-        <div className="flex flex-col items-center justify-center px-4 pt-24">
-          <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin-slow mb-6" />
-          <h3 className="text-lg font-semibold font-display mb-2">
-            {fileParseMode === "photo" ? "Reading your invoice photo..." : fileParseMode === "pdf_scan" ? "Scanning your PDF..." : "Reading your invoice..."}
-          </h3>
-          <p className="text-sm text-muted-foreground text-center">
-            {(fileParseMode === "photo" || fileParseMode === "pdf_scan")
-              ? "Using AI image recognition to extract product data"
-              : "Extracting product names, prices, and quantities"}
-          </p>
-          {fileParseMode && (
-            <p className="text-xs text-muted-foreground mt-2">
-              {fileParseMode === "pdf_text" && "📄 Digital PDF — text layer detected"}
-              {fileParseMode === "pdf_scan" && "🔍 Scanned PDF — OCR in progress"}
-              {fileParseMode === "photo" && "📷 Photo — AI vision processing"}
-              {fileParseMode === "spreadsheet" && "📊 Spreadsheet — parsing rows"}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground mt-3 font-mono-data">
-            ⏱ {Math.floor(processingElapsed / 60)}:{String(processingElapsed % 60).padStart(2, "0")} elapsed
-            {useTemplate ? " · ~0:02 remaining" : " · ~0:03 remaining"}
-          </p>
-          {useTemplate && matchedTemplate && (
-            <p className="text-xs text-primary mt-2 flex items-center gap-1">
-              <Zap className="w-3 h-3" /> Using {matchedTemplate.supplier} template — faster parsing
-            </p>
-          )}
-          {customInstructions.trim() && (
-            <p className="text-xs text-primary mt-2">🤖 Applying your custom instructions...</p>
-          )}
+        <div className="px-4 pt-4">
+          {(() => {
+            const total = enrichLines.length;
+            const done = enrichLines.filter(l => l.status === "done" || l.status === "review" || l.status === "not_found").length;
+            const inProgress = enrichLines.filter(l => l.status === "searching" || l.status === "extracting").length;
+            const waiting = enrichLines.filter(l => l.status === "waiting").length;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            const avgPerLine = processingElapsed > 0 && done > 0 ? processingElapsed / done : 3;
+            const remaining = Math.max(0, Math.round(avgPerLine * (total - done)));
+            const fmtTime = (s: number) => s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+
+            return (
+              <>
+                {/* Completion summary overlay */}
+                {showCompletionSummary && (
+                  <div className="bg-card rounded-lg border border-border p-5 mb-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Check className="w-5 h-5 text-success" />
+                      <h3 className="text-lg font-semibold font-display">Processing complete</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {total} lines processed in {fmtTime(finalProcessingTime)}
+                    </p>
+                    <div className="bg-muted/50 rounded-lg border border-border divide-y divide-border overflow-hidden mb-4">
+                      <div className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-sm flex items-center gap-2"><Check className="w-3.5 h-3.5 text-success" /> Ready to export</span>
+                        <span className="text-sm font-mono-data">{enrichLines.filter(l => l.status === "done").length} lines ({total > 0 ? Math.round(enrichLines.filter(l => l.status === "done").length / total * 100) : 0}%)</span>
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-sm flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5 text-secondary" /> Review recommended</span>
+                        <span className="text-sm font-mono-data">{enrichLines.filter(l => l.status === "review").length} lines ({total > 0 ? Math.round(enrichLines.filter(l => l.status === "review").length / total * 100) : 0}%)</span>
+                      </div>
+                      <div className="flex items-center justify-between px-4 py-2.5">
+                        <span className="text-sm flex items-center gap-2"><X className="w-3.5 h-3.5 text-destructive" /> Not found</span>
+                        <span className="text-sm font-mono-data">{enrichLines.filter(l => l.status === "not_found").length} lines ({total > 0 ? Math.round(enrichLines.filter(l => l.status === "not_found").length / total * 100) : 0}%)</span>
+                      </div>
+                    </div>
+                    {enrichLines.some(l => l.status === "review" || l.status === "not_found") && (
+                      <p className="text-xs text-muted-foreground mb-4">
+                        {enrichLines.filter(l => l.status === "review" || l.status === "not_found").length} product{enrichLines.filter(l => l.status === "review" || l.status === "not_found").length > 1 ? "s" : ""} tagged NEEDS-ENRICHMENT — search manually before importing.
+                      </p>
+                    )}
+                    <div className="flex gap-2">
+                      <Button variant="teal" className="flex-1 h-11" onClick={handleProceedToReview}>
+                        → Review & export
+                      </Button>
+                      {enrichLines.some(l => l.status === "review" || l.status === "not_found") && (
+                        <Button variant="outline" className="flex-1 h-11 text-xs" onClick={() => { setFilterReviewOnly(true); handleProceedToReview(); }}>
+                          Review issues first
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cancelled state */}
+                {processingCancelled && !showCompletionSummary && (
+                  <div className="bg-secondary/10 border border-secondary/20 rounded-lg p-4 mb-4">
+                    <p className="text-sm font-medium mb-1">⏹ Processing stopped</p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      {done}/{total} lines enriched.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="h-8 text-xs" onClick={handleResumeProcessing}>
+                        <RotateCcw className="w-3 h-3 mr-1" /> Resume
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleProceedToReview}>
+                        Review partial results →
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status overview bar */}
+                {!showCompletionSummary && (
+                  <div className="bg-card rounded-lg border border-border p-4 mb-4">
+                    <div className="flex items-center justify-between text-xs mb-3">
+                      <div className="flex gap-3">
+                        <span className="text-muted-foreground">{total} lines</span>
+                        <span className="text-success">✓ {done} enriched</span>
+                        {inProgress > 0 && <span className="text-primary">⚙ {inProgress} in progress</span>}
+                        {waiting > 0 && <span className="text-muted-foreground">○ {waiting} pending</span>}
+                      </div>
+                      <span className="text-muted-foreground font-mono-data">
+                        {processingDone
+                          ? `✅ Complete in ${fmtTime(finalProcessingTime)}`
+                          : `~${fmtTime(remaining)} remaining`}
+                      </span>
+                    </div>
+                    <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <span className="text-xs font-semibold text-primary">{pct}%</span>
+                      <span className="text-[10px] text-muted-foreground font-mono-data">
+                        ⏱ {fmtTime(processingElapsed)} elapsed
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Line-by-line status table */}
+                {!showCompletionSummary && (
+                  <div className="bg-card rounded-lg border border-border overflow-hidden mb-4">
+                    <div className="px-3 py-2 border-b border-border bg-muted/30">
+                      <div className="grid grid-cols-[24px_1fr_90px_1fr_50px] gap-2 text-[10px] font-semibold text-muted-foreground uppercase">
+                        <span>#</span>
+                        <span>Product</span>
+                        <span>Status</span>
+                        <span>Current action</span>
+                        <span>Conf.</span>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {enrichLines.map((line, i) => (
+                        <div key={i} className="grid grid-cols-[24px_1fr_90px_1fr_50px] gap-2 items-center px-3 py-2 text-xs">
+                          <span className="text-muted-foreground">{i + 1}</span>
+                          <span className="truncate font-medium">{line.name}</span>
+                          <span className={`flex items-center gap-1 text-[11px] font-medium ${
+                            line.status === "waiting" ? "text-muted-foreground" :
+                            line.status === "searching" || line.status === "extracting" ? "text-primary" :
+                            line.status === "done" ? "text-success" :
+                            line.status === "review" ? "text-secondary" :
+                            "text-destructive"
+                          }`}>
+                            {line.status === "waiting" && "○ Waiting"}
+                            {line.status === "searching" && <><Loader2 className="w-3 h-3 animate-spin" /> Searching</>}
+                            {line.status === "extracting" && <><Loader2 className="w-3 h-3 animate-spin" /> Extracting</>}
+                            {line.status === "done" && "✓ Done"}
+                            {line.status === "review" && "⚠ Review"}
+                            {line.status === "not_found" && "✗ Not found"}
+                          </span>
+                          <span className="text-muted-foreground truncate text-[11px]">{line.action}</span>
+                          <span className={`font-mono-data text-[11px] ${
+                            line.confidence >= 90 ? "text-success" :
+                            line.confidence >= 70 ? "text-secondary" :
+                            line.confidence > 0 ? "text-destructive" :
+                            "text-muted-foreground"
+                          }`}>
+                            {line.confidence > 0 ? `${line.confidence}%` : "—"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Cancel button */}
+                {!processingDone && !processingCancelled && (
+                  <Button
+                    variant="ghost"
+                    className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 h-10"
+                    onClick={handleCancelProcessing}
+                  >
+                    ⏹ Cancel processing
+                  </Button>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 

@@ -232,6 +232,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [processingCancelled, setProcessingCancelled] = useState(false);
   const [showCompletionSummary, setShowCompletionSummary] = useState(false);
   const [filterReviewOnly, setFilterReviewOnly] = useState(false);
+  const [confidenceFilter, setConfidenceFilter] = useState<"all" | "high" | "medium" | "low">("all");
 
   // Line-by-line enrichment status
   type LineStatus = "waiting" | "searching" | "extracting" | "done" | "review" | "not_found";

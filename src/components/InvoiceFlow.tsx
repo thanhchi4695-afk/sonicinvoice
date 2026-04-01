@@ -250,10 +250,10 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   ] : [];
 
   const mockProducts = [
-    { name: "Bond Eye Mara One Piece - Black", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready" },
-    { name: "Seafolly Collective Bikini Top - Navy", brand: "Seafolly", type: "Bikini Tops", price: 45.00, rrp: 109.95, status: "ready" },
-    { name: "Baku Riviera High Waist Pant - Ivory", brand: "Baku", type: "Bikini Bottoms", price: 38.00, rrp: 89.95, status: "review" },
-    { name: "Jantzen Retro Racerback - Coral", brand: "Jantzen", type: "One Piece", price: 65.00, rrp: 159.95, status: "ready" },
+    { name: "Bond Eye Mara One Piece - Black", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready", metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" } },
+    { name: "Seafolly Collective Bikini Top - Navy", brand: "Seafolly", type: "Bikini Tops", price: 45.00, rrp: 109.95, status: "ready", metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" } },
+    { name: "Baku Riviera High Waist Pant - Ivory", brand: "Baku", type: "Bikini Bottoms", price: 38.00, rrp: 89.95, status: "review", metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" } },
+    { name: "Jantzen Retro Racerback - Coral", brand: "Jantzen", type: "One Piece", price: 65.00, rrp: 159.95, status: "ready", metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" } },
   ];
 
   return (

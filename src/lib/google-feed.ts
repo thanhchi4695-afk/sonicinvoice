@@ -146,6 +146,7 @@ export function buildGoogleFeedItem(p: GoogleFeedProduct, saleDateStr?: string):
     custom_label_2: tagArr.find(t => /^\w{3}\d{2}$/.test(t)) || '',
     custom_label_3: hasRRP ? 'sale' : 'full_price',
     custom_label_4: '',
+    sale_price_effective_date: (salePrice && saleDateStr) ? saleDateStr : '',
   };
 }
 

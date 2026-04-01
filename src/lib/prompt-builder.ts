@@ -63,6 +63,7 @@ const DEFAULT_STORE: StoreConfig = {
   locale: 'AU',
   industry: 'general',
   storeType: 'shopify',
+  lightspeedVersion: 'x_series',
   seoTitleTemplate: '{product} | {brand} | {store_name}',
   seoDescriptionTemplate: 'Shop {product} by {brand} at {store_name}. Free shipping on orders over $100.',
   enrichmentSources: [],

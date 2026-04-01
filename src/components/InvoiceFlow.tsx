@@ -997,7 +997,7 @@ function LightspeedRestockSection({ products, supplierName }: {
   );
 }
 
-const ProductCard = ({ product, onPreview }: { product: { name: string; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string> }; onPreview?: () => void }) => {
+const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
   const [showSplit, setShowSplit] = useState(false);
@@ -1013,6 +1013,7 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; brand: s
   const meta = product.metafields || {};
   const invoiceQty = 12;
   const splitTotal = Object.values(splitQtys).reduce((a, b) => a + b, 0);
+  const margin = product.rrp > 0 ? ((product.rrp - product.price) / product.rrp) * 100 : null;
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">

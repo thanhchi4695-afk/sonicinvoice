@@ -316,10 +316,26 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             <Check className="w-10 h-10 text-success" />
           </div>
           <h3 className="text-xl font-bold font-display mb-2">Your file is ready</h3>
-          <p className="text-sm text-muted-foreground mb-8">{mockProducts.length} products, Shopify-ready format</p>
+          <p className="text-sm text-muted-foreground mb-8">{mockProducts.length} products, {mode.isLightspeed ? 'Lightspeed' : 'Shopify'}-ready format</p>
           <Button variant="success" className="w-full max-w-xs h-14 text-base">
-            <Download className="w-5 h-5 mr-2" /> Download product file
+            <Download className="w-5 h-5 mr-2" /> Download {mode.exportLabel}
           </Button>
+
+          {/* Lightspeed sync rules reminder */}
+          {mode.isLightspeed && (
+            <div className="w-full max-w-xs mt-6 bg-card border border-purple-500/20 rounded-lg p-4 text-left">
+              <div className="flex items-center gap-2 mb-2">
+                <Monitor className="w-4 h-4 text-purple-400" />
+                <span className="text-xs font-semibold">After importing into Lightspeed</span>
+              </div>
+              <div className="text-xs space-y-1.5 text-muted-foreground">
+                <p>✅ <span className="text-foreground">DO in Shopify:</span> Add photos, SEO titles, collections</p>
+                <p>❌ <span className="text-foreground">DON'T in Shopify:</span> Edit name, price, SKU, description</p>
+                <p className="text-[10px] mt-2 text-muted-foreground/70">Editing product details in Shopify will break the sync with Lightspeed. Always edit products in Lightspeed POS.</p>
+              </div>
+            </div>
+          )}
+
           <button onClick={onBack} className="mt-6 text-sm text-primary font-medium">
             Import another invoice
           </button>

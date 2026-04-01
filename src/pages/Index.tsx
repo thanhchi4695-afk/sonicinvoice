@@ -105,6 +105,7 @@ const Index = () => {
       {activeTab === "history" && <HistoryScreen />}
       {activeTab === "tools" && <ToolsScreen />}
       {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
+      {activeTab === "help" && <HelpCentre />}
       {activeTab === "account" && <AccountScreen />}
       <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 

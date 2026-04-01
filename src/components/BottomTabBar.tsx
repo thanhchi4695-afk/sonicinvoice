@@ -1,4 +1,4 @@
-import { Home, FolderOpen, Wrench, User, Monitor, BarChart3 } from "lucide-react";
+import { Home, FolderOpen, Wrench, User, Monitor, BarChart3, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoreMode } from "@/hooks/use-store-mode";
 
@@ -12,6 +12,7 @@ const baseTabs = [
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "history", label: "History", icon: FolderOpen },
   { id: "tools", label: "Tools", icon: Wrench },
+  { id: "help", label: "Help", icon: HelpCircle },
   { id: "account", label: "Account", icon: User },
 ];
 

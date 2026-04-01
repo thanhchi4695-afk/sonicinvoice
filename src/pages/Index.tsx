@@ -64,56 +64,28 @@ const Index = () => {
     return <OnboardingFlow onComplete={() => setOnboarded(true)} />;
   }
 
-  if (activeFlow === "invoice") {
-    return <InvoiceFlow onBack={() => setActiveFlow(null)} />;
-  }
+  const renderFlow = () => {
+    switch (activeFlow) {
+      case "invoice": return <InvoiceFlow onBack={() => setActiveFlow(null)} />;
+      case "sale": return <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />;
+      case "restock": return <RestockAnalytics onBack={() => setActiveFlow(null)} />;
+      case "price_adjust": return <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />;
+      case "price_lookup": return <PriceLookup onBack={() => setActiveFlow(null)} />;
+      case "order_form": return <OrderFormFlow onBack={() => setActiveFlow(null)} />;
+      case "seasons": return <SeasonManager onBack={() => setActiveFlow(null)} />;
+      case "reorder": return <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />;
+      case "suppliers": return <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />;
+      case "audit_log": return <AuditLogPanel onBack={() => setActiveFlow(null)} />;
+      case "purchase_orders": return <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />;
+      case "catalog_memory": return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
+      case "email_inbox": return <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />;
+      default: return null;
+    }
+  };
 
-  if (activeFlow === "sale") {
-    return <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />;
-  }
-
-  if (activeFlow === "restock") {
-    return <RestockAnalytics onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "price_adjust") {
-    return <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "price_lookup") {
-    return <PriceLookup onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "order_form") {
-    return <OrderFormFlow onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "seasons") {
-    return <SeasonManager onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "reorder") {
-    return <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />;
-  }
-
-  if (activeFlow === "suppliers") {
-    return <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />;
-  }
-
-  if (activeFlow === "audit_log") {
-    return <AuditLogPanel onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "purchase_orders") {
-    return <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "catalog_memory") {
-    return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "email_inbox") {
-    return <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />;
+  // In standalone mode, flows replace the entire screen
+  if (!isEmbedded && activeFlow) {
+    return renderFlow();
   }
 
   const mainContent = (

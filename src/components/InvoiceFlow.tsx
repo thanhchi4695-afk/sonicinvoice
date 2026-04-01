@@ -497,6 +497,28 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     metafields: g.metafields,
   }));
 
+  // Confidence scoring per product group
+  const groupConfidences: ConfidenceBreakdown[] = productGroups.map(g => {
+    return calculateConfidence({
+      name: g.name,
+      type: g.type,
+      description: g.status !== "pending" ? "Stylish swimwear piece" : undefined,
+      hasImage: g.status === "ready",
+      rrp: g.rrp,
+      seoTitle: g.status !== "pending" ? `${g.name} | ${g.brand}` : undefined,
+      hasTags: g.status !== "pending",
+      matchSource: g.variants[0]?.sku ? "sku" : "name",
+      isPending: g.status === "pending",
+    });
+  });
+  const confCounts = {
+    high: groupConfidences.filter(c => c.level === "high").length,
+    medium: groupConfidences.filter(c => c.level === "medium").length,
+    low: groupConfidences.filter(c => c.level === "low").length,
+    pending: groupConfidences.filter(c => c.level === "pending").length,
+  };
+
+
   const totalVariantLines = productGroups.reduce((s, g) => s + g.variants.length, 0);
   const groupedCount = productGroups.filter(g => g.isGrouped).length;
   const standaloneCount = productGroups.filter(g => !g.isGrouped).length;

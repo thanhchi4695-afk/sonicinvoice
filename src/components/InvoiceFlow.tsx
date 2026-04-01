@@ -8,6 +8,7 @@ import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { generateXSeriesCSV, getXSeriesSettings, saveXSeriesSettings, type XSeriesSettings, type XSeriesProduct } from "@/lib/lightspeed-xseries";
 import { findTemplate, saveFormatTemplate, incrementTemplateUse, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
+import { getStoreLocations } from "@/components/AccountScreen";
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -170,6 +171,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [previewIdx, setPreviewIdx] = useState(0);
   const mode = useStoreMode();
 
+  // Location state
+  const storeLocations = getStoreLocations();
+  const defaultLoc = storeLocations.find(l => l.isDefault) || storeLocations[0];
+  const [receivingLocation, setReceivingLocation] = useState(defaultLoc?.id || "");
+
   // Template recognition state
   const [matchedTemplate, setMatchedTemplate] = useState<InvoiceTemplate | null>(null);
   const [useTemplate, setUseTemplate] = useState<boolean | null>(null);
@@ -280,6 +286,22 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       {/* Step 1: Upload */}
       {step === 1 && (
         <div className="px-4 pt-6">
+          {/* Location selector */}
+          {storeLocations.length > 1 && (
+            <div className="bg-card rounded-lg border border-border p-3 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm">📍</span>
+                <span className="text-xs font-medium">Receiving location for this invoice:</span>
+              </div>
+              <select value={receivingLocation} onChange={e => setReceivingLocation(e.target.value)}
+                className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm">
+                {storeLocations.map(loc => (
+                  <option key={loc.id} value={loc.id}>{loc.name}{loc.isDefault ? " (default)" : ""}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             onClick={handleFileSelect}
             className="w-full h-48 rounded-lg border-2 border-dashed border-border bg-card flex flex-col items-center justify-center gap-3 active:bg-muted transition-colors"
@@ -882,8 +904,19 @@ function LightspeedRestockSection({ products, supplierName }: {
 const ProductCard = ({ product, onPreview }: { product: { name: string; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string> }; onPreview?: () => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
+  const [showSplit, setShowSplit] = useState(false);
+  const locs = getStoreLocations();
+  const defaultLoc = locs.find(l => l.isDefault) || locs[0];
+  const [selectedLocation, setSelectedLocation] = useState(defaultLoc?.id || "");
+  const [splitQtys, setSplitQtys] = useState<Record<string, number>>(() => {
+    const init: Record<string, number> = {};
+    locs.forEach(l => { init[l.id] = l.isDefault ? 12 : 0; });
+    return init;
+  });
   const enabledMeta = (() => { try { return (JSON.parse(localStorage.getItem("metafield_config") || "[]") as { key: string; label: string; enabled: boolean }[]).filter(m => m.enabled); } catch { return []; } })();
   const meta = product.metafields || {};
+  const invoiceQty = 12;
+  const splitTotal = Object.values(splitQtys).reduce((a, b) => a + b, 0);
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
@@ -922,10 +955,44 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; brand: s
             <input defaultValue={product.type} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Type" />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <input type="number" defaultValue={product.price} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Price" />
+            <input type="number" defaultValue={product.price} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="Cost" />
             <input type="number" defaultValue={product.rrp} className="h-10 rounded-md bg-input border border-border px-3 text-sm" placeholder="RRP" />
           </div>
           <textarea defaultValue="Stylish swimwear piece perfect for summer." className="w-full h-20 rounded-md bg-input border border-border px-3 py-2 text-sm resize-none" placeholder="Description" />
+
+          {/* Per-line location */}
+          {locs.length > 1 && (
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">📍 Location</label>
+              <div className="flex gap-2 items-center">
+                <select value={selectedLocation} onChange={e => setSelectedLocation(e.target.value)}
+                  className="flex-1 h-8 rounded-md bg-input border border-border px-2 text-xs">
+                  {locs.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+                <button onClick={() => setShowSplit(!showSplit)}
+                  className="text-[10px] text-primary font-medium whitespace-nowrap">
+                  {showSplit ? "Cancel split" : "Split shipment"}
+                </button>
+              </div>
+              {showSplit && (
+                <div className="mt-2 bg-muted/30 rounded-lg p-2.5 space-y-1.5">
+                  <p className="text-[10px] text-muted-foreground font-medium mb-1">Split across locations (invoice qty: {invoiceQty})</p>
+                  {locs.map(l => (
+                    <div key={l.id} className="flex items-center gap-2">
+                      <span className="text-[10px] flex-1 truncate">{l.name}</span>
+                      <input type="number" min={0} value={splitQtys[l.id] || 0}
+                        onChange={e => setSplitQtys({ ...splitQtys, [l.id]: parseInt(e.target.value) || 0 })}
+                        className="w-16 h-7 rounded-md bg-input border border-border px-2 text-xs text-center" />
+                      <span className="text-[10px] text-muted-foreground">units</span>
+                    </div>
+                  ))}
+                  <div className={`text-[10px] font-medium mt-1 ${splitTotal === invoiceQty ? "text-success" : "text-destructive"}`}>
+                    Total: {splitTotal} / {invoiceQty} {splitTotal === invoiceQty ? "✓" : `⚠ ${splitTotal > invoiceQty ? "over" : "under"} by ${Math.abs(splitTotal - invoiceQty)}`}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Metafields section */}
           {enabledMeta.length > 0 && (

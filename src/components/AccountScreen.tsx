@@ -9,6 +9,7 @@ import {
 import { getApiKeys, saveApiKeys, getCacheStats, clearCache, type PriceApiKeys } from "@/lib/price-intelligence";
 import { getStoreConfig, saveStoreConfig, getIndustryConfig } from "@/lib/prompt-builder";
 import { SEO_TITLE_PRESETS, getCtaPhrases, saveCtaPhrases, generateSeoTitle, generateSeoDescription } from "@/lib/seo-engine";
+import { CURRENCIES, LOCALES } from "@/lib/i18n";
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");
@@ -106,13 +107,13 @@ const AccountScreen = () => {
       {/* Store Details */}
       <Section title="Store details">
         <Field label="Store name" value={storeName} onChange={setStoreName} placeholder="My Boutique" />
-        <Field label="Store website" placeholder="myboutique.com.au" />
+        <Field label="Store website" placeholder="mystore.com" />
         <div className="grid grid-cols-2 gap-3">
           <SelectField label="Currency" value={currency} onChange={setCurrency}
-            options={[{ v: "AUD", l: "AUD" }, { v: "USD", l: "USD" }, { v: "GBP", l: "GBP" }, { v: "NZD", l: "NZD" }, { v: "EUR", l: "EUR" }]}
+            options={CURRENCIES.map(c => ({ v: c.code, l: `${c.flag} ${c.code} (${c.symbol})` }))}
           />
           <SelectField label="Locale" value="AU" onChange={() => {}}
-            options={[{ v: "AU", l: "Australia" }, { v: "US", l: "US" }, { v: "UK", l: "UK" }, { v: "NZ", l: "NZ" }]}
+            options={LOCALES.map(l => ({ v: l.id, l: `${l.flag} ${l.country}` }))}
           />
         </div>
       </Section>

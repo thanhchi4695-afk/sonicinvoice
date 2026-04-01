@@ -10,12 +10,16 @@ import {
   type PriceResult,
   type PriceProduct,
 } from "@/lib/price-intelligence";
+import { getStoreConfig } from "@/lib/prompt-builder";
+import { getCurrency, formatPrice } from "@/lib/i18n";
 
 interface PriceLookupProps {
   onBack: () => void;
 }
 
 const PriceLookup = ({ onBack }: PriceLookupProps) => {
+  const store = getStoreConfig();
+  const curr = getCurrency(store.currency);
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [barcode, setBarcode] = useState("");
@@ -28,7 +32,7 @@ const PriceLookup = ({ onBack }: PriceLookupProps) => {
     setResult(null);
     const product: PriceProduct = { name, brand, barcode: barcode || undefined };
     try {
-      const r = await matchPrice(product, "AUD", undefined, undefined, skipCache);
+      const r = await matchPrice(product, store.currency, undefined, undefined, skipCache);
       setResult(r);
     } catch {
       setResult({ price: null, source: "Error", confidence: 0, method: "", allPrices: [], debugLog: ["Error occurred"] });
@@ -47,7 +51,7 @@ const PriceLookup = ({ onBack }: PriceLookupProps) => {
         <button onClick={onBack} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
         <div>
           <h2 className="text-lg font-semibold font-display">🔍 Price Lookup</h2>
-          <p className="text-xs text-muted-foreground">Look up AU retail prices from multiple sources</p>
+          <p className="text-xs text-muted-foreground">Look up {curr.code} retail prices from multiple sources</p>
         </div>
       </div>
 
@@ -95,8 +99,8 @@ const PriceLookup = ({ onBack }: PriceLookupProps) => {
             </div>
             {result.price ? (
               <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-3xl font-bold font-mono-data">${result.price.toFixed(2)}</span>
-                <span className="text-sm text-muted-foreground">AUD</span>
+                <span className="text-3xl font-bold font-mono-data">{formatPrice(result.price, store.currency)}</span>
+                <span className="text-sm text-muted-foreground">{store.currency}</span>
               </div>
             ) : (
               <p className="text-sm text-destructive mb-2">No price found</p>

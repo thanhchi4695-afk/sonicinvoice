@@ -32,7 +32,7 @@ const INDUSTRY_CTA_DEFAULTS: Record<string, string[]> = {
   beauty: [
     'Shop {brand} at {store} — free delivery over {threshold}',
     'Discover your new favourite at {store}',
-    'Authentic {brand} with fast AU shipping at {store}',
+    'Authentic {brand} with fast shipping at {store}',
   ],
   fashion: [
     'Shop the latest from {brand} at {store}',
@@ -56,7 +56,7 @@ const INDUSTRY_CTA_DEFAULTS: Record<string, string[]> = {
   ],
   health: [
     'Shop {brand} supplements at {store}',
-    'Fast AU delivery from {store}',
+    'Fast delivery from {store}',
     'Quality {brand} at {store}',
   ],
   home: [

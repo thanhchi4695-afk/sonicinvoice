@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft, Check, Upload } from "lucide-react";
 import { saveStoreConfig, getIndustryConfig } from "@/lib/prompt-builder";
+import { CURRENCIES, LOCALES } from "@/lib/i18n";
 
 interface OnboardingFlowProps {
   onComplete: () => void;
@@ -102,7 +103,7 @@ const sampleInvoices: Record<string, { vendor: string; lines: { name: string; va
 };
 
 const doneMessages: Record<string, { emoji: string; text: string }> = {
-  swimwear: { emoji: "🏄", text: "SkuPilot knows your brands, your tags, and your AU pricing sources. Let's go." },
+  swimwear: { emoji: "🏄", text: "SkuPilot knows your brands, your tags, and your pricing sources. Let's go." },
   beauty: { emoji: "✨", text: "SkuPilot knows your shades, your formulas, and your beauty brands. Let's go." },
   fashion: { emoji: "👗", text: "SkuPilot knows your sizing, your styles, and your fashion brands. Let's go." },
   electronics: { emoji: "📱", text: "SkuPilot knows your specs, your models, and your tech brands. Let's go." },
@@ -194,7 +195,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Store website</label>
-                <input value={storeUrl} onChange={e => setStoreUrl(e.target.value)} placeholder="e.g. mystore.com.au"
+                <input value={storeUrl} onChange={e => setStoreUrl(e.target.value)} placeholder="e.g. mystore.com"
                   className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -202,16 +203,14 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                   <label className="text-xs text-muted-foreground mb-1 block">Currency</label>
                   <select value={currency} onChange={e => setCurrency(e.target.value)}
                     className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm text-foreground">
-                    <option value="AUD">AUD</option><option value="USD">USD</option>
-                    <option value="GBP">GBP</option><option value="NZD">NZD</option><option value="EUR">EUR</option>
+                    {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code} ({c.symbol})</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Locale</label>
                   <select value={locale} onChange={e => setLocale(e.target.value)}
                     className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm text-foreground">
-                    <option value="AU">Australia</option><option value="US">US</option>
-                    <option value="UK">UK</option><option value="NZ">New Zealand</option>
+                    {LOCALES.map(l => <option key={l.id} value={l.id}>{l.flag} {l.country}</option>)}
                   </select>
                 </div>
               </div>

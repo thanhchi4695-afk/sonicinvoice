@@ -83,6 +83,7 @@ const Index = () => {
       case "catalog_memory": return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
       case "email_inbox": return <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />;
       case "collab_seo": return <CollabSEOFlow onBack={() => setActiveFlow(null)} />;
+      case "google_ads_setup": return <GoogleAdsSetupWizard onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

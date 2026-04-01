@@ -1124,6 +1124,38 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </button>
           </div>
 
+          {/* Confidence filter buttons */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {([
+              { key: "all" as const, label: `All ${productGroups.length}`, cls: "" },
+              { key: "high" as const, label: `✓ Ready ${confCounts.high}`, cls: "text-success" },
+              { key: "medium" as const, label: `⚠ Review ${confCounts.medium}`, cls: "text-warning" },
+              { key: "low" as const, label: `✗ Fix needed ${confCounts.low}`, cls: "text-destructive" },
+            ]).map(f => (
+              <button
+                key={f.key}
+                onClick={() => setConfidenceFilter(f.key)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                  confidenceFilter === f.key
+                    ? "bg-primary/10 border-primary text-primary"
+                    : `bg-muted border-border ${f.cls || "text-muted-foreground"}`
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+            {(confCounts.medium > 0 || confCounts.low > 0) && (
+              <button
+                onClick={() => {
+                  setConfidenceFilter(confCounts.low > 0 ? "low" : "medium");
+                }}
+                className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-muted border border-border text-muted-foreground ml-auto flex items-center gap-1"
+              >
+                <ArrowDown className="w-3 h-3" /> Jump to next issue
+              </button>
+            )}
+          </div>
+
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-medium">{productGroups.length} products found</p>

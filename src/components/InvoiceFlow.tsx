@@ -390,7 +390,35 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             Take a photo
           </button>
 
-          {/* Collapsible details */}
+          {/* File parse mode indicator */}
+          {fileParseMode && (
+            <div className="mt-3 bg-card rounded-lg border border-border px-3 py-2 flex items-center gap-2">
+              {fileParseMode === "pdf_text" && <><FileText className="w-4 h-4 text-primary" /><span className="text-xs">📄 Digital PDF — reading text layer</span></>}
+              {fileParseMode === "pdf_scan" && <><Search className="w-4 h-4 text-accent-foreground" /><span className="text-xs">🔍 Scanned PDF — using image recognition</span></>}
+              {fileParseMode === "photo" && <><Camera className="w-4 h-4 text-accent-foreground" /><span className="text-xs">📷 Invoice photo — using image recognition</span></>}
+              {fileParseMode === "spreadsheet" && <><FileText className="w-4 h-4 text-primary" /><span className="text-xs">📊 Spreadsheet — reading data rows</span></>}
+              {fileParseMode === "email" && <><FileText className="w-4 h-4 text-primary" /><span className="text-xs">📧 Email — extracting invoice data</span></>}
+            </div>
+          )}
+
+          {/* Low quality image warning */}
+          {showLowQualityWarning && (
+            <div className="mt-3 bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+              <p className="text-xs font-semibold text-destructive mb-1">⚠️ Image quality may be affecting accuracy</p>
+              <p className="text-xs text-muted-foreground mb-2">AI extracted fewer than 3 lines from this image. For best results:</p>
+              <ul className="text-xs text-muted-foreground space-y-0.5 mb-2 list-disc list-inside">
+                <li>Use good lighting when photographing invoices</li>
+                <li>Ensure text is in focus and not blurry</li>
+                <li>Avoid shadows across the text</li>
+              </ul>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowLowQualityWarning(false); setFileParseMode(null); }}>Try again with a better photo</Button>
+                <Button size="sm" className="h-7 text-xs" onClick={() => setShowLowQualityWarning(false)}>Continue</Button>
+              </div>
+            </div>
+          )}
+
+
           <button
             onClick={() => setShowDetails(!showDetails)}
             className="flex items-center gap-2 mt-6 text-sm text-muted-foreground"

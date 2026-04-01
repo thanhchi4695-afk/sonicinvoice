@@ -190,79 +190,40 @@ const AccountScreen = () => {
           </div>
         )}
 
-        <Field
-          label="Store URL"
-          value={shopifyUrl}
-          onChange={setShopifyUrl}
-          placeholder="yourstore.myshopify.com"
-        />
-
-        <div>
-          <label className="text-xs text-muted-foreground mb-1 block">Access token</label>
-          <div className="relative">
-            <input
-              type={showToken ? "text" : "password"}
-              value={shopifyToken}
-              onChange={(e) => setShopifyToken(e.target.value)}
-              placeholder="shpat_xxxxx"
-              className="w-full h-10 rounded-md bg-input border border-border px-3 pr-10 text-sm"
+        {!shopifyConnected && (
+          <>
+            <Field
+              label="Store URL"
+              value={shopifyUrl}
+              onChange={setShopifyUrl}
+              placeholder="yourstore.myshopify.com"
             />
-            <button
-              onClick={() => setShowToken(!showToken)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+
+            <Button
+              variant="outline"
+              className="w-full h-10"
+              onClick={handleOAuthConnect}
+              disabled={oauthLoading}
             >
-              {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          {shopifyConnected && !shopifyToken && (
-            <p className="text-xs text-muted-foreground mt-1">{maskedToken || "Token saved securely"}</p>
-          )}
-        </div>
+              {oauthLoading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <ExternalLink className="w-4 h-4 mr-2" />
+              )}
+              {oauthLoading ? "Redirecting to Shopify..." : "Connect to Shopify"}
+            </Button>
 
-        <SelectField
-          label="API Version"
-          value={shopifyVersion}
-          onChange={setShopifyVersion}
-          options={[
-            { v: "2024-10", l: "2024-10" },
-            { v: "2024-07", l: "2024-07" },
-            { v: "2024-04", l: "2024-04" },
-            { v: "2024-01", l: "2024-01" },
-          ]}
-        />
-
-        {/* How to get token guide */}
-        <button
-          onClick={() => setShowGuide(!showGuide)}
-          className="flex items-center gap-1 text-xs text-muted-foreground mt-1"
-        >
-          {showGuide ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          How to get your access token
-        </button>
-        {showGuide && (
-          <ol className="text-xs text-muted-foreground mt-2 space-y-1.5 pl-4 list-decimal">
-            <li>In Shopify Admin → Settings → Apps and sales channels</li>
-            <li>Click "Develop apps" (top right)</li>
-            <li>Click "Create an app" → name it "SkuPilot"</li>
-            <li>Click "Configure Admin API scopes"</li>
-            <li className="font-medium text-foreground">
-              Enable: write_products, read_products, write_inventory, read_inventory, read_locations
-            </li>
-            <li>Click Save → Install app → Reveal token once</li>
-            <li>Copy and paste the token here</li>
-          </ol>
+            <p className="text-[11px] text-muted-foreground">
+              You'll be redirected to Shopify to authorize access. No manual tokens needed.
+            </p>
+          </>
         )}
 
-        {/* Test button */}
-        <Button
-          variant="outline"
-          className="w-full h-10"
-          onClick={handleTestConnection}
-          disabled={testStatus === "testing"}
-        >
-          {testStatus === "testing" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          {testStatus === "testing" ? "Testing..." : "Test connection"}
-        </Button>
+        {testStatus === "error" && (
+          <p className="text-xs text-destructive flex items-center gap-1 mt-1">
+            <X className="w-3 h-3" /> {testMessage}
+          </p>
+        )}
 
         {testStatus === "success" && (
           <p className="text-xs text-success flex items-center gap-1 mt-1">

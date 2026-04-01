@@ -23,7 +23,7 @@ interface HomeScreenProps {
   onStartCollabSEO?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [

@@ -161,6 +161,18 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
         Title: `${p.brand} ${p.name}`, Tags: `${p.brand}, ${p.type}, New Arrival`,
       }));
       downloadFile("\uFEFF" + Papa.unparse(rows), filename);
+    } else if (selectedFormat === "google_xml") {
+      const xml = generateGoogleFeedXML(prods.map(p => ({
+        name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
+        tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
+      })), supplierName);
+      downloadFile(xml, filename, "application/xml;charset=utf-8");
+    } else if (selectedFormat === "google_tsv") {
+      const tsv = generateGoogleFeedTSV(prods.map(p => ({
+        name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
+        tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
+      })));
+      downloadFile("\uFEFF" + tsv, filename, "text/tab-separated-values;charset=utf-8");
     } else if (selectedFormat === "xlsx" || selectedFormat === "summary_pdf") {
       // Fallback to CSV for now
       const rows = prods.map(p => ({

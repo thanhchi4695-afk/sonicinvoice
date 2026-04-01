@@ -26,6 +26,7 @@ const tools = [
   { id: "seo", icon: Search, label: "SEO writer", desc: "Generate SEO title + meta description", color: "text-primary" },
   { id: "brands", icon: Globe, label: "Brand reference", desc: "Brand website directory", color: "text-primary" },
   { id: "ai", icon: Bot, label: "AI instructions", desc: "Custom rules for your invoices", color: "text-secondary" },
+  { id: "google_feed", icon: ShoppingCart, label: "Google feed preview", desc: "Preview & download Google Shopping feed", color: "text-success" },
 ];
 
 const quickInserts = [

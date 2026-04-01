@@ -755,6 +755,37 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
         </>
       )}
 
+      {/* Promotions feed section */}
+      {(() => {
+        const saleMeta = getSaleMeta();
+        const hasPromo = saleMeta && saleMeta.direction === 'apply';
+        return (
+          <div className="bg-card rounded-lg border border-border p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold mb-0.5">Promotions feed</h3>
+                <p className="text-xs text-muted-foreground">
+                  {hasPromo
+                    ? `${saleMeta.pct}% off — ${saleMeta.tags.slice(0, 2).join(', ') || 'selected products'} — applied ${new Date(saleMeta.appliedAt).toLocaleDateString('en-AU')}`
+                    : 'No sale applied yet'}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" disabled={!hasPromo} onClick={() => {
+                const xml = generatePromotionsFeed();
+                if (!xml) return;
+                const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'google_promotions_feed.xml'; a.click();
+                URL.revokeObjectURL(url);
+              }}>
+                <Download className="w-3 h-3" /> Download
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
         <p className="text-xs font-semibold text-primary mb-1">💡 How to submit to Google Merchant Center:</p>
         <p className="text-xs text-muted-foreground">

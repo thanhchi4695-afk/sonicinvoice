@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { getEnabledMetafields } from "@/lib/metafields";
+import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed";
 
 export interface ExportProduct {
   name: string;

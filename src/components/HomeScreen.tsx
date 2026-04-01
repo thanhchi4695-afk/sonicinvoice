@@ -160,7 +160,6 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
           Start <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
-      </div>
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 gap-3 mb-6">

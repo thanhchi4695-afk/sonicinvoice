@@ -795,6 +795,12 @@ const BulkSaleFlow = ({ onBack, onNavigateToGoogleFeed }: BulkSaleFlowProps) => 
                 </button>
               </div>
 
+              {downloaded && onNavigateToGoogleFeed && (
+                <Button variant="ghost" size="sm" className="w-full mt-3 text-xs text-muted-foreground" onClick={onNavigateToGoogleFeed}>
+                  Also update Google Shopping feed →
+                </Button>
+              )}
+
               {/* Post-download: import guide */}
               {downloaded && (
                 <div className="mt-6">

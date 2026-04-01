@@ -34,6 +34,18 @@ const historyItems = [
   { type: "invoice" as const, label: "Bond Eye Jan26", count: 12, date: "5 Jan 2026", supplier: "bond-eye", processingTime: 54, source: "photo" },
 ];
 
+// Load SEO campaigns from localStorage
+function getCollabCampaigns(): { theme: string; partnerCount: number; date: string }[] {
+  try {
+    const campaigns = JSON.parse(localStorage.getItem("collab_campaigns") || "[]");
+    return campaigns.map((c: any) => ({
+      theme: c.theme || "Untitled campaign",
+      partnerCount: c.partners?.length || 0,
+      date: c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "",
+    }));
+  } catch { return []; }
+}
+
 function getExportHistory(): ExportEntry[] {
   try { return JSON.parse(localStorage.getItem("export_history") || "[]"); } catch { return []; }
 }

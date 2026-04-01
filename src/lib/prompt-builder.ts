@@ -52,7 +52,7 @@ export interface EnrichProduct {
 }
 
 // ── Defaults ───────────────────────────────────────────────
-const STORE_CONFIG_KEY = 'store_config_skupilot';
+const STORE_CONFIG_KEY = 'store_config_sonic_invoice';
 
 const DEFAULT_STORE: StoreConfig = {
   name: 'My Store',
@@ -106,7 +106,7 @@ export function getIndustryList(): { id: string; name: string }[] {
 }
 
 // ── Brand Directory ────────────────────────────────────────
-const BRAND_DIR_KEY = 'brand_directory_skupilot';
+const BRAND_DIR_KEY = 'brand_directory_sonic_invoice';
 
 export function getBrandDirectory(): BrandEntry[] {
   try { return JSON.parse(localStorage.getItem(BRAND_DIR_KEY) || '[]'); } catch { return []; }

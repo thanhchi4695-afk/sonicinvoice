@@ -29,8 +29,8 @@ const LightspeedGuide = ({ onBack, onNavigate }: LightspeedGuideProps) => {
         <div className="space-y-2">
           {[
             { emoji: "📄", label: "Supplier sends invoice", sub: "PDF, Excel, or email" },
-            { emoji: "⚡", label: "SkuPilot", sub: "AI reads & enriches", highlight: true },
-            { emoji: "📥", label: "Lightspeed CSV", sub: "Export from SkuPilot" },
+            { emoji: "⚡", label: "Sonic Invoice", sub: "AI reads & enriches", highlight: true },
+            { emoji: "📥", label: "Lightspeed CSV", sub: "Export from Sonic Invoice" },
             { emoji: "🖥️", label: "Lightspeed POS", sub: "System of Record", accent: true },
             { emoji: "🔄", label: "Auto-syncs", sub: "No action needed" },
             { emoji: "🛍️", label: "Shopify Store", sub: "Online sales channel" },
@@ -52,7 +52,7 @@ const LightspeedGuide = ({ onBack, onNavigate }: LightspeedGuideProps) => {
           ))}
         </div>
         <p className="text-xs text-muted-foreground mt-3">
-          Lightspeed is your system of record. Everything starts in Lightspeed and flows to Shopify automatically. SkuPilot creates the Lightspeed import file — you never need to manually enter products in either system.
+          Lightspeed is your system of record. Everything starts in Lightspeed and flows to Shopify automatically. Sonic Invoice creates the Lightspeed import file — you never need to manually enter products in either system.
         </p>
       </section>
 
@@ -103,7 +103,7 @@ const LightspeedGuide = ({ onBack, onNavigate }: LightspeedGuideProps) => {
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mt-3 flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
           <p className="text-xs text-muted-foreground">
-            SkuPilot generates SEO titles, meta descriptions, and tags — but for Lightspeed clients, these are added to Shopify <span className="font-medium text-foreground">after</span> Lightspeed imports the product, not via the Lightspeed CSV. See the workflow below.
+            Sonic Invoice generates SEO titles, meta descriptions, and tags — but for Lightspeed clients, these are added to Shopify <span className="font-medium text-foreground">after</span> Lightspeed imports the product, not via the Lightspeed CSV. See the workflow below.
           </p>
         </div>
       </section>
@@ -114,12 +114,12 @@ const LightspeedGuide = ({ onBack, onNavigate }: LightspeedGuideProps) => {
         <div className="space-y-3">
           {[
             { step: 1, emoji: "📄", title: "Receive invoice from supplier", desc: "Your supplier sends an invoice (PDF, Excel, or email)", action: null },
-            { step: 2, emoji: "📤", title: "Upload to SkuPilot", desc: "Upload the invoice here. AI reads every line.", action: "invoice" },
-            { step: 3, emoji: "✨", title: "AI enrichment", desc: "SkuPilot finds the RRP, description, images, and generates your tags and SEO content.", action: null },
+            { step: 2, emoji: "📤", title: "Upload to Sonic Invoice", desc: "Upload the invoice here. AI reads every line.", action: "invoice" },
+            { step: 3, emoji: "✨", title: "AI enrichment", desc: "Sonic Invoice finds the RRP, description, images, and generates your tags and SEO content.", action: null },
             { step: 4, emoji: "📥", title: "Download Lightspeed CSV", desc: "Export as Lightspeed format: handle, name, SKU, brand, supply price, retail price, tags, size/colour attributes, and stock quantities.", action: "invoice" },
             { step: 5, emoji: "🖥️", title: "Import into Lightspeed POS", desc: "In Lightspeed: Catalog → Products → Import. Upload your CSV. Products appear in your POS immediately.", action: null },
             { step: 6, emoji: "🔄", title: "Lightspeed syncs to Shopify", desc: "Products appear in your Shopify store within minutes. No action needed — the integration does this for you.", action: null },
-            { step: 7, emoji: "🖼️", title: "Add images and SEO in Shopify", desc: "Add product photos, SEO title, meta description, and assign collections. Use the SEO export from SkuPilot for this step.", action: null },
+            { step: 7, emoji: "🖼️", title: "Add images and SEO in Shopify", desc: "Add product photos, SEO title, meta description, and assign collections. Use the SEO export from Sonic Invoice for this step.", action: null },
           ].map((s) => (
             <div key={s.step} className="flex gap-3">
               <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">

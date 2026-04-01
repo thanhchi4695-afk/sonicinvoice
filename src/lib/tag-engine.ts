@@ -42,7 +42,7 @@ export interface TagConfig {
 }
 
 // ── Storage ────────────────────────────────────────────────
-const TAG_CONFIG_KEY = 'tag_config_skupilot';
+const TAG_CONFIG_KEY = 'tag_config_sonic_invoice';
 
 export function getTagConfig(): TagConfig {
   try {

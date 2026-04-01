@@ -336,7 +336,7 @@ const AccountScreen = () => {
 
       {/* Branding footer */}
       <div className="text-center mt-8 mb-4 space-y-1">
-        <p className="text-xs font-semibold text-muted-foreground">SkuPilot v1.0</p>
+        <p className="text-xs font-semibold text-muted-foreground">Sonic Invoice v1.0</p>
         <p className="text-[10px] text-muted-foreground">Built for AU fashion boutiques</p>
         <div className="flex items-center justify-center gap-1.5 mt-1">
           <span className="text-xs">🛍</span>
@@ -583,7 +583,7 @@ function SeoTemplateSection() {
 }
 
 // ── Default AI Instructions Section ────────────────────────
-const DEFAULT_INSTRUCTIONS_KEY = 'default_ai_instructions_skupilot';
+const DEFAULT_INSTRUCTIONS_KEY = 'default_ai_instructions_sonic_invoice';
 
 function DefaultInstructionsSection() {
   const [instructions, setInstructions] = useState(() => {

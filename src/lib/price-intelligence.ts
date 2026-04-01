@@ -56,7 +56,7 @@ const AU_TRUSTED_RETAILERS = [
 const UNTRUSTED_SOURCES = ['ebay', 'wish', 'aliexpress', 'amazon', 'temu'];
 
 // ── Cache ──────────────────────────────────────────────────
-const CACHE_KEY = 'price_cache_skupilot';
+const CACHE_KEY = 'price_cache_sonic_invoice';
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 interface CacheEntry {
@@ -124,7 +124,7 @@ function setCache(p: PriceProduct, result: PriceResult, currency: string) {
 }
 
 // ── API Key Storage ────────────────────────────────────────
-const API_KEYS_KEY = 'price_api_keys_skupilot';
+const API_KEYS_KEY = 'price_api_keys_sonic_invoice';
 
 export function getApiKeys(): PriceApiKeys {
   try {
@@ -139,7 +139,7 @@ export function saveApiKeys(keys: PriceApiKeys) {
 }
 
 // ── Settings Storage ───────────────────────────────────────
-const SETTINGS_KEY = 'price_match_settings_skupilot';
+const SETTINGS_KEY = 'price_match_settings_sonic_invoice';
 
 export function getSettings(): PriceMatchSettings {
   try {

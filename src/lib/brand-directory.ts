@@ -17,7 +17,7 @@ export interface BrandDirectoryEntry {
   dateAdded: string;
 }
 
-const BRAND_DIR_KEY = 'brand_directory_skupilot';
+const BRAND_DIR_KEY = 'brand_directory_sonic_invoice';
 
 function uid(): string { return Math.random().toString(36).slice(2, 12); }
 function toTag(name: string): string { return name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim(); }

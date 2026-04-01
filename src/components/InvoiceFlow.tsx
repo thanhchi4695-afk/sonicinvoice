@@ -1029,7 +1029,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 <span className="text-xs font-semibold text-primary">📋 Save this invoice format?</span>
               </div>
               <p className="text-xs text-muted-foreground mb-2">
-                SkuPilot detected a consistent layout for {supplierName || "this supplier"}'s invoices. Save it so future invoices parse instantly.
+                Sonic Invoice detected a consistent layout for {supplierName || "this supplier"}'s invoices. Save it so future invoices parse instantly.
               </p>
               <div className="grid grid-cols-2 gap-1 text-[11px] bg-muted/50 rounded-md p-2 mb-2">
                 <span className="text-muted-foreground">Supplier:</span><span>{supplierName}</span>
@@ -1620,7 +1620,7 @@ function ShopifySeoUpdateSection({ products, supplierName }: {
 }
 
 // ── Lightspeed Stock Order Restock Section ─────────────────
-const CATALOG_KEY = 'catalog_memory_skupilot';
+const CATALOG_KEY = 'catalog_memory_sonic_invoice';
 
 interface CatalogEntry {
   sku: string;
@@ -1776,11 +1776,11 @@ function LightspeedRestockSection({ products, supplierName }: {
           <li>Click: New Order</li>
           <li>Select your supplier from the dropdown</li>
           <li>Under Products, click: Import via CSV</li>
-          <li>Upload the Stock Order CSV from SkuPilot</li>
+          <li>Upload the Stock Order CSV from Sonic Invoice</li>
           <li>Review the imported lines — quantities appear in the order</li>
           <li>Mark the order as received to update stock</li>
           <li className="text-amber-400 font-medium mt-2">
-            ⚠ All products in a single stock order must be from the SAME supplier in Lightspeed. If your invoice has multiple suppliers, SkuPilot splits the CSV into one file per supplier automatically.
+            ⚠ All products in a single stock order must be from the SAME supplier in Lightspeed. If your invoice has multiple suppliers, Sonic Invoice splits the CSV into one file per supplier automatically.
           </li>
         </ol>
       )}

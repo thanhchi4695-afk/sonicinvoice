@@ -105,7 +105,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [simSubject, setSimSubject] = useState("");
   const [simFile, setSimFile] = useState<string | null>(null);
 
-  const username = localStorage.getItem("skupilot_username") || "splash";
+  const username = localStorage.getItem("sonic_invoice_username") || "splash";
   const inboxAddress = `${username}@suppliersync.app`;
 
   const handleCopy = () => {

@@ -150,7 +150,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
     } else if (selectedFormat === "shopify_inventory") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        "Variant SKU": "", Barcode: "", "Variant Inventory Qty": "1", "Variant Inventory Policy": "deny",
+        "Variant SKU": p.sku || "", Barcode: p.barcode || "", "Variant Inventory Qty": "1", "Variant Inventory Policy": "deny",
       }));
       downloadFile("\uFEFF" + Papa.unparse(rows), filename);
     } else if (selectedFormat === "shopify_price") {

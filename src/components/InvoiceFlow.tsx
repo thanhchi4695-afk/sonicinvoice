@@ -480,6 +480,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         type: "Bikini Tops",
         price: 45.00,
         rrp: 109.95,
+        cogs: 45.00,
         status: "ready",
         colour: "Navy",
         size: "One Size",

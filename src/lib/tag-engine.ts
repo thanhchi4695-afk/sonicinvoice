@@ -72,15 +72,7 @@ function toTag(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
-const DEFAULT_LAYERS: TagLayer[] = [
-  { id: uid(), name: 'Gender', description: 'One tag per product', type: 'single', values: ['Womens', 'Mens', 'Kids', 'Unisex'], active: true, order: 1 },
-  { id: uid(), name: 'Department', description: 'Product department', type: 'auto', values: [], active: true, order: 2 },
-  { id: uid(), name: 'Product Type', description: 'From product type list', type: 'auto', values: [], active: true, order: 3 },
-  { id: uid(), name: 'Brand', description: 'Vendor/brand name', type: 'auto', values: [], active: true, order: 4 },
-  { id: uid(), name: 'Arrival Month', description: 'Month product arrived', type: 'date', values: [], active: true, order: 5 },
-  { id: uid(), name: 'Price Status', description: 'Full price or on sale', type: 'single', values: ['full_price', 'sale'], active: true, order: 6 },
-  { id: uid(), name: 'Special Properties', description: 'Detected from keywords', type: 'multiple', values: [], active: true, order: 7 },
-];
+// DEFAULT_LAYERS removed — now derived from industry-config
 
 const INDUSTRY_SPECIAL_RULES: Record<string, SpecialRule[]> = {
   swimwear: [

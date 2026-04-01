@@ -1255,8 +1255,111 @@ function LightspeedRestockSection({ products, supplierName }: {
     </div>
   );
 }
+// ── Variant Group Card ────────────────────────────────────
+const VariantGroupCard = ({ group, onSplit, onPreview }: {
+  group: { styleGroup: string; name: string; brand: string; type: string; price: number; rrp: number; status: string; variants: { sku: string; option1Name: string; option1Value: string; option2Name: string; option2Value: string; qty: number }[]; metafields: Record<string, string> };
+  onSplit: () => void;
+  onPreview?: () => void;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const variants = group.variants;
+  const totalQty = variants.reduce((s, v) => s + v.qty, 0);
 
-const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
+  // Build the grid: option2 values as rows, option1 values as columns
+  const option1Values = [...new Set(variants.map(v => v.option1Value))];
+  const option2Values = [...new Set(variants.filter(v => v.option2Value).map(v => v.option2Value))];
+  const hasOption2 = option2Values.length > 0;
+
+  const getQty = (opt1: string, opt2: string) => {
+    const v = variants.find(v => v.option1Value === opt1 && v.option2Value === opt2);
+    return v?.qty ?? 0;
+  };
+
+  return (
+    <div className="bg-card rounded-lg border-2 border-primary/30 overflow-hidden">
+      <button onClick={() => setExpanded(!expanded)} className="w-full px-4 py-3 text-left">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🧩</span>
+              <p className="font-semibold text-sm truncate">{group.name} — {group.brand}</p>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {hasOption2
+                ? `${option2Values.length} colour${option2Values.length > 1 ? "s" : ""} × ${option1Values.length} size${option1Values.length > 1 ? "s" : ""}`
+                : `${option1Values.length} variant${option1Values.length > 1 ? "s" : ""}`}
+              {" · "}{variants.length} variants · Total qty: {totalQty}
+            </p>
+            <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] bg-primary/10 text-primary border border-primary/20">
+              ✓ Enriched ({variants.length} variants)
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 ml-3">
+            <span className={`w-2 h-2 rounded-full ${group.status === "ready" ? "bg-success" : "bg-secondary"}`} />
+            <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
+          </div>
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+          {/* Variant grid */}
+          {hasOption2 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr>
+                    <th className="text-left py-1.5 pr-3 text-muted-foreground font-medium border-b border-border">
+                      {variants[0]?.option2Name || "Colour"} / {variants[0]?.option1Name || "Size"}
+                    </th>
+                    {option1Values.map(s => (
+                      <th key={s} className="text-center py-1.5 px-2 text-muted-foreground font-medium border-b border-border">{s}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {option2Values.map(colour => (
+                    <tr key={colour} className="border-b border-border/50">
+                      <td className="py-1.5 pr-3 font-medium">{colour}</td>
+                      {option1Values.map(size => {
+                        const qty = getQty(size, colour);
+                        return (
+                          <td key={size} className="text-center py-1.5 px-2">
+                            <span className={`inline-block min-w-[24px] rounded px-1 py-0.5 font-mono-data ${qty > 0 ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground/40"}`}>
+                              {qty > 0 ? qty : "—"}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {variants.map((v, i) => (
+                <div key={i} className="px-2.5 py-1 rounded-md bg-muted text-xs font-mono-data">
+                  {v.option1Value}: <span className="font-medium">{v.qty}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-2 flex-wrap">
+            {onPreview && <Button variant="outline" size="sm" onClick={onPreview}><Eye className="w-3.5 h-3.5 mr-1" /> Preview</Button>}
+            <Button variant="ghost" size="sm" onClick={onSplit}>
+              <Scissors className="w-3.5 h-3.5 mr-1" /> Split into separate products
+            </Button>
+            <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
   const [expanded, setExpanded] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
   const [showSplit, setShowSplit] = useState(false);

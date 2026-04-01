@@ -2017,7 +2017,30 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
             </div>
           )}
 
-          <div className="flex gap-2">
+          {/* Save to barcode catalog */}
+          {product.barcode && product.matchSource !== "barcode" && !savedToBarcodeCatalog && (
+            <div className="bg-primary/5 border border-primary/20 rounded-md p-2 flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground">Barcode found but not in catalog. Save it to speed up future invoices.</span>
+              <Button size="sm" variant="outline" className="h-6 text-[10px] ml-2 shrink-0" onClick={() => {
+                saveBarcodeToCatalog(product.barcode!, {
+                  title: product.name, vendor: product.brand, sku: product.sku || "", type: product.type,
+                  addedDate: new Date().toISOString().slice(0, 10),
+                });
+                setSavedToBarcodeCatalog(true);
+                addAuditEntry("Catalog", `Barcode ${product.barcode} saved for ${product.name}`);
+              }}>
+                <Save className="w-3 h-3 mr-1" /> Save to catalog
+              </Button>
+            </div>
+          )}
+          {savedToBarcodeCatalog && (
+            <div className="bg-success/10 border border-success/20 rounded-md p-2 flex items-center gap-2">
+              <Check className="w-3 h-3 text-success" />
+              <span className="text-[10px] text-success font-medium">Barcode saved to catalog ✓</span>
+            </div>
+          )}
+
+          <div className="flex gap-2 flex-wrap">
             {onPreview && <Button variant="outline" size="sm" onClick={onPreview}><Eye className="w-3.5 h-3.5 mr-1" /> Preview</Button>}
             <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
             <Button variant="ghost" size="sm" className="text-destructive"><X className="w-3.5 h-3.5 mr-1" /> Remove</Button>

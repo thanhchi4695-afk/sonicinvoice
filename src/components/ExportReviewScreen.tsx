@@ -17,6 +17,7 @@ export interface ExportProduct {
   barcode?: string;
   price: number;
   rrp: number;
+  cogs?: number;
   status: string;
   hasImage?: boolean;
   hasSeo?: boolean;

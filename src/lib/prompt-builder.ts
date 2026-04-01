@@ -24,6 +24,7 @@ export interface IndustryConfig {
   descriptionFeatures: string;
   productTypes: { name: string }[];
   defaultType: string;
+  icon?: string;
 }
 
 export interface BrandEntry {

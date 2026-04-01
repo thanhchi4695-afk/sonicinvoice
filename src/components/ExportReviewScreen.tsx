@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
+import { getEnabledMetafields } from "@/lib/metafields";
 
 export interface ExportProduct {
   name: string;

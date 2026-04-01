@@ -330,11 +330,43 @@ const AccountScreen = () => {
       {/* Metafields */}
       <MetafieldsSection />
 
+      {/* App Information */}
+      <Section title="App information">
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between"><span className="text-muted-foreground">Version</span><span className="font-mono-data">1.0.0</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Build date</span><span className="font-mono-data">Mar 2026</span></div>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2">
+          <button className="text-xs text-primary hover:underline">View changelog</button>
+          <span className="text-muted-foreground">·</span>
+          <button className="text-xs text-primary hover:underline">Contact support</button>
+          <span className="text-muted-foreground">·</span>
+          <button className="text-xs text-primary hover:underline">Documentation</button>
+        </div>
+        <div className="mt-3 flex items-center gap-2 bg-muted/50 rounded-lg p-2.5 border border-border">
+          <span className="text-sm">🛍</span>
+          <span className="text-xs text-muted-foreground">Works with Shopify</span>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-2">
+          This app will be available on the Shopify App Store. When installed from the App Store, your store connects automatically — no manual token entry needed.
+        </p>
+      </Section>
+
       <Button variant="teal" className="w-full mt-4 h-12 text-base">Save settings</Button>
 
       <Button variant="ghost" className="w-full mt-6 text-destructive h-12">
         <LogOut className="w-4 h-4 mr-2" /> Sign out
       </Button>
+
+      {/* Branding footer */}
+      <div className="text-center mt-8 mb-4 space-y-1">
+        <p className="text-xs font-semibold text-muted-foreground">SkuPilot v1.0</p>
+        <p className="text-[10px] text-muted-foreground">Built for AU fashion boutiques</p>
+        <div className="flex items-center justify-center gap-1.5 mt-1">
+          <span className="text-xs">🛍</span>
+          <span className="text-[10px] text-muted-foreground">Works with Shopify</span>
+        </div>
+      </div>
     </div>
   );
 };

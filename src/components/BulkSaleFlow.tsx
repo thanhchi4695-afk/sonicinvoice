@@ -80,7 +80,7 @@ function saveTemplates(t: SaleTemplate[]) {
   localStorage.setItem("sale_templates", JSON.stringify(t));
 }
 
-const BulkSaleFlow = ({ onBack }: BulkSaleFlowProps) => {
+const BulkSaleFlow = ({ onBack, onNavigateToGoogleFeed }: BulkSaleFlowProps) => {
   // File state
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [fileName, setFileName] = useState("");

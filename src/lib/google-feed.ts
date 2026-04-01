@@ -65,6 +65,7 @@ export interface GoogleFeedItem {
   image_link: string;
   price: string;
   sale_price: string;
+  sale_price_effective_date: string;
   availability: string;
   condition: string;
   brand: string;
@@ -92,7 +93,7 @@ function escXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
-export function buildGoogleFeedItem(p: GoogleFeedProduct): GoogleFeedItem {
+export function buildGoogleFeedItem(p: GoogleFeedProduct, saleDateStr?: string): GoogleFeedItem {
   const handle = `${p.name}-${p.brand}`
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
@@ -145,11 +146,12 @@ export function buildGoogleFeedItem(p: GoogleFeedProduct): GoogleFeedItem {
     custom_label_2: tagArr.find(t => /^\w{3}\d{2}$/.test(t)) || '',
     custom_label_3: hasRRP ? 'sale' : 'full_price',
     custom_label_4: '',
+    sale_price_effective_date: (salePrice && saleDateStr) ? saleDateStr : '',
   };
 }
 
-export function generateGoogleFeedXML(products: GoogleFeedProduct[], storeName?: string): string {
-  const items = products.map(p => buildGoogleFeedItem(p));
+export function generateGoogleFeedXML(products: GoogleFeedProduct[], storeName?: string, saleDateStr?: string): string {
+  const items = products.map(p => buildGoogleFeedItem(p, saleDateStr));
   const title = storeName || 'Product Feed';
   const domain = localStorage.getItem('shopify_store_url') || 'yourstore.com.au';
 
@@ -160,7 +162,8 @@ export function generateGoogleFeedXML(products: GoogleFeedProduct[], storeName?:
       <g:link>${escXml(item.link)}</g:link>
       <g:image_link>${escXml(item.image_link)}</g:image_link>
       <g:price>${escXml(item.price)}</g:price>${item.sale_price ? `
-      <g:sale_price>${escXml(item.sale_price)}</g:sale_price>` : ''}
+      <g:sale_price>${escXml(item.sale_price)}</g:sale_price>` : ''}${item.sale_price_effective_date ? `
+      <g:sale_price_effective_date>${escXml(item.sale_price_effective_date)}</g:sale_price_effective_date>` : ''}
       <g:availability>${item.availability}</g:availability>
       <g:condition>${item.condition}</g:condition>
       <g:brand>${escXml(item.brand)}</g:brand>${item.gtin ? `
@@ -190,15 +193,15 @@ ${xmlItems}
 </rss>`;
 }
 
-export function generateGoogleFeedTSV(products: GoogleFeedProduct[]): string {
-  const items = products.map(p => buildGoogleFeedItem(p));
+export function generateGoogleFeedTSV(products: GoogleFeedProduct[], saleDateStr?: string): string {
+  const items = products.map(p => buildGoogleFeedItem(p, saleDateStr));
   const headers = [
     'id', 'title', 'description', 'link', 'image_link',
     'price', 'sale_price', 'availability', 'condition',
     'brand', 'gtin', 'mpn', 'google_product_category',
     'product_type', 'color', 'size', 'gender', 'age_group',
     'custom_label_0', 'custom_label_1', 'custom_label_2',
-    'custom_label_3', 'custom_label_4',
+    'custom_label_3', 'custom_label_4', 'sale_price_effective_date',
   ];
   const rows = [
     headers.join('\t'),

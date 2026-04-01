@@ -55,7 +55,7 @@ const Index = () => {
   }
 
   if (activeFlow === "sale") {
-    return <BulkSaleFlow onBack={() => setActiveFlow(null)} />;
+    return <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />;
   }
 
   if (activeFlow === "restock") {

@@ -644,12 +644,17 @@ function SeoWriterPanel({ onBack }: { onBack: () => void }) {
 // ── Google Feed Preview Panel ──────────────────────────────
 function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [saleStart, setSaleStart] = useState('');
+  const [saleEnd, setSaleEnd] = useState('');
+
+  const getSaleDateStr = () => {
+    if (!saleStart || !saleEnd) return '';
+    return `${saleStart}T00:00+10:00/${saleEnd}T23:59+10:00`;
+  };
 
   // Load last invoice products from localStorage
   const getProducts = () => {
     try {
-      const hist = JSON.parse(localStorage.getItem("export_history") || "[]");
-      // Try to get products from last enrichment
       const raw = localStorage.getItem("last_enriched_products");
       if (raw) return JSON.parse(raw) as { name: string; brand: string; type: string; price: number; rrp: number; tags?: string }[];
       return [];
@@ -659,7 +664,7 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
   const products = getProducts();
   const hasProducts = products.length > 0;
 
-  const xml = hasProducts ? generateGoogleFeedXML(products) : '';
+  const xml = hasProducts ? generateGoogleFeedXML(products, undefined, getSaleDateStr()) : '';
 
   const handleDownloadXML = () => {
     if (!hasProducts) return;
@@ -672,7 +677,7 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
 
   const handleDownloadTSV = () => {
     if (!hasProducts) return;
-    const tsv = generateGoogleFeedTSV(products);
+    const tsv = generateGoogleFeedTSV(products, getSaleDateStr());
     const blob = new Blob(['\uFEFF' + tsv], { type: 'text/tab-separated-values;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -717,6 +722,26 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
             <pre className="text-[10.5px] font-mono-data text-muted-foreground bg-muted/50 rounded-lg p-3 max-h-80 overflow-auto whitespace-pre-wrap break-all">
               {xml.slice(0, 2000)}{xml.length > 2000 ? `\n\n... (${products.length} products total)` : ''}
             </pre>
+          </div>
+
+          {/* Sale dates */}
+          <div className="bg-card rounded-lg border border-border p-4 mb-4">
+            <h3 className="text-sm font-semibold mb-2">Sale dates (optional)</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Sale starts</label>
+                <input type="date" value={saleStart} onChange={e => setSaleStart(e.target.value)}
+                  className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Sale ends</label>
+                <input type="date" value={saleEnd} onChange={e => setSaleEnd(e.target.value)}
+                  className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground" />
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Leave blank to omit — Google will show the sale indefinitely until you update the feed.
+            </p>
           </div>
 
           <div className="flex gap-3 mb-4">

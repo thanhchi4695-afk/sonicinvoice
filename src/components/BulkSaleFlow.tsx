@@ -17,6 +17,7 @@ import {
 
 interface BulkSaleFlowProps {
   onBack: () => void;
+  onNavigateToGoogleFeed?: () => void;
 }
 
 interface SaleTemplate {
@@ -79,7 +80,7 @@ function saveTemplates(t: SaleTemplate[]) {
   localStorage.setItem("sale_templates", JSON.stringify(t));
 }
 
-const BulkSaleFlow = ({ onBack }: BulkSaleFlowProps) => {
+const BulkSaleFlow = ({ onBack, onNavigateToGoogleFeed }: BulkSaleFlowProps) => {
   // File state
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [fileName, setFileName] = useState("");
@@ -793,6 +794,12 @@ const BulkSaleFlow = ({ onBack }: BulkSaleFlowProps) => {
                   <Copy className="w-3 h-3" /> Copy CSV to clipboard
                 </button>
               </div>
+
+              {downloaded && onNavigateToGoogleFeed && (
+                <Button variant="ghost" size="sm" className="w-full mt-3 text-xs text-muted-foreground" onClick={onNavigateToGoogleFeed}>
+                  Also update Google Shopping feed →
+                </Button>
+              )}
 
               {/* Post-download: import guide */}
               {downloaded && (

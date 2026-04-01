@@ -608,7 +608,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           </div>
           <div className="space-y-2">
-            {mockProducts.map((p, i) => (
+            {costChanges.map((p, i) => (
               <ProductCard key={i} product={p} onPreview={() => setPreviewProduct(p)} />
             ))}
           </div>

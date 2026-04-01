@@ -286,6 +286,22 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       {/* Step 1: Upload */}
       {step === 1 && (
         <div className="px-4 pt-6">
+          {/* Location selector */}
+          {storeLocations.length > 1 && (
+            <div className="bg-card rounded-lg border border-border p-3 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-sm">📍</span>
+                <span className="text-xs font-medium">Receiving location for this invoice:</span>
+              </div>
+              <select value={receivingLocation} onChange={e => setReceivingLocation(e.target.value)}
+                className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm">
+                {storeLocations.map(loc => (
+                  <option key={loc.id} value={loc.id}>{loc.name}{loc.isDefault ? " (default)" : ""}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             onClick={handleFileSelect}
             className="w-full h-48 rounded-lg border-2 border-dashed border-border bg-card flex flex-col items-center justify-center gap-3 active:bg-muted transition-colors"

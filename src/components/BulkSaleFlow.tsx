@@ -6,6 +6,7 @@ import {
 import ShopifyPushFlow from "@/components/ShopifyPushFlow";
 import type { PushProduct } from "@/lib/shopify-api";
 import { Button } from "@/components/ui/button";
+import { saveSaleMeta, generatePromotionsFeed, getSaleMeta } from "@/lib/google-feed";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";

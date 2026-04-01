@@ -123,6 +123,14 @@ const AccountScreen = () => {
             options={LOCALES.map(l => ({ v: l.id, l: `${l.flag} ${l.country}` }))}
           />
         </div>
+        <SelectField label="Store type / POS" value={storeType} onChange={(v) => { setStoreType(v as StoreType); saveStoreConfig({ storeType: v as StoreType }); }}
+          options={[
+            { v: "shopify", l: "🛍️ Shopify only" },
+            { v: "lightspeed_shopify", l: "🖥️ Lightspeed + Shopify" },
+            { v: "lightspeed", l: "🖥️ Lightspeed POS only" },
+            { v: "other", l: "📦 Other / Not sure" },
+          ]}
+        />
       </Section>
 
       {/* Pricing Rules */}

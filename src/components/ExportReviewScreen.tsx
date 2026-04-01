@@ -11,6 +11,8 @@ export interface ExportProduct {
   name: string;
   brand: string;
   type: string;
+  colour?: string;
+  size?: string;
   price: number;
   rrp: number;
   status: string;

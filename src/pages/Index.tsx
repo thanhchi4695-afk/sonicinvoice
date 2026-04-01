@@ -56,6 +56,10 @@ const Index = () => {
     return <PriceLookup onBack={() => setActiveFlow(null)} />;
   }
 
+  if (activeFlow === "order_form") {
+    return <OrderFormFlow onBack={() => setActiveFlow(null)} />;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Top bar */}

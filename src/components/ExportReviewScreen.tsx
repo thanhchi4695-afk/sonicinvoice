@@ -126,35 +126,49 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
     URL.revokeObjectURL(url);
   };
 
+  const handleToggleVariantMode = (checked: boolean) => {
+    const newMode: VariantMode = checked ? "variant" : "simple";
+    setVariantModeState(newMode);
+    setVariantMode(newMode);
+    setValidationResult(null);
+    setExportBlocked(false);
+  };
+
+  const runValidation = () => {
+    if (selectedFormat !== "shopify_full") {
+      setValidationResult(null);
+      setExportBlocked(false);
+      return true;
+    }
+    const enabledMeta = getEnabledMetafields();
+    const { validation } = generateShopifyCSV(
+      filtered,
+      variantMode,
+      enabledMeta.map(m => ({ key: m.key, shopifyColumn: m.shopifyColumn }))
+    );
+    setValidationResult(validation);
+    setExportBlocked(!validation.valid);
+    return validation.valid;
+  };
+
   const handleExport = () => {
     const filename = generateFilename(supplierName, selectedFormat);
     const prods = filtered;
 
     if (selectedFormat === "shopify_full") {
       const enabledMeta = getEnabledMetafields();
-      const rows = prods.map(p => {
-        const handle = `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-        const row: Record<string, string> = {
-          Handle: handle, Title: `${p.brand} ${p.name}`, "Body (HTML)": `<p>${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.</p>`,
-          Vendor: p.brand, Type: p.type, Tags: `${p.brand}, ${p.type}, New Arrival`,
-          Published: "TRUE", "Variant Price": p.rrp.toFixed(2), "Variant Compare At Price": "",
-          "Variant SKU": p.sku || "", "Variant Barcode": p.barcode || "", "Image Src": "", Status: "draft",
-          "SEO Title": `${p.name} | ${p.brand}`.slice(0, 70),
-          "SEO Description": `Shop ${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.`.slice(0, 160),
-        };
-        // Add metafield columns where at least one product has data
-        for (const mf of enabledMeta) {
-          const val = p.metafields?.[mf.key] || "";
-          row[mf.shopifyColumn] = val;
-        }
-        return row;
-      });
-      // Filter out metafield columns where ALL values are empty
-      const metaColsToInclude = enabledMeta
-        .filter(mf => rows.some(r => r[mf.shopifyColumn]?.trim()))
-        .map(mf => mf.shopifyColumn);
-      const baseColumns = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Variant SKU", "Variant Barcode", "Variant Price", "Variant Compare At Price", "Image Src", "Status", "SEO Title", "SEO Description"];
-      downloadFile("\uFEFF" + Papa.unparse(rows, { columns: [...baseColumns, ...metaColsToInclude] }), filename);
+      const { csv, validation } = generateShopifyCSV(
+        prods,
+        variantMode,
+        enabledMeta.map(m => ({ key: m.key, shopifyColumn: m.shopifyColumn }))
+      );
+      setValidationResult(validation);
+      if (!validation.valid) {
+        setExportBlocked(true);
+        return;
+      }
+      setExportBlocked(false);
+      downloadFile(csv, filename);
     } else if (selectedFormat === "shopify_inventory") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
@@ -176,21 +190,18 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
     } else if (selectedFormat === "google_xml") {
       const xml = generateGoogleFeedXML(prods.map(p => ({
         name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
-        cogs: p.cogs,
-        colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
+        cogs: p.cogs, colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
         tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
       })), supplierName);
       downloadFile(xml, filename, "application/xml;charset=utf-8");
     } else if (selectedFormat === "google_tsv") {
       const tsv = generateGoogleFeedTSV(prods.map(p => ({
         name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
-        cogs: p.cogs,
-        colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
+        cogs: p.cogs, colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
         tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
       })));
       downloadFile("\uFEFF" + tsv, filename, "text/tab-separated-values;charset=utf-8");
     } else if (selectedFormat === "xlsx" || selectedFormat === "summary_pdf") {
-      // Fallback to CSV for now
       const rows = prods.map(p => ({
         Product: p.name, Brand: p.brand, Type: p.type,
         Cost: p.price.toFixed(2), RRP: p.rrp.toFixed(2), Confidence: p.confidence,

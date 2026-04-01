@@ -25,6 +25,7 @@ const navSections = [
       { id: "email_inbox", label: "Email Inbox", icon: Mail, type: "flow" as const },
       { id: "catalog_memory", label: "Catalog Memory", icon: BookOpen, type: "flow" as const },
       { id: "restock", label: "Restock Analytics", icon: Package, type: "flow" as const },
+      { id: "collab_seo", label: "Collab SEO", icon: Link, type: "flow" as const },
     ],
   },
   {

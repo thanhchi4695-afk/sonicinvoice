@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ChevronLeft, Download, TrendingUp, Package, Users, DollarSign, BarChart3, PieChart, LineChart, Award, Filter, X } from "lucide-react";
+import { ChevronLeft, Download, TrendingUp, Package, Users, DollarSign, BarChart3, PieChart, LineChart, Award, Filter, X, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getStoreConfig } from "@/lib/prompt-builder";

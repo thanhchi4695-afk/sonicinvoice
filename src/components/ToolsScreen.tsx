@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PriceLookup from "@/components/PriceLookup";
+import SupplierEmails from "@/components/SupplierEmails";
 import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";

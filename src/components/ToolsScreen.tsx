@@ -677,7 +677,7 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
 
   const handleDownloadTSV = () => {
     if (!hasProducts) return;
-    const tsv = generateGoogleFeedTSV(products);
+    const tsv = generateGoogleFeedTSV(products, getSaleDateStr());
     const blob = new Blob(['\uFEFF' + tsv], { type: 'text/tab-separated-values;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

@@ -1,4 +1,4 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft, Check, Upload } from "lucide-react";
 import { saveStoreConfig, getIndustryConfig } from "@/lib/prompt-builder";
+import { CURRENCIES, LOCALES } from "@/lib/i18n";
 
 interface OnboardingFlowProps {
   onComplete: () => void;

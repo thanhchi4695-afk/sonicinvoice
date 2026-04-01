@@ -74,49 +74,7 @@ function toTag(name: string): string {
 
 // DEFAULT_LAYERS removed — now derived from industry-config
 
-const INDUSTRY_SPECIAL_RULES: Record<string, SpecialRule[]> = {
-  swimwear: [
-    { id: uid(), keyword: 'chlorine resist', tag: 'chlorine-resist', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'underwire', tag: 'underwire', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'plus size', tag: 'plus-size', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'UPF', tag: 'upf-protection', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  beauty: [
-    { id: uid(), keyword: 'cruelty-free', tag: 'cruelty-free', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'vegan', tag: 'vegan', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'SPF', tag: 'spf', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'natural', tag: 'natural', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  fashion: [
-    { id: uid(), keyword: 'sustainable', tag: 'sustainable', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'organic cotton', tag: 'organic-cotton', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'plus size', tag: 'plus-size', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  clothing: [
-    { id: uid(), keyword: 'sustainable', tag: 'sustainable', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'organic cotton', tag: 'organic-cotton', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  electronics: [
-    { id: uid(), keyword: 'wireless', tag: 'wireless', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'USB-C', tag: 'usb-c', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'Bluetooth', tag: 'bluetooth', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  health: [
-    { id: uid(), keyword: 'vegan', tag: 'vegan', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'gluten-free', tag: 'gluten-free', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'dairy-free', tag: 'dairy-free', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  jewellery: [
-    { id: uid(), keyword: 'sterling silver', tag: 'sterling-silver', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'gold plated', tag: 'gold-plated', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'hypoallergenic', tag: 'hypoallergenic', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  home: [
-    { id: uid(), keyword: 'handmade', tag: 'handmade', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-    { id: uid(), keyword: 'sustainable', tag: 'sustainable', caseSensitive: false, matchType: 'contains', searchTitle: true, searchDescription: true, active: true },
-  ],
-  general: [],
-};
+// INDUSTRY_SPECIAL_RULES removed — now derived from industry-config
 
 export function getIndustryTagDefaults(): TagConfig {
   const store = getStoreConfig();

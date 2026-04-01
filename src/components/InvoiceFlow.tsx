@@ -1896,7 +1896,17 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
             <p className="font-semibold text-sm truncate">{product.name}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {product.brand} · {product.type} · ${product.rrp.toFixed(2)}
+              {product.sku && <> · <span className="font-mono-data">{product.sku}</span></>}
             </p>
+            {/* Barcode display */}
+            {product.barcode && (
+              <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                <Barcode className="w-3 h-3" />
+                <span className="font-mono-data">{product.barcode}</span>
+                {product.matchSource === "barcode" && <span className="text-primary font-medium">· In catalog</span>}
+                {product.barcode && product.matchSource !== "barcode" && <span className="text-warning">· Not in catalog</span>}
+              </p>
+            )}
             {/* Collection pills */}
             {(() => {
               const tags = [product.type, product.brand, "new arrivals", "Womens", "Swimwear", "full_price"].filter(Boolean);

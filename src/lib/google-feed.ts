@@ -223,6 +223,7 @@ export function generateGoogleFeedTSV(products: GoogleFeedProduct[], saleDateStr
     'product_type', 'color', 'size', 'gender', 'age_group',
     'custom_label_0', 'custom_label_1', 'custom_label_2',
     'custom_label_3', 'custom_label_4', 'sale_price_effective_date',
+    'cost_of_goods_sold', 'auto_pricing_min_price',
   ];
   const rows = [
     headers.join('\t'),

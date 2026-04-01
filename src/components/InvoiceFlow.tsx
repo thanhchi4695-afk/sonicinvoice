@@ -256,11 +256,28 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   ] : [];
 
   const mockProducts = [
-    { name: "Bond Eye Mara One Piece - Black", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready", metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" } },
-    { name: "Seafolly Collective Bikini Top - Navy", brand: "Seafolly", type: "Bikini Tops", price: 45.00, rrp: 109.95, status: "ready", metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" } },
-    { name: "Baku Riviera High Waist Pant - Ivory", brand: "Baku", type: "Bikini Bottoms", price: 38.00, rrp: 89.95, status: "review", metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" } },
-    { name: "Jantzen Retro Racerback - Coral", brand: "Jantzen", type: "One Piece", price: 65.00, rrp: 159.95, status: "ready", metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" } },
+    { name: "Bond Eye Mara One Piece - Black", sku: "BE10042", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready", metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" } },
+    { name: "Seafolly Collective Bikini Top - Navy", sku: "SF10023", brand: "Seafolly", type: "Bikini Tops", price: 45.00, rrp: 109.95, status: "ready", metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" } },
+    { name: "Baku Riviera High Waist Pant - Ivory", sku: "BK20015", brand: "Baku", type: "Bikini Bottoms", price: 38.00, rrp: 89.95, status: "review", metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" } },
+    { name: "Jantzen Retro Racerback - Coral", sku: "JA81520", brand: "Jantzen", type: "One Piece", price: 65.00, rrp: 159.95, status: "ready", metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" } },
   ];
+
+  // ── Cost history tracking ────────────────────────────────
+  const costHistory = getCostHistory();
+  const costChanges = mockProducts.map(p => {
+    const key = p.sku || p.name.toLowerCase().replace(/\s*-\s*(black|navy|ivory|coral|white|red|blue|green|pink).*$/i, "").trim();
+    const history = costHistory[key];
+    if (!history || history.length === 0) return { ...p, costChange: null, isNew: true };
+    const prev = history[history.length - 1];
+    const changeAmount = p.price - prev.cost;
+    const changePct = (changeAmount / prev.cost) * 100;
+    return { ...p, costChange: { prev: prev.cost, changeAmount, changePct, prevDate: prev.date }, isNew: false };
+  });
+  const priceIncreases = costChanges.filter(c => c.costChange && c.costChange.changePct > 0);
+  const priceDecreases = costChanges.filter(c => c.costChange && c.costChange.changePct < 0);
+  const largePriceAlert = costChanges.find(c => c.costChange && c.costChange.changePct > 10);
+  const [showCostSummary, setShowCostSummary] = useState(true);
+  const [showPriceAlertModal, setShowPriceAlertModal] = useState(!!largePriceAlert);
 
   return (
     <div className="min-h-screen pb-24 animate-fade-in">

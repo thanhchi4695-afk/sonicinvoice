@@ -347,6 +347,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin-slow mb-6" />
           <h3 className="text-lg font-semibold font-display mb-2">Reading your invoice...</h3>
           <p className="text-sm text-muted-foreground text-center">Extracting product names, prices, and quantities</p>
+          {useTemplate && matchedTemplate && (
+            <p className="text-xs text-primary mt-3 flex items-center gap-1">
+              <Zap className="w-3 h-3" /> Using {matchedTemplate.supplier} template — faster parsing
+            </p>
+          )}
           {customInstructions.trim() && (
             <p className="text-xs text-primary mt-3">🤖 Applying your custom instructions...</p>
           )}

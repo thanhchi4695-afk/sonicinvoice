@@ -183,6 +183,43 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* Stock by Location */}
+      {(() => {
+        const locs = getStoreLocations();
+        if (locs.length <= 1) return null;
+        const mockStock = [
+          { products: 47, units: 312, lastUpdated: "Today" },
+          { products: 23, units: 189, lastUpdated: "28 Mar 2026" },
+          { products: 12, units: 67, lastUpdated: "25 Mar 2026" },
+          { products: 8, units: 42, lastUpdated: "20 Mar 2026" },
+        ];
+        return (
+          <div className="bg-card rounded-lg border border-border p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <MapPin className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Stock by location</span>
+            </div>
+            <div className="space-y-2">
+              {locs.map((loc, i) => {
+                const data = mockStock[i % mockStock.length];
+                return (
+                  <div key={loc.id} className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <MapPin className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">{loc.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{data.products} products · {data.units} units</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-mono-data shrink-0">{data.lastUpdated}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Stat tiles */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-card rounded-lg border border-border p-4 text-center">

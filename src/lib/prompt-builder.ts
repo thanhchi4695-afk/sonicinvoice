@@ -8,7 +8,7 @@ export interface StoreConfig {
   city?: string;
   currency: string;
   currencySymbol: string;
-  locale: 'AU' | 'US' | 'UK' | 'NZ' | 'EU';
+  locale: string;
   industry: string;
   seoTitleTemplate: string;
   seoDescriptionTemplate: string;

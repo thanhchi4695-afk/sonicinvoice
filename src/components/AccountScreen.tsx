@@ -808,6 +808,123 @@ function InvoiceTemplatesSection() {
   );
 }
 
+// ── Locations Section ──────────────────────────────────────
+interface StoreLocation {
+  id: string;
+  name: string;
+  type: "retail" | "warehouse" | "online" | "popup";
+  address: string;
+  isDefault: boolean;
+}
+
+const LOCATION_STORAGE_KEY = "locations_config";
+const LOCATION_TYPES = [
+  { v: "retail", l: "Retail store" },
+  { v: "warehouse", l: "Warehouse" },
+  { v: "online", l: "Online" },
+  { v: "popup", l: "Pop-up" },
+];
+
+export function getStoreLocations(): StoreLocation[] {
+  try {
+    const saved = localStorage.getItem(LOCATION_STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return [{ id: "loc_1", name: "Main Store", type: "retail", address: "", isDefault: true }];
+}
+
+export function saveStoreLocations(locs: StoreLocation[]) {
+  localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(locs));
+}
+
+function LocationsSection() {
+  const [locations, setLocations] = useState<StoreLocation[]>(getStoreLocations);
+  const [editing, setEditing] = useState<string | null>(null);
+
+  const save = (updated: StoreLocation[]) => {
+    setLocations(updated);
+    saveStoreLocations(updated);
+  };
+
+  const addLocation = () => {
+    const id = `loc_${Date.now()}`;
+    save([...locations, { id, name: "New Location", type: "retail", address: "", isDefault: false }]);
+    setEditing(id);
+  };
+
+  const removeLocation = (id: string) => {
+    const loc = locations.find(l => l.id === id);
+    if (loc?.isDefault) return;
+    save(locations.filter(l => l.id !== id));
+  };
+
+  const setDefault = (id: string) => {
+    save(locations.map(l => ({ ...l, isDefault: l.id === id })));
+  };
+
+  const updateField = (id: string, field: keyof StoreLocation, value: string) => {
+    save(locations.map(l => l.id === id ? { ...l, [field]: value } : l));
+  };
+
+  return (
+    <Section title="📍 Locations">
+      <p className="text-xs text-muted-foreground -mt-1 mb-3">
+        Configure store locations for multi-location inventory tracking.
+      </p>
+      <div className="space-y-2">
+        {locations.map(loc => (
+          <div key={loc.id} className="bg-muted/30 rounded-lg border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium truncate">{loc.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{LOCATION_TYPES.find(t => t.v === loc.type)?.l || loc.type}{loc.address ? ` · ${loc.address}` : ""}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {loc.isDefault && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] bg-primary/15 text-primary font-medium">Default</span>
+                )}
+                <button onClick={() => setEditing(editing === loc.id ? null : loc.id)} className="text-muted-foreground">
+                  <Edit2 className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+            {editing === loc.id && (
+              <div className="px-3 pb-3 space-y-2 border-t border-border pt-2">
+                <input value={loc.name} onChange={e => updateField(loc.id, "name", e.target.value)}
+                  placeholder="Location name" className="w-full h-8 rounded-md bg-input border border-border px-2 text-xs" />
+                <select value={loc.type} onChange={e => updateField(loc.id, "type", e.target.value as StoreLocation["type"])}
+                  className="w-full h-8 rounded-md bg-input border border-border px-2 text-xs">
+                  {LOCATION_TYPES.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
+                </select>
+                <input value={loc.address} onChange={e => updateField(loc.id, "address", e.target.value)}
+                  placeholder="Address (optional)" className="w-full h-8 rounded-md bg-input border border-border px-2 text-xs" />
+                <div className="flex gap-2">
+                  {!loc.isDefault && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setDefault(loc.id)}>
+                      Set as default
+                    </Button>
+                  )}
+                  {!loc.isDefault && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => removeLocation(loc.id)}>
+                      <Trash2 className="w-3 h-3 mr-1" /> Remove
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <Button variant="outline" size="sm" className="mt-2 h-7 text-xs w-full" onClick={addLocation}>
+        <Plus className="w-3 h-3 mr-1" /> Add location
+      </Button>
+    </Section>
+  );
+}
+
 // ── Metafields Section ─────────────────────────────────────
 function MetafieldsSection() {
   const [config, setConfig] = useState<MetafieldDefinition[]>(getMetafieldConfig);

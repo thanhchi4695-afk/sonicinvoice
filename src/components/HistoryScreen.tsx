@@ -126,6 +126,19 @@ const HistoryScreen = () => {
             </div>
           );
         })}
+
+        {/* SEO Campaigns */}
+        {seoCampaigns.map((c, i) => (
+          <div key={`seo-${i}`} className="bg-card rounded-lg border border-border px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 shrink-0">SEO</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{c.theme}</p>
+                <p className="text-xs text-muted-foreground font-mono-data">{c.partnerCount} partners · {c.date}</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

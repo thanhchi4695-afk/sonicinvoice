@@ -203,6 +203,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [previewIdx, setPreviewIdx] = useState(0);
   const mode = useStoreMode();
 
+  // OCR / file type detection state
+  type FileParseMode = "pdf_text" | "pdf_scan" | "photo" | "spreadsheet" | "email";
+  const [fileParseMode, setFileParseMode] = useState<FileParseMode | null>(null);
+  const [showLowQualityWarning, setShowLowQualityWarning] = useState(false);
+
   // Location state
   const storeLocations = getStoreLocations();
   const defaultLoc = storeLocations.find(l => l.isDefault) || storeLocations[0];

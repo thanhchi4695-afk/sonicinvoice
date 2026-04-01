@@ -498,8 +498,22 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       {step === 2 && (
         <div className="flex flex-col items-center justify-center px-4 pt-24">
           <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin-slow mb-6" />
-          <h3 className="text-lg font-semibold font-display mb-2">Reading your invoice...</h3>
-          <p className="text-sm text-muted-foreground text-center">Extracting product names, prices, and quantities</p>
+          <h3 className="text-lg font-semibold font-display mb-2">
+            {fileParseMode === "photo" ? "Reading your invoice photo..." : fileParseMode === "pdf_scan" ? "Scanning your PDF..." : "Reading your invoice..."}
+          </h3>
+          <p className="text-sm text-muted-foreground text-center">
+            {(fileParseMode === "photo" || fileParseMode === "pdf_scan")
+              ? "Using AI image recognition to extract product data"
+              : "Extracting product names, prices, and quantities"}
+          </p>
+          {fileParseMode && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {fileParseMode === "pdf_text" && "📄 Digital PDF — text layer detected"}
+              {fileParseMode === "pdf_scan" && "🔍 Scanned PDF — OCR in progress"}
+              {fileParseMode === "photo" && "📷 Photo — AI vision processing"}
+              {fileParseMode === "spreadsheet" && "📊 Spreadsheet — parsing rows"}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground mt-3 font-mono-data">
             ⏱ {Math.floor(processingElapsed / 60)}:{String(processingElapsed % 60).padStart(2, "0")} elapsed
             {useTemplate ? " · ~0:02 remaining" : " · ~0:03 remaining"}

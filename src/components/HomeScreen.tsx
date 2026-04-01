@@ -2,6 +2,7 @@ import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileTe
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
+import { getStockUpdatesCount } from "@/lib/inventory-sim";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";
 

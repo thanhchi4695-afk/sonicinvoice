@@ -22,6 +22,7 @@ import ReorderPanel from "@/components/ReorderPanel";
 import SupplierPanel from "@/components/SupplierPanel";
 import HelpCentre from "@/components/HelpCentre";
 import AuditLogPanel from "@/components/AuditLogPanel";
+import CatalogMemoryPanel from "@/components/CatalogMemoryPanel";
 import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";

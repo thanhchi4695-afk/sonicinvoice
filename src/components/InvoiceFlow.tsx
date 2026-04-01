@@ -387,6 +387,77 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   );
 };
 
+// ── Shopify SEO Update Companion Export ────────────────────
+function ShopifySeoUpdateSection({ products, supplierName }: {
+  products: { name: string; brand: string; type: string; price: number; rrp: number; status: string }[];
+  supplierName: string;
+}) {
+  const [showGuide, setShowGuide] = useState(false);
+
+  const generateSeoCSV = () => {
+    const rows = products.map(p => {
+      const handle = `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      return {
+        'Handle': handle,
+        'Title': `${p.brand} ${p.name}`,
+        'SEO Title': `${p.name} | ${p.brand}`.slice(0, 70),
+        'SEO Description': `Shop ${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.`.slice(0, 160),
+        'Tags': `${p.brand}, ${p.type}, New Arrival`,
+        'Image Src': '',
+        'Image Alt Text': `${p.brand} ${p.name} - ${p.type}`,
+      };
+    });
+    return Papa.unparse(rows, {
+      columns: ['Handle', 'Title', 'SEO Title', 'SEO Description', 'Tags', 'Image Src', 'Image Alt Text'],
+    });
+  };
+
+  const handleDownload = () => {
+    const csv = generateSeoCSV();
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const month = new Date().toLocaleString('en', { month: 'short', year: '2-digit' }).replace(' ', '');
+    const tag = (supplierName || 'products').toLowerCase().replace(/\s+/g, '-');
+    a.href = url; a.download = `${tag}_seo_update_${month}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-4">
+      <p className="text-xs font-semibold mb-1 flex items-center gap-1.5">
+        <Search className="w-3.5 h-3.5 text-primary" />
+        Step 2: Download Shopify SEO Update <span className="text-muted-foreground font-normal">(optional)</span>
+      </p>
+      <p className="text-[11px] text-muted-foreground mb-3">
+        After Lightspeed syncs to Shopify, import this file into Shopify to add SEO titles, tags, and images
+      </p>
+      <Button variant="outline" className="w-full h-11 text-sm" onClick={handleDownload}>
+        <Download className="w-4 h-4 mr-2" /> Download Shopify SEO Update — {products.length} products
+      </Button>
+
+      <button
+        onClick={() => setShowGuide(!showGuide)}
+        className="flex items-center gap-1 text-xs text-muted-foreground mt-3"
+      >
+        <ChevronDown className={`w-3 h-3 transition-transform ${showGuide ? 'rotate-180' : ''}`} />
+        How to import the SEO Update into Shopify
+      </button>
+      {showGuide && (
+        <ol className="text-xs text-muted-foreground mt-2 space-y-1.5 pl-4 list-decimal">
+          <li>Wait for Lightspeed to sync products to your Shopify store (check Shopify admin → Products to confirm they appear)</li>
+          <li>In Shopify admin: go to Products → Import</li>
+          <li>Upload the Shopify SEO Update CSV file</li>
+          <li>On the import screen, tick: <span className="font-medium text-foreground">☑ "Overwrite existing products with matching handle"</span></li>
+          <li>Click Import → SEO titles, tags, and images will update</li>
+          <li>Verify by checking one product in Shopify admin — confirm SEO title and tags are correct</li>
+          <li className="text-amber-400 font-medium mt-2">⚠ Do NOT tick "Create new products" — this will create duplicates. Only use the overwrite/update option.</li>
+        </ol>
+      )}
+    </div>
+  );
+}
+
 // ── Lightspeed Stock Order Restock Section ─────────────────
 const CATALOG_KEY = 'catalog_memory_skupilot';
 

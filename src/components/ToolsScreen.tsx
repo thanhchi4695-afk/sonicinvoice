@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Tag, Search, Globe, Bot, ChevronLeft } from "lucide-react";
+import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PriceLookup from "@/components/PriceLookup";
 
 const tools = [
+  { id: "price_lookup", icon: DollarSign, label: "Price lookup", desc: "Look up AU retail prices via APIs", color: "text-success" },
   { id: "tags", icon: Tag, label: "Tag builder", desc: "Build Shopify tags manually", color: "text-primary" },
   { id: "seo", icon: Search, label: "SEO writer", desc: "Generate SEO title + meta description", color: "text-primary" },
   { id: "brands", icon: Globe, label: "Brand reference", desc: "AU brand website directory", color: "text-primary" },

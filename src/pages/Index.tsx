@@ -92,6 +92,7 @@ const Index = () => {
           onStartSale={() => setActiveFlow("sale")}
           onStartRestock={() => setActiveFlow("restock")}
           onStartPriceAdjust={() => setActiveFlow("price_adjust")}
+          onStartOrderForm={() => setActiveFlow("order_form")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

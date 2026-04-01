@@ -819,7 +819,7 @@ function LightspeedRestockSection({ products, supplierName }: {
   );
 }
 
-const ProductCard = ({ product }: { product: { name: string; brand: string; type: string; price: number; rrp: number; status: string } }) => {
+const ProductCard = ({ product, onPreview }: { product: { name: string; brand: string; type: string; price: number; rrp: number; status: string }; onPreview?: () => void }) => {
   const [expanded, setExpanded] = useState(false);
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">

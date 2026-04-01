@@ -356,6 +356,52 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       {/* Step 3: Review */}
       {step === 3 && (
         <div className="px-4 pt-4">
+          {/* Template save prompt */}
+          {showSaveTemplate && !savedTemplate && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <FileText className="w-4 h-4 text-primary" />
+                <span className="text-xs font-semibold text-primary">📋 Save this invoice format?</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">
+                SkuPilot detected a consistent layout for {supplierName || "this supplier"}'s invoices. Save it so future invoices parse instantly.
+              </p>
+              <div className="grid grid-cols-2 gap-1 text-[11px] bg-muted/50 rounded-md p-2 mb-2">
+                <span className="text-muted-foreground">Supplier:</span><span>{supplierName}</span>
+                <span className="text-muted-foreground">File type:</span><span>PDF</span>
+                <span className="text-muted-foreground">Header row:</span><span>Row 1</span>
+                <span className="text-muted-foreground">Product column:</span><span>Column A</span>
+                <span className="text-muted-foreground">SKU column:</span><span>Column B</span>
+                <span className="text-muted-foreground">Cost column:</span><span>Column F</span>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" className="h-7 text-xs" onClick={() => {
+                  saveFormatTemplate({
+                    supplier: supplierName,
+                    fileType: "pdf",
+                    headerRow: 1,
+                    columns: { title: "A", sku: "B", colour: "C", size: "D", qty: "E", cost: "F" },
+                    successCount: 1, errorCount: 0,
+                    lastUsed: new Date().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    notes: "",
+                  });
+                  setSavedTemplate(true);
+                  setShowSaveTemplate(false);
+                }}>
+                  <Check className="w-3 h-3 mr-1" /> Save template
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowSaveTemplate(false)}>Not now</Button>
+              </div>
+            </div>
+          )}
+          {savedTemplate && (
+            <div className="bg-success/10 border border-success/20 rounded-lg p-2 mb-3 flex items-center gap-2">
+              <Check className="w-3.5 h-3.5 text-success" />
+              <span className="text-xs text-success font-medium">Template saved — future {supplierName} invoices will parse faster</span>
+            </div>
+          )}
+
           {/* Custom rules applied feedback */}
           {appliedRules.length > 0 && (
             <div className="bg-success/10 border border-success/20 rounded-lg p-3 mb-3">

@@ -306,6 +306,258 @@ function SpecialRulesManager({ config, onSave, onBack }: { config: TagConfig; on
   );
 }
 
+// ── Brand Directory Panel ──────────────────────────────────
+function BrandDirectoryPanel({ onBack }: { onBack: () => void }) {
+  const store = getStoreConfig();
+  const [brands, setBrands] = useState<BrandDirectoryEntry[]>(() => sortBrandsByIndustry(getBrandDirectory(), store.industry));
+  const [query, setQuery] = useState('');
+  const [industryFilter, setIndustryFilter] = useState('all');
+  const [countryFilter, setCountryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showAdd, setShowAdd] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const refresh = () => setBrands(sortBrandsByIndustry(getBrandDirectory(), store.industry));
+  const filtered = searchBrands(brands, query, industryFilter, countryFilter, statusFilter);
+  const industries = getIndustryList();
+  const countries = [...new Set(brands.map(b => b.country))].sort();
+
+  const handleDelete = (id: string) => { deleteBrand(id); refresh(); };
+  const handleExport = () => {
+    const csv = exportBrandsCSV(brands);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'brand_directory.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+  const handleTemplate = () => {
+    const csv = getCSVTemplate();
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'brand_template.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = importBrandsCSV(ev.target?.result as string);
+      setImportResult({ imported: result.imported.length, skipped: result.skipped.length });
+      refresh();
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const statusBadge = (s: string) => {
+    switch (s) {
+      case 'system': return <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Built-in</span>;
+      case 'custom': return <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">Custom</span>;
+      case 'unverified': return <span className="text-xs px-1.5 py-0.5 rounded bg-warning/10 text-warning">Unverified</span>;
+      case 'catalog': return <span className="text-xs px-1.5 py-0.5 rounded bg-success/10 text-success">Catalog</span>;
+      default: return null;
+    }
+  };
+
+  if (showAdd) {
+    return <AddBrandForm onBack={() => { setShowAdd(false); refresh(); }} storeIndustry={store.industry} />;
+  }
+
+  return (
+    <div className="px-4 pt-6 pb-24 animate-fade-in">
+      <div className="flex items-center gap-3 mb-4">
+        <button onClick={onBack} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
+        <h2 className="text-lg font-semibold font-display">📚 Brand Directory</h2>
+      </div>
+
+      {/* Search */}
+      <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search brands..."
+        className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm mb-3" />
+
+      {/* Filters */}
+      <div className="flex gap-2 mb-3 overflow-x-auto">
+        <select value={industryFilter} onChange={e => setIndustryFilter(e.target.value)}
+          className="h-8 rounded-md bg-input border border-border px-2 text-xs text-foreground">
+          <option value="all">All industries</option>
+          {industries.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+        </select>
+        <select value={countryFilter} onChange={e => setCountryFilter(e.target.value)}
+          className="h-8 rounded-md bg-input border border-border px-2 text-xs text-foreground">
+          <option value="all">All countries</option>
+          {countries.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="h-8 rounded-md bg-input border border-border px-2 text-xs text-foreground">
+          <option value="all">All status</option>
+          <option value="system">Built-in</option>
+          <option value="custom">Custom</option>
+          <option value="unverified">Unverified</option>
+        </select>
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2 mb-4">
+        <Button variant="teal" size="sm" className="h-8 text-xs flex-1" onClick={() => setShowAdd(true)}>
+          <Plus className="w-3 h-3 mr-1" /> Add brand
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => fileRef.current?.click()}>
+          <Upload className="w-3 h-3 mr-1" /> Import
+        </Button>
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleExport}>
+          <Download className="w-3 h-3 mr-1" /> Export
+        </Button>
+        <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
+      </div>
+
+      {/* Import result */}
+      {importResult && (
+        <div className="bg-success/10 border border-success/20 rounded-lg p-3 mb-3">
+          <p className="text-xs text-success font-medium">✅ {importResult.imported} brands imported{importResult.skipped > 0 ? ` · ${importResult.skipped} skipped (duplicates)` : ''}</p>
+          <button onClick={() => setImportResult(null)} className="text-xs text-muted-foreground mt-1">Dismiss</button>
+        </div>
+      )}
+
+      {/* Brand count */}
+      <p className="text-xs text-muted-foreground mb-2">{filtered.length} of {brands.length} brands</p>
+
+      {/* Brand list */}
+      <div className="space-y-2">
+        {filtered.slice(0, 50).map(brand => (
+          <div key={brand.id} className="bg-card rounded-lg border border-border p-3">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-sm font-semibold">{brand.name}</span>
+                  {statusBadge(brand.status)}
+                </div>
+                {brand.website && (
+                  <a href={`https://${brand.website}`} target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-primary flex items-center gap-1">
+                    {brand.website} <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-muted-foreground">{brand.industry}</span>
+                  <span className="text-xs text-muted-foreground">·</span>
+                  <span className="text-xs font-mono-data text-muted-foreground">{brand.tag}</span>
+                  {brand.aliases.length > 0 && (
+                    <>
+                      <span className="text-xs text-muted-foreground">·</span>
+                      <span className="text-xs text-muted-foreground">{brand.aliases.length} alias{brand.aliases.length > 1 ? 'es' : ''}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-1.5 ml-2">
+                {brand.website && (
+                  <a href={`https://${brand.website}`} target="_blank" rel="noopener noreferrer"
+                    className="text-muted-foreground p-1"><ExternalLink className="w-3.5 h-3.5" /></a>
+                )}
+                {brand.status !== 'system' && (
+                  <button onClick={() => handleDelete(brand.id)} className="text-destructive p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+        {filtered.length > 50 && <p className="text-xs text-muted-foreground text-center py-2">Showing first 50 of {filtered.length} brands</p>}
+      </div>
+
+      {/* Template download */}
+      <button onClick={handleTemplate} className="text-xs text-primary mt-4 block">Download CSV template for bulk import →</button>
+    </div>
+  );
+}
+
+function AddBrandForm({ onBack, storeIndustry }: { onBack: () => void; storeIndustry: string }) {
+  const [name, setName] = useState('');
+  const [aliases, setAliases] = useState('');
+  const [website, setWebsite] = useState('');
+  const [tag, setTag] = useState('');
+  const [industry, setIndustry] = useState(storeIndustry);
+  const [country, setCountry] = useState('AU');
+  const [notes, setNotes] = useState('');
+  const industries = getIndustryList();
+
+  const handleSave = () => {
+    if (!name.trim()) return;
+    addBrand({
+      name: name.trim(),
+      aliases: aliases.split(',').map(a => a.trim()).filter(Boolean),
+      website: website.trim(),
+      category: industry,
+      industry,
+      country,
+      tag: tag.trim() || name.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim(),
+      status: 'custom',
+      notes: notes.trim(),
+      addedBy: 'user',
+    });
+    onBack();
+  };
+
+  return (
+    <div className="px-4 pt-6 pb-24 animate-fade-in">
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={onBack} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
+        <h2 className="text-lg font-semibold font-display">Add Brand</h2>
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Brand name *</label>
+          <input value={name} onChange={e => { setName(e.target.value); setTag(e.target.value.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim()); }}
+            placeholder="e.g. MECCA" className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Also known as (comma separated)</label>
+          <input value={aliases} onChange={e => setAliases(e.target.value)}
+            placeholder="e.g. MECCA Cosmetica, MECCA Brands Pty Ltd" className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Official website</label>
+          <input value={website} onChange={e => setWebsite(e.target.value)}
+            placeholder="e.g. mecca.com.au" className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm" />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Shopify tag</label>
+          <input value={tag} onChange={e => setTag(e.target.value)}
+            placeholder="Auto-generated" className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm font-mono-data" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Industry</label>
+            <select value={industry} onChange={e => setIndustry(e.target.value)}
+              className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm text-foreground">
+              {industries.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Country</label>
+            <select value={country} onChange={e => setCountry(e.target.value)}
+              className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm text-foreground">
+              {['AU', 'US', 'UK', 'NZ', 'CA', 'FR', 'IT', 'DE', 'JP', 'EU'].map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Notes</label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+            placeholder="Optional notes" className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm resize-none" />
+        </div>
+        {website && (
+          <a href={`https://${website}`} target="_blank" rel="noopener noreferrer"
+            className="text-xs text-primary flex items-center gap-1">
+            <ExternalLink className="w-3 h-3" /> Test website →
+          </a>
+        )}
+        <Button variant="teal" className="w-full h-11" onClick={handleSave} disabled={!name.trim()}>Save brand</Button>
+      </div>
+    </div>
+  );
+}
+
 // ── SEO Writer Panel ───────────────────────────────────────
 function SeoWriterPanel({ onBack }: { onBack: () => void }) {
   const store = getStoreConfig();

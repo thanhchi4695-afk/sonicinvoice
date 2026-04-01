@@ -1203,8 +1203,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 const isUpdate = lineModes[i] === "update";
                 return (
                   <div key={`p-${i}`}>
-                    {/* Mode toggle + confidence badge */}
-                    <div className="flex items-center gap-2 mb-1">
+                    {/* Mode toggle + match source + confidence badge */}
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <button
                         onClick={() => toggleLineMode(i)}
                         className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${!isUpdate ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}
@@ -1218,8 +1218,10 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                         📦 Update
                       </button>
                       {isUpdate && (
-                        <span className="text-[10px] text-success ml-1">→ Will update existing stock</span>
+                        <span className="text-[10px] text-success">→ Will update existing stock</span>
                       )}
+                      {/* Match source badge */}
+                      <MatchSourceBadge source={group.matchSource || "none"} barcode={group.barcode} />
                       <span className="ml-auto"><ConfidenceBadge breakdown={conf} /></span>
                     </div>
                     {group.isGrouped ? (

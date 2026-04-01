@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save } from "lucide-react";
+import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus } from "lucide-react";
+import { getCollectionRules, saveCollectionRules, resetCollectionRules, type CollectionRule } from "@/lib/collection-engine";
 import {
   saveConnection, testConnection, getConnection, deleteConnection,
   getLocations, updateConnectionSettings, ShopifyConnection,
@@ -307,6 +308,9 @@ const AccountScreen = () => {
       {/* SEO Templates */}
       <SeoTemplateSection />
 
+      {/* Collections */}
+      <CollectionManagerSection />
+
       {/* Default AI Instructions */}
       <DefaultInstructionsSection />
 
@@ -584,6 +588,60 @@ function DefaultInstructionsSection() {
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSave}>
           <Save className="w-3 h-3 mr-1" /> Save default instructions
         </Button>
+      </div>
+    </Section>
+  );
+}
+
+// ── Collection Manager Section ─────────────────────────────
+function CollectionManagerSection() {
+  const [rules, setRules] = useState<CollectionRule[]>(getCollectionRules);
+  const [newName, setNewName] = useState("");
+  const [newTags, setNewTags] = useState("");
+
+  const handleAdd = () => {
+    if (!newName.trim() || !newTags.trim()) return;
+    const updated = [...rules, { name: newName.trim(), triggerTags: newTags.split(",").map(t => t.trim()).filter(Boolean), matchMode: "all" as const }];
+    setRules(updated);
+    saveCollectionRules(updated);
+    setNewName("");
+    setNewTags("");
+  };
+
+  const handleDelete = (idx: number) => {
+    const updated = rules.filter((_, i) => i !== idx);
+    setRules(updated);
+    saveCollectionRules(updated);
+  };
+
+  const handleReset = () => {
+    resetCollectionRules();
+    setRules(getCollectionRules());
+  };
+
+  return (
+    <Section title="🏷️ Collections">
+      <p className="text-xs text-muted-foreground -mt-1 mb-2">
+        Define smart collection rules. Products matching these tags will be auto-assigned.
+      </p>
+      <div className="space-y-1.5 max-h-48 overflow-y-auto mb-3">
+        {rules.map((r, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs bg-muted/50 rounded-lg px-3 py-2">
+            <span className="font-medium text-foreground flex-1 truncate">{r.name}</span>
+            <span className="text-muted-foreground truncate max-w-[140px]">{r.triggerTags.join(", ")}</span>
+            <button onClick={() => handleDelete(i)} className="text-destructive shrink-0"><Trash2 className="w-3 h-3" /></button>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Input placeholder="Collection name" value={newName} onChange={e => setNewName(e.target.value)} className="h-9 text-xs" />
+        <Input placeholder="Trigger tags (comma-sep)" value={newTags} onChange={e => setNewTags(e.target.value)} className="h-9 text-xs" />
+      </div>
+      <div className="flex gap-2 mt-2">
+        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleAdd} disabled={!newName.trim()}>
+          <Plus className="w-3 h-3 mr-1" /> Add collection
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleReset}>Reset to defaults</Button>
       </div>
     </Section>
   );

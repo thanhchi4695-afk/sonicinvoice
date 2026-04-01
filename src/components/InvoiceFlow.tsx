@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import { Button } from "@/components/ui/button";
+import { matchCollectionsWithBrand, checkCoverage } from "@/lib/collection-engine";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { generateXSeriesCSV, getXSeriesSettings, saveXSeriesSettings, type XSeriesSettings, type XSeriesProduct } from "@/lib/lightspeed-xseries";
@@ -316,6 +317,26 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               <ProductCard key={i} product={p} onPreview={() => setPreviewProduct(p)} />
             ))}
           </div>
+
+          {/* Collection coverage check */}
+          {(() => {
+            const coverageData = mockProducts.map(p => ({
+              name: p.name, brand: p.brand, type: p.type,
+              tags: [p.type, p.brand, "new arrivals", "Womens", "Swimwear", "full_price"].filter(Boolean),
+            }));
+            const coverage = checkCoverage(coverageData);
+            const unassigned = coverage.results.filter(r => !r.hasSpecificCollection);
+            return (
+              <div className={`rounded-lg p-3 mt-3 text-xs ${unassigned.length > 0 ? "bg-warning/10 border border-warning/20" : "bg-success/10 border border-success/20"}`}>
+                <p className={`font-semibold ${unassigned.length > 0 ? "text-warning" : "text-success"}`}>
+                  🏷️ {coverage.assignedCount}/{coverage.total} products assigned to specific collections
+                </p>
+                {unassigned.map((u, i) => (
+                  <p key={i} className="text-warning/80 mt-0.5">⚠ {u.productName} — {u.suggestion}</p>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Preview modal */}
           {(previewProduct || previewAll) && (
@@ -830,6 +851,19 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; brand: s
             <p className="text-xs text-muted-foreground mt-0.5">
               {product.brand} · {product.type} · ${product.rrp.toFixed(2)}
             </p>
+            {/* Collection pills */}
+            {(() => {
+              const tags = [product.type, product.brand, "new arrivals", "Womens", "Swimwear", "full_price"].filter(Boolean);
+              const cols = matchCollectionsWithBrand(tags, product.brand);
+              return cols.length > 0 ? (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {cols.slice(0, 4).map(c => (
+                    <span key={c} className="px-1.5 py-0.5 rounded text-[9px] bg-primary/10 text-primary border border-primary/20">{c}</span>
+                  ))}
+                  {cols.length > 4 && <span className="text-[9px] text-muted-foreground">+{cols.length - 4}</span>}
+                </div>
+              ) : null;
+            })()}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />

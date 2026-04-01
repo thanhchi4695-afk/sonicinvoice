@@ -22,6 +22,7 @@ import ReorderPanel from "@/components/ReorderPanel";
 import SupplierPanel from "@/components/SupplierPanel";
 import HelpCentre from "@/components/HelpCentre";
 import AuditLogPanel from "@/components/AuditLogPanel";
+import CatalogMemoryPanel from "@/components/CatalogMemoryPanel";
 import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -30,7 +31,7 @@ const Index = () => {
   const [authed, setAuthed] = useState(false);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
@@ -92,6 +93,10 @@ const Index = () => {
     return <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />;
   }
 
+  if (activeFlow === "catalog_memory") {
+    return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Top bar */}
@@ -129,6 +134,7 @@ const Index = () => {
           onStartSuppliers={() => setActiveFlow("suppliers")}
           onOpenAuditLog={() => setActiveFlow("audit_log")}
           onStartPurchaseOrders={() => setActiveFlow("purchase_orders")}
+          onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

@@ -1,8 +1,9 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList, BookOpen } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
 import { getStockUpdatesCount } from "@/lib/inventory-sim";
+import { getTotalCatalogProducts } from "@/lib/catalog-memory";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";
 
@@ -16,9 +17,10 @@ interface HomeScreenProps {
   onStartSuppliers?: () => void;
   onOpenAuditLog?: () => void;
   onStartPurchaseOrders?: () => void;
+  onStartCatalogMemory?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -269,6 +271,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* Catalog Memory Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <BookOpen className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Catalog memory</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Upload supplier catalogs so future invoices match instantly — no web search needed.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">{getTotalCatalogProducts()} products learned</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartCatalogMemory}>
+          Manage catalogs <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
       {/* Stock by Location */}
       {(() => {
         const locs = getStoreLocations();
@@ -307,7 +328,7 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
       })()}
 
       {/* Stat tiles */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="bg-card rounded-lg border border-border p-4 text-center">
           <p className="text-2xl font-bold font-display">3</p>
           <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Lightspeed imports' : 'CSV exports'}</p>
@@ -319,6 +340,11 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         <div className="bg-card rounded-lg border border-border p-4 text-center">
           <p className="text-2xl font-bold font-display">{getStockUpdatesCount()}</p>
           <p className="text-xs text-muted-foreground mt-1">📦 Stock updates</p>
+        </div>
+        <div className="bg-card rounded-lg border border-border p-4 text-center cursor-pointer hover:border-primary/30 transition-colors" onClick={onStartCatalogMemory}>
+          <p className="text-2xl font-bold font-display">{getTotalCatalogProducts()}</p>
+          <p className="text-xs text-muted-foreground mt-1">📚 Catalog products</p>
+          <p className="text-[9px] text-muted-foreground/60 mt-0.5">More catalogs = faster matching</p>
         </div>
       </div>
 

@@ -109,6 +109,7 @@ const Index = () => {
           onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
           onStartEmailInbox={() => setActiveFlow("email_inbox")}
           onStartCollabSEO={() => setActiveFlow("collab_seo")}
+          onStartGoogleAdsSetup={() => setActiveFlow("google_ads_setup")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

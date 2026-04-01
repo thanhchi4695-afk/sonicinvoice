@@ -634,6 +634,7 @@ const ToolsScreen = () => {
   if (activeTool === "price_lookup") return <PriceLookup onBack={() => setActiveTool(null)} />;
   if (activeTool === "seo") return <SeoWriterPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "tags") return <TagBuilderPanel onBack={() => setActiveTool(null)} />;
+  if (activeTool === "brands") return <BrandDirectoryPanel onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

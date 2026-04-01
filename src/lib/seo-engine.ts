@@ -24,53 +24,9 @@ export interface SeoResult {
 // ── CTA Storage ────────────────────────────────────────────
 const CTA_KEY = 'seo_cta_phrases_skupilot';
 
-const INDUSTRY_CTA_DEFAULTS: Record<string, string[]> = {
-  swimwear: [
-    'Shop the full collection at {store}',
-    'New arrivals at {store} {city}',
-    'Free shipping over {threshold} at {store}',
-  ],
-  beauty: [
-    'Shop {brand} at {store} — free delivery over {threshold}',
-    'Discover your new favourite at {store}',
-    'Authentic {brand} with fast shipping at {store}',
-  ],
-  fashion: [
-    'Shop the latest from {brand} at {store}',
-    'New season arrivals — shop now at {store}',
-    'Style meets value at {store}',
-  ],
-  clothing: [
-    'Shop the latest from {brand} at {store}',
-    'New season arrivals — shop now at {store}',
-    'Style meets value at {store}',
-  ],
-  jewellery: [
-    'Beautiful {brand} jewellery at {store}',
-    'Free gift wrapping at {store}',
-    'Shop {brand} at {store} — perfect for gifting',
-  ],
-  electronics: [
-    'Shop {brand} at {store} — fast delivery',
-    'Latest tech at {store}',
-    'Free shipping over {threshold} at {store}',
-  ],
-  health: [
-    'Shop {brand} supplements at {store}',
-    'Fast delivery from {store}',
-    'Quality {brand} at {store}',
-  ],
-  home: [
-    'Shop {brand} homewares at {store}',
-    'Transform your space with {store}',
-    'Free shipping over {threshold} at {store}',
-  ],
-  general: [
-    'Shop now at {store}',
-    'Free shipping over {threshold} at {store}',
-    'New arrivals at {store}',
-  ],
-};
+function getIndustryCtas(industry: string): string[] {
+  return getIndustryDefinition(industry).seoCtas;
+}
 
 export function getCtaPhrases(industry?: string): string[] {
   try {

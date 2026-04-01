@@ -819,6 +819,46 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
         })()}
       </div>
 
+      {/* Local Inventory feed section */}
+      <div className="bg-card rounded-lg border border-border p-4 mb-4">
+        <h3 className="text-sm font-semibold mb-1">Local Inventory feed</h3>
+        <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+          Shows "In stock nearby" in Google Shopping for local shoppers. Submit to Merchant Center → Products → Local products → Feeds.
+        </p>
+        {(() => {
+          const store = getLocalStoreSettings();
+          if (!store) return (
+            <p className="text-[11px] text-muted-foreground">
+              Store details not set. Add a retail location with address in Settings → Locations.
+            </p>
+          );
+          return (
+            <>
+              <p className="text-[11px] text-success font-mono mb-2">Store: {store.name} ({store.code})</p>
+              <Button variant="outline" size="sm" className="h-8 text-xs gap-1" disabled={!hasProducts} onClick={() => {
+                const feedProducts = products.map(p => ({
+                  id: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 60),
+                  price: p.price,
+                  rrp: p.rrp,
+                  qty: 1,
+                }));
+                const xml = generateLocalInventoryFeed(feedProducts, store);
+                const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'google_local_inventory.xml'; a.click();
+                URL.revokeObjectURL(url);
+              }}>
+                <Download className="w-3 h-3" /> Download local inventory feed
+              </Button>
+            </>
+          );
+        })()}
+        <p className="text-[10px] text-muted-foreground mt-2">
+          First time? Also submit a Store feed in Google Merchant Center → Business information → Stores to register your physical location.
+        </p>
+      </div>
+
       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
         <p className="text-xs font-semibold text-primary mb-1">💡 How to submit to Google Merchant Center:</p>
         <p className="text-xs text-muted-foreground">

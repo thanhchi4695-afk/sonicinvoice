@@ -44,52 +44,9 @@ export function saveCtaPhrases(phrases: string[]) {
 }
 
 // ── Feature Phrase Detection ───────────────────────────────
-const INDUSTRY_FEATURES: Record<string, { pattern: RegExp; phrase: string }[]> = {
-  swimwear: [
-    { pattern: /underwire/i, phrase: 'With underwire support.' },
-    { pattern: /chlorine\s*resist/i, phrase: 'Chlorine resistant fabric.' },
-    { pattern: /plus\s*size|extended\s*siz/i, phrase: 'Available in extended sizing.' },
-    { pattern: /[d-g]\s*cup|full\s*bust/i, phrase: 'Full bust support in D-G cup.' },
-    { pattern: /upf|sun\s*protect/i, phrase: 'UPF 50+ sun protection.' },
-  ],
-  beauty: [
-    { pattern: /cruelty[\s-]*free/i, phrase: 'Cruelty-free formula.' },
-    { pattern: /\bvegan\b/i, phrase: '100% vegan.' },
-    { pattern: /\bspf\b/i, phrase: 'With SPF sun protection.' },
-    { pattern: /\bnatural\b/i, phrase: 'Made with natural ingredients.' },
-    { pattern: /anti[\s-]*age?ing/i, phrase: 'Anti-ageing formula.' },
-  ],
-  fashion: [
-    { pattern: /sustainab/i, phrase: 'Made from sustainable materials.' },
-    { pattern: /organic\s*cotton/i, phrase: '100% organic cotton.' },
-    { pattern: /plus\s*size|extended\s*siz/i, phrase: 'Available in extended sizes.' },
-  ],
-  clothing: [
-    { pattern: /sustainab/i, phrase: 'Made from sustainable materials.' },
-    { pattern: /organic\s*cotton/i, phrase: '100% organic cotton.' },
-    { pattern: /plus\s*size|extended\s*siz/i, phrase: 'Available in extended sizes.' },
-  ],
-  jewellery: [
-    { pattern: /sterling\s*silver/i, phrase: 'Sterling silver.' },
-    { pattern: /gold\s*plated/i, phrase: 'Gold plated.' },
-    { pattern: /hypoallergenic/i, phrase: 'Hypoallergenic.' },
-  ],
-  electronics: [
-    { pattern: /\bwireless\b/i, phrase: 'Wireless connectivity.' },
-    { pattern: /\busb[\s-]*c\b/i, phrase: 'USB-C compatible.' },
-    { pattern: /\bbluetooth\b/i, phrase: 'Bluetooth enabled.' },
-  ],
-  health: [
-    { pattern: /\bvegan\b/i, phrase: 'Vegan-friendly formula.' },
-    { pattern: /gluten[\s-]*free/i, phrase: 'Gluten-free.' },
-    { pattern: /dairy[\s-]*free/i, phrase: 'Dairy-free.' },
-  ],
-  home: [
-    { pattern: /handmade/i, phrase: 'Handmade.' },
-    { pattern: /sustainab/i, phrase: 'Made from sustainable materials.' },
-  ],
-  general: [],
-};
+function getIndustryFeatures(industry: string): { pattern: RegExp; phrase: string }[] {
+  return getIndustryDefinition(industry).featureRules;
+}
 
 export function detectFeatures(product: SeoProduct, industry: string): string {
   const rules = INDUSTRY_FEATURES[industry] || [];

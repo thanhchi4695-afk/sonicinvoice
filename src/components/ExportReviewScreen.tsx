@@ -114,9 +114,10 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
     const prods = filtered;
 
     if (selectedFormat === "shopify_full") {
+      const enabledMeta = getEnabledMetafields();
       const rows = prods.map(p => {
         const handle = `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-        return {
+        const row: Record<string, string> = {
           Handle: handle, Title: `${p.brand} ${p.name}`, "Body (HTML)": `<p>${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.</p>`,
           Vendor: p.brand, Type: p.type, Tags: `${p.brand}, ${p.type}, New Arrival`,
           Published: "TRUE", "Variant Price": p.rrp.toFixed(2), "Variant Compare At Price": "",
@@ -124,8 +125,19 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
           "SEO Title": `${p.name} | ${p.brand}`.slice(0, 70),
           "SEO Description": `Shop ${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.`.slice(0, 160),
         };
+        // Add metafield columns where at least one product has data
+        for (const mf of enabledMeta) {
+          const val = p.metafields?.[mf.key] || "";
+          row[mf.shopifyColumn] = val;
+        }
+        return row;
       });
-      downloadFile("\uFEFF" + Papa.unparse(rows), filename);
+      // Filter out metafield columns where ALL values are empty
+      const metaColsToInclude = enabledMeta
+        .filter(mf => rows.some(r => r[mf.shopifyColumn]?.trim()))
+        .map(mf => mf.shopifyColumn);
+      const baseColumns = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Variant Price", "Variant Compare At Price", "Variant SKU", "Image Src", "Status", "SEO Title", "SEO Description"];
+      downloadFile("\uFEFF" + Papa.unparse(rows, { columns: [...baseColumns, ...metaColsToInclude] }), filename);
     } else if (selectedFormat === "shopify_inventory") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),

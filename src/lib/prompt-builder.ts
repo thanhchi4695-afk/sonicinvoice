@@ -95,7 +95,7 @@ export function getIndustryConfig(industry: string): IndustryConfig {
 }
 
 export function getIndustryList(): { id: string; name: string }[] {
-  return getIndustryListFromConfig().map(i => ({ id: i.id, name: i.displayName }));
+  return getIndustryListFromConfig().map(i => ({ id: i.id, name: i.name }));
 }
 
 // ── Brand Directory ────────────────────────────────────────

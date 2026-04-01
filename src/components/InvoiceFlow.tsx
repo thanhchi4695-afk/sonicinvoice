@@ -646,6 +646,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       name: base.name.replace(/\s*-\s*(Black|Navy|Ivory|Coral|White|Red|Blue|Green|Pink|S|M|L|XL|8|10|12|14|16).*$/i, "").trim(),
       brand: base.brand,
       type: base.type,
+      colour: selected.map(s => s.colour).filter(Boolean).join(" / ") || "",
+      size: selected.map(s => s.size).filter(Boolean).join(", ") || "",
       price: base.price,
       rrp: base.rrp,
       status: base.status,

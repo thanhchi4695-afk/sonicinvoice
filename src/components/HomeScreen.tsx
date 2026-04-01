@@ -1,4 +1,4 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStoreMode } from "@/hooks/use-store-mode";
 
@@ -7,9 +7,10 @@ interface HomeScreenProps {
   onStartSale: () => void;
   onStartRestock: () => void;
   onStartPriceAdjust: () => void;
+  onStartOrderForm: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -137,6 +138,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
           </div>
         </div>
         <Button variant="outline" className="w-full mt-4 h-12 text-base border-destructive/30 text-destructive hover:bg-destructive/10" onClick={onStartRestock}>
+          Start <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Order Form Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <FileText className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Order forms</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Create professional wholesale order forms to send to your suppliers.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">PDF · CSV · email text</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartOrderForm}>
           Start <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>

@@ -14,6 +14,7 @@ import PriceLookup from "@/components/PriceLookup";
 import LightspeedGuide from "@/components/LightspeedGuide";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
 import QuickCapture from "@/components/QuickCapture";
+import OrderFormFlow from "@/components/OrderFormFlow";
 import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -22,7 +23,7 @@ const Index = () => {
   const [authed, setAuthed] = useState(false);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
@@ -53,6 +54,10 @@ const Index = () => {
 
   if (activeFlow === "price_lookup") {
     return <PriceLookup onBack={() => setActiveFlow(null)} />;
+  }
+
+  if (activeFlow === "order_form") {
+    return <OrderFormFlow onBack={() => setActiveFlow(null)} />;
   }
 
   return (
@@ -87,6 +92,7 @@ const Index = () => {
           onStartSale={() => setActiveFlow("sale")}
           onStartRestock={() => setActiveFlow("restock")}
           onStartPriceAdjust={() => setActiveFlow("price_adjust")}
+          onStartOrderForm={() => setActiveFlow("order_form")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

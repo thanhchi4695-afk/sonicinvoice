@@ -495,6 +495,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         price: 38.00,
         rrp: 89.95,
         status: "review",
+        colour: "Ivory",
+        size: "One Size",
         metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" },
         isGrouped: false,
         barcode: "",

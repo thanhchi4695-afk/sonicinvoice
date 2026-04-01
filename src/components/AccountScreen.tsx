@@ -134,12 +134,35 @@ const AccountScreen = () => {
           ]}
         />
         {(storeType === 'lightspeed' || storeType === 'lightspeed_shopify') && (
-          <SelectField label="Lightspeed version" value={lsVersion} onChange={(v) => { setLsVersion(v as LightspeedVersion); saveStoreConfig({ lightspeedVersion: v as LightspeedVersion }); }}
-            options={[
-              { v: "x_series", l: "X-Series (current)" },
-              { v: "r_series", l: "R-Series (legacy)" },
-            ]}
-          />
+          <>
+            <SelectField label="Lightspeed version" value={lsVersion} onChange={(v) => { setLsVersion(v as LightspeedVersion); saveStoreConfig({ lightspeedVersion: v as LightspeedVersion }); }}
+              options={[
+                { v: "x_series", l: "X-Series (current)" },
+                { v: "r_series", l: "R-Series (legacy)" },
+              ]}
+            />
+            <Field label="Outlet name" placeholder="e.g. Main Store" />
+            <Field label="Tax name" placeholder="GST" />
+            <SelectField label="Default export" value="lightspeed" onChange={() => {}}
+              options={[
+                { v: "lightspeed", l: "Lightspeed CSV" },
+                { v: "shopify", l: "Shopify CSV" },
+              ]}
+            />
+            <SelectField label="Attribute order" value="size_first" onChange={() => {}}
+              options={[
+                { v: "size_first", l: "Size first (Size → Colour)" },
+                { v: "colour_first", l: "Colour first (Colour → Size)" },
+              ]}
+            />
+          </>
+        )}
+        {storeType === 'lightspeed_shopify' && (
+          <div className="mt-3 pt-3 border-t border-border space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shopify settings (for post-import SEO update)</p>
+            <Field label="Shopify store URL" placeholder="yourstore.myshopify.com" />
+            <p className="text-[11px] text-muted-foreground">Your Shopify store is managed via Lightspeed. Only use these settings for the optional SEO update step.</p>
+          </div>
         )}
       </Section>
 

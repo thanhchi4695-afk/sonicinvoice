@@ -1,14 +1,19 @@
-import { useState } from "react";
-import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check } from "lucide-react";
+import { useState, useRef } from "react";
+import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PriceLookup from "@/components/PriceLookup";
-import { getStoreConfig, getIndustryConfig } from "@/lib/prompt-builder";
+import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
 import {
   getTagConfig, saveTagConfig, resetTagConfig, getIndustryTagDefaults,
   generateTags, toTag,
   type TagConfig, type ProductTypeEntry, type TagLayer, type SpecialRule, type TagInput,
 } from "@/lib/tag-engine";
+import {
+  getBrandDirectory, saveBrandDirectory, addBrand, deleteBrand,
+  searchBrands, sortBrandsByIndustry, exportBrandsCSV, importBrandsCSV, getCSVTemplate,
+  type BrandDirectoryEntry,
+} from "@/lib/brand-directory";
 
 const tools = [
   { id: "price_lookup", icon: DollarSign, label: "Price lookup", desc: "Look up retail prices via APIs", color: "text-success" },

@@ -534,7 +534,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   // Flatten for backward-compat with cost tracking etc.
   const mockProducts = productGroups.map(g => ({
     name: g.name,
-    sku: g.variants[0]?.sku || "",
+    sku: g.variants[0]?.sku || g.vendorCode || "",
+    barcode: g.barcode || "",
     brand: g.brand,
     type: g.type,
     colour: g.colour || "",

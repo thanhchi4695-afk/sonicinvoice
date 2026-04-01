@@ -331,10 +331,24 @@ export function saveLocalStoreSettings(settings: LocalStoreSettings) {
 
 export function getLocalStoreSettings(): LocalStoreSettings | null {
   try {
+    // Check dedicated local store settings first
     const raw = localStorage.getItem(LOCAL_STORE_KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    return (s.name && s.code) ? s : null;
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s.name && s.code) return s;
+    }
+    // Fallback: derive from locations config (retail locations with address)
+    const locsRaw = localStorage.getItem('locations_config');
+    if (locsRaw) {
+      const locs = JSON.parse(locsRaw) as { id: string; name: string; type: string; address: string; isDefault: boolean }[];
+      const retail = locs.find(l => l.type === 'retail' && l.address) || locs.find(l => l.address);
+      if (retail) {
+        const code = retail.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/,'');
+        const website = localStorage.getItem('shopify_store_url') || '';
+        return { name: retail.name, code, address: retail.address, phone: '', website };
+      }
+    }
+    return null;
   } catch { return null; }
 }
 

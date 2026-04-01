@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import Papa from "papaparse";
 import { generateXSeriesCSV, getXSeriesSettings, saveXSeriesSettings, type XSeriesSettings, type XSeriesProduct } from "@/lib/lightspeed-xseries";
 import { findTemplate, saveFormatTemplate, incrementTemplateUse, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
 import { getStoreLocations } from "@/components/AccountScreen";
+import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCount, type InventoryItem } from "@/lib/inventory-sim";
+import { addAuditEntry } from "@/lib/audit-log";
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -496,6 +498,44 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const groupedCount = productGroups.filter(g => g.isGrouped).length;
   const standaloneCount = productGroups.filter(g => !g.isGrouped).length;
   const totalQty = productGroups.reduce((s, g) => s + g.variants.reduce((v, l) => v + l.qty, 0), 0);
+
+  // ── Inventory update mode per product group ──────────────
+  type LineMode = "new" | "update";
+  const [lineModes, setLineModes] = useState<Record<number, LineMode>>(() => {
+    const modes: Record<number, LineMode> = {};
+    productGroups.forEach((g, i) => {
+      const mainSku = g.variants[0]?.sku || "";
+      const existing = lookupInventory(mainSku);
+      modes[i] = existing ? "update" : "new";
+    });
+    return modes;
+  });
+  const [reviewTab, setReviewTab] = useState<"new" | "update">("new");
+  const [inventoryApplied, setInventoryApplied] = useState(false);
+  const [inventoryApplyCount, setInventoryApplyCount] = useState(0);
+
+  const toggleLineMode = (idx: number) => {
+    setLineModes(prev => ({ ...prev, [idx]: prev[idx] === "new" ? "update" : "new" }));
+  };
+
+  const newProductGroups = productGroups.filter((_, i) => lineModes[i] === "new");
+  const updateProductGroups = productGroups.map((g, i) => ({ ...g, _idx: i })).filter((_, i) => lineModes[i] === "update");
+
+  const handleApplyInventoryUpdates = () => {
+    let count = 0;
+    updateProductGroups.forEach(g => {
+      g.variants.forEach(v => {
+        const loc = receivingLocation || storeLocations[0]?.name || "Main store";
+        updateStock(v.sku, v.qty, loc);
+        count++;
+      });
+      addAuditEntry("Inventory", `Inventory update: ${g.name} +${g.variants.reduce((s, v) => s + v.qty, 0)} units at ${receivingLocation || "Main store"}`);
+    });
+    incrementStockUpdates(count);
+    setInventoryApplied(true);
+    setInventoryApplyCount(count);
+    addAuditEntry("Inventory", `${count} inventory updates applied`);
+  };
 
   // Split / ungroup a grouped product into individual rows
   const handleSplitGroup = (idx: number) => {
@@ -1037,6 +1077,22 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
+          {/* Mode tabs */}
+          <div className="flex gap-1 mb-4 bg-muted/50 rounded-lg p-1">
+            <button
+              onClick={() => setReviewTab("new")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-medium transition-colors ${reviewTab === "new" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+            >
+              <PackagePlus className="w-3.5 h-3.5" /> 🆕 New products ({newProductGroups.length})
+            </button>
+            <button
+              onClick={() => setReviewTab("update")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-medium transition-colors ${reviewTab === "update" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+            >
+              <Package className="w-3.5 h-3.5" /> 📦 Update stock ({updateProductGroups.length})
+            </button>
+          </div>
+
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-medium">{productGroups.length} products found</p>
@@ -1055,44 +1111,138 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               <Button variant="teal" size="sm" onClick={() => setStep(4)}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>
           </div>
-          <div className="space-y-2">
-            {productGroups.map((group, i) => (
-              group.isGrouped ? (
-                <VariantGroupCard
-                  key={`g-${i}`}
-                  group={group}
-                  onSplit={() => handleSplitGroup(i)}
-                  onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
-                />
-              ) : (
-                <div key={`s-${i}`} className="relative">
-                  {/* Merge selection checkbox */}
-                  <div className="absolute top-3 right-12 z-10">
-                    <input
-                      type="checkbox"
-                      checked={mergeSelection.includes(i)}
-                      onChange={e => {
-                        if (e.target.checked) setMergeSelection([...mergeSelection, i]);
-                        else setMergeSelection(mergeSelection.filter(x => x !== i));
-                      }}
-                      title="Select to group as variants"
-                      className="w-4 h-4 rounded border-border accent-primary"
-                    />
+          {/* New products tab */}
+          {reviewTab === "new" && (
+            <div className="space-y-2">
+              {productGroups.map((group, i) => {
+                const isUpdate = lineModes[i] === "update";
+                return (
+                  <div key={`p-${i}`}>
+                    {/* Mode toggle */}
+                    <div className="flex items-center gap-2 mb-1">
+                      <button
+                        onClick={() => toggleLineMode(i)}
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${!isUpdate ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}
+                      >
+                        🆕 New
+                      </button>
+                      <button
+                        onClick={() => toggleLineMode(i)}
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${isUpdate ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}
+                      >
+                        📦 Update
+                      </button>
+                      {isUpdate && (
+                        <span className="text-[10px] text-success ml-1">→ Will update existing stock</span>
+                      )}
+                    </div>
+                    {group.isGrouped ? (
+                      <VariantGroupCard
+                        group={group}
+                        onSplit={() => handleSplitGroup(i)}
+                        onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
+                      />
+                    ) : (
+                      <div className="relative">
+                        <div className="absolute top-3 right-12 z-10">
+                          <input
+                            type="checkbox"
+                            checked={mergeSelection.includes(i)}
+                            onChange={e => {
+                              if (e.target.checked) setMergeSelection([...mergeSelection, i]);
+                              else setMergeSelection(mergeSelection.filter(x => x !== i));
+                            }}
+                            title="Select to group as variants"
+                            className="w-4 h-4 rounded border-border accent-primary"
+                          />
+                        </div>
+                        <ProductCard
+                          product={{
+                            ...mockProducts.find(p => p.name === group.name) || { name: group.name, brand: group.brand, type: group.type, price: group.price, rrp: group.rrp, status: group.status },
+                            sku: group.variants[0]?.sku,
+                            metafields: group.metafields,
+                            costChange: costChanges.find(c => c.name === group.name)?.costChange || null,
+                            isNew: costChanges.find(c => c.name === group.name)?.isNew,
+                          }}
+                          onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
+                        />
+                      </div>
+                    )}
                   </div>
-                  <ProductCard
-                    product={{
-                      ...mockProducts.find(p => p.name === group.name) || { name: group.name, brand: group.brand, type: group.type, price: group.price, rrp: group.rrp, status: group.status },
-                      sku: group.variants[0]?.sku,
-                      metafields: group.metafields,
-                      costChange: costChanges.find(c => c.name === group.name)?.costChange || null,
-                      isNew: costChanges.find(c => c.name === group.name)?.isNew,
-                    }}
-                    onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
-                  />
+                );
+              })}
+            </div>
+          )}
+
+          {/* Inventory updates tab */}
+          {reviewTab === "update" && (
+            <div className="space-y-3">
+              {inventoryApplied ? (
+                <div className="bg-success/10 border border-success/20 rounded-lg p-4 text-center">
+                  <Check className="w-8 h-8 text-success mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-success">✅ {inventoryApplyCount} inventory updates applied</p>
+                  <p className="text-xs text-muted-foreground mt-1">Stock levels have been updated in your simulated inventory.</p>
                 </div>
-              )
-            ))}
-          </div>
+              ) : updateProductGroups.length === 0 ? (
+                <div className="text-center py-10">
+                  <Package className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm font-medium">No stock updates</p>
+                  <p className="text-xs text-muted-foreground mt-1">Toggle products to "📦 Update" mode in the New Products tab to add stock updates here.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-card rounded-lg border border-border overflow-hidden">
+                    <div className="px-3 py-2 border-b border-border bg-muted/30">
+                      <div className="grid grid-cols-[1fr_60px_50px_60px_80px] gap-2 text-[10px] font-semibold text-muted-foreground uppercase">
+                        <span>Product</span>
+                        <span>Current</span>
+                        <span>Adding</span>
+                        <span>New total</span>
+                        <span>Location</span>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-border">
+                      {updateProductGroups.flatMap(g =>
+                        g.variants.map((v, vi) => {
+                          const existing = lookupInventory(v.sku);
+                          const currentQty = existing?.qty || 0;
+                          const newTotal = currentQty + v.qty;
+                          const isLargeQty = v.qty >= 50;
+                          return (
+                            <div key={`${g._idx}-${vi}`} className={`grid grid-cols-[1fr_60px_50px_60px_80px] gap-2 items-center px-3 py-2.5 text-xs ${isLargeQty ? "bg-secondary/5" : ""}`}>
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">{g.name}</p>
+                                <p className="text-[10px] text-muted-foreground font-mono-data">{v.sku}</p>
+                              </div>
+                              <span className="text-muted-foreground font-mono-data">{currentQty}</span>
+                              <span className="text-success font-mono-data font-semibold">+{v.qty}</span>
+                              <span className="font-mono-data font-semibold">{newTotal}</span>
+                              <span className="text-[10px] text-muted-foreground truncate">{existing?.location || receivingLocation || "Main store"}</span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {updateProductGroups.some(g => g.variants.some(v => v.qty >= 50)) && (
+                    <div className="bg-secondary/10 border border-secondary/20 rounded-lg p-2 flex items-center gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-secondary shrink-0" />
+                      <span className="text-xs text-secondary">Large quantity detected — confirm this is correct</span>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-muted-foreground">
+                    Inventory shown is simulated. Connect to Shopify to sync real stock levels.
+                  </p>
+
+                  <Button variant="teal" className="w-full h-11" onClick={handleApplyInventoryUpdates}>
+                    <Check className="w-4 h-4 mr-1" /> Approve all updates ({updateProductGroups.reduce((s, g) => s + g.variants.length, 0)} items)
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Collection coverage check */}
           {(() => {

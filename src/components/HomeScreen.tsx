@@ -2,6 +2,7 @@ import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileTe
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
+import { getStockUpdatesCount } from "@/lib/inventory-sim";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";
 
@@ -306,14 +307,18 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
       })()}
 
       {/* Stat tiles */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="bg-card rounded-lg border border-border p-4 text-center">
           <p className="text-2xl font-bold font-display">3</p>
           <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Lightspeed imports' : 'CSV exports'}</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-4 text-center">
           <p className="text-2xl font-bold font-display">84</p>
-          <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Products ready for Lightspeed' : 'Products imported to Shopify'}</p>
+          <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Products ready' : 'Products imported'}</p>
+        </div>
+        <div className="bg-card rounded-lg border border-border p-4 text-center">
+          <p className="text-2xl font-bold font-display">{getStockUpdatesCount()}</p>
+          <p className="text-xs text-muted-foreground mt-1">📦 Stock updates</p>
         </div>
       </div>
 

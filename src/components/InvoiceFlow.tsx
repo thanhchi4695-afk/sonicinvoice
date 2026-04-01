@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -304,12 +304,156 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     { applied: true, text: 'Custom AI instructions applied to all products' },
   ] : [];
 
-  const mockProducts = [
-    { name: "Bond Eye Mara One Piece - Black", sku: "BE10042", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready", metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" } },
-    { name: "Seafolly Collective Bikini Top - Navy", sku: "SF10023", brand: "Seafolly", type: "Bikini Tops", price: 45.00, rrp: 109.95, status: "ready", metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" } },
-    { name: "Baku Riviera High Waist Pant - Ivory", sku: "BK20015", brand: "Baku", type: "Bikini Bottoms", price: 38.00, rrp: 89.95, status: "review", metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" } },
-    { name: "Jantzen Retro Racerback - Coral", sku: "JA81520", brand: "Jantzen", type: "One Piece", price: 65.00, rrp: 159.95, status: "ready", metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" } },
-  ];
+  // ── Variant matrix types & data ──────────────────────────
+  interface VariantLine {
+    sku: string;
+    option1Name: string;
+    option1Value: string;
+    option2Name: string;
+    option2Value: string;
+    qty: number;
+    price: number;
+    rrp: number;
+  }
+
+  interface ProductGroup {
+    styleGroup: string;
+    name: string;
+    brand: string;
+    type: string;
+    price: number;
+    rrp: number;
+    status: string;
+    metafields: Record<string, string>;
+    variants: VariantLine[];
+    isGrouped: boolean;
+  }
+
+  const [productGroups, setProductGroups] = useState<ProductGroup[]>([
+    {
+      styleGroup: "Mara One Piece",
+      name: "Bond Eye Mara One Piece",
+      brand: "Bond Eye",
+      type: "One Piece",
+      price: 89.95,
+      rrp: 219.95,
+      status: "ready",
+      metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" },
+      isGrouped: true,
+      variants: [
+        { sku: "BE2204-BLK-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
+        { sku: "BE2204-BLK-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Black", qty: 3, price: 89.95, rrp: 219.95 },
+        { sku: "BE2204-BLK-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
+        { sku: "BE2204-NAV-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Navy", qty: 1, price: 89.95, rrp: 219.95 },
+        { sku: "BE2204-NAV-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Navy", qty: 3, price: 89.95, rrp: 219.95 },
+        { sku: "BE2204-NAV-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Navy", qty: 2, price: 89.95, rrp: 219.95 },
+      ],
+    },
+    {
+      styleGroup: null as any,
+      name: "Seafolly Collective Bikini Top - Navy",
+      brand: "Seafolly",
+      type: "Bikini Tops",
+      price: 45.00,
+      rrp: 109.95,
+      status: "ready",
+      metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" },
+      isGrouped: false,
+      variants: [{ sku: "SF10023", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 6, price: 45.00, rrp: 109.95 }],
+    },
+    {
+      styleGroup: null as any,
+      name: "Baku Riviera High Waist Pant - Ivory",
+      brand: "Baku",
+      type: "Bikini Bottoms",
+      price: 38.00,
+      rrp: 89.95,
+      status: "review",
+      metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" },
+      isGrouped: false,
+      variants: [{ sku: "BK20015", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 4, price: 38.00, rrp: 89.95 }],
+    },
+    {
+      styleGroup: "Retro Racerback",
+      name: "Jantzen Retro Racerback",
+      brand: "Jantzen",
+      type: "One Piece",
+      price: 65.00,
+      rrp: 159.95,
+      status: "ready",
+      metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" },
+      isGrouped: true,
+      variants: [
+        { sku: "JA81520-COR-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
+        { sku: "JA81520-COR-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Coral", qty: 3, price: 65.00, rrp: 159.95 },
+        { sku: "JA81520-COR-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
+      ],
+    },
+  ]);
+
+  // Flatten for backward-compat with cost tracking etc.
+  const mockProducts = productGroups.map(g => ({
+    name: g.name,
+    sku: g.variants[0]?.sku || "",
+    brand: g.brand,
+    type: g.type,
+    price: g.price,
+    rrp: g.rrp,
+    status: g.status,
+    metafields: g.metafields,
+  }));
+
+  const totalVariantLines = productGroups.reduce((s, g) => s + g.variants.length, 0);
+  const groupedCount = productGroups.filter(g => g.isGrouped).length;
+  const standaloneCount = productGroups.filter(g => !g.isGrouped).length;
+  const totalQty = productGroups.reduce((s, g) => s + g.variants.reduce((v, l) => v + l.qty, 0), 0);
+
+  // Split / ungroup a grouped product into individual rows
+  const handleSplitGroup = (idx: number) => {
+    const group = productGroups[idx];
+    if (!group.isGrouped) return;
+    const newProducts: ProductGroup[] = group.variants.map(v => ({
+      styleGroup: null as any,
+      name: `${group.name} - ${v.option2Value || v.option1Value}`,
+      brand: group.brand,
+      type: group.type,
+      price: v.price,
+      rrp: v.rrp,
+      status: group.status,
+      metafields: { ...group.metafields },
+      isGrouped: false,
+      variants: [v],
+    }));
+    setProductGroups(prev => [...prev.slice(0, idx), ...newProducts, ...prev.slice(idx + 1)]);
+  };
+
+  // Merge selected standalone rows into a group
+  const [mergeSelection, setMergeSelection] = useState<number[]>([]);
+  const [showMergeForm, setShowMergeForm] = useState(false);
+  const [mergeOpt1, setMergeOpt1] = useState("Size");
+  const [mergeOpt2, setMergeOpt2] = useState("Colour");
+
+  const handleMergeSelected = () => {
+    if (mergeSelection.length < 2) return;
+    const selected = mergeSelection.map(i => productGroups[i]).filter(Boolean);
+    const base = selected[0];
+    const merged: ProductGroup = {
+      styleGroup: base.name.replace(/\s*-\s*(Black|Navy|Ivory|Coral|White|Red|Blue|Green|Pink|S|M|L|XL|8|10|12|14|16).*$/i, "").trim(),
+      name: base.name.replace(/\s*-\s*(Black|Navy|Ivory|Coral|White|Red|Blue|Green|Pink|S|M|L|XL|8|10|12|14|16).*$/i, "").trim(),
+      brand: base.brand,
+      type: base.type,
+      price: base.price,
+      rrp: base.rrp,
+      status: base.status,
+      metafields: { ...base.metafields },
+      isGrouped: true,
+      variants: selected.flatMap(s => s.variants),
+    };
+    const remaining = productGroups.filter((_, i) => !mergeSelection.includes(i));
+    setProductGroups([...remaining, merged]);
+    setMergeSelection([]);
+    setShowMergeForm(false);
+  };
 
   // ── Cost history tracking ────────────────────────────────
   const costHistory = getCostHistory();
@@ -582,7 +726,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           {processingDone && finalProcessingTime > 0 && (
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 mb-3 flex items-center gap-2">
               <span className="text-xs text-primary font-medium font-mono-data">
-                ✅ {mockProducts.length} lines enriched in {finalProcessingTime < 60 ? `${finalProcessingTime}s` : `${Math.floor(finalProcessingTime / 60)}m ${finalProcessingTime % 60}s`}
+                ✅ {totalVariantLines} lines → {productGroups.length} products ({groupedCount} grouped + {standaloneCount} standalone) · {totalQty} total units · enriched in {finalProcessingTime < 60 ? `${finalProcessingTime}s` : `${Math.floor(finalProcessingTime / 60)}m ${finalProcessingTime % 60}s`}
               </span>
             </div>
           )}
@@ -672,16 +816,59 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           )}
 
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium">{mockProducts.length} products found</p>
+            <div>
+              <p className="text-sm font-medium">{productGroups.length} products found</p>
+              <p className="text-[10px] text-muted-foreground">{totalVariantLines} lines → {groupedCount} grouped + {standaloneCount} standalone</p>
+            </div>
             <div className="flex gap-2">
+              {mergeSelection.length >= 2 ? (
+                <Button variant="outline" size="sm" onClick={handleMergeSelected} className="gap-1 text-primary border-primary">
+                  <Link className="w-3.5 h-3.5" /> Group {mergeSelection.length} as variants
+                </Button>
+              ) : mergeSelection.length > 0 ? (
+                <span className="text-[10px] text-muted-foreground self-center">Select {2 - mergeSelection.length} more to group</span>
+              ) : null}
               <Button variant="outline" size="sm" onClick={() => setPreviewAll(true)} className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview all</Button>
               <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
               <Button variant="teal" size="sm" onClick={() => setStep(4)}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>
           </div>
           <div className="space-y-2">
-            {costChanges.map((p, i) => (
-              <ProductCard key={i} product={p} onPreview={() => setPreviewProduct(p)} />
+            {productGroups.map((group, i) => (
+              group.isGrouped ? (
+                <VariantGroupCard
+                  key={`g-${i}`}
+                  group={group}
+                  onSplit={() => handleSplitGroup(i)}
+                  onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
+                />
+              ) : (
+                <div key={`s-${i}`} className="relative">
+                  {/* Merge selection checkbox */}
+                  <div className="absolute top-3 right-12 z-10">
+                    <input
+                      type="checkbox"
+                      checked={mergeSelection.includes(i)}
+                      onChange={e => {
+                        if (e.target.checked) setMergeSelection([...mergeSelection, i]);
+                        else setMergeSelection(mergeSelection.filter(x => x !== i));
+                      }}
+                      title="Select to group as variants"
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                  </div>
+                  <ProductCard
+                    product={{
+                      ...mockProducts.find(p => p.name === group.name) || { name: group.name, brand: group.brand, type: group.type, price: group.price, rrp: group.rrp, status: group.status },
+                      sku: group.variants[0]?.sku,
+                      metafields: group.metafields,
+                      costChange: costChanges.find(c => c.name === group.name)?.costChange || null,
+                      isNew: costChanges.find(c => c.name === group.name)?.isNew,
+                    }}
+                    onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
+                  />
+                </div>
+              )
             ))}
           </div>
 
@@ -1068,6 +1255,109 @@ function LightspeedRestockSection({ products, supplierName }: {
     </div>
   );
 }
+// ── Variant Group Card ────────────────────────────────────
+const VariantGroupCard = ({ group, onSplit, onPreview }: {
+  group: { styleGroup: string; name: string; brand: string; type: string; price: number; rrp: number; status: string; variants: { sku: string; option1Name: string; option1Value: string; option2Name: string; option2Value: string; qty: number }[]; metafields: Record<string, string> };
+  onSplit: () => void;
+  onPreview?: () => void;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const variants = group.variants;
+  const totalQty = variants.reduce((s, v) => s + v.qty, 0);
+
+  // Build the grid: option2 values as rows, option1 values as columns
+  const option1Values = [...new Set(variants.map(v => v.option1Value))];
+  const option2Values = [...new Set(variants.filter(v => v.option2Value).map(v => v.option2Value))];
+  const hasOption2 = option2Values.length > 0;
+
+  const getQty = (opt1: string, opt2: string) => {
+    const v = variants.find(v => v.option1Value === opt1 && v.option2Value === opt2);
+    return v?.qty ?? 0;
+  };
+
+  return (
+    <div className="bg-card rounded-lg border-2 border-primary/30 overflow-hidden">
+      <button onClick={() => setExpanded(!expanded)} className="w-full px-4 py-3 text-left">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🧩</span>
+              <p className="font-semibold text-sm truncate">{group.name} — {group.brand}</p>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {hasOption2
+                ? `${option2Values.length} colour${option2Values.length > 1 ? "s" : ""} × ${option1Values.length} size${option1Values.length > 1 ? "s" : ""}`
+                : `${option1Values.length} variant${option1Values.length > 1 ? "s" : ""}`}
+              {" · "}{variants.length} variants · Total qty: {totalQty}
+            </p>
+            <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] bg-primary/10 text-primary border border-primary/20">
+              ✓ Enriched ({variants.length} variants)
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 ml-3">
+            <span className={`w-2 h-2 rounded-full ${group.status === "ready" ? "bg-success" : "bg-secondary"}`} />
+            <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
+          </div>
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+          {/* Variant grid */}
+          {hasOption2 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr>
+                    <th className="text-left py-1.5 pr-3 text-muted-foreground font-medium border-b border-border">
+                      {variants[0]?.option2Name || "Colour"} / {variants[0]?.option1Name || "Size"}
+                    </th>
+                    {option1Values.map(s => (
+                      <th key={s} className="text-center py-1.5 px-2 text-muted-foreground font-medium border-b border-border">{s}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {option2Values.map(colour => (
+                    <tr key={colour} className="border-b border-border/50">
+                      <td className="py-1.5 pr-3 font-medium">{colour}</td>
+                      {option1Values.map(size => {
+                        const qty = getQty(size, colour);
+                        return (
+                          <td key={size} className="text-center py-1.5 px-2">
+                            <span className={`inline-block min-w-[24px] rounded px-1 py-0.5 font-mono-data ${qty > 0 ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground/40"}`}>
+                              {qty > 0 ? qty : "—"}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {variants.map((v, i) => (
+                <div key={i} className="px-2.5 py-1 rounded-md bg-muted text-xs font-mono-data">
+                  {v.option1Value}: <span className="font-medium">{v.qty}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-2 flex-wrap">
+            {onPreview && <Button variant="outline" size="sm" onClick={onPreview}><Eye className="w-3.5 h-3.5 mr-1" /> Preview</Button>}
+            <Button variant="ghost" size="sm" onClick={onSplit}>
+              <Scissors className="w-3.5 h-3.5 mr-1" /> Split into separate products
+            </Button>
+            <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
   const [expanded, setExpanded] = useState(false);

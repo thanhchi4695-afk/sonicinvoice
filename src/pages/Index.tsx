@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AuthScreen from "@/components/AuthScreen";
+import { addAuditEntry } from "@/lib/audit-log";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import BottomTabBar from "@/components/BottomTabBar";
 import HomeScreen from "@/components/HomeScreen";

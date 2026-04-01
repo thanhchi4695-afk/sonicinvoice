@@ -49,6 +49,7 @@ export interface GoogleFeedProduct {
   type: string;
   price: number;
   rrp: number;
+  cogs?: number;
   tags?: string;
   description?: string;
   colour?: string;
@@ -82,6 +83,8 @@ export interface GoogleFeedItem {
   custom_label_2: string;
   custom_label_3: string;
   custom_label_4: string;
+  cost_of_goods_sold: string;
+  auto_pricing_min_price: string;
 }
 
 function escXml(str: string): string {
@@ -91,6 +94,20 @@ function escXml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
+}
+
+export function getMarginFloor(): number {
+  const saved = parseFloat(localStorage.getItem('margin_floor') || '');
+  return (!isNaN(saved) && saved >= 1.0) ? saved : 1.20;
+}
+
+export function setMarginFloor(val: number) {
+  localStorage.setItem('margin_floor', String(val));
+}
+
+function calcMinPrice(cogs: number): string {
+  if (!cogs || cogs <= 0) return '';
+  return (cogs * getMarginFloor()).toFixed(2);
 }
 
 export function buildGoogleFeedItem(p: GoogleFeedProduct, saleDateStr?: string): GoogleFeedItem {
@@ -147,6 +164,8 @@ export function buildGoogleFeedItem(p: GoogleFeedProduct, saleDateStr?: string):
     custom_label_3: hasRRP ? 'sale' : 'full_price',
     custom_label_4: '',
     sale_price_effective_date: (salePrice && saleDateStr) ? saleDateStr : '',
+    cost_of_goods_sold: p.cogs && p.cogs > 0 ? `${p.cogs.toFixed(2)} AUD` : '',
+    auto_pricing_min_price: p.cogs && p.cogs > 0 ? `${calcMinPrice(p.cogs)} AUD` : '',
   };
 }
 
@@ -174,7 +193,9 @@ export function generateGoogleFeedXML(products: GoogleFeedProduct[], storeName?:
       <g:color>${escXml(item.color)}</g:color>` : ''}${item.size ? `
       <g:size>${escXml(item.size)}</g:size>` : ''}
       <g:gender>${item.gender}</g:gender>
-      <g:age_group>${item.age_group}</g:age_group>
+      <g:age_group>${item.age_group}</g:age_group>${item.cost_of_goods_sold ? `
+      <g:cost_of_goods_sold>${escXml(item.cost_of_goods_sold)}</g:cost_of_goods_sold>` : ''}${item.auto_pricing_min_price ? `
+      <g:auto_pricing_min_price>${escXml(item.auto_pricing_min_price)}</g:auto_pricing_min_price>` : ''}
       <g:custom_label_0>${escXml(item.custom_label_0)}</g:custom_label_0>
       <g:custom_label_1>${escXml(item.custom_label_1)}</g:custom_label_1>
       <g:custom_label_2>${escXml(item.custom_label_2)}</g:custom_label_2>
@@ -202,6 +223,7 @@ export function generateGoogleFeedTSV(products: GoogleFeedProduct[], saleDateStr
     'product_type', 'color', 'size', 'gender', 'age_group',
     'custom_label_0', 'custom_label_1', 'custom_label_2',
     'custom_label_3', 'custom_label_4', 'sale_price_effective_date',
+    'cost_of_goods_sold', 'auto_pricing_min_price',
   ];
   const rows = [
     headers.join('\t'),

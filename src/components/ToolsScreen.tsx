@@ -7,7 +7,7 @@ import SeasonManager from "@/components/SeasonManager";
 import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
-import { generateGoogleFeedXML, generateGoogleFeedTSV, getSaleMeta, generatePromotionsFeed } from "@/lib/google-feed";
+import { generateGoogleFeedXML, generateGoogleFeedTSV, getSaleMeta, generatePromotionsFeed, getMarginFloor, setMarginFloor } from "@/lib/google-feed";
 import {
   getTagConfig, saveTagConfig, resetTagConfig, getIndustryTagDefaults,
   generateTags, toTag,
@@ -646,6 +646,7 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
   const [copied, setCopied] = useState(false);
   const [saleStart, setSaleStart] = useState('');
   const [saleEnd, setSaleEnd] = useState('');
+  const [marginFloor, setMarginFloorState] = useState(getMarginFloor);
 
   const getSaleDateStr = () => {
     if (!saleStart || !saleEnd) return '';
@@ -785,6 +786,38 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
           </div>
         );
       })()}
+
+      {/* Automated Discounts section */}
+      <div className="bg-card rounded-lg border border-border p-4 mb-4">
+        <h3 className="text-sm font-semibold mb-1">Google Automated Discounts</h3>
+        <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+          Your feed includes cost and minimum price data. Enrol in Google Merchant Center → Growth → Manage programs → Automated Discounts.
+        </p>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>Margin floor: <strong className="text-foreground">Cost × {marginFloor.toFixed(2)}</strong></span>
+          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => {
+            const val = prompt(
+              'Set minimum margin multiplier:\n1.20 = 20% above cost (recommended)\n1.15 = 15% above cost\n1.30 = 30% above cost\n\nCurrent: ' + marginFloor.toFixed(2),
+              String(marginFloor)
+            );
+            const num = parseFloat(val || '');
+            if (!isNaN(num) && num >= 1.0 && num <= 3.0) {
+              setMarginFloor(num);
+              setMarginFloorState(num);
+            }
+          }}>
+            Change
+          </Button>
+        </div>
+        {hasProducts && (() => {
+          const withCogs = products.filter(p => (p as any).cogs && (p as any).cogs > 0).length;
+          return (
+            <p className={`text-[11px] mt-2 font-mono ${withCogs === products.length ? 'text-success' : 'text-warning'}`}>
+              {withCogs}/{products.length} products have cost data
+            </p>
+          );
+        })()}
+      </div>
 
       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
         <p className="text-xs font-semibold text-primary mb-1">💡 How to submit to Google Merchant Center:</p>

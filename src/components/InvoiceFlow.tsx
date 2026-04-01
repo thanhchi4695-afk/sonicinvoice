@@ -436,6 +436,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     size: string;
     price: number;
     rrp: number;
+    cogs?: number;
     status: string;
     metafields: Record<string, string>;
     variants: VariantLine[];
@@ -455,6 +456,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         type: "One Piece",
         price: 89.95,
         rrp: 219.95,
+        cogs: 89.95,
         status: "ready",
         colour: "Black / Navy",
         size: "8-12",
@@ -478,6 +480,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         type: "Bikini Tops",
         price: 45.00,
         rrp: 109.95,
+        cogs: 45.00,
         status: "ready",
         colour: "Navy",
         size: "One Size",
@@ -494,6 +497,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         type: "Bikini Bottoms",
         price: 38.00,
         rrp: 89.95,
+        cogs: 38.00,
         status: "review",
         colour: "Ivory",
         size: "One Size",
@@ -510,6 +514,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         type: "One Piece",
         price: 65.00,
         rrp: 159.95,
+        cogs: 65.00,
         status: "ready",
         colour: "Coral",
         size: "8-12",

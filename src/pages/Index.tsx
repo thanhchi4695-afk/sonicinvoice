@@ -122,6 +122,7 @@ const Index = () => {
           onStartOrderForm={() => setActiveFlow("order_form")}
           onStartReorder={() => setActiveFlow("reorder")}
           onStartSuppliers={() => setActiveFlow("suppliers")}
+          onOpenAuditLog={() => setActiveFlow("audit_log")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

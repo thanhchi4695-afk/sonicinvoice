@@ -10,12 +10,28 @@ interface ExportEntry {
   date: string;
 }
 
+const SOURCE_ICONS: Record<string, string> = {
+  pdf_text: "📄",
+  pdf_scan: "🔍",
+  photo: "📷",
+  spreadsheet: "📊",
+  email: "📧",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  pdf_text: "PDF text",
+  pdf_scan: "PDF scan",
+  photo: "Photo",
+  spreadsheet: "Spreadsheet",
+  email: "Email",
+};
+
 const historyItems = [
-  { type: "invoice" as const, label: "Jantzen Mar26", count: 18, date: "30 Mar 2026", supplier: "jantzen", processingTime: 83 },
-  { type: "sale" as const, label: "Baku 30% off", count: 48, date: "28 Mar 2026", supplier: "baku", processingTime: 127 },
-  { type: "invoice" as const, label: "Seafolly Feb26", count: 24, date: "15 Feb 2026", supplier: "seafolly", processingTime: 96 },
-  { type: "sale" as const, label: "Summer clearance 50%", count: 92, date: "10 Feb 2026", supplier: "mixed", processingTime: 215 },
-  { type: "invoice" as const, label: "Bond Eye Jan26", count: 12, date: "5 Jan 2026", supplier: "bond-eye", processingTime: 54 },
+  { type: "invoice" as const, label: "Jantzen Mar26", count: 18, date: "30 Mar 2026", supplier: "jantzen", processingTime: 83, source: "pdf_text" },
+  { type: "sale" as const, label: "Baku 30% off", count: 48, date: "28 Mar 2026", supplier: "baku", processingTime: 127, source: "spreadsheet" },
+  { type: "invoice" as const, label: "Seafolly Feb26", count: 24, date: "15 Feb 2026", supplier: "seafolly", processingTime: 96, source: "pdf_scan" },
+  { type: "sale" as const, label: "Summer clearance 50%", count: 92, date: "10 Feb 2026", supplier: "mixed", processingTime: 215, source: "spreadsheet" },
+  { type: "invoice" as const, label: "Bond Eye Jan26", count: 12, date: "5 Jan 2026", supplier: "bond-eye", processingTime: 54, source: "photo" },
 ];
 
 function getExportHistory(): ExportEntry[] {
@@ -71,8 +87,8 @@ const HistoryScreen = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.label}</p>
                   <div className="flex items-center gap-2">
-                    <p className="text-xs text-muted-foreground font-mono-data">
-                      {item.count} products · {item.date} · ⏱ {item.processingTime < 60 ? `${item.processingTime}s` : `${Math.floor(item.processingTime / 60)}m ${item.processingTime % 60}s`}
+                     <p className="text-xs text-muted-foreground font-mono-data">
+                      {SOURCE_ICONS[item.source] || "📄"} {SOURCE_LABELS[item.source] || item.source} · {item.count} products · {item.date} · ⏱ {item.processingTime < 60 ? `${item.processingTime}s` : `${Math.floor(item.processingTime / 60)}m ${item.processingTime % 60}s`}
                     </p>
                     {exportCount > 0 && (
                       <span className="text-[10px] text-primary font-medium" title={lastExport ? `Last exported: ${new Date(lastExport.date).toLocaleDateString()} · ${FORMAT_LABELS[lastExport.format] || lastExport.format}` : ""}>

@@ -203,6 +203,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [previewIdx, setPreviewIdx] = useState(0);
   const mode = useStoreMode();
 
+  // OCR / file type detection state
+  type FileParseMode = "pdf_text" | "pdf_scan" | "photo" | "spreadsheet" | "email";
+  const [fileParseMode, setFileParseMode] = useState<FileParseMode | null>(null);
+  const [showLowQualityWarning, setShowLowQualityWarning] = useState(false);
+
   // Location state
   const storeLocations = getStoreLocations();
   const defaultLoc = storeLocations.find(l => l.isDefault) || storeLocations[0];
@@ -253,7 +258,19 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     if (useTemplate && matchedTemplate) {
       incrementTemplateUse(supplierName);
     }
-    setFileName("invoice_jantzen_mar26.pdf");
+    // Simulate file type detection for demo
+    const fName = "invoice_jantzen_mar26.pdf";
+    setFileName(fName);
+    const ext = fName.split(".").pop()?.toLowerCase() || "";
+    if (["jpg", "jpeg", "png", "heic", "webp"].includes(ext)) {
+      setFileParseMode("photo");
+    } else if (ext === "pdf") {
+      // Simulate: check if text layer is substantial (>50 chars)
+      const hasTextLayer = true; // In real impl, try text extraction first
+      setFileParseMode(hasTextLayer ? "pdf_text" : "pdf_scan");
+    } else {
+      setFileParseMode("spreadsheet");
+    }
     setProcessStartTime(Date.now());
     setProcessingDone(false);
     setProcessingElapsed(0);
@@ -360,7 +377,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
             <div className="text-center">
               <p className="text-sm font-medium">Tap to upload invoice</p>
-              <p className="text-xs text-muted-foreground mt-1">PDF · Excel · CSV · Word · Photo</p>
+              <p className="text-xs text-muted-foreground mt-1">PDF · Excel · CSV · Word · JPG · PNG</p>
+              <p className="text-[11px] text-muted-foreground/70 mt-0.5">📷 Drop a photo of your invoice — AI will read it automatically</p>
             </div>
           </button>
 
@@ -372,7 +390,35 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             Take a photo
           </button>
 
-          {/* Collapsible details */}
+          {/* File parse mode indicator */}
+          {fileParseMode && (
+            <div className="mt-3 bg-card rounded-lg border border-border px-3 py-2 flex items-center gap-2">
+              {fileParseMode === "pdf_text" && <><FileText className="w-4 h-4 text-primary" /><span className="text-xs">📄 Digital PDF — reading text layer</span></>}
+              {fileParseMode === "pdf_scan" && <><Search className="w-4 h-4 text-accent-foreground" /><span className="text-xs">🔍 Scanned PDF — using image recognition</span></>}
+              {fileParseMode === "photo" && <><Camera className="w-4 h-4 text-accent-foreground" /><span className="text-xs">📷 Invoice photo — using image recognition</span></>}
+              {fileParseMode === "spreadsheet" && <><FileText className="w-4 h-4 text-primary" /><span className="text-xs">📊 Spreadsheet — reading data rows</span></>}
+              {fileParseMode === "email" && <><FileText className="w-4 h-4 text-primary" /><span className="text-xs">📧 Email — extracting invoice data</span></>}
+            </div>
+          )}
+
+          {/* Low quality image warning */}
+          {showLowQualityWarning && (
+            <div className="mt-3 bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+              <p className="text-xs font-semibold text-destructive mb-1">⚠️ Image quality may be affecting accuracy</p>
+              <p className="text-xs text-muted-foreground mb-2">AI extracted fewer than 3 lines from this image. For best results:</p>
+              <ul className="text-xs text-muted-foreground space-y-0.5 mb-2 list-disc list-inside">
+                <li>Use good lighting when photographing invoices</li>
+                <li>Ensure text is in focus and not blurry</li>
+                <li>Avoid shadows across the text</li>
+              </ul>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setShowLowQualityWarning(false); setFileParseMode(null); }}>Try again with a better photo</Button>
+                <Button size="sm" className="h-7 text-xs" onClick={() => setShowLowQualityWarning(false)}>Continue</Button>
+              </div>
+            </div>
+          )}
+
+
           <button
             onClick={() => setShowDetails(!showDetails)}
             className="flex items-center gap-2 mt-6 text-sm text-muted-foreground"
@@ -452,8 +498,22 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       {step === 2 && (
         <div className="flex flex-col items-center justify-center px-4 pt-24">
           <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin-slow mb-6" />
-          <h3 className="text-lg font-semibold font-display mb-2">Reading your invoice...</h3>
-          <p className="text-sm text-muted-foreground text-center">Extracting product names, prices, and quantities</p>
+          <h3 className="text-lg font-semibold font-display mb-2">
+            {fileParseMode === "photo" ? "Reading your invoice photo..." : fileParseMode === "pdf_scan" ? "Scanning your PDF..." : "Reading your invoice..."}
+          </h3>
+          <p className="text-sm text-muted-foreground text-center">
+            {(fileParseMode === "photo" || fileParseMode === "pdf_scan")
+              ? "Using AI image recognition to extract product data"
+              : "Extracting product names, prices, and quantities"}
+          </p>
+          {fileParseMode && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {fileParseMode === "pdf_text" && "📄 Digital PDF — text layer detected"}
+              {fileParseMode === "pdf_scan" && "🔍 Scanned PDF — OCR in progress"}
+              {fileParseMode === "photo" && "📷 Photo — AI vision processing"}
+              {fileParseMode === "spreadsheet" && "📊 Spreadsheet — parsing rows"}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground mt-3 font-mono-data">
             ⏱ {Math.floor(processingElapsed / 60)}:{String(processingElapsed % 60).padStart(2, "0")} elapsed
             {useTemplate ? " · ~0:02 remaining" : " · ~0:03 remaining"}

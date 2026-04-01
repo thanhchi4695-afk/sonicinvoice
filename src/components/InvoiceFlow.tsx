@@ -303,15 +303,26 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-medium">{mockProducts.length} products found</p>
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPreviewAll(true)} className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview all</Button>
               <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
               <Button variant="teal" size="sm" onClick={() => setStep(4)}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>
           </div>
           <div className="space-y-2">
             {mockProducts.map((p, i) => (
-              <ProductCard key={i} product={p} />
+              <ProductCard key={i} product={p} onPreview={() => setPreviewProduct(p)} />
             ))}
           </div>
+
+          {/* Preview modal */}
+          {(previewProduct || previewAll) && (
+            <ShopifyPreview
+              product={previewAll && !previewProduct ? mockProducts[previewIdx] : (previewProduct || mockProducts[0])}
+              open={true}
+              onClose={() => { setPreviewProduct(null); setPreviewAll(false); setPreviewIdx(0); }}
+              onSave={() => { if (previewAll && previewIdx < mockProducts.length - 1) { setPreviewIdx(previewIdx + 1); } else { setPreviewProduct(null); setPreviewAll(false); setPreviewIdx(0); } }}
+            />
+          )}
         </div>
       )}
 

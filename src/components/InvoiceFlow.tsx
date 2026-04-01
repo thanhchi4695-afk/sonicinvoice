@@ -216,14 +216,32 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       incrementTemplateUse(supplierName);
     }
     setFileName("invoice_jantzen_mar26.pdf");
+    setProcessStartTime(Date.now());
+    setProcessingDone(false);
+    setProcessingElapsed(0);
     setTimeout(() => setStep(2), 300);
+    const duration = useTemplate ? 1500 : 3000;
     setTimeout(() => {
+      const elapsed = Math.round(duration / 1000);
+      setProcessingDone(true);
+      setFinalProcessingTime(elapsed);
       setStep(3);
+      if (elapsed > 3) setShowSpeedTips(true);
       // Show save-template prompt if no existing template
       if (!matchedTemplate && supplierName.trim()) {
         setShowSaveTemplate(true);
       }
-    }, useTemplate ? 1500 : 3000); // Faster with template
+      // Save to processing history
+      const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
+      history.unshift({
+        supplier: supplierName || "Unknown",
+        lines: 4,
+        processingTime: elapsed,
+        matchRate: 94,
+        date: new Date().toISOString(),
+      });
+      localStorage.setItem("processing_history", JSON.stringify(history.slice(0, 100)));
+    }, duration);
   };
 
   // Simulated rules-applied feedback

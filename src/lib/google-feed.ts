@@ -305,3 +305,75 @@ ${itemIds}
   </promotions>
 </feed>`;
 }
+
+// ── Google Local Inventory Feed ────────────────────────────
+
+export interface LocalInventoryProduct {
+  id: string;
+  price: number;
+  rrp: number;
+  qty: number;
+}
+
+export interface LocalStoreSettings {
+  name: string;
+  code: string;
+  address: string;
+  phone: string;
+  website: string;
+}
+
+const LOCAL_STORE_KEY = 'local_store_settings';
+
+export function saveLocalStoreSettings(settings: LocalStoreSettings) {
+  localStorage.setItem(LOCAL_STORE_KEY, JSON.stringify(settings));
+}
+
+export function getLocalStoreSettings(): LocalStoreSettings | null {
+  try {
+    // Check dedicated local store settings first
+    const raw = localStorage.getItem(LOCAL_STORE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s.name && s.code) return s;
+    }
+    // Fallback: derive from locations config (retail locations with address)
+    const locsRaw = localStorage.getItem('locations_config');
+    if (locsRaw) {
+      const locs = JSON.parse(locsRaw) as { id: string; name: string; type: string; address: string; isDefault: boolean }[];
+      const retail = locs.find(l => l.type === 'retail' && l.address) || locs.find(l => l.address);
+      if (retail) {
+        const code = retail.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/,'');
+        const website = localStorage.getItem('shopify_store_url') || '';
+        return { name: retail.name, code, address: retail.address, phone: '', website };
+      }
+    }
+    return null;
+  } catch { return null; }
+}
+
+export function generateLocalInventoryFeed(products: LocalInventoryProduct[], store: LocalStoreSettings): string {
+  const items = products.map(item => {
+    const qty = item.qty || 0;
+    const price = item.price || 0;
+    const hasRRP = item.rrp > price && item.rrp > 0;
+    return `    <item>
+      <g:item_id>${escXml(item.id)}</g:item_id>
+      <g:store_code>${escXml(store.code)}</g:store_code>
+      <g:quantity>${qty}</g:quantity>
+      <g:availability>${qty > 0 ? 'in_stock' : 'out_of_stock'}</g:availability>
+      <g:price>${price.toFixed(2)} AUD</g:price>${hasRRP ? `
+      <g:sale_price>${price.toFixed(2)} AUD</g:sale_price>` : ''}
+    </item>`;
+  }).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
+  <channel>
+    <title>${escXml(store.name)} — Local Inventory</title>
+    <link>https://${escXml(store.website || 'yourstore.com.au')}</link>
+    <description>Local inventory for ${escXml(store.name)}</description>
+${items}
+  </channel>
+</rss>`;
+}

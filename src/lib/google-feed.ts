@@ -83,6 +83,8 @@ export interface GoogleFeedItem {
   custom_label_2: string;
   custom_label_3: string;
   custom_label_4: string;
+  cost_of_goods_sold: string;
+  auto_pricing_min_price: string;
 }
 
 function escXml(str: string): string {

@@ -644,12 +644,17 @@ function SeoWriterPanel({ onBack }: { onBack: () => void }) {
 // ── Google Feed Preview Panel ──────────────────────────────
 function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [saleStart, setSaleStart] = useState('');
+  const [saleEnd, setSaleEnd] = useState('');
+
+  const getSaleDateStr = () => {
+    if (!saleStart || !saleEnd) return '';
+    return `${saleStart}T00:00+10:00/${saleEnd}T23:59+10:00`;
+  };
 
   // Load last invoice products from localStorage
   const getProducts = () => {
     try {
-      const hist = JSON.parse(localStorage.getItem("export_history") || "[]");
-      // Try to get products from last enrichment
       const raw = localStorage.getItem("last_enriched_products");
       if (raw) return JSON.parse(raw) as { name: string; brand: string; type: string; price: number; rrp: number; tags?: string }[];
       return [];
@@ -659,7 +664,7 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
   const products = getProducts();
   const hasProducts = products.length > 0;
 
-  const xml = hasProducts ? generateGoogleFeedXML(products) : '';
+  const xml = hasProducts ? generateGoogleFeedXML(products, undefined, getSaleDateStr()) : '';
 
   const handleDownloadXML = () => {
     if (!hasProducts) return;

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AuthScreen from "@/components/AuthScreen";
+import { addAuditEntry } from "@/lib/audit-log";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import BottomTabBar from "@/components/BottomTabBar";
 import HomeScreen from "@/components/HomeScreen";
@@ -19,6 +20,7 @@ import SeasonManager from "@/components/SeasonManager";
 import ReorderPanel from "@/components/ReorderPanel";
 import SupplierPanel from "@/components/SupplierPanel";
 import HelpCentre from "@/components/HelpCentre";
+import AuditLogPanel from "@/components/AuditLogPanel";
 import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -27,13 +29,18 @@ const Index = () => {
   const [authed, setAuthed] = useState(false);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
 
+  const handleAuth = () => {
+    setAuthed(true);
+    addAuditEntry("Login", `User logged in`);
+  };
+
   if (!authed) {
-    return <AuthScreen onAuth={() => setAuthed(true)} />;
+    return <AuthScreen onAuth={handleAuth} />;
   }
 
   if (!onboarded) {
@@ -76,6 +83,10 @@ const Index = () => {
     return <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />;
   }
 
+  if (activeFlow === "audit_log") {
+    return <AuditLogPanel onBack={() => setActiveFlow(null)} />;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Top bar */}
@@ -111,6 +122,7 @@ const Index = () => {
           onStartOrderForm={() => setActiveFlow("order_form")}
           onStartReorder={() => setActiveFlow("reorder")}
           onStartSuppliers={() => setActiveFlow("suppliers")}
+          onOpenAuditLog={() => setActiveFlow("audit_log")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

@@ -253,6 +253,9 @@ const AccountScreen = () => {
       {/* Price Intelligence API Keys */}
       <ApiKeysSection />
 
+      {/* SEO Templates */}
+      <SeoTemplateSection />
+
       {/* Default AI Instructions */}
       <DefaultInstructionsSection />
 

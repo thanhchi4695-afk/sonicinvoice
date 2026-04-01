@@ -7,6 +7,7 @@ interface HomeScreenProps {
   onStartSale: () => void;
   onStartRestock: () => void;
   onStartPriceAdjust: () => void;
+  onStartOrderForm: () => void;
 }
 
 const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust }: HomeScreenProps) => {

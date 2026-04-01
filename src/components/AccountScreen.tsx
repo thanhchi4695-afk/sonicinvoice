@@ -40,6 +40,7 @@ const AccountScreen = () => {
     setStoreName(cfg.name || '');
     setCurrency(cfg.currency || 'AUD');
     setStoreType(cfg.storeType || 'shopify');
+    setLsVersion(cfg.lightspeedVersion || 'x_series');
 
     getConnection().then((conn) => {
       if (conn) {

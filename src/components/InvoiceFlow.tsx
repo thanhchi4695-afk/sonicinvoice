@@ -436,6 +436,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     size: string;
     price: number;
     rrp: number;
+    cogs: number;
     status: string;
     metafields: Record<string, string>;
     variants: VariantLine[];

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { findTemplate, saveFormatTemplate, incrementTemplateUse, COLUMN_LABELS, 
 import { getStoreLocations } from "@/components/AccountScreen";
 import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCount, type InventoryItem } from "@/lib/inventory-sim";
 import { addAuditEntry } from "@/lib/audit-log";
+import { calculateConfidence, type ConfidenceBreakdown, type ConfidenceLevel, getConfidenceLabel } from "@/lib/confidence";
+import ConfidenceBadge from "@/components/ConfidenceBadge";
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -230,6 +232,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [processingCancelled, setProcessingCancelled] = useState(false);
   const [showCompletionSummary, setShowCompletionSummary] = useState(false);
   const [filterReviewOnly, setFilterReviewOnly] = useState(false);
+  const [confidenceFilter, setConfidenceFilter] = useState<"all" | "high" | "medium" | "low">("all");
 
   // Line-by-line enrichment status
   type LineStatus = "waiting" | "searching" | "extracting" | "done" | "review" | "not_found";
@@ -493,6 +496,28 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     status: g.status,
     metafields: g.metafields,
   }));
+
+  // Confidence scoring per product group
+  const groupConfidences: ConfidenceBreakdown[] = productGroups.map(g => {
+    return calculateConfidence({
+      name: g.name,
+      type: g.type,
+      description: g.status !== "pending" ? "Stylish swimwear piece" : undefined,
+      hasImage: g.status === "ready",
+      rrp: g.rrp,
+      seoTitle: g.status !== "pending" ? `${g.name} | ${g.brand}` : undefined,
+      hasTags: g.status !== "pending",
+      matchSource: g.variants[0]?.sku ? "sku" : "name",
+      isPending: g.status === "pending",
+    });
+  });
+  const confCounts = {
+    high: groupConfidences.filter(c => c.level === "high").length,
+    medium: groupConfidences.filter(c => c.level === "medium").length,
+    low: groupConfidences.filter(c => c.level === "low").length,
+    pending: groupConfidences.filter(c => c.level === "pending").length,
+  };
+
 
   const totalVariantLines = productGroups.reduce((s, g) => s + g.variants.length, 0);
   const groupedCount = productGroups.filter(g => g.isGrouped).length;
@@ -984,12 +1009,18 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
-          {/* Processing time banner */}
+          {/* Processing time + confidence summary banner */}
           {processingDone && finalProcessingTime > 0 && (
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 mb-3 flex items-center gap-2">
-              <span className="text-xs text-primary font-medium font-mono-data">
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 mb-3 space-y-1.5">
+              <span className="text-xs text-primary font-medium font-mono-data block">
                 ✅ {totalVariantLines} lines → {productGroups.length} products ({groupedCount} grouped + {standaloneCount} standalone) · {totalQty} total units · enriched in {finalProcessingTime < 60 ? `${finalProcessingTime}s` : `${Math.floor(finalProcessingTime / 60)}m ${finalProcessingTime % 60}s`}
               </span>
+              <div className="flex flex-wrap gap-2 text-[11px]">
+                <span className="text-muted-foreground">{productGroups.length} lines ·</span>
+                <span className="text-success font-medium">{confCounts.high} ready ✓</span>
+                <span className="text-warning font-medium">{confCounts.medium} review ⚠</span>
+                {confCounts.low > 0 && <span className="text-destructive font-medium">{confCounts.low} fix needed ✗</span>}
+              </div>
             </div>
           )}
 
@@ -1093,6 +1124,38 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </button>
           </div>
 
+          {/* Confidence filter buttons */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {([
+              { key: "all" as const, label: `All ${productGroups.length}`, cls: "" },
+              { key: "high" as const, label: `✓ Ready ${confCounts.high}`, cls: "text-success" },
+              { key: "medium" as const, label: `⚠ Review ${confCounts.medium}`, cls: "text-warning" },
+              { key: "low" as const, label: `✗ Fix needed ${confCounts.low}`, cls: "text-destructive" },
+            ]).map(f => (
+              <button
+                key={f.key}
+                onClick={() => setConfidenceFilter(f.key)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                  confidenceFilter === f.key
+                    ? "bg-primary/10 border-primary text-primary"
+                    : `bg-muted border-border ${f.cls || "text-muted-foreground"}`
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+            {(confCounts.medium > 0 || confCounts.low > 0) && (
+              <button
+                onClick={() => {
+                  setConfidenceFilter(confCounts.low > 0 ? "low" : "medium");
+                }}
+                className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-muted border border-border text-muted-foreground ml-auto flex items-center gap-1"
+              >
+                <ArrowDown className="w-3 h-3" /> Jump to next issue
+              </button>
+            )}
+          </div>
+
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-medium">{productGroups.length} products found</p>
@@ -1115,10 +1178,12 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           {reviewTab === "new" && (
             <div className="space-y-2">
               {productGroups.map((group, i) => {
+                const conf = groupConfidences[i];
+                if (confidenceFilter !== "all" && conf.level !== confidenceFilter) return null;
                 const isUpdate = lineModes[i] === "update";
                 return (
                   <div key={`p-${i}`}>
-                    {/* Mode toggle */}
+                    {/* Mode toggle + confidence badge */}
                     <div className="flex items-center gap-2 mb-1">
                       <button
                         onClick={() => toggleLineMode(i)}
@@ -1135,6 +1200,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                       {isUpdate && (
                         <span className="text-[10px] text-success ml-1">→ Will update existing stock</span>
                       )}
+                      <span className="ml-auto"><ConfidenceBadge breakdown={conf} /></span>
                     </div>
                     {group.isGrouped ? (
                       <VariantGroupCard
@@ -1278,18 +1344,50 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
       {/* Step 4: Export Review */}
       {step === 4 && (
-        <ExportReviewScreen
-          products={mockProducts.map(p => ({
-            ...p,
-            hasImage: p.status === "ready",
-            hasSeo: true,
-            hasTags: true,
-            confidence: p.status === "ready" ? "high" as const : "medium" as const,
-            isNew: true,
-          }))}
-          supplierName={supplierName}
-          onBack={() => setStep(3)}
-        />
+        <div className="px-4 pt-4 pb-24 animate-fade-in">
+          {/* Confidence gate warning */}
+          {confCounts.low > 0 && (
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 mb-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-destructive">⚠ {confCounts.low} line{confCounts.low > 1 ? "s need" : " needs"} attention before export</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {confCounts.high} lines ready to export · {confCounts.medium} lines need review · {confCounts.low} line{confCounts.low > 1 ? "s have" : " has"} issues
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStep(3)}>
+                      Review issues first
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground">
+                      Export all anyway
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {confCounts.low === 0 && (
+            <div className="bg-success/10 border border-success/20 rounded-lg p-2 mb-4 flex items-center gap-2">
+              <Check className="w-3.5 h-3.5 text-success shrink-0" />
+              <span className="text-xs text-success font-medium">
+                {confCounts.high} lines ready · {confCounts.medium} need review · All products exportable
+              </span>
+            </div>
+          )}
+          <ExportReviewScreen
+            products={mockProducts.map((p, i) => ({
+              ...p,
+              hasImage: p.status === "ready",
+              hasSeo: true,
+              hasTags: true,
+              confidence: groupConfidences[i]?.level === "high" ? "high" as const : groupConfidences[i]?.level === "low" ? "low" as const : "medium" as const,
+              isNew: true,
+            }))}
+            supplierName={supplierName}
+            onBack={() => setStep(3)}
+          />
+        </div>
       )}
     </div>
   );

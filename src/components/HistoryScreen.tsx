@@ -34,6 +34,18 @@ const historyItems = [
   { type: "invoice" as const, label: "Bond Eye Jan26", count: 12, date: "5 Jan 2026", supplier: "bond-eye", processingTime: 54, source: "photo" },
 ];
 
+// Load SEO campaigns from localStorage
+function getCollabCampaigns(): { theme: string; partnerCount: number; date: string }[] {
+  try {
+    const campaigns = JSON.parse(localStorage.getItem("collab_campaigns") || "[]");
+    return campaigns.map((c: any) => ({
+      theme: c.theme || "Untitled campaign",
+      partnerCount: c.partners?.length || 0,
+      date: c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "",
+    }));
+  } catch { return []; }
+}
+
 function getExportHistory(): ExportEntry[] {
   try { return JSON.parse(localStorage.getItem("export_history") || "[]"); } catch { return []; }
 }
@@ -62,9 +74,12 @@ const HistoryScreen = () => {
     setExports(getExportHistory());
   }, []);
 
+  const seoCampaigns = getCollabCampaigns();
+
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
       <h1 className="text-2xl font-bold font-display mb-1">History</h1>
+      <p className="text-muted-foreground text-sm mb-6">Past imports, sale runs & SEO campaigns</p>
       <p className="text-muted-foreground text-sm mb-6">Past imports and sale runs</p>
 
       <div className="space-y-2">
@@ -111,6 +126,19 @@ const HistoryScreen = () => {
             </div>
           );
         })}
+
+        {/* SEO Campaigns */}
+        {seoCampaigns.map((c, i) => (
+          <div key={`seo-${i}`} className="bg-card rounded-lg border border-border px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 shrink-0">SEO</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{c.theme}</p>
+                <p className="text-xs text-muted-foreground font-mono-data">{c.partnerCount} partners · {c.date}</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

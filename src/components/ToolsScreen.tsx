@@ -28,6 +28,7 @@ const tools = [
   { id: "brands", icon: Globe, label: "Brand reference", desc: "Brand website directory", color: "text-primary" },
   { id: "ai", icon: Bot, label: "AI instructions", desc: "Custom rules for your invoices", color: "text-secondary" },
   { id: "google_feed", icon: ShoppingCart, label: "Google feed preview", desc: "Preview & download Google Shopping feed", color: "text-success" },
+  { id: "collab_seo", icon: Globe, label: "Collab SEO", desc: "View all campaigns and manage partner list", color: "text-primary" },
 ];
 
 const quickInserts = [

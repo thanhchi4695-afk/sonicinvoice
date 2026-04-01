@@ -1009,12 +1009,18 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
-          {/* Processing time banner */}
+          {/* Processing time + confidence summary banner */}
           {processingDone && finalProcessingTime > 0 && (
-            <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 mb-3 flex items-center gap-2">
-              <span className="text-xs text-primary font-medium font-mono-data">
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 mb-3 space-y-1.5">
+              <span className="text-xs text-primary font-medium font-mono-data block">
                 ✅ {totalVariantLines} lines → {productGroups.length} products ({groupedCount} grouped + {standaloneCount} standalone) · {totalQty} total units · enriched in {finalProcessingTime < 60 ? `${finalProcessingTime}s` : `${Math.floor(finalProcessingTime / 60)}m ${finalProcessingTime % 60}s`}
               </span>
+              <div className="flex flex-wrap gap-2 text-[11px]">
+                <span className="text-muted-foreground">{productGroups.length} lines ·</span>
+                <span className="text-success font-medium">{confCounts.high} ready ✓</span>
+                <span className="text-warning font-medium">{confCounts.medium} review ⚠</span>
+                {confCounts.low > 0 && <span className="text-destructive font-medium">{confCounts.low} fix needed ✗</span>}
+              </div>
             </div>
           )}
 

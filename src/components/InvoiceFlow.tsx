@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStoreMode } from "@/hooks/use-store-mode";
+import Papa from "papaparse";
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -311,19 +312,26 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
       {/* Step 4: Download */}
       {step === 4 && (
-        <div className="flex flex-col items-center justify-center px-4 pt-20">
-          <div className="w-20 h-20 rounded-full bg-success/15 flex items-center justify-center mb-6">
-            <Check className="w-10 h-10 text-success" />
+        <div className="px-4 pt-8 pb-24">
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-20 h-20 rounded-full bg-success/15 flex items-center justify-center mb-6">
+              <Check className="w-10 h-10 text-success" />
+            </div>
+            <h3 className="text-xl font-bold font-display mb-2">Your file is ready</h3>
+            <p className="text-sm text-muted-foreground mb-6">{mockProducts.length} products, {mode.isLightspeed ? 'Lightspeed' : 'Shopify'}-ready format</p>
+            <Button variant="success" className="w-full max-w-xs h-14 text-base">
+              <Download className="w-5 h-5 mr-2" /> Download {mode.exportLabel}
+            </Button>
           </div>
-          <h3 className="text-xl font-bold font-display mb-2">Your file is ready</h3>
-          <p className="text-sm text-muted-foreground mb-8">{mockProducts.length} products, {mode.isLightspeed ? 'Lightspeed' : 'Shopify'}-ready format</p>
-          <Button variant="success" className="w-full max-w-xs h-14 text-base">
-            <Download className="w-5 h-5 mr-2" /> Download {mode.exportLabel}
-          </Button>
+
+          {/* Lightspeed Stock Order restock option */}
+          {mode.isLightspeed && (
+            <LightspeedRestockSection products={mockProducts} supplierName={supplierName} />
+          )}
 
           {/* Lightspeed sync rules reminder */}
           {mode.isLightspeed && (
-            <div className="w-full max-w-xs mt-6 bg-card border border-purple-500/20 rounded-lg p-4 text-left">
+            <div className="bg-card border border-purple-500/20 rounded-lg p-4 mt-4">
               <div className="flex items-center gap-2 mb-2">
                 <Monitor className="w-4 h-4 text-purple-400" />
                 <span className="text-xs font-semibold">After importing into Lightspeed</span>
@@ -336,7 +344,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
-          <button onClick={onBack} className="mt-6 text-sm text-primary font-medium">
+          <button onClick={onBack} className="w-full mt-6 text-sm text-primary font-medium text-center">
             Import another invoice
           </button>
         </div>
@@ -344,6 +352,175 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     </div>
   );
 };
+
+// ── Lightspeed Stock Order Restock Section ─────────────────
+const CATALOG_KEY = 'catalog_memory_skupilot';
+
+interface CatalogEntry {
+  sku: string;
+  handle: string;
+  brand: string;
+}
+
+function getCatalog(): Record<string, CatalogEntry> {
+  try { return JSON.parse(localStorage.getItem(CATALOG_KEY) || '{}'); } catch { return {}; }
+}
+
+function generateHandle(name: string, brand: string): string {
+  return `${name}-${brand}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+function LightspeedRestockSection({ products, supplierName }: {
+  products: { name: string; brand: string; type: string; price: number; rrp: number; status: string }[];
+  supplierName: string;
+}) {
+  const [showGuide, setShowGuide] = useState(false);
+  const catalog = getCatalog();
+
+  // Build stock order lines, flag missing SKUs
+  const lines = products.map(p => {
+    const key = `${p.brand}::${p.name}`.toLowerCase();
+    const entry = catalog[key];
+    return {
+      name: p.name,
+      brand: p.brand,
+      handle: entry?.handle || generateHandle(p.name, p.brand),
+      sku: entry?.sku || '',
+      supply_price: p.price,
+      quantity: 1, // placeholder
+      hasSku: !!entry?.sku,
+    };
+  });
+
+  const validLines = lines.filter(l => l.hasSku);
+  const missingLines = lines.filter(l => !l.hasSku);
+
+  // Group by brand/supplier for split
+  const bySupplier: Record<string, typeof lines> = {};
+  for (const l of lines) {
+    const key = l.brand || 'Unknown';
+    if (!bySupplier[key]) bySupplier[key] = [];
+    bySupplier[key].push(l);
+  }
+  const supplierKeys = Object.keys(bySupplier);
+  const needsSplit = supplierKeys.length > 1;
+
+  const generateStockOrderCSV = (items: typeof lines) => {
+    const rows = items.filter(l => l.hasSku).map(l => ({
+      handle: l.handle,
+      sku: l.sku,
+      supply_price: l.supply_price,
+      quantity: l.quantity,
+    }));
+    return Papa.unparse(rows, { columns: ['handle', 'sku', 'supply_price', 'quantity'] });
+  };
+
+  const downloadCSV = (csv: string, filename: string) => {
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownload = () => {
+    if (needsSplit) {
+      // Download each supplier separately
+      for (const [brand, items] of Object.entries(bySupplier)) {
+        const csv = generateStockOrderCSV(items);
+        if (csv.split('\n').length > 1) {
+          const tag = brand.toLowerCase().replace(/\s+/g, '-');
+          const month = new Date().toLocaleString('en', { month: 'short', year: '2-digit' }).replace(' ', '');
+          downloadCSV(csv, `${tag}_restock_${month}.csv`);
+        }
+      }
+    } else {
+      const csv = generateStockOrderCSV(lines);
+      const month = new Date().toLocaleString('en', { month: 'short', year: '2-digit' }).replace(' ', '');
+      const tag = (supplierName || supplierKeys[0] || 'restock').toLowerCase().replace(/\s+/g, '-');
+      downloadCSV(csv, `${tag}_restock_${month}.csv`);
+    }
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-lg p-4 mt-4">
+      <div className="flex items-center gap-2 mb-2">
+        <Package className="w-4 h-4 text-primary" />
+        <span className="text-sm font-semibold">Restock existing products (Stock Order import)</span>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">
+        For deliveries of products already in Lightspeed. Only updates quantities — does not create new products.
+      </p>
+
+      {/* Missing SKU warnings */}
+      {missingLines.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+            <div className="text-xs">
+              <p className="font-medium text-amber-300 mb-1">SKU not found for {missingLines.length} product{missingLines.length > 1 ? 's' : ''}</p>
+              {missingLines.slice(0, 3).map((l, i) => (
+                <p key={i} className="text-muted-foreground">• {l.name}</p>
+              ))}
+              {missingLines.length > 3 && (
+                <p className="text-muted-foreground">…and {missingLines.length - 3} more</p>
+              )}
+              <p className="text-muted-foreground mt-1.5">Use full product import for new products, or add SKUs to catalog memory.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Split summary */}
+      {needsSplit && validLines.length > 0 && (
+        <div className="bg-muted/50 rounded-lg p-3 mb-3 text-xs">
+          <p className="font-medium mb-1">Your restock will be split into {supplierKeys.length} files:</p>
+          {supplierKeys.map(s => {
+            const count = bySupplier[s].filter(l => l.hasSku).length;
+            return count > 0 ? (
+              <p key={s} className="text-muted-foreground">
+                • <span className="font-mono-data">{s.toLowerCase().replace(/\s+/g, '-')}_restock.csv</span> — {count} line{count > 1 ? 's' : ''}
+              </p>
+            ) : null;
+          })}
+        </div>
+      )}
+
+      <Button
+        variant="outline"
+        className="w-full h-11"
+        onClick={handleDownload}
+        disabled={validLines.length === 0}
+      >
+        <Download className="w-4 h-4 mr-2" />
+        {validLines.length === 0 ? 'No SKUs found for stock order' : `Download Lightspeed Stock Order CSV`}
+      </Button>
+
+      {/* Import guide */}
+      <button
+        onClick={() => setShowGuide(!showGuide)}
+        className="flex items-center gap-1 text-xs text-muted-foreground mt-3"
+      >
+        <ChevronDown className={`w-3 h-3 transition-transform ${showGuide ? 'rotate-180' : ''}`} />
+        How to import a stock order into Lightspeed
+      </button>
+      {showGuide && (
+        <ol className="text-xs text-muted-foreground mt-2 space-y-1.5 pl-4 list-decimal">
+          <li>In Lightspeed: go to Inventory → Stock Control → Order Stock</li>
+          <li>Click: New Order</li>
+          <li>Select your supplier from the dropdown</li>
+          <li>Under Products, click: Import via CSV</li>
+          <li>Upload the Stock Order CSV from SkuPilot</li>
+          <li>Review the imported lines — quantities appear in the order</li>
+          <li>Mark the order as received to update stock</li>
+          <li className="text-amber-400 font-medium mt-2">
+            ⚠ All products in a single stock order must be from the SAME supplier in Lightspeed. If your invoice has multiple suppliers, SkuPilot splits the CSV into one file per supplier automatically.
+          </li>
+        </ol>
+      )}
+    </div>
+  );
+}
 
 const ProductCard = ({ product }: { product: { name: string; brand: string; type: string; price: number; rrp: number; status: string } }) => {
   const [expanded, setExpanded] = useState(false);

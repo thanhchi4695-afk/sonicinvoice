@@ -13,6 +13,8 @@ export interface ExportProduct {
   type: string;
   colour?: string;
   size?: string;
+  sku?: string;
+  barcode?: string;
   price: number;
   rrp: number;
   status: string;

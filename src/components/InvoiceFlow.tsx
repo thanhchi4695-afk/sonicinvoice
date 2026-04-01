@@ -171,6 +171,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [previewIdx, setPreviewIdx] = useState(0);
   const mode = useStoreMode();
 
+  // Location state
+  const storeLocations = getStoreLocations();
+  const defaultLoc = storeLocations.find(l => l.isDefault) || storeLocations[0];
+  const [receivingLocation, setReceivingLocation] = useState(defaultLoc?.id || "");
+
   // Template recognition state
   const [matchedTemplate, setMatchedTemplate] = useState<InvoiceTemplate | null>(null);
   const [useTemplate, setUseTemplate] = useState<boolean | null>(null);

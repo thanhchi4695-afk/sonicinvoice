@@ -49,7 +49,7 @@ function getIndustryFeatures(industry: string): { pattern: RegExp; phrase: strin
 }
 
 export function detectFeatures(product: SeoProduct, industry: string): string {
-  const rules = INDUSTRY_FEATURES[industry] || [];
+  const rules = getIndustryFeatures(industry);
   const searchText = `${product.title} ${product.description || ''} ${(product.tags || []).join(' ')}`;
   const found: string[] = [];
   for (const rule of rules) {

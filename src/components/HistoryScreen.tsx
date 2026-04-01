@@ -74,9 +74,12 @@ const HistoryScreen = () => {
     setExports(getExportHistory());
   }, []);
 
+  const seoCampaigns = getCollabCampaigns();
+
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
       <h1 className="text-2xl font-bold font-display mb-1">History</h1>
+      <p className="text-muted-foreground text-sm mb-6">Past imports, sale runs & SEO campaigns</p>
       <p className="text-muted-foreground text-sm mb-6">Past imports and sale runs</p>
 
       <div className="space-y-2">

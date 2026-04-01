@@ -26,14 +26,35 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
     },
   ];
 
+  // Check for incomplete onboarding
+  const onboardingStep = localStorage.getItem("onboarding_step");
+  const onboardingComplete = localStorage.getItem("onboarding_complete") === "true";
+  const showResumeBanner = !onboardingComplete && onboardingStep && parseInt(onboardingStep) < 5;
+
   return (
     <div className="px-4 pt-2 pb-24 animate-fade-in">
       <h1 className="text-2xl font-bold font-display mb-1">SkuPilot</h1>
-      <p className="text-muted-foreground text-sm mb-6">
+      <p className="text-muted-foreground text-sm mb-4">
         {mode.isLightspeed
           ? `Invoice → ${mode.targetPlatform} in minutes`
           : "Invoice → Shopify in minutes"}
       </p>
+
+      {/* Onboarding resume banner */}
+      {showResumeBanner && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">📋</span>
+            <span className="text-xs font-medium">Complete your setup (Step {onboardingStep} of 5)</span>
+          </div>
+          <Button variant="link" size="sm" className="text-xs h-auto p-0" onClick={() => {
+            localStorage.removeItem("onboarding_complete");
+            window.location.reload();
+          }}>
+            Continue →
+          </Button>
+        </div>
+      )}
 
       {/* Lightspeed workflow card */}
       {mode.isLightspeed && (

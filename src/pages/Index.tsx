@@ -16,6 +16,7 @@ import AnalyticsPanel from "@/components/AnalyticsPanel";
 import QuickCapture from "@/components/QuickCapture";
 import OrderFormFlow from "@/components/OrderFormFlow";
 import SeasonManager from "@/components/SeasonManager";
+import HelpCentre from "@/components/HelpCentre";
 import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -104,6 +105,7 @@ const Index = () => {
       {activeTab === "history" && <HistoryScreen />}
       {activeTab === "tools" && <ToolsScreen />}
       {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
+      {activeTab === "help" && <HelpCentre />}
       {activeTab === "account" && <AccountScreen />}
       <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 

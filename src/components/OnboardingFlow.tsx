@@ -113,7 +113,14 @@ const doneMessages: Record<string, { emoji: string; text: string }> = {
 };
 
 const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStepRaw] = useState<Step>(() => {
+    const saved = localStorage.getItem("onboarding_step");
+    return saved ? Math.min(parseInt(saved), 5) as Step : 1;
+  });
+  const setStep = (s: Step) => {
+    localStorage.setItem("onboarding_step", String(s));
+    setStepRaw(s);
+  };
   const [selectedIndustry, setSelectedIndustry] = useState<string | null>(null);
   const [storeName, setStoreName] = useState("");
   const [storeUrl, setStoreUrl] = useState("");

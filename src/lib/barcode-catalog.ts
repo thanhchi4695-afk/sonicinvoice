@@ -96,7 +96,7 @@ export const COLOUR_ABBR: Record<string, string> = {
   'YLW': 'Yellow', 'ORG': 'Orange', 'TRQ': 'Turquoise',
   'PRT': 'Print', 'CRM': 'Cream', 'GRY': 'Grey',
   'EMR': 'Emerald', 'CRL': 'Coral', 'RST': 'Rust',
-  'NAV': 'Navy', 'BLU': 'Blue',
+  'NAV': 'Navy',
 };
 
 export function extractColourFromTitle(title: string): string {

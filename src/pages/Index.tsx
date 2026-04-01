@@ -1,16 +1,44 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import AuthScreen from "@/components/AuthScreen";
+import BottomTabBar from "@/components/BottomTabBar";
+import HomeScreen from "@/components/HomeScreen";
+import HistoryScreen from "@/components/HistoryScreen";
+import ToolsScreen from "@/components/ToolsScreen";
+import AccountScreen from "@/components/AccountScreen";
+import InvoiceFlow from "@/components/InvoiceFlow";
+import BulkSaleFlow from "@/components/BulkSaleFlow";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+const Index = () => {
+  const [authed, setAuthed] = useState(false);
+  const [activeTab, setActiveTab] = useState("home");
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | null>(null);
+
+  if (!authed) {
+    return <AuthScreen onAuth={() => setAuthed(true)} />;
+  }
+
+  if (activeFlow === "invoice") {
+    return <InvoiceFlow onBack={() => setActiveFlow(null)} />;
+  }
+
+  if (activeFlow === "sale") {
+    return <BulkSaleFlow onBack={() => setActiveFlow(null)} />;
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen">
+      {activeTab === "home" && (
+        <HomeScreen
+          onStartInvoice={() => setActiveFlow("invoice")}
+          onStartSale={() => setActiveFlow("sale")}
+        />
+      )}
+      {activeTab === "history" && <HistoryScreen />}
+      {activeTab === "tools" && <ToolsScreen />}
+      {activeTab === "account" && <AccountScreen />}
+      <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
   );
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;

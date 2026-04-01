@@ -194,6 +194,22 @@ const CustomInstructionsField = ({
   );
 };
 
+// ── Match Source Badge ──────────────────────────────────────
+const MatchSourceBadge = ({ source, barcode }: { source: MatchSource; barcode?: string }) => {
+  const config: Record<MatchSource, { icon: string; label: string; cls: string }> = {
+    barcode: { icon: "🔵", label: "Barcode match", cls: "bg-primary/15 text-primary border-primary/20" },
+    sku: { icon: "🟢", label: "SKU match", cls: "bg-success/15 text-success border-success/20" },
+    name: { icon: "🟡", label: "Name match", cls: "bg-warning/15 text-warning border-warning/20" },
+    none: { icon: "🔴", label: "No match", cls: "bg-destructive/15 text-destructive border-destructive/20" },
+  };
+  const c = config[source];
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium border ${c.cls}`} title={barcode ? `Barcode: ${barcode}` : undefined}>
+      {c.icon} {c.label}
+    </span>
+  );
+};
+
 const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [step, setStep] = useState<Step>(1);
   const [showDetails, setShowDetails] = useState(false);

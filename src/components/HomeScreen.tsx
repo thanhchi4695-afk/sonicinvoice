@@ -348,25 +348,44 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         );
       })()}
 
-      {/* Recent Activity */}
+      {/* Recent Activity — from audit log */}
       <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recent activity</h3>
-      <div className="space-y-2">
-        {recentActivity.map((item, i) => (
-          <div key={i} className="flex items-center gap-3 bg-card rounded-lg border border-border px-4 py-3">
-            <span
-              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                item.type === "invoice"
-                  ? "bg-primary/15 text-primary"
-                  : "bg-secondary/15 text-secondary"
-              }`}
-            >
-              {item.type === "invoice" ? "Invoice" : "Sale"}
-            </span>
-            <span className="text-sm flex-1 truncate">{item.label}</span>
-            <span className="text-xs text-muted-foreground font-mono-data">{item.time}</span>
+      {(() => {
+        const auditEntries = getRecentAuditEntries(5);
+        if (auditEntries.length === 0) {
+          return (
+            <div className="space-y-2">
+              {recentActivity.map((item, i) => (
+                <div key={i} className="flex items-center gap-3 bg-card rounded-lg border border-border px-4 py-3">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${item.type === "invoice" ? "bg-primary/15 text-primary" : "bg-secondary/15 text-secondary"}`}>
+                    {item.type === "invoice" ? "Invoice" : "Sale"}
+                  </span>
+                  <span className="text-sm flex-1 truncate">{item.label}</span>
+                  <span className="text-xs text-muted-foreground font-mono-data">{item.time}</span>
+                </div>
+              ))}
+            </div>
+          );
+        }
+        return (
+          <div className="space-y-1.5">
+            {auditEntries.map((entry, i) => (
+              <div key={`${entry.timestamp}-${i}`} className="flex items-center gap-2 bg-card rounded-lg border border-border px-3 py-2.5">
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
+                  {entry.action}
+                </span>
+                <span className="text-xs flex-1 truncate text-foreground/80">{entry.detail}</span>
+                <span className="text-[10px] text-muted-foreground font-mono-data shrink-0">{formatRelativeTime(entry.timestamp)}</span>
+              </div>
+            ))}
+            {onOpenAuditLog && (
+              <button onClick={onOpenAuditLog} className="flex items-center gap-1 text-xs text-primary mt-2 hover:underline">
+                <ClipboardList className="w-3 h-3" /> View full log →
+              </button>
+            )}
           </div>
-        ))}
-      </div>
+        );
+      })()}
     </div>
   );
 };

@@ -3,6 +3,7 @@ import AuthScreen from "@/components/AuthScreen";
 import { addAuditEntry } from "@/lib/audit-log";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import BottomTabBar from "@/components/BottomTabBar";
+import EmbeddedNav from "@/components/EmbeddedNav";
 import HomeScreen from "@/components/HomeScreen";
 import HistoryScreen from "@/components/HistoryScreen";
 import ToolsScreen from "@/components/ToolsScreen";
@@ -27,6 +28,7 @@ import EmailInboxPanel from "@/components/EmailInboxPanel";
 import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
 
 const Index = () => {
   const [authed, setAuthed] = useState(true);
@@ -36,6 +38,7 @@ const Index = () => {
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
+  const { isEmbedded } = useShopifyEmbedded();
 
   // Handle Shopify OAuth callback redirect
   useEffect(() => {
@@ -51,66 +54,110 @@ const Index = () => {
     addAuditEntry("Login", `User logged in`);
   };
 
-  if (!authed) {
+  // When embedded in Shopify, skip standalone auth/onboarding
+  // (Shopify handles auth via OAuth install flow)
+  if (!isEmbedded && !authed) {
     return <AuthScreen onAuth={handleAuth} />;
   }
 
-  if (!onboarded) {
+  if (!isEmbedded && !onboarded) {
     return <OnboardingFlow onComplete={() => setOnboarded(true)} />;
   }
 
-  if (activeFlow === "invoice") {
-    return <InvoiceFlow onBack={() => setActiveFlow(null)} />;
+  const renderFlow = () => {
+    switch (activeFlow) {
+      case "invoice": return <InvoiceFlow onBack={() => setActiveFlow(null)} />;
+      case "sale": return <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />;
+      case "restock": return <RestockAnalytics onBack={() => setActiveFlow(null)} />;
+      case "price_adjust": return <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />;
+      case "price_lookup": return <PriceLookup onBack={() => setActiveFlow(null)} />;
+      case "order_form": return <OrderFormFlow onBack={() => setActiveFlow(null)} />;
+      case "seasons": return <SeasonManager onBack={() => setActiveFlow(null)} />;
+      case "reorder": return <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />;
+      case "suppliers": return <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />;
+      case "audit_log": return <AuditLogPanel onBack={() => setActiveFlow(null)} />;
+      case "purchase_orders": return <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />;
+      case "catalog_memory": return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
+      case "email_inbox": return <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />;
+      default: return null;
+    }
+  };
+
+  // In standalone mode, flows replace the entire screen
+  if (!isEmbedded && activeFlow) {
+    return renderFlow();
   }
 
-  if (activeFlow === "sale") {
-    return <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />;
+  const mainContent = (
+    <>
+      {activeTab === "home" && (
+        <HomeScreen
+          onStartInvoice={() => setActiveFlow("invoice")}
+          onStartSale={() => setActiveFlow("sale")}
+          onStartRestock={() => setActiveFlow("restock")}
+          onStartPriceAdjust={() => setActiveFlow("price_adjust")}
+          onStartOrderForm={() => setActiveFlow("order_form")}
+          onStartReorder={() => setActiveFlow("reorder")}
+          onStartSuppliers={() => setActiveFlow("suppliers")}
+          onOpenAuditLog={() => setActiveFlow("audit_log")}
+          onStartPurchaseOrders={() => setActiveFlow("purchase_orders")}
+          onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
+          onStartEmailInbox={() => setActiveFlow("email_inbox")}
+        />
+      )}
+      {activeTab === "analytics" && <AnalyticsPanel />}
+      {activeTab === "history" && <HistoryScreen />}
+      {activeTab === "tools" && <ToolsScreen />}
+      {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
+      {activeTab === "help" && <HelpCentre />}
+      {activeTab === "account" && <AccountScreen />}
+    </>
+  );
+
+  // ─── Embedded layout (inside Shopify Admin) ───
+  if (isEmbedded) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-background">
+        <EmbeddedNav
+          activeTab={activeFlow ? "" : activeTab}
+          onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
+          onFlowChange={(flow) => setActiveFlow(flow as any)}
+        />
+        <main className="flex-1 overflow-y-auto">
+          <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-0 border-b border-border mb-0">
+            <div className="flex items-center gap-2">
+              {activeFlow && (
+                <button
+                  onClick={() => setActiveFlow(null)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  ← Back
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 pb-2">
+              <NotificationBell
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkRead={markRead}
+                onMarkAllRead={markAllRead}
+                onNavigate={(link) => {
+                  if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
+                    setActiveFlow(link as any);
+                  } else {
+                    setActiveTab(link);
+                  }
+                }}
+              />
+            </div>
+          </div>
+          {activeFlow ? renderFlow() : mainContent}
+        </main>
+      </div>
+    );
   }
 
-  if (activeFlow === "restock") {
-    return <RestockAnalytics onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "price_adjust") {
-    return <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "price_lookup") {
-    return <PriceLookup onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "order_form") {
-    return <OrderFormFlow onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "seasons") {
-    return <SeasonManager onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "reorder") {
-    return <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />;
-  }
-
-  if (activeFlow === "suppliers") {
-    return <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />;
-  }
-
-  if (activeFlow === "audit_log") {
-    return <AuditLogPanel onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "purchase_orders") {
-    return <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "catalog_memory") {
-    return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
-  }
-
-  if (activeFlow === "email_inbox") {
-    return <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />;
-  }
-
+  // ─── Standalone layout (original mobile-first) ───
   return (
     <div className="min-h-screen">
       {/* Top bar */}
@@ -137,27 +184,7 @@ const Index = () => {
         </button>
       </div>
 
-      {activeTab === "home" && (
-        <HomeScreen
-          onStartInvoice={() => setActiveFlow("invoice")}
-          onStartSale={() => setActiveFlow("sale")}
-          onStartRestock={() => setActiveFlow("restock")}
-          onStartPriceAdjust={() => setActiveFlow("price_adjust")}
-          onStartOrderForm={() => setActiveFlow("order_form")}
-          onStartReorder={() => setActiveFlow("reorder")}
-          onStartSuppliers={() => setActiveFlow("suppliers")}
-          onOpenAuditLog={() => setActiveFlow("audit_log")}
-          onStartPurchaseOrders={() => setActiveFlow("purchase_orders")}
-          onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
-          onStartEmailInbox={() => setActiveFlow("email_inbox")}
-        />
-      )}
-      {activeTab === "analytics" && <AnalyticsPanel />}
-      {activeTab === "history" && <HistoryScreen />}
-      {activeTab === "tools" && <ToolsScreen />}
-      {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
-      {activeTab === "help" && <HelpCentre />}
-      {activeTab === "account" && <AccountScreen />}
+      {mainContent}
       <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Floating Quick Capture button — mobile only */}

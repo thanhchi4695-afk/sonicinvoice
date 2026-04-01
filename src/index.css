@@ -92,3 +92,12 @@
     font-size: 16px; /* prevents iOS zoom */
   }
 }
+
+/* Shopify embedded mode — fit within iframe */
+.shopify-embedded-app {
+  height: 100vh;
+  overflow: hidden;
+}
+.shopify-embedded-app main {
+  scrollbar-width: thin;
+}

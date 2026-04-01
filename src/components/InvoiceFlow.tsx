@@ -422,6 +422,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     metafields: Record<string, string>;
     variants: VariantLine[];
     isGrouped: boolean;
+    barcode?: string;
+    vendorCode?: string;
+    matchSource?: MatchSource;
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([

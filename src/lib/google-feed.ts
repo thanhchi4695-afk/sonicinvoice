@@ -96,6 +96,20 @@ function escXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
+export function getMarginFloor(): number {
+  const saved = parseFloat(localStorage.getItem('margin_floor') || '');
+  return (!isNaN(saved) && saved >= 1.0) ? saved : 1.20;
+}
+
+export function setMarginFloor(val: number) {
+  localStorage.setItem('margin_floor', String(val));
+}
+
+function calcMinPrice(cogs: number): string {
+  if (!cogs || cogs <= 0) return '';
+  return (cogs * getMarginFloor()).toFixed(2);
+}
+
 export function buildGoogleFeedItem(p: GoogleFeedProduct, saleDateStr?: string): GoogleFeedItem {
   const handle = `${p.name}-${p.brand}`
     .toLowerCase()

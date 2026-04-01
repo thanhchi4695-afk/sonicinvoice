@@ -83,6 +83,10 @@ const Index = () => {
     return <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />;
   }
 
+  if (activeFlow === "audit_log") {
+    return <AuditLogPanel onBack={() => setActiveFlow(null)} />;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Top bar */}

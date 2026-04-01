@@ -49,6 +49,7 @@ export interface GoogleFeedProduct {
   type: string;
   price: number;
   rrp: number;
+  cogs?: number;
   tags?: string;
   description?: string;
   colour?: string;

@@ -102,7 +102,7 @@ const sampleInvoices: Record<string, { vendor: string; lines: { name: string; va
 };
 
 const doneMessages: Record<string, { emoji: string; text: string }> = {
-  swimwear: { emoji: "🏄", text: "SkuPilot knows your brands, your tags, and your AU pricing sources. Let's go." },
+  swimwear: { emoji: "🏄", text: "SkuPilot knows your brands, your tags, and your pricing sources. Let's go." },
   beauty: { emoji: "✨", text: "SkuPilot knows your shades, your formulas, and your beauty brands. Let's go." },
   fashion: { emoji: "👗", text: "SkuPilot knows your sizing, your styles, and your fashion brands. Let's go." },
   electronics: { emoji: "📱", text: "SkuPilot knows your specs, your models, and your tech brands. Let's go." },

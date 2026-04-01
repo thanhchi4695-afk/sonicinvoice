@@ -35,6 +35,11 @@ const AccountScreen = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    const cfg = getStoreConfig();
+    setStoreName(cfg.name || '');
+    setCurrency(cfg.currency || 'AUD');
+    setStoreType(cfg.storeType || 'shopify');
+
     getConnection().then((conn) => {
       if (conn) {
         setShopifyUrl(conn.store_url);

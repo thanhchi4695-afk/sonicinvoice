@@ -113,7 +113,7 @@ export function generateSeoTitle(
 // DESC_TEMPLATES now derived from industry-config
 
 export function getDefaultDescTemplate(industry: string): string {
-  return DESC_TEMPLATES[industry] || DESC_TEMPLATES.general;
+  return getIndustryDefinition(industry).seoDescTemplate;
 }
 
 export function generateSeoDescription(

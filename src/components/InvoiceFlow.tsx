@@ -383,13 +383,17 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin-slow mb-6" />
           <h3 className="text-lg font-semibold font-display mb-2">Reading your invoice...</h3>
           <p className="text-sm text-muted-foreground text-center">Extracting product names, prices, and quantities</p>
+          <p className="text-xs text-muted-foreground mt-3 font-mono-data">
+            ⏱ {Math.floor(processingElapsed / 60)}:{String(processingElapsed % 60).padStart(2, "0")} elapsed
+            {useTemplate ? " · ~0:02 remaining" : " · ~0:03 remaining"}
+          </p>
           {useTemplate && matchedTemplate && (
-            <p className="text-xs text-primary mt-3 flex items-center gap-1">
+            <p className="text-xs text-primary mt-2 flex items-center gap-1">
               <Zap className="w-3 h-3" /> Using {matchedTemplate.supplier} template — faster parsing
             </p>
           )}
           {customInstructions.trim() && (
-            <p className="text-xs text-primary mt-3">🤖 Applying your custom instructions...</p>
+            <p className="text-xs text-primary mt-2">🤖 Applying your custom instructions...</p>
           )}
         </div>
       )}

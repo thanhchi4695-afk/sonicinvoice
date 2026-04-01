@@ -456,6 +456,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         type: "One Piece",
         price: 89.95,
         rrp: 219.95,
+        cogs: 89.95,
         status: "ready",
         colour: "Black / Navy",
         size: "8-12",

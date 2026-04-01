@@ -432,6 +432,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     name: string;
     brand: string;
     type: string;
+    colour: string;
+    size: string;
     price: number;
     rrp: number;
     status: string;

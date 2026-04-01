@@ -321,6 +321,9 @@ const AccountScreen = () => {
       {/* Notification Preferences */}
       <NotificationPrefsSection />
 
+      {/* Locations */}
+      <LocationsSection />
+
       {/* Invoice Templates */}
       <InvoiceTemplatesSection />
 

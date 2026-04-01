@@ -12,6 +12,7 @@ import RestockAnalytics from "@/components/RestockAnalytics";
 import PriceAdjustmentPanel from "@/components/PriceAdjustmentPanel";
 import PriceLookup from "@/components/PriceLookup";
 import LightspeedGuide from "@/components/LightspeedGuide";
+import AnalyticsPanel from "@/components/AnalyticsPanel";
 import { useStoreMode } from "@/hooks/use-store-mode";
 
 const Index = () => {

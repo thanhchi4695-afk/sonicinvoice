@@ -15,6 +15,7 @@ import LightspeedGuide from "@/components/LightspeedGuide";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
 import QuickCapture from "@/components/QuickCapture";
 import OrderFormFlow from "@/components/OrderFormFlow";
+import SeasonManager from "@/components/SeasonManager";
 import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";

@@ -164,6 +164,8 @@ export function buildGoogleFeedItem(p: GoogleFeedProduct, saleDateStr?: string):
     custom_label_3: hasRRP ? 'sale' : 'full_price',
     custom_label_4: '',
     sale_price_effective_date: (salePrice && saleDateStr) ? saleDateStr : '',
+    cost_of_goods_sold: p.cogs && p.cogs > 0 ? `${p.cogs.toFixed(2)} AUD` : '',
+    auto_pricing_min_price: p.cogs && p.cogs > 0 ? `${calcMinPrice(p.cogs)} AUD` : '',
   };
 }
 

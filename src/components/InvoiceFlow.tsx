@@ -8,6 +8,7 @@ import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { generateXSeriesCSV, getXSeriesSettings, saveXSeriesSettings, type XSeriesSettings, type XSeriesProduct } from "@/lib/lightspeed-xseries";
 import { findTemplate, saveFormatTemplate, incrementTemplateUse, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
+import { getStoreLocations } from "@/components/AccountScreen";
 
 interface InvoiceFlowProps {
   onBack: () => void;

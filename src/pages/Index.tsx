@@ -72,6 +72,10 @@ const Index = () => {
     return <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />;
   }
 
+  if (activeFlow === "suppliers") {
+    return <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Top bar */}

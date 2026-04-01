@@ -158,6 +158,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [fileName, setFileName] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
   const [supplierName, setSupplierName] = useState("");
+  const [exportFormat, setExportFormat] = useState<'shopify' | 'lightspeed_x' | 'xlsx'>('shopify');
+  const [showLsSettings, setShowLsSettings] = useState(false);
+  const [lsSettings, setLsSettings] = useState<XSeriesSettings>(getXSeriesSettings);
   const mode = useStoreMode();
 
   const handleFileSelect = () => {

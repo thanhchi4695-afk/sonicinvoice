@@ -1178,10 +1178,12 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           {reviewTab === "new" && (
             <div className="space-y-2">
               {productGroups.map((group, i) => {
+                const conf = groupConfidences[i];
+                if (confidenceFilter !== "all" && conf.level !== confidenceFilter) return null;
                 const isUpdate = lineModes[i] === "update";
                 return (
                   <div key={`p-${i}`}>
-                    {/* Mode toggle */}
+                    {/* Mode toggle + confidence badge */}
                     <div className="flex items-center gap-2 mb-1">
                       <button
                         onClick={() => toggleLineMode(i)}

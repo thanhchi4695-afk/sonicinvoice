@@ -640,8 +640,106 @@ function SeoWriterPanel({ onBack }: { onBack: () => void }) {
     </div>
   );
 }
+// ── Google Feed Preview Panel ──────────────────────────────
+function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
+  const [copied, setCopied] = useState(false);
 
-const ToolsScreen = () => {
+  // Load last invoice products from localStorage
+  const getProducts = () => {
+    try {
+      const hist = JSON.parse(localStorage.getItem("export_history") || "[]");
+      // Try to get products from last enrichment
+      const raw = localStorage.getItem("last_enriched_products");
+      if (raw) return JSON.parse(raw) as { name: string; brand: string; type: string; price: number; rrp: number; tags?: string }[];
+      return [];
+    } catch { return []; }
+  };
+
+  const products = getProducts();
+  const hasProducts = products.length > 0;
+
+  const xml = hasProducts ? generateGoogleFeedXML(products) : '';
+
+  const handleDownloadXML = () => {
+    if (!hasProducts) return;
+    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'google_shopping_feed.xml'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTSV = () => {
+    if (!hasProducts) return;
+    const tsv = generateGoogleFeedTSV(products);
+    const blob = new Blob(['\uFEFF' + tsv], { type: 'text/tab-separated-values;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'google_shopping_feed.tsv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleCopy = () => {
+    if (!xml) return;
+    navigator.clipboard.writeText(xml);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="px-4 pt-6 pb-24 animate-fade-in">
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={onBack} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
+        <h2 className="text-lg font-semibold font-display">Google Shopping feed</h2>
+      </div>
+      <p className="text-sm text-muted-foreground mb-5">
+        Preview and download a Google Merchant Center-ready product feed from your current invoice batch
+      </p>
+
+      <div className="bg-card rounded-lg border border-border p-4 mb-4">
+        <p className="text-sm text-muted-foreground">
+          {hasProducts
+            ? `${products.length} products ready for Google Shopping feed.`
+            : 'Load an invoice first to generate the feed preview.'}
+        </p>
+      </div>
+
+      {hasProducts && (
+        <>
+          <div className="bg-card rounded-lg border border-border p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold">Feed preview</h3>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={handleCopy}>
+                {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy XML</>}
+              </Button>
+            </div>
+            <pre className="text-[10.5px] font-mono-data text-muted-foreground bg-muted/50 rounded-lg p-3 max-h-80 overflow-auto whitespace-pre-wrap break-all">
+              {xml.slice(0, 2000)}{xml.length > 2000 ? `\n\n... (${products.length} products total)` : ''}
+            </pre>
+          </div>
+
+          <div className="flex gap-3 mb-4">
+            <Button variant="default" className="flex-1 h-11 gap-2" onClick={handleDownloadXML}>
+              <Download className="w-4 h-4" /> Download feed (.xml)
+            </Button>
+            <Button variant="outline" size="sm" className="h-11 text-xs" onClick={handleDownloadTSV}>
+              Download as TSV
+            </Button>
+          </div>
+        </>
+      )}
+
+      <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+        <p className="text-xs font-semibold text-primary mb-1">💡 How to submit to Google Merchant Center:</p>
+        <p className="text-xs text-muted-foreground">
+          Google Merchant Center → Products → Feeds → Add feed → Upload file → select the downloaded .xml file. Allow up to 24 hours for review.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");
 

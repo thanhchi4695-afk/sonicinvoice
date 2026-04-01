@@ -18,6 +18,7 @@ export interface ExportProduct {
   hasTags?: boolean;
   confidence?: "high" | "medium" | "low";
   isNew?: boolean;
+  metafields?: Record<string, string>;
 }
 
 interface ExportReviewScreenProps {

@@ -11,6 +11,7 @@ import BulkSaleFlow from "@/components/BulkSaleFlow";
 import RestockAnalytics from "@/components/RestockAnalytics";
 import PriceAdjustmentPanel from "@/components/PriceAdjustmentPanel";
 import PriceLookup from "@/components/PriceLookup";
+import LightspeedGuide from "@/components/LightspeedGuide";
 import { useStoreMode } from "@/hooks/use-store-mode";
 
 const Index = () => {
@@ -71,6 +72,7 @@ const Index = () => {
       )}
       {activeTab === "history" && <HistoryScreen />}
       {activeTab === "tools" && <ToolsScreen />}
+      {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
       {activeTab === "account" && <AccountScreen />}
       <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
     </div>

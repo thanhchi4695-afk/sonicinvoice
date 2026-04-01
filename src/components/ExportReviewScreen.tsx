@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Download, Check, AlertTriangle, FileSpreadsheet, FileText, Tag, Package, DollarSign, ChevronLeft, ShoppingCart } from "lucide-react";
+import { Download, Check, AlertTriangle, FileSpreadsheet, FileText, Tag, Package, DollarSign, ChevronLeft, ShoppingCart, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { getEnabledMetafields } from "@/lib/metafields";
 import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed";
+import ShopifyPushFlow from "@/components/ShopifyPushFlow";
+import type { PushProduct } from "@/lib/shopify-api";
 
 export interface ExportProduct {
   name: string;
@@ -332,6 +334,35 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
           <p className="text-[10px] text-muted-foreground text-center font-mono-data">
             {generateFilename(supplierName, selectedFormat)}
           </p>
+
+          {/* Push to Shopify */}
+          <div className="mt-4">
+            <ShopifyPushFlow
+              products={filtered.map((p): PushProduct => ({
+                title: `${p.brand} ${p.name}`,
+                body_html: `<p>${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.</p>`,
+                vendor: p.brand,
+                product_type: p.type,
+                tags: `${p.brand}, ${p.type}, New Arrival`,
+                variants: [{
+                  price: p.rrp.toFixed(2),
+                  compare_at_price: p.price < p.rrp ? p.rrp.toFixed(2) : undefined,
+                  sku: p.sku || "",
+                  cost: p.cogs?.toFixed(2),
+                  inventory_management: "shopify",
+                  inventory_quantity: 1,
+                  option1: p.size || undefined,
+                  option2: p.colour || undefined,
+                }],
+                options: [
+                  ...(p.size ? [{ name: "Size" }] : []),
+                  ...(p.colour ? [{ name: "Colour" }] : []),
+                ],
+              }))}
+              source="invoice_export"
+              onFallbackCSV={handleExport}
+            />
+          </div>
         </div>
       </div>
     </div>

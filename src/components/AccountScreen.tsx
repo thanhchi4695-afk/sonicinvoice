@@ -289,6 +289,23 @@ const AccountScreen = () => {
       {/* Metafields */}
       <MetafieldsSection />
 
+      {/* Developer Mode */}
+      <Section title="🛠️ Developer mode">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Embedded sidebar layout</p>
+            <p className="text-xs text-muted-foreground">Preview the Shopify Admin sidebar layout without a real store connection</p>
+          </div>
+          <Switch
+            checked={getDevEmbeddedMode()}
+            onCheckedChange={(checked) => {
+              setDevEmbeddedMode(checked);
+              window.location.reload();
+            }}
+          />
+        </div>
+      </Section>
+
       {/* App Information */}
       <Section title="App information">
         <div className="space-y-2 text-sm">

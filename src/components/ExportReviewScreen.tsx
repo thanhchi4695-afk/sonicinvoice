@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Download, Check, AlertTriangle, FileSpreadsheet, FileText, Tag, Package, DollarSign, ChevronLeft, ShoppingCart, ShoppingBag } from "lucide-react";
+import { Download, Check, AlertTriangle, FileSpreadsheet, FileText, Tag, Package, DollarSign, ChevronLeft, ShoppingCart, ShoppingBag, ShieldCheck, XCircle, ToggleLeft, ToggleRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { getEnabledMetafields } from "@/lib/metafields";
 import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed";
 import ShopifyPushFlow from "@/components/ShopifyPushFlow";
 import type { PushProduct } from "@/lib/shopify-api";
+import { generateShopifyCSV, getVariantMode, setVariantMode, type VariantMode, type ValidationResult } from "@/lib/csv-export-engine";
 
 export interface ExportProduct {
   name: string;
@@ -75,6 +77,9 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
   const [filterNew, setFilterNew] = useState(true);
   const [filterUpdates, setFilterUpdates] = useState(true);
   const [filterMissingImages, setFilterMissingImages] = useState(true);
+  const [variantMode, setVariantModeState] = useState<VariantMode>(getVariantMode());
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [exportBlocked, setExportBlocked] = useState(false);
   const mode = useStoreMode();
 
   // Assign defaults
@@ -121,35 +126,49 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
     URL.revokeObjectURL(url);
   };
 
+  const handleToggleVariantMode = (checked: boolean) => {
+    const newMode: VariantMode = checked ? "variant" : "simple";
+    setVariantModeState(newMode);
+    setVariantMode(newMode);
+    setValidationResult(null);
+    setExportBlocked(false);
+  };
+
+  const runValidation = () => {
+    if (selectedFormat !== "shopify_full") {
+      setValidationResult(null);
+      setExportBlocked(false);
+      return true;
+    }
+    const enabledMeta = getEnabledMetafields();
+    const { validation } = generateShopifyCSV(
+      filtered,
+      variantMode,
+      enabledMeta.map(m => ({ key: m.key, shopifyColumn: m.shopifyColumn }))
+    );
+    setValidationResult(validation);
+    setExportBlocked(!validation.valid);
+    return validation.valid;
+  };
+
   const handleExport = () => {
     const filename = generateFilename(supplierName, selectedFormat);
     const prods = filtered;
 
     if (selectedFormat === "shopify_full") {
       const enabledMeta = getEnabledMetafields();
-      const rows = prods.map(p => {
-        const handle = `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-        const row: Record<string, string> = {
-          Handle: handle, Title: `${p.brand} ${p.name}`, "Body (HTML)": `<p>${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.</p>`,
-          Vendor: p.brand, Type: p.type, Tags: `${p.brand}, ${p.type}, New Arrival`,
-          Published: "TRUE", "Variant Price": p.rrp.toFixed(2), "Variant Compare At Price": "",
-          "Variant SKU": p.sku || "", "Variant Barcode": p.barcode || "", "Image Src": "", Status: "draft",
-          "SEO Title": `${p.name} | ${p.brand}`.slice(0, 70),
-          "SEO Description": `Shop ${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.`.slice(0, 160),
-        };
-        // Add metafield columns where at least one product has data
-        for (const mf of enabledMeta) {
-          const val = p.metafields?.[mf.key] || "";
-          row[mf.shopifyColumn] = val;
-        }
-        return row;
-      });
-      // Filter out metafield columns where ALL values are empty
-      const metaColsToInclude = enabledMeta
-        .filter(mf => rows.some(r => r[mf.shopifyColumn]?.trim()))
-        .map(mf => mf.shopifyColumn);
-      const baseColumns = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Variant SKU", "Variant Barcode", "Variant Price", "Variant Compare At Price", "Image Src", "Status", "SEO Title", "SEO Description"];
-      downloadFile("\uFEFF" + Papa.unparse(rows, { columns: [...baseColumns, ...metaColsToInclude] }), filename);
+      const { csv, validation } = generateShopifyCSV(
+        prods,
+        variantMode,
+        enabledMeta.map(m => ({ key: m.key, shopifyColumn: m.shopifyColumn }))
+      );
+      setValidationResult(validation);
+      if (!validation.valid) {
+        setExportBlocked(true);
+        return;
+      }
+      setExportBlocked(false);
+      downloadFile(csv, filename);
     } else if (selectedFormat === "shopify_inventory") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
@@ -171,21 +190,18 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
     } else if (selectedFormat === "google_xml") {
       const xml = generateGoogleFeedXML(prods.map(p => ({
         name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
-        cogs: p.cogs,
-        colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
+        cogs: p.cogs, colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
         tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
       })), supplierName);
       downloadFile(xml, filename, "application/xml;charset=utf-8");
     } else if (selectedFormat === "google_tsv") {
       const tsv = generateGoogleFeedTSV(prods.map(p => ({
         name: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
-        cogs: p.cogs,
-        colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
+        cogs: p.cogs, colour: p.colour, size: p.size, barcode: p.barcode, sku: p.sku,
         tags: p.hasTags ? `${p.brand}, ${p.type}, New Arrival` : '',
       })));
       downloadFile("\uFEFF" + tsv, filename, "text/tab-separated-values;charset=utf-8");
     } else if (selectedFormat === "xlsx" || selectedFormat === "summary_pdf") {
-      // Fallback to CSV for now
       const rows = prods.map(p => ({
         Product: p.name, Brand: p.brand, Type: p.type,
         Cost: p.price.toFixed(2), RRP: p.rrp.toFixed(2), Confidence: p.confidence,
@@ -299,13 +315,31 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
 
         {/* RIGHT — Format selection */}
         <div className="space-y-3">
+          {/* Variant Mode Toggle */}
+          {selectedFormat === "shopify_full" && (
+            <div className="bg-card rounded-lg border border-border p-4">
+              <h3 className="text-sm font-semibold mb-3">Product structure</h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">{variantMode === "simple" ? "Simple Products Mode" : "Variant Mode"}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {variantMode === "simple"
+                      ? "Each product = 1 row with Option1 = \"Default Title\""
+                      : "Products grouped by title — size/colour become variant rows"}
+                  </p>
+                </div>
+                <Switch checked={variantMode === "variant"} onCheckedChange={handleToggleVariantMode} />
+              </div>
+            </div>
+          )}
+
           <div className="bg-card rounded-lg border border-border p-4">
             <h3 className="text-sm font-semibold mb-3">Export format</h3>
             <div className="space-y-2">
               {FORMAT_CARDS.map(fmt => (
                 <button
                   key={fmt.id}
-                  onClick={() => setSelectedFormat(fmt.id)}
+                  onClick={() => { setSelectedFormat(fmt.id); setValidationResult(null); setExportBlocked(false); }}
                   className={`w-full rounded-lg border-2 p-3 text-left transition-all ${
                     selectedFormat === fmt.id ? "border-primary bg-primary/5" : "border-border bg-card hover:border-muted-foreground/30"
                   }`}
@@ -326,11 +360,55 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
             </div>
           </div>
 
+          {/* Validation Check */}
+          {selectedFormat === "shopify_full" && (
+            <Button variant="outline" className="w-full" onClick={runValidation}>
+              <ShieldCheck className="w-4 h-4 mr-2" />
+              Run Shopify Import Simulation Check
+            </Button>
+          )}
+
+          {/* Validation Results */}
+          {validationResult && (
+            <div className={`rounded-lg border p-3 ${validationResult.valid ? "bg-success/10 border-success/30" : "bg-destructive/10 border-destructive/30"}`}>
+              <div className="flex items-center gap-2 mb-2">
+                {validationResult.valid
+                  ? <ShieldCheck className="w-4 h-4 text-success" />
+                  : <XCircle className="w-4 h-4 text-destructive" />}
+                <span className={`text-sm font-semibold ${validationResult.valid ? "text-success" : "text-destructive"}`}>
+                  {validationResult.valid ? "✓ All checks passed — safe to import" : `${validationResult.errorCount} error${validationResult.errorCount !== 1 ? "s" : ""} found — export blocked`}
+                </span>
+              </div>
+              {validationResult.warningCount > 0 && (
+                <p className="text-xs text-warning mb-1">{validationResult.warningCount} warning{validationResult.warningCount !== 1 ? "s" : ""}</p>
+              )}
+              {validationResult.issues.length > 0 && (
+                <div className="space-y-1 mt-2 max-h-40 overflow-y-auto">
+                  {validationResult.issues.slice(0, 10).map((issue, i) => (
+                    <div key={i} className={`text-xs flex items-start gap-1.5 ${issue.severity === "error" ? "text-destructive" : "text-warning"}`}>
+                      {issue.severity === "error" ? <XCircle className="w-3 h-3 mt-0.5 shrink-0" /> : <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />}
+                      <div>
+                        <span className="font-medium">Row {issue.row} · {issue.field}:</span> {issue.message}
+                        {issue.suggestion && <span className="text-muted-foreground"> — {issue.suggestion}</span>}
+                      </div>
+                    </div>
+                  ))}
+                  {validationResult.issues.length > 10 && (
+                    <p className="text-xs text-muted-foreground">...and {validationResult.issues.length - 10} more issues</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Download */}
-          <Button variant="success" className="w-full h-14 text-base" onClick={handleExport} disabled={filtered.length === 0}>
+          <Button variant="success" className="w-full h-14 text-base" onClick={handleExport} disabled={filtered.length === 0 || exportBlocked}>
             <Download className="w-5 h-5 mr-2" />
             Download {FORMAT_CARDS.find(f => f.id === selectedFormat)?.label} — {filtered.length} products
           </Button>
+          {exportBlocked && (
+            <p className="text-xs text-destructive text-center font-medium">Fix the errors above before exporting</p>
+          )}
           <p className="text-[10px] text-muted-foreground text-center font-mono-data">
             {generateFilename(supplierName, selectedFormat)}
           </p>

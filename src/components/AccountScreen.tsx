@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell } from "lucide-react";
+import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText } from "lucide-react";
 import { getCollectionRules, saveCollectionRules, resetCollectionRules, type CollectionRule } from "@/lib/collection-engine";
 import {
   saveConnection, testConnection, getConnection, deleteConnection,
@@ -14,6 +14,7 @@ import { CURRENCIES, LOCALES } from "@/lib/i18n";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { loadPreferences, savePreferences, type NotificationPreferences } from "@/hooks/use-notifications";
 import { Switch } from "@/components/ui/switch";
+import { getFormatTemplates, deleteFormatTemplate, SHARED_AU_TEMPLATES, getTemplateQuality, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");
@@ -318,6 +319,9 @@ const AccountScreen = () => {
 
       {/* Notification Preferences */}
       <NotificationPrefsSection />
+
+      {/* Invoice Templates */}
+      <InvoiceTemplatesSection />
 
       <Button variant="teal" className="w-full mt-4 h-12 text-base">Save settings</Button>
 
@@ -717,6 +721,80 @@ function NotificationPrefsSection() {
           >
             {[1, 2, 3, 4].map(v => <option key={v} value={v}>{v} week{v > 1 ? "s" : ""}</option>)}
           </select>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// ── Invoice Templates Section ──────────────────────────────
+function InvoiceTemplatesSection() {
+  const [templates, setTemplates] = useState<Record<string, InvoiceTemplate>>(getFormatTemplates);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
+  const handleDelete = (key: string) => {
+    deleteFormatTemplate(key);
+    setTemplates(getFormatTemplates());
+  };
+
+  const userTemplates = Object.entries(templates);
+
+  return (
+    <Section title="📋 Invoice Templates">
+      <p className="text-xs text-muted-foreground -mt-1 mb-2">
+        Saved formats for faster invoice parsing. Templates learn your suppliers' layouts.
+      </p>
+
+      {/* User templates */}
+      {userTemplates.length === 0 ? (
+        <p className="text-xs text-muted-foreground italic">No custom templates saved yet. Process an invoice and save its format.</p>
+      ) : (
+        <div className="space-y-1.5 mb-3">
+          {userTemplates.map(([key, t]) => {
+            const q = getTemplateQuality(t);
+            const expanded = expandedKey === key;
+            return (
+              <div key={key} className="bg-muted/50 rounded-lg">
+                <button
+                  onClick={() => setExpandedKey(expanded ? null : key)}
+                  className="w-full flex items-center gap-2 text-xs px-3 py-2 text-left"
+                >
+                  <span className="font-medium text-foreground flex-1">{t.supplier}</span>
+                  <span className="text-muted-foreground">{t.fileType.toUpperCase()}</span>
+                  <span className={`text-[10px] ${q.color}`}>✓ {t.successCount}</span>
+                </button>
+                {expanded && (
+                  <div className="px-3 pb-2 space-y-1.5">
+                    <div className="grid grid-cols-2 gap-1 text-[11px]">
+                      <span className="text-muted-foreground">Header row:</span><span>Row {t.headerRow}</span>
+                      {Object.entries(t.columns).filter(([, v]) => v).map(([k, v]) => (
+                        <><span key={k} className="text-muted-foreground">{COLUMN_LABELS[k as keyof ColumnMapping] || k}:</span><span>Col {v}</span></>
+                      ))}
+                      <span className="text-muted-foreground">Quality:</span><span className={q.color}>{q.label}</span>
+                      {t.lastUsed && <><span className="text-muted-foreground">Last used:</span><span>{new Date(t.lastUsed).toLocaleDateString()}</span></>}
+                    </div>
+                    <button onClick={() => handleDelete(key)} className="text-destructive text-[11px] flex items-center gap-1 mt-1">
+                      <Trash2 className="w-3 h-3" /> Delete template
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Shared AU templates */}
+      <div className="mt-3 pt-3 border-t">
+        <p className="text-xs font-semibold text-muted-foreground mb-2">🇦🇺 Shared AU Templates</p>
+        <p className="text-[11px] text-muted-foreground mb-2">Pre-configured for common AU swimwear supplier invoice formats.</p>
+        <div className="space-y-1">
+          {SHARED_AU_TEMPLATES.map(t => (
+            <div key={t.supplier} className="flex items-center justify-between text-xs bg-muted/30 rounded-lg px-3 py-1.5">
+              <span className="font-medium text-foreground">{t.supplier}</span>
+              <span className="text-muted-foreground">{t.fileType.toUpperCase()}</span>
+            </div>
+          ))}
         </div>
       </div>
     </Section>

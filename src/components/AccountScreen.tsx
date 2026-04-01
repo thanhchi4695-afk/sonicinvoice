@@ -133,6 +133,14 @@ const AccountScreen = () => {
             { v: "other", l: "📦 Other / Not sure" },
           ]}
         />
+        {(storeType === 'lightspeed' || storeType === 'lightspeed_shopify') && (
+          <SelectField label="Lightspeed version" value={lsVersion} onChange={(v) => { setLsVersion(v as LightspeedVersion); saveStoreConfig({ lightspeedVersion: v as LightspeedVersion }); }}
+            options={[
+              { v: "x_series", l: "X-Series (current)" },
+              { v: "r_series", l: "R-Series (legacy)" },
+            ]}
+          />
+        )}
       </Section>
 
       {/* Pricing Rules */}

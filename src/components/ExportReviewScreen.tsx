@@ -145,7 +145,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
       const metaColsToInclude = enabledMeta
         .filter(mf => rows.some(r => r[mf.shopifyColumn]?.trim()))
         .map(mf => mf.shopifyColumn);
-      const baseColumns = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Variant Price", "Variant Compare At Price", "Variant SKU", "Image Src", "Status", "SEO Title", "SEO Description"];
+      const baseColumns = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Variant SKU", "Variant Barcode", "Variant Price", "Variant Compare At Price", "Image Src", "Status", "SEO Title", "SEO Description"];
       downloadFile("\uFEFF" + Papa.unparse(rows, { columns: [...baseColumns, ...metaColsToInclude] }), filename);
     } else if (selectedFormat === "shopify_inventory") {
       const rows = prods.map(p => ({

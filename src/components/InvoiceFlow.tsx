@@ -318,6 +318,26 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             ))}
           </div>
 
+          {/* Collection coverage check */}
+          {(() => {
+            const coverageData = mockProducts.map(p => ({
+              name: p.name, brand: p.brand, type: p.type,
+              tags: [p.type, p.brand, "new arrivals", "Womens", "Swimwear", "full_price"].filter(Boolean),
+            }));
+            const coverage = checkCoverage(coverageData);
+            const unassigned = coverage.results.filter(r => !r.hasSpecificCollection);
+            return (
+              <div className={`rounded-lg p-3 mt-3 text-xs ${unassigned.length > 0 ? "bg-warning/10 border border-warning/20" : "bg-success/10 border border-success/20"}`}>
+                <p className={`font-semibold ${unassigned.length > 0 ? "text-warning" : "text-success"}`}>
+                  🏷️ {coverage.assignedCount}/{coverage.total} products assigned to specific collections
+                </p>
+                {unassigned.map((u, i) => (
+                  <p key={i} className="text-warning/80 mt-0.5">⚠ {u.productName} — {u.suggestion}</p>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* Preview modal */}
           {(previewProduct || previewAll) && (
             <ShopifyPreview

@@ -1,4 +1,5 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";
@@ -34,8 +35,30 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
   const onboardingComplete = localStorage.getItem("onboarding_complete") === "true";
   const showResumeBanner = !onboardingComplete && onboardingStep && parseInt(onboardingStep) < 5;
 
+  const [bannerDismissed, setBannerDismissed] = useState(() => localStorage.getItem("shopify_app_store_banner_dismissed") === "true");
+
+  const dismissBanner = () => {
+    setBannerDismissed(true);
+    localStorage.setItem("shopify_app_store_banner_dismissed", "true");
+  };
+
   return (
     <div className="px-4 pt-2 pb-24 animate-fade-in">
+      {/* Shopify App Store waitlist banner */}
+      {!bannerDismissed && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4 flex items-start gap-3">
+          <span className="text-lg shrink-0">🛍</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">SkuPilot is coming to the Shopify App Store.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Install directly from Shopify for automatic connection and one-click setup.</p>
+            <button className="text-xs text-primary font-medium mt-1.5 hover:underline">Join the waitlist →</button>
+          </div>
+          <button onClick={dismissBanner} className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold font-display mb-1">SkuPilot</h1>
       <p className="text-muted-foreground text-sm mb-4">
         {mode.isLightspeed

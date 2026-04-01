@@ -42,6 +42,11 @@ const BottomTabBar = ({ activeTab, onTabChange }: BottomTabBarProps) => {
           );
         })}
       </div>
+      <div className="flex items-center justify-center gap-1 pb-1 -mt-1">
+        <span className="text-[9px] text-muted-foreground/60">SkuPilot v1.0</span>
+        <span className="text-[9px] text-muted-foreground/40">·</span>
+        <span className="text-[9px] text-muted-foreground/60">🛍 Shopify</span>
+      </div>
     </nav>
   );
 };

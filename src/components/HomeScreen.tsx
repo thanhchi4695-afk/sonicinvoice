@@ -315,6 +315,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* Local Collab SEO Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Link className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Local collab SEO</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Write one blog post with local partners. Every store gets a backlink. Runs in 10 minutes.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">blog post · outreach emails · backlink tracker</p>
+          </div>
+        </div>
+        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartCollabSEO}>
+          Start campaign <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
       {/* Stock by Location */}
       {(() => {
         const locs = getStoreLocations();

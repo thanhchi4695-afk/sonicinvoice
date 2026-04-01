@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,38 @@ const quickInserts = [
 // ── localStorage helpers ───────────────────────────────────
 const HISTORY_KEY = 'custom_instructions_history';
 const TEMPLATES_KEY = 'invoice_templates';
+const COST_HISTORY_KEY = 'cost_history';
+
+interface CostEntry { date: string; cost: number; supplier: string; invoice: string; }
+type CostHistoryMap = Record<string, CostEntry[]>;
+
+export function getCostHistory(): CostHistoryMap {
+  try { return JSON.parse(localStorage.getItem(COST_HISTORY_KEY) || "{}"); } catch { return {}; }
+}
+
+export function saveCostHistory(h: CostHistoryMap) {
+  localStorage.setItem(COST_HISTORY_KEY, JSON.stringify(h));
+}
+
+export function addCostEntry(sku: string, entry: CostEntry) {
+  const h = getCostHistory();
+  if (!h[sku]) h[sku] = [];
+  h[sku].push(entry);
+  saveCostHistory(h);
+}
+
+// Seed demo cost history on first load
+(function seedCostHistory() {
+  const h = getCostHistory();
+  if (Object.keys(h).length > 0) return;
+  const seed: CostHistoryMap = {
+    "BE10042": [{ date: "2026-01-15", cost: 85.00, supplier: "Bond Eye", invoice: "BE-1001" }],
+    "SF10023": [{ date: "2026-02-10", cost: 45.00, supplier: "Seafolly", invoice: "SF-1122" }],
+    "BK20015": [{ date: "2026-01-20", cost: 40.00, supplier: "Baku", invoice: "BK-501" }],
+    "JA81520": [{ date: "2026-01-15", cost: 61.20, supplier: "Jantzen", invoice: "JAN-2647" }],
+  };
+  saveCostHistory(seed);
+})();
 
 function getHistory(): { text: string; label: string }[] {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
@@ -256,11 +288,28 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   ] : [];
 
   const mockProducts = [
-    { name: "Bond Eye Mara One Piece - Black", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready", metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" } },
-    { name: "Seafolly Collective Bikini Top - Navy", brand: "Seafolly", type: "Bikini Tops", price: 45.00, rrp: 109.95, status: "ready", metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" } },
-    { name: "Baku Riviera High Waist Pant - Ivory", brand: "Baku", type: "Bikini Bottoms", price: 38.00, rrp: 89.95, status: "review", metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" } },
-    { name: "Jantzen Retro Racerback - Coral", brand: "Jantzen", type: "One Piece", price: 65.00, rrp: 159.95, status: "ready", metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" } },
+    { name: "Bond Eye Mara One Piece - Black", sku: "BE10042", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready", metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" } },
+    { name: "Seafolly Collective Bikini Top - Navy", sku: "SF10023", brand: "Seafolly", type: "Bikini Tops", price: 45.00, rrp: 109.95, status: "ready", metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" } },
+    { name: "Baku Riviera High Waist Pant - Ivory", sku: "BK20015", brand: "Baku", type: "Bikini Bottoms", price: 38.00, rrp: 89.95, status: "review", metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" } },
+    { name: "Jantzen Retro Racerback - Coral", sku: "JA81520", brand: "Jantzen", type: "One Piece", price: 65.00, rrp: 159.95, status: "ready", metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" } },
   ];
+
+  // ── Cost history tracking ────────────────────────────────
+  const costHistory = getCostHistory();
+  const costChanges = mockProducts.map(p => {
+    const key = p.sku || p.name.toLowerCase().replace(/\s*-\s*(black|navy|ivory|coral|white|red|blue|green|pink).*$/i, "").trim();
+    const history = costHistory[key];
+    if (!history || history.length === 0) return { ...p, costChange: null, isNew: true };
+    const prev = history[history.length - 1];
+    const changeAmount = p.price - prev.cost;
+    const changePct = (changeAmount / prev.cost) * 100;
+    return { ...p, costChange: { prev: prev.cost, changeAmount, changePct, prevDate: prev.date }, isNew: false };
+  });
+  const priceIncreases = costChanges.filter(c => c.costChange && c.costChange.changePct > 0);
+  const priceDecreases = costChanges.filter(c => c.costChange && c.costChange.changePct < 0);
+  const largePriceAlert = costChanges.find(c => c.costChange && c.costChange.changePct > 10);
+  const [showCostSummary, setShowCostSummary] = useState(true);
+  const [showPriceAlertModal, setShowPriceAlertModal] = useState(!!largePriceAlert);
 
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
@@ -478,7 +527,66 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
-          {/* Speed tips */}
+          {/* Cost change summary */}
+          {(priceIncreases.length > 0 || priceDecreases.length > 0) && (
+            <div className="bg-card border border-border rounded-lg p-3 mb-3">
+              <button onClick={() => setShowCostSummary(!showCostSummary)} className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-secondary" />
+                  <span className="text-xs font-semibold">💰 Cost changes detected</span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${showCostSummary ? "rotate-180" : ""}`} />
+              </button>
+              {showCostSummary && (
+                <div className="mt-2.5 space-y-1.5">
+                  <p className="text-[10px] text-muted-foreground">
+                    {priceIncreases.length > 0 && <span className="text-destructive">⚠ {priceIncreases.length} increase{priceIncreases.length > 1 ? "s" : ""}</span>}
+                    {priceIncreases.length > 0 && priceDecreases.length > 0 && " · "}
+                    {priceDecreases.length > 0 && <span className="text-success">↓ {priceDecreases.length} decrease{priceDecreases.length > 1 ? "s" : ""}</span>}
+                  </p>
+                  {costChanges.filter(c => c.costChange && c.costChange.changePct !== 0).map((c, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs bg-muted/30 rounded px-2.5 py-1.5">
+                      <span className="truncate flex-1 mr-2">{c.name}</span>
+                      <span className={`shrink-0 font-mono-data font-medium ${c.costChange!.changePct > 5 ? "text-destructive" : c.costChange!.changePct > 0 ? "text-warning" : "text-success"}`}>
+                        ${c.costChange!.prev.toFixed(2)} → ${c.price.toFixed(2)} ({c.costChange!.changePct > 0 ? "+" : ""}{c.costChange!.changePct.toFixed(1)}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Large price increase alert modal */}
+          {showPriceAlertModal && largePriceAlert && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="bg-card rounded-xl border border-border shadow-lg max-w-sm w-full p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  <h3 className="font-semibold text-sm">Large price increase detected</h3>
+                </div>
+                <div className="text-xs text-muted-foreground space-y-1.5">
+                  <p>{largePriceAlert.brand} has increased the cost of:</p>
+                  <p className="font-medium text-foreground">{largePriceAlert.name} — SKU {largePriceAlert.sku}</p>
+                  <div className="bg-muted/50 rounded-lg p-2.5 space-y-0.5 font-mono-data">
+                    <p>Previous cost: ${largePriceAlert.costChange!.prev.toFixed(2)} ({largePriceAlert.costChange!.prevDate})</p>
+                    <p>New cost: ${largePriceAlert.price.toFixed(2)}</p>
+                    <p className="text-destructive font-semibold">Increase: ${largePriceAlert.costChange!.changeAmount.toFixed(2)} (+{largePriceAlert.costChange!.changePct.toFixed(1)}%)</p>
+                  </div>
+                  {largePriceAlert.rrp > 0 && (() => {
+                    const oldMargin = ((largePriceAlert.rrp - largePriceAlert.costChange!.prev) / largePriceAlert.rrp * 100).toFixed(0);
+                    const newMargin = ((largePriceAlert.rrp - largePriceAlert.price) / largePriceAlert.rrp * 100).toFixed(0);
+                    return <p className="text-[10px]">RRP: ${largePriceAlert.rrp.toFixed(2)} · Margin: {oldMargin}% → {newMargin}%</p>;
+                  })()}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => setShowPriceAlertModal(false)}>Acknowledge</Button>
+                  <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowPriceAlertModal(false)}>Review price</Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {showSpeedTips && (
             <div className="bg-muted/50 border border-border rounded-lg p-3 mb-3">
               <div className="flex items-center justify-between mb-1.5">
@@ -512,7 +620,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           </div>
           <div className="space-y-2">
-            {mockProducts.map((p, i) => (
+            {costChanges.map((p, i) => (
               <ProductCard key={i} product={p} onPreview={() => setPreviewProduct(p)} />
             ))}
           </div>
@@ -901,7 +1009,7 @@ function LightspeedRestockSection({ products, supplierName }: {
   );
 }
 
-const ProductCard = ({ product, onPreview }: { product: { name: string; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string> }; onPreview?: () => void }) => {
+const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
   const [showSplit, setShowSplit] = useState(false);
@@ -917,6 +1025,7 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; brand: s
   const meta = product.metafields || {};
   const invoiceQty = 12;
   const splitTotal = Object.values(splitQtys).reduce((a, b) => a + b, 0);
+  const margin = product.rrp > 0 ? ((product.rrp - product.price) / product.rrp) * 100 : null;
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
@@ -940,6 +1049,25 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; brand: s
                 </div>
               ) : null;
             })()}
+            {/* Cost change badge */}
+            {product.costChange && product.costChange.changePct !== 0 && (
+              <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                product.costChange.changePct > 5 ? "bg-destructive/15 text-destructive" :
+                product.costChange.changePct > 0 ? "bg-warning/15 text-warning" :
+                "bg-success/15 text-success"
+              }`}>
+                {product.costChange.changePct > 0 ? "↑" : "↓"} {product.costChange.changePct > 0 ? "+" : ""}{product.costChange.changePct.toFixed(1)}% vs last order
+              </span>
+            )}
+            {product.isNew && !product.costChange && (
+              <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] bg-muted text-muted-foreground">New — no price history</span>
+            )}
+            {/* Margin indicator */}
+            {margin !== null && (
+              <span className={`inline-block mt-0.5 text-[9px] ${margin < 25 ? "text-destructive" : margin < 40 ? "text-warning" : "text-muted-foreground"}`}>
+                {margin < 25 && "⚠ "}Margin: {margin.toFixed(0)}%
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />

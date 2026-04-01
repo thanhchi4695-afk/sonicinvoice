@@ -16,6 +16,7 @@ import { loadPreferences, savePreferences, type NotificationPreferences } from "
 import { Switch } from "@/components/ui/switch";
 import { getFormatTemplates, deleteFormatTemplate, SHARED_AU_TEMPLATES, getTemplateQuality, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
 import { getMetafieldConfig, saveMetafieldConfig, type MetafieldDefinition } from "@/lib/metafields";
+import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");
@@ -287,6 +288,23 @@ const AccountScreen = () => {
 
       {/* Metafields */}
       <MetafieldsSection />
+
+      {/* Developer Mode */}
+      <Section title="🛠️ Developer mode">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Embedded sidebar layout</p>
+            <p className="text-xs text-muted-foreground">Preview the Shopify Admin sidebar layout without a real store connection</p>
+          </div>
+          <Switch
+            checked={getDevEmbeddedMode()}
+            onCheckedChange={(checked) => {
+              setDevEmbeddedMode(checked);
+              window.location.reload();
+            }}
+          />
+        </div>
+      </Section>
 
       {/* App Information */}
       <Section title="App information">

@@ -169,19 +169,43 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [previewIdx, setPreviewIdx] = useState(0);
   const mode = useStoreMode();
 
+  // Template recognition state
+  const [matchedTemplate, setMatchedTemplate] = useState<InvoiceTemplate | null>(null);
+  const [useTemplate, setUseTemplate] = useState<boolean | null>(null);
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [savedTemplate, setSavedTemplate] = useState(false);
+
+  // Check for template match when supplier changes
+  useEffect(() => {
+    if (supplierName.trim()) {
+      const tmpl = findTemplate(supplierName);
+      setMatchedTemplate(tmpl);
+      setUseTemplate(null);
+    } else {
+      setMatchedTemplate(null);
+    }
+  }, [supplierName]);
+
   const handleFileSelect = () => {
-    // Save instructions to history
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
-      // Save template if toggled
       const saveCheckbox = document.getElementById('save-supplier') as HTMLInputElement;
       if (saveCheckbox?.checked && supplierName) {
         saveTemplate(supplierName, customInstructions);
       }
     }
+    if (useTemplate && matchedTemplate) {
+      incrementTemplateUse(supplierName);
+    }
     setFileName("invoice_jantzen_mar26.pdf");
     setTimeout(() => setStep(2), 300);
-    setTimeout(() => setStep(3), 3000);
+    setTimeout(() => {
+      setStep(3);
+      // Show save-template prompt if no existing template
+      if (!matchedTemplate && supplierName.trim()) {
+        setShowSaveTemplate(true);
+      }
+    }, useTemplate ? 1500 : 3000); // Faster with template
   };
 
   // Simulated rules-applied feedback

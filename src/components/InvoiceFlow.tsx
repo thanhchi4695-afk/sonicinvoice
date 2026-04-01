@@ -619,6 +619,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       name: `${group.name} - ${v.option2Value || v.option1Value}`,
       brand: group.brand,
       type: group.type,
+      colour: v.option2Value || group.colour || "",
+      size: v.option1Value || group.size || "",
       price: v.price,
       rrp: v.rrp,
       status: group.status,

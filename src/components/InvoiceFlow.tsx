@@ -319,12 +319,30 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
             <h3 className="text-xl font-bold font-display mb-2">Your file is ready</h3>
             <p className="text-sm text-muted-foreground mb-6">{mockProducts.length} products, {mode.isLightspeed ? 'Lightspeed' : 'Shopify'}-ready format</p>
-            <Button variant="success" className="w-full max-w-xs h-14 text-base">
-              <Download className="w-5 h-5 mr-2" /> Download {mode.exportLabel}
-            </Button>
-          </div>
+            {mode.isLightspeed ? (
+              <div className="w-full max-w-md space-y-3">
+                <div className="bg-card border border-border rounded-lg p-4">
+                  <p className="text-xs font-semibold mb-1 flex items-center gap-1.5">📥 Step 1: Download {mode.exportLabel}</p>
+                  <p className="text-[11px] text-muted-foreground mb-3">Import this into Lightspeed POS first</p>
+                  <Button variant="success" className="w-full h-12 text-sm">
+                    <Download className="w-4 h-4 mr-2" /> Download {mode.exportLabel} — {mockProducts.length} products
+                  </Button>
+                </div>
 
-          {/* R-Series import note */}
+                <p className="text-[10px] text-muted-foreground text-center px-4">
+                  Wait until Lightspeed has synced your products to Shopify before importing the SEO Update file. The handle must exist in Shopify for the update to work. This usually takes a few minutes after Lightspeed import.
+                </p>
+
+                <ShopifySeoUpdateSection products={mockProducts} supplierName={supplierName} />
+              </div>
+            ) : (
+              <Button variant="success" className="w-full max-w-xs h-14 text-base">
+                <Download className="w-5 h-5 mr-2" /> Download {mode.exportLabel}
+              </Button>
+            )}
+           </div>
+
+           {/* R-Series import note */}
           {mode.isRSeries && (
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 mt-4">
               <div className="flex items-start gap-2">

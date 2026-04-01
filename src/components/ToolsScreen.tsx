@@ -7,7 +7,7 @@ import SeasonManager from "@/components/SeasonManager";
 import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
-import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed";
+import { generateGoogleFeedXML, generateGoogleFeedTSV, getSaleMeta, generatePromotionsFeed } from "@/lib/google-feed";
 import {
   getTagConfig, saveTagConfig, resetTagConfig, getIndustryTagDefaults,
   generateTags, toTag,

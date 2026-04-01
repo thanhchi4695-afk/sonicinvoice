@@ -651,6 +651,7 @@ const ToolsScreen = () => {
   if (activeTool === "seo") return <SeoWriterPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "tags") return <TagBuilderPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "brands") return <BrandDirectoryPanel onBack={() => setActiveTool(null)} />;
+  if (activeTool === "google_feed") return <GoogleFeedPanel onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

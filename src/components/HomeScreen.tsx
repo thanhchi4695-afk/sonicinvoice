@@ -1,4 +1,4 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";
@@ -9,9 +9,10 @@ interface HomeScreenProps {
   onStartRestock: () => void;
   onStartPriceAdjust: () => void;
   onStartOrderForm: () => void;
+  onStartReorder: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -180,6 +181,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </div>
         <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartOrderForm}>
           Start <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Reorder Suggestions Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
+            <RotateCcw className="w-5 h-5 text-secondary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Reorder suggestions</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              AI-powered reorder recommendations based on stock levels and order history.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Low stock · due for reorder · seasonal</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartReorder}>
+          View suggestions <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
 

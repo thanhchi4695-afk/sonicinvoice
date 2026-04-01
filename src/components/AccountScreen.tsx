@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus } from "lucide-react";
+import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell } from "lucide-react";
 import { getCollectionRules, saveCollectionRules, resetCollectionRules, type CollectionRule } from "@/lib/collection-engine";
 import {
   saveConnection, testConnection, getConnection, deleteConnection,
@@ -12,6 +12,8 @@ import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType, typ
 import { SEO_TITLE_PRESETS, getCtaPhrases, saveCtaPhrases, generateSeoTitle, generateSeoDescription } from "@/lib/seo-engine";
 import { CURRENCIES, LOCALES } from "@/lib/i18n";
 import { useStoreMode } from "@/hooks/use-store-mode";
+import { loadPreferences, savePreferences, type NotificationPreferences } from "@/hooks/use-notifications";
+import { Switch } from "@/components/ui/switch";
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");
@@ -313,6 +315,9 @@ const AccountScreen = () => {
 
       {/* Default AI Instructions */}
       <DefaultInstructionsSection />
+
+      {/* Notification Preferences */}
+      <NotificationPrefsSection />
 
       <Button variant="teal" className="w-full mt-4 h-12 text-base">Save settings</Button>
 
@@ -642,6 +647,77 @@ function CollectionManagerSection() {
           <Plus className="w-3 h-3 mr-1" /> Add collection
         </Button>
         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleReset}>Reset to defaults</Button>
+      </div>
+    </Section>
+  );
+}
+
+// ── Notification Preferences Section ───────────────────────
+function NotificationPrefsSection() {
+  const [prefs, setPrefs] = useState<NotificationPreferences>(loadPreferences);
+
+  const update = (patch: Partial<NotificationPreferences>) => {
+    const updated = { ...prefs, ...patch };
+    setPrefs(updated);
+    savePreferences(updated);
+  };
+
+  const toggles: { key: keyof NotificationPreferences; label: string }[] = [
+    { key: "priceIncreases", label: "Large price increases (>threshold)" },
+    { key: "overdueDeliveries", label: "Overdue brand deliveries" },
+    { key: "lowStock", label: "Low stock warnings" },
+    { key: "duplicateInvoices", label: "Duplicate invoice detections" },
+    { key: "processingComplete", label: "Invoice processing complete" },
+    { key: "exportComplete", label: "Export complete" },
+    { key: "everyLogin", label: "Every login (noisy)" },
+  ];
+
+  return (
+    <Section title="🔔 Notifications">
+      <p className="text-xs text-muted-foreground -mt-1 mb-2">Choose which notifications you receive.</p>
+      <div className="space-y-2">
+        {toggles.map(({ key, label }) => (
+          <div key={key} className="flex items-center justify-between">
+            <span className="text-xs text-foreground">{label}</span>
+            <Switch
+              checked={!!prefs[key]}
+              onCheckedChange={(v) => update({ [key]: v })}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Price increase threshold (%)</label>
+          <select
+            value={prefs.priceThreshold}
+            onChange={(e) => update({ priceThreshold: Number(e.target.value) })}
+            className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm text-foreground"
+          >
+            {[3, 5, 10, 15, 20].map(v => <option key={v} value={v}>{v}%</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Low stock threshold (units)</label>
+          <select
+            value={prefs.lowStockThreshold}
+            onChange={(e) => update({ lowStockThreshold: Number(e.target.value) })}
+            className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm text-foreground"
+          >
+            {[1, 2, 3, 5, 10].map(v => <option key={v} value={v}>{v} units</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Overdue delivery threshold</label>
+          <select
+            value={prefs.overdueWeeks}
+            onChange={(e) => update({ overdueWeeks: Number(e.target.value) })}
+            className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm text-foreground"
+          >
+            {[1, 2, 3, 4].map(v => <option key={v} value={v}>{v} week{v > 1 ? "s" : ""}</option>)}
+          </select>
+        </div>
       </div>
     </Section>
   );

@@ -14,7 +14,9 @@ import PriceLookup from "@/components/PriceLookup";
 import LightspeedGuide from "@/components/LightspeedGuide";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
 import QuickCapture from "@/components/QuickCapture";
+import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";
+import { useNotifications } from "@/hooks/use-notifications";
 
 const Index = () => {
   const [authed, setAuthed] = useState(false);
@@ -23,6 +25,7 @@ const Index = () => {
   const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
+  const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
 
   if (!authed) {
     return <AuthScreen onAuth={() => setAuthed(true)} />;
@@ -54,8 +57,21 @@ const Index = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Mode badge top bar */}
-      <div className="flex items-center justify-end px-4 pt-3 pb-0">
+      {/* Top bar */}
+      <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
+        <NotificationBell
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkRead={markRead}
+          onMarkAllRead={markAllRead}
+          onNavigate={(link) => {
+            if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
+              setActiveFlow(link as any);
+            } else {
+              setActiveTab(link);
+            }
+          }}
+        />
         <button
           onClick={() => setActiveTab("account")}
           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${mode.modeBadge.color}`}

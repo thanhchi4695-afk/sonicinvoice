@@ -3,6 +3,7 @@ import { ChevronLeft, Download, TrendingUp, Package, Users, DollarSign, BarChart
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getStoreConfig } from "@/lib/prompt-builder";
+import { getCostHistory } from "@/components/InvoiceFlow";
 
 // ── Types ──────────────────────────────────────────────────
 interface InvoiceRecord {

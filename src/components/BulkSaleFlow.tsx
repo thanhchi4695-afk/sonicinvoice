@@ -212,6 +212,18 @@ const BulkSaleFlow = ({ onBack, onNavigateToGoogleFeed }: BulkSaleFlowProps) => 
     a.click();
     URL.revokeObjectURL(url);
     setDownloaded(true);
+
+    // Save sale metadata for promotions feed
+    if (direction === 'apply') {
+      saveSaleMeta({
+        appliedAt: new Date().toISOString(),
+        pct: discountValue,
+        tags: selectedTags,
+        handles: selectedProducts.map(p => p.handle),
+        direction,
+        discountType,
+      });
+    }
   }, [parsed, selectedProducts, direction, discountType, discountValue, rounding, priceFloor, tagOpts, selectedTags]);
 
   // Copy CSV

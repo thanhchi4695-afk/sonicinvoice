@@ -1037,6 +1037,25 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
                 </div>
               ) : null;
             })()}
+            {/* Cost change badge */}
+            {product.costChange && product.costChange.changePct !== 0 && (
+              <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                product.costChange.changePct > 5 ? "bg-destructive/15 text-destructive" :
+                product.costChange.changePct > 0 ? "bg-warning/15 text-warning" :
+                "bg-success/15 text-success"
+              }`}>
+                {product.costChange.changePct > 0 ? "↑" : "↓"} {product.costChange.changePct > 0 ? "+" : ""}{product.costChange.changePct.toFixed(1)}% vs last order
+              </span>
+            )}
+            {product.isNew && !product.costChange && (
+              <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] bg-muted text-muted-foreground">New — no price history</span>
+            )}
+            {/* Margin indicator */}
+            {margin !== null && (
+              <span className={`inline-block mt-0.5 text-[9px] ${margin < 25 ? "text-destructive" : margin < 40 ? "text-warning" : "text-muted-foreground"}`}>
+                {margin < 25 && "⚠ "}Margin: {margin.toFixed(0)}%
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />

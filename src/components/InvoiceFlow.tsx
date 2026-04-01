@@ -176,6 +176,23 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [savedTemplate, setSavedTemplate] = useState(false);
 
+  // Processing timer state
+  const [processStartTime, setProcessStartTime] = useState<number | null>(null);
+  const [processingElapsed, setProcessingElapsed] = useState(0);
+  const [processingDone, setProcessingDone] = useState(false);
+  const [finalProcessingTime, setFinalProcessingTime] = useState(0);
+  const [showSpeedTips, setShowSpeedTips] = useState(false);
+
+  // Timer tick
+  useEffect(() => {
+    if (processStartTime && !processingDone) {
+      const interval = setInterval(() => {
+        setProcessingElapsed(Math.floor((Date.now() - processStartTime) / 1000));
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [processStartTime, processingDone]);
+
   // Check for template match when supplier changes
   useEffect(() => {
     if (supplierName.trim()) {

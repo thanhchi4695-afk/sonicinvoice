@@ -739,8 +739,7 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
     </div>
   );
 }
-
-
+const ToolsScreen = () => {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");
 

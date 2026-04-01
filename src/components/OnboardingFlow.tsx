@@ -131,6 +131,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
       currency,
       locale: locale as any,
       industry: selectedIndustry || "general",
+      storeType: (selectedPos as any) || "shopify",
     });
     localStorage.setItem("onboarding_complete", "true");
     onComplete();

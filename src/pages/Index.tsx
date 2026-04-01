@@ -9,11 +9,12 @@ import InvoiceFlow from "@/components/InvoiceFlow";
 import BulkSaleFlow from "@/components/BulkSaleFlow";
 import RestockAnalytics from "@/components/RestockAnalytics";
 import PriceAdjustmentPanel from "@/components/PriceAdjustmentPanel";
+import PriceLookup from "@/components/PriceLookup";
 
 const Index = () => {
   const [authed, setAuthed] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | null>(null);
 
   if (!authed) {
     return <AuthScreen onAuth={() => setAuthed(true)} />;

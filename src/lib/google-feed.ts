@@ -162,7 +162,8 @@ export function generateGoogleFeedXML(products: GoogleFeedProduct[], storeName?:
       <g:link>${escXml(item.link)}</g:link>
       <g:image_link>${escXml(item.image_link)}</g:image_link>
       <g:price>${escXml(item.price)}</g:price>${item.sale_price ? `
-      <g:sale_price>${escXml(item.sale_price)}</g:sale_price>` : ''}
+      <g:sale_price>${escXml(item.sale_price)}</g:sale_price>` : ''}${item.sale_price_effective_date ? `
+      <g:sale_price_effective_date>${escXml(item.sale_price_effective_date)}</g:sale_price_effective_date>` : ''}
       <g:availability>${item.availability}</g:availability>
       <g:condition>${item.condition}</g:condition>
       <g:brand>${escXml(item.brand)}</g:brand>${item.gtin ? `

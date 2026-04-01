@@ -312,19 +312,26 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
       {/* Step 4: Download */}
       {step === 4 && (
-        <div className="flex flex-col items-center justify-center px-4 pt-20">
-          <div className="w-20 h-20 rounded-full bg-success/15 flex items-center justify-center mb-6">
-            <Check className="w-10 h-10 text-success" />
+        <div className="px-4 pt-8 pb-24">
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-20 h-20 rounded-full bg-success/15 flex items-center justify-center mb-6">
+              <Check className="w-10 h-10 text-success" />
+            </div>
+            <h3 className="text-xl font-bold font-display mb-2">Your file is ready</h3>
+            <p className="text-sm text-muted-foreground mb-6">{mockProducts.length} products, {mode.isLightspeed ? 'Lightspeed' : 'Shopify'}-ready format</p>
+            <Button variant="success" className="w-full max-w-xs h-14 text-base">
+              <Download className="w-5 h-5 mr-2" /> Download {mode.exportLabel}
+            </Button>
           </div>
-          <h3 className="text-xl font-bold font-display mb-2">Your file is ready</h3>
-          <p className="text-sm text-muted-foreground mb-8">{mockProducts.length} products, {mode.isLightspeed ? 'Lightspeed' : 'Shopify'}-ready format</p>
-          <Button variant="success" className="w-full max-w-xs h-14 text-base">
-            <Download className="w-5 h-5 mr-2" /> Download {mode.exportLabel}
-          </Button>
+
+          {/* Lightspeed Stock Order restock option */}
+          {mode.isLightspeed && (
+            <LightspeedRestockSection products={mockProducts} supplierName={supplierName} />
+          )}
 
           {/* Lightspeed sync rules reminder */}
           {mode.isLightspeed && (
-            <div className="w-full max-w-xs mt-6 bg-card border border-purple-500/20 rounded-lg p-4 text-left">
+            <div className="bg-card border border-purple-500/20 rounded-lg p-4 mt-4">
               <div className="flex items-center gap-2 mb-2">
                 <Monitor className="w-4 h-4 text-purple-400" />
                 <span className="text-xs font-semibold">After importing into Lightspeed</span>
@@ -337,7 +344,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
-          <button onClick={onBack} className="mt-6 text-sm text-primary font-medium">
+          <button onClick={onBack} className="w-full mt-6 text-sm text-primary font-medium text-center">
             Import another invoice
           </button>
         </div>

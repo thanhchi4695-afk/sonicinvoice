@@ -724,6 +724,26 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
             </pre>
           </div>
 
+          {/* Sale dates */}
+          <div className="bg-card rounded-lg border border-border p-4 mb-4">
+            <h3 className="text-sm font-semibold mb-2">Sale dates (optional)</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Sale starts</label>
+                <input type="date" value={saleStart} onChange={e => setSaleStart(e.target.value)}
+                  className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground" />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground block mb-1">Sale ends</label>
+                <input type="date" value={saleEnd} onChange={e => setSaleEnd(e.target.value)}
+                  className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground" />
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Leave blank to omit — Google will show the sale indefinitely until you update the feed.
+            </p>
+          </div>
+
           <div className="flex gap-3 mb-4">
             <Button variant="default" className="flex-1 h-11 gap-2" onClick={handleDownloadXML}>
               <Download className="w-4 h-4" /> Download feed (.xml)

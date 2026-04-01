@@ -304,12 +304,156 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     { applied: true, text: 'Custom AI instructions applied to all products' },
   ] : [];
 
-  const mockProducts = [
-    { name: "Bond Eye Mara One Piece - Black", sku: "BE10042", brand: "Bond Eye", type: "One Piece", price: 89.95, rrp: 219.95, status: "ready", metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" } },
-    { name: "Seafolly Collective Bikini Top - Navy", sku: "SF10023", brand: "Seafolly", type: "Bikini Tops", price: 45.00, rrp: 109.95, status: "ready", metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" } },
-    { name: "Baku Riviera High Waist Pant - Ivory", sku: "BK20015", brand: "Baku", type: "Bikini Bottoms", price: 38.00, rrp: 89.95, status: "review", metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" } },
-    { name: "Jantzen Retro Racerback - Coral", sku: "JA81520", brand: "Jantzen", type: "One Piece", price: 65.00, rrp: 159.95, status: "ready", metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" } },
-  ];
+  // ── Variant matrix types & data ──────────────────────────
+  interface VariantLine {
+    sku: string;
+    option1Name: string;
+    option1Value: string;
+    option2Name: string;
+    option2Value: string;
+    qty: number;
+    price: number;
+    rrp: number;
+  }
+
+  interface ProductGroup {
+    styleGroup: string;
+    name: string;
+    brand: string;
+    type: string;
+    price: number;
+    rrp: number;
+    status: string;
+    metafields: Record<string, string>;
+    variants: VariantLine[];
+    isGrouped: boolean;
+  }
+
+  const [productGroups, setProductGroups] = useState<ProductGroup[]>([
+    {
+      styleGroup: "Mara One Piece",
+      name: "Bond Eye Mara One Piece",
+      brand: "Bond Eye",
+      type: "One Piece",
+      price: 89.95,
+      rrp: 219.95,
+      status: "ready",
+      metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" },
+      isGrouped: true,
+      variants: [
+        { sku: "BE2204-BLK-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
+        { sku: "BE2204-BLK-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Black", qty: 3, price: 89.95, rrp: 219.95 },
+        { sku: "BE2204-BLK-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
+        { sku: "BE2204-NAV-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Navy", qty: 1, price: 89.95, rrp: 219.95 },
+        { sku: "BE2204-NAV-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Navy", qty: 3, price: 89.95, rrp: 219.95 },
+        { sku: "BE2204-NAV-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Navy", qty: 2, price: 89.95, rrp: 219.95 },
+      ],
+    },
+    {
+      styleGroup: null as any,
+      name: "Seafolly Collective Bikini Top - Navy",
+      brand: "Seafolly",
+      type: "Bikini Tops",
+      price: 45.00,
+      rrp: 109.95,
+      status: "ready",
+      metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" },
+      isGrouped: false,
+      variants: [{ sku: "SF10023", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 6, price: 45.00, rrp: 109.95 }],
+    },
+    {
+      styleGroup: null as any,
+      name: "Baku Riviera High Waist Pant - Ivory",
+      brand: "Baku",
+      type: "Bikini Bottoms",
+      price: 38.00,
+      rrp: 89.95,
+      status: "review",
+      metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" },
+      isGrouped: false,
+      variants: [{ sku: "BK20015", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 4, price: 38.00, rrp: 89.95 }],
+    },
+    {
+      styleGroup: "Retro Racerback",
+      name: "Jantzen Retro Racerback",
+      brand: "Jantzen",
+      type: "One Piece",
+      price: 65.00,
+      rrp: 159.95,
+      status: "ready",
+      metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" },
+      isGrouped: true,
+      variants: [
+        { sku: "JA81520-COR-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
+        { sku: "JA81520-COR-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Coral", qty: 3, price: 65.00, rrp: 159.95 },
+        { sku: "JA81520-COR-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
+      ],
+    },
+  ]);
+
+  // Flatten for backward-compat with cost tracking etc.
+  const mockProducts = productGroups.map(g => ({
+    name: g.name,
+    sku: g.variants[0]?.sku || "",
+    brand: g.brand,
+    type: g.type,
+    price: g.price,
+    rrp: g.rrp,
+    status: g.status,
+    metafields: g.metafields,
+  }));
+
+  const totalVariantLines = productGroups.reduce((s, g) => s + g.variants.length, 0);
+  const groupedCount = productGroups.filter(g => g.isGrouped).length;
+  const standaloneCount = productGroups.filter(g => !g.isGrouped).length;
+  const totalQty = productGroups.reduce((s, g) => s + g.variants.reduce((v, l) => v + l.qty, 0), 0);
+
+  // Split / ungroup a grouped product into individual rows
+  const handleSplitGroup = (idx: number) => {
+    const group = productGroups[idx];
+    if (!group.isGrouped) return;
+    const newProducts: ProductGroup[] = group.variants.map(v => ({
+      styleGroup: null as any,
+      name: `${group.name} - ${v.option2Value || v.option1Value}`,
+      brand: group.brand,
+      type: group.type,
+      price: v.price,
+      rrp: v.rrp,
+      status: group.status,
+      metafields: { ...group.metafields },
+      isGrouped: false,
+      variants: [v],
+    }));
+    setProductGroups(prev => [...prev.slice(0, idx), ...newProducts, ...prev.slice(idx + 1)]);
+  };
+
+  // Merge selected standalone rows into a group
+  const [mergeSelection, setMergeSelection] = useState<number[]>([]);
+  const [showMergeForm, setShowMergeForm] = useState(false);
+  const [mergeOpt1, setMergeOpt1] = useState("Size");
+  const [mergeOpt2, setMergeOpt2] = useState("Colour");
+
+  const handleMergeSelected = () => {
+    if (mergeSelection.length < 2) return;
+    const selected = mergeSelection.map(i => productGroups[i]).filter(Boolean);
+    const base = selected[0];
+    const merged: ProductGroup = {
+      styleGroup: base.name.replace(/\s*-\s*(Black|Navy|Ivory|Coral|White|Red|Blue|Green|Pink|S|M|L|XL|8|10|12|14|16).*$/i, "").trim(),
+      name: base.name.replace(/\s*-\s*(Black|Navy|Ivory|Coral|White|Red|Blue|Green|Pink|S|M|L|XL|8|10|12|14|16).*$/i, "").trim(),
+      brand: base.brand,
+      type: base.type,
+      price: base.price,
+      rrp: base.rrp,
+      status: base.status,
+      metafields: { ...base.metafields },
+      isGrouped: true,
+      variants: selected.flatMap(s => s.variants),
+    };
+    const remaining = productGroups.filter((_, i) => !mergeSelection.includes(i));
+    setProductGroups([...remaining, merged]);
+    setMergeSelection([]);
+    setShowMergeForm(false);
+  };
 
   // ── Cost history tracking ────────────────────────────────
   const costHistory = getCostHistory();

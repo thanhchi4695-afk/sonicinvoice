@@ -2,6 +2,7 @@
 
 // ── Store Config ───────────────────────────────────────────
 export type StoreType = 'shopify' | 'lightspeed_shopify' | 'lightspeed' | 'other';
+export type LightspeedVersion = 'x_series' | 'r_series';
 
 export interface StoreConfig {
   name: string;
@@ -13,6 +14,7 @@ export interface StoreConfig {
   locale: string;
   industry: string;
   storeType: StoreType;
+  lightspeedVersion: LightspeedVersion;
   seoTitleTemplate: string;
   seoDescriptionTemplate: string;
   enrichmentSources: string[];
@@ -61,6 +63,7 @@ const DEFAULT_STORE: StoreConfig = {
   locale: 'AU',
   industry: 'general',
   storeType: 'shopify',
+  lightspeedVersion: 'x_series',
   seoTitleTemplate: '{product} | {brand} | {store_name}',
   seoDescriptionTemplate: 'Shop {product} by {brand} at {store_name}. Free shipping on orders over $100.',
   enrichmentSources: [],

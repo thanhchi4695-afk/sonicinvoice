@@ -324,6 +324,22 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </Button>
           </div>
 
+          {/* R-Series import note */}
+          {mode.isRSeries && (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 mt-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <div className="text-xs space-y-2">
+                  <p className="font-semibold text-amber-300">R-Series Import Note</p>
+                  <p className="text-muted-foreground">For large imports (100+ products), Lightspeed recommends submitting to their Retail Imports Team. Allow 3–5 business days for processing.</p>
+                  <p className="text-muted-foreground">For small imports (&lt;100 products): go to Inventory → Import Items → New Import in R-Series. Select "Create new items only".</p>
+                  <p className="text-amber-400 font-medium">⚠ The System ID column must be BLANK for new products. Never enter a number in the System ID column.</p>
+                  <p className="text-muted-foreground">⚠ QOH (Quantity on Hand) ADDS to existing inventory — it does not replace it.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Lightspeed Stock Order restock option */}
           {mode.isLightspeed && (
             <LightspeedRestockSection products={mockProducts} supplierName={supplierName} />

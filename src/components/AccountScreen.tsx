@@ -7,7 +7,7 @@ import {
   getLocations, updateConnectionSettings, ShopifyConnection,
 } from "@/lib/shopify-api";
 import { getApiKeys, saveApiKeys, getCacheStats, clearCache, type PriceApiKeys } from "@/lib/price-intelligence";
-import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType } from "@/lib/prompt-builder";
+import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType, type LightspeedVersion } from "@/lib/prompt-builder";
 import { SEO_TITLE_PRESETS, getCtaPhrases, saveCtaPhrases, generateSeoTitle, generateSeoDescription } from "@/lib/seo-engine";
 import { CURRENCIES, LOCALES } from "@/lib/i18n";
 import { useStoreMode } from "@/hooks/use-store-mode";
@@ -16,6 +16,7 @@ const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");
   const [currency, setCurrency] = useState("AUD");
   const [storeType, setStoreType] = useState<StoreType>("shopify");
+  const [lsVersion, setLsVersion] = useState<LightspeedVersion>("x_series");
   const [markup, setMarkup] = useState("2.35");
   const [rounding, setRounding] = useState("nearest_05");
 
@@ -39,6 +40,7 @@ const AccountScreen = () => {
     setStoreName(cfg.name || '');
     setCurrency(cfg.currency || 'AUD');
     setStoreType(cfg.storeType || 'shopify');
+    setLsVersion(cfg.lightspeedVersion || 'x_series');
 
     getConnection().then((conn) => {
       if (conn) {
@@ -131,6 +133,14 @@ const AccountScreen = () => {
             { v: "other", l: "📦 Other / Not sure" },
           ]}
         />
+        {(storeType === 'lightspeed' || storeType === 'lightspeed_shopify') && (
+          <SelectField label="Lightspeed version" value={lsVersion} onChange={(v) => { setLsVersion(v as LightspeedVersion); saveStoreConfig({ lightspeedVersion: v as LightspeedVersion }); }}
+            options={[
+              { v: "x_series", l: "X-Series (current)" },
+              { v: "r_series", l: "R-Series (legacy)" },
+            ]}
+          />
+        )}
       </Section>
 
       {/* Pricing Rules */}

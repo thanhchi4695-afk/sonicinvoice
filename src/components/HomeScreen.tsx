@@ -10,7 +10,7 @@ interface HomeScreenProps {
   onStartOrderForm: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [

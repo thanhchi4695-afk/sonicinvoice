@@ -12,6 +12,8 @@ import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType, typ
 import { SEO_TITLE_PRESETS, getCtaPhrases, saveCtaPhrases, generateSeoTitle, generateSeoDescription } from "@/lib/seo-engine";
 import { CURRENCIES, LOCALES } from "@/lib/i18n";
 import { useStoreMode } from "@/hooks/use-store-mode";
+import { loadPreferences, savePreferences, type NotificationPreferences } from "@/hooks/use-notifications";
+import { Switch } from "@/components/ui/switch";
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");

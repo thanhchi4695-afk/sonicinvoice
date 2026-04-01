@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AuthScreen from "@/components/AuthScreen";
+import OnboardingFlow from "@/components/OnboardingFlow";
 import BottomTabBar from "@/components/BottomTabBar";
 import HomeScreen from "@/components/HomeScreen";
 import HistoryScreen from "@/components/HistoryScreen";
@@ -13,11 +14,16 @@ import PriceLookup from "@/components/PriceLookup";
 
 const Index = () => {
   const [authed, setAuthed] = useState(false);
+  const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
   const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | null>(null);
 
   if (!authed) {
     return <AuthScreen onAuth={() => setAuthed(true)} />;
+  }
+
+  if (!onboarded) {
+    return <OnboardingFlow onComplete={() => setOnboarded(true)} />;
   }
 
   if (activeFlow === "invoice") {

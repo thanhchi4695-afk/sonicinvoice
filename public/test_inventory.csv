@@ -1,0 +1,13 @@
+Handle,Title,Vendor,Type,Option1 Name,Option1 Value,Option2 Name,Option2 Value,Variant SKU,Variant Inventory Qty,Variant Price,Cost per item,Status
+mara-one-piece-black,Mara One Piece - Black,Bond Eye,One Piece,Size,8,Colour,Black,BE2204-8,0,180.00,58.00,active
+mara-one-piece-black,,,,Size,10,Colour,Black,BE2204-10,4,180.00,58.00,active
+mara-one-piece-black,,,,Size,12,Colour,Black,BE2204-12,3,180.00,58.00,active
+mara-one-piece-black,,,,Size,14,Colour,Black,BE2204-14,2,180.00,58.00,active
+sahara-kaftan,Sahara Kaftan - Khaki,Jantzen,Kaftan,Size,S,Colour,Khaki,JA82001-S,0,120.00,42.00,active
+sahara-kaftan,,,,Size,M,Colour,Khaki,JA82001-M,0,120.00,42.00,active
+sahara-kaftan,,,,Size,L,Colour,Khaki,JA82001-L,5,120.00,42.00,active
+sahara-kaftan,,,,Size,XL,Colour,Khaki,JA82001-XL,4,120.00,42.00,active
+mira-one-piece,Mira One Piece - Black,Seafolly,One Piece,Size,8,Colour,Black,SF001-8,0,160.00,50.00,active
+mira-one-piece,,,,Size,10,Colour,Black,SF001-10,0,160.00,50.00,active
+mira-one-piece,,,,Size,12,Colour,Black,SF001-12,0,160.00,50.00,active
+mira-one-piece,,,,Size,14,Colour,Black,SF001-14,0,160.00,50.00,active

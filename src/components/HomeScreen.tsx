@@ -1,10 +1,11 @@
-import { FilePlus, Percent, ChevronRight, BarChart3 } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface HomeScreenProps {
   onStartInvoice: () => void;
   onStartSale: () => void;
   onStartRestock: () => void;
+  onStartPriceAdjust: () => void;
 }
 
 const recentActivity = [
@@ -12,7 +13,7 @@ const recentActivity = [
   { type: "sale" as const, label: "Baku 30% off", count: 48, time: "5 days ago" },
 ];
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust }: HomeScreenProps) => {
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
       <h1 className="text-2xl font-bold font-display mb-1">SkuPilot</h1>
@@ -52,6 +53,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock }: HomeScreenP
           </div>
         </div>
         <Button variant="amber" className="w-full mt-4 h-12 text-base" onClick={onStartSale}>
+          Start <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Price Adjustment Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-success/15 flex items-center justify-center shrink-0">
+            <DollarSign className="w-5 h-5 text-success" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Price adjustment</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Apply bulk discounts, markups, or exact pricing to products. AI-powered or manual.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">% discount · markup · exact price · rounding</p>
+          </div>
+        </div>
+        <Button variant="success" className="w-full mt-4 h-12 text-base" onClick={onStartPriceAdjust}>
           Start <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>

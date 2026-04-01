@@ -292,3 +292,92 @@ const SelectField = ({ label, value, onChange, options }: {
 );
 
 export default AccountScreen;
+
+// ── API Keys Section ───────────────────────────────────────
+const apiProviders = [
+  { key: 'barcodeLookup' as const, name: 'Barcode Lookup API', site: 'barcodelookup.com/api', url: 'https://www.barcodelookup.com/api', desc: 'Barcode → structured retail prices' },
+  { key: 'serpApi' as const, name: 'SerpApi — Google Shopping', site: 'serpapi.com', url: 'https://serpapi.com/', desc: 'Real-time AU Google Shopping prices' },
+  { key: 'goUpc' as const, name: 'Go-UPC Barcode Database', site: 'go-upc.com', url: 'https://go-upc.com/api', desc: '1B+ product barcode database' },
+];
+
+function ApiKeysSection() {
+  const [keys, setKeys] = useState<PriceApiKeys>(getApiKeys());
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const cacheStats = getCacheStats();
+
+  const updateKey = (provider: keyof PriceApiKeys, value: string) => {
+    const updated = { ...keys, [provider]: value };
+    setKeys(updated);
+    saveApiKeys(updated);
+  };
+
+  const hasAny = !!(keys.barcodeLookup || keys.serpApi || keys.goUpc);
+
+  return (
+    <Section title="🔑 Price intelligence API keys">
+      <p className="text-xs text-muted-foreground -mt-1 mb-2">
+        Connect external APIs for more accurate price matching. Keys are stored locally in your browser only.
+      </p>
+
+      {!hasAny && (
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-2">
+          <p className="text-xs text-primary">💡 No price APIs connected. The app uses Claude AI web search as fallback. Add APIs above for faster, more accurate prices.</p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {apiProviders.map((p) => {
+          const val = keys[p.key] || '';
+          const show = showKeys[p.key] || false;
+          const connected = !!val;
+          return (
+            <div key={p.key} className="bg-muted/50 rounded-lg p-3 border border-border">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium">{p.name}</span>
+                <span className={`text-xs font-medium ${connected ? 'text-success' : 'text-muted-foreground'}`}>
+                  {connected ? '🟢 Connected' : '🔴 Not connected'}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">{p.desc}</p>
+              <div className="relative">
+                <input
+                  type={show ? 'text' : 'password'}
+                  value={val}
+                  onChange={e => updateKey(p.key, e.target.value)}
+                  placeholder="Paste API key"
+                  className="w-full h-9 rounded-md bg-input border border-border px-3 pr-16 text-xs font-mono-data"
+                />
+                <div className="absolute right-1 top-1/2 -translate-y-1/2 flex gap-1">
+                  <button onClick={() => setShowKeys(s => ({ ...s, [p.key]: !show }))} className="text-muted-foreground p-1">
+                    {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                  {connected && (
+                    <button onClick={() => updateKey(p.key, '')} className="text-destructive p-1">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <a href={p.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary mt-1.5 inline-block">
+                Get API key →
+              </a>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Cache stats */}
+      <div className="bg-muted/50 rounded-lg p-3 border border-border mt-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium">Price cache</p>
+            <p className="text-xs text-muted-foreground">{cacheStats.validCount} products cached</p>
+          </div>
+          <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { clearCache(); window.location.reload(); }}>
+            <Trash2 className="w-3 h-3 mr-1" /> Clear cache
+          </Button>
+        </div>
+      </div>
+    </Section>
+  );
+}

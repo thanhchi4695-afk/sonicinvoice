@@ -16,6 +16,7 @@ import LightspeedGuide from "@/components/LightspeedGuide";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
 import QuickCapture from "@/components/QuickCapture";
 import OrderFormFlow from "@/components/OrderFormFlow";
+import PurchaseOrderPanel from "@/components/PurchaseOrderPanel";
 import SeasonManager from "@/components/SeasonManager";
 import ReorderPanel from "@/components/ReorderPanel";
 import SupplierPanel from "@/components/SupplierPanel";

@@ -308,6 +308,9 @@ const AccountScreen = () => {
       {/* SEO Templates */}
       <SeoTemplateSection />
 
+      {/* Collections */}
+      <CollectionManagerSection />
+
       {/* Default AI Instructions */}
       <DefaultInstructionsSection />
 

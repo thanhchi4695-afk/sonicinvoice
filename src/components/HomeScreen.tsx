@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
 import { getStockUpdatesCount } from "@/lib/inventory-sim";
 import { getTotalCatalogProducts } from "@/lib/catalog-memory";
+import { getUnprocessedInboxCount } from "@/components/EmailInboxPanel";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";
 

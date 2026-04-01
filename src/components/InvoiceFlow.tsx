@@ -377,7 +377,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
             <div className="text-center">
               <p className="text-sm font-medium">Tap to upload invoice</p>
-              <p className="text-xs text-muted-foreground mt-1">PDF · Excel · CSV · Word · Photo</p>
+              <p className="text-xs text-muted-foreground mt-1">PDF · Excel · CSV · Word · JPG · PNG</p>
+              <p className="text-[11px] text-muted-foreground/70 mt-0.5">📷 Drop a photo of your invoice — AI will read it automatically</p>
             </div>
           </button>
 

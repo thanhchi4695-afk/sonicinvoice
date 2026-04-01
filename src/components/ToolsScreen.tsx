@@ -646,6 +646,7 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
   const [copied, setCopied] = useState(false);
   const [saleStart, setSaleStart] = useState('');
   const [saleEnd, setSaleEnd] = useState('');
+  const [marginFloor, setMarginFloorState] = useState(getMarginFloor);
 
   const getSaleDateStr = () => {
     if (!saleStart || !saleEnd) return '';

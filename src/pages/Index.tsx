@@ -93,6 +93,10 @@ const Index = () => {
     return <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />;
   }
 
+  if (activeFlow === "catalog_memory") {
+    return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
+  }
+
   return (
     <div className="min-h-screen">
       {/* Top bar */}

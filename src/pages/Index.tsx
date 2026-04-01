@@ -8,11 +8,12 @@ import AccountScreen from "@/components/AccountScreen";
 import InvoiceFlow from "@/components/InvoiceFlow";
 import BulkSaleFlow from "@/components/BulkSaleFlow";
 import RestockAnalytics from "@/components/RestockAnalytics";
+import PriceAdjustmentPanel from "@/components/PriceAdjustmentPanel";
 
 const Index = () => {
   const [authed, setAuthed] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | null>(null);
 
   if (!authed) {
     return <AuthScreen onAuth={() => setAuthed(true)} />;
@@ -30,6 +31,10 @@ const Index = () => {
     return <RestockAnalytics onBack={() => setActiveFlow(null)} />;
   }
 
+  if (activeFlow === "price_adjust") {
+    return <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />;
+  }
+
   return (
     <div className="min-h-screen">
       {activeTab === "home" && (
@@ -37,6 +42,7 @@ const Index = () => {
           onStartInvoice={() => setActiveFlow("invoice")}
           onStartSale={() => setActiveFlow("sale")}
           onStartRestock={() => setActiveFlow("restock")}
+          onStartPriceAdjust={() => setActiveFlow("price_adjust")}
         />
       )}
       {activeTab === "history" && <HistoryScreen />}

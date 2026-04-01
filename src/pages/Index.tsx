@@ -3,6 +3,7 @@ import AuthScreen from "@/components/AuthScreen";
 import { addAuditEntry } from "@/lib/audit-log";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import BottomTabBar from "@/components/BottomTabBar";
+import EmbeddedNav from "@/components/EmbeddedNav";
 import HomeScreen from "@/components/HomeScreen";
 import HistoryScreen from "@/components/HistoryScreen";
 import ToolsScreen from "@/components/ToolsScreen";
@@ -27,6 +28,7 @@ import EmailInboxPanel from "@/components/EmailInboxPanel";
 import NotificationBell from "@/components/NotificationBell";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
+import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
 
 const Index = () => {
   const [authed, setAuthed] = useState(true);

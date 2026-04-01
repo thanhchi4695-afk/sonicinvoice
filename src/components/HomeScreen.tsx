@@ -19,6 +19,7 @@ interface HomeScreenProps {
   onOpenAuditLog?: () => void;
   onStartPurchaseOrders?: () => void;
   onStartCatalogMemory?: () => void;
+  onStartEmailInbox?: () => void;
 }
 
 const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory }: HomeScreenProps) => {

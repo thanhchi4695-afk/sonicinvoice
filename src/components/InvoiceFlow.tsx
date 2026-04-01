@@ -1077,6 +1077,22 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
+          {/* Mode tabs */}
+          <div className="flex gap-1 mb-4 bg-muted/50 rounded-lg p-1">
+            <button
+              onClick={() => setReviewTab("new")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-medium transition-colors ${reviewTab === "new" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+            >
+              <PackagePlus className="w-3.5 h-3.5" /> 🆕 New products ({newProductGroups.length})
+            </button>
+            <button
+              onClick={() => setReviewTab("update")}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-medium transition-colors ${reviewTab === "update" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+            >
+              <Package className="w-3.5 h-3.5" /> 📦 Update stock ({updateProductGroups.length})
+            </button>
+          </div>
+
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-medium">{productGroups.length} products found</p>

@@ -390,6 +390,121 @@ function ApiKeysSection() {
   );
 }
 
+// ── SEO Template Section ───────────────────────────────────
+function SeoTemplateSection() {
+  const store = getStoreConfig();
+  const industry = getIndustryConfig(store.industry);
+  const [titleTemplate, setTitleTemplate] = useState(store.seoTitleTemplate || '{product} | {brand} | {store}');
+  const [descTemplate, setDescTemplate] = useState(store.seoDescriptionTemplate || '');
+  const [ctaPhrases, setCtaPhrasesState] = useState<string[]>(() => getCtaPhrases(store.industry));
+  const [newCta, setNewCta] = useState('');
+
+  // Live preview with sample product
+  const sampleTitle = generateSeoTitle(
+    { title: 'Sample Product', brand: 'Sample Brand', type: industry.defaultType },
+    { ...store, seoTitleTemplate: titleTemplate, seoDescriptionTemplate: descTemplate },
+  );
+  const sampleDesc = generateSeoDescription(
+    { title: 'Sample Product', brand: 'Sample Brand', type: industry.defaultType },
+    { ...store, seoTitleTemplate: titleTemplate, seoDescriptionTemplate: descTemplate },
+    0,
+  );
+
+  const handleSave = () => {
+    saveStoreConfig({ seoTitleTemplate: titleTemplate, seoDescriptionTemplate: descTemplate || undefined });
+    saveCtaPhrases(ctaPhrases);
+  };
+
+  const addCta = () => {
+    if (newCta.trim()) {
+      const updated = [...ctaPhrases, newCta.trim()];
+      setCtaPhrasesState(updated);
+      setNewCta('');
+    }
+  };
+
+  const removeCta = (idx: number) => {
+    setCtaPhrasesState(ctaPhrases.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <Section title="🔍 SEO templates">
+      <p className="text-xs text-muted-foreground -mt-1 mb-2">
+        Configure how SEO titles and descriptions are generated for all products.
+      </p>
+
+      {/* Title template */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">SEO title template</label>
+        <input
+          value={titleTemplate}
+          onChange={e => setTitleTemplate(e.target.value)}
+          placeholder="{product} | {brand} | {store}"
+          className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm font-mono-data"
+        />
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-xs text-muted-foreground">Variables: {'{product}'} {'{brand}'} {'{type}'} {'{store}'} {'{city}'}</p>
+          <p className={`text-xs font-mono ${sampleTitle.length > 70 ? 'text-destructive' : 'text-success'}`}>{sampleTitle.length}/70</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {SEO_TITLE_PRESETS.map(p => (
+            <button key={p.label} onClick={() => setTitleTemplate(p.template)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${titleTemplate === p.template ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted text-muted-foreground border-border'}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Description template */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">SEO description template</label>
+        <textarea
+          value={descTemplate}
+          onChange={e => setDescTemplate(e.target.value)}
+          rows={2}
+          placeholder={`{product} by {brand}. {features}{cta} at {store}.`}
+          className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm font-mono-data resize-none"
+        />
+        <div className="flex items-center justify-between mt-1">
+          <p className="text-xs text-muted-foreground">+ {'{features}'} {'{cta}'} {'{threshold}'}</p>
+          <p className={`text-xs font-mono ${sampleDesc.length > 160 ? 'text-destructive' : 'text-success'}`}>{sampleDesc.length}/160</p>
+        </div>
+      </div>
+
+      {/* Google preview */}
+      <div className="bg-background rounded-lg border border-border p-3">
+        <p className="text-xs text-muted-foreground mb-1.5 font-medium">Google preview</p>
+        <p className="text-primary text-sm leading-snug truncate" style={{ fontFamily: 'Arial, sans-serif' }}>{sampleTitle}</p>
+        <p className="text-success text-xs mt-0.5" style={{ fontFamily: 'Arial, sans-serif' }}>{store.url || 'yourstore.com'} › products</p>
+        <p className="text-muted-foreground text-xs mt-1 leading-relaxed line-clamp-2" style={{ fontFamily: 'Arial, sans-serif' }}>{sampleDesc}</p>
+      </div>
+
+      {/* CTA phrases */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">CTA phrases (rotated per product)</label>
+        <div className="space-y-1.5">
+          {ctaPhrases.map((cta, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="flex-1 text-xs bg-muted rounded-md px-2.5 py-1.5 font-mono-data">{cta}</span>
+              <button onClick={() => removeCta(i)} className="text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-2">
+          <input value={newCta} onChange={e => setNewCta(e.target.value)} placeholder="New CTA phrase..."
+            className="flex-1 h-8 rounded-md bg-input border border-border px-2.5 text-xs" onKeyDown={e => e.key === 'Enter' && addCta()} />
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={addCta}>Add</Button>
+        </div>
+      </div>
+
+      <Button variant="outline" size="sm" className="w-full h-8 text-xs" onClick={handleSave}>
+        <Save className="w-3 h-3 mr-1" /> Save SEO settings
+      </Button>
+    </Section>
+  );
+}
+
 // ── Default AI Instructions Section ────────────────────────
 const DEFAULT_INSTRUCTIONS_KEY = 'default_ai_instructions_skupilot';
 

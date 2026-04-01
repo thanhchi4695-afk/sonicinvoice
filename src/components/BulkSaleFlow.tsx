@@ -17,6 +17,7 @@ import {
 
 interface BulkSaleFlowProps {
   onBack: () => void;
+  onNavigateToGoogleFeed?: () => void;
 }
 
 interface SaleTemplate {

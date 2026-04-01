@@ -14,7 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      shopify_connections: {
+        Row: {
+          access_token: string
+          api_version: string
+          created_at: string
+          default_location_id: string | null
+          id: string
+          product_status: string
+          shop_name: string | null
+          store_url: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          api_version?: string
+          created_at?: string
+          default_location_id?: string | null
+          id?: string
+          product_status?: string
+          shop_name?: string | null
+          store_url: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          api_version?: string
+          created_at?: string
+          default_location_id?: string | null
+          id?: string
+          product_status?: string
+          shop_name?: string | null
+          store_url?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      shopify_push_history: {
+        Row: {
+          created_at: string
+          errors: number
+          id: string
+          products_created: number
+          products_updated: number
+          source: string | null
+          store_url: string
+          summary: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          errors?: number
+          id?: string
+          products_created?: number
+          products_updated?: number
+          source?: string | null
+          store_url: string
+          summary?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          errors?: number
+          id?: string
+          products_created?: number
+          products_updated?: number
+          source?: string | null
+          store_url?: string
+          summary?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

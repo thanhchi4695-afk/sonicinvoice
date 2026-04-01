@@ -573,7 +573,18 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               </div>
             </div>
           )}
-
+// Seed demo cost history on first load
+(function seedCostHistory() {
+  const h = getCostHistory();
+  if (Object.keys(h).length > 0) return;
+  const seed: CostHistoryMap = {
+    "BE10042": [{ date: "2026-01-15", cost: 85.00, supplier: "Bond Eye", invoice: "BE-1001" }],
+    "SF10023": [{ date: "2026-02-10", cost: 45.00, supplier: "Seafolly", invoice: "SF-1122" }],
+    "BK20015": [{ date: "2026-01-20", cost: 40.00, supplier: "Baku", invoice: "BK-501" }],
+    "JA81520": [{ date: "2026-01-15", cost: 61.20, supplier: "Jantzen", invoice: "JAN-2647" }],
+  };
+  saveCostHistory(seed);
+})();
 
           {showSpeedTips && (
             <div className="bg-muted/50 border border-border rounded-lg p-3 mb-3">

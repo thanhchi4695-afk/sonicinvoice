@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCou
 import { addAuditEntry } from "@/lib/audit-log";
 import { calculateConfidence, type ConfidenceBreakdown, type ConfidenceLevel, getConfidenceLabel } from "@/lib/confidence";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
+import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource } from "@/lib/barcode-catalog";
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -190,6 +191,22 @@ const CustomInstructionsField = ({
           className="w-full h-9 rounded-md bg-input border border-border px-3 text-xs mt-2" />
       )}
     </div>
+  );
+};
+
+// ── Match Source Badge ──────────────────────────────────────
+const MatchSourceBadge = ({ source, barcode }: { source: MatchSource; barcode?: string }) => {
+  const config: Record<MatchSource, { icon: string; label: string; cls: string }> = {
+    barcode: { icon: "🔵", label: "Barcode match", cls: "bg-primary/15 text-primary border-primary/20" },
+    sku: { icon: "🟢", label: "SKU match", cls: "bg-success/15 text-success border-success/20" },
+    name: { icon: "🟡", label: "Name match", cls: "bg-warning/15 text-warning border-warning/20" },
+    none: { icon: "🔴", label: "No match", cls: "bg-destructive/15 text-destructive border-destructive/20" },
+  };
+  const c = config[source];
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium border ${c.cls}`} title={barcode ? `Barcode: ${barcode}` : undefined}>
+      {c.icon} {c.label}
+    </span>
   );
 };
 
@@ -421,69 +438,88 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     metafields: Record<string, string>;
     variants: VariantLine[];
     isGrouped: boolean;
+    barcode?: string;
+    vendorCode?: string;
+    matchSource?: MatchSource;
   }
 
-  const [productGroups, setProductGroups] = useState<ProductGroup[]>([
-    {
-      styleGroup: "Mara One Piece",
-      name: "Bond Eye Mara One Piece",
-      brand: "Bond Eye",
-      type: "One Piece",
-      price: 89.95,
-      rrp: 219.95,
-      status: "ready",
-      metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" },
-      isGrouped: true,
-      variants: [
-        { sku: "BE2204-BLK-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
-        { sku: "BE2204-BLK-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Black", qty: 3, price: 89.95, rrp: 219.95 },
-        { sku: "BE2204-BLK-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
-        { sku: "BE2204-NAV-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Navy", qty: 1, price: 89.95, rrp: 219.95 },
-        { sku: "BE2204-NAV-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Navy", qty: 3, price: 89.95, rrp: 219.95 },
-        { sku: "BE2204-NAV-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Navy", qty: 2, price: 89.95, rrp: 219.95 },
-      ],
-    },
-    {
-      styleGroup: null as any,
-      name: "Seafolly Collective Bikini Top - Navy",
-      brand: "Seafolly",
-      type: "Bikini Tops",
-      price: 45.00,
-      rrp: 109.95,
-      status: "ready",
-      metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" },
-      isGrouped: false,
-      variants: [{ sku: "SF10023", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 6, price: 45.00, rrp: 109.95 }],
-    },
-    {
-      styleGroup: null as any,
-      name: "Baku Riviera High Waist Pant - Ivory",
-      brand: "Baku",
-      type: "Bikini Bottoms",
-      price: 38.00,
-      rrp: 89.95,
-      status: "review",
-      metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" },
-      isGrouped: false,
-      variants: [{ sku: "BK20015", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 4, price: 38.00, rrp: 89.95 }],
-    },
-    {
-      styleGroup: "Retro Racerback",
-      name: "Jantzen Retro Racerback",
-      brand: "Jantzen",
-      type: "One Piece",
-      price: 65.00,
-      rrp: 159.95,
-      status: "ready",
-      metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" },
-      isGrouped: true,
-      variants: [
-        { sku: "JA81520-COR-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
-        { sku: "JA81520-COR-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Coral", qty: 3, price: 65.00, rrp: 159.95 },
-        { sku: "JA81520-COR-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
-      ],
-    },
-  ]);
+  const [productGroups, setProductGroups] = useState<ProductGroup[]>(() => {
+    // Run barcode matching on init to determine match sources
+    const groups: ProductGroup[] = [
+      {
+        styleGroup: "Mara One Piece",
+        name: "Bond Eye Mara One Piece",
+        brand: "Bond Eye",
+        type: "One Piece",
+        price: 89.95,
+        rrp: 219.95,
+        status: "ready",
+        metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" },
+        isGrouped: true,
+        barcode: "9350444555666",
+        vendorCode: "BE2204",
+        variants: [
+          { sku: "BE2204-BLK-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
+          { sku: "BE2204-BLK-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Black", qty: 3, price: 89.95, rrp: 219.95 },
+          { sku: "BE2204-BLK-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
+          { sku: "BE2204-NAV-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Navy", qty: 1, price: 89.95, rrp: 219.95 },
+          { sku: "BE2204-NAV-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Navy", qty: 3, price: 89.95, rrp: 219.95 },
+          { sku: "BE2204-NAV-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Navy", qty: 2, price: 89.95, rrp: 219.95 },
+        ],
+      },
+      {
+        styleGroup: null as any,
+        name: "Seafolly Collective Bikini Top - Navy",
+        brand: "Seafolly",
+        type: "Bikini Tops",
+        price: 45.00,
+        rrp: 109.95,
+        status: "ready",
+        metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" },
+        isGrouped: false,
+        barcode: "9350987654321",
+        vendorCode: "SF-COL-BK",
+        variants: [{ sku: "SF10023", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 6, price: 45.00, rrp: 109.95 }],
+      },
+      {
+        styleGroup: null as any,
+        name: "Baku Riviera High Waist Pant - Ivory",
+        brand: "Baku",
+        type: "Bikini Bottoms",
+        price: 38.00,
+        rrp: 89.95,
+        status: "review",
+        metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" },
+        isGrouped: false,
+        barcode: "",
+        vendorCode: "BK-RIV-HW",
+        variants: [{ sku: "BK20015", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 4, price: 38.00, rrp: 89.95 }],
+      },
+      {
+        styleGroup: "Retro Racerback",
+        name: "Jantzen Retro Racerback",
+        brand: "Jantzen",
+        type: "One Piece",
+        price: 65.00,
+        rrp: 159.95,
+        status: "ready",
+        metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" },
+        isGrouped: true,
+        barcode: "9351234567890",
+        vendorCode: "JA-RR-26",
+        variants: [
+          { sku: "JA81520-COR-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
+          { sku: "JA81520-COR-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Coral", qty: 3, price: 65.00, rrp: 159.95 },
+          { sku: "JA81520-COR-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
+        ],
+      },
+    ];
+    // Run matching for each group
+    return groups.map(g => {
+      const result = matchProduct(g.barcode, g.variants[0]?.sku, g.name);
+      return { ...g, matchSource: result.source };
+    });
+  });
 
   // Flatten for backward-compat with cost tracking etc.
   const mockProducts = productGroups.map(g => ({
@@ -507,7 +543,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       rrp: g.rrp,
       seoTitle: g.status !== "pending" ? `${g.name} | ${g.brand}` : undefined,
       hasTags: g.status !== "pending",
-      matchSource: g.variants[0]?.sku ? "sku" : "name",
+      matchSource: g.matchSource || (g.barcode ? "barcode" : g.variants[0]?.sku ? "sku" : "name"),
       isPending: g.status === "pending",
     });
   });
@@ -1183,8 +1219,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 const isUpdate = lineModes[i] === "update";
                 return (
                   <div key={`p-${i}`}>
-                    {/* Mode toggle + confidence badge */}
-                    <div className="flex items-center gap-2 mb-1">
+                    {/* Mode toggle + match source + confidence badge */}
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <button
                         onClick={() => toggleLineMode(i)}
                         className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${!isUpdate ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}
@@ -1198,8 +1234,10 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                         📦 Update
                       </button>
                       {isUpdate && (
-                        <span className="text-[10px] text-success ml-1">→ Will update existing stock</span>
+                        <span className="text-[10px] text-success">→ Will update existing stock</span>
                       )}
+                      {/* Match source badge */}
+                      <MatchSourceBadge source={group.matchSource || "none"} barcode={group.barcode} />
                       <span className="ml-auto"><ConfidenceBadge breakdown={conf} /></span>
                     </div>
                     {group.isGrouped ? (
@@ -1226,6 +1264,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                           product={{
                             ...mockProducts.find(p => p.name === group.name) || { name: group.name, brand: group.brand, type: group.type, price: group.price, rrp: group.rrp, status: group.status },
                             sku: group.variants[0]?.sku,
+                            barcode: group.barcode,
+                            matchSource: group.matchSource,
                             metafields: group.metafields,
                             costChange: costChanges.find(c => c.name === group.name)?.costChange || null,
                             isNew: costChanges.find(c => c.name === group.name)?.isNew,
@@ -1829,8 +1869,9 @@ const VariantGroupCard = ({ group, onSplit, onPreview }: {
   );
 };
 
-const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
+const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; barcode?: string; matchSource?: MatchSource; brand: string; type: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
   const [expanded, setExpanded] = useState(false);
+  const [savedToBarcodeCatalog, setSavedToBarcodeCatalog] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
   const [showSplit, setShowSplit] = useState(false);
   const locs = getStoreLocations();
@@ -1855,7 +1896,17 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
             <p className="font-semibold text-sm truncate">{product.name}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {product.brand} · {product.type} · ${product.rrp.toFixed(2)}
+              {product.sku && <> · <span className="font-mono-data">{product.sku}</span></>}
             </p>
+            {/* Barcode display */}
+            {product.barcode && (
+              <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                <Barcode className="w-3 h-3" />
+                <span className="font-mono-data">{product.barcode}</span>
+                {product.matchSource === "barcode" && <span className="text-primary font-medium">· In catalog</span>}
+                {product.barcode && product.matchSource !== "barcode" && <span className="text-warning">· Not in catalog</span>}
+              </p>
+            )}
             {/* Collection pills */}
             {(() => {
               const tags = [product.type, product.brand, "new arrivals", "Womens", "Swimwear", "full_price"].filter(Boolean);
@@ -1966,7 +2017,30 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
             </div>
           )}
 
-          <div className="flex gap-2">
+          {/* Save to barcode catalog */}
+          {product.barcode && product.matchSource !== "barcode" && !savedToBarcodeCatalog && (
+            <div className="bg-primary/5 border border-primary/20 rounded-md p-2 flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground">Barcode found but not in catalog. Save it to speed up future invoices.</span>
+              <Button size="sm" variant="outline" className="h-6 text-[10px] ml-2 shrink-0" onClick={() => {
+                saveBarcodeToCatalog(product.barcode!, {
+                  title: product.name, vendor: product.brand, sku: product.sku || "", type: product.type,
+                  addedDate: new Date().toISOString().slice(0, 10),
+                });
+                setSavedToBarcodeCatalog(true);
+                addAuditEntry("Catalog", `Barcode ${product.barcode} saved for ${product.name}`);
+              }}>
+                <Save className="w-3 h-3 mr-1" /> Save to catalog
+              </Button>
+            </div>
+          )}
+          {savedToBarcodeCatalog && (
+            <div className="bg-success/10 border border-success/20 rounded-md p-2 flex items-center gap-2">
+              <Check className="w-3 h-3 text-success" />
+              <span className="text-[10px] text-success font-medium">Barcode saved to catalog ✓</span>
+            </div>
+          )}
+
+          <div className="flex gap-2 flex-wrap">
             {onPreview && <Button variant="outline" size="sm" onClick={onPreview}><Eye className="w-3.5 h-3.5 mr-1" /> Preview</Button>}
             <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
             <Button variant="ghost" size="sm" className="text-destructive"><X className="w-3.5 h-3.5 mr-1" /> Remove</Button>

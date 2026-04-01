@@ -99,8 +99,8 @@ const PriceLookup = ({ onBack }: PriceLookupProps) => {
             </div>
             {result.price ? (
               <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-3xl font-bold font-mono-data">${result.price.toFixed(2)}</span>
-                <span className="text-sm text-muted-foreground">AUD</span>
+                <span className="text-3xl font-bold font-mono-data">{formatPrice(result.price, store.currency)}</span>
+                <span className="text-sm text-muted-foreground">{store.currency}</span>
               </div>
             ) : (
               <p className="text-sm text-destructive mb-2">No price found</p>

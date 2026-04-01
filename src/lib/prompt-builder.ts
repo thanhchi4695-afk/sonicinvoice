@@ -182,24 +182,14 @@ export function saveBrandDirectory(brands: BrandEntry[]) {
   localStorage.setItem(BRAND_DIR_KEY, JSON.stringify(brands));
 }
 
-// ── Locale helpers ─────────────────────────────────────────
+import { getLocaleEnglish, getEnrichmentInstruction } from './i18n';
+
 function localeEnglish(locale: string): string {
-  switch (locale) {
-    case 'AU': case 'NZ': return 'Australian English';
-    case 'UK': return 'British English';
-    case 'US': return 'American English';
-    default: return 'English';
-  }
+  return getLocaleEnglish(locale);
 }
 
 function priceSourceInstruction(locale: string, currency: string): string {
-  switch (locale) {
-    case 'AU': return `Search .com.au sources. ${currency} prices only.`;
-    case 'US': return `Search .com sources. ${currency} prices only.`;
-    case 'UK': return `Search .co.uk sources. ${currency} prices only.`;
-    case 'NZ': return `Search .co.nz sources, then .com.au. ${currency} prices only.`;
-    default: return `${currency} prices only.`;
-  }
+  return getEnrichmentInstruction(locale, currency);
 }
 
 // ── Enrichment Prompt Builder ──────────────────────────────

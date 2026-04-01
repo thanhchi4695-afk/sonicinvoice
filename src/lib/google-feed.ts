@@ -211,3 +211,75 @@ export function generateGoogleFeedTSV(products: GoogleFeedProduct[], saleDateStr
   ];
   return rows.join('\n');
 }
+
+// ── Google Promotions Feed ─────────────────────────────────
+
+export interface SaleMeta {
+  appliedAt: string;
+  pct: number;
+  tags: string[];
+  handles: string[];
+  direction: string;
+  discountType?: string;
+}
+
+const SALE_META_KEY = 'last_sale_meta';
+
+export function saveSaleMeta(meta: SaleMeta) {
+  localStorage.setItem(SALE_META_KEY, JSON.stringify(meta));
+}
+
+export function getSaleMeta(): SaleMeta | null {
+  try {
+    const raw = localStorage.getItem(SALE_META_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+export function generatePromotionsFeed(meta?: SaleMeta | null): string | null {
+  const m = meta || getSaleMeta();
+  if (!m || m.direction !== 'apply') return null;
+
+  const storeDomain = localStorage.getItem('shopify_store_url') || 'yourstore.com.au';
+
+  const tagSlug = m.tags.slice(0, 2)
+    .join('-').toLowerCase().replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
+  const dateSlug = new Date(m.appliedAt).toISOString().slice(0, 7).replace('-', '');
+  const promotionId = `${tagSlug || 'sale'}-${m.pct}off-${dateSlug}`;
+
+  const start = new Date(m.appliedAt);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 30);
+  const fmt = (d: Date) => d.toISOString().slice(0, 10) + 'T00:00+10:00';
+  const dateRange = `${fmt(start)}/${fmt(end)}`;
+
+  const tagLabel = m.tags.slice(0, 2).join(', ') || 'selected products';
+  let longTitle = `${m.pct}% off ${tagLabel}`;
+  if (longTitle.length > 60) longTitle = longTitle.slice(0, 57) + '...';
+
+  const itemIds = m.handles
+    .slice(0, 500)
+    .map(h => `        <item_id>${escXml(h)}</item_id>`)
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.google.com/shopping/promotions/2020/01"
+      xmlns:g="http://base.google.com/ns/1.0">
+  <promotions>
+    <promotion>
+      <g:promotion_id>${escXml(promotionId)}</g:promotion_id>
+      <g:product_applicability>SPECIFIC_PRODUCTS</g:product_applicability>
+      <g:offer_type>PERCENT_OFF</g:offer_type>
+      <g:percent_off>${m.pct}</g:percent_off>
+      <g:long_title>${escXml(longTitle)}</g:long_title>
+      <g:promotion_effective_dates>${dateRange}</g:promotion_effective_dates>
+      <g:redemption_channel>ONLINE</g:redemption_channel>
+      <g:item_id_inclusion>
+${itemIds}
+      </g:item_id_inclusion>
+    </promotion>
+  </promotions>
+</feed>`;
+}

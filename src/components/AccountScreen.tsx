@@ -16,6 +16,7 @@ const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");
   const [currency, setCurrency] = useState("AUD");
   const [storeType, setStoreType] = useState<StoreType>("shopify");
+  const [lsVersion, setLsVersion] = useState<LightspeedVersion>("x_series");
   const [markup, setMarkup] = useState("2.35");
   const [rounding, setRounding] = useState("nearest_05");
 

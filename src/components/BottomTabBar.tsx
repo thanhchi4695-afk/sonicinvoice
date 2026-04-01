@@ -9,6 +9,7 @@ interface BottomTabBarProps {
 
 const baseTabs = [
   { id: "home", label: "Home", icon: Home },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "history", label: "History", icon: FolderOpen },
   { id: "tools", label: "Tools", icon: Wrench },
   { id: "account", label: "Account", icon: User },

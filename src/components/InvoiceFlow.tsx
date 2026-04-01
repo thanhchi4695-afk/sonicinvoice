@@ -1264,6 +1264,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                           product={{
                             ...mockProducts.find(p => p.name === group.name) || { name: group.name, brand: group.brand, type: group.type, price: group.price, rrp: group.rrp, status: group.status },
                             sku: group.variants[0]?.sku,
+                            barcode: group.barcode,
+                            matchSource: group.matchSource,
                             metafields: group.metafields,
                             costChange: costChanges.find(c => c.name === group.name)?.costChange || null,
                             isNew: costChanges.find(c => c.name === group.name)?.isNew,

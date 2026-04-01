@@ -156,7 +156,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
     } else if (selectedFormat === "shopify_price") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        "Variant SKU": "", "Variant Price": p.rrp.toFixed(2), "Variant Compare At Price": "",
+        "Variant SKU": p.sku || "", "Variant Price": p.rrp.toFixed(2), "Variant Compare At Price": "",
       }));
       downloadFile("\uFEFF" + Papa.unparse(rows), filename);
     } else if (selectedFormat === "tags_only") {

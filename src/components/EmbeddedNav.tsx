@@ -27,6 +27,7 @@ const navSections = [
       { id: "restock", label: "Restock Analytics", icon: Package, type: "flow" as const },
       { id: "collab_seo", label: "Collab SEO", icon: Link, type: "flow" as const },
       { id: "google_ads_setup", label: "Google Ads Setup", icon: Megaphone, type: "flow" as const },
+      { id: "meta_ads_setup", label: "Meta Ads Setup", icon: Target, type: "flow" as const },
     ],
   },
   {

@@ -756,27 +756,30 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           </button>
 
+          {/* Hidden file inputs */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.heic,.webp"
+            onChange={handleFileChosen}
+            className="hidden"
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileChosen}
+            className="hidden"
+          />
+
           <button
-            onClick={handleFileSelect}
+            onClick={handleCameraSelect}
             className="w-full mt-3 h-12 rounded-lg border border-border bg-card flex items-center justify-center gap-2 text-sm active:bg-muted"
           >
             <Camera className="w-4 h-4 text-primary" />
             Take a photo
           </button>
-
-          {/* File parse mode indicator */}
-          {fileParseMode && (
-            <div className="mt-3 bg-card rounded-lg border border-border px-3 py-2 flex items-center gap-2">
-              {fileParseMode === "pdf_text" && <><FileText className="w-4 h-4 text-primary" /><span className="text-xs">📄 Digital PDF — reading text layer</span></>}
-              {fileParseMode === "pdf_scan" && <><Search className="w-4 h-4 text-accent-foreground" /><span className="text-xs">🔍 Scanned PDF — using image recognition</span></>}
-              {fileParseMode === "photo" && <><Camera className="w-4 h-4 text-accent-foreground" /><span className="text-xs">📷 Invoice photo — using image recognition</span></>}
-              {fileParseMode === "spreadsheet" && <><FileText className="w-4 h-4 text-primary" /><span className="text-xs">📊 Spreadsheet — reading data rows</span></>}
-              {fileParseMode === "email" && <><FileText className="w-4 h-4 text-primary" /><span className="text-xs">📧 Email — extracting invoice data</span></>}
-            </div>
-          )}
-
-          {/* Low quality image warning */}
-          {showLowQualityWarning && (
             <div className="mt-3 bg-destructive/10 border border-destructive/20 rounded-lg p-3">
               <p className="text-xs font-semibold text-destructive mb-1">⚠️ Image quality may be affecting accuracy</p>
               <p className="text-xs text-muted-foreground mb-2">AI extracted fewer than 3 lines from this image. For best results:</p>

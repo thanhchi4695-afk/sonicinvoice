@@ -357,6 +357,23 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const cancelledRef = { current: false };
 
   const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleCameraSelect = () => {
+    cameraInputRef.current?.click();
+  };
+
+  const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadedFile(file);
+    startProcessing(file.name);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
+  };
+
+  const startProcessing = (fName: string) => {
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
       const saveCheckbox = document.getElementById('save-supplier') as HTMLInputElement;
@@ -367,14 +384,12 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     if (useTemplate && matchedTemplate) {
       incrementTemplateUse(supplierName);
     }
-    const fName = "invoice_jantzen_mar26.pdf";
     setFileName(fName);
     const ext = fName.split(".").pop()?.toLowerCase() || "";
     if (["jpg", "jpeg", "png", "heic", "webp"].includes(ext)) {
       setFileParseMode("photo");
     } else if (ext === "pdf") {
-      const hasTextLayer = true;
-      setFileParseMode(hasTextLayer ? "pdf_text" : "pdf_scan");
+      setFileParseMode("pdf_text");
     } else {
       setFileParseMode("spreadsheet");
     }

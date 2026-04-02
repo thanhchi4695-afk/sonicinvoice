@@ -135,7 +135,12 @@ Important:
     const jsonStr = (jsonMatch[1] || content).trim();
     const parsed = JSON.parse(jsonStr);
 
-    return new Response(JSON.stringify(parsed), {
+    // Normalize: AI may return array directly or {supplier, products}
+    const result = Array.isArray(parsed)
+      ? { supplier: supplierName || "", products: parsed }
+      : { supplier: parsed.supplier || supplierName || "", products: parsed.products || [] };
+
+    return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

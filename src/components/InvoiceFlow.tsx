@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";

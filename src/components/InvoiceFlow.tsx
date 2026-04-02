@@ -341,6 +341,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   };
 
   const cancelledRef = { current: false };
+  const [parsedNames, setParsedNames] = useState<string[]>([]);
 
   const handleFileSelect = () => {
     fileInputRef.current?.click();
@@ -354,12 +355,160 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadedFile(file);
-    startProcessing(file.name);
-    // Reset input so the same file can be re-selected
+    startProcessing(file);
     e.target.value = "";
   };
 
-  const startProcessing = (fName: string) => {
+  const convertToProductGroups = (products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }>) => {
+    const groups: ProductGroup[] = products.map(p => {
+      const result = matchProduct(p.barcode, p.sku, p.name);
+      return {
+        styleGroup: null as any,
+        name: p.brand && p.name && !p.name.toLowerCase().startsWith(p.brand.toLowerCase()) ? `${p.brand} ${p.name}` : (p.name || "Unnamed Product"),
+        brand: p.brand || supplierName || "Unknown",
+        type: p.type || "General",
+        colour: p.colour || "",
+        size: p.size || "",
+        price: p.cost || 0,
+        rrp: p.rrp || 0,
+        cogs: p.cost || 0,
+        status: (p.cost > 0 && p.name) ? "ready" : "review",
+        metafields: {},
+        isGrouped: false,
+        barcode: p.barcode || "",
+        vendorCode: p.sku || "",
+        matchSource: result.source,
+        variants: [{
+          sku: p.sku || "",
+          option1Name: "Size",
+          option1Value: p.size || "One Size",
+          option2Name: p.colour ? "Colour" : "",
+          option2Value: p.colour || "",
+          qty: p.qty || 1,
+          price: p.cost || 0,
+          rrp: p.rrp || 0,
+        }],
+      };
+    });
+    return groups;
+  };
+
+  const parseSpreadsheet = (file: File): Promise<Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }>> => {
+    return new Promise((resolve) => {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      if (ext === "csv") {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const products = (results.data as Record<string, string>[]).map(row => {
+              const findCol = (keys: string[]) => {
+                for (const k of keys) {
+                  const found = Object.keys(row).find(h => h.toLowerCase().trim().includes(k.toLowerCase()));
+                  if (found && row[found]?.trim()) return row[found].trim();
+                }
+                return "";
+              };
+              const findNum = (keys: string[]) => parseFloat(findCol(keys).replace(/[^0-9.]/g, "")) || 0;
+              return {
+                name: findCol(["product", "name", "title", "description", "item"]),
+                brand: findCol(["brand", "vendor", "supplier", "manufacturer"]),
+                sku: findCol(["sku", "style", "code", "item code", "article"]),
+                barcode: findCol(["barcode", "ean", "upc", "gtin"]),
+                type: findCol(["type", "category", "product type", "dept"]),
+                colour: findCol(["colour", "color", "col"]),
+                size: findCol(["size", "sz"]),
+                qty: findNum(["qty", "quantity", "units", "ordered", "order qty"]),
+                cost: findNum(["cost", "wholesale", "unit price", "price", "net"]),
+                rrp: findNum(["rrp", "retail", "rrp price", "sell", "msrp"]),
+              };
+            }).filter(p => p.name);
+            resolve(products);
+          },
+          error: () => resolve([]),
+        });
+      } else if (["xlsx", "xls"].includes(ext)) {
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          try {
+            const XLSX = await import("xlsx");
+            const wb = XLSX.read(ev.target?.result, { type: "array" });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const data = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "" });
+            const products = data.map((row: Record<string, any>) => {
+              const findCol = (keys: string[]) => {
+                for (const k of keys) {
+                  const found = Object.keys(row).find(h => h.toLowerCase().trim().includes(k.toLowerCase()));
+                  if (found && String(row[found]).trim()) return String(row[found]).trim();
+                }
+                return "";
+              };
+              const findNum = (keys: string[]) => parseFloat(String(findCol(keys)).replace(/[^0-9.]/g, "")) || 0;
+              return {
+                name: findCol(["product", "name", "title", "description", "item"]),
+                brand: findCol(["brand", "vendor", "supplier", "manufacturer"]),
+                sku: findCol(["sku", "style", "code", "item code", "article"]),
+                barcode: findCol(["barcode", "ean", "upc", "gtin"]),
+                type: findCol(["type", "category", "product type", "dept"]),
+                colour: findCol(["colour", "color", "col"]),
+                size: findCol(["size", "sz"]),
+                qty: findNum(["qty", "quantity", "units", "ordered", "order qty"]),
+                cost: findNum(["cost", "wholesale", "unit price", "price", "net"]),
+                rrp: findNum(["rrp", "retail", "rrp price", "sell", "msrp"]),
+              };
+            }).filter((p: any) => p.name);
+            resolve(products);
+          } catch {
+            resolve([]);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        resolve([]);
+      }
+    });
+  };
+
+  const parseWithAI = async (file: File): Promise<Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }>> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({
+          fileContent: base64,
+          fileName: file.name,
+          fileType: ext,
+          customInstructions,
+          supplierName,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("AI parse failed:", await response.text());
+        return [];
+      }
+
+      const data = await response.json();
+      if (data.supplier && !supplierName) {
+        setSupplierName(data.supplier);
+      }
+      return data.products || [];
+    } catch (err) {
+      console.error("AI parse error:", err);
+      return [];
+    }
+  };
+
+  const startProcessing = async (file: File) => {
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
       const saveCheckbox = document.getElementById('save-supplier') as HTMLInputElement;
@@ -370,6 +519,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     if (useTemplate && matchedTemplate) {
       incrementTemplateUse(supplierName);
     }
+    const fName = file.name;
     setFileName(fName);
     const ext = fName.split(".").pop()?.toLowerCase() || "";
     if (["jpg", "jpeg", "png", "heic", "webp"].includes(ext)) {
@@ -385,10 +535,33 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     setProcessingElapsed(0);
     setShowCompletionSummary(false);
     cancelledRef.current = false;
-    setTimeout(() => {
-      setStep(2);
-      runEnrichmentSim(cancelledRef);
-    }, 300);
+    setStep(2);
+    setEnrichLines([{ name: "Reading file...", status: "searching", action: "Parsing invoice data...", confidence: 0 }]);
+
+    let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = [];
+
+    if (["csv", "xlsx", "xls"].includes(ext)) {
+      products = await parseSpreadsheet(file);
+    } else {
+      products = await parseWithAI(file);
+    }
+
+    if (cancelledRef.current) return;
+
+    if (products.length === 0) {
+      setEnrichLines([{ name: "No products found", status: "not_found", action: "Could not extract products from this file. Try CSV/Excel format or check column headers.", confidence: 0 }]);
+      setProcessingDone(true);
+      setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
+      setShowCompletionSummary(true);
+      return;
+    }
+
+    const groups = convertToProductGroups(products);
+    setProductGroups(groups);
+
+    const names = groups.map(g => g.name);
+    setParsedNames(names);
+    runEnrichmentSim(cancelledRef, names);
   };
 
   const handleCancelProcessing = () => {
@@ -403,7 +576,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     setProcessingCancelled(false);
     setProcessingDone(false);
     cancelledRef.current = false;
-    runEnrichmentSim(cancelledRef);
+    runEnrichmentSim(cancelledRef, parsedNames);
   };
 
   const handleProceedToReview = () => {

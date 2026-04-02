@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
@@ -223,6 +223,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [previewAll, setPreviewAll] = useState(false);
   const [previewIdx, setPreviewIdx] = useState(0);
   const mode = useStoreMode();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   // OCR / file type detection state
   type FileParseMode = "pdf_text" | "pdf_scan" | "photo" | "spreadsheet" | "email";
@@ -354,6 +357,23 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const cancelledRef = { current: false };
 
   const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleCameraSelect = () => {
+    cameraInputRef.current?.click();
+  };
+
+  const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadedFile(file);
+    startProcessing(file.name);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
+  };
+
+  const startProcessing = (fName: string) => {
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
       const saveCheckbox = document.getElementById('save-supplier') as HTMLInputElement;
@@ -364,14 +384,12 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     if (useTemplate && matchedTemplate) {
       incrementTemplateUse(supplierName);
     }
-    const fName = "invoice_jantzen_mar26.pdf";
     setFileName(fName);
     const ext = fName.split(".").pop()?.toLowerCase() || "";
     if (["jpg", "jpeg", "png", "heic", "webp"].includes(ext)) {
       setFileParseMode("photo");
     } else if (ext === "pdf") {
-      const hasTextLayer = true;
-      setFileParseMode(hasTextLayer ? "pdf_text" : "pdf_scan");
+      setFileParseMode("pdf_text");
     } else {
       setFileParseMode("spreadsheet");
     }
@@ -738,8 +756,25 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           </button>
 
+          {/* Hidden file inputs */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.heic,.webp"
+            onChange={handleFileChosen}
+            className="hidden"
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileChosen}
+            className="hidden"
+          />
+
           <button
-            onClick={handleFileSelect}
+            onClick={handleCameraSelect}
             className="w-full mt-3 h-12 rounded-lg border border-border bg-card flex items-center justify-center gap-2 text-sm active:bg-muted"
           >
             <Camera className="w-4 h-4 text-primary" />

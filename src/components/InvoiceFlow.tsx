@@ -274,15 +274,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     }
   }, [supplierName]);
 
-  // Simulated enrichment line progression
-  const lineNames = [
-    "Bond Eye Mara One Piece",
-    "Seafolly Collective Bikini Top",
-    "Baku Riviera High Waist Pant",
-    "Jantzen Retro Racerback",
-  ];
+  // Enrichment simulation that uses real parsed product names
   const actionSequence = [
-    "Searching jantzen.com.au...",
     "Extracting description...",
     "Finding image URL...",
     "Generating SEO title...",
@@ -290,8 +283,14 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     "Done ✓",
   ];
 
-  const runEnrichmentSim = (cancelled: { current: boolean }) => {
-    const lines: EnrichLine[] = lineNames.map(name => ({
+  const runEnrichmentSim = (cancelled: { current: boolean }, names: string[]) => {
+    if (names.length === 0) {
+      setProcessingDone(true);
+      setFinalProcessingTime(0);
+      setShowCompletionSummary(true);
+      return;
+    }
+    const lines: EnrichLine[] = names.map(name => ({
       name, status: "waiting" as LineStatus, action: "○ Waiting", confidence: 0,
     }));
     setEnrichLines([...lines]);
@@ -303,13 +302,12 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           setProcessingDone(true);
           setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
           setShowCompletionSummary(true);
-          // Save to processing history
           const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
           history.unshift({
             supplier: supplierName || "Unknown",
             lines: lines.length,
             processingTime: Math.floor((Date.now() - (processStartTime || Date.now())) / 1000),
-            matchRate: 94,
+            matchRate: Math.round((lines.filter(l => l.status === "done").length / lines.length) * 100),
             date: new Date().toISOString(),
           });
           localStorage.setItem("processing_history", JSON.stringify(history.slice(0, 100)));
@@ -318,8 +316,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       }
       const i = lineIdx;
       let actionIdx = 0;
-      // searching
-      lines[i] = { ...lines[i], status: "searching", action: `Searching ${lineNames[i].split(" ")[0].toLowerCase()}.com.au...` };
+      const brandGuess = names[i].split(" ")[0]?.toLowerCase() || "supplier";
+      lines[i] = { ...lines[i], status: "searching", action: `Searching ${brandGuess}.com.au...` };
       setEnrichLines([...lines]);
 
       const stepAction = () => {
@@ -328,17 +326,16 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         if (actionIdx < actionSequence.length - 1) {
           lines[i] = { ...lines[i], status: "extracting", action: actionSequence[actionIdx] };
           setEnrichLines([...lines]);
-          setTimeout(stepAction, 300 + Math.random() * 400);
+          setTimeout(stepAction, 200 + Math.random() * 300);
         } else {
-          // Done — assign final status
-          const finalStatus: LineStatus = i === 2 ? "review" : "done";
+          const finalStatus: LineStatus = Math.random() > 0.85 ? "review" : "done";
           lines[i] = { ...lines[i], status: finalStatus, action: "Done ✓", confidence: finalStatus === "review" ? 72 : 95 };
           setEnrichLines([...lines]);
           lineIdx++;
-          setTimeout(processNextLine, 200);
+          setTimeout(processNextLine, 150);
         }
       };
-      setTimeout(stepAction, 500 + Math.random() * 500);
+      setTimeout(stepAction, 300 + Math.random() * 400);
     };
     processNextLine();
   };

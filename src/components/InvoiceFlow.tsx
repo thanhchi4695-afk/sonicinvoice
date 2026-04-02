@@ -223,6 +223,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [previewAll, setPreviewAll] = useState(false);
   const [previewIdx, setPreviewIdx] = useState(0);
   const mode = useStoreMode();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   // OCR / file type detection state
   type FileParseMode = "pdf_text" | "pdf_scan" | "photo" | "spreadsheet" | "email";

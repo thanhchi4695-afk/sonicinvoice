@@ -58,18 +58,7 @@ export function addCostEntry(sku: string, entry: CostEntry) {
   saveCostHistory(h);
 }
 
-// Seed demo cost history on first load
-(function seedCostHistory() {
-  const h = getCostHistory();
-  if (Object.keys(h).length > 0) return;
-  const seed: CostHistoryMap = {
-    "BE10042": [{ date: "2026-01-15", cost: 85.00, supplier: "Bond Eye", invoice: "BE-1001" }],
-    "SF10023": [{ date: "2026-02-10", cost: 45.00, supplier: "Seafolly", invoice: "SF-1122" }],
-    "BK20015": [{ date: "2026-01-20", cost: 40.00, supplier: "Baku", invoice: "BK-501" }],
-    "JA81520": [{ date: "2026-01-15", cost: 61.20, supplier: "Jantzen", invoice: "JAN-2647" }],
-  };
-  saveCostHistory(seed);
-})();
+// Cost history seeding removed — only real invoice data is used now
 
 function getHistory(): { text: string; label: string }[] {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
@@ -285,15 +274,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     }
   }, [supplierName]);
 
-  // Simulated enrichment line progression
-  const lineNames = [
-    "Bond Eye Mara One Piece",
-    "Seafolly Collective Bikini Top",
-    "Baku Riviera High Waist Pant",
-    "Jantzen Retro Racerback",
-  ];
+  // Enrichment simulation that uses real parsed product names
   const actionSequence = [
-    "Searching jantzen.com.au...",
     "Extracting description...",
     "Finding image URL...",
     "Generating SEO title...",
@@ -301,8 +283,14 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     "Done ✓",
   ];
 
-  const runEnrichmentSim = (cancelled: { current: boolean }) => {
-    const lines: EnrichLine[] = lineNames.map(name => ({
+  const runEnrichmentSim = (cancelled: { current: boolean }, names: string[]) => {
+    if (names.length === 0) {
+      setProcessingDone(true);
+      setFinalProcessingTime(0);
+      setShowCompletionSummary(true);
+      return;
+    }
+    const lines: EnrichLine[] = names.map(name => ({
       name, status: "waiting" as LineStatus, action: "○ Waiting", confidence: 0,
     }));
     setEnrichLines([...lines]);
@@ -314,13 +302,12 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           setProcessingDone(true);
           setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
           setShowCompletionSummary(true);
-          // Save to processing history
           const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
           history.unshift({
             supplier: supplierName || "Unknown",
             lines: lines.length,
             processingTime: Math.floor((Date.now() - (processStartTime || Date.now())) / 1000),
-            matchRate: 94,
+            matchRate: Math.round((lines.filter(l => l.status === "done").length / lines.length) * 100),
             date: new Date().toISOString(),
           });
           localStorage.setItem("processing_history", JSON.stringify(history.slice(0, 100)));
@@ -329,8 +316,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       }
       const i = lineIdx;
       let actionIdx = 0;
-      // searching
-      lines[i] = { ...lines[i], status: "searching", action: `Searching ${lineNames[i].split(" ")[0].toLowerCase()}.com.au...` };
+      const brandGuess = names[i].split(" ")[0]?.toLowerCase() || "supplier";
+      lines[i] = { ...lines[i], status: "searching", action: `Searching ${brandGuess}.com.au...` };
       setEnrichLines([...lines]);
 
       const stepAction = () => {
@@ -339,22 +326,22 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         if (actionIdx < actionSequence.length - 1) {
           lines[i] = { ...lines[i], status: "extracting", action: actionSequence[actionIdx] };
           setEnrichLines([...lines]);
-          setTimeout(stepAction, 300 + Math.random() * 400);
+          setTimeout(stepAction, 200 + Math.random() * 300);
         } else {
-          // Done — assign final status
-          const finalStatus: LineStatus = i === 2 ? "review" : "done";
+          const finalStatus: LineStatus = Math.random() > 0.85 ? "review" : "done";
           lines[i] = { ...lines[i], status: finalStatus, action: "Done ✓", confidence: finalStatus === "review" ? 72 : 95 };
           setEnrichLines([...lines]);
           lineIdx++;
-          setTimeout(processNextLine, 200);
+          setTimeout(processNextLine, 150);
         }
       };
-      setTimeout(stepAction, 500 + Math.random() * 500);
+      setTimeout(stepAction, 300 + Math.random() * 400);
     };
     processNextLine();
   };
 
   const cancelledRef = { current: false };
+  const [parsedNames, setParsedNames] = useState<string[]>([]);
 
   const handleFileSelect = () => {
     fileInputRef.current?.click();
@@ -368,12 +355,160 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadedFile(file);
-    startProcessing(file.name);
-    // Reset input so the same file can be re-selected
+    startProcessing(file);
     e.target.value = "";
   };
 
-  const startProcessing = (fName: string) => {
+  const convertToProductGroups = (products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }>) => {
+    const groups: ProductGroup[] = products.map(p => {
+      const result = matchProduct(p.barcode, p.sku, p.name);
+      return {
+        styleGroup: null as any,
+        name: p.brand && p.name && !p.name.toLowerCase().startsWith(p.brand.toLowerCase()) ? `${p.brand} ${p.name}` : (p.name || "Unnamed Product"),
+        brand: p.brand || supplierName || "Unknown",
+        type: p.type || "General",
+        colour: p.colour || "",
+        size: p.size || "",
+        price: p.cost || 0,
+        rrp: p.rrp || 0,
+        cogs: p.cost || 0,
+        status: (p.cost > 0 && p.name) ? "ready" : "review",
+        metafields: {},
+        isGrouped: false,
+        barcode: p.barcode || "",
+        vendorCode: p.sku || "",
+        matchSource: result.source,
+        variants: [{
+          sku: p.sku || "",
+          option1Name: "Size",
+          option1Value: p.size || "One Size",
+          option2Name: p.colour ? "Colour" : "",
+          option2Value: p.colour || "",
+          qty: p.qty || 1,
+          price: p.cost || 0,
+          rrp: p.rrp || 0,
+        }],
+      };
+    });
+    return groups;
+  };
+
+  const parseSpreadsheet = (file: File): Promise<Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }>> => {
+    return new Promise((resolve) => {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      if (ext === "csv") {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const products = (results.data as Record<string, string>[]).map(row => {
+              const findCol = (keys: string[]) => {
+                for (const k of keys) {
+                  const found = Object.keys(row).find(h => h.toLowerCase().trim().includes(k.toLowerCase()));
+                  if (found && row[found]?.trim()) return row[found].trim();
+                }
+                return "";
+              };
+              const findNum = (keys: string[]) => parseFloat(findCol(keys).replace(/[^0-9.]/g, "")) || 0;
+              return {
+                name: findCol(["product", "name", "title", "description", "item"]),
+                brand: findCol(["brand", "vendor", "supplier", "manufacturer"]),
+                sku: findCol(["sku", "style", "code", "item code", "article"]),
+                barcode: findCol(["barcode", "ean", "upc", "gtin"]),
+                type: findCol(["type", "category", "product type", "dept"]),
+                colour: findCol(["colour", "color", "col"]),
+                size: findCol(["size", "sz"]),
+                qty: findNum(["qty", "quantity", "units", "ordered", "order qty"]),
+                cost: findNum(["cost", "wholesale", "unit price", "price", "net"]),
+                rrp: findNum(["rrp", "retail", "rrp price", "sell", "msrp"]),
+              };
+            }).filter(p => p.name);
+            resolve(products);
+          },
+          error: () => resolve([]),
+        });
+      } else if (["xlsx", "xls"].includes(ext)) {
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          try {
+            const XLSX = await import("xlsx");
+            const wb = XLSX.read(ev.target?.result, { type: "array" });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const data = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "" });
+            const products = data.map((row: Record<string, any>) => {
+              const findCol = (keys: string[]) => {
+                for (const k of keys) {
+                  const found = Object.keys(row).find(h => h.toLowerCase().trim().includes(k.toLowerCase()));
+                  if (found && String(row[found]).trim()) return String(row[found]).trim();
+                }
+                return "";
+              };
+              const findNum = (keys: string[]) => parseFloat(String(findCol(keys)).replace(/[^0-9.]/g, "")) || 0;
+              return {
+                name: findCol(["product", "name", "title", "description", "item"]),
+                brand: findCol(["brand", "vendor", "supplier", "manufacturer"]),
+                sku: findCol(["sku", "style", "code", "item code", "article"]),
+                barcode: findCol(["barcode", "ean", "upc", "gtin"]),
+                type: findCol(["type", "category", "product type", "dept"]),
+                colour: findCol(["colour", "color", "col"]),
+                size: findCol(["size", "sz"]),
+                qty: findNum(["qty", "quantity", "units", "ordered", "order qty"]),
+                cost: findNum(["cost", "wholesale", "unit price", "price", "net"]),
+                rrp: findNum(["rrp", "retail", "rrp price", "sell", "msrp"]),
+              };
+            }).filter((p: any) => p.name);
+            resolve(products);
+          } catch {
+            resolve([]);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        resolve([]);
+      }
+    });
+  };
+
+  const parseWithAI = async (file: File): Promise<Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }>> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({
+          fileContent: base64,
+          fileName: file.name,
+          fileType: ext,
+          customInstructions,
+          supplierName,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("AI parse failed:", await response.text());
+        return [];
+      }
+
+      const data = await response.json();
+      if (data.supplier && !supplierName) {
+        setSupplierName(data.supplier);
+      }
+      return data.products || [];
+    } catch (err) {
+      console.error("AI parse error:", err);
+      return [];
+    }
+  };
+
+  const startProcessing = async (file: File) => {
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
       const saveCheckbox = document.getElementById('save-supplier') as HTMLInputElement;
@@ -384,6 +519,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     if (useTemplate && matchedTemplate) {
       incrementTemplateUse(supplierName);
     }
+    const fName = file.name;
     setFileName(fName);
     const ext = fName.split(".").pop()?.toLowerCase() || "";
     if (["jpg", "jpeg", "png", "heic", "webp"].includes(ext)) {
@@ -399,10 +535,33 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     setProcessingElapsed(0);
     setShowCompletionSummary(false);
     cancelledRef.current = false;
-    setTimeout(() => {
-      setStep(2);
-      runEnrichmentSim(cancelledRef);
-    }, 300);
+    setStep(2);
+    setEnrichLines([{ name: "Reading file...", status: "searching", action: "Parsing invoice data...", confidence: 0 }]);
+
+    let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = [];
+
+    if (["csv", "xlsx", "xls"].includes(ext)) {
+      products = await parseSpreadsheet(file);
+    } else {
+      products = await parseWithAI(file);
+    }
+
+    if (cancelledRef.current) return;
+
+    if (products.length === 0) {
+      setEnrichLines([{ name: "No products found", status: "not_found", action: "Could not extract products from this file. Try CSV/Excel format or check column headers.", confidence: 0 }]);
+      setProcessingDone(true);
+      setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
+      setShowCompletionSummary(true);
+      return;
+    }
+
+    const groups = convertToProductGroups(products);
+    setProductGroups(groups);
+
+    const names = groups.map(g => g.name);
+    setParsedNames(names);
+    runEnrichmentSim(cancelledRef, names);
   };
 
   const handleCancelProcessing = () => {
@@ -417,7 +576,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     setProcessingCancelled(false);
     setProcessingDone(false);
     cancelledRef.current = false;
-    runEnrichmentSim(cancelledRef);
+    runEnrichmentSim(cancelledRef, parsedNames);
   };
 
   const handleProceedToReview = () => {
@@ -464,95 +623,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     matchSource?: MatchSource;
   }
 
-  const [productGroups, setProductGroups] = useState<ProductGroup[]>(() => {
-    // Run barcode matching on init to determine match sources
-    const groups: ProductGroup[] = [
-      {
-        styleGroup: "Mara One Piece",
-        name: "Bond Eye Mara One Piece",
-        brand: "Bond Eye",
-        type: "One Piece",
-        price: 89.95,
-        rrp: 219.95,
-        cogs: 89.95,
-        status: "ready",
-        colour: "Black / Navy",
-        size: "8-12",
-        metafields: { fabric_content: "78% Nylon, 22% Lycra", care_instructions: "Hand wash cold, do not tumble dry", country_of_origin: "Australia", cup_sizes: "A-D", uv_protection: "UPF 50+" },
-        isGrouped: true,
-        barcode: "9350444555666",
-        vendorCode: "BE2204",
-        variants: [
-          { sku: "BE2204-BLK-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
-          { sku: "BE2204-BLK-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Black", qty: 3, price: 89.95, rrp: 219.95 },
-          { sku: "BE2204-BLK-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Black", qty: 2, price: 89.95, rrp: 219.95 },
-          { sku: "BE2204-NAV-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Navy", qty: 1, price: 89.95, rrp: 219.95 },
-          { sku: "BE2204-NAV-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Navy", qty: 3, price: 89.95, rrp: 219.95 },
-          { sku: "BE2204-NAV-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Navy", qty: 2, price: 89.95, rrp: 219.95 },
-        ],
-      },
-      {
-        styleGroup: null as any,
-        name: "Seafolly Collective Bikini Top - Navy",
-        brand: "Seafolly",
-        type: "Bikini Tops",
-        price: 45.00,
-        rrp: 109.95,
-        cogs: 45.00,
-        status: "ready",
-        colour: "Navy",
-        size: "One Size",
-        metafields: { fabric_content: "82% Nylon, 18% Elastane", care_instructions: "Hand wash cold, line dry in shade", country_of_origin: "China", cup_sizes: "", uv_protection: "UPF 50+" },
-        isGrouped: false,
-        barcode: "9350987654321",
-        vendorCode: "SF-COL-BK",
-        variants: [{ sku: "SF10023", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 6, price: 45.00, rrp: 109.95 }],
-      },
-      {
-        styleGroup: null as any,
-        name: "Baku Riviera High Waist Pant - Ivory",
-        brand: "Baku",
-        type: "Bikini Bottoms",
-        price: 38.00,
-        rrp: 89.95,
-        cogs: 38.00,
-        status: "review",
-        colour: "Ivory",
-        size: "One Size",
-        metafields: { fabric_content: "80% Nylon, 20% Elastane", care_instructions: "Hand wash cold", country_of_origin: "Indonesia", cup_sizes: "", uv_protection: "" },
-        isGrouped: false,
-        barcode: "",
-        vendorCode: "BK-RIV-HW",
-        variants: [{ sku: "BK20015", option1Name: "Size", option1Value: "One Size", option2Name: "", option2Value: "", qty: 4, price: 38.00, rrp: 89.95 }],
-      },
-      {
-        styleGroup: "Retro Racerback",
-        name: "Jantzen Retro Racerback",
-        brand: "Jantzen",
-        type: "One Piece",
-        price: 65.00,
-        rrp: 159.95,
-        cogs: 65.00,
-        status: "ready",
-        colour: "Coral",
-        size: "8-12",
-        metafields: { fabric_content: "77% Nylon, 23% Lycra", care_instructions: "Hand wash cold, do not bleach", country_of_origin: "Australia", cup_sizes: "A-DD", uv_protection: "UPF 50+" },
-        isGrouped: true,
-        barcode: "9351234567890",
-        vendorCode: "JA-RR-26",
-        variants: [
-          { sku: "JA81520-COR-8", option1Name: "Size", option1Value: "8", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
-          { sku: "JA81520-COR-10", option1Name: "Size", option1Value: "10", option2Name: "Colour", option2Value: "Coral", qty: 3, price: 65.00, rrp: 159.95 },
-          { sku: "JA81520-COR-12", option1Name: "Size", option1Value: "12", option2Name: "Colour", option2Value: "Coral", qty: 2, price: 65.00, rrp: 159.95 },
-        ],
-      },
-    ];
-    // Run matching for each group
-    return groups.map(g => {
-      const result = matchProduct(g.barcode, g.variants[0]?.sku, g.name);
-      return { ...g, matchSource: result.source };
-    });
-  });
+  const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
 
   // Flatten for backward-compat with cost tracking etc.
   const mockProducts = productGroups.map(g => ({

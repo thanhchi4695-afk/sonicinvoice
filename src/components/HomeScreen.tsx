@@ -22,9 +22,10 @@ interface HomeScreenProps {
   onStartEmailInbox?: () => void;
   onStartCollabSEO?: () => void;
   onStartGoogleAdsSetup?: () => void;
+  onStartMetaAdsSetup?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [

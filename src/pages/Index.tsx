@@ -27,7 +27,7 @@ import CatalogMemoryPanel from "@/components/CatalogMemoryPanel";
 import EmailInboxPanel from "@/components/EmailInboxPanel";
 import CollabSEOFlow from "@/components/CollabSEOFlow";
 import NotificationBell from "@/components/NotificationBell";
-import GoogleAdsGuide from "@/components/GoogleAdsGuide";
+import AdsGuideTabs from "@/components/AdsGuideTabs";
 import GoogleAdsSetupWizard from "@/components/GoogleAdsSetupWizard";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -116,7 +116,7 @@ const Index = () => {
       {activeTab === "history" && <HistoryScreen />}
       {activeTab === "tools" && <ToolsScreen />}
       {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
-      {activeTab === "google_ads" && <GoogleAdsGuide />}
+      {activeTab === "google_ads" && <AdsGuideTabs />}
       {activeTab === "help" && <HelpCentre />}
       {activeTab === "account" && <AccountScreen />}
     </>

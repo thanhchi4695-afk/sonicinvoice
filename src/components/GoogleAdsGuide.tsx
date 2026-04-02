@@ -376,15 +376,7 @@ const GoogleAdsGuide = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 pb-32 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold font-display text-foreground">Google Ads Guide</h1>
-        <p className="text-xs text-muted-foreground mt-1">
-          Step-by-step playbook to set up, run and scale Google Ads for retail — based on strategies from Ben Heath ($300M+ ad spend).
-        </p>
-      </div>
-
+    <div className="space-y-6">
       {/* Overall progress */}
       <Card className="border-primary/30">
         <CardContent className="p-4 space-y-2">

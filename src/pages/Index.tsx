@@ -29,6 +29,7 @@ import CollabSEOFlow from "@/components/CollabSEOFlow";
 import NotificationBell from "@/components/NotificationBell";
 import AdsGuideTabs from "@/components/AdsGuideTabs";
 import GoogleAdsSetupWizard from "@/components/GoogleAdsSetupWizard";
+import MetaAdsSetupWizard from "@/components/MetaAdsSetupWizard";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";

@@ -12,7 +12,7 @@ const baseTabs = [
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "history", label: "History", icon: FolderOpen },
   { id: "tools", label: "Tools", icon: Wrench },
-  { id: "google_ads", label: "Ads", icon: Megaphone },
+  { id: "google_ads", label: "Marketing", icon: Megaphone },
   { id: "help", label: "Help", icon: HelpCircle },
   { id: "account", label: "Account", icon: User },
 ];

@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
           await supabaseAdmin
             .from("shopify_connections")
             .update({ shop_name: data.shop.name, updated_at: new Date().toISOString() })
-            .eq("user_id", user.id);
+            .eq("user_id", userId);
         }
         result = { shop: data.shop };
         break;

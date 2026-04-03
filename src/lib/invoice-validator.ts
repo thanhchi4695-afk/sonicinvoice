@@ -352,26 +352,84 @@ export function validateAndCleanProducts(
       issues.push("No cost price, using RRP as reference");
     }
 
-    // ── Confidence scoring ──
+    // ── Confidence scoring with positive/negative signals ──
+    const signals: ConfidenceSignal[] = [];
     let confidence = 0;
+
     if (!rejected) {
-      if (isValidTitle(p.name)) confidence += 30;
-      if (p.brand?.trim()) confidence += 10;
-      if (p.type?.trim()) confidence += 10;
-      if (p.sku?.trim()) confidence += 10;
-      if (p.barcode?.trim()) confidence += 10;
-      if (p.cost > 0) confidence += 15;
-      if (p.rrp > 0) confidence += 5;
-      if (p.qty > 0) confidence += 5;
-      if (p.colour?.trim()) confidence += 3;
-      if (p.size?.trim()) confidence += 2;
+      // ── Positive signals ──
+      if (isValidTitle(p.name) && p.name.length > 5) {
+        signals.push({ label: "Valid descriptive title", delta: 20 });
+        confidence += 20;
+      }
+      if (p.cost > 0 && !isNaN(p.cost)) {
+        signals.push({ label: "Price detected", delta: 15 });
+        confidence += 15;
+      }
+      if (p.qty > 0) {
+        signals.push({ label: "Quantity detected", delta: 10 });
+        confidence += 10;
+      }
+      if (p.brand?.trim()) {
+        signals.push({ label: "Vendor assigned", delta: 10 });
+        confidence += 10;
+      }
+      if (p.sku?.trim() || p.barcode?.trim()) {
+        signals.push({ label: "SKU / barcode present", delta: 10 });
+        confidence += 10;
+      }
+      if (p.type?.trim()) {
+        signals.push({ label: "Product type set", delta: 10 });
+        confidence += 10;
+      }
+      // Brand + product keywords
+      const PRODUCT_KEYWORDS = /dress|top|bikini|pant|skirt|shirt|blouse|jacket|coat|short|sandal|shoe|boot|bag|hat/i;
+      if (PRODUCT_KEYWORDS.test(p.name)) {
+        signals.push({ label: "Title contains product keyword", delta: 5 });
+        confidence += 5;
+      }
+      if (p.rrp > 0) {
+        signals.push({ label: "RRP / compare-at price present", delta: 5 });
+        confidence += 5;
+      }
+      if (p.colour?.trim() || p.size?.trim()) {
+        signals.push({ label: "Variant data present", delta: 5 });
+        confidence += 5;
+      }
+      // Consistent row (has both title + price)
+      if (isValidTitle(p.name) && p.cost > 0) {
+        signals.push({ label: "Row structure complete", delta: 10 });
+        confidence += 10;
+      }
+
+      // ── Negative signals ──
+      if (!p.cost || p.cost <= 0) {
+        signals.push({ label: "Missing price", delta: -20 });
+        confidence -= 20;
+      }
+      if (p.name.length < 3 && p.name.length > 0) {
+        signals.push({ label: "Title too short", delta: -15 });
+        confidence -= 15;
+      }
+      if (rowCorrections.length > 0) {
+        signals.push({ label: "Required AI corrections", delta: -10 });
+        confidence -= 10;
+      }
+      // Duplicate-like check within current batch
+      const nameKey = p.name.toLowerCase();
+      if (nameCounts[nameKey] && nameCounts[nameKey] > 1 && nameCounts[nameKey] < repeatedThreshold) {
+        signals.push({ label: "Possible duplicate text", delta: -10 });
+        confidence -= 10;
+      }
     }
-    confidence = Math.min(100, confidence);
+
+    confidence = Math.max(0, Math.min(100, confidence));
 
     const confidenceLevel: "high" | "medium" | "low" =
-      rejected ? "low" : confidence >= 70 ? "high" : confidence >= 40 ? "medium" : "low";
+      rejected ? "low" : confidence >= 90 ? "high" : confidence >= 70 ? "medium" : "low";
 
     if (rejected) {
+      signals.push({ label: rejectReason || "Invalid row", delta: -100 });
       rejectedRows.push({ row: i, name: rawName || "(empty)", reason: rejectReason || "Invalid" });
     }
 
@@ -382,6 +440,7 @@ export function validateAndCleanProducts(
       _rawCost: rawCost,
       _confidence: rejected ? 0 : confidence,
       _confidenceLevel: confidenceLevel,
+      _confidenceReasons: signals,
       _issues: issues,
       _corrections: rowCorrections,
       _rejected: rejected,

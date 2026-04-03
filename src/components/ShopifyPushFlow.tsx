@@ -191,12 +191,25 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
   return (
     <>
       <div className="bg-card rounded-lg border border-border p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <ShoppingBag className="w-4 h-4 text-primary" />
-          <h4 className="text-sm font-semibold">Push to Shopify</h4>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4 text-primary" />
+            <h4 className="text-sm font-semibold">Push to Shopify</h4>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className={`text-[10px] font-medium ${useGraphQL ? "text-primary" : "text-muted-foreground"}`}>
+              {useGraphQL ? "GraphQL API" : "REST API"}
+            </span>
+            <button
+              onClick={() => setUseGraphQL(!useGraphQL)}
+              className={`w-8 h-4 rounded-full transition-colors relative ${useGraphQL ? "bg-primary" : "bg-muted"}`}
+            >
+              <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${useGraphQL ? "left-4" : "left-0.5"}`} />
+            </button>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          {products.length} products ready · Creates as {productStatus}s for your review
+          {products.length} products ready · Creates as {productStatus}s via {useGraphQL ? "GraphQL Admin API" : "REST API"}
         </p>
         <Button
           variant="teal"

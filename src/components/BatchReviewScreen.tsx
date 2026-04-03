@@ -447,7 +447,11 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
                 <div className="flex items-center py-1">
                   <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleSelect(p.id)} />
                 </div>
-                <EditableCell value={p.title} onChange={v => updateField(p._idx, "title", v)} className="font-medium" />
+                <div className="flex items-center gap-0.5">
+                  <EditableCell value={p.title} onChange={v => updateField(p._idx, "title", v)} className="font-medium flex-1" />
+                  <SmartNamingButton currentTitle={p.title} currentType={p.type} vendor={p.vendor} sku={p.sku} barcode={p.barcode} colour={p.colour}
+                    onApply={r => { updateField(p._idx, "title", r.title); updateField(p._idx, "type", r.type); updateField(p._idx, "description", r.description); updateField(p._idx, "tags", r.tags); }} />
+                </div>
                 <EditableCell value={p.type} onChange={v => updateField(p._idx, "type", v)} />
                 <EditableCell value={p.vendor} onChange={v => updateField(p._idx, "vendor", v)} />
                 <EditableCell value={p.sku} onChange={v => updateField(p._idx, "sku", v)} mono />

@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   ChevronLeft, Download, Search, Filter, Check, AlertTriangle,
   CheckCircle2, Trash2, Tag, Layers, Copy as CopyIcon, ChevronDown,
-  ArrowUpDown, Eye, FileCheck, Sparkles, RefreshCw, DollarSign
+  ArrowUpDown, Eye, FileCheck, Sparkles, RefreshCw, DollarSign, Rocket
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

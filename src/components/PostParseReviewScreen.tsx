@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/lib/invoice-validator";
 
 interface PostParseReviewScreenProps {

@@ -1143,8 +1143,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                       </span>
                     </div>
                     <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
+                      {!processingDone && (
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-loading-bar" />
+                      )}
                       <div
-                        className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all duration-500 ease-out"
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-primary/70 rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${pct}%` }}
                       />
                     </div>

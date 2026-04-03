@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink } from "lucide-react";
+import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { getCollectionRules, saveCollectionRules, resetCollectionRules, type CollectionRule } from "@/lib/collection-engine";
 import {
   saveConnection, testConnection, getConnection, deleteConnection,
@@ -338,7 +339,17 @@ const AccountScreen = () => {
 
       <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); }}>Save settings</Button>
 
-      <Button variant="ghost" className="w-full mt-6 text-destructive h-12">
+      {/* Billing / Plan */}
+      <BillingSection />
+
+      <Button
+        variant="ghost"
+        className="w-full mt-6 text-destructive h-12"
+        onClick={async () => {
+          await supabase.auth.signOut();
+          window.location.href = "/";
+        }}
+      >
         <LogOut className="w-4 h-4 mr-2" /> Sign out
       </Button>
 
@@ -354,6 +365,110 @@ const AccountScreen = () => {
     </div>
   );
 };
+
+// ─── Billing Section ────────────────────────────────────────────────
+function BillingSection() {
+  const [billingStatus, setBillingStatus] = useState<{
+    has_subscription: boolean;
+    plan_name: string | null;
+    status: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [subscribing, setSubscribing] = useState(false);
+
+  useEffect(() => {
+    checkBillingStatus();
+  }, []);
+
+  const checkBillingStatus = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("shopify-billing", {
+        body: { action: "status" },
+      });
+      if (!error && data) {
+        setBillingStatus(data);
+      }
+    } catch (err) {
+      console.error("Billing check failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubscribe = async () => {
+    setSubscribing(true);
+    try {
+      const returnUrl = window.location.href;
+      const { data, error } = await supabase.functions.invoke("shopify-billing", {
+        body: { action: "create", return_url: returnUrl, test: true },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.confirmation_url) {
+        // Redirect merchant to Shopify's approval screen
+        window.location.href = data.confirmation_url;
+      }
+    } catch (err) {
+      console.error("Subscribe failed:", err);
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Section title="💳 Plan & Billing">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="w-3 h-3 animate-spin" /> Checking billing status...
+        </div>
+      </Section>
+    );
+  }
+
+  return (
+    <Section title="💳 Plan & Billing">
+      {billingStatus?.has_subscription ? (
+        <div className="bg-muted/30 rounded-xl p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold">{billingStatus.plan_name || "Sonic Invoice Pro"}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Status: <span className="text-foreground font-medium capitalize">{billingStatus.status}</span>
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Manage your subscription from the Shopify admin → Apps section.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-muted/30 rounded-xl p-4 space-y-3">
+          <div className="text-center">
+            <p className="text-sm font-semibold mb-1">Sonic Invoice Pro</p>
+            <p className="text-2xl font-bold font-display">$29<span className="text-sm text-muted-foreground font-normal">/month</span></p>
+            <p className="text-xs text-muted-foreground mt-1">14-day free trial included</p>
+          </div>
+          <ul className="text-xs text-muted-foreground space-y-1">
+            <li className="flex items-center gap-1.5"><Check className="w-3 h-3 text-primary" /> Unlimited invoice processing</li>
+            <li className="flex items-center gap-1.5"><Check className="w-3 h-3 text-primary" /> Direct Shopify product push</li>
+            <li className="flex items-center gap-1.5"><Check className="w-3 h-3 text-primary" /> AI enrichment & SEO</li>
+            <li className="flex items-center gap-1.5"><Check className="w-3 h-3 text-primary" /> Restock analytics</li>
+          </ul>
+          <Button
+            variant="teal"
+            className="w-full h-10"
+            onClick={handleSubscribe}
+            disabled={subscribing}
+          >
+            {subscribing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Start free trial
+          </Button>
+          <p className="text-[10px] text-muted-foreground text-center">
+            You'll be redirected to Shopify to approve. No charge until trial ends.
+          </p>
+        </div>
+      )}
+    </Section>
+  );
+}
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="mb-6">

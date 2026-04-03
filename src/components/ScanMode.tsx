@@ -462,6 +462,17 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
     toast.success(`Exported ${products.length} products`);
   };
 
+  // ── Batch review screen ──
+  if (showBatchReview) {
+    return (
+      <BatchReviewScreen
+        products={products}
+        onBack={() => setShowBatchReview(false)}
+        onSetProducts={setProducts}
+      />
+    );
+  }
+
   // ── Export review screen ──
   if (showExportReview) {
     return (

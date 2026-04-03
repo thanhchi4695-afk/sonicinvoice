@@ -13,38 +13,55 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const messages: Array<{ role: string; content: any }> = [
-      {
-        role: "system",
-        content: `You are a product data assistant for ${storeName || "a retail store"} in ${storeCity || "Australia"}.
-Given a product description, barcode, or image, generate clean Shopify-ready product data.
+    const systemPrompt = `You are a retail product identification assistant for ${storeName || "a retail store"} in ${storeCity || "Australia"}.
 
-Rules:
-- Title: Brand + Product Type + Key Feature. Clean, no supplier codes or noise.
-- Type: Category like Dress, Shoes, Swimwear, Accessories, etc.
-- Vendor: Brand name if detectable.
-- Description: 1-2 sentence retail description.
-- Tags: comma-separated relevant tags.
-- Australian English.
+TASK: Analyze the input and generate a clean, Shopify-ready product draft.
+
+RULES:
+- Title: Clean, retail-friendly. Format: Key attributes + Product type. Example: "Blue Floral Midi Dress", "Tan Flat Sandals"
+- Do NOT invent brand names unless clearly visible/readable
+- Do NOT guess exact materials unless visually obvious
+- Do NOT guess price or size
+- Use only what is visually supported
+- Keep description to 1-2 factual sentences about visible features
+- Australian English
+
+PRODUCT TYPES to choose from:
+Dresses, Tops, Pants, Shorts, Skirts, Swimwear, Shoes, Sandals, Boots, Bags, Accessories, Jewellery, Hats, Homewares, Gifts, Jackets, Knitwear, Activewear, Sleepwear, Lingerie, General
+
+CONFIDENCE SCORING:
+- 90-100: Clear product, obvious category, visible details
+- 70-89: Identifiable but some attributes uncertain
+- Below 70: Unclear image, folded/packaged item, ambiguous product
 
 RESPOND WITH JSON ONLY:
-{"title":"...","type":"...","vendor":"...","description":"...","tags":"..."}`,
-      },
+{
+  "product_title": "string",
+  "product_type": "string",
+  "short_description": "string",
+  "tags": ["tag1", "tag2"],
+  "colour": "string or empty",
+  "pattern": "string or empty",
+  "confidence_score": number,
+  "confidence_reason": "string explaining the score"
+}`;
+
+    const messages: Array<{ role: string; content: any }> = [
+      { role: "system", content: systemPrompt },
     ];
 
     if (mode === "image") {
-      // input is a base64 data URL
       messages.push({
         role: "user",
         content: [
-          { type: "text", text: "Identify this product and generate Shopify-ready product data." },
+          { type: "text", text: "Identify this product from the image. Generate a Shopify-ready product draft with confidence score." },
           { type: "image_url", image_url: { url: input } },
         ],
       });
     } else {
       messages.push({
         role: "user",
-        content: `Generate product data for: "${input}"`,
+        content: `Generate a Shopify-ready product draft for: "${input}"`,
       });
     }
 
@@ -67,7 +84,7 @@ RESPOND WITH JSON ONLY:
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted." }), {
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -80,31 +97,44 @@ RESPOND WITH JSON ONLY:
     const raw = data.choices?.[0]?.message?.content || "";
     const clean = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
-    try {
-      const parsed = JSON.parse(clean);
-      return new Response(JSON.stringify(parsed), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    } catch {
+    const tryParse = (str: string) => {
+      try { return JSON.parse(str); } catch { return null; }
+    };
+
+    let parsed = tryParse(clean);
+    if (!parsed) {
       const match = clean.match(/\{[\s\S]*\}/);
-      if (match) {
-        try {
-          const parsed = JSON.parse(match[0]);
-          return new Response(JSON.stringify(parsed), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        } catch {}
-      }
-      return new Response(JSON.stringify({
-        title: input?.substring?.(0, 50) || "Product",
-        type: "General",
-        vendor: "",
-        description: "",
-        tags: "",
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (match) parsed = tryParse(match[0]);
     }
+
+    if (!parsed) {
+      parsed = {
+        product_title: input?.substring?.(0, 50) || "Product",
+        product_type: "General",
+        short_description: "",
+        tags: [],
+        colour: "",
+        pattern: "",
+        confidence_score: 30,
+        confidence_reason: "Could not parse AI response",
+      };
+    }
+
+    // Normalize response
+    const result = {
+      product_title: parsed.product_title || parsed.title || "Product",
+      product_type: parsed.product_type || parsed.type || "General",
+      short_description: parsed.short_description || parsed.description || "",
+      tags: Array.isArray(parsed.tags) ? parsed.tags : (parsed.tags || "").split(",").map((t: string) => t.trim()).filter(Boolean),
+      colour: parsed.colour || parsed.color || "",
+      pattern: parsed.pattern || "",
+      confidence_score: typeof parsed.confidence_score === "number" ? parsed.confidence_score : 50,
+      confidence_reason: parsed.confidence_reason || "",
+    };
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
     console.error("scan-mode-ai error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {

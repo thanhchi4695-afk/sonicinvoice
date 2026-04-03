@@ -165,6 +165,7 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
   const sym = config.currencySymbol || "$";
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showPipeline, setShowPipeline] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterMode>("all");
   const [sortKey, setSortKey] = useState<SortKey>("title");

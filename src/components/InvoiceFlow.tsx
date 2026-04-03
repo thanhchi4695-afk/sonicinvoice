@@ -621,6 +621,18 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     barcode?: string;
     vendorCode?: string;
     matchSource?: MatchSource;
+    // Enrichment fields
+    enriched?: boolean;
+    enriching?: boolean;
+    imageSrc?: string;
+    imageUrls?: string[];
+    desc?: string;
+    fabric?: string;
+    care?: string;
+    origin?: string;
+    productPageUrl?: string;
+    enrichConfidence?: string;
+    enrichNote?: string;
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);

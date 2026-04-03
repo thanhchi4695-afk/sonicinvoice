@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     const { data: conn, error: connError } = await supabaseAdmin
       .from("shopify_connections")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
 
     if (connError || !conn) {

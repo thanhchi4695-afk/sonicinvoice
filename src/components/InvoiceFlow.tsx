@@ -1299,7 +1299,13 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
-          {/* Processing time + confidence summary banner */}
+          {/* Debug panel for parsed invoice data */}
+          {validationDebug && validatedProducts.length > 0 && (
+            <div className="mb-3">
+              <InvoiceDebugPanel debug={validationDebug} products={validatedProducts} />
+            </div>
+          )}
+
           {processingDone && finalProcessingTime > 0 && (
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 mb-3 space-y-1.5">
               <span className="text-xs text-primary font-medium font-mono-data block">

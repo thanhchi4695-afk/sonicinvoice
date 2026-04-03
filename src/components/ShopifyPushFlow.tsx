@@ -5,7 +5,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from "@/components/ui/dialog";
 import { Check, X, Loader2, ExternalLink, Download, ShoppingBag, AlertTriangle, RotateCcw } from "lucide-react";
-import { PushProduct, PushResult, pushProducts, getConnection, recordPush } from "@/lib/shopify-api";
+import { PushProduct, PushResult, pushProducts, getConnection, recordPush, pushProductGraphQL } from "@/lib/shopify-api";
 
 interface ShopifyPushFlowProps {
   products: PushProduct[];

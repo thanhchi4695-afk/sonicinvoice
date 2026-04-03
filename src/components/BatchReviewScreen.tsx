@@ -2,12 +2,13 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   ChevronLeft, Download, Search, Filter, Check, AlertTriangle,
   CheckCircle2, Trash2, Tag, Layers, Copy as CopyIcon, ChevronDown,
-  ArrowUpDown, Eye, FileCheck
+  ArrowUpDown, Eye, FileCheck, Sparkles, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { getStoreConfig } from "@/lib/prompt-builder";
+import { SmartNamingButton, runBulkSmartNaming } from "@/components/SmartNamingPanel";
 import {
   validateForExport, generateShopifyCSV, inferCategory, generateHandles,
   type ScannedProductForExport,

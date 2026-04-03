@@ -423,6 +423,86 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "create_custom_collection": {
+        if (!body.collection) {
+          return new Response(JSON.stringify({ error: "Missing collection data" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const resp = await shopifyFetch("/custom_collections.json", {
+          method: "POST",
+          body: JSON.stringify({ custom_collection: body.collection }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to create collection", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: data.custom_collection };
+        break;
+      }
+
+      case "update_custom_collection": {
+        if (!body.collection_id || !body.collection) {
+          return new Response(JSON.stringify({ error: "Missing collection_id or collection data" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const resp = await shopifyFetch(`/custom_collections/${body.collection_id}.json`, {
+          method: "PUT",
+          body: JSON.stringify({ custom_collection: { id: body.collection_id, ...body.collection } }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to update collection", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: data.custom_collection };
+        break;
+      }
+
+      case "create_smart_collection": {
+        if (!body.collection) {
+          return new Response(JSON.stringify({ error: "Missing collection data" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const resp = await shopifyFetch("/smart_collections.json", {
+          method: "POST",
+          body: JSON.stringify({ smart_collection: body.collection }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to create smart collection", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: data.smart_collection };
+        break;
+      }
+
+      case "update_smart_collection": {
+        if (!body.collection_id || !body.collection) {
+          return new Response(JSON.stringify({ error: "Missing collection_id or collection data" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const resp = await shopifyFetch(`/smart_collections/${body.collection_id}.json`, {
+          method: "PUT",
+          body: JSON.stringify({ smart_collection: { id: body.collection_id, ...body.collection } }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to update smart collection", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: data.smart_collection };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

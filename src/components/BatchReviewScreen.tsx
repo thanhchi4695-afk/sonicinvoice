@@ -168,6 +168,7 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
   const [showPreview, setShowPreview] = useState(false);
   const [bulkNaming, setBulkNaming] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  const [bulkSEO, setBulkSEO] = useState(false);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);

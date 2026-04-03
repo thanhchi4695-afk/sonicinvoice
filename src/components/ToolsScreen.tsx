@@ -989,6 +989,7 @@ const ToolsScreen = () => {
   if (activeTool === "export_collections") return <ExportCollections onBack={() => setActiveTool(null)} />;
   if (activeTool === "import_collections") return <ImportCollections onBack={() => setActiveTool(null)} />;
   if (activeTool === "auto_collections") return <AutoCollectionBuilder onBack={() => setActiveTool(null)} />;
+  if (activeTool === "collection_seo") return <CollectionSEOPanel onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

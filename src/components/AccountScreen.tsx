@@ -25,6 +25,8 @@ const AccountScreen = () => {
   const [lsVersion, setLsVersion] = useState<LightspeedVersion>("x_series");
   const [markup, setMarkup] = useState("2.35");
   const [rounding, setRounding] = useState("nearest_05");
+  const [storeCity, setStoreCity] = useState("");
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState("");
 
   // Shopify connection
   const [shopifyUrl, setShopifyUrl] = useState("");

@@ -128,6 +128,8 @@ RESPOND WITH JSON ONLY:
       tags: Array.isArray(parsed.tags) ? parsed.tags : (parsed.tags || "").split(",").map((t: string) => t.trim()).filter(Boolean),
       colour: parsed.colour || parsed.color || "",
       pattern: parsed.pattern || "",
+      sku: parsed.sku || "",
+      barcode: parsed.barcode || "",
       confidence_score: typeof parsed.confidence_score === "number" ? parsed.confidence_score : 50,
       confidence_reason: parsed.confidence_reason || "",
     };

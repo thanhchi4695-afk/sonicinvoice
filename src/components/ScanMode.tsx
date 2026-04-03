@@ -545,10 +545,13 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
           ))}
         </div>
         <div className="shrink-0 px-4 py-3 border-t border-border bg-background space-y-2 safe-bottom">
-          <Button className="w-full h-12 text-base font-semibold" onClick={exportCSV} disabled={products.length === 0}>
-            <Download className="w-5 h-5 mr-2" /> Export {mode.isLightspeed ? "Lightspeed" : "Shopify"} CSV
+          <Button className="w-full h-12 text-base font-semibold" onClick={() => setShowExportReview(true)} disabled={products.length === 0}>
+            <FileCheck className="w-5 h-5 mr-2" /> Review & Export Shopify CSV
           </Button>
-          <Button variant="outline" className="w-full h-10" onClick={() => setShowList(false)}>
+          <Button variant="outline" className="w-full h-10" onClick={exportCSV} disabled={products.length === 0}>
+            <Download className="w-4 h-4 mr-1" /> Quick Export CSV
+          </Button>
+          <Button variant="ghost" className="w-full h-10" onClick={() => setShowList(false)}>
             <Plus className="w-4 h-4 mr-1" /> Add more items
           </Button>
         </div>

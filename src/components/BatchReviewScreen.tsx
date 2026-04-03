@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { getStoreConfig } from "@/lib/prompt-builder";
 import { SmartNamingButton, runBulkSmartNaming } from "@/components/SmartNamingPanel";
 import { SEOButton, runBulkSEO } from "@/components/SEOPanel";
+import { PricingButton, calculateBulkPrices } from "@/components/PricingStrategyPanel";
 import {
   validateForExport, generateShopifyCSV, inferCategory, generateHandles,
   type ScannedProductForExport,

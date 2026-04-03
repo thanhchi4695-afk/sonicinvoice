@@ -202,3 +202,30 @@ export async function pushProducts(
 
   return results;
 }
+
+/* ─── Collections ─── */
+export interface ShopifyCollection {
+  id: number;
+  handle: string;
+  title: string;
+  body_html: string | null;
+  image: { src: string } | null;
+  sort_order: string;
+  published_at: string | null;
+  template_suffix: string | null;
+  created_at: string;
+  updated_at: string;
+  // Smart collection fields
+  rules?: { column: string; relation: string; condition: string }[];
+  disjunctive?: boolean;
+}
+
+export async function getCustomCollections(): Promise<ShopifyCollection[]> {
+  const data = await callProxy({ action: "get_custom_collections" });
+  return data.collections || [];
+}
+
+export async function getSmartCollections(): Promise<ShopifyCollection[]> {
+  const data = await callProxy({ action: "get_smart_collections" });
+  return data.collections || [];
+}

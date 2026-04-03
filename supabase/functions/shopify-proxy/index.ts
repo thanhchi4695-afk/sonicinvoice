@@ -7,7 +7,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo" | "graphql_create_product";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant
@@ -371,6 +371,52 @@ Deno.serve(async (req) => {
         }
 
         result = { product: productResult?.product };
+        break;
+      }
+
+      case "get_custom_collections": {
+        const allCollections: unknown[] = [];
+        let pageInfo: string | null = null;
+        do {
+          const url = pageInfo
+            ? `/custom_collections.json?limit=250&page_info=${pageInfo}`
+            : "/custom_collections.json?limit=250";
+          const resp = await shopifyFetch(url);
+          const data = await resp.json();
+          if (!resp.ok) {
+            return new Response(JSON.stringify({ error: "Failed to fetch custom collections", details: data }), {
+              status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          allCollections.push(...(data.custom_collections || []));
+          const linkHeader = resp.headers.get("link") || "";
+          const nextMatch = linkHeader.match(/page_info=([^>&]+)>;\s*rel="next"/);
+          pageInfo = nextMatch ? nextMatch[1] : null;
+        } while (pageInfo);
+        result = { collections: allCollections };
+        break;
+      }
+
+      case "get_smart_collections": {
+        const allSmarts: unknown[] = [];
+        let smartPageInfo: string | null = null;
+        do {
+          const url = smartPageInfo
+            ? `/smart_collections.json?limit=250&page_info=${smartPageInfo}`
+            : "/smart_collections.json?limit=250";
+          const resp = await shopifyFetch(url);
+          const data = await resp.json();
+          if (!resp.ok) {
+            return new Response(JSON.stringify({ error: "Failed to fetch smart collections", details: data }), {
+              status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          allSmarts.push(...(data.smart_collections || []));
+          const linkHeader = resp.headers.get("link") || "";
+          const nextMatch = linkHeader.match(/page_info=([^>&]+)>;\s*rel="next"/);
+          smartPageInfo = nextMatch ? nextMatch[1] : null;
+        } while (smartPageInfo);
+        result = { collections: allSmarts };
         break;
       }
 

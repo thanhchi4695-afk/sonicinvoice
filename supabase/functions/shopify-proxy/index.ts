@@ -5,8 +5,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo";
-  // For push_product
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo" | "graphql_create_product";
+  // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant
   sku?: string;

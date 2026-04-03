@@ -9,6 +9,7 @@ import { lookupCatalog } from "@/lib/catalog-memory";
 import { matchProduct, lookupBarcode, saveBarcodeToCatalog, validateGTIN, extractColourFromTitle, extractSizeFromTitle } from "@/lib/barcode-catalog";
 import { generateShopifyCSV, type ScannedProductForExport } from "@/lib/shopify-csv-schema";
 import ScanExportReview from "@/components/ScanExportReview";
+import BatchReviewScreen from "@/components/BatchReviewScreen";
 
 interface ScannedProduct {
   id: string;

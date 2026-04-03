@@ -621,11 +621,99 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     barcode?: string;
     vendorCode?: string;
     matchSource?: MatchSource;
+    // Enrichment fields
+    enriched?: boolean;
+    enriching?: boolean;
+    imageSrc?: string;
+    imageUrls?: string[];
+    desc?: string;
+    fabric?: string;
+    care?: string;
+    origin?: string;
+    productPageUrl?: string;
+    enrichConfidence?: string;
+    enrichNote?: string;
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
+  const [enrichAllRunning, setEnrichAllRunning] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
 
-  // Flatten for backward-compat with cost tracking etc.
+  // ── Product Enrichment via AI ────────────────────────────
+  const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {
+    try {
+      const storeConfig = JSON.parse(localStorage.getItem('store_config_sonic_invoice') || '{}');
+      const storeName = storeConfig.name || 'My Store';
+      const storeCity = storeConfig.city || '';
+      const customInstr = storeConfig.defaultInstructions || '';
+      
+      // Look up brand website from brand directory
+      const brandDir = JSON.parse(localStorage.getItem('brand_directory_sonic_invoice') || '[]');
+      const brandEntry = brandDir.find((b: any) => b.name.toLowerCase() === group.brand.toLowerCase());
+      const brandWebsite = brandEntry?.website || '';
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-product`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          title: group.name,
+          vendor: group.brand,
+          type: group.type,
+          brandWebsite,
+          storeName,
+          storeCity,
+          customInstructions: customInstr,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Failed' }));
+        return { enrichConfidence: 'low', enrichNote: err.error || 'Enrichment failed' };
+      }
+
+      const result = await response.json();
+      return {
+        desc: result.description && result.description.length > 20 ? result.description : undefined,
+        imageUrls: result.imageUrls?.length > 0 ? result.imageUrls : undefined,
+        imageSrc: result.imageUrls?.[0] || undefined,
+        fabric: result.fabric || undefined,
+        care: result.care || undefined,
+        origin: result.origin || undefined,
+        productPageUrl: result.productPageUrl || '',
+        enrichConfidence: result.confidence || 'low',
+        enrichNote: result.note || '',
+      };
+    } catch (e) {
+      return { enrichConfidence: 'low', enrichNote: e instanceof Error ? e.message : 'Network error' };
+    }
+  };
+
+  const runEnrichment = async (idx: number) => {
+    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, enriching: true } : g));
+    const result = await enrichProduct(productGroups[idx]);
+    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g));
+    addAuditEntry('Enriched', `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence`);
+  };
+
+  const runEnrichAll = async () => {
+    const unenriched = productGroups.map((g, i) => ({ g, i })).filter(({ g }) => g.name && !g.enriched);
+    if (unenriched.length === 0) return;
+    setEnrichAllRunning(true);
+    setEnrichProgress({ current: 0, total: unenriched.length });
+    for (let j = 0; j < unenriched.length; j++) {
+      setEnrichProgress({ current: j + 1, total: unenriched.length });
+      await runEnrichment(unenriched[j].i);
+      if (j < unenriched.length - 1) await new Promise(r => setTimeout(r, 700));
+    }
+    setEnrichAllRunning(false);
+  };
+
+  const setProductImage = (idx: number, url: string) => {
+    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, imageSrc: url } : g));
+  };
   const mockProducts = productGroups.map(g => ({
     name: g.name,
     sku: g.variants[0]?.sku || g.vendorCode || "",
@@ -1320,12 +1408,39 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             )}
           </div>
 
+          {/* Enrichment status bar */}
+          {(() => {
+            const enrichedCount = productGroups.filter(g => g.enriched).length;
+            const withImg = productGroups.filter(g => g.imageSrc).length;
+            return enrichedCount > 0 ? (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 mb-3 flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="text-xs text-primary font-medium">
+                  {enrichedCount}/{productGroups.length} enriched · {withImg} with images
+                </span>
+              </div>
+            ) : null;
+          })()}
+
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-medium">{productGroups.length} products found</p>
               <p className="text-[10px] text-muted-foreground">{totalVariantLines} lines → {groupedCount} grouped + {standaloneCount} standalone</p>
             </div>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={runEnrichAll}
+                disabled={enrichAllRunning}
+                className="gap-1"
+              >
+                {enrichAllRunning ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enriching {enrichProgress.current}/{enrichProgress.total}...</>
+                ) : (
+                  <><Zap className="w-3.5 h-3.5" /> ✦ Enrich all</>
+                )}
+              </Button>
               {mergeSelection.length >= 2 ? (
                 <Button variant="outline" size="sm" onClick={handleMergeSelected} className="gap-1 text-primary border-primary">
                   <Link className="w-3.5 h-3.5" /> Group {mergeSelection.length} as variants
@@ -1397,8 +1512,21 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                             metafields: group.metafields,
                             costChange: costChanges.find(c => c.name === group.name)?.costChange || null,
                             isNew: costChanges.find(c => c.name === group.name)?.isNew,
+                            enriched: group.enriched,
+                            enriching: group.enriching,
+                            imageSrc: group.imageSrc,
+                            imageUrls: group.imageUrls,
+                            desc: group.desc,
+                            fabric: group.fabric,
+                            care: group.care,
+                            origin: group.origin,
+                            productPageUrl: group.productPageUrl,
+                            enrichConfidence: group.enrichConfidence,
+                            enrichNote: group.enrichNote,
                           }}
                           onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
+                          onEnrich={() => runEnrichment(i)}
+                          onSetImage={(url) => setProductImage(i, url)}
                         />
                       </div>
                     )}
@@ -1997,7 +2125,7 @@ const VariantGroupCard = ({ group, onSplit, onPreview }: {
   );
 };
 
-const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
+const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean; enriched?: boolean; enriching?: boolean; imageSrc?: string; imageUrls?: string[]; desc?: string; fabric?: string; care?: string; origin?: string; productPageUrl?: string; enrichConfidence?: string; enrichNote?: string }; onPreview?: () => void; onEnrich?: () => void; onSetImage?: (url: string) => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [savedToBarcodeCatalog, setSavedToBarcodeCatalog] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
@@ -2019,7 +2147,15 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       <button onClick={() => setExpanded(!expanded)} className="w-full px-4 py-3 text-left">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3">
+          {/* Image thumbnail */}
+          <div className="shrink-0 w-11 h-11 rounded bg-muted border border-border flex items-center justify-center overflow-hidden">
+            {product.imageSrc ? (
+              <img src={product.imageSrc} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            ) : (
+              <span className="text-base text-muted-foreground">📷</span>
+            )}
+          </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate">{product.name}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -2029,7 +2165,6 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
               {" · "}${product.rrp.toFixed(2)}
               {product.sku && <> · <span className="font-mono-data">{product.sku}</span></>}
             </p>
-            {/* Barcode display */}
             {product.barcode && (
               <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
                 <Barcode className="w-3 h-3" />
@@ -2038,7 +2173,6 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
                 {product.barcode && product.matchSource !== "barcode" && <span className="text-warning">· Not in catalog</span>}
               </p>
             )}
-            {/* Collection pills */}
             {(() => {
               const tags = [product.type, product.brand, "new arrivals", "Womens", "Swimwear", "full_price"].filter(Boolean);
               const cols = matchCollectionsWithBrand(tags, product.brand);
@@ -2051,7 +2185,6 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
                 </div>
               ) : null;
             })()}
-            {/* Cost change badge */}
             {product.costChange && product.costChange.changePct !== 0 && (
               <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${
                 product.costChange.changePct > 5 ? "bg-destructive/15 text-destructive" :
@@ -2064,10 +2197,19 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
             {product.isNew && !product.costChange && (
               <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] bg-muted text-muted-foreground">New — no price history</span>
             )}
-            {/* Margin indicator */}
             {margin !== null && (
               <span className={`inline-block mt-0.5 text-[9px] ${margin < 25 ? "text-destructive" : margin < 40 ? "text-warning" : "text-muted-foreground"}`}>
                 {margin < 25 && "⚠ "}Margin: {margin.toFixed(0)}%
+              </span>
+            )}
+            {/* Enrichment badge */}
+            {product.enriched && (
+              <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                product.enrichConfidence === 'high' ? 'bg-success/15 text-success' :
+                product.enrichConfidence === 'medium' ? 'bg-warning/15 text-warning' :
+                'bg-destructive/15 text-destructive'
+              }`}>
+                ✦ {product.enrichConfidence} confidence
               </span>
             )}
           </div>
@@ -2185,7 +2327,52 @@ const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: st
             </div>
           )}
 
+          {/* Enrichment results */}
+          {product.enriched && (
+            <div className="mt-2 pt-2 border-t border-border space-y-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Enrichment results</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                  product.enrichConfidence === 'high' ? 'bg-success/15 text-success' :
+                  product.enrichConfidence === 'medium' ? 'bg-warning/15 text-warning' :
+                  'bg-destructive/15 text-destructive'
+                }`}>{product.enrichConfidence} confidence</span>
+                {product.productPageUrl && (
+                  <a href={product.productPageUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline">View on brand site ↗</a>
+                )}
+              </div>
+              {product.imageUrls && product.imageUrls.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground mb-1">Images found ({product.imageUrls.length}) — click to set as primary</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {product.imageUrls.slice(0, 6).map((url, j) => (
+                      <div key={j} className="relative cursor-pointer" onClick={(e) => { e.stopPropagation(); onSetImage?.(url); }}>
+                        <img src={url} alt="" className={`w-14 h-14 object-cover rounded border ${product.imageSrc === url ? 'border-primary' : 'border-border'}`} onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }} />
+                        {product.imageSrc === url && <div className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center text-[7px] text-primary-foreground">✓</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(product.fabric || product.care || product.origin) && (
+                <div className="grid grid-cols-2 gap-1 text-[11px]">
+                  {product.fabric && <div><span className="text-muted-foreground">Fabric: </span>{product.fabric}</div>}
+                  {product.care && <div><span className="text-muted-foreground">Care: </span>{product.care}</div>}
+                  {product.origin && <div><span className="text-muted-foreground">Origin: </span>{product.origin}</div>}
+                </div>
+              )}
+              {product.enrichNote && (
+                <div className="text-[10px] text-warning bg-warning/10 rounded p-1.5">⚠ {product.enrichNote}</div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2 flex-wrap">
+            {onEnrich && (
+              <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onEnrich(); }} disabled={product.enriching}>
+                {product.enriching ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> Finding...</> : product.enriched ? <><RotateCcw className="w-3.5 h-3.5 mr-1" /> Re-enrich</> : <><Zap className="w-3.5 h-3.5 mr-1" /> ✦ Enrich</>}
+              </Button>
+            )}
             {onPreview && <Button variant="outline" size="sm" onClick={onPreview}><Eye className="w-3.5 h-3.5 mr-1" /> Preview</Button>}
             <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
             <Button variant="ghost" size="sm" className="text-destructive"><X className="w-3.5 h-3.5 mr-1" /> Remove</Button>

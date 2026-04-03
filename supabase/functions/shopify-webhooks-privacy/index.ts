@@ -2,19 +2,22 @@
  * Shopify Mandatory Compliance Webhooks
  * Required for Shopify App Store approval.
  *
- * Handles three compliance topics:
+ * Equivalent to the Express route: POST /webhooks/privacy
+ * Handles all three compliance topics via X-Shopify-Topic header:
  *   - customers/data_request
  *   - customers/redact
  *   - shop/redact
  *
- * Single endpoint — the topic is detected from the X-Shopify-Topic header.
+ * HMAC is verified using the raw body + SHOPIFY_API_SECRET
+ * before any JSON parsing occurs (same as express.raw() pattern).
  */
 
 const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET")!;
 
-// ─── HMAC verification ───────────────────────────────────────────────
+// ─── HMAC verification (timing-safe) ────────────────────────────────
 // Shopify signs every webhook with HMAC-SHA256 using your app's API secret.
-// The signature is sent in the X-Shopify-Hmac-Sha256 header (base64-encoded).
+// The signature is in X-Shopify-Hmac-Sha256 (base64-encoded).
+// We use constant-time comparison to prevent timing attacks.
 async function verifyShopifyHmac(
   rawBody: string,
   hmacHeader: string | null
@@ -30,122 +33,153 @@ async function verifyShopifyHmac(
     ["sign"]
   );
   const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(rawBody));
-  const computed = btoa(String.fromCharCode(...new Uint8Array(signature)));
-  return computed === hmacHeader;
+  const computedBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
+
+  // Timing-safe comparison
+  if (computedBase64.length !== hmacHeader.length) return false;
+  const a = encoder.encode(computedBase64);
+  const b = encoder.encode(hmacHeader);
+  if (a.byteLength !== b.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(a, b);
 }
 
 // ─── Topic handlers ──────────────────────────────────────────────────
 
 /**
  * customers/data_request
- * Shopify sends this when a customer requests their data.
- * TODO: Query your database for any data associated with the customer
- *       (orders, profiles, etc.) and prepare it for export / review.
+ * Shopify sends this when a customer requests their data under GDPR/CCPA.
+ *
+ * TODO (replace placeholder):
+ *   1. Look up all data stored for this customer/shop
+ *   2. Export or compile it for manual review / compliance workflow
+ *   3. Notify your support/compliance inbox if needed
  */
-function handleCustomersDataRequest(payload: Record<string, unknown>) {
-  const shopDomain = payload.shop_domain;
+async function handleCustomerDataRequest(shop: string, payload: Record<string, unknown>) {
   const customer = payload.customer as Record<string, unknown> | undefined;
-  console.log(
-    `[customers/data_request] Shop: ${shopDomain}, Customer ID: ${customer?.id}`
-  );
-  // ──────────────────────────────────────────────────────
-  // PLACEHOLDER: Export relevant customer/order data here.
-  // Example:
-  //   const data = await supabase.from("orders")
-  //     .select("*")
-  //     .eq("shopify_customer_id", customer?.id);
-  //   // Send data to the shop owner or store for later retrieval
-  // ──────────────────────────────────────────────────────
+  console.log("Handle customers/data_request", {
+    shop,
+    customerId: customer?.id,
+    ordersRequested: payload.orders_requested,
+  });
+
+  // Example placeholder:
+  // const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  // await supabase.from("privacy_requests").insert({
+  //   type: "customers/data_request",
+  //   shop,
+  //   customer_id: customer?.id,
+  //   payload,
+  //   status: "pending"
+  // });
 }
 
 /**
  * customers/redact
  * Shopify sends this when a store must redact/delete a customer's data.
- * TODO: Delete or anonymize all personally-identifiable customer data
- *       where legally allowed (keep transaction records if required by law).
+ *
+ * TODO (replace placeholder):
+ *   1. Find all data stored for this customer
+ *   2. Delete or anonymize it unless legally required to retain
  */
-function handleCustomersRedact(payload: Record<string, unknown>) {
-  const shopDomain = payload.shop_domain;
+async function handleCustomerRedact(shop: string, payload: Record<string, unknown>) {
   const customer = payload.customer as Record<string, unknown> | undefined;
-  console.log(
-    `[customers/redact] Shop: ${shopDomain}, Customer ID: ${customer?.id}`
-  );
-  // ──────────────────────────────────────────────────────
-  // PLACEHOLDER: Redact/delete customer data here.
-  // Example:
-  //   await supabase.from("customer_profiles")
-  //     .delete()
-  //     .eq("shopify_customer_id", customer?.id);
-  // ──────────────────────────────────────────────────────
+  console.log("Handle customers/redact", {
+    shop,
+    customerId: customer?.id,
+  });
+
+  // Example placeholder:
+  // const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  // if (customer?.id) {
+  //   await supabase.from("customer_data").delete()
+  //     .eq("shop", shop).eq("shopify_customer_id", customer.id);
+  // }
 }
 
 /**
  * shop/redact
  * Shopify sends this 48 hours after a store uninstalls your app.
- * TODO: Delete all data associated with this shop from your database.
+ *
+ * TODO (replace placeholder):
+ *   1. Delete shop-level data (tokens, cached files, settings, analytics)
+ *   2. Remove all stored data for this shop where legally allowed
  */
-function handleShopRedact(payload: Record<string, unknown>) {
-  const shopDomain = payload.shop_domain;
-  console.log(`[shop/redact] Shop: ${shopDomain}`);
-  // ──────────────────────────────────────────────────────
-  // PLACEHOLDER: Delete all shop data here.
-  // Example:
-  //   await supabase.from("shopify_connections")
-  //     .delete()
-  //     .eq("store_url", shopDomain);
-  //   await supabase.from("shopify_push_history")
-  //     .delete()
-  //     .eq("store_url", shopDomain);
-  // ──────────────────────────────────────────────────────
+async function handleShopRedact(shop: string, payload: Record<string, unknown>) {
+  console.log("Handle shop/redact", { shop, payload });
+
+  // Example placeholder:
+  // const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  // await supabase.from("shopify_connections").delete().eq("store_url", shop);
+  // await supabase.from("shopify_push_history").delete().eq("store_url", shop);
 }
 
 // ─── Main handler ────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
-  // Only accept POST
+  const url = new URL(req.url);
+
+  // Health check endpoint
+  if (req.method === "GET" && url.pathname.endsWith("/health")) {
+    return new Response(JSON.stringify({ status: "ok" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Only accept POST for webhook processing
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
+  // Check server config
+  if (!SHOPIFY_API_SECRET) {
+    console.error("Missing SHOPIFY_API_SECRET");
+    return new Response("Server misconfigured", { status: 500 });
+  }
+
+  // Step 1: Read raw body BEFORE parsing (same as express.raw())
   const rawBody = await req.text();
 
-  // ── HMAC verification step ──
+  // Step 2: Verify HMAC — return 401 if invalid
   const hmacHeader = req.headers.get("x-shopify-hmac-sha256");
   const valid = await verifyShopifyHmac(rawBody, hmacHeader);
   if (!valid) {
-    console.warn("Webhook HMAC verification failed");
+    console.warn("Invalid Shopify webhook HMAC");
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // ── Detect compliance topic from header ──
-  const topic = req.headers.get("x-shopify-topic") || "";
-  let payload: Record<string, unknown> = {};
+  // Step 3: Parse JSON only AFTER HMAC verification passes
+  let payload: Record<string, unknown>;
   try {
     payload = JSON.parse(rawBody);
   } catch {
     return new Response("Bad Request", { status: 400 });
   }
 
-  console.log(`Received Shopify webhook: ${topic}`);
+  // Step 4: Read topic and shop from Shopify headers
+  const topic = req.headers.get("x-shopify-topic") || "";
+  const shop = req.headers.get("x-shopify-shop-domain") || "";
 
+  console.log("Privacy webhook received:", { topic, shop });
+
+  // Step 5: Handle compliance topics
   switch (topic) {
     case "customers/data_request":
-      handleCustomersDataRequest(payload);
+      await handleCustomerDataRequest(shop, payload);
       break;
     case "customers/redact":
-      handleCustomersRedact(payload);
+      await handleCustomerRedact(shop, payload);
       break;
     case "shop/redact":
-      handleShopRedact(payload);
+      await handleShopRedact(shop, payload);
       break;
     default:
-      console.warn(`Unknown compliance topic: ${topic}`);
-      // Still return 200 to avoid Shopify retries
+      console.warn(`Unhandled privacy webhook topic: ${topic}`);
       break;
   }
 
-  // Return 200 quickly as required by Shopify
-  return new Response(JSON.stringify({ success: true }), {
+  // Step 6: Respond 200 quickly as required by Shopify
+  return new Response(JSON.stringify({ ok: true }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });

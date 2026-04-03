@@ -329,6 +329,22 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
           <h2 className="font-semibold text-foreground text-sm">Batch Review</h2>
           <p className="text-xs text-muted-foreground">{products.length} products · {readyCount} ready · {fixCount} need fixing</p>
         </div>
+        <Button size="sm" variant="ghost" onClick={async () => {
+          setBulkNaming(true);
+          setBulkProgress({ done: 0, total: products.length });
+          try {
+            const results = await runBulkSmartNaming(products, (done, total) => setBulkProgress({ done, total }));
+            onSetProducts(prev => prev.map(p => {
+              const r = results.get(p.id);
+              if (!r) return p;
+              return { ...p, title: r.recommended_title, type: r.product_type, description: r.short_description, tags: r.tags.join(", "), confidence: r.confidence_score, confidenceReason: r.confidence_reason };
+            }));
+            toast.success(`Smart named ${results.size} products`);
+          } catch { toast.error("Bulk naming failed"); }
+          finally { setBulkNaming(false); }
+        }} disabled={bulkNaming} className="h-7 text-xs gap-1 text-primary">
+          {bulkNaming ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> {bulkProgress.done}/{bulkProgress.total}</> : <><Sparkles className="w-3.5 h-3.5" /> Smart Name All</>}
+        </Button>
         <Button size="sm" variant="ghost" onClick={() => setShowPreview(true)} className="h-7 text-xs gap-1">
           <Eye className="w-3.5 h-3.5" /> Preview
         </Button>

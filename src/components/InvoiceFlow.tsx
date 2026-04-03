@@ -642,6 +642,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [enrichAllRunning, setEnrichAllRunning] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
+  const [validationDebug, setValidationDebug] = useState<ValidationDebugInfo | null>(null);
+  const [validatedProducts, setValidatedProducts] = useState<ValidatedProduct[]>([]);
 
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {

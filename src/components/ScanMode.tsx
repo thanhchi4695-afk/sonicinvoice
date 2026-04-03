@@ -81,7 +81,7 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
     try {
       const base64 = await fileToBase64(file);
       const { data, error } = await supabase.functions.invoke("scan-mode-ai", {
-        body: { input: base64, mode: "image", storeName: config.storeName, storeCity: config.storeCity },
+        body: { input: base64, mode: "image", storeName: config.name, storeCity: config.city },
       });
       if (error) throw error;
       setGeneratedTitle(data.title || "Product");

@@ -1,5 +1,5 @@
-// Invoice post-processing validator
-// Cleans parsed invoice data: rejects bad titles, reassigns numeric values, deduplicates
+// Invoice Auto-Correct AI Layer
+// Classifies, validates, corrects, and scores every parsed invoice row
 
 export interface RawProduct {
   name: string;
@@ -14,29 +14,78 @@ export interface RawProduct {
   rrp: number;
 }
 
+export type CellClassification =
+  | "product_title"
+  | "vendor"
+  | "sku"
+  | "variant"
+  | "quantity"
+  | "unit_price"
+  | "total"
+  | "ignored_text";
+
+export interface CorrectionDetail {
+  field: string;
+  from: string;
+  to: string;
+  reason: string;
+}
+
 export interface ValidatedProduct extends RawProduct {
+  _rowIndex: number;
+  _rawName: string;
+  _rawCost: number;
   _confidence: number;
   _confidenceLevel: "high" | "medium" | "low";
   _issues: string[];
+  _corrections: CorrectionDetail[];
   _rejected: boolean;
   _rejectReason?: string;
+  _classification: CellClassification;
+  _suggestedTitle: string;
+  _suggestedPrice: number;
+  _suggestedVendor: string;
 }
 
 export interface ValidationDebugInfo {
   totalRaw: number;
   accepted: number;
+  needsReview: number;
   rejected: number;
   rejectedRows: { row: number; name: string; reason: string }[];
   detectedVendor: string;
-  corrections: { row: number; field: string; from: string; to: string }[];
+  corrections: { row: number; field: string; from: string; to: string; reason: string }[];
 }
 
+// ── Pattern matchers ──
+
 const NUMERIC_ONLY = /^[\d.,\s$€£¥%]+$/;
+const CURRENCY_PATTERN = /^\$?\s?\d{1,6}[.,]\d{2}$/;
+const PRICE_LIKE = /^\d+[.,]\d{2}$/;
 const MIN_TITLE_LENGTH = 3;
 const HAS_ALPHA = /[a-zA-Z]/;
 
+const BOILERPLATE_TERMS = [
+  "subtotal", "sub total", "total", "gst", "tax", "freight", "shipping",
+  "delivery", "discount", "invoice", "order", "date", "due", "terms",
+  "payment", "account", "abn", "acn", "page", "qty", "quantity",
+  "unit price", "amount", "description", "item", "ref", "note",
+  "balance due", "remittance", "bill to", "ship to", "po number",
+  "purchase order", "thank you", "regards",
+];
+
 function isNumericOnly(val: string): boolean {
   return NUMERIC_ONLY.test(val.trim());
+}
+
+function isCurrencyValue(val: string): boolean {
+  const cleaned = val.trim().replace(/[$€£¥,\s]/g, "");
+  return CURRENCY_PATTERN.test(val.trim()) || PRICE_LIKE.test(cleaned);
+}
+
+function isBoilerplate(val: string): boolean {
+  const lower = val.toLowerCase().trim();
+  return BOILERPLATE_TERMS.some(t => lower === t || lower.startsWith(t + " ") || lower.endsWith(" " + t));
 }
 
 function isValidTitle(title: string): boolean {
@@ -44,11 +93,14 @@ function isValidTitle(title: string): boolean {
   if (!t || t.length < MIN_TITLE_LENGTH) return false;
   if (!HAS_ALPHA.test(t)) return false;
   if (isNumericOnly(t)) return false;
+  if (isCurrencyValue(t)) return false;
+  if (isBoilerplate(t)) return false;
   return true;
 }
 
-function normalizeVendor(products: RawProduct[], supplierName: string): string {
-  // Detect vendor from: explicit brand fields, repeated text, or supplier name
+// ── Vendor detection ──
+
+function detectVendor(products: RawProduct[], supplierName: string): string {
   const brandCounts: Record<string, number> = {};
   for (const p of products) {
     if (p.brand?.trim()) {
@@ -56,115 +108,282 @@ function normalizeVendor(products: RawProduct[], supplierName: string): string {
       brandCounts[b] = (brandCounts[b] || 0) + 1;
     }
   }
+
+  // Also check if any "name" field is repeated across many rows (likely vendor, not product)
+  const nameCounts: Record<string, number> = {};
+  for (const p of products) {
+    if (p.name?.trim()) {
+      const n = p.name.trim().toUpperCase();
+      nameCounts[n] = (nameCounts[n] || 0) + 1;
+    }
+  }
+  // If a name appears in >40% of rows, it's likely the vendor
+  const threshold = Math.max(3, products.length * 0.4);
+  for (const [name, count] of Object.entries(nameCounts)) {
+    if (count >= threshold && !brandCounts[name]) {
+      brandCounts[name] = count;
+    }
+  }
+
   const topBrand = Object.entries(brandCounts).sort((a, b) => b[1] - a[1])[0];
   return topBrand ? topBrand[0] : (supplierName || "Unknown");
 }
+
+// ── Cell classification ──
+
+function classifyCell(value: string, vendorName: string): CellClassification {
+  const trimmed = value.trim();
+  if (!trimmed) return "ignored_text";
+
+  const lower = trimmed.toLowerCase();
+  const vendorLower = vendorName.toLowerCase();
+
+  // Vendor match
+  if (lower === vendorLower || lower.replace(/\s+(pty|ltd|limited|inc|llc|co)\s*/gi, "").trim() === vendorLower.replace(/\s+(pty|ltd|limited|inc|llc|co)\s*/gi, "").trim()) {
+    return "vendor";
+  }
+
+  // Pure numeric = price or qty
+  if (isNumericOnly(trimmed)) {
+    const num = parseFloat(trimmed.replace(/[^0-9.]/g, ""));
+    if (num > 0 && num < 50 && Number.isInteger(num)) return "quantity";
+    if (isCurrencyValue(trimmed) || num > 1) return "unit_price";
+    return "unit_price";
+  }
+
+  // Boilerplate
+  if (isBoilerplate(trimmed)) return "ignored_text";
+
+  // SKU-like (short alphanumeric code)
+  if (/^[A-Z0-9]{2,10}[A-Z]$/i.test(trimmed) && trimmed.length <= 12) return "sku";
+
+  // Size-like
+  if (/^(XXS|XS|S|M|L|XL|XXL|XXXL|OS|\d{1,2}\s*(AU|US|UK))/i.test(trimmed)) return "variant";
+
+  return "product_title";
+}
+
+// ── Line item reconstruction ──
+
+function tryMergeFragmentedRows(products: RawProduct[], vendorName: string): RawProduct[] {
+  const merged: RawProduct[] = [];
+  let i = 0;
+
+  while (i < products.length) {
+    const current = { ...products[i] };
+    const currentName = (current.name || "").trim();
+
+    // If current row has no valid title but has a price
+    if (!isValidTitle(currentName) && isNumericOnly(currentName)) {
+      const numVal = parseFloat(currentName.replace(/[^0-9.]/g, ""));
+
+      // Look backward for the nearest valid title row without a price
+      if (merged.length > 0) {
+        const prev = merged[merged.length - 1];
+        if (prev.cost === 0 && numVal > 0) {
+          prev.cost = numVal;
+          i++;
+          continue;
+        }
+      }
+
+      // Look forward for descriptive text
+      if (i + 1 < products.length) {
+        const next = products[i + 1];
+        if (isValidTitle((next.name || "").trim())) {
+          if (next.cost === 0) next.cost = numVal;
+          // Skip this row, next will pick up the price
+          i++;
+          continue;
+        }
+      }
+    }
+
+    // If current row's name is the vendor name, skip it
+    if (currentName.toLowerCase().replace(/\s+/g, " ") === vendorName.toLowerCase().replace(/\s+/g, " ")) {
+      i++;
+      continue;
+    }
+
+    merged.push(current);
+    i++;
+  }
+
+  return merged;
+}
+
+// ── Main validator ──
 
 export function validateAndCleanProducts(
   raw: RawProduct[],
   supplierName: string
 ): { products: ValidatedProduct[]; debug: ValidationDebugInfo } {
-  const detectedVendor = normalizeVendor(raw, supplierName);
-  const vendorLower = detectedVendor.toLowerCase();
+  const detectedVendor = detectVendor(raw, supplierName);
+  const vendorLower = detectedVendor.toLowerCase().replace(/\s+/g, " ").trim();
+  const vendorNormalized = vendorLower.replace(/\s+(pty|ltd|limited|inc|llc|co)\s*/gi, "").trim();
+
+  // Phase 1: Detect repeated names (likely vendor text)
+  const nameCounts: Record<string, number> = {};
+  for (const p of raw) {
+    const n = (p.name || "").trim().toLowerCase();
+    if (n) nameCounts[n] = (nameCounts[n] || 0) + 1;
+  }
+  const repeatedThreshold = Math.max(3, raw.length * 0.3);
+
+  // Phase 2: Merge fragmented rows
+  const merged = tryMergeFragmentedRows(raw, detectedVendor);
+
   const corrections: ValidationDebugInfo["corrections"] = [];
   const rejectedRows: ValidationDebugInfo["rejectedRows"] = [];
   const results: ValidatedProduct[] = [];
 
-  for (let i = 0; i < raw.length; i++) {
-    const p = { ...raw[i] };
+  for (let i = 0; i < merged.length; i++) {
+    const p = { ...merged[i] };
+    const rawName = (p.name || "").trim();
+    const rawCost = p.cost;
     const issues: string[] = [];
+    const rowCorrections: CorrectionDetail[] = [];
     let rejected = false;
     let rejectReason: string | undefined;
 
-    // ── Title validation ──
-    let name = (p.name || "").trim();
+    let name = rawName;
 
-    // If title is numeric-only, try to reassign as price
+    // ── Classification ──
+    const classification = classifyCell(name, detectedVendor);
+
+    // ── Rule 1: Numeric-only title → reassign to price ──
     if (isNumericOnly(name)) {
       const numVal = parseFloat(name.replace(/[^0-9.]/g, ""));
       if (numVal > 0 && p.cost === 0) {
-        corrections.push({ row: i, field: "cost", from: "0", to: String(numVal) });
+        rowCorrections.push({ field: "cost", from: "0", to: String(numVal), reason: "Numeric-only value reassigned from title to price" });
+        corrections.push({ row: i, field: "cost", from: "0", to: String(numVal), reason: "Numeric-only value reassigned from title to price" });
         p.cost = numVal;
       }
-      // Try to find a better title from nearby context
-      name = "";
-      issues.push("Title was numeric-only, reassigned to price");
-    }
-
-    // If title matches vendor name exactly, reject as title
-    if (name && name.toLowerCase().replace(/\s+/g, " ").trim() === vendorLower.replace(/\s+/g, " ").trim()) {
-      issues.push("Title matched vendor name");
+      rejected = true;
+      rejectReason = `Numeric-only value "${name}" cannot be product title — classified as unit_price`;
       name = "";
     }
 
-    // If title contains vendor name + "Size" pattern, strip vendor
-    if (name && vendorLower) {
+    // ── Rule 2: Currency pattern title → reassign to price ──
+    if (!rejected && isCurrencyValue(name)) {
+      const numVal = parseFloat(name.replace(/[^0-9.]/g, ""));
+      if (numVal > 0 && p.cost === 0) {
+        rowCorrections.push({ field: "cost", from: "0", to: String(numVal), reason: "Currency value reassigned from title to price" });
+        corrections.push({ row: i, field: "cost", from: "0", to: String(numVal), reason: "Currency value reassigned from title to price" });
+        p.cost = numVal;
+      }
+      rejected = true;
+      rejectReason = `Currency value "${name}" cannot be product title`;
+      name = "";
+    }
+
+    // ── Rule 3: Vendor name as title ──
+    if (!rejected && name) {
+      const nameLower = name.toLowerCase().replace(/\s+/g, " ").trim();
+      const nameNormalized = nameLower.replace(/\s+(pty|ltd|limited|inc|llc|co)\s*/gi, "").trim();
+      if (nameLower === vendorLower || nameNormalized === vendorNormalized) {
+        rejected = true;
+        rejectReason = `"${name}" matches vendor name — not a product`;
+        issues.push("Title matched vendor name");
+        name = "";
+      }
+    }
+
+    // ── Rule 4: Repeated identical text ──
+    if (!rejected && name && (nameCounts[name.toLowerCase()] || 0) >= repeatedThreshold) {
+      rejected = true;
+      rejectReason = `"${name}" repeated ${nameCounts[name.toLowerCase()]} times — likely vendor/header text`;
+      name = "";
+    }
+
+    // ── Rule 5: Boilerplate/header/footer text ──
+    if (!rejected && isBoilerplate(name)) {
+      rejected = true;
+      rejectReason = `"${name}" is invoice boilerplate text`;
+      name = "";
+    }
+
+    // ── Rule 6: Strip vendor prefix from valid titles ──
+    if (!rejected && name && vendorLower) {
       const vendorPattern = new RegExp(`^${escapeRegex(detectedVendor)}\\s+`, "i");
       if (vendorPattern.test(name) && name.toLowerCase() !== vendorLower) {
         const cleaned = name.replace(vendorPattern, "").trim();
         if (cleaned.length >= MIN_TITLE_LENGTH && HAS_ALPHA.test(cleaned)) {
-          corrections.push({ row: i, field: "name", from: name, to: cleaned });
+          rowCorrections.push({ field: "name", from: name, to: cleaned, reason: "Stripped vendor prefix from title" });
+          corrections.push({ row: i, field: "name", from: name, to: cleaned, reason: "Stripped vendor prefix from title" });
           name = cleaned;
         }
       }
     }
 
-    // Final title validity check
-    if (!isValidTitle(name)) {
-      // If we have a SKU, use it as a fallback title
+    // ── Rule 7: Final title validity ──
+    if (!rejected && !isValidTitle(name)) {
       if (p.sku && HAS_ALPHA.test(p.sku) && p.sku.length >= MIN_TITLE_LENGTH) {
-        corrections.push({ row: i, field: "name", from: name, to: `Product ${p.sku}` });
+        rowCorrections.push({ field: "name", from: name, to: `Product ${p.sku}`, reason: "Used SKU as fallback title" });
+        corrections.push({ row: i, field: "name", from: name, to: `Product ${p.sku}`, reason: "Used SKU as fallback title" });
         name = `Product ${p.sku}`;
         issues.push("Used SKU as fallback title");
       } else {
         rejected = true;
         rejectReason = name
-          ? `Invalid title: "${name}" (${isNumericOnly(name) ? "numeric only" : "too short or no alpha chars"})`
+          ? `Invalid title: "${name}" (too short or no alpha chars)`
           : "Empty title with no fallback";
       }
     }
 
     p.name = name;
 
+    // ── Vendor assignment ──
+    const suggestedVendor = p.brand?.trim() || detectedVendor;
+    if (!p.brand?.trim()) {
+      p.brand = detectedVendor;
+      rowCorrections.push({ field: "brand", from: "", to: detectedVendor, reason: "Assigned detected vendor" });
+      corrections.push({ row: i, field: "brand", from: "", to: detectedVendor, reason: "Assigned detected vendor" });
+    }
+
     // ── Price validation ──
     if (p.cost <= 0 && p.rrp > 0) {
       issues.push("No cost price, using RRP as reference");
     }
 
-    // ── Vendor assignment ──
-    if (!p.brand?.trim()) {
-      p.brand = detectedVendor;
-      corrections.push({ row: i, field: "brand", from: "", to: detectedVendor });
-    }
-
     // ── Confidence scoring ──
     let confidence = 0;
-    if (isValidTitle(p.name)) confidence += 30;
-    if (p.brand?.trim()) confidence += 10;
-    if (p.type?.trim()) confidence += 10;
-    if (p.sku?.trim()) confidence += 10;
-    if (p.barcode?.trim()) confidence += 10;
-    if (p.cost > 0) confidence += 15;
-    if (p.rrp > 0) confidence += 5;
-    if (p.qty > 0) confidence += 5;
-    if (p.colour?.trim()) confidence += 3;
-    if (p.size?.trim()) confidence += 2;
+    if (!rejected) {
+      if (isValidTitle(p.name)) confidence += 30;
+      if (p.brand?.trim()) confidence += 10;
+      if (p.type?.trim()) confidence += 10;
+      if (p.sku?.trim()) confidence += 10;
+      if (p.barcode?.trim()) confidence += 10;
+      if (p.cost > 0) confidence += 15;
+      if (p.rrp > 0) confidence += 5;
+      if (p.qty > 0) confidence += 5;
+      if (p.colour?.trim()) confidence += 3;
+      if (p.size?.trim()) confidence += 2;
+    }
     confidence = Math.min(100, confidence);
 
     const confidenceLevel: "high" | "medium" | "low" =
-      confidence >= 80 ? "high" : confidence >= 50 ? "medium" : "low";
+      rejected ? "low" : confidence >= 80 ? "high" : confidence >= 50 ? "medium" : "low";
 
     if (rejected) {
-      rejectedRows.push({ row: i, name: raw[i].name || "(empty)", reason: rejectReason || "Invalid" });
+      rejectedRows.push({ row: i, name: rawName || "(empty)", reason: rejectReason || "Invalid" });
     }
 
     results.push({
       ...p,
-      _confidence: confidence,
+      _rowIndex: i,
+      _rawName: rawName,
+      _rawCost: rawCost,
+      _confidence: rejected ? 0 : confidence,
       _confidenceLevel: confidenceLevel,
       _issues: issues,
+      _corrections: rowCorrections,
       _rejected: rejected,
       _rejectReason: rejectReason,
+      _classification: classification,
+      _suggestedTitle: rejected ? "" : p.name,
+      _suggestedPrice: p.cost,
+      _suggestedVendor: suggestedVendor,
     });
   }
 
@@ -176,19 +395,24 @@ export function validateAndCleanProducts(
     if (seen.has(key)) {
       p._rejected = true;
       p._rejectReason = "Duplicate row";
-      rejectedRows.push({ row: results.indexOf(p), name: p.name, reason: "Duplicate" });
+      p._confidenceLevel = "low";
+      p._confidence = 0;
+      rejectedRows.push({ row: p._rowIndex, name: p.name, reason: "Duplicate" });
     }
     seen.add(key);
   }
 
-  const accepted = results.filter(p => !p._rejected);
+  const accepted = results.filter(p => !p._rejected && p._confidenceLevel === "high");
+  const needsReview = results.filter(p => !p._rejected && p._confidenceLevel !== "high");
+  const rejectedList = results.filter(p => p._rejected);
 
   return {
     products: results,
     debug: {
       totalRaw: raw.length,
       accepted: accepted.length,
-      rejected: results.filter(p => p._rejected).length,
+      needsReview: needsReview.length,
+      rejected: rejectedList.length,
       rejectedRows,
       detectedVendor,
       corrections,

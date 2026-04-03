@@ -133,14 +133,14 @@ const PublishAdsPipeline = ({ products, open, onOpenChange }: Props) => {
     const success = items.filter((r) => r.status === "success").length;
     const errors = items.filter((r) => r.status === "error").length;
     try {
-      await recordPush({
-        products_created: success,
-        products_updated: 0,
+      await recordPush(
+        conn.store_url,
+        success,
+        0,
         errors,
-        store_url: conn.store_url,
-        source: "publish-pipeline",
-        summary: `Pipeline push: ${success} created, ${errors} errors`,
-      });
+        `Pipeline push: ${success} created, ${errors} errors`,
+        "publish-pipeline"
+      );
     } catch {}
 
     setPushing(false);

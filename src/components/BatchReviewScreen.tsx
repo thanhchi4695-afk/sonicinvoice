@@ -368,6 +368,19 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
         }} disabled={bulkSEO} className="h-7 text-xs gap-1 text-primary">
           {bulkSEO ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> SEO {bulkProgress.done}/{bulkProgress.total}</> : <><Search className="w-3.5 h-3.5" /> SEO All</>}
         </Button>
+        <Button size="sm" variant="ghost" onClick={() => {
+          const withCost = products.filter(p => p.price > 0);
+          if (!withCost.length) { toast.error("Products need cost prices first"); return; }
+          const results = calculateBulkPrices(withCost.map(p => ({ id: p.id, costPrice: p.price, productType: p.type, vendor: p.vendor })));
+          onSetProducts(prev => prev.map(p => {
+            const r = results.get(p.id);
+            if (!r) return p;
+            return { ...p, price: r.recommended_price };
+          }));
+          toast.success(`AI priced ${results.size} products`);
+        }} className="h-7 text-xs gap-1 text-primary">
+          <DollarSign className="w-3.5 h-3.5" /> Price All
+        </Button>
         <Button size="sm" variant="ghost" onClick={() => setShowPreview(true)} className="h-7 text-xs gap-1">
           <Eye className="w-3.5 h-3.5" /> Preview
         </Button>

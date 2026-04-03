@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Check, X, AlertTriangle, ArrowRight, Bug, ChevronDown, ChevronRight, Eye, RotateCcw, ShieldCheck } from "lucide-react";
+import { Check, X, AlertTriangle, ArrowRight, Bug, ChevronDown, ChevronRight, Eye, RotateCcw, ShieldCheck, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ValidationDebugInfo, ValidatedProduct } from "@/lib/invoice-validator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { ValidationDebugInfo, ValidatedProduct, ConfidenceSignal } from "@/lib/invoice-validator";
 
 interface InvoiceAutoCorrectPanelProps {
   debug: ValidationDebugInfo;
@@ -184,13 +185,30 @@ function ProductRow({
           {expanded ? <ChevronDown className="w-3 h-3 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
         </button>
 
-        {/* Confidence badge */}
-        <span className={`shrink-0 text-[10px] font-bold min-w-[32px] text-center ${
-          p._confidenceLevel === "high" ? "text-success" :
-          p._confidenceLevel === "medium" ? "text-warning" : "text-destructive"
-        }`}>
-          {p._confidence}%
-        </span>
+        {/* Confidence badge with tooltip */}
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={`shrink-0 text-[10px] font-bold min-w-[32px] text-center cursor-help ${
+                p._confidenceLevel === "high" ? "text-success" :
+                p._confidenceLevel === "medium" ? "text-warning" : "text-destructive"
+              }`}>
+                {p._confidence}%
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[220px] p-2">
+              <p className="text-[10px] font-semibold mb-1">Confidence breakdown</p>
+              <div className="space-y-0.5">
+                {(p._confidenceReasons || []).slice(0, 5).map((r, i) => (
+                  <div key={i} className={`text-[9px] flex items-center gap-1 ${r.delta > 0 ? "text-success" : "text-destructive"}`}>
+                    <span>{r.delta > 0 ? "+" : ""}{r.delta}</span>
+                    <span className="text-muted-foreground">{r.label}</span>
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         {/* Product info */}
         <div className="flex-1 min-w-0">
@@ -249,6 +267,17 @@ function ProductRow({
             value={`${p._confidence}% (${p._confidenceLevel})`}
             color={p._confidenceLevel === "high" ? "text-success" : p._confidenceLevel === "medium" ? "text-warning" : "text-destructive"}
           />
+          {(p._confidenceReasons || []).length > 0 && (
+            <div className="pt-1 border-t border-border/50">
+              <span className="text-muted-foreground">Score factors:</span>
+              {p._confidenceReasons.map((r, ri) => (
+                <div key={ri} className={`flex items-center gap-1 mt-0.5 ${r.delta > 0 ? "text-success" : "text-destructive"}`}>
+                  <span className="font-mono text-[9px]">{r.delta > 0 ? "+" : ""}{r.delta}</span>
+                  <span className="text-muted-foreground">{r.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <DetailRow label="Classification" value={p._classification} />
           {p._rejectReason && <DetailRow label="Reason" value={p._rejectReason} color="text-destructive" />}
           {p._corrections.length > 0 && (

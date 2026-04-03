@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/lib/invoice-validator";
 
 interface PostParseReviewScreenProps {
@@ -472,15 +473,32 @@ function ReviewRow({
           {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
 
-        {/* Confidence */}
-        <div className="shrink-0 w-10 text-center">
-          <span className={`text-sm font-bold font-mono ${
-            p._confidenceLevel === "high" ? "text-success" :
-            p._confidenceLevel === "medium" ? "text-secondary" : "text-destructive"
-          }`}>
-            {p._confidence}%
-          </span>
-        </div>
+        {/* Confidence with tooltip */}
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="shrink-0 w-10 text-center cursor-help">
+                <span className={`text-sm font-bold font-mono ${
+                  p._confidenceLevel === "high" ? "text-success" :
+                  p._confidenceLevel === "medium" ? "text-secondary" : "text-destructive"
+                }`}>
+                  {p._confidence}%
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[220px] p-2">
+              <p className="text-[10px] font-semibold mb-1">Score breakdown</p>
+              <div className="space-y-0.5">
+                {(p._confidenceReasons || []).slice(0, 5).map((r, i) => (
+                  <div key={i} className={`text-[9px] flex items-center gap-1 ${r.delta > 0 ? "text-success" : "text-destructive"}`}>
+                    <span className="font-mono">{r.delta > 0 ? "+" : ""}{r.delta}</span>
+                    <span className="text-muted-foreground">{r.label}</span>
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         {/* Product info */}
         <div className="flex-1 min-w-0">
@@ -652,7 +670,7 @@ function ReviewRow({
                 </div>
               )}
 
-              {/* Confidence breakdown */}
+              {/* Confidence breakdown with signals */}
               <div className="pt-1.5 border-t border-border/50">
                 <DetailRow
                   label="Confidence"
@@ -660,6 +678,17 @@ function ReviewRow({
                   color={p._confidenceLevel === "high" ? "text-success" : p._confidenceLevel === "medium" ? "text-secondary" : "text-destructive"}
                 />
                 <DetailRow label="Classification" value={p._classification} />
+                {(p._confidenceReasons || []).length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    <span className="text-muted-foreground text-[9px]">Score factors:</span>
+                    {p._confidenceReasons.map((r, ri) => (
+                      <div key={ri} className={`flex items-center gap-1 text-[9px] ${r.delta > 0 ? "text-success" : "text-destructive"}`}>
+                        <span className="font-mono">{r.delta > 0 ? "+" : ""}{r.delta}</span>
+                        <span className="text-muted-foreground">{r.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Rejection reason for rejected tab */}

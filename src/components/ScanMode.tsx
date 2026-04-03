@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback } from "react";
-import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle } from "lucide-react";
+import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoreConfig } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { toast } from "sonner";
+import { lookupCatalog } from "@/lib/catalog-memory";
+import { matchProduct, lookupBarcode, saveBarcodeToCatalog, validateGTIN, extractColourFromTitle, extractSizeFromTitle } from "@/lib/barcode-catalog";
 
 interface ScannedProduct {
   id: string;
@@ -14,14 +16,25 @@ interface ScannedProduct {
   description: string;
   tags: string;
   colour: string;
+  sku: string;
+  barcode: string;
   price: number;
   quantity: number;
   confidence: number;
   confidenceReason: string;
+  matchSource: string;
   imageUrl: string | null;
 }
 
-type InputMode = "camera" | "text" | "barcode";
+type InputMode = "camera" | "text" | "barcode" | "sku";
+
+const MATCH_SOURCE_LABELS: Record<string, string> = {
+  catalog_memory: "Catalog Match",
+  barcode_catalog: "Barcode Library",
+  existing_session: "Session Match",
+  ai_generated: "AI Generated",
+  manual_only: "Manual Entry",
+};
 
 const ConfidenceBadgeInline = ({ score }: { score: number }) => {
   const level = score >= 90 ? "high" : score >= 70 ? "medium" : "low";
@@ -38,29 +51,57 @@ const ConfidenceBadgeInline = ({ score }: { score: number }) => {
   );
 };
 
+const MatchSourceBadge = ({ source }: { source: string }) => {
+  if (!source || source === "manual_only") return null;
+  const colors: Record<string, string> = {
+    catalog_memory: "bg-primary/15 text-primary",
+    barcode_catalog: "bg-accent text-accent-foreground",
+    existing_session: "bg-secondary text-secondary-foreground",
+    ai_generated: "bg-muted text-muted-foreground",
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${colors[source] || "bg-muted text-muted-foreground"}`}>
+      <Tag className="w-2.5 h-2.5" /> {MATCH_SOURCE_LABELS[source] || source}
+    </span>
+  );
+};
+
 const PROGRESS_MESSAGES = [
   "Analyzing item…",
   "Identifying product…",
   "Generating draft…",
 ];
 
+interface DraftState {
+  title: string;
+  type: string;
+  vendor: string;
+  description: string;
+  tags: string[];
+  colour: string;
+  pattern: string;
+  sku: string;
+  barcode: string;
+  confidence: number;
+  confidenceReason: string;
+  matchSource: string;
+}
+
 const ScanMode = ({ onBack }: { onBack: () => void }) => {
   const config = getStoreConfig();
   const mode = useStoreMode();
   const sym = config.currencySymbol || "$";
   const fileRef = useRef<HTMLInputElement>(null);
+  const barcodeFileRef = useRef<HTMLInputElement>(null);
 
-  const [inputMode, setInputMode] = useState<InputMode>("camera");
+  const [inputMode, setInputMode] = useState<InputMode>("barcode");
   const [textInput, setTextInput] = useState("");
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [preview, setPreview] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [progressIdx, setProgressIdx] = useState(0);
-  const [draft, setDraft] = useState<{
-    title: string; type: string; description: string; tags: string[];
-    colour: string; pattern: string; confidence: number; confidenceReason: string;
-  } | null>(null);
+  const [draft, setDraft] = useState<DraftState | null>(null);
   const [products, setProducts] = useState<ScannedProduct[]>([]);
   const [showList, setShowList] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
@@ -73,6 +114,7 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
     setDraft(null);
     setProgressIdx(0);
     if (fileRef.current) fileRef.current.value = "";
+    if (barcodeFileRef.current) barcodeFileRef.current.value = "";
   }, []);
 
   const animateProgress = () => {
@@ -82,6 +124,147 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
       setProgressIdx(idx);
     }, 1200);
     return () => clearInterval(interval);
+  };
+
+  // ── Lookup pipeline: session → barcode catalog → catalog memory → AI ──
+  const lookupBarcodeSku = (input: string): DraftState | null => {
+    const cleanInput = input.trim();
+    if (!cleanInput) return null;
+
+    const isNumeric = /^\d+$/.test(cleanInput);
+    const queryBarcode = isNumeric ? cleanInput : undefined;
+    const querySku = !isNumeric ? cleanInput : undefined;
+
+    // 1. Check existing session
+    const sessionMatch = products.find(
+      p => (queryBarcode && p.barcode === queryBarcode) || (querySku && p.sku.toLowerCase() === cleanInput.toLowerCase())
+    );
+    if (sessionMatch) {
+      return {
+        title: sessionMatch.title,
+        type: sessionMatch.type,
+        vendor: sessionMatch.vendor,
+        description: sessionMatch.description,
+        tags: sessionMatch.tags ? sessionMatch.tags.split(", ") : [],
+        colour: sessionMatch.colour,
+        pattern: "",
+        sku: sessionMatch.sku,
+        barcode: sessionMatch.barcode,
+        confidence: 95,
+        confidenceReason: "Matched existing item in current session",
+        matchSource: "existing_session",
+      };
+    }
+
+    // 2. Check barcode catalog (personal library)
+    const barcodeMatch = matchProduct(queryBarcode, querySku, undefined);
+    if (barcodeMatch.source !== "none" && barcodeMatch.entry) {
+      const e = barcodeMatch.entry;
+      return {
+        title: e.title,
+        type: e.type,
+        vendor: e.vendor,
+        description: "",
+        tags: [e.type].filter(Boolean),
+        colour: extractColourFromTitle(e.title),
+        pattern: "",
+        sku: e.sku,
+        barcode: barcodeMatch.barcode || queryBarcode || "",
+        confidence: 95,
+        confidenceReason: `Matched via ${barcodeMatch.source} in barcode library`,
+        matchSource: "barcode_catalog",
+      };
+    }
+
+    // 3. Check catalog memory (uploaded supplier catalogs)
+    const catalogMatch = lookupCatalog({ barcode: queryBarcode, sku: querySku });
+    if (catalogMatch.matched) {
+      const p = catalogMatch.product;
+      return {
+        title: p.title,
+        type: p.type,
+        vendor: catalogMatch.supplier,
+        description: "",
+        tags: [p.type, p.colour].filter(Boolean),
+        colour: p.colour,
+        pattern: "",
+        sku: p.sku,
+        barcode: p.barcode || queryBarcode || "",
+        confidence: 92,
+        confidenceReason: `Matched via ${catalogMatch.matchType} in ${catalogMatch.supplier} catalog`,
+        matchSource: "catalog_memory",
+      };
+    }
+
+    return null; // No local match — fall through to AI
+  };
+
+  const handleBarcodeSkuSubmit = async () => {
+    const input = textInput.trim();
+    if (!input) return;
+
+    // Try local lookup first
+    const localMatch = lookupBarcodeSku(input);
+    if (localMatch) {
+      setDraft(localMatch);
+      toast.success("Product found!", { duration: 1500 });
+      return;
+    }
+
+    // Validate GTIN if numeric
+    const isNumeric = /^\d+$/.test(input);
+    const validBarcode = isNumeric ? validateGTIN(input) : "";
+
+    // Fall back to AI
+    setGenerating(true);
+    setProgressIdx(0);
+    const stopAnim = animateProgress();
+    try {
+      const prompt = isNumeric
+        ? `I scanned a barcode: ${input}. Generate a best-effort product draft. If you cannot identify the product, use "Unidentified Product" as the title.`
+        : `I have a product SKU: ${input}. Generate a best-effort product draft. If you cannot identify the product from the SKU, use "Unidentified Product" as the title.`;
+
+      const { data, error } = await supabase.functions.invoke("scan-mode-ai", {
+        body: { input: prompt, mode: "text", storeName: config.name, storeCity: config.city },
+      });
+      if (error) throw error;
+
+      const title = data.product_title || "Unidentified Product";
+      setDraft({
+        title,
+        type: data.product_type || "General",
+        vendor: "",
+        description: data.short_description || "",
+        tags: Array.isArray(data.tags) ? data.tags : [],
+        colour: data.colour || "",
+        pattern: data.pattern || "",
+        sku: isNumeric ? "" : input,
+        barcode: validBarcode || (isNumeric ? input : ""),
+        confidence: Math.min(data.confidence_score ?? 50, 65), // Cap at 65 for unmatched barcode/SKU
+        confidenceReason: data.confidence_reason || "No catalog match — AI best effort",
+        matchSource: "ai_generated",
+      });
+    } catch (e: any) {
+      console.error("AI error:", e);
+      toast.error(e?.message || "AI generation failed");
+      setDraft({
+        title: "Unidentified Product",
+        type: "General",
+        vendor: "",
+        description: "",
+        tags: [],
+        colour: "",
+        pattern: "",
+        sku: isNumeric ? "" : input,
+        barcode: isNumeric ? input : "",
+        confidence: 20,
+        confidenceReason: "No match found and AI call failed — manual entry required",
+        matchSource: "manual_only",
+      });
+    } finally {
+      stopAnim();
+      setGenerating(false);
+    }
   };
 
   const callAI = async (input: string, aiMode: "text" | "image") => {
@@ -96,12 +279,16 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
       setDraft({
         title: data.product_title || "Product",
         type: data.product_type || "General",
+        vendor: "",
         description: data.short_description || "",
         tags: Array.isArray(data.tags) ? data.tags : [],
         colour: data.colour || "",
         pattern: data.pattern || "",
+        sku: "",
+        barcode: "",
         confidence: data.confidence_score ?? 50,
         confidenceReason: data.confidence_reason || "",
+        matchSource: "ai_generated",
       });
     } catch (e: any) {
       console.error("AI error:", e);
@@ -109,12 +296,16 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
       setDraft({
         title: textInput || "Product",
         type: "General",
+        vendor: "",
         description: "",
         tags: [],
         colour: "",
         pattern: "",
+        sku: "",
+        barcode: "",
         confidence: 20,
         confidenceReason: "AI call failed — manual entry required",
+        matchSource: "manual_only",
       });
     } finally {
       stopAnim();
@@ -138,6 +329,65 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
     callAI(base64, "image");
   };
 
+  const handleSkuLabelCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPreview(URL.createObjectURL(file));
+    const base64 = await fileToBase64(file);
+
+    // Use AI with special OCR prompt for SKU labels
+    setGenerating(true);
+    setProgressIdx(0);
+    const stopAnim = animateProgress();
+    try {
+      const { data, error } = await supabase.functions.invoke("scan-mode-ai", {
+        body: {
+          input: base64,
+          mode: "image",
+          storeName: config.name,
+          storeCity: config.city,
+          ocrMode: true,
+        },
+      });
+      if (error) throw error;
+
+      // Try to look up any detected barcode/SKU
+      const detectedBarcode = data.barcode || "";
+      const detectedSku = data.sku || "";
+      let localMatch: DraftState | null = null;
+
+      if (detectedBarcode || detectedSku) {
+        localMatch = lookupBarcodeSku(detectedBarcode || detectedSku);
+      }
+
+      if (localMatch) {
+        setDraft({ ...localMatch, barcode: localMatch.barcode || detectedBarcode, sku: localMatch.sku || detectedSku });
+        toast.success("Product found from label!", { duration: 1500 });
+      } else {
+        setDraft({
+          title: data.product_title || "Unidentified Product",
+          type: data.product_type || "General",
+          vendor: "",
+          description: data.short_description || "",
+          tags: Array.isArray(data.tags) ? data.tags : [],
+          colour: data.colour || "",
+          pattern: data.pattern || "",
+          sku: detectedSku,
+          barcode: detectedBarcode,
+          confidence: data.confidence_score ?? 50,
+          confidenceReason: data.confidence_reason || "",
+          matchSource: "ai_generated",
+        });
+      }
+    } catch (e: any) {
+      console.error("AI error:", e);
+      toast.error(e?.message || "Label scan failed");
+    } finally {
+      stopAnim();
+      setGenerating(false);
+    }
+  };
+
   const handleTextSubmit = () => {
     if (!textInput.trim()) return;
     callAI(textInput.trim(), "text");
@@ -152,16 +402,31 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
       id: crypto.randomUUID(),
       title: draft.title,
       type: draft.type,
-      vendor: "",
+      vendor: draft.vendor,
       description: draft.description,
       tags: draft.tags.join(", "),
       colour: draft.colour,
+      sku: draft.sku,
+      barcode: draft.barcode,
       price: parseFloat(price) || 0,
       quantity: parseInt(quantity) || 1,
       confidence: draft.confidence,
       confidenceReason: draft.confidenceReason,
+      matchSource: draft.matchSource,
       imageUrl: preview,
     };
+
+    // Auto-save to barcode catalog for future lookups
+    if (item.barcode && item.title !== "Unidentified Product") {
+      saveBarcodeToCatalog(item.barcode, {
+        title: item.title,
+        vendor: item.vendor,
+        sku: item.sku,
+        type: item.type,
+        addedDate: new Date().toISOString().slice(0, 10),
+      });
+    }
+
     setProducts(prev => [...prev, item]);
     resetInput();
     toast.success(`Added "${item.title}"`, { duration: 1500 });
@@ -177,11 +442,11 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   };
 
   const exportCSV = () => {
-    const headers = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Option1 Name", "Option1 Value", "Variant SKU", "Variant Price", "Variant Inventory Qty", "Status"];
+    const headers = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Option1 Name", "Option1 Value", "Variant SKU", "Variant Barcode", "Variant Price", "Variant Inventory Qty", "Status"];
     const rows = products.map(p => [
       p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""),
       p.title, p.description, p.vendor, p.type, p.tags, "TRUE",
-      "Title", "Default Title", "", p.price.toFixed(2), p.quantity.toString(), "active",
+      "Title", "Default Title", p.sku, p.barcode, p.price.toFixed(2), p.quantity.toString(), "active",
     ]);
     const csv = [headers, ...rows].map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -220,6 +485,12 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
                       className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm text-foreground" placeholder="Vendor" />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
+                    <input value={p.sku} onChange={e => updateProduct(i, "sku", e.target.value)}
+                      className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm text-foreground font-mono" placeholder="SKU" />
+                    <input value={p.barcode} onChange={e => updateProduct(i, "barcode", e.target.value)}
+                      className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm text-foreground font-mono" placeholder="Barcode" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
                     <input type="number" value={p.price} onChange={e => updateProduct(i, "price", parseFloat(e.target.value) || 0)}
                       className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm text-foreground" />
                     <input type="number" value={p.quantity} onChange={e => updateProduct(i, "quantity", parseInt(e.target.value) || 1)}
@@ -235,11 +506,17 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
                     <img src={p.imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm text-foreground truncate">{p.title}</p>
                       <ConfidenceBadgeInline score={p.confidence} />
+                      <MatchSourceBadge source={p.matchSource} />
                     </div>
                     <p className="text-xs text-muted-foreground">{p.type}{p.colour ? ` · ${p.colour}` : ""}</p>
+                    {(p.sku || p.barcode) && (
+                      <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                        {p.sku && `SKU: ${p.sku}`}{p.sku && p.barcode ? " · " : ""}{p.barcode && `BC: ${p.barcode}`}
+                      </p>
+                    )}
                     <p className="text-xs text-foreground mt-0.5">{sym}{p.price.toFixed(2)} · Qty: {p.quantity}</p>
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0">
@@ -272,7 +549,7 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
         <button onClick={onBack}><ChevronLeft className="w-5 h-5 text-muted-foreground" /></button>
         <div className="flex-1">
           <h2 className="font-semibold text-foreground flex items-center gap-1.5">
-            <Eye className="w-4 h-4 text-primary" /> Scan Mode (AI Vision)
+            <Eye className="w-4 h-4 text-primary" /> Scan Mode (AI)
           </h2>
         </div>
         {products.length > 0 && (
@@ -284,20 +561,62 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {/* Input mode tabs */}
-        <div className="flex gap-2">
+        <div className="grid grid-cols-4 gap-1.5">
           {([
+            { m: "barcode" as InputMode, icon: ScanBarcode, label: "Barcode" },
+            { m: "sku" as InputMode, icon: Search, label: "SKU Label" },
             { m: "camera" as InputMode, icon: Camera, label: "Photo" },
             { m: "text" as InputMode, icon: Type, label: "Text" },
-            { m: "barcode" as InputMode, icon: ScanBarcode, label: "Barcode" },
           ]).map(t => (
             <button key={t.m} onClick={() => { setInputMode(t.m); resetInput(); }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-medium transition-colors ${inputMode === t.m ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+              className={`flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-medium transition-colors ${inputMode === t.m ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
               <t.icon className="w-4 h-4" /> {t.label}
             </button>
           ))}
         </div>
 
-        {/* Camera input — default */}
+        {/* Barcode / manual entry */}
+        {inputMode === "barcode" && !draft && !generating && (
+          <div className="space-y-3">
+            <label className="text-xs font-medium text-muted-foreground">Scan or enter barcode / SKU</label>
+            <div className="flex gap-2">
+              <input value={textInput} onChange={e => setTextInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleBarcodeSkuSubmit()}
+                placeholder="e.g. 9312345678901 or JA81520"
+                className="flex-1 h-12 rounded-xl border border-border bg-background px-4 text-base text-foreground font-mono" autoFocus />
+              <Button className="h-12 px-4" onClick={handleBarcodeSkuSubmit} disabled={!textInput.trim()}>
+                <Search className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Checks: session → barcode library → supplier catalogs → AI fallback
+            </p>
+          </div>
+        )}
+
+        {/* SKU label scan (camera OCR) */}
+        {inputMode === "sku" && !draft && !generating && (
+          <div className="space-y-3">
+            <label className="text-xs font-medium text-muted-foreground">Scan product label or swing tag</label>
+            <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center min-h-[200px] cursor-pointer"
+              onClick={() => barcodeFileRef.current?.click()}>
+              {preview ? (
+                <img src={preview} alt="Label" className="w-full h-full object-contain max-h-[240px] rounded-xl" />
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                    <ScanBarcode className="w-8 h-8 text-primary" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">Scan SKU / barcode label</p>
+                  <p className="text-xs text-muted-foreground mt-1">AI will read the label and identify the product</p>
+                </>
+              )}
+              <input ref={barcodeFileRef} type="file" accept="image/*" capture="environment" onChange={handleSkuLabelCapture} className="hidden" />
+            </div>
+          </div>
+        )}
+
+        {/* Camera input (product photo) */}
         {inputMode === "camera" && !draft && !generating && (
           <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center min-h-[240px] cursor-pointer"
             onClick={() => fileRef.current?.click()}>
@@ -332,22 +651,6 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
           </div>
         )}
 
-        {/* Barcode input */}
-        {inputMode === "barcode" && !draft && !generating && (
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Enter barcode / SKU</label>
-            <div className="flex gap-2">
-              <input value={textInput} onChange={e => setTextInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleTextSubmit()}
-                placeholder="e.g. 9312345678901"
-                className="flex-1 h-12 rounded-xl border border-border bg-background px-4 text-base text-foreground font-mono" autoFocus />
-              <Button className="h-12 px-4" onClick={handleTextSubmit} disabled={!textInput.trim()}>
-                <Zap className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
         {/* Processing animation */}
         {generating && (
           <div className="rounded-xl bg-primary/5 border border-primary/10 p-5">
@@ -363,7 +666,9 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">{PROGRESS_MESSAGES[progressIdx]}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">AI Vision is processing your image</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {inputMode === "sku" ? "Reading label via OCR…" : "AI is processing your input"}
+                </p>
               </div>
             </div>
             <div className="mt-3 w-full h-1 rounded-full bg-muted overflow-hidden">
@@ -375,14 +680,15 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
         {/* Generated draft card */}
         {draft && !generating && (
           <div className="space-y-3">
-            {/* Image thumbnail + confidence */}
+            {/* Image thumbnail + confidence + match source */}
             <div className="flex gap-3">
               {preview && (
                 <img src={preview} alt="" className="w-20 h-20 rounded-xl object-cover shrink-0 border border-border" />
               )}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <ConfidenceBadgeInline score={draft.confidence} />
+                  <MatchSourceBadge source={draft.matchSource} />
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">{draft.confidenceReason}</p>
                 {draft.confidence < 70 && (
@@ -408,8 +714,32 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
                     className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm text-foreground" />
                 </div>
                 <div>
+                  <label className="text-[10px] text-muted-foreground">Vendor</label>
+                  <input value={draft.vendor} onChange={e => setDraft({ ...draft, vendor: e.target.value })}
+                    className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm text-foreground" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-muted-foreground">SKU</label>
+                  <input value={draft.sku} onChange={e => setDraft({ ...draft, sku: e.target.value })}
+                    className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm text-foreground font-mono" placeholder="e.g. JA81520" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Barcode</label>
+                  <input value={draft.barcode} onChange={e => setDraft({ ...draft, barcode: e.target.value })}
+                    className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm text-foreground font-mono" placeholder="e.g. 9312345678901" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
                   <label className="text-[10px] text-muted-foreground">Colour</label>
                   <input value={draft.colour} onChange={e => setDraft({ ...draft, colour: e.target.value })}
+                    className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm text-foreground" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Tags</label>
+                  <input value={draft.tags.join(", ")} onChange={e => setDraft({ ...draft, tags: e.target.value.split(",").map(t => t.trim()).filter(Boolean) })}
                     className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm text-foreground" />
                 </div>
               </div>
@@ -418,16 +748,6 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
                   <label className="text-[10px] text-muted-foreground">Description</label>
                   <textarea value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })}
                     className="w-full rounded-lg bg-input border border-border px-3 py-2 text-xs text-foreground min-h-[56px] resize-none" />
-                </div>
-              )}
-              {draft.tags.length > 0 && (
-                <div>
-                  <label className="text-[10px] text-muted-foreground">Tags</label>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {draft.tags.map((tag, i) => (
-                      <span key={i} className="px-2 py-0.5 rounded-full bg-muted text-[10px] text-muted-foreground">{tag}</span>
-                    ))}
-                  </div>
                 </div>
               )}
 
@@ -462,7 +782,10 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
           </Button>
         ) : !generating ? (
           <div className="text-center text-xs text-muted-foreground py-2">
-            {inputMode === "camera" ? "Take a photo to get started" : "Enter product info to generate"}
+            {inputMode === "barcode" ? "Enter a barcode or SKU to look up" :
+             inputMode === "sku" ? "Scan a product label to get started" :
+             inputMode === "camera" ? "Take a photo to get started" :
+             "Enter product info to generate"}
           </div>
         ) : null}
         {products.length > 0 && (

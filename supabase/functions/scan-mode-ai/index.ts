@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { input, mode, storeName, storeCity } = await req.json();
+    const { input, mode, storeName, storeCity, ocrMode } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -42,6 +42,8 @@ RESPOND WITH JSON ONLY:
   "tags": ["tag1", "tag2"],
   "colour": "string or empty",
   "pattern": "string or empty",
+  "sku": "string or empty - any style code or SKU visible",
+  "barcode": "string or empty - any barcode number visible",
   "confidence_score": number,
   "confidence_reason": "string explaining the score"
 }`;
@@ -51,10 +53,13 @@ RESPOND WITH JSON ONLY:
     ];
 
     if (mode === "image") {
+      const imagePrompt = ocrMode
+        ? "Read this product label, swing tag, or barcode label. Extract: any barcode numbers, SKU/style codes, brand name, product name, and other details. If a barcode is visible, include it in the barcode field. Generate a Shopify-ready product draft."
+        : "Identify this product from the image. Generate a Shopify-ready product draft with confidence score.";
       messages.push({
         role: "user",
         content: [
-          { type: "text", text: "Identify this product from the image. Generate a Shopify-ready product draft with confidence score." },
+          { type: "text", text: imagePrompt },
           { type: "image_url", image_url: { url: input } },
         ],
       });
@@ -128,6 +133,8 @@ RESPOND WITH JSON ONLY:
       tags: Array.isArray(parsed.tags) ? parsed.tags : (parsed.tags || "").split(",").map((t: string) => t.trim()).filter(Boolean),
       colour: parsed.colour || parsed.color || "",
       pattern: parsed.pattern || "",
+      sku: parsed.sku || "",
+      barcode: parsed.barcode || "",
       confidence_score: typeof parsed.confidence_score === "number" ? parsed.confidence_score : 50,
       confidence_reason: parsed.confidence_reason || "",
     };

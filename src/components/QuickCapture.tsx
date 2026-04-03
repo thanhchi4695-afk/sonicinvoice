@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Camera, Upload, ChevronLeft, ChevronRight, Check, X, Download, RotateCcw, FileText, Edit2 } from "lucide-react";
+import { Camera, Upload, ChevronLeft, ChevronRight, Check, X, Download, RotateCcw, FileText, Edit2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getStoreConfig } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";

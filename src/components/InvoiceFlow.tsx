@@ -2156,7 +2156,8 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
               <span className="text-base text-muted-foreground">📷</span>
             )}
           </div>
-          <div className="flex-1 min-w-0 flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm truncate">{product.name}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               {product.brand} · {product.type}
               {product.colour && <> · <span className="text-foreground">{product.colour}</span></>}
@@ -2164,7 +2165,6 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
               {" · "}${product.rrp.toFixed(2)}
               {product.sku && <> · <span className="font-mono-data">{product.sku}</span></>}
             </p>
-            {/* Barcode display */}
             {product.barcode && (
               <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
                 <Barcode className="w-3 h-3" />
@@ -2173,7 +2173,6 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
                 {product.barcode && product.matchSource !== "barcode" && <span className="text-warning">· Not in catalog</span>}
               </p>
             )}
-            {/* Collection pills */}
             {(() => {
               const tags = [product.type, product.brand, "new arrivals", "Womens", "Swimwear", "full_price"].filter(Boolean);
               const cols = matchCollectionsWithBrand(tags, product.brand);
@@ -2186,7 +2185,6 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
                 </div>
               ) : null;
             })()}
-            {/* Cost change badge */}
             {product.costChange && product.costChange.changePct !== 0 && (
               <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${
                 product.costChange.changePct > 5 ? "bg-destructive/15 text-destructive" :
@@ -2199,10 +2197,19 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
             {product.isNew && !product.costChange && (
               <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] bg-muted text-muted-foreground">New — no price history</span>
             )}
-            {/* Margin indicator */}
             {margin !== null && (
               <span className={`inline-block mt-0.5 text-[9px] ${margin < 25 ? "text-destructive" : margin < 40 ? "text-warning" : "text-muted-foreground"}`}>
                 {margin < 25 && "⚠ "}Margin: {margin.toFixed(0)}%
+              </span>
+            )}
+            {/* Enrichment badge */}
+            {product.enriched && (
+              <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                product.enrichConfidence === 'high' ? 'bg-success/15 text-success' :
+                product.enrichConfidence === 'medium' ? 'bg-warning/15 text-warning' :
+                'bg-destructive/15 text-destructive'
+              }`}>
+                ✦ {product.enrichConfidence} confidence
               </span>
             )}
           </div>
@@ -2210,6 +2217,7 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />
             <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
           </div>
+        </div>
         </div>
       </button>
       {expanded && (

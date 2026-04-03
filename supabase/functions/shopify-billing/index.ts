@@ -20,12 +20,25 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Plan configuration
-const PLAN = {
-  name: "Sonic Invoice Pro",
-  price: 29.00,
-  currency: "USD",
-  trialDays: 14,
-  test: false, // Set to true for development stores
+const PLANS = {
+  monthly: {
+    name: "Starter (Monthly)",
+    handle: "starter",
+    price: 19.00,
+    currency: "USD",
+    trialDays: 7,
+    interval: "EVERY_30_DAYS",
+    test: false,
+  },
+  yearly: {
+    name: "Starter (Yearly)",
+    handle: "starter",
+    price: 190.00,
+    currency: "USD",
+    trialDays: 7,
+    interval: "ANNUAL",
+    test: false,
+  },
 };
 
 Deno.serve(async (req) => {

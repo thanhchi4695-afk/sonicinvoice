@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { BatchProduct } from "@/components/BatchReviewScreen";
 import { PushProduct, getConnection, pushProductGraphQL, recordPush } from "@/lib/shopify-api";
-import { generateMerchantXML } from "@/lib/google-feed";
+import { generateGoogleFeedXML } from "@/lib/google-feed";
 import { validateForExport } from "@/lib/shopify-csv-schema";
 
 /* ─── types ─── */

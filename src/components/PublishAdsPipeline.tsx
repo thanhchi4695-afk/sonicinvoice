@@ -161,7 +161,7 @@ const PublishAdsPipeline = ({ products, open, onOpenChange }: Props) => {
       sku: p.sku,
       barcode: p.barcode,
     }));
-    const xml = generateMerchantXML(feedProducts, "https://yourstore.myshopify.com");
+    const xml = generateGoogleFeedXML(feedProducts);
     const blob = new Blob([xml], { type: "application/xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

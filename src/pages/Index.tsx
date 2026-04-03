@@ -16,6 +16,7 @@ import PriceLookup from "@/components/PriceLookup";
 import LightspeedGuide from "@/components/LightspeedGuide";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
 import QuickCapture from "@/components/QuickCapture";
+import ScanMode from "@/components/ScanMode";
 import OrderFormFlow from "@/components/OrderFormFlow";
 import PurchaseOrderPanel from "@/components/PurchaseOrderPanel";
 import SeasonManager from "@/components/SeasonManager";
@@ -44,7 +45,7 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
@@ -222,6 +223,7 @@ const Index = () => {
       case "google_ads_setup": return <GoogleAdsSetupWizard onBack={() => setActiveFlow(null)} />;
       case "meta_ads_setup": return <MetaAdsSetupWizard onBack={() => setActiveFlow(null)} />;
       case "lightspeed_convert": return <LightspeedConverter onBack={() => setActiveFlow(null)} />;
+      case "scan_mode": return <ScanMode onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };
@@ -250,6 +252,7 @@ const Index = () => {
           onStartGoogleAdsSetup={() => setActiveFlow("google_ads_setup")}
           onStartMetaAdsSetup={() => setActiveFlow("meta_ads_setup")}
           onStartLightspeedConvert={() => setActiveFlow("lightspeed_convert")}
+          onStartScanMode={() => setActiveFlow("scan_mode")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

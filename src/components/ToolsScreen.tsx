@@ -7,6 +7,7 @@ import SeasonManager from "@/components/SeasonManager";
 import ExportCollections from "@/components/ExportCollections";
 import ImportCollections from "@/components/ImportCollections";
 import AutoCollectionBuilder from "@/components/AutoCollectionBuilder";
+import CollectionSEOPanel from "@/components/CollectionSEOPanel";
 import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
@@ -37,6 +38,7 @@ const tools = [
   { id: "export_collections", icon: Download, label: "Export collections", desc: "Export all Shopify collections to CSV", color: "text-success" },
   { id: "import_collections", icon: Upload, label: "Import collections", desc: "Create or update collections from CSV", color: "text-success" },
   { id: "auto_collections", icon: Sparkles, label: "Auto collections AI", desc: "AI-generate smart collections from products", color: "text-primary" },
+  { id: "collection_seo", icon: Globe, label: "Collection SEO AI", desc: "SEO-optimize collections for Google rankings", color: "text-success" },
 ];
 
 const quickInserts = [
@@ -987,6 +989,7 @@ const ToolsScreen = () => {
   if (activeTool === "export_collections") return <ExportCollections onBack={() => setActiveTool(null)} />;
   if (activeTool === "import_collections") return <ImportCollections onBack={() => setActiveTool(null)} />;
   if (activeTool === "auto_collections") return <AutoCollectionBuilder onBack={() => setActiveTool(null)} />;
+  if (activeTool === "collection_seo") return <CollectionSEOPanel onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

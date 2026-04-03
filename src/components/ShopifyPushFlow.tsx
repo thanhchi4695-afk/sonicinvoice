@@ -22,6 +22,7 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
   const [pushing, setPushing] = useState(false);
   const [results, setResults] = useState<PushResult[]>([]);
   const [done, setDone] = useState(false);
+  const [useGraphQL, setUseGraphQL] = useState(true);
 
   useEffect(() => {
     getConnection().then((conn) => {

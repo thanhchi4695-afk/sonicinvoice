@@ -16,7 +16,7 @@ import { calculateConfidence, type ConfidenceBreakdown, type ConfidenceLevel, ge
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource } from "@/lib/barcode-catalog";
 import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugInfo } from "@/lib/invoice-validator";
-import InvoiceDebugPanel from "@/components/InvoiceDebugPanel";
+import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -1299,10 +1299,43 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
-          {/* Debug panel for parsed invoice data */}
+          {/* Auto-Correct AI panel */}
           {validationDebug && validatedProducts.length > 0 && (
             <div className="mb-3">
-              <InvoiceDebugPanel debug={validationDebug} products={validatedProducts} />
+              <InvoiceAutoCorrectPanel
+                debug={validationDebug}
+                products={validatedProducts}
+                onApproveRow={(rowIndex) => {
+                  setValidatedProducts(prev => prev.map(p =>
+                    p._rowIndex === rowIndex
+                      ? { ...p, _rejected: false, _confidenceLevel: "high" as const, _confidence: Math.max(p._confidence, 80) }
+                      : p
+                  ));
+                  // Rebuild product groups from accepted products
+                  const accepted = validatedProducts
+                    .map(p => p._rowIndex === rowIndex ? { ...p, _rejected: false } : p)
+                    .filter(p => !p._rejected);
+                  const clean = accepted.map(({ _confidence, _confidenceLevel, _issues, _corrections, _rejected, _rejectReason, _classification, _suggestedTitle, _suggestedPrice, _suggestedVendor, _rowIndex, _rawName, _rawCost, ...rest }) => rest);
+                  const groups = convertToProductGroups(clean);
+                  setProductGroups(groups);
+                  toast("Row approved", { description: "Product added to accepted list" });
+                }}
+                onRejectRow={(rowIndex) => {
+                  setValidatedProducts(prev => prev.map(p =>
+                    p._rowIndex === rowIndex
+                      ? { ...p, _rejected: true, _rejectReason: "Manually rejected", _confidenceLevel: "low" as const, _confidence: 0 }
+                      : p
+                  ));
+                  // Rebuild product groups without rejected
+                  const accepted = validatedProducts
+                    .map(p => p._rowIndex === rowIndex ? { ...p, _rejected: true } : p)
+                    .filter(p => !p._rejected);
+                  const clean = accepted.map(({ _confidence, _confidenceLevel, _issues, _corrections, _rejected, _rejectReason, _classification, _suggestedTitle, _suggestedPrice, _suggestedVendor, _rowIndex, _rawName, _rawCost, ...rest }) => rest);
+                  const groups = convertToProductGroups(clean);
+                  setProductGroups(groups);
+                  toast("Row rejected", { description: "Product removed from list" });
+                }}
+              />
             </div>
           )}
 

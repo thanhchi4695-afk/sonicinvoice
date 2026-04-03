@@ -473,15 +473,32 @@ function ReviewRow({
           {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
 
-        {/* Confidence */}
-        <div className="shrink-0 w-10 text-center">
-          <span className={`text-sm font-bold font-mono ${
-            p._confidenceLevel === "high" ? "text-success" :
-            p._confidenceLevel === "medium" ? "text-secondary" : "text-destructive"
-          }`}>
-            {p._confidence}%
-          </span>
-        </div>
+        {/* Confidence with tooltip */}
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="shrink-0 w-10 text-center cursor-help">
+                <span className={`text-sm font-bold font-mono ${
+                  p._confidenceLevel === "high" ? "text-success" :
+                  p._confidenceLevel === "medium" ? "text-secondary" : "text-destructive"
+                }`}>
+                  {p._confidence}%
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[220px] p-2">
+              <p className="text-[10px] font-semibold mb-1">Score breakdown</p>
+              <div className="space-y-0.5">
+                {(p._confidenceReasons || []).slice(0, 5).map((r, i) => (
+                  <div key={i} className={`text-[9px] flex items-center gap-1 ${r.delta > 0 ? "text-success" : "text-destructive"}`}>
+                    <span className="font-mono">{r.delta > 0 ? "+" : ""}{r.delta}</span>
+                    <span className="text-muted-foreground">{r.label}</span>
+                  </div>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         {/* Product info */}
         <div className="flex-1 min-w-0">

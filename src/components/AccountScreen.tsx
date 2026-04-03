@@ -46,6 +46,8 @@ const AccountScreen = () => {
     setCurrency(cfg.currency || 'AUD');
     setStoreType(cfg.storeType || 'shopify');
     setLsVersion(cfg.lightspeedVersion || 'x_series');
+    setStoreCity(cfg.city || '');
+    setFreeShippingThreshold(cfg.freeShippingThreshold || '');
 
     getConnection().then((conn) => {
       if (conn) {

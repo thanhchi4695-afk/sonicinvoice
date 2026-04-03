@@ -139,6 +139,7 @@ const BulkBar = ({
             {[
               { label: "✨ Smart Name Selected", fn: onSmartName, highlight: true },
               { label: "🔍 Generate SEO", fn: onSEO, highlight: true },
+              { label: "💰 AI Price Selected", fn: onBulkPrice, highlight: true },
               { label: "Set Vendor", fn: onSetVendor },
               { label: "Set Product Type", fn: onSetType },
               { label: "Add Tags", fn: onAddTag },

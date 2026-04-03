@@ -882,6 +882,7 @@ const ToolsScreen = () => {
   if (activeTool === "tags") return <TagBuilderPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "brands") return <BrandDirectoryPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "google_feed") return <GoogleFeedPanel onBack={() => setActiveTool(null)} />;
+  if (activeTool === "image_helper") return <ImageHelperPanel onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

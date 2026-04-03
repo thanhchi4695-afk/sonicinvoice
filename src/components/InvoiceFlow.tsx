@@ -17,6 +17,7 @@ import ConfidenceBadge from "@/components/ConfidenceBadge";
 import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource } from "@/lib/barcode-catalog";
 import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugInfo } from "@/lib/invoice-validator";
 import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
+import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 
 interface InvoiceFlowProps {
   onBack: () => void;

@@ -2327,7 +2327,52 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
             </div>
           )}
 
+          {/* Enrichment results */}
+          {product.enriched && (
+            <div className="mt-2 pt-2 border-t border-border space-y-2">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Enrichment results</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                  product.enrichConfidence === 'high' ? 'bg-success/15 text-success' :
+                  product.enrichConfidence === 'medium' ? 'bg-warning/15 text-warning' :
+                  'bg-destructive/15 text-destructive'
+                }`}>{product.enrichConfidence} confidence</span>
+                {product.productPageUrl && (
+                  <a href={product.productPageUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-primary hover:underline">View on brand site ↗</a>
+                )}
+              </div>
+              {product.imageUrls && product.imageUrls.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-muted-foreground mb-1">Images found ({product.imageUrls.length}) — click to set as primary</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {product.imageUrls.slice(0, 6).map((url, j) => (
+                      <div key={j} className="relative cursor-pointer" onClick={(e) => { e.stopPropagation(); onSetImage?.(url); }}>
+                        <img src={url} alt="" className={`w-14 h-14 object-cover rounded border ${product.imageSrc === url ? 'border-primary' : 'border-border'}`} onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }} />
+                        {product.imageSrc === url && <div className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center text-[7px] text-primary-foreground">✓</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(product.fabric || product.care || product.origin) && (
+                <div className="grid grid-cols-2 gap-1 text-[11px]">
+                  {product.fabric && <div><span className="text-muted-foreground">Fabric: </span>{product.fabric}</div>}
+                  {product.care && <div><span className="text-muted-foreground">Care: </span>{product.care}</div>}
+                  {product.origin && <div><span className="text-muted-foreground">Origin: </span>{product.origin}</div>}
+                </div>
+              )}
+              {product.enrichNote && (
+                <div className="text-[10px] text-warning bg-warning/10 rounded p-1.5">⚠ {product.enrichNote}</div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2 flex-wrap">
+            {onEnrich && (
+              <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onEnrich(); }} disabled={product.enriching}>
+                {product.enriching ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> Finding...</> : product.enriched ? <><RotateCcw className="w-3.5 h-3.5 mr-1" /> Re-enrich</> : <><Zap className="w-3.5 h-3.5 mr-1" /> ✦ Enrich</>}
+              </Button>
+            )}
             {onPreview && <Button variant="outline" size="sm" onClick={onPreview}><Eye className="w-3.5 h-3.5 mr-1" /> Preview</Button>}
             <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
             <Button variant="ghost" size="sm" className="text-destructive"><X className="w-3.5 h-3.5 mr-1" /> Remove</Button>

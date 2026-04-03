@@ -1408,12 +1408,39 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             )}
           </div>
 
+          {/* Enrichment status bar */}
+          {(() => {
+            const enrichedCount = productGroups.filter(g => g.enriched).length;
+            const withImg = productGroups.filter(g => g.imageSrc).length;
+            return enrichedCount > 0 ? (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 mb-3 flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="text-xs text-primary font-medium">
+                  {enrichedCount}/{productGroups.length} enriched · {withImg} with images
+                </span>
+              </div>
+            ) : null;
+          })()}
+
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-sm font-medium">{productGroups.length} products found</p>
               <p className="text-[10px] text-muted-foreground">{totalVariantLines} lines → {groupedCount} grouped + {standaloneCount} standalone</p>
             </div>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={runEnrichAll}
+                disabled={enrichAllRunning}
+                className="gap-1"
+              >
+                {enrichAllRunning ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enriching {enrichProgress.current}/{enrichProgress.total}...</>
+                ) : (
+                  <><Zap className="w-3.5 h-3.5" /> ✦ Enrich all</>
+                )}
+              </Button>
               {mergeSelection.length >= 2 ? (
                 <Button variant="outline" size="sm" onClick={handleMergeSelected} className="gap-1 text-primary border-primary">
                   <Link className="w-3.5 h-3.5" /> Group {mergeSelection.length} as variants

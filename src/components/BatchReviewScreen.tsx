@@ -136,6 +136,7 @@ const BulkBar = ({
           <div className="absolute right-0 top-8 z-50 bg-card border border-border rounded-lg shadow-lg py-1 w-48">
             {[
               { label: "✨ Smart Name Selected", fn: onSmartName, highlight: true },
+              { label: "🔍 Generate SEO", fn: onSEO, highlight: true },
               { label: "Set Vendor", fn: onSetVendor },
               { label: "Set Product Type", fn: onSetType },
               { label: "Add Tags", fn: onAddTag },

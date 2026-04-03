@@ -670,7 +670,7 @@ function ReviewRow({
                 </div>
               )}
 
-              {/* Confidence breakdown */}
+              {/* Confidence breakdown with signals */}
               <div className="pt-1.5 border-t border-border/50">
                 <DetailRow
                   label="Confidence"
@@ -678,6 +678,17 @@ function ReviewRow({
                   color={p._confidenceLevel === "high" ? "text-success" : p._confidenceLevel === "medium" ? "text-secondary" : "text-destructive"}
                 />
                 <DetailRow label="Classification" value={p._classification} />
+                {(p._confidenceReasons || []).length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    <span className="text-muted-foreground text-[9px]">Score factors:</span>
+                    {p._confidenceReasons.map((r, ri) => (
+                      <div key={ri} className={`flex items-center gap-1 text-[9px] ${r.delta > 0 ? "text-success" : "text-destructive"}`}>
+                        <span className="font-mono">{r.delta > 0 ? "+" : ""}{r.delta}</span>
+                        <span className="text-muted-foreground">{r.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Rejection reason for rejected tab */}

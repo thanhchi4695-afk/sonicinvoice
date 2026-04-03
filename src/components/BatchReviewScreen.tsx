@@ -597,16 +597,24 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
 
       {/* Bottom bar */}
       <div className="shrink-0 px-4 py-3 border-t border-border bg-background space-y-2 safe-bottom">
-        <Button className="w-full h-12 text-base font-semibold" onClick={handleExport} disabled={!allReady}>
-          <Download className="w-5 h-5 mr-2" />
-          Export Shopify CSV ({readyCount} product{readyCount !== 1 ? "s" : ""})
-        </Button>
+        <div className="flex gap-2">
+          <Button className="flex-1 h-12 text-base font-semibold" onClick={handleExport} disabled={!allReady}>
+            <Download className="w-5 h-5 mr-2" />
+            Export CSV ({readyCount})
+          </Button>
+          <Button className="flex-1 h-12 text-base font-semibold" onClick={() => setShowPipeline(true)} disabled={readyCount === 0}>
+            <Rocket className="w-5 h-5 mr-2" />
+            Publish & Promote
+          </Button>
+        </div>
         {!allReady && products.length > 0 && (
           <p className="text-center text-[10px] text-destructive">
             Fix {fixCount} item{fixCount > 1 ? "s" : ""} before exporting
           </p>
         )}
       </div>
+
+      <PublishAdsPipeline products={products} open={showPipeline} onOpenChange={setShowPipeline} />
     </div>
   );
 };

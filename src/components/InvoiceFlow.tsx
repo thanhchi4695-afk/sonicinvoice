@@ -2125,7 +2125,7 @@ const VariantGroupCard = ({ group, onSplit, onPreview }: {
   );
 };
 
-const ProductCard = ({ product, onPreview }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean }; onPreview?: () => void }) => {
+const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean; enriched?: boolean; enriching?: boolean; imageSrc?: string; imageUrls?: string[]; desc?: string; fabric?: string; care?: string; origin?: string; productPageUrl?: string; enrichConfidence?: string; enrichNote?: string }; onPreview?: () => void; onEnrich?: () => void; onSetImage?: (url: string) => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [savedToBarcodeCatalog, setSavedToBarcodeCatalog] = useState(false);
   const [showMeta, setShowMeta] = useState(false);

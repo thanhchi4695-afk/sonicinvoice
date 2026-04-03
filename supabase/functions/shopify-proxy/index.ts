@@ -7,7 +7,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant
@@ -20,6 +20,9 @@ interface ShopifyRequestBody {
   product_id?: string;
   seo_title?: string;
   seo_description?: string;
+  // For collection operations
+  collection?: Record<string, unknown>;
+  collection_id?: number;
 }
 
 Deno.serve(async (req) => {
@@ -417,6 +420,86 @@ Deno.serve(async (req) => {
           smartPageInfo = nextMatch ? nextMatch[1] : null;
         } while (smartPageInfo);
         result = { collections: allSmarts };
+        break;
+      }
+
+      case "create_custom_collection": {
+        if (!body.collection) {
+          return new Response(JSON.stringify({ error: "Missing collection data" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const resp = await shopifyFetch("/custom_collections.json", {
+          method: "POST",
+          body: JSON.stringify({ custom_collection: body.collection }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to create collection", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: data.custom_collection };
+        break;
+      }
+
+      case "update_custom_collection": {
+        if (!body.collection_id || !body.collection) {
+          return new Response(JSON.stringify({ error: "Missing collection_id or collection data" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const resp = await shopifyFetch(`/custom_collections/${body.collection_id}.json`, {
+          method: "PUT",
+          body: JSON.stringify({ custom_collection: { id: body.collection_id, ...body.collection } }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to update collection", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: data.custom_collection };
+        break;
+      }
+
+      case "create_smart_collection": {
+        if (!body.collection) {
+          return new Response(JSON.stringify({ error: "Missing collection data" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const resp = await shopifyFetch("/smart_collections.json", {
+          method: "POST",
+          body: JSON.stringify({ smart_collection: body.collection }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to create smart collection", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: data.smart_collection };
+        break;
+      }
+
+      case "update_smart_collection": {
+        if (!body.collection_id || !body.collection) {
+          return new Response(JSON.stringify({ error: "Missing collection_id or collection data" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const resp = await shopifyFetch(`/smart_collections/${body.collection_id}.json`, {
+          method: "PUT",
+          body: JSON.stringify({ smart_collection: { id: body.collection_id, ...body.collection } }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to update smart collection", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: data.smart_collection };
         break;
       }
 

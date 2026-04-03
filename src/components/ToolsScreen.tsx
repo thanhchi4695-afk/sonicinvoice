@@ -5,6 +5,7 @@ import PriceLookup from "@/components/PriceLookup";
 import SupplierEmails from "@/components/SupplierEmails";
 import SeasonManager from "@/components/SeasonManager";
 import ExportCollections from "@/components/ExportCollections";
+import ImportCollections from "@/components/ImportCollections";
 import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
@@ -33,6 +34,7 @@ const tools = [
   { id: "lightspeed_convert", icon: Download, label: "Lightspeed converter", desc: "Convert Lightspeed product exports to Shopify-ready CSV format", color: "text-primary" },
   { id: "image_helper", icon: Image, label: "Image download helper", desc: "View and save enriched product images", color: "text-secondary" },
   { id: "export_collections", icon: Download, label: "Export collections", desc: "Export all Shopify collections to CSV", color: "text-success" },
+  { id: "import_collections", icon: Upload, label: "Import collections", desc: "Create or update collections from CSV", color: "text-success" },
 ];
 
 const quickInserts = [
@@ -981,6 +983,7 @@ const ToolsScreen = () => {
   if (activeTool === "google_feed") return <GoogleFeedPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "image_helper") return <ImageHelperPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "export_collections") return <ExportCollections onBack={() => setActiveTool(null)} />;
+  if (activeTool === "import_collections") return <ImportCollections onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

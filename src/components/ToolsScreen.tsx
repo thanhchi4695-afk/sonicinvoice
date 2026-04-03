@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
-import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail, CalendarDays, ShoppingCart, Image } from "lucide-react";
+import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail, CalendarDays, ShoppingCart, Image, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PriceLookup from "@/components/PriceLookup";
 import SupplierEmails from "@/components/SupplierEmails";
 import SeasonManager from "@/components/SeasonManager";
 import ExportCollections from "@/components/ExportCollections";
 import ImportCollections from "@/components/ImportCollections";
+import AutoCollectionBuilder from "@/components/AutoCollectionBuilder";
 import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
@@ -35,6 +36,7 @@ const tools = [
   { id: "image_helper", icon: Image, label: "Image download helper", desc: "View and save enriched product images", color: "text-secondary" },
   { id: "export_collections", icon: Download, label: "Export collections", desc: "Export all Shopify collections to CSV", color: "text-success" },
   { id: "import_collections", icon: Upload, label: "Import collections", desc: "Create or update collections from CSV", color: "text-success" },
+  { id: "auto_collections", icon: Sparkles, label: "Auto collections AI", desc: "AI-generate smart collections from products", color: "text-primary" },
 ];
 
 const quickInserts = [
@@ -984,6 +986,7 @@ const ToolsScreen = () => {
   if (activeTool === "image_helper") return <ImageHelperPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "export_collections") return <ExportCollections onBack={() => setActiveTool(null)} />;
   if (activeTool === "import_collections") return <ImportCollections onBack={() => setActiveTool(null)} />;
+  if (activeTool === "auto_collections") return <AutoCollectionBuilder onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

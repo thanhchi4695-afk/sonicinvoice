@@ -458,8 +458,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 colour: findCol(["colour", "color", "col"]),
                 size: findCol(["size", "sz"]),
                 qty: findNum(["qty", "quantity", "units", "ordered", "order qty"]),
-                cost: findNum(["cost", "wholesale", "unit price", "price", "net"]),
-                rrp: findNum(["rrp", "retail", "rrp price", "sell", "msrp"]),
+                cost: findNum(["cost per item", "cost", "wholesale", "unit price", "net"]),
+                rrp: findNum(["compare-at price", "rrp", "retail", "rrp price", "sell", "msrp", "price"]),
               };
             }).filter((p: any) => p.name);
             resolve(products);

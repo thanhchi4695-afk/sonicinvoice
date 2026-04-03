@@ -558,11 +558,14 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
           ))}
         </div>
         <div className="shrink-0 px-4 py-3 border-t border-border bg-background space-y-2 safe-bottom">
-          <Button className="w-full h-12 text-base font-semibold" onClick={() => setShowExportReview(true)} disabled={products.length === 0}>
-            <FileCheck className="w-5 h-5 mr-2" /> Review & Export Shopify CSV
+          <Button className="w-full h-12 text-base font-semibold" onClick={() => setShowBatchReview(true)} disabled={products.length === 0}>
+            <Layers className="w-5 h-5 mr-2" /> Batch Review & Edit
           </Button>
-          <Button variant="outline" className="w-full h-10" onClick={exportCSV} disabled={products.length === 0}>
-            <Download className="w-4 h-4 mr-1" /> Quick Export CSV
+          <Button variant="outline" className="w-full h-10" onClick={() => setShowExportReview(true)} disabled={products.length === 0}>
+            <FileCheck className="w-4 h-4 mr-1" /> Review & Export CSV
+          </Button>
+          <Button variant="ghost" className="w-full h-10 text-xs" onClick={exportCSV} disabled={products.length === 0}>
+            <Download className="w-3.5 h-3.5 mr-1" /> Quick Export
           </Button>
           <Button variant="ghost" className="w-full h-10" onClick={() => setShowList(false)}>
             <Plus className="w-4 h-4 mr-1" /> Add more items

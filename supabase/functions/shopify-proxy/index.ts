@@ -1,5 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+// ═══ Session token verification import ═══
+import { verifyShopifySessionToken, extractShopDomain } from "../_shared/verify-session-token.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -26,7 +28,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Authenticate user
+    // ═══ Authentication: support both Supabase JWT and Shopify session token ═══
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
@@ -35,12 +37,38 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    let userId: string | null = null;
 
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-    if (userError || !user) {
+    const bearerToken = authHeader.replace("Bearer ", "");
+
+    // Try Shopify session token first (embedded mode)
+    const sessionPayload = await verifyShopifySessionToken(bearerToken);
+    if (sessionPayload) {
+      // ═══ Session token validated — look up user by shop ═══
+      const shop = extractShopDomain(sessionPayload.dest || sessionPayload.iss);
+      const { data: conn } = await supabaseAdmin
+        .from("shopify_connections")
+        .select("user_id")
+        .eq("store_url", shop)
+        .single();
+      if (conn) userId = conn.user_id;
+    }
+
+    // Fallback: standard Supabase JWT auth (standalone mode)
+    if (!userId) {
+      const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+      if (userError || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = user.id;
+    }
+
+    if (!userId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -50,7 +78,7 @@ Deno.serve(async (req) => {
     const { data: conn, error: connError } = await supabaseAdmin
       .from("shopify_connections")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
 
     if (connError || !conn) {
@@ -105,7 +133,7 @@ Deno.serve(async (req) => {
           await supabaseAdmin
             .from("shopify_connections")
             .update({ shop_name: data.shop.name, updated_at: new Date().toISOString() })
-            .eq("user_id", user.id);
+            .eq("user_id", userId);
         }
         result = { shop: data.shop };
         break;

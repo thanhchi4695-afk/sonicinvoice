@@ -220,6 +220,132 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "graphql_create_product": {
+        if (!body.product) {
+          return new Response(JSON.stringify({ error: "Missing product data" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const p = body.product as Record<string, unknown>;
+        const variants = (p.variants as Record<string, unknown>[]) || [];
+        const options = (p.options as { name: string }[]) || [];
+        const images = (p.images as { src: string }[]) || [];
+
+        const variantInputs = variants.map((v: Record<string, unknown>) => {
+          const optionValues: string[] = [];
+          if (v.option1) optionValues.push(String(v.option1));
+          if (v.option2) optionValues.push(String(v.option2));
+
+          return `{
+            price: "${v.price || "0.00"}"
+            ${v.compare_at_price ? `compareAtPrice: "${v.compare_at_price}"` : ""}
+            ${v.sku ? `sku: "${v.sku}"` : ""}
+            ${v.cost ? `inventoryItem: { cost: "${v.cost}" }` : ""}
+            ${v.inventory_management === "shopify" ? `inventoryManagement: SHOPIFY` : ""}
+            ${optionValues.length > 0 ? `optionValues: [${optionValues.map(ov => `{ name: "${ov}", optionName: "${options[optionValues.indexOf(ov)]?.name || "Option"}" }`).join(", ")}]` : ""}
+          }`;
+        });
+
+        const mutation = `
+          mutation productCreate($input: ProductInput!, $media: [CreateMediaInput!]) {
+            productCreate(input: $input, media: $media) {
+              product {
+                id
+                title
+                handle
+                status
+                onlineStoreUrl
+                variants(first: 10) {
+                  edges {
+                    node {
+                      id
+                      sku
+                      price
+                    }
+                  }
+                }
+              }
+              userErrors {
+                field
+                message
+              }
+            }
+          }
+        `;
+
+        const productInput: Record<string, unknown> = {
+          title: p.title || "",
+          descriptionHtml: p.body_html || "",
+          vendor: p.vendor || "",
+          productType: p.product_type || "",
+          status: (p.status || "DRAFT").toUpperCase(),
+          tags: p.tags ? (p.tags as string).split(",").map((t: string) => t.trim()) : [],
+        };
+
+        // Build variants for GraphQL input
+        if (variants.length > 0) {
+          productInput.variants = variants.map((v: Record<string, unknown>) => {
+            const variant: Record<string, unknown> = {
+              price: String(v.price || "0.00"),
+            };
+            if (v.compare_at_price) variant.compareAtPrice = String(v.compare_at_price);
+            if (v.sku) variant.sku = String(v.sku);
+            if (v.cost) variant.inventoryItem = { cost: String(v.cost) };
+            if (v.inventory_management === "shopify") variant.inventoryManagement = "SHOPIFY";
+            const optVals: { name: string; optionName: string }[] = [];
+            if (v.option1 && options[0]) optVals.push({ name: String(v.option1), optionName: options[0].name });
+            if (v.option2 && options[1]) optVals.push({ name: String(v.option2), optionName: options[1].name });
+            if (optVals.length > 0) variant.optionValues = optVals;
+            return variant;
+          });
+        }
+
+        const mediaInput = images.map((img: { src: string }) => ({
+          originalSource: img.src,
+          mediaContentType: "IMAGE",
+        }));
+
+        const graphqlResp = await fetch(`${baseUrl.replace(`/api/${conn.api_version}`, "")}/admin/api/${conn.api_version}/graphql.json`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": access_token,
+          },
+          body: JSON.stringify({
+            query: mutation,
+            variables: {
+              input: productInput,
+              media: mediaInput.length > 0 ? mediaInput : undefined,
+            },
+          }),
+        });
+
+        const graphqlData = await graphqlResp.json();
+
+        if (graphqlData.errors) {
+          return new Response(JSON.stringify({
+            error: "GraphQL errors",
+            details: graphqlData.errors,
+          }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const productResult = graphqlData.data?.productCreate;
+        if (productResult?.userErrors?.length > 0) {
+          return new Response(JSON.stringify({
+            error: productResult.userErrors.map((e: { message: string }) => e.message).join(", "),
+            details: productResult.userErrors,
+          }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        result = { product: productResult?.product };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

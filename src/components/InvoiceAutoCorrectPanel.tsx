@@ -267,6 +267,17 @@ function ProductRow({
             value={`${p._confidence}% (${p._confidenceLevel})`}
             color={p._confidenceLevel === "high" ? "text-success" : p._confidenceLevel === "medium" ? "text-warning" : "text-destructive"}
           />
+          {(p._confidenceReasons || []).length > 0 && (
+            <div className="pt-1 border-t border-border/50">
+              <span className="text-muted-foreground">Score factors:</span>
+              {p._confidenceReasons.map((r, ri) => (
+                <div key={ri} className={`flex items-center gap-1 mt-0.5 ${r.delta > 0 ? "text-success" : "text-destructive"}`}>
+                  <span className="font-mono text-[9px]">{r.delta > 0 ? "+" : ""}{r.delta}</span>
+                  <span className="text-muted-foreground">{r.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <DetailRow label="Classification" value={p._classification} />
           {p._rejectReason && <DetailRow label="Reason" value={p._rejectReason} color="text-destructive" />}
           {p._corrections.length > 0 && (

@@ -223,6 +223,7 @@ const Index = () => {
       case "google_ads_setup": return <GoogleAdsSetupWizard onBack={() => setActiveFlow(null)} />;
       case "meta_ads_setup": return <MetaAdsSetupWizard onBack={() => setActiveFlow(null)} />;
       case "lightspeed_convert": return <LightspeedConverter onBack={() => setActiveFlow(null)} />;
+      case "scan_mode": return <ScanMode onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

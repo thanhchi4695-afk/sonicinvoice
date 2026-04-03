@@ -57,7 +57,7 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
     setGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke("scan-mode-ai", {
-        body: { input, mode: "text", storeName: config.storeName, storeCity: config.storeCity },
+        body: { input, mode: "text", storeName: config.name, storeCity: config.city },
       });
       if (error) throw error;
       setGeneratedTitle(data.title || input);

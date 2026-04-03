@@ -526,7 +526,11 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
                 <EditableCell value={p.vendor} onChange={v => updateField(p._idx, "vendor", v)} />
                 <EditableCell value={p.sku} onChange={v => updateField(p._idx, "sku", v)} mono />
                 <EditableCell value={p.barcode} onChange={v => updateField(p._idx, "barcode", v)} mono />
-                <EditableCell value={p.price} onChange={v => updateField(p._idx, "price", parseFloat(v) || 0)} type="number" />
+                <div className="flex items-center gap-0.5">
+                  <EditableCell value={p.price} onChange={v => updateField(p._idx, "price", parseFloat(v) || 0)} type="number" />
+                  <PricingButton costPrice={p.price} productType={p.type} vendor={p.vendor} currentPrice={p.price}
+                    onApply={(price) => updateField(p._idx, "price", price)} />
+                </div>
                 <EditableCell value={p.quantity} onChange={v => updateField(p._idx, "quantity", parseInt(v) || 0)} type="number" />
                 <div className="px-2 py-1">
                   {p._valid.valid ? (

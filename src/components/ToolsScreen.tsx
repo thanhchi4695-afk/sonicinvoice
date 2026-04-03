@@ -986,6 +986,7 @@ const ToolsScreen = () => {
   if (activeTool === "image_helper") return <ImageHelperPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "export_collections") return <ExportCollections onBack={() => setActiveTool(null)} />;
   if (activeTool === "import_collections") return <ImportCollections onBack={() => setActiveTool(null)} />;
+  if (activeTool === "auto_collections") return <AutoCollectionBuilder onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

@@ -413,6 +413,26 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
               setSelected(new Set());
             }
           }}
+          onSEO={async () => {
+            const items = products.filter(p => selected.has(p.id));
+            if (!items.length) return;
+            setBulkSEO(true);
+            setBulkProgress({ done: 0, total: items.length });
+            try {
+              const results = await runBulkSEO(items, (done, total) => setBulkProgress({ done, total }));
+              onSetProducts(prev => prev.map(p => {
+                const r = results.get(p.id);
+                if (!r) return p;
+                return { ...p, description: r.seo_description, tags: r.keywords.join(", ") };
+              }));
+              toast.success(`SEO generated for ${results.size} products`);
+            } catch (e: any) {
+              toast.error(e.message || "SEO generation failed");
+            } finally {
+              setBulkSEO(false);
+              setSelected(new Set());
+            }
+          }}
         />
       )}
 

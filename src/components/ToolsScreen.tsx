@@ -871,6 +871,101 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
     </div>
   );
 }
+// ── Image Download Helper Panel ──────────────────────────────
+function ImageHelperPanel({ onBack }: { onBack: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const [imgErrors, setImgErrors] = useState<Set<number>>(new Set());
+
+  // Read enriched products from localStorage (saved by InvoiceFlow)
+  const getEnrichedProducts = (): { title: string; imageSrc: string; imageUrls: string[] }[] => {
+    try {
+      const raw = localStorage.getItem('last_enriched_products');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((p: any) => p.imageSrc || (p.imageUrls && p.imageUrls.length > 0)) : [];
+    } catch { return []; }
+  };
+
+  const products = getEnrichedProducts();
+
+  const copyUrlList = () => {
+    const list = products.map(p => `${p.title}\t${p.imageSrc}`).join('\n');
+    navigator.clipboard.writeText(list);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const openAllTabs = () => {
+    const urls = products.map(p => p.imageSrc).filter(Boolean);
+    if (urls.length === 0) return;
+    if (urls.length > 20 && !confirm(`Open ${urls.length} tabs? Your browser may block this.`)) return;
+    urls.forEach(url => window.open(url, '_blank'));
+  };
+
+  const handleImgError = (idx: number) => {
+    setImgErrors(prev => new Set(prev).add(idx));
+  };
+
+  return (
+    <div className="px-4 pt-6 pb-24 animate-fade-in">
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={onBack} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
+        <h2 className="text-lg font-semibold font-display">🖼 Image download helper</h2>
+      </div>
+
+      <p className="text-sm text-muted-foreground mb-5">
+        Shopify imports images automatically from URLs. Use this if you also want the files on your computer.
+      </p>
+
+      <div className="bg-card rounded-lg border border-border p-4 mb-4">
+        <h3 className="text-sm font-semibold mb-1">Images from last import</h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          {products.length > 0 ? `${products.length} products with images` : 'No enriched products yet. Run Enrich All on an invoice first.'}
+        </p>
+
+        {products.length > 0 && (
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {products.map((p, i) => (
+              <div key={i} className="text-center">
+                {!imgErrors.has(i) ? (
+                  <img
+                    src={p.imageSrc}
+                    alt={p.title}
+                    className="w-full aspect-square object-cover rounded-md border border-border cursor-pointer"
+                    onClick={() => window.open(p.imageSrc, '_blank')}
+                    onError={() => handleImgError(i)}
+                  />
+                ) : (
+                  <div className="w-full aspect-square rounded-md border border-border bg-muted flex items-center justify-center text-muted-foreground text-lg">📷</div>
+                )}
+                <p className="text-[10px] text-muted-foreground mt-1 truncate">{(p.title || '').slice(0, 20)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4">
+          <p className="text-xs text-muted-foreground">
+            <span className="font-semibold text-primary">💡 Tip:</span> To save images to your computer: right-click any image above → Save image as. Or use "Open all in tabs" to open them in new browser tabs then save from there.
+          </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            <span className="font-semibold text-foreground">Shopify auto-imports images:</span> The Image Src column in your CSV tells Shopify where to find each image. When you import the CSV, Shopify fetches and hosts the images automatically — you do not need to download them manually unless you want local copies.
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button variant="teal" size="sm" className="flex-1 gap-1" onClick={openAllTabs} disabled={products.length === 0}>
+            <ExternalLink className="w-3.5 h-3.5" /> Open all in tabs
+          </Button>
+          <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={copyUrlList} disabled={products.length === 0}>
+            {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy URL list</>}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const ToolsScreen = () => {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");

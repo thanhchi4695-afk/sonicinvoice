@@ -81,9 +81,21 @@ const QuickCapture = ({ onClose }: { onClose: () => void }) => {
   if (step === "processing") {
     return (
       <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-6">
-        <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mb-6" />
+        <div className="relative w-16 h-16 mb-6">
+          <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+          <div className="absolute inset-1 rounded-full bg-primary/10 animate-pulse" />
+          <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary/30 to-primary/5 border border-primary/20">
+            <Zap className="w-7 h-7 text-primary animate-pulse" fill="currentColor" />
+          </div>
+        </div>
         <h2 className="text-lg font-bold text-foreground mb-2">Processing invoice…</h2>
-        <p className="text-sm text-muted-foreground text-center">AI is reading your {supplier || "supplier"} invoice</p>
+        <p className="text-sm text-muted-foreground text-center mb-4">AI is reading your {supplier || "supplier"} invoice</p>
+        <div className="w-48 h-1 rounded-full bg-muted overflow-hidden">
+          <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-primary to-primary/40 animate-loading-bar" />
+        </div>
+        <div className="mt-4 space-y-1.5 text-xs text-muted-foreground">
+          <p className="animate-fade-in">Extracting products...</p>
+        </div>
       </div>
     );
   }

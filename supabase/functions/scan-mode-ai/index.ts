@@ -53,10 +53,13 @@ RESPOND WITH JSON ONLY:
     ];
 
     if (mode === "image") {
+      const imagePrompt = ocrMode
+        ? "Read this product label, swing tag, or barcode label. Extract: any barcode numbers, SKU/style codes, brand name, product name, and other details. If a barcode is visible, include it in the barcode field. Generate a Shopify-ready product draft."
+        : "Identify this product from the image. Generate a Shopify-ready product draft with confidence score.";
       messages.push({
         role: "user",
         content: [
-          { type: "text", text: "Identify this product from the image. Generate a Shopify-ready product draft with confidence score." },
+          { type: "text", text: imagePrompt },
           { type: "image_url", image_url: { url: input } },
         ],
       });

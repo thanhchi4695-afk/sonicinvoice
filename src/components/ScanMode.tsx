@@ -445,20 +445,32 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   };
 
   const exportCSV = () => {
-    const headers = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Option1 Name", "Option1 Value", "Variant SKU", "Variant Barcode", "Variant Price", "Variant Inventory Qty", "Status"];
-    const rows = products.map(p => [
-      p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""),
-      p.title, p.description, p.vendor, p.type, p.tags, "TRUE",
-      "Title", "Default Title", p.sku, p.barcode, p.price.toFixed(2), p.quantity.toString(), "active",
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    const exportData: ScannedProductForExport[] = products.map(p => ({
+      title: p.title, type: p.type, vendor: p.vendor, description: p.description,
+      tags: p.tags, colour: p.colour, sku: p.sku, barcode: p.barcode,
+      price: p.price, quantity: p.quantity,
+    }));
+    const csv = generateShopifyCSV(exportData);
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `scan-mode-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `scan-mode-export-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
+    URL.revokeObjectURL(a.href);
     toast.success(`Exported ${products.length} products`);
   };
+
+  // ── Export review screen ──
+  if (showExportReview) {
+    return (
+      <ScanExportReview
+        products={products}
+        onBack={() => setShowExportReview(false)}
+        onUpdateProduct={(idx, field, value) => updateProduct(idx, field as keyof ScannedProduct, value)}
+        onRemoveProduct={removeProduct}
+      />
+    );
+  }
 
   // ── Session list ──
   if (showList) {

@@ -636,8 +636,84 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
+  const [enrichAllRunning, setEnrichAllRunning] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
 
-  // Flatten for backward-compat with cost tracking etc.
+  // ── Product Enrichment via AI ────────────────────────────
+  const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {
+    try {
+      const storeConfig = JSON.parse(localStorage.getItem('store_config_sonic_invoice') || '{}');
+      const storeName = storeConfig.name || 'My Store';
+      const storeCity = storeConfig.city || '';
+      const customInstr = storeConfig.defaultInstructions || '';
+      
+      // Look up brand website from brand directory
+      const brandDir = JSON.parse(localStorage.getItem('brand_directory_sonic_invoice') || '[]');
+      const brandEntry = brandDir.find((b: any) => b.name.toLowerCase() === group.brand.toLowerCase());
+      const brandWebsite = brandEntry?.website || '';
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-product`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          title: group.name,
+          vendor: group.brand,
+          type: group.type,
+          brandWebsite,
+          storeName,
+          storeCity,
+          customInstructions: customInstr,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Failed' }));
+        return { enrichConfidence: 'low', enrichNote: err.error || 'Enrichment failed' };
+      }
+
+      const result = await response.json();
+      return {
+        desc: result.description && result.description.length > 20 ? result.description : undefined,
+        imageUrls: result.imageUrls?.length > 0 ? result.imageUrls : undefined,
+        imageSrc: result.imageUrls?.[0] || undefined,
+        fabric: result.fabric || undefined,
+        care: result.care || undefined,
+        origin: result.origin || undefined,
+        productPageUrl: result.productPageUrl || '',
+        enrichConfidence: result.confidence || 'low',
+        enrichNote: result.note || '',
+      };
+    } catch (e) {
+      return { enrichConfidence: 'low', enrichNote: e instanceof Error ? e.message : 'Network error' };
+    }
+  };
+
+  const runEnrichment = async (idx: number) => {
+    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, enriching: true } : g));
+    const result = await enrichProduct(productGroups[idx]);
+    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g));
+    addAuditEntry('Enriched', `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence`);
+  };
+
+  const runEnrichAll = async () => {
+    const unenriched = productGroups.map((g, i) => ({ g, i })).filter(({ g }) => g.name && !g.enriched);
+    if (unenriched.length === 0) return;
+    setEnrichAllRunning(true);
+    setEnrichProgress({ current: 0, total: unenriched.length });
+    for (let j = 0; j < unenriched.length; j++) {
+      setEnrichProgress({ current: j + 1, total: unenriched.length });
+      await runEnrichment(unenriched[j].i);
+      if (j < unenriched.length - 1) await new Promise(r => setTimeout(r, 700));
+    }
+    setEnrichAllRunning(false);
+  };
+
+  const setProductImage = (idx: number, url: string) => {
+    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, imageSrc: url } : g));
+  };
   const mockProducts = productGroups.map(g => ({
     name: g.name,
     sku: g.variants[0]?.sku || g.vendorCode || "",

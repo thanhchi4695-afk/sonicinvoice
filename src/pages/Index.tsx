@@ -34,6 +34,8 @@ import MetaAdsSetupWizard from "@/components/MetaAdsSetupWizard";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
+import { exchangeShopifyToken } from "@/lib/shopify-auth";
+import { toast } from "sonner";
 
 const Index = () => {
   const [authed, setAuthed] = useState(true);
@@ -45,12 +47,33 @@ const Index = () => {
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
   const { isEmbedded } = useShopifyEmbedded();
 
-  // Handle Shopify OAuth callback redirect
+  // Handle Shopify OAuth callback redirect (store connection)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("shopify_connected") === "1") {
       window.history.replaceState({}, "", window.location.pathname);
       setActiveTab("account");
+    }
+  }, []);
+
+  // Handle Shopify OAuth login callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const loginToken = params.get("shopify_login");
+    if (loginToken) {
+      window.history.replaceState({}, "", window.location.pathname);
+      exchangeShopifyToken(loginToken)
+        .then(({ shop }) => {
+          setAuthed(true);
+          setOnboarded(true);
+          localStorage.setItem("onboarding_complete", "true");
+          addAuditEntry("Login", `Shopify OAuth login from ${shop}`);
+          toast.success(`Signed in via Shopify (${shop})`);
+        })
+        .catch((err) => {
+          console.error("Shopify login failed:", err);
+          toast.error("Shopify sign-in failed. Please try again.");
+        });
     }
   }, []);
 

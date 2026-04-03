@@ -79,6 +79,14 @@ export async function pushProduct(product: PushProduct): Promise<{ id: string }>
   return { id: String(data.product?.id || "") };
 }
 
+export async function pushProductGraphQL(product: PushProduct): Promise<{ id: string; handle?: string }> {
+  const data = await callProxy({ action: "graphql_create_product", product });
+  const gqlId = data.product?.id || "";
+  // Extract numeric ID from GID format: gid://shopify/Product/12345
+  const numericId = String(gqlId).split("/").pop() || String(gqlId);
+  return { id: numericId, handle: data.product?.handle };
+}
+
 export async function getConnection(): Promise<ShopifyConnection | null> {
   const { data } = await supabase
     .from("shopify_connections")

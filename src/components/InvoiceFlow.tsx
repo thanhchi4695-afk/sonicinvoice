@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
@@ -355,6 +356,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadedFile(file);
+    toast("Invoice uploaded", { description: `Processing ${file.name}…` });
     startProcessing(file);
     e.target.value = "";
   };
@@ -1143,8 +1145,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                       </span>
                     </div>
                     <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
+                      {!processingDone && (
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-loading-bar" />
+                      )}
                       <div
-                        className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all duration-500 ease-out"
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-primary/70 rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -1928,6 +1933,7 @@ function LightspeedRestockSection({ products, supplierName }: {
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
+    toast.success("CSV downloaded", { description: filename });
   };
 
   const handleDownload = () => {

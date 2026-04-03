@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag, FileCheck } from "lucide-react";
+import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag, FileCheck, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoreConfig } from "@/lib/prompt-builder";
@@ -9,6 +9,7 @@ import { lookupCatalog } from "@/lib/catalog-memory";
 import { matchProduct, lookupBarcode, saveBarcodeToCatalog, validateGTIN, extractColourFromTitle, extractSizeFromTitle } from "@/lib/barcode-catalog";
 import { generateShopifyCSV, type ScannedProductForExport } from "@/lib/shopify-csv-schema";
 import ScanExportReview from "@/components/ScanExportReview";
+import BatchReviewScreen from "@/components/BatchReviewScreen";
 
 interface ScannedProduct {
   id: string;
@@ -108,6 +109,7 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   const [showList, setShowList] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [showExportReview, setShowExportReview] = useState(false);
+  const [showBatchReview, setShowBatchReview] = useState(false);
 
   const resetInput = useCallback(() => {
     setTextInput("");
@@ -460,6 +462,17 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
     toast.success(`Exported ${products.length} products`);
   };
 
+  // ── Batch review screen ──
+  if (showBatchReview) {
+    return (
+      <BatchReviewScreen
+        products={products}
+        onBack={() => setShowBatchReview(false)}
+        onSetProducts={setProducts}
+      />
+    );
+  }
+
   // ── Export review screen ──
   if (showExportReview) {
     return (
@@ -545,11 +558,14 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
           ))}
         </div>
         <div className="shrink-0 px-4 py-3 border-t border-border bg-background space-y-2 safe-bottom">
-          <Button className="w-full h-12 text-base font-semibold" onClick={() => setShowExportReview(true)} disabled={products.length === 0}>
-            <FileCheck className="w-5 h-5 mr-2" /> Review & Export Shopify CSV
+          <Button className="w-full h-12 text-base font-semibold" onClick={() => setShowBatchReview(true)} disabled={products.length === 0}>
+            <Layers className="w-5 h-5 mr-2" /> Batch Review & Edit
           </Button>
-          <Button variant="outline" className="w-full h-10" onClick={exportCSV} disabled={products.length === 0}>
-            <Download className="w-4 h-4 mr-1" /> Quick Export CSV
+          <Button variant="outline" className="w-full h-10" onClick={() => setShowExportReview(true)} disabled={products.length === 0}>
+            <FileCheck className="w-4 h-4 mr-1" /> Review & Export CSV
+          </Button>
+          <Button variant="ghost" className="w-full h-10 text-xs" onClick={exportCSV} disabled={products.length === 0}>
+            <Download className="w-3.5 h-3.5 mr-1" /> Quick Export
           </Button>
           <Button variant="ghost" className="w-full h-10" onClick={() => setShowList(false)}>
             <Plus className="w-4 h-4 mr-1" /> Add more items

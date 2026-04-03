@@ -140,6 +140,42 @@ export type Database = {
         }
         Relationships: []
       }
+      shopify_subscriptions: {
+        Row: {
+          created_at: string
+          id: string
+          plan_name: string
+          shop: string
+          shopify_subscription_id: string | null
+          status: string
+          trial_ends_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          plan_name?: string
+          shop: string
+          shopify_subscription_id?: string | null
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          plan_name?: string
+          shop?: string
+          shopify_subscription_id?: string | null
+          status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

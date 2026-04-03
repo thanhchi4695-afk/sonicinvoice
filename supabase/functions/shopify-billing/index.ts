@@ -176,8 +176,9 @@ Deno.serve(async (req) => {
 
     // ── ACTION: create — Create new subscription ──
     if (action === "create") {
+      const billing = body.interval === "yearly" ? PLANS.yearly : PLANS.monthly;
       const returnUrl = body.return_url || `https://${store_url}/admin/apps`;
-      const isTest = body.test !== undefined ? body.test : PLAN.test;
+      const isTest = body.test !== undefined ? body.test : billing.test;
 
       const result = await shopifyGraphQL(`
         mutation appSubscriptionCreate($name: String!, $lineItems: [AppSubscriptionLineItemInput!]!, $returnUrl: URL!, $trialDays: Int, $test: Boolean) {
@@ -200,17 +201,18 @@ Deno.serve(async (req) => {
           }
         }
       `, {
-        name: PLAN.name,
+        name: billing.name,
         returnUrl,
-        trialDays: PLAN.trialDays,
+        trialDays: billing.trialDays,
         test: isTest,
         lineItems: [{
           plan: {
             appRecurringPricingDetails: {
               price: {
-                amount: PLAN.price,
-                currencyCode: PLAN.currency,
+                amount: billing.price,
+                currencyCode: billing.currency,
               },
+              interval: billing.interval,
             },
           },
         }],
@@ -232,10 +234,10 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from("shopify_subscriptions").upsert({
           user_id: user.id,
           shop: store_url,
-          plan_name: PLAN.name,
+          plan_name: billing.name,
           shopify_subscription_id: createResult.appSubscription.id,
           status: "pending",
-          trial_ends_at: new Date(Date.now() + PLAN.trialDays * 24 * 60 * 60 * 1000).toISOString(),
+          trial_ends_at: new Date(Date.now() + billing.trialDays * 24 * 60 * 60 * 1000).toISOString(),
           updated_at: new Date().toISOString(),
         }, { onConflict: "user_id" });
       }

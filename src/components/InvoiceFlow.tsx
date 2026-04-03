@@ -694,7 +694,14 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const runEnrichment = async (idx: number) => {
     setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, enriching: true } : g));
     const result = await enrichProduct(productGroups[idx]);
-    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g));
+    setProductGroups(prev => {
+      const updated = prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g);
+      // Persist enriched products for Image Download Helper
+      const enrichedForStorage = updated.filter(g => g.enriched && (g.imageSrc || (g.imageUrls && g.imageUrls.length > 0)))
+        .map(g => ({ title: g.name, imageSrc: g.imageSrc || '', imageUrls: g.imageUrls || [] }));
+      try { localStorage.setItem('last_enriched_products', JSON.stringify(enrichedForStorage)); } catch {}
+      return updated;
+    });
     addAuditEntry('Enriched', `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence`);
   };
 

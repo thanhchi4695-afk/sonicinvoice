@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag } from "lucide-react";
+import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoreConfig } from "@/lib/prompt-builder";
@@ -7,6 +7,8 @@ import { useStoreMode } from "@/hooks/use-store-mode";
 import { toast } from "sonner";
 import { lookupCatalog } from "@/lib/catalog-memory";
 import { matchProduct, lookupBarcode, saveBarcodeToCatalog, validateGTIN, extractColourFromTitle, extractSizeFromTitle } from "@/lib/barcode-catalog";
+import { generateShopifyCSV, type ScannedProductForExport } from "@/lib/shopify-csv-schema";
+import ScanExportReview from "@/components/ScanExportReview";
 
 interface ScannedProduct {
   id: string;

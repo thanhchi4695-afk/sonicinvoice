@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { initiateShopifyLogin } from "@/lib/shopify-auth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface AuthScreenProps {
   onAuth: () => void;
@@ -16,10 +18,68 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
   const [showShopifyLogin, setShowShopifyLogin] = useState(false);
   const [shopifyLoading, setShopifyLoading] = useState(false);
   const [shopifyError, setShopifyError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAuth();
+    setLoading(true);
+
+    try {
+      if (isSignUp) {
+        // Real Supabase sign up
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { store_name: storeName },
+            emailRedirectTo: window.location.origin,
+          },
+        });
+        if (error) throw error;
+        if (data.user && !data.session) {
+          toast.success("Check your email to confirm your account");
+        } else if (data.session) {
+          toast.success("Account created successfully");
+          onAuth();
+        }
+      } else {
+        // Real Supabase sign in
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        if (data.session) {
+          onAuth();
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Authentication failed";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) return;
+    setForgotLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast.success("Password reset link sent to your email");
+      setShowForgotPassword(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send reset email");
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   const handleShopifyLogin = async () => {
@@ -40,6 +100,34 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
       setShopifyLoading(false);
     }
   };
+
+  // Forgot password form
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 animate-fade-in">
+        <div className="w-full max-w-sm">
+          <h1 className="text-2xl font-bold font-display text-center mb-1">Reset Password</h1>
+          <p className="text-muted-foreground text-sm text-center mb-6">
+            Enter your email and we'll send a reset link.
+          </p>
+          <form onSubmit={handleForgotPassword} className="space-y-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Email</label>
+              <input type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="you@store.com" className="w-full h-12 rounded-lg bg-input border border-border px-4 text-sm" required />
+            </div>
+            <Button variant="teal" className="w-full h-12 text-base" type="submit" disabled={forgotLoading}>
+              {forgotLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Send reset link
+            </Button>
+          </form>
+          <button onClick={() => setShowForgotPassword(false)} className="w-full mt-4 text-sm text-primary text-center font-medium">
+            ← Back to sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 animate-fade-in">
@@ -127,13 +215,19 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
               placeholder="••••••••" className="w-full h-12 rounded-lg bg-input border border-border px-4 text-sm" required />
           </div>
 
-          <Button variant="teal" className="w-full h-12 text-base" type="submit">
+          <Button variant="teal" className="w-full h-12 text-base" type="submit" disabled={loading}>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             {isSignUp ? "Create account" : "Sign in"}
           </Button>
         </form>
 
         {!isSignUp && (
-          <button className="w-full mt-3 text-xs text-muted-foreground text-center">Forgot password?</button>
+          <button
+            onClick={() => setShowForgotPassword(true)}
+            className="w-full mt-3 text-xs text-muted-foreground text-center hover:text-foreground transition-colors"
+          >
+            Forgot password?
+          </button>
         )}
 
         <button onClick={() => setIsSignUp(!isSignUp)} className="w-full mt-6 text-sm text-primary text-center font-medium">

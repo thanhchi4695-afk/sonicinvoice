@@ -27,7 +27,9 @@ export interface BatchProduct {
   price: number;
   quantity: number;
   confidence: number;
+  confidenceReason: string;
   matchSource: string;
+  imageUrl: string | null;
 }
 
 interface Props {

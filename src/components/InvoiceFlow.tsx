@@ -560,7 +560,29 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       return;
     }
 
-    const groups = convertToProductGroups(products);
+    // ── Post-processing validation ──
+    const { products: validated, debug } = validateAndCleanProducts(products, supplierName);
+    setValidationDebug(debug);
+    setValidatedProducts(validated);
+
+    // Filter to accepted products only
+    const cleanProducts = validated
+      .filter(p => !p._rejected)
+      .map(({ _confidence, _confidenceLevel, _issues, _rejected, _rejectReason, ...rest }) => rest);
+
+    if (cleanProducts.length === 0) {
+      setEnrichLines([{ name: "No valid products found", status: "not_found", action: `${debug.rejected} rows rejected. Check Debug View for details.`, confidence: 0 }]);
+      setProcessingDone(true);
+      setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
+      setShowCompletionSummary(true);
+      return;
+    }
+
+    if (debug.rejected > 0) {
+      toast(`${debug.rejected} invalid rows filtered`, { description: `${debug.corrections.length} auto-corrections applied` });
+    }
+
+    const groups = convertToProductGroups(cleanProducts);
     setProductGroups(groups);
 
     const names = groups.map(g => g.name);

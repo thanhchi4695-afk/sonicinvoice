@@ -107,6 +107,7 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   const [products, setProducts] = useState<ScannedProduct[]>([]);
   const [showList, setShowList] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [showExportReview, setShowExportReview] = useState(false);
 
   const resetInput = useCallback(() => {
     setTextInput("");

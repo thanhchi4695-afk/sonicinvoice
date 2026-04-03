@@ -16,7 +16,7 @@ import { calculateConfidence, type ConfidenceBreakdown, type ConfidenceLevel, ge
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource } from "@/lib/barcode-catalog";
 import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugInfo } from "@/lib/invoice-validator";
-import InvoiceDebugPanel from "@/components/InvoiceDebugPanel";
+import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 
 interface InvoiceFlowProps {
   onBack: () => void;

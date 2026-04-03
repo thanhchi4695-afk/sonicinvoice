@@ -1525,6 +1525,17 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                       )}
                       {/* Match source badge */}
                       <MatchSourceBadge source={group.matchSource || "none"} barcode={group.barcode} />
+                      {/* Parse confidence from validator */}
+                      {validatedProducts.length > 0 && (() => {
+                        const vp = validatedProducts.find(v => !v._rejected && v.name === group.name);
+                        if (!vp) return null;
+                        const cls = vp._confidenceLevel === "high" ? "text-success" : vp._confidenceLevel === "medium" ? "text-warning" : "text-destructive";
+                        return (
+                          <span className={`text-[9px] font-medium ${cls}`} title={vp._issues.join(", ") || "No issues"}>
+                            {vp._confidence}%
+                          </span>
+                        );
+                      })()}
                       <span className="ml-auto"><ConfidenceBadge breakdown={conf} /></span>
                     </div>
                     {group.isGrouped ? (

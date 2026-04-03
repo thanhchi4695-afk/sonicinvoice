@@ -51,7 +51,39 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
     setPushing(true);
     setDone(false);
 
-    const finalResults = await pushProducts(products, productStatus, setResults);
+    let finalResults: PushResult[];
+
+    if (useGraphQL) {
+      // GraphQL Admin API push
+      finalResults = products.map((p) => ({ title: p.title, status: "pending" as const }));
+      setResults([...finalResults]);
+
+      for (let i = 0; i < products.length; i++) {
+        finalResults[i].status = "pushing";
+        setResults([...finalResults]);
+
+        try {
+          const product = { ...products[i], status: productStatus };
+          const { id, handle } = await pushProductGraphQL(product);
+          finalResults[i] = { title: products[i].title, status: "success", shopifyId: id };
+        } catch (err) {
+          finalResults[i] = {
+            title: products[i].title,
+            status: "error",
+            error: err instanceof Error ? err.message : "Unknown error",
+          };
+        }
+
+        setResults([...finalResults]);
+
+        if (i < products.length - 1) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+    } else {
+      // REST API push (legacy)
+      finalResults = await pushProducts(products, productStatus, setResults);
+    }
 
     setResults(finalResults);
     setPushing(false);
@@ -59,7 +91,7 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
 
     const created = finalResults.filter((r) => r.status === "success").length;
     const errors = finalResults.filter((r) => r.status === "error").length;
-    await recordPush(storeUrl, created, 0, errors, `${created} created, ${errors} errors`, source || "bulk_sale");
+    await recordPush(storeUrl, created, 0, errors, `${created} created, ${errors} errors (${useGraphQL ? "GraphQL" : "REST"})`, source || "bulk_sale");
   };
 
   const handleRetryFailed = async () => {

@@ -2218,7 +2218,6 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
             <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
           </div>
         </div>
-        </div>
       </button>
       {expanded && (
         <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">

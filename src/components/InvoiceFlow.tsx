@@ -15,6 +15,8 @@ import { addAuditEntry } from "@/lib/audit-log";
 import { calculateConfidence, type ConfidenceBreakdown, type ConfidenceLevel, getConfidenceLabel } from "@/lib/confidence";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource } from "@/lib/barcode-catalog";
+import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugInfo } from "@/lib/invoice-validator";
+import InvoiceDebugPanel from "@/components/InvoiceDebugPanel";
 
 interface InvoiceFlowProps {
   onBack: () => void;

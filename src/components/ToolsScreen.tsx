@@ -983,6 +983,7 @@ const ToolsScreen = () => {
   if (activeTool === "google_feed") return <GoogleFeedPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "image_helper") return <ImageHelperPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "export_collections") return <ExportCollections onBack={() => setActiveTool(null)} />;
+  if (activeTool === "import_collections") return <ImportCollections onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

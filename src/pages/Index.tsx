@@ -87,6 +87,7 @@ const Index = () => {
       case "collab_seo": return <CollabSEOFlow onBack={() => setActiveFlow(null)} />;
       case "google_ads_setup": return <GoogleAdsSetupWizard onBack={() => setActiveFlow(null)} />;
       case "meta_ads_setup": return <MetaAdsSetupWizard onBack={() => setActiveFlow(null)} />;
+      case "lightspeed_convert": return <LightspeedConverter onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

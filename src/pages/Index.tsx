@@ -16,6 +16,7 @@ import PriceLookup from "@/components/PriceLookup";
 import LightspeedGuide from "@/components/LightspeedGuide";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
 import QuickCapture from "@/components/QuickCapture";
+import ScanMode from "@/components/ScanMode";
 import OrderFormFlow from "@/components/OrderFormFlow";
 import PurchaseOrderPanel from "@/components/PurchaseOrderPanel";
 import SeasonManager from "@/components/SeasonManager";

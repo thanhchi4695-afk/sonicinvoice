@@ -339,7 +339,17 @@ const AccountScreen = () => {
 
       <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); }}>Save settings</Button>
 
-      <Button variant="ghost" className="w-full mt-6 text-destructive h-12">
+      {/* Billing / Plan */}
+      <BillingSection />
+
+      <Button
+        variant="ghost"
+        className="w-full mt-6 text-destructive h-12"
+        onClick={async () => {
+          await supabase.auth.signOut();
+          window.location.href = "/";
+        }}
+      >
         <LogOut className="w-4 h-4 mr-2" /> Sign out
       </Button>
 

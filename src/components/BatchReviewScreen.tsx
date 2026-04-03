@@ -111,7 +111,7 @@ const EditableCell = ({
 
 /* ─── bulk action bar ─── */
 const BulkBar = ({
-  count, onSetVendor, onSetType, onAddTag, onDelete, onMarkReady,
+  count, onSetVendor, onSetType, onAddTag, onDelete, onMarkReady, onSmartName,
 }: {
   count: number;
   onSetVendor: () => void;
@@ -119,6 +119,7 @@ const BulkBar = ({
   onAddTag: () => void;
   onDelete: () => void;
   onMarkReady: () => void;
+  onSmartName: () => void;
 }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -132,6 +133,7 @@ const BulkBar = ({
         {open && (
           <div className="absolute right-0 top-8 z-50 bg-card border border-border rounded-lg shadow-lg py-1 w-48">
             {[
+              { label: "✨ Smart Name Selected", fn: onSmartName, highlight: true },
               { label: "Set Vendor", fn: onSetVendor },
               { label: "Set Product Type", fn: onSetType },
               { label: "Add Tags", fn: onAddTag },
@@ -139,7 +141,7 @@ const BulkBar = ({
               { label: "Delete Selected", fn: onDelete, destructive: true },
             ].map(a => (
               <button key={a.label} onClick={() => { a.fn(); setOpen(false); }}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors ${a.destructive ? "text-destructive" : "text-foreground"}`}>
+                className={`w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors ${(a as any).destructive ? "text-destructive" : (a as any).highlight ? "text-primary font-medium" : "text-foreground"}`}>
                 {a.label}
               </button>
             ))}

@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Check, X, AlertTriangle, ArrowRight, Bug, ChevronDown, ChevronRight, Eye, RotateCcw, ShieldCheck } from "lucide-react";
+import { Check, X, AlertTriangle, ArrowRight, Bug, ChevronDown, ChevronRight, Eye, RotateCcw, ShieldCheck, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ValidationDebugInfo, ValidatedProduct } from "@/lib/invoice-validator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { ValidationDebugInfo, ValidatedProduct, ConfidenceSignal } from "@/lib/invoice-validator";
 
 interface InvoiceAutoCorrectPanelProps {
   debug: ValidationDebugInfo;

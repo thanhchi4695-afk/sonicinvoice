@@ -15,6 +15,8 @@ import { addAuditEntry } from "@/lib/audit-log";
 import { calculateConfidence, type ConfidenceBreakdown, type ConfidenceLevel, getConfidenceLabel } from "@/lib/confidence";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource } from "@/lib/barcode-catalog";
+import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugInfo } from "@/lib/invoice-validator";
+import InvoiceDebugPanel from "@/components/InvoiceDebugPanel";
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -558,7 +560,29 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       return;
     }
 
-    const groups = convertToProductGroups(products);
+    // ── Post-processing validation ──
+    const { products: validated, debug } = validateAndCleanProducts(products, supplierName);
+    setValidationDebug(debug);
+    setValidatedProducts(validated);
+
+    // Filter to accepted products only
+    const cleanProducts = validated
+      .filter(p => !p._rejected)
+      .map(({ _confidence, _confidenceLevel, _issues, _rejected, _rejectReason, ...rest }) => rest);
+
+    if (cleanProducts.length === 0) {
+      setEnrichLines([{ name: "No valid products found", status: "not_found", action: `${debug.rejected} rows rejected. Check Debug View for details.`, confidence: 0 }]);
+      setProcessingDone(true);
+      setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
+      setShowCompletionSummary(true);
+      return;
+    }
+
+    if (debug.rejected > 0) {
+      toast(`${debug.rejected} invalid rows filtered`, { description: `${debug.corrections.length} auto-corrections applied` });
+    }
+
+    const groups = convertToProductGroups(cleanProducts);
     setProductGroups(groups);
 
     const names = groups.map(g => g.name);
@@ -640,6 +664,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [enrichAllRunning, setEnrichAllRunning] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
+  const [validationDebug, setValidationDebug] = useState<ValidationDebugInfo | null>(null);
+  const [validatedProducts, setValidatedProducts] = useState<ValidatedProduct[]>([]);
 
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {
@@ -1273,7 +1299,13 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
-          {/* Processing time + confidence summary banner */}
+          {/* Debug panel for parsed invoice data */}
+          {validationDebug && validatedProducts.length > 0 && (
+            <div className="mb-3">
+              <InvoiceDebugPanel debug={validationDebug} products={validatedProducts} />
+            </div>
+          )}
+
           {processingDone && finalProcessingTime > 0 && (
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 mb-3 space-y-1.5">
               <span className="text-xs text-primary font-medium font-mono-data block">
@@ -1493,6 +1525,17 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                       )}
                       {/* Match source badge */}
                       <MatchSourceBadge source={group.matchSource || "none"} barcode={group.barcode} />
+                      {/* Parse confidence from validator */}
+                      {validatedProducts.length > 0 && (() => {
+                        const vp = validatedProducts.find(v => !v._rejected && v.name === group.name);
+                        if (!vp) return null;
+                        const cls = vp._confidenceLevel === "high" ? "text-success" : vp._confidenceLevel === "medium" ? "text-warning" : "text-destructive";
+                        return (
+                          <span className={`text-[9px] font-medium ${cls}`} title={vp._issues.join(", ") || "No issues"}>
+                            {vp._confidence}%
+                          </span>
+                        );
+                      })()}
                       <span className="ml-auto"><ConfidenceBadge breakdown={conf} /></span>
                     </div>
                     {group.isGrouped ? (

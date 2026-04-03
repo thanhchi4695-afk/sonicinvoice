@@ -349,6 +349,22 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
         }} disabled={bulkNaming} className="h-7 text-xs gap-1 text-primary">
           {bulkNaming ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> {bulkProgress.done}/{bulkProgress.total}</> : <><Sparkles className="w-3.5 h-3.5" /> Smart Name All</>}
         </Button>
+        <Button size="sm" variant="ghost" onClick={async () => {
+          setBulkSEO(true);
+          setBulkProgress({ done: 0, total: products.length });
+          try {
+            const results = await runBulkSEO(products, (done, total) => setBulkProgress({ done, total }));
+            onSetProducts(prev => prev.map(p => {
+              const r = results.get(p.id);
+              if (!r) return p;
+              return { ...p, description: r.seo_description, tags: r.keywords.join(", ") };
+            }));
+            toast.success(`SEO generated for ${results.size} products`);
+          } catch { toast.error("Bulk SEO failed"); }
+          finally { setBulkSEO(false); }
+        }} disabled={bulkSEO} className="h-7 text-xs gap-1 text-primary">
+          {bulkSEO ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> SEO {bulkProgress.done}/{bulkProgress.total}</> : <><Search className="w-3.5 h-3.5" /> SEO All</>}
+        </Button>
         <Button size="sm" variant="ghost" onClick={() => setShowPreview(true)} className="h-7 text-xs gap-1">
           <Eye className="w-3.5 h-3.5" /> Preview
         </Button>

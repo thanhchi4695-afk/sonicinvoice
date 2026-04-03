@@ -373,6 +373,26 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
           onAddTag={bulkAddTag}
           onDelete={bulkDelete}
           onMarkReady={() => { setSelected(new Set()); }}
+          onSmartName={async () => {
+            const items = products.filter(p => selected.has(p.id));
+            if (!items.length) return;
+            setBulkNaming(true);
+            setBulkProgress({ done: 0, total: items.length });
+            try {
+              const results = await runBulkSmartNaming(items, (done, total) => setBulkProgress({ done, total }));
+              onSetProducts(prev => prev.map(p => {
+                const r = results.get(p.id);
+                if (!r) return p;
+                return { ...p, title: r.recommended_title, type: r.product_type, description: r.short_description, tags: r.tags.join(", "), confidence: r.confidence_score, confidenceReason: r.confidence_reason };
+              }));
+              toast.success(`Smart named ${results.size} products`);
+            } catch (e: any) {
+              toast.error(e.message || "Bulk naming failed");
+            } finally {
+              setBulkNaming(false);
+              setSelected(new Set());
+            }
+          }}
         />
       )}
 

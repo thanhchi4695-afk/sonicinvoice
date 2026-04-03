@@ -229,3 +229,23 @@ export async function getSmartCollections(): Promise<ShopifyCollection[]> {
   const data = await callProxy({ action: "get_smart_collections" });
   return data.collections || [];
 }
+
+export async function createCustomCollection(collection: Record<string, unknown>): Promise<ShopifyCollection> {
+  const data = await callProxy({ action: "create_custom_collection", collection });
+  return data.collection;
+}
+
+export async function updateCustomCollection(collectionId: number, collection: Record<string, unknown>): Promise<ShopifyCollection> {
+  const data = await callProxy({ action: "update_custom_collection", collection_id: collectionId, collection });
+  return data.collection;
+}
+
+export async function createSmartCollection(collection: Record<string, unknown>): Promise<ShopifyCollection> {
+  const data = await callProxy({ action: "create_smart_collection", collection });
+  return data.collection;
+}
+
+export async function updateSmartCollection(collectionId: number, collection: Record<string, unknown>): Promise<ShopifyCollection> {
+  const data = await callProxy({ action: "update_smart_collection", collection_id: collectionId, collection });
+  return data.collection;
+}

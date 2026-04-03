@@ -124,6 +124,10 @@ const AccountScreen = () => {
       <Section title="Store details">
         <Field label="Store name" value={storeName} onChange={setStoreName} placeholder="My Boutique" />
         <Field label="Store website" placeholder="mystore.com" />
+        <Field label="City / Location" value={storeCity} onChange={setStoreCity} placeholder="e.g. Darwin NT" />
+        <p className="text-[11px] text-muted-foreground -mt-2">Used in product descriptions and SEO meta text.</p>
+        <Field label="Free shipping threshold (AUD)" value={freeShippingThreshold} onChange={setFreeShippingThreshold} placeholder="e.g. 150" type="number" />
+        <p className="text-[11px] text-muted-foreground -mt-2">Leave blank to omit free shipping from descriptions.</p>
         <div className="grid grid-cols-2 gap-3">
           <SelectField label="Currency" value={currency} onChange={setCurrency}
             options={CURRENCIES.map(c => ({ v: c.code, l: `${c.flag} ${c.code} (${c.symbol})` }))}

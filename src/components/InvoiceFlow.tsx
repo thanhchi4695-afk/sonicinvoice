@@ -1512,8 +1512,21 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                             metafields: group.metafields,
                             costChange: costChanges.find(c => c.name === group.name)?.costChange || null,
                             isNew: costChanges.find(c => c.name === group.name)?.isNew,
+                            enriched: group.enriched,
+                            enriching: group.enriching,
+                            imageSrc: group.imageSrc,
+                            imageUrls: group.imageUrls,
+                            desc: group.desc,
+                            fabric: group.fabric,
+                            care: group.care,
+                            origin: group.origin,
+                            productPageUrl: group.productPageUrl,
+                            enrichConfidence: group.enrichConfidence,
+                            enrichNote: group.enrichNote,
                           }}
                           onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
+                          onEnrich={() => runEnrichment(i)}
+                          onSetImage={(url) => setProductImage(i, url)}
                         />
                       </div>
                     )}

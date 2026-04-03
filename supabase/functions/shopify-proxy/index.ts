@@ -374,6 +374,52 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "get_custom_collections": {
+        const allCollections: unknown[] = [];
+        let pageInfo: string | null = null;
+        do {
+          const url = pageInfo
+            ? `/custom_collections.json?limit=250&page_info=${pageInfo}`
+            : "/custom_collections.json?limit=250";
+          const resp = await shopifyFetch(url);
+          const data = await resp.json();
+          if (!resp.ok) {
+            return new Response(JSON.stringify({ error: "Failed to fetch custom collections", details: data }), {
+              status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          allCollections.push(...(data.custom_collections || []));
+          const linkHeader = resp.headers.get("link") || "";
+          const nextMatch = linkHeader.match(/page_info=([^>&]+)>;\s*rel="next"/);
+          pageInfo = nextMatch ? nextMatch[1] : null;
+        } while (pageInfo);
+        result = { collections: allCollections };
+        break;
+      }
+
+      case "get_smart_collections": {
+        const allSmarts: unknown[] = [];
+        let smartPageInfo: string | null = null;
+        do {
+          const url = smartPageInfo
+            ? `/smart_collections.json?limit=250&page_info=${smartPageInfo}`
+            : "/smart_collections.json?limit=250";
+          const resp = await shopifyFetch(url);
+          const data = await resp.json();
+          if (!resp.ok) {
+            return new Response(JSON.stringify({ error: "Failed to fetch smart collections", details: data }), {
+              status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          allSmarts.push(...(data.smart_collections || []));
+          const linkHeader = resp.headers.get("link") || "";
+          const nextMatch = linkHeader.match(/page_info=([^>&]+)>;\s*rel="next"/);
+          smartPageInfo = nextMatch ? nextMatch[1] : null;
+        } while (smartPageInfo);
+        result = { collections: allSmarts };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

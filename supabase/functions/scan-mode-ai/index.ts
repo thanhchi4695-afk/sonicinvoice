@@ -42,6 +42,8 @@ RESPOND WITH JSON ONLY:
   "tags": ["tag1", "tag2"],
   "colour": "string or empty",
   "pattern": "string or empty",
+  "sku": "string or empty - any style code or SKU visible",
+  "barcode": "string or empty - any barcode number visible",
   "confidence_score": number,
   "confidence_reason": "string explaining the score"
 }`;

@@ -2147,9 +2147,16 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       <button onClick={() => setExpanded(!expanded)} className="w-full px-4 py-3 text-left">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate">{product.name}</p>
+        <div className="flex items-start gap-3">
+          {/* Image thumbnail */}
+          <div className="shrink-0 w-11 h-11 rounded bg-muted border border-border flex items-center justify-center overflow-hidden">
+            {product.imageSrc ? (
+              <img src={product.imageSrc} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            ) : (
+              <span className="text-base text-muted-foreground">📷</span>
+            )}
+          </div>
+          <div className="flex-1 min-w-0 flex items-start justify-between">
             <p className="text-xs text-muted-foreground mt-0.5">
               {product.brand} · {product.type}
               {product.colour && <> · <span className="text-foreground">{product.colour}</span></>}

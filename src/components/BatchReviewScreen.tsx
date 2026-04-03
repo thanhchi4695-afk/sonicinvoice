@@ -113,7 +113,7 @@ const EditableCell = ({
 
 /* ─── bulk action bar ─── */
 const BulkBar = ({
-  count, onSetVendor, onSetType, onAddTag, onDelete, onMarkReady, onSmartName, onSEO,
+  count, onSetVendor, onSetType, onAddTag, onDelete, onMarkReady, onSmartName, onSEO, onBulkPrice,
 }: {
   count: number;
   onSetVendor: () => void;
@@ -123,6 +123,7 @@ const BulkBar = ({
   onMarkReady: () => void;
   onSmartName: () => void;
   onSEO: () => void;
+  onBulkPrice: () => void;
 }) => {
   const [open, setOpen] = useState(false);
   return (

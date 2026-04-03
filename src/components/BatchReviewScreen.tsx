@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   ChevronLeft, Download, Search, Filter, Check, AlertTriangle,
   CheckCircle2, Trash2, Tag, Layers, Copy as CopyIcon, ChevronDown,
-  ArrowUpDown, Eye, FileCheck, Sparkles, RefreshCw
+  ArrowUpDown, Eye, FileCheck, Sparkles, RefreshCw, DollarSign
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { getStoreConfig } from "@/lib/prompt-builder";
 import { SmartNamingButton, runBulkSmartNaming } from "@/components/SmartNamingPanel";
 import { SEOButton, runBulkSEO } from "@/components/SEOPanel";
+import { PricingButton, calculateBulkPrices } from "@/components/PricingStrategyPanel";
 import {
   validateForExport, generateShopifyCSV, inferCategory, generateHandles,
   type ScannedProductForExport,
@@ -112,7 +113,7 @@ const EditableCell = ({
 
 /* ─── bulk action bar ─── */
 const BulkBar = ({
-  count, onSetVendor, onSetType, onAddTag, onDelete, onMarkReady, onSmartName, onSEO,
+  count, onSetVendor, onSetType, onAddTag, onDelete, onMarkReady, onSmartName, onSEO, onBulkPrice,
 }: {
   count: number;
   onSetVendor: () => void;
@@ -122,6 +123,7 @@ const BulkBar = ({
   onMarkReady: () => void;
   onSmartName: () => void;
   onSEO: () => void;
+  onBulkPrice: () => void;
 }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -137,6 +139,7 @@ const BulkBar = ({
             {[
               { label: "✨ Smart Name Selected", fn: onSmartName, highlight: true },
               { label: "🔍 Generate SEO", fn: onSEO, highlight: true },
+              { label: "💰 AI Price Selected", fn: onBulkPrice, highlight: true },
               { label: "Set Vendor", fn: onSetVendor },
               { label: "Set Product Type", fn: onSetType },
               { label: "Add Tags", fn: onAddTag },
@@ -365,6 +368,19 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
         }} disabled={bulkSEO} className="h-7 text-xs gap-1 text-primary">
           {bulkSEO ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> SEO {bulkProgress.done}/{bulkProgress.total}</> : <><Search className="w-3.5 h-3.5" /> SEO All</>}
         </Button>
+        <Button size="sm" variant="ghost" onClick={() => {
+          const withCost = products.filter(p => p.price > 0);
+          if (!withCost.length) { toast.error("Products need cost prices first"); return; }
+          const results = calculateBulkPrices(withCost.map(p => ({ id: p.id, costPrice: p.price, productType: p.type, vendor: p.vendor })));
+          onSetProducts(prev => prev.map(p => {
+            const r = results.get(p.id);
+            if (!r) return p;
+            return { ...p, price: r.recommended_price };
+          }));
+          toast.success(`AI priced ${results.size} products`);
+        }} className="h-7 text-xs gap-1 text-primary">
+          <DollarSign className="w-3.5 h-3.5" /> Price All
+        </Button>
         <Button size="sm" variant="ghost" onClick={() => setShowPreview(true)} className="h-7 text-xs gap-1">
           <Eye className="w-3.5 h-3.5" /> Preview
         </Button>
@@ -449,6 +465,18 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
               setSelected(new Set());
             }
           }}
+          onBulkPrice={() => {
+            const items = products.filter(p => selected.has(p.id) && p.price > 0);
+            if (!items.length) { toast.error("Selected items need a cost price"); return; }
+            const results = calculateBulkPrices(items.map(p => ({ id: p.id, costPrice: p.price, productType: p.type, vendor: p.vendor })));
+            onSetProducts(prev => prev.map(p => {
+              const r = results.get(p.id);
+              if (!r) return p;
+              return { ...p, price: r.recommended_price };
+            }));
+            toast.success(`AI priced ${results.size} products`);
+            setSelected(new Set());
+          }}
         />
       )}
 
@@ -498,7 +526,11 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
                 <EditableCell value={p.vendor} onChange={v => updateField(p._idx, "vendor", v)} />
                 <EditableCell value={p.sku} onChange={v => updateField(p._idx, "sku", v)} mono />
                 <EditableCell value={p.barcode} onChange={v => updateField(p._idx, "barcode", v)} mono />
-                <EditableCell value={p.price} onChange={v => updateField(p._idx, "price", parseFloat(v) || 0)} type="number" />
+                <div className="flex items-center gap-0.5">
+                  <EditableCell value={p.price} onChange={v => updateField(p._idx, "price", parseFloat(v) || 0)} type="number" />
+                  <PricingButton costPrice={p.price} productType={p.type} vendor={p.vendor} currentPrice={p.price}
+                    onApply={(price) => updateField(p._idx, "price", price)} />
+                </div>
                 <EditableCell value={p.quantity} onChange={v => updateField(p._idx, "quantity", parseInt(v) || 0)} type="number" />
                 <div className="px-2 py-1">
                   {p._valid.valid ? (

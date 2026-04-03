@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag } from "lucide-react";
+import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoreConfig } from "@/lib/prompt-builder";
@@ -7,6 +7,8 @@ import { useStoreMode } from "@/hooks/use-store-mode";
 import { toast } from "sonner";
 import { lookupCatalog } from "@/lib/catalog-memory";
 import { matchProduct, lookupBarcode, saveBarcodeToCatalog, validateGTIN, extractColourFromTitle, extractSizeFromTitle } from "@/lib/barcode-catalog";
+import { generateShopifyCSV, type ScannedProductForExport } from "@/lib/shopify-csv-schema";
+import ScanExportReview from "@/components/ScanExportReview";
 
 interface ScannedProduct {
   id: string;
@@ -105,6 +107,7 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   const [products, setProducts] = useState<ScannedProduct[]>([]);
   const [showList, setShowList] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [showExportReview, setShowExportReview] = useState(false);
 
   const resetInput = useCallback(() => {
     setTextInput("");
@@ -442,20 +445,32 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   };
 
   const exportCSV = () => {
-    const headers = ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published", "Option1 Name", "Option1 Value", "Variant SKU", "Variant Barcode", "Variant Price", "Variant Inventory Qty", "Status"];
-    const rows = products.map(p => [
-      p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, ""),
-      p.title, p.description, p.vendor, p.type, p.tags, "TRUE",
-      "Title", "Default Title", p.sku, p.barcode, p.price.toFixed(2), p.quantity.toString(), "active",
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(c => `"${(c || "").replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    const exportData: ScannedProductForExport[] = products.map(p => ({
+      title: p.title, type: p.type, vendor: p.vendor, description: p.description,
+      tags: p.tags, colour: p.colour, sku: p.sku, barcode: p.barcode,
+      price: p.price, quantity: p.quantity,
+    }));
+    const csv = generateShopifyCSV(exportData);
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `scan-mode-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `scan-mode-export-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
+    URL.revokeObjectURL(a.href);
     toast.success(`Exported ${products.length} products`);
   };
+
+  // ── Export review screen ──
+  if (showExportReview) {
+    return (
+      <ScanExportReview
+        products={products}
+        onBack={() => setShowExportReview(false)}
+        onUpdateProduct={(idx, field, value) => updateProduct(idx, field as keyof ScannedProduct, value)}
+        onRemoveProduct={removeProduct}
+      />
+    );
+  }
 
   // ── Session list ──
   if (showList) {
@@ -530,10 +545,13 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
           ))}
         </div>
         <div className="shrink-0 px-4 py-3 border-t border-border bg-background space-y-2 safe-bottom">
-          <Button className="w-full h-12 text-base font-semibold" onClick={exportCSV} disabled={products.length === 0}>
-            <Download className="w-5 h-5 mr-2" /> Export {mode.isLightspeed ? "Lightspeed" : "Shopify"} CSV
+          <Button className="w-full h-12 text-base font-semibold" onClick={() => setShowExportReview(true)} disabled={products.length === 0}>
+            <FileCheck className="w-5 h-5 mr-2" /> Review & Export Shopify CSV
           </Button>
-          <Button variant="outline" className="w-full h-10" onClick={() => setShowList(false)}>
+          <Button variant="outline" className="w-full h-10" onClick={exportCSV} disabled={products.length === 0}>
+            <Download className="w-4 h-4 mr-1" /> Quick Export CSV
+          </Button>
+          <Button variant="ghost" className="w-full h-10" onClick={() => setShowList(false)}>
             <Plus className="w-4 h-4 mr-1" /> Add more items
           </Button>
         </div>

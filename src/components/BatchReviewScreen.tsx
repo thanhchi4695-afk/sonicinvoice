@@ -452,6 +452,18 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
               setSelected(new Set());
             }
           }}
+          onBulkPrice={() => {
+            const items = products.filter(p => selected.has(p.id) && p.price > 0);
+            if (!items.length) { toast.error("Selected items need a cost price"); return; }
+            const results = calculateBulkPrices(items.map(p => ({ id: p.id, costPrice: p.price, productType: p.type, vendor: p.vendor })));
+            onSetProducts(prev => prev.map(p => {
+              const r = results.get(p.id);
+              if (!r) return p;
+              return { ...p, price: r.recommended_price };
+            }));
+            toast.success(`AI priced ${results.size} products`);
+            setSelected(new Set());
+          }}
         />
       )}
 

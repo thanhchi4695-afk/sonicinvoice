@@ -356,6 +356,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadedFile(file);
+    toast("Invoice uploaded", { description: `Processing ${file.name}…` });
     startProcessing(file);
     e.target.value = "";
   };

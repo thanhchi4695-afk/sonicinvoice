@@ -20,6 +20,7 @@ export interface StoreConfig {
   enrichmentSources: string[];
   excludedSources: string[];
   defaultInstructions?: string;
+  freeShippingThreshold?: string;
 }
 
 export interface IndustryConfig {

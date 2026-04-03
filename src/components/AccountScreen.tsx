@@ -25,6 +25,8 @@ const AccountScreen = () => {
   const [lsVersion, setLsVersion] = useState<LightspeedVersion>("x_series");
   const [markup, setMarkup] = useState("2.35");
   const [rounding, setRounding] = useState("nearest_05");
+  const [storeCity, setStoreCity] = useState("");
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState("");
 
   // Shopify connection
   const [shopifyUrl, setShopifyUrl] = useState("");
@@ -44,6 +46,8 @@ const AccountScreen = () => {
     setCurrency(cfg.currency || 'AUD');
     setStoreType(cfg.storeType || 'shopify');
     setLsVersion(cfg.lightspeedVersion || 'x_series');
+    setStoreCity(cfg.city || '');
+    setFreeShippingThreshold(cfg.freeShippingThreshold || '');
 
     getConnection().then((conn) => {
       if (conn) {
@@ -120,6 +124,10 @@ const AccountScreen = () => {
       <Section title="Store details">
         <Field label="Store name" value={storeName} onChange={setStoreName} placeholder="My Boutique" />
         <Field label="Store website" placeholder="mystore.com" />
+        <Field label="City / Location" value={storeCity} onChange={setStoreCity} placeholder="e.g. Darwin NT" />
+        <p className="text-[11px] text-muted-foreground -mt-2">Used in product descriptions and SEO meta text.</p>
+        <Field label="Free shipping threshold (AUD)" value={freeShippingThreshold} onChange={setFreeShippingThreshold} placeholder="e.g. 150" type="number" />
+        <p className="text-[11px] text-muted-foreground -mt-2">Leave blank to omit free shipping from descriptions.</p>
         <div className="grid grid-cols-2 gap-3">
           <SelectField label="Currency" value={currency} onChange={setCurrency}
             options={CURRENCIES.map(c => ({ v: c.code, l: `${c.flag} ${c.code} (${c.symbol})` }))}
@@ -328,7 +336,7 @@ const AccountScreen = () => {
         </p>
       </Section>
 
-      <Button variant="teal" className="w-full mt-4 h-12 text-base">Save settings</Button>
+      <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); }}>Save settings</Button>
 
       <Button variant="ghost" className="w-full mt-6 text-destructive h-12">
         <LogOut className="w-4 h-4 mr-2" /> Sign out

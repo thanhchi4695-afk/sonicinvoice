@@ -1,4 +1,5 @@
 // SEO Engine — dynamic title, description, feature detection, CTA rotation
+// Store-agnostic: reads store name, city, and shipping threshold from settings
 import { getStoreConfig, type StoreConfig } from './prompt-builder';
 import { getIndustryDefinition } from './industry-config';
 
@@ -10,6 +11,7 @@ export interface SeoProduct {
   category?: string;
   tags?: string[];
   description?: string;
+  specials?: string[];
 }
 
 export interface SeoResult {
@@ -80,13 +82,14 @@ export function generateSeoTitle(
   store?: StoreConfig,
 ): string {
   const s = store || getStoreConfig();
+  const storeName = s.name || 'My Store';
   const template = s.seoTitleTemplate || '{product} | {brand} | {store}';
 
   const vars: Record<string, string> = {
     product: product.title,
     brand: product.brand,
     type: product.type,
-    store: s.name,
+    store: storeName,
     city: s.city || '',
     category: product.category || product.type,
   };
@@ -109,8 +112,39 @@ export function generateSeoTitle(
   return title;
 }
 
-// ── SEO Description Generator ──────────────────────────────
-// DESC_TEMPLATES now derived from industry-config
+// ── SEO Meta Description Generator ─────────────────────────
+// Type-specific phrasing for meta descriptions
+const TYPE_PHRASE_MAP: Record<string, string> = {
+  'One Pieces': 'one-piece swimsuit',
+  'Swimdress': 'swim dress',
+  'Bikini Tops': 'bikini top',
+  'Bikini Bottoms': 'bikini bottom',
+  'Bikini Set': 'bikini set',
+  'Tankini Tops': 'tankini top',
+  'Rashies & Sunsuits': 'rashguard',
+  'Blouson': 'blouson swimsuit',
+  'Boardshorts': "men's boardshorts",
+  'Mens Swimwear': "men's swimwear",
+  'Mens Shorts': "men's shorts",
+  'Mens Shirt': "men's shirt",
+  'Dresses': 'resort dress',
+  'Tops': 'top',
+  'Skirts': 'skirt',
+  'Shorts': 'shorts',
+  'Kaftans & Cover Ups': 'kaftan',
+  'Sarongs': 'sarong',
+  'Hats': 'sun hat',
+  'Sunnies': 'sunglasses',
+  'Girls 00-7': "girls' swimwear",
+  'Girls 8-16': "girls' swimwear",
+  'Boys 00-7': "boys' swimwear",
+  'Boys 8-16': "boys' swimwear",
+  'Jewellery': 'jewellery piece',
+  'Earrings': 'earrings',
+  'Necklaces': 'necklace',
+  'Bracelets': 'bracelet',
+  'Accessories': 'beach accessory',
+};
 
 export function getDefaultDescTemplate(industry: string): string {
   return getIndustryDefinition(industry).seoDescTemplate;
@@ -122,44 +156,30 @@ export function generateSeoDescription(
   ctaIndex?: number,
 ): string {
   const s = store || getStoreConfig();
+  const storeName = s.name || 'My Store';
+  const storeCity = s.city || '';
+  const freeShipping = s.freeShippingThreshold || '';
   const industry = s.industry || 'general';
-  const template = s.seoDescriptionTemplate || getDefaultDescTemplate(industry);
 
-  const features = detectFeatures(product, industry);
-  const phrases = getCtaPhrases(industry);
-  const idx = ctaIndex ?? Math.floor(Math.random() * phrases.length);
-  const rawCta = phrases[idx % phrases.length] || '';
+  // Use type-specific phrasing
+  const typePhrase = TYPE_PHRASE_MAP[product.type] || 'swimwear';
 
-  const ctaVars: Record<string, string> = {
-    store: s.name,
-    brand: product.brand,
-    city: s.city || '',
-    threshold: '$100',
-  };
-  const cta = replaceVars(rawCta, ctaVars);
+  // Feature text from specials
+  const feats = product.specials && product.specials.length > 0
+    ? product.specials.slice(0, 2).join(', ') + '. '
+    : '';
 
-  const vars: Record<string, string> = {
-    product: product.title,
-    brand: product.brand,
-    type: product.type,
-    store: s.name,
-    city: s.city || '',
-    features: features ? features + ' ' : '',
-    cta,
-    currency: s.currency,
-    threshold: '$100',
-    category: product.category || product.type,
-  };
+  const locationStr = storeCity ? ` ${storeCity}` : '';
+  const shippingStr = freeShipping
+    ? ` Free shipping over $${freeShipping} AU.`
+    : '';
 
-  let desc = replaceVars(template, vars);
+  let desc = `${product.title} — ${typePhrase} by ${product.brand}. `
+    + `${feats}Shop at ${storeName}${locationStr}.`
+    + `${shippingStr}`;
 
-  // Enforce 160-char limit — trim features first
-  if (desc.length > SEO_DESC_MAX && features) {
-    vars.features = '';
-    desc = replaceVars(template, vars);
-  }
   if (desc.length > SEO_DESC_MAX) {
-    desc = desc.slice(0, SEO_DESC_MAX - 1) + '…';
+    desc = desc.slice(0, SEO_DESC_MAX - 3) + '...';
   }
 
   return desc;

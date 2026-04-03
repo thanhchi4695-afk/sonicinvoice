@@ -1,4 +1,4 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList, BookOpen, Mail, Link, Target } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList, BookOpen, Mail, Link, Target, ScanLine } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";

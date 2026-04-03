@@ -35,6 +35,7 @@ const tools = [
   { id: "image_helper", icon: Image, label: "Image download helper", desc: "View and save enriched product images", color: "text-secondary" },
   { id: "export_collections", icon: Download, label: "Export collections", desc: "Export all Shopify collections to CSV", color: "text-success" },
   { id: "import_collections", icon: Upload, label: "Import collections", desc: "Create or update collections from CSV", color: "text-success" },
+  { id: "auto_collections", icon: Sparkles, label: "Auto collections AI", desc: "AI-generate smart collections from products", color: "text-primary" },
 ];
 
 const quickInserts = [

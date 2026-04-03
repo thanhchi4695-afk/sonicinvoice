@@ -109,6 +109,7 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   const [showList, setShowList] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [showExportReview, setShowExportReview] = useState(false);
+  const [showBatchReview, setShowBatchReview] = useState(false);
 
   const resetInput = useCallback(() => {
     setTextInput("");

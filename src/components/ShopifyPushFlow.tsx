@@ -5,7 +5,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from "@/components/ui/dialog";
 import { Check, X, Loader2, ExternalLink, Download, ShoppingBag, AlertTriangle, RotateCcw } from "lucide-react";
-import { PushProduct, PushResult, pushProducts, getConnection, recordPush } from "@/lib/shopify-api";
+import { PushProduct, PushResult, pushProducts, getConnection, recordPush, pushProductGraphQL } from "@/lib/shopify-api";
 
 interface ShopifyPushFlowProps {
   products: PushProduct[];
@@ -22,6 +22,7 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
   const [pushing, setPushing] = useState(false);
   const [results, setResults] = useState<PushResult[]>([]);
   const [done, setDone] = useState(false);
+  const [useGraphQL, setUseGraphQL] = useState(true);
 
   useEffect(() => {
     getConnection().then((conn) => {
@@ -50,7 +51,39 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
     setPushing(true);
     setDone(false);
 
-    const finalResults = await pushProducts(products, productStatus, setResults);
+    let finalResults: PushResult[];
+
+    if (useGraphQL) {
+      // GraphQL Admin API push
+      finalResults = products.map((p) => ({ title: p.title, status: "pending" as const }));
+      setResults([...finalResults]);
+
+      for (let i = 0; i < products.length; i++) {
+        finalResults[i].status = "pushing";
+        setResults([...finalResults]);
+
+        try {
+          const product = { ...products[i], status: productStatus };
+          const { id, handle } = await pushProductGraphQL(product);
+          finalResults[i] = { title: products[i].title, status: "success", shopifyId: id };
+        } catch (err) {
+          finalResults[i] = {
+            title: products[i].title,
+            status: "error",
+            error: err instanceof Error ? err.message : "Unknown error",
+          };
+        }
+
+        setResults([...finalResults]);
+
+        if (i < products.length - 1) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+    } else {
+      // REST API push (legacy)
+      finalResults = await pushProducts(products, productStatus, setResults);
+    }
 
     setResults(finalResults);
     setPushing(false);
@@ -58,7 +91,7 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
 
     const created = finalResults.filter((r) => r.status === "success").length;
     const errors = finalResults.filter((r) => r.status === "error").length;
-    await recordPush(storeUrl, created, 0, errors, `${created} created, ${errors} errors`, source || "bulk_sale");
+    await recordPush(storeUrl, created, 0, errors, `${created} created, ${errors} errors (${useGraphQL ? "GraphQL" : "REST"})`, source || "bulk_sale");
   };
 
   const handleRetryFailed = async () => {
@@ -158,12 +191,25 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
   return (
     <>
       <div className="bg-card rounded-lg border border-border p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <ShoppingBag className="w-4 h-4 text-primary" />
-          <h4 className="text-sm font-semibold">Push to Shopify</h4>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4 text-primary" />
+            <h4 className="text-sm font-semibold">Push to Shopify</h4>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className={`text-[10px] font-medium ${useGraphQL ? "text-primary" : "text-muted-foreground"}`}>
+              {useGraphQL ? "GraphQL API" : "REST API"}
+            </span>
+            <button
+              onClick={() => setUseGraphQL(!useGraphQL)}
+              className={`w-8 h-4 rounded-full transition-colors relative ${useGraphQL ? "bg-primary" : "bg-muted"}`}
+            >
+              <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${useGraphQL ? "left-4" : "left-0.5"}`} />
+            </button>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          {products.length} products ready · Creates as {productStatus}s for your review
+          {products.length} products ready · Creates as {productStatus}s via {useGraphQL ? "GraphQL Admin API" : "REST API"}
         </p>
         <Button
           variant="teal"

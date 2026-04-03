@@ -979,6 +979,7 @@ const ToolsScreen = () => {
   if (activeTool === "brands") return <BrandDirectoryPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "google_feed") return <GoogleFeedPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "image_helper") return <ImageHelperPanel onBack={() => setActiveTool(null)} />;
+  if (activeTool === "export_collections") return <ExportCollections onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { getStoreConfig } from "@/lib/prompt-builder";
 import { SmartNamingButton, runBulkSmartNaming } from "@/components/SmartNamingPanel";
+import { SEOButton, runBulkSEO } from "@/components/SEOPanel";
 import {
   validateForExport, generateShopifyCSV, inferCategory, generateHandles,
   type ScannedProductForExport,
@@ -111,7 +112,7 @@ const EditableCell = ({
 
 /* ─── bulk action bar ─── */
 const BulkBar = ({
-  count, onSetVendor, onSetType, onAddTag, onDelete, onMarkReady, onSmartName,
+  count, onSetVendor, onSetType, onAddTag, onDelete, onMarkReady, onSmartName, onSEO,
 }: {
   count: number;
   onSetVendor: () => void;
@@ -120,6 +121,7 @@ const BulkBar = ({
   onDelete: () => void;
   onMarkReady: () => void;
   onSmartName: () => void;
+  onSEO: () => void;
 }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -134,6 +136,7 @@ const BulkBar = ({
           <div className="absolute right-0 top-8 z-50 bg-card border border-border rounded-lg shadow-lg py-1 w-48">
             {[
               { label: "✨ Smart Name Selected", fn: onSmartName, highlight: true },
+              { label: "🔍 Generate SEO", fn: onSEO, highlight: true },
               { label: "Set Vendor", fn: onSetVendor },
               { label: "Set Product Type", fn: onSetType },
               { label: "Add Tags", fn: onAddTag },
@@ -165,6 +168,7 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
   const [showPreview, setShowPreview] = useState(false);
   const [bulkNaming, setBulkNaming] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  const [bulkSEO, setBulkSEO] = useState(false);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -345,6 +349,22 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
         }} disabled={bulkNaming} className="h-7 text-xs gap-1 text-primary">
           {bulkNaming ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> {bulkProgress.done}/{bulkProgress.total}</> : <><Sparkles className="w-3.5 h-3.5" /> Smart Name All</>}
         </Button>
+        <Button size="sm" variant="ghost" onClick={async () => {
+          setBulkSEO(true);
+          setBulkProgress({ done: 0, total: products.length });
+          try {
+            const results = await runBulkSEO(products, (done, total) => setBulkProgress({ done, total }));
+            onSetProducts(prev => prev.map(p => {
+              const r = results.get(p.id);
+              if (!r) return p;
+              return { ...p, description: r.seo_description, tags: r.keywords.join(", ") };
+            }));
+            toast.success(`SEO generated for ${results.size} products`);
+          } catch { toast.error("Bulk SEO failed"); }
+          finally { setBulkSEO(false); }
+        }} disabled={bulkSEO} className="h-7 text-xs gap-1 text-primary">
+          {bulkSEO ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> SEO {bulkProgress.done}/{bulkProgress.total}</> : <><Search className="w-3.5 h-3.5" /> SEO All</>}
+        </Button>
         <Button size="sm" variant="ghost" onClick={() => setShowPreview(true)} className="h-7 text-xs gap-1">
           <Eye className="w-3.5 h-3.5" /> Preview
         </Button>
@@ -409,6 +429,26 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
               setSelected(new Set());
             }
           }}
+          onSEO={async () => {
+            const items = products.filter(p => selected.has(p.id));
+            if (!items.length) return;
+            setBulkSEO(true);
+            setBulkProgress({ done: 0, total: items.length });
+            try {
+              const results = await runBulkSEO(items, (done, total) => setBulkProgress({ done, total }));
+              onSetProducts(prev => prev.map(p => {
+                const r = results.get(p.id);
+                if (!r) return p;
+                return { ...p, description: r.seo_description, tags: r.keywords.join(", ") };
+              }));
+              toast.success(`SEO generated for ${results.size} products`);
+            } catch (e: any) {
+              toast.error(e.message || "SEO generation failed");
+            } finally {
+              setBulkSEO(false);
+              setSelected(new Set());
+            }
+          }}
         />
       )}
 
@@ -451,6 +491,8 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
                   <EditableCell value={p.title} onChange={v => updateField(p._idx, "title", v)} className="font-medium flex-1" />
                   <SmartNamingButton currentTitle={p.title} currentType={p.type} vendor={p.vendor} sku={p.sku} barcode={p.barcode} colour={p.colour}
                     onApply={r => { updateField(p._idx, "title", r.title); updateField(p._idx, "type", r.type); updateField(p._idx, "description", r.description); updateField(p._idx, "tags", r.tags); }} />
+                  <SEOButton product={{ title: p.title, type: p.type, vendor: p.vendor, colour: p.colour, tags: p.tags }}
+                    onApply={r => { updateField(p._idx, "description", r.seo_description); updateField(p._idx, "tags", r.keywords.join(", ")); }} />
                 </div>
                 <EditableCell value={p.type} onChange={v => updateField(p._idx, "type", v)} />
                 <EditableCell value={p.vendor} onChange={v => updateField(p._idx, "vendor", v)} />

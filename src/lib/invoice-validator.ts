@@ -363,7 +363,7 @@ export function validateAndCleanProducts(
     confidence = Math.min(100, confidence);
 
     const confidenceLevel: "high" | "medium" | "low" =
-      rejected ? "low" : confidence >= 80 ? "high" : confidence >= 50 ? "medium" : "low";
+      rejected ? "low" : confidence >= 70 ? "high" : confidence >= 40 ? "medium" : "low";
 
     if (rejected) {
       rejectedRows.push({ row: i, name: rawName || "(empty)", reason: rejectReason || "Invalid" });

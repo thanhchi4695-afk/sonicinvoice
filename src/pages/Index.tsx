@@ -115,6 +115,7 @@ const Index = () => {
           onStartCollabSEO={() => setActiveFlow("collab_seo")}
           onStartGoogleAdsSetup={() => setActiveFlow("google_ads_setup")}
           onStartMetaAdsSetup={() => setActiveFlow("meta_ads_setup")}
+          onStartLightspeedConvert={() => setActiveFlow("lightspeed_convert")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

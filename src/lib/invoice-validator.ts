@@ -31,12 +31,18 @@ export interface CorrectionDetail {
   reason: string;
 }
 
+export interface ConfidenceSignal {
+  label: string;
+  delta: number;
+}
+
 export interface ValidatedProduct extends RawProduct {
   _rowIndex: number;
   _rawName: string;
   _rawCost: number;
   _confidence: number;
   _confidenceLevel: "high" | "medium" | "low";
+  _confidenceReasons: ConfidenceSignal[];
   _issues: string[];
   _corrections: CorrectionDetail[];
   _rejected: boolean;

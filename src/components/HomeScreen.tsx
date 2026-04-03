@@ -23,9 +23,10 @@ interface HomeScreenProps {
   onStartCollabSEO?: () => void;
   onStartGoogleAdsSetup?: () => void;
   onStartMetaAdsSetup?: () => void;
+  onStartLightspeedConvert?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -352,6 +353,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </div>
         <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartMetaAdsSetup}>
           Start <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Lightspeed → Shopify Converter Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <FileText className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Lightspeed → Shopify</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Convert your Lightspeed product export to a Shopify-ready CSV. Barcodes mapped automatically where available.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">products · variants · barcodes · pricing</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartLightspeedConvert}>
+          Convert file → <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
 

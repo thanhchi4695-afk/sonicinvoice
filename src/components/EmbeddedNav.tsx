@@ -1,4 +1,4 @@
-import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target } from "lucide-react";
+import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EmbeddedNavProps {
@@ -28,6 +28,7 @@ const navSections = [
       { id: "collab_seo", label: "Collab SEO", icon: Link, type: "flow" as const },
       { id: "google_ads_setup", label: "Google Ads Setup", icon: Megaphone, type: "flow" as const },
       { id: "meta_ads_setup", label: "Meta Ads Setup", icon: Target, type: "flow" as const },
+      { id: "lightspeed_convert", label: "Lightspeed → Shopify", icon: ArrowLeftRight, type: "flow" as const },
     ],
   },
   {

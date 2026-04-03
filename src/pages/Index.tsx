@@ -255,6 +255,7 @@ const Index = () => {
           onStartMetaAdsSetup={() => setActiveFlow("meta_ads_setup")}
           onStartLightspeedConvert={() => setActiveFlow("lightspeed_convert")}
           onStartScanMode={() => setActiveFlow("scan_mode")}
+          onStartPerformance={() => setActiveFlow("performance")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

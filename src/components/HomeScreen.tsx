@@ -339,6 +339,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* Performance Dashboard Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <BarChart3 className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Performance</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Track ROAS, spend, conversions, and pipeline activity for published products.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">ROAS · spend · conversions · funnel</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartPerformance}>
+          View dashboard <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
       {/* Google Ads Setup AI Card */}
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">

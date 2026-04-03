@@ -181,12 +181,15 @@ const Index = () => {
   // ── Loading state ──
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-3" />
-          <p className="text-sm text-muted-foreground">Loading Sonic Invoice...</p>
-        </div>
-      </div>
+      <LoadingScreen
+        title="Sonic Invoice"
+        messages={[
+          "Initialising session...",
+          "Connecting to backend...",
+          "Almost ready...",
+        ]}
+        interval={1800}
+      />
     );
   }
 

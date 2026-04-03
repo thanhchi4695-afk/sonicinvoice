@@ -2,12 +2,13 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   ChevronLeft, Download, Search, Filter, Check, AlertTriangle,
   CheckCircle2, Trash2, Tag, Layers, Copy as CopyIcon, ChevronDown,
-  ArrowUpDown, Eye, FileCheck
+  ArrowUpDown, Eye, FileCheck, Sparkles, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { getStoreConfig } from "@/lib/prompt-builder";
+import { SmartNamingButton, runBulkSmartNaming } from "@/components/SmartNamingPanel";
 import {
   validateForExport, generateShopifyCSV, inferCategory, generateHandles,
   type ScannedProductForExport,
@@ -110,7 +111,7 @@ const EditableCell = ({
 
 /* ─── bulk action bar ─── */
 const BulkBar = ({
-  count, onSetVendor, onSetType, onAddTag, onDelete, onMarkReady,
+  count, onSetVendor, onSetType, onAddTag, onDelete, onMarkReady, onSmartName,
 }: {
   count: number;
   onSetVendor: () => void;
@@ -118,6 +119,7 @@ const BulkBar = ({
   onAddTag: () => void;
   onDelete: () => void;
   onMarkReady: () => void;
+  onSmartName: () => void;
 }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -131,6 +133,7 @@ const BulkBar = ({
         {open && (
           <div className="absolute right-0 top-8 z-50 bg-card border border-border rounded-lg shadow-lg py-1 w-48">
             {[
+              { label: "✨ Smart Name Selected", fn: onSmartName, highlight: true },
               { label: "Set Vendor", fn: onSetVendor },
               { label: "Set Product Type", fn: onSetType },
               { label: "Add Tags", fn: onAddTag },
@@ -138,7 +141,7 @@ const BulkBar = ({
               { label: "Delete Selected", fn: onDelete, destructive: true },
             ].map(a => (
               <button key={a.label} onClick={() => { a.fn(); setOpen(false); }}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors ${a.destructive ? "text-destructive" : "text-foreground"}`}>
+                className={`w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors ${(a as any).destructive ? "text-destructive" : (a as any).highlight ? "text-primary font-medium" : "text-foreground"}`}>
                 {a.label}
               </button>
             ))}
@@ -160,6 +163,8 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
   const [sortKey, setSortKey] = useState<SortKey>("title");
   const [sortAsc, setSortAsc] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
+  const [bulkNaming, setBulkNaming] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -324,6 +329,22 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
           <h2 className="font-semibold text-foreground text-sm">Batch Review</h2>
           <p className="text-xs text-muted-foreground">{products.length} products · {readyCount} ready · {fixCount} need fixing</p>
         </div>
+        <Button size="sm" variant="ghost" onClick={async () => {
+          setBulkNaming(true);
+          setBulkProgress({ done: 0, total: products.length });
+          try {
+            const results = await runBulkSmartNaming(products, (done, total) => setBulkProgress({ done, total }));
+            onSetProducts(prev => prev.map(p => {
+              const r = results.get(p.id);
+              if (!r) return p;
+              return { ...p, title: r.recommended_title, type: r.product_type, description: r.short_description, tags: r.tags.join(", "), confidence: r.confidence_score, confidenceReason: r.confidence_reason };
+            }));
+            toast.success(`Smart named ${results.size} products`);
+          } catch { toast.error("Bulk naming failed"); }
+          finally { setBulkNaming(false); }
+        }} disabled={bulkNaming} className="h-7 text-xs gap-1 text-primary">
+          {bulkNaming ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> {bulkProgress.done}/{bulkProgress.total}</> : <><Sparkles className="w-3.5 h-3.5" /> Smart Name All</>}
+        </Button>
         <Button size="sm" variant="ghost" onClick={() => setShowPreview(true)} className="h-7 text-xs gap-1">
           <Eye className="w-3.5 h-3.5" /> Preview
         </Button>
@@ -368,6 +389,26 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
           onAddTag={bulkAddTag}
           onDelete={bulkDelete}
           onMarkReady={() => { setSelected(new Set()); }}
+          onSmartName={async () => {
+            const items = products.filter(p => selected.has(p.id));
+            if (!items.length) return;
+            setBulkNaming(true);
+            setBulkProgress({ done: 0, total: items.length });
+            try {
+              const results = await runBulkSmartNaming(items, (done, total) => setBulkProgress({ done, total }));
+              onSetProducts(prev => prev.map(p => {
+                const r = results.get(p.id);
+                if (!r) return p;
+                return { ...p, title: r.recommended_title, type: r.product_type, description: r.short_description, tags: r.tags.join(", "), confidence: r.confidence_score, confidenceReason: r.confidence_reason };
+              }));
+              toast.success(`Smart named ${results.size} products`);
+            } catch (e: any) {
+              toast.error(e.message || "Bulk naming failed");
+            } finally {
+              setBulkNaming(false);
+              setSelected(new Set());
+            }
+          }}
         />
       )}
 
@@ -406,7 +447,11 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
                 <div className="flex items-center py-1">
                   <Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleSelect(p.id)} />
                 </div>
-                <EditableCell value={p.title} onChange={v => updateField(p._idx, "title", v)} className="font-medium" />
+                <div className="flex items-center gap-0.5">
+                  <EditableCell value={p.title} onChange={v => updateField(p._idx, "title", v)} className="font-medium flex-1" />
+                  <SmartNamingButton currentTitle={p.title} currentType={p.type} vendor={p.vendor} sku={p.sku} barcode={p.barcode} colour={p.colour}
+                    onApply={r => { updateField(p._idx, "title", r.title); updateField(p._idx, "type", r.type); updateField(p._idx, "description", r.description); updateField(p._idx, "tags", r.tags); }} />
+                </div>
                 <EditableCell value={p.type} onChange={v => updateField(p._idx, "type", v)} />
                 <EditableCell value={p.vendor} onChange={v => updateField(p._idx, "vendor", v)} />
                 <EditableCell value={p.sku} onChange={v => updateField(p._idx, "sku", v)} mono />

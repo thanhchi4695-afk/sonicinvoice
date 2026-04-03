@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { initiateShopifyLogin } from "@/lib/shopify-auth";
 
 interface AuthScreenProps {
   onAuth: () => void;
@@ -10,10 +12,33 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [storeName, setStoreName] = useState("");
+  const [shopifyShop, setShopifyShop] = useState("");
+  const [showShopifyLogin, setShowShopifyLogin] = useState(false);
+  const [shopifyLoading, setShopifyLoading] = useState(false);
+  const [shopifyError, setShopifyError] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onAuth();
+  };
+
+  const handleShopifyLogin = async () => {
+    const shop = shopifyShop.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+    if (!shop) {
+      setShopifyError("Please enter your Shopify store URL");
+      return;
+    }
+    const fullShop = shop.includes(".myshopify.com") ? shop : `${shop}.myshopify.com`;
+
+    setShopifyLoading(true);
+    setShopifyError("");
+    try {
+      const installUrl = await initiateShopifyLogin(fullShop);
+      window.location.href = installUrl;
+    } catch (err) {
+      setShopifyError(err instanceof Error ? err.message : "Failed to connect");
+      setShopifyLoading(false);
+    }
   };
 
   return (
@@ -21,6 +46,67 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
       <div className="w-full max-w-sm">
         <h1 className="text-3xl font-bold font-display text-center mb-1">Sonic Invoice</h1>
         <p className="text-muted-foreground text-sm text-center mb-8">Invoice → Shopify in minutes</p>
+
+        {/* Shopify OAuth Login */}
+        <div className="mb-6">
+          {!showShopifyLogin ? (
+            <Button
+              variant="outline"
+              className="w-full h-12 text-base gap-2 border-[#96bf48] text-[#96bf48] hover:bg-[#96bf48]/10"
+              onClick={() => setShowShopifyLogin(true)}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M15.337 3.415c-.15-.075-.3-.03-.375.09-.06.105-1.005 1.935-1.005 1.935s-1.11-.39-1.215-.42c-.03-.015-.06-.015-.09-.015C12.477 4.62 12.045 3 11.91 2.58c-.045-.12-.075-.195-.105-.24-.315-.465-.735-.51-.93-.51h-.045C10.56 1.83 10.29 2.1 10.14 2.37c-.39.69-.93 1.77-.93 1.77L7.5 3.57c-.15-.045-.255-.015-.315.09-.075.135-1.635 3.975-1.635 3.975L3.885 18.09l10.545 1.905 5.64-1.245S15.472 3.49 15.337 3.415z" />
+              </svg>
+              Sign in with Shopify
+            </Button>
+          ) : (
+            <div className="space-y-3 p-4 rounded-lg border border-[#96bf48]/30 bg-[#96bf48]/5">
+              <p className="text-xs text-muted-foreground">Enter your Shopify store URL to sign in:</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={shopifyShop}
+                  onChange={(e) => { setShopifyShop(e.target.value); setShopifyError(""); }}
+                  placeholder="yourstore.myshopify.com"
+                  className="flex-1 h-10 rounded-lg bg-input border border-border px-3 text-sm"
+                  onKeyDown={(e) => e.key === "Enter" && handleShopifyLogin()}
+                />
+              </div>
+              {shopifyError && <p className="text-xs text-destructive">{shopifyError}</p>}
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setShowShopifyLogin(false); setShopifyError(""); }}
+                  className="text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="teal"
+                  size="sm"
+                  className="flex-1"
+                  onClick={handleShopifyLogin}
+                  disabled={shopifyLoading}
+                >
+                  {shopifyLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                  Connect & Sign in
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                This will install Sonic Invoice on your Shopify store and sign you in automatically.
+                Your store data stays private.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-muted-foreground">or use email</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           {isSignUp && (

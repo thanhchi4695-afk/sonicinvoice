@@ -491,6 +491,8 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
                   <EditableCell value={p.title} onChange={v => updateField(p._idx, "title", v)} className="font-medium flex-1" />
                   <SmartNamingButton currentTitle={p.title} currentType={p.type} vendor={p.vendor} sku={p.sku} barcode={p.barcode} colour={p.colour}
                     onApply={r => { updateField(p._idx, "title", r.title); updateField(p._idx, "type", r.type); updateField(p._idx, "description", r.description); updateField(p._idx, "tags", r.tags); }} />
+                  <SEOButton product={{ title: p.title, type: p.type, vendor: p.vendor, colour: p.colour, tags: p.tags }}
+                    onApply={r => { updateField(p._idx, "description", r.seo_description); updateField(p._idx, "tags", r.keywords.join(", ")); }} />
                 </div>
                 <EditableCell value={p.type} onChange={v => updateField(p._idx, "type", v)} />
                 <EditableCell value={p.vendor} onChange={v => updateField(p._idx, "vendor", v)} />

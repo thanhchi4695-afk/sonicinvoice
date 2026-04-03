@@ -375,6 +375,7 @@ function BillingSection() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
 
   useEffect(() => {
     checkBillingStatus();
@@ -400,11 +401,10 @@ function BillingSection() {
     try {
       const returnUrl = window.location.href;
       const { data, error } = await supabase.functions.invoke("shopify-billing", {
-        body: { action: "create", return_url: returnUrl, test: true },
+        body: { action: "create", return_url: returnUrl, interval: billingInterval, test: true },
       });
       if (error) throw new Error(error.message);
       if (data?.confirmation_url) {
-        // Redirect merchant to Shopify's approval screen
         window.location.href = data.confirmation_url;
       }
     } catch (err) {
@@ -430,7 +430,7 @@ function BillingSection() {
         <div className="bg-muted/30 rounded-xl p-4 space-y-2">
           <div className="flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold">{billingStatus.plan_name || "Sonic Invoice Pro"}</span>
+            <span className="text-sm font-semibold">{billingStatus.plan_name || "Starter"}</span>
           </div>
           <p className="text-xs text-muted-foreground">
             Status: <span className="text-foreground font-medium capitalize">{billingStatus.status}</span>
@@ -442,9 +442,31 @@ function BillingSection() {
       ) : (
         <div className="bg-muted/30 rounded-xl p-4 space-y-3">
           <div className="text-center">
-            <p className="text-sm font-semibold mb-1">Sonic Invoice Pro</p>
-            <p className="text-2xl font-bold font-display">$29<span className="text-sm text-muted-foreground font-normal">/month</span></p>
-            <p className="text-xs text-muted-foreground mt-1">14-day free trial included</p>
+            <p className="text-sm font-semibold mb-2">Sonic Invoice Starter</p>
+            {/* Monthly / Yearly toggle */}
+            <div className="inline-flex items-center bg-muted rounded-full p-0.5 mb-2">
+              <button
+                onClick={() => setBillingInterval("monthly")}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${billingInterval === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingInterval("yearly")}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${billingInterval === "yearly" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                Yearly
+              </button>
+            </div>
+            {billingInterval === "monthly" ? (
+              <p className="text-2xl font-bold font-display">$19<span className="text-sm text-muted-foreground font-normal">/month</span></p>
+            ) : (
+              <div>
+                <p className="text-2xl font-bold font-display">$190<span className="text-sm text-muted-foreground font-normal">/year</span></p>
+                <p className="text-xs text-primary font-medium mt-0.5">Save 20% vs monthly</p>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">7-day free trial included</p>
           </div>
           <ul className="text-xs text-muted-foreground space-y-1">
             <li className="flex items-center gap-1.5"><Check className="w-3 h-3 text-primary" /> Unlimited invoice processing</li>
@@ -459,7 +481,7 @@ function BillingSection() {
             disabled={subscribing}
           >
             {subscribing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            Start free trial
+            Start 7-day free trial
           </Button>
           <p className="text-[10px] text-muted-foreground text-center">
             You'll be redirected to Shopify to approve. No charge until trial ends.

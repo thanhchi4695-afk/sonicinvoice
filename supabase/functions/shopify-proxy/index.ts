@@ -508,6 +508,35 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "update_collection_seo": {
+        if (!body.collection_id) {
+          return new Response(JSON.stringify({ error: "Missing collection_id" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const isCustom = body.collection_type !== "smart";
+        const endpoint = isCustom
+          ? `/custom_collections/${body.collection_id}.json`
+          : `/smart_collections/${body.collection_id}.json`;
+        const key = isCustom ? "custom_collection" : "smart_collection";
+        const payload: Record<string, unknown> = { id: body.collection_id };
+        if (body.body_html !== undefined) payload.body_html = body.body_html;
+        if (body.meta_title !== undefined) payload.metafields_global_title_tag = body.meta_title;
+        if (body.meta_description !== undefined) payload.metafields_global_description_tag = body.meta_description;
+        const resp = await shopifyFetch(endpoint, {
+          method: "PUT",
+          body: JSON.stringify({ [key]: payload }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to update collection SEO", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: data[key] };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

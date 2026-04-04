@@ -40,6 +40,7 @@ const tools = [
   { id: "import_collections", icon: Upload, label: "Import collections", desc: "Create or update collections from CSV", color: "text-success" },
   { id: "auto_collections", icon: Sparkles, label: "Auto collections AI", desc: "AI-generate smart collections from products", color: "text-primary" },
   { id: "collection_seo", icon: Globe, label: "Collection SEO AI", desc: "SEO-optimize collections for Google rankings", color: "text-success" },
+  { id: "feed_optimise", icon: Sparkles, label: "AI Feed Optimisation", desc: "Generate Google Shopping product_detail attributes", color: "text-primary" },
 ];
 
 const quickInserts = [

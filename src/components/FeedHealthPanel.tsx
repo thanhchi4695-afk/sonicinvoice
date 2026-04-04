@@ -137,21 +137,14 @@ export default function FeedHealthPanel({ onBack }: { onBack: () => void }) {
       if (metafields.length === 0) { success += batch.length; continue; }
 
       try {
-        const { data, error } = await supabase.functions.invoke("shopify-proxy", {
-          body: { action: "set_metafields", metafields },
-        });
-
-        if (error || data?.error) {
-          failed += batch.length;
-        } else {
-          success += batch.length;
-          setRows(prev => prev.map(r => {
-            if (batch.find(b => b.product.id === r.product.id)) {
-              return { ...r, pushed: true };
-            }
-            return r;
-          }));
-        }
+        await callProxy({ action: "set_metafields", metafields });
+        success += batch.length;
+        setRows(prev => prev.map(r => {
+          if (batch.find(b => b.product.id === r.product.id)) {
+            return { ...r, pushed: true };
+          }
+          return r;
+        }));
       } catch {
         failed += batch.length;
       }

@@ -279,6 +279,7 @@ const Index = () => {
           onStartStyleGrouping={() => setActiveFlow("style_grouping")}
           onStartCompetitorIntel={() => setActiveFlow("competitor_intel")}
           onStartCollectionSEO={() => setActiveFlow("collection_seo")}
+          onStartGeoAgentic={() => setActiveFlow("geo_agentic")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

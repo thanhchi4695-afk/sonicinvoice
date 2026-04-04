@@ -111,6 +111,94 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
     setManualTitle("");
   };
 
+  const loadFromShopify = async () => {
+    setLoading(true);
+    try {
+      const [custom, smart] = await Promise.all([getCustomCollections(), getSmartCollections()]);
+      const mapped: CollectionInput[] = [
+        ...custom.map(c => ({
+          id: `shopify-custom-${c.id}`,
+          shopifyId: c.id,
+          shopifyType: "custom" as const,
+          title: c.title,
+          collection_type: "custom",
+          products: [] as { title: string }[],
+          tags: "",
+          vendor: "",
+        })),
+        ...smart.map(c => ({
+          id: `shopify-smart-${c.id}`,
+          shopifyId: c.id,
+          shopifyType: "smart" as const,
+          title: c.title,
+          collection_type: "smart",
+          products: [] as { title: string }[],
+          tags: "",
+          vendor: "",
+        })),
+      ];
+      setCollections(mapped);
+      toast.success(`Loaded ${mapped.length} collections from Shopify`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to load collections from Shopify");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pushSEOToShopify = async (colId: string) => {
+    const col = collections.find(c => c.id === colId);
+    const result = results.get(colId);
+    if (!col || !result || !col.shopifyId || !col.shopifyType) {
+      toast.error("This collection must be loaded from Shopify to push SEO");
+      return;
+    }
+    setPushing(colId);
+    try {
+      const bodyHtml = `${result.intro_text}\n\n${result.seo_content}`;
+      await updateCollectionSEO(col.shopifyId, col.shopifyType, {
+        body_html: bodyHtml,
+        meta_title: result.meta_title,
+        meta_description: result.meta_description,
+      });
+      setPushed(prev => new Set(prev).add(colId));
+      toast.success(`SEO pushed for "${col.title}"`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to push SEO");
+    } finally {
+      setPushing(null);
+    }
+  };
+
+  const pushAllToShopify = async () => {
+    const pushable = collections.filter(c => c.shopifyId && c.shopifyType && results.has(c.id) && !pushed.has(c.id));
+    if (pushable.length === 0) {
+      toast.error("No collections to push. Load from Shopify and generate SEO first.");
+      return;
+    }
+    setPushingAll(true);
+    setPushProgress({ done: 0, total: pushable.length });
+    for (let i = 0; i < pushable.length; i++) {
+      const col = pushable[i];
+      const result = results.get(col.id)!;
+      try {
+        const bodyHtml = `${result.intro_text}\n\n${result.seo_content}`;
+        await updateCollectionSEO(col.shopifyId!, col.shopifyType!, {
+          body_html: bodyHtml,
+          meta_title: result.meta_title,
+          meta_description: result.meta_description,
+        });
+        setPushed(prev => new Set(prev).add(col.id));
+      } catch (e: any) {
+        console.error(`Failed to push SEO for ${col.title}:`, e);
+      }
+      setPushProgress({ done: i + 1, total: pushable.length });
+      if (i < pushable.length - 1) await new Promise(r => setTimeout(r, 500));
+    }
+    setPushingAll(false);
+    toast.success("SEO pushed to all collections");
+  };
+
   const generateSEO = async () => {
     if (collections.length === 0) {
       toast.error("Add collections first");

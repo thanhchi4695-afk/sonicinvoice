@@ -258,6 +258,7 @@ const Index = () => {
           onStartLightspeedConvert={() => setActiveFlow("lightspeed_convert")}
           onStartScanMode={() => setActiveFlow("scan_mode")}
           onStartPerformance={() => setActiveFlow("performance")}
+          onStartFeedOptimise={() => setActiveFlow("feed_optimise")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

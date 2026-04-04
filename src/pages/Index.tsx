@@ -245,6 +245,7 @@ const Index = () => {
       case "collection_seo": return <CollectionSEOFlow onBack={() => setActiveFlow(null)} />;
       case "geo_agentic": return <GeoAgenticFlow onBack={() => setActiveFlow(null)} />;
       case "organic_seo": return <OrganicSEOFlow onBack={() => setActiveFlow(null)} />;
+      case "margin_protection": return <MarginProtectionPanel onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

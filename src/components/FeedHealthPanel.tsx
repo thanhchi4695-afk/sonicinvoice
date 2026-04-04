@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { ChevronLeft, Activity, Check, AlertTriangle, Loader2, Eye, ShoppingCart, Pencil } from "lucide-react";
+import { ChevronLeft, Activity, Check, AlertTriangle, Loader2, Eye, ShoppingCart, Pencil, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getActiveDirectStore } from "@/lib/shopify-direct";
 import {
   type FeedHealthProduct,
   type FeedHealthRow,
@@ -30,6 +31,25 @@ export default function FeedHealthPanel({ onBack }: { onBack: () => void }) {
   const [detailRow, setDetailRow] = useState<FeedHealthRow | null>(null);
   const [editField, setEditField] = useState<{ id: string; field: string } | null>(null);
 
+  const directStore = getActiveDirectStore();
+
+  // Helper to call the appropriate proxy
+  const callProxy = async (body: Record<string, unknown>) => {
+    if (directStore) {
+      const { data, error } = await supabase.functions.invoke("shopify-direct-proxy", {
+        body: { store_url: directStore.storeUrl, token: directStore.token, ...body },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      return data;
+    }
+    // Fallback to OAuth proxy
+    const { data, error } = await supabase.functions.invoke("shopify-proxy", { body });
+    if (error) throw new Error(error.message);
+    if (data?.error) throw new Error(data.error);
+    return data;
+  };
+
   // ── SCAN ──────────────────────────────────────
   const startScan = async () => {
     setStep("scanning");
@@ -42,16 +62,11 @@ export default function FeedHealthPanel({ onBack }: { onBack: () => void }) {
 
     try {
       do {
-        const { data, error } = await supabase.functions.invoke("shopify-proxy", {
-          body: {
-            action: "get_products_page",
-            limit: 250,
-            page_info: pageInfo || undefined,
-          },
+        const data = await callProxy({
+          action: "get_products_page",
+          limit: 250,
+          page_info: pageInfo || undefined,
         });
-
-        if (error) throw new Error(error.message);
-        if (data?.error) throw new Error(data.error);
 
         const products = (data.products || []).map((raw: any) => {
           const product = parseShopifyProduct(raw);
@@ -122,21 +137,14 @@ export default function FeedHealthPanel({ onBack }: { onBack: () => void }) {
       if (metafields.length === 0) { success += batch.length; continue; }
 
       try {
-        const { data, error } = await supabase.functions.invoke("shopify-proxy", {
-          body: { action: "set_metafields", metafields },
-        });
-
-        if (error || data?.error) {
-          failed += batch.length;
-        } else {
-          success += batch.length;
-          setRows(prev => prev.map(r => {
-            if (batch.find(b => b.product.id === r.product.id)) {
-              return { ...r, pushed: true };
-            }
-            return r;
-          }));
-        }
+        await callProxy({ action: "set_metafields", metafields });
+        success += batch.length;
+        setRows(prev => prev.map(r => {
+          if (batch.find(b => b.product.id === r.product.id)) {
+            return { ...r, pushed: true };
+          }
+          return r;
+        }));
       } catch {
         failed += batch.length;
       }
@@ -210,6 +218,23 @@ export default function FeedHealthPanel({ onBack }: { onBack: () => void }) {
             <li>Map metafields in your Google feed app (Simprosys / Google & YouTube)</li>
           </ol>
         </div>
+
+        {/* Connected store indicator */}
+        {directStore ? (
+          <div className="bg-success/10 border border-success/20 rounded-lg p-3 mb-4 flex items-center gap-2">
+            <Store className="w-4 h-4 text-success" />
+            <div>
+              <p className="text-xs font-medium text-success">{directStore.storeName}</p>
+              <p className="text-[10px] text-muted-foreground">{directStore.storeUrl} · {directStore.productCount} products</p>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-secondary/10 border border-secondary/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-muted-foreground">
+              <span className="font-semibold text-secondary">No store connected.</span> Go to Account → Connected Shopify stores to connect one, or use the OAuth connection.
+            </p>
+          </div>
+        )}
 
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4">
           <p className="text-xs text-muted-foreground">

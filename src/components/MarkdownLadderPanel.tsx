@@ -230,7 +230,7 @@ const MarkdownLadderPanel = ({ onBack }: MarkdownLadderPanelProps) => {
       if (!nextStage) return { ...p, status: "completed" };
 
       const newPrice = +(p.originalPrice * (1 - nextStage.discountPercent / 100)).toFixed(2);
-      const marginCheck = p.cost ? checkMargin(newPrice, p.cost, "invoice") : null;
+      const marginCheck = p.cost ? checkMargin(newPrice, { cost: p.cost, source: "invoice" }) : null;
 
       if (marginCheck?.status === "blocked") {
         toast.error(`Blocked: ${p.title} — markdown would breach minimum margin`);

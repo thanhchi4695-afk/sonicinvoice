@@ -7,7 +7,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant
@@ -28,6 +28,12 @@ interface ShopifyRequestBody {
   body_html?: string;
   meta_title?: string;
   meta_description?: string;
+  // For get_products_page
+  page_info?: string;
+  limit?: number;
+  fields?: string;
+  // For set_metafields
+  metafields?: Array<{ ownerId: string; namespace: string; key: string; value: string; type: string }>;
 }
 
 Deno.serve(async (req) => {
@@ -534,6 +540,71 @@ Deno.serve(async (req) => {
           });
         }
         result = { collection: data[key] };
+        break;
+      }
+
+      case "get_products_page": {
+        const limit = body.limit || 250;
+        const fieldsParam = body.fields || "id,title,handle,vendor,product_type,tags,variants,images";
+        let url = `/products.json?limit=${limit}&fields=${fieldsParam}`;
+        if (body.page_info) {
+          url = `/products.json?limit=${limit}&page_info=${body.page_info}`;
+        }
+        const resp = await shopifyFetch(url);
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to fetch products", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Extract next page cursor from Link header
+        const linkHeader = resp.headers.get("link") || "";
+        const nextMatch = linkHeader.match(/page_info=([^>&]+)>;\s*rel="next"/);
+        const nextPageInfo = nextMatch ? nextMatch[1] : null;
+        result = { products: data.products || [], nextPageInfo };
+        break;
+      }
+
+      case "set_metafields": {
+        if (!body.metafields || body.metafields.length === 0) {
+          return new Response(JSON.stringify({ error: "Missing metafields" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Use GraphQL metafieldsSet mutation
+        const graphqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+        const mutation = `
+          mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+              metafields { key namespace value ownerId }
+              userErrors { field message code }
+            }
+          }
+        `;
+        const gqlResp = await fetch(graphqlUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": access_token,
+          },
+          body: JSON.stringify({
+            query: mutation,
+            variables: { metafields: body.metafields },
+          }),
+        });
+        const gqlData = await gqlResp.json();
+        if (gqlData.errors) {
+          return new Response(JSON.stringify({ error: "GraphQL errors", details: gqlData.errors }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const userErrors = gqlData.data?.metafieldsSet?.userErrors || [];
+        if (userErrors.length > 0) {
+          return new Response(JSON.stringify({ error: userErrors.map((e: any) => e.message).join(", "), details: userErrors }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { metafields: gqlData.data?.metafieldsSet?.metafields || [], success: true };
         break;
       }
 

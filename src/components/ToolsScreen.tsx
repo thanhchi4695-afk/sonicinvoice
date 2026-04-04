@@ -9,6 +9,7 @@ import ImportCollections from "@/components/ImportCollections";
 import AutoCollectionBuilder from "@/components/AutoCollectionBuilder";
 import CollectionSEOPanel from "@/components/CollectionSEOPanel";
 import AIFeedOptimisation from "@/components/AIFeedOptimisation";
+import FeedHealthPanel from "@/components/FeedHealthPanel";
 import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
@@ -41,6 +42,7 @@ const tools = [
   { id: "auto_collections", icon: Sparkles, label: "Auto collections AI", desc: "AI-generate smart collections from products", color: "text-primary" },
   { id: "collection_seo", icon: Globe, label: "Collection SEO AI", desc: "SEO-optimize collections for Google rankings", color: "text-success" },
   { id: "feed_optimise", icon: Sparkles, label: "AI Feed Optimisation", desc: "Generate Google Shopping product_detail attributes", color: "text-primary" },
+  { id: "feed_health", icon: Globe, label: "Google Feed Health", desc: "Fix gender, age_group, color — push to Shopify", color: "text-success" },
 ];
 
 const quickInserts = [
@@ -993,6 +995,7 @@ const ToolsScreen = () => {
   if (activeTool === "auto_collections") return <AutoCollectionBuilder onBack={() => setActiveTool(null)} />;
   if (activeTool === "collection_seo") return <CollectionSEOPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "feed_optimise") return <AIFeedOptimisation onBack={() => setActiveTool(null)} />;
+  if (activeTool === "feed_health") return <FeedHealthPanel onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

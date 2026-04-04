@@ -499,6 +499,196 @@ function BillingSection() {
   );
 }
 
+// ─── Direct Store Connections ──────────────────────────────────────
+function DirectStoresSection() {
+  const [stores, setStores] = useState<DirectStore[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [storeUrl, setStoreUrl] = useState("");
+  const [token, setToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [testMessage, setTestMessage] = useState("");
+  const [testResult, setTestResult] = useState<{ shopName: string; productCount: number } | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
+
+  useEffect(() => {
+    setStores(getDirectStores());
+  }, []);
+
+  const refresh = () => setStores(getDirectStores());
+
+  const handleTest = async () => {
+    if (!storeUrl || !token) {
+      setTestStatus("error");
+      setTestMessage("Enter both store URL and access token");
+      return;
+    }
+    setTestStatus("testing");
+    setTestMessage("");
+    setTestResult(null);
+    try {
+      const url = normalizeStoreUrl(storeUrl);
+      const { data, error } = await supabase.functions.invoke("shopify-direct-proxy", {
+        body: { store_url: url, token, action: "test" },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      setTestResult({ shopName: data.shop_name, productCount: data.product_count });
+      setTestStatus("success");
+      setTestMessage(`Connected — ${data.shop_name} (${data.product_count} products)`);
+    } catch (err) {
+      setTestStatus("error");
+      setTestMessage(err instanceof Error ? err.message : "Connection failed");
+    }
+  };
+
+  const handleSave = () => {
+    if (!testResult || testStatus !== "success") return;
+    const url = normalizeStoreUrl(storeUrl);
+    saveDirectStore({
+      storeUrl: url,
+      token,
+      storeName: testResult.shopName,
+      productCount: testResult.productCount,
+      isActive: true,
+    });
+    refresh();
+    setShowModal(false);
+    setStoreUrl("");
+    setToken("");
+    setTestStatus("idle");
+    setTestResult(null);
+  };
+
+  const handleRemove = (id: string) => {
+    removeDirectStore(id);
+    refresh();
+  };
+
+  const handleSetActive = (id: string) => {
+    setActiveStore(id);
+    refresh();
+  };
+
+  return (
+    <Section title="🔗 Connected Shopify stores">
+      <p className="text-xs text-muted-foreground -mt-1 mb-2">
+        Connect a store to read and fix all products directly — no CSV export needed.
+      </p>
+
+      {stores.map(s => (
+        <div key={s.id} className="bg-card border border-border rounded-lg p-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              {s.isActive && <span className="w-2 h-2 rounded-full bg-success shrink-0" />}
+              <div>
+                <p className="text-sm font-medium">{s.storeName}</p>
+                <p className="text-[11px] text-muted-foreground">{s.storeUrl}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {s.productCount} products · Connected {new Date(s.connectedAt).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-2">
+            {!s.isActive && (
+              <Button variant="outline" size="sm" className="text-xs h-7 gap-1" onClick={() => handleSetActive(s.id)}>
+                <Check className="w-3 h-3" /> Set as active
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" className="text-xs h-7 text-destructive gap-1" onClick={() => handleRemove(s.id)}>
+              <Trash2 className="w-3 h-3" /> Disconnect
+            </Button>
+          </div>
+        </div>
+      ))}
+
+      <Button variant="outline" className="w-full h-10 gap-2" onClick={() => setShowModal(true)}>
+        <Plus className="w-4 h-4" /> Connect a store
+      </Button>
+
+      {/* Connect modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowModal(false)}>
+          <div className="bg-card border border-border rounded-xl w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold flex items-center gap-2"><Store className="w-4 h-4" /> Connect Shopify store</h3>
+              <button onClick={() => setShowModal(false)} className="text-muted-foreground"><X className="w-4 h-4" /></button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Store URL</label>
+                <Input value={storeUrl} onChange={e => setStoreUrl(e.target.value)} placeholder="yourstore.myshopify.com" />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Admin API access token</label>
+                <div className="relative">
+                  <Input
+                    type={showToken ? "text" : "password"}
+                    value={token}
+                    onChange={e => setToken(e.target.value)}
+                    placeholder="shpat_xxxxxxxxxxxxxxxxxxxxxxxx"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowToken(!showToken)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  >
+                    {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Your token is stored only in this browser. It is never sent to any server other than your own Shopify store.
+                </p>
+              </div>
+            </div>
+
+            {/* How to get token guide */}
+            <button onClick={() => setShowGuide(!showGuide)} className="flex items-center gap-1 text-xs text-primary font-medium">
+              {showGuide ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              How to get your token
+            </button>
+            {showGuide && (
+              <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside bg-muted/30 rounded-lg p-3">
+                <li>Shopify Admin → Settings → Apps and sales channels</li>
+                <li>Click "Develop apps" → "Create an app"</li>
+                <li>Name it "Sonic Invoices" → Create app</li>
+                <li>Configure Admin API scopes:<br />
+                  <span className="ml-4">✓ read_products</span><br />
+                  <span className="ml-4">✓ write_products</span>
+                </li>
+                <li>Click "Install app"</li>
+                <li>Copy the Admin API access token (starts with <code className="bg-muted px-1 rounded">shpat_</code>)</li>
+                <li className="text-secondary font-medium">⚠ You only see this once — copy it now</li>
+              </ol>
+            )}
+
+            {/* Status messages */}
+            {testStatus === "success" && (
+              <p className="text-xs text-success flex items-center gap-1"><Check className="w-3 h-3" /> {testMessage}</p>
+            )}
+            {testStatus === "error" && (
+              <p className="text-xs text-destructive flex items-center gap-1"><X className="w-3 h-3" /> {testMessage}</p>
+            )}
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 h-10" onClick={handleTest} disabled={testStatus === "testing"}>
+                {testStatus === "testing" ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                Test connection
+              </Button>
+              <Button variant="teal" className="flex-1 h-10" onClick={handleSave} disabled={testStatus !== "success"}>
+                Save and connect
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="mb-6">
     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{title}</h3>

@@ -543,6 +543,71 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "get_products_page": {
+        const limit = body.limit || 250;
+        const fieldsParam = body.fields || "id,title,handle,vendor,product_type,tags,variants,images";
+        let url = `/products.json?limit=${limit}&fields=${fieldsParam}`;
+        if (body.page_info) {
+          url = `/products.json?limit=${limit}&page_info=${body.page_info}`;
+        }
+        const resp = await shopifyFetch(url);
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to fetch products", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Extract next page cursor from Link header
+        const linkHeader = resp.headers.get("link") || "";
+        const nextMatch = linkHeader.match(/page_info=([^>&]+)>;\s*rel="next"/);
+        const nextPageInfo = nextMatch ? nextMatch[1] : null;
+        result = { products: data.products || [], nextPageInfo };
+        break;
+      }
+
+      case "set_metafields": {
+        if (!body.metafields || body.metafields.length === 0) {
+          return new Response(JSON.stringify({ error: "Missing metafields" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Use GraphQL metafieldsSet mutation
+        const graphqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+        const mutation = `
+          mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+              metafields { key namespace value ownerId }
+              userErrors { field message code }
+            }
+          }
+        `;
+        const gqlResp = await fetch(graphqlUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": access_token,
+          },
+          body: JSON.stringify({
+            query: mutation,
+            variables: { metafields: body.metafields },
+          }),
+        });
+        const gqlData = await gqlResp.json();
+        if (gqlData.errors) {
+          return new Response(JSON.stringify({ error: "GraphQL errors", details: gqlData.errors }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const userErrors = gqlData.data?.metafieldsSet?.userErrors || [];
+        if (userErrors.length > 0) {
+          return new Response(JSON.stringify({ error: userErrors.map((e: any) => e.message).join(", "), details: userErrors }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { metafields: gqlData.data?.metafieldsSet?.metafields || [], success: true };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

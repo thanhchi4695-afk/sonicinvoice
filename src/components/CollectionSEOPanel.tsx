@@ -475,6 +475,22 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
                     }}>
                       <Copy className="w-3 h-3" /> Copy All HTML
                     </Button>
+                    {col.shopifyId && col.shopifyType && (
+                      <Button
+                        size="sm"
+                        className="flex-1 h-7 text-xs gap-1"
+                        onClick={() => pushSEOToShopify(col.id)}
+                        disabled={pushing === col.id || pushed.has(col.id)}
+                      >
+                        {pushed.has(col.id) ? (
+                          <><Check className="w-3 h-3" /> Pushed</>
+                        ) : pushing === col.id ? (
+                          <><Loader2 className="w-3 h-3 animate-spin" /> Pushing</>
+                        ) : (
+                          <><Upload className="w-3 h-3" /> Push to Shopify</>
+                        )}
+                      </Button>
+                    )}
                     <Button size="sm" variant="destructive" className="h-7 text-xs px-3" onClick={() => removeCollection(col.id)}>
                       Remove
                     </Button>

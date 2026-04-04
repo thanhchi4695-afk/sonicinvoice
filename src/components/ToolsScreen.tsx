@@ -8,6 +8,7 @@ import ExportCollections from "@/components/ExportCollections";
 import ImportCollections from "@/components/ImportCollections";
 import AutoCollectionBuilder from "@/components/AutoCollectionBuilder";
 import CollectionSEOPanel from "@/components/CollectionSEOPanel";
+import AIFeedOptimisation from "@/components/AIFeedOptimisation";
 import { getStoreConfig, getIndustryConfig, getIndustryList } from "@/lib/prompt-builder";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";

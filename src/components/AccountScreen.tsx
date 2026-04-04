@@ -279,6 +279,9 @@ const AccountScreen = () => {
         )}
       </Section>
 
+      {/* Connected Shopify Stores (Custom App tokens) */}
+      <DirectStoresSection />
+
       {/* Price Intelligence API Keys */}
       <ApiKeysSection />
 

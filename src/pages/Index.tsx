@@ -42,6 +42,7 @@ import CompetitorIntelFlow from "@/components/CompetitorIntelFlow";
 import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import GeoAgenticFlow from "@/components/GeoAgenticFlow";
 import OrganicSEOFlow from "@/components/OrganicSEOFlow";
+import MarginProtectionPanel from "@/components/MarginProtectionPanel";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";

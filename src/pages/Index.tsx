@@ -264,6 +264,7 @@ const Index = () => {
           onStartPerformance={() => setActiveFlow("performance")}
           onStartFeedOptimise={() => setActiveFlow("feed_optimise")}
           onStartFeedHealth={() => setActiveFlow("feed_health")}
+          onStartGoogleColour={() => setActiveFlow("google_colour")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

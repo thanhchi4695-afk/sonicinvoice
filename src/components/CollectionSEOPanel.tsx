@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { ChevronLeft, Sparkles, RefreshCw, Check, Copy, Search, Globe, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { ChevronLeft, Sparkles, RefreshCw, Check, Copy, Search, Globe, ChevronDown, ChevronUp, ExternalLink, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoreConfig } from "@/lib/prompt-builder";
+import { getCustomCollections, getSmartCollections, updateCollectionSEO, type ShopifyCollection } from "@/lib/shopify-api";
 import { toast } from "sonner";
 
 interface CollectionSEOResult {
@@ -20,6 +21,8 @@ interface CollectionSEOResult {
 
 interface CollectionInput {
   id: string;
+  shopifyId?: number;
+  shopifyType?: "custom" | "smart";
   title: string;
   collection_type: string;
   products: { title: string }[];
@@ -36,6 +39,10 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [manualTitle, setManualTitle] = useState("");
+  const [pushing, setPushing] = useState<string | null>(null);
+  const [pushed, setPushed] = useState<Set<string>>(new Set());
+  const [pushingAll, setPushingAll] = useState(false);
+  const [pushProgress, setPushProgress] = useState({ done: 0, total: 0 });
 
   // Load collections from localStorage (same source as AutoCollectionBuilder)
   const loadFromLocal = () => {
@@ -102,6 +109,94 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
       vendor: "",
     }]);
     setManualTitle("");
+  };
+
+  const loadFromShopify = async () => {
+    setLoading(true);
+    try {
+      const [custom, smart] = await Promise.all([getCustomCollections(), getSmartCollections()]);
+      const mapped: CollectionInput[] = [
+        ...custom.map(c => ({
+          id: `shopify-custom-${c.id}`,
+          shopifyId: c.id,
+          shopifyType: "custom" as const,
+          title: c.title,
+          collection_type: "custom",
+          products: [] as { title: string }[],
+          tags: "",
+          vendor: "",
+        })),
+        ...smart.map(c => ({
+          id: `shopify-smart-${c.id}`,
+          shopifyId: c.id,
+          shopifyType: "smart" as const,
+          title: c.title,
+          collection_type: "smart",
+          products: [] as { title: string }[],
+          tags: "",
+          vendor: "",
+        })),
+      ];
+      setCollections(mapped);
+      toast.success(`Loaded ${mapped.length} collections from Shopify`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to load collections from Shopify");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pushSEOToShopify = async (colId: string) => {
+    const col = collections.find(c => c.id === colId);
+    const result = results.get(colId);
+    if (!col || !result || !col.shopifyId || !col.shopifyType) {
+      toast.error("This collection must be loaded from Shopify to push SEO");
+      return;
+    }
+    setPushing(colId);
+    try {
+      const bodyHtml = `${result.intro_text}\n\n${result.seo_content}`;
+      await updateCollectionSEO(col.shopifyId, col.shopifyType, {
+        body_html: bodyHtml,
+        meta_title: result.meta_title,
+        meta_description: result.meta_description,
+      });
+      setPushed(prev => new Set(prev).add(colId));
+      toast.success(`SEO pushed for "${col.title}"`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to push SEO");
+    } finally {
+      setPushing(null);
+    }
+  };
+
+  const pushAllToShopify = async () => {
+    const pushable = collections.filter(c => c.shopifyId && c.shopifyType && results.has(c.id) && !pushed.has(c.id));
+    if (pushable.length === 0) {
+      toast.error("No collections to push. Load from Shopify and generate SEO first.");
+      return;
+    }
+    setPushingAll(true);
+    setPushProgress({ done: 0, total: pushable.length });
+    for (let i = 0; i < pushable.length; i++) {
+      const col = pushable[i];
+      const result = results.get(col.id)!;
+      try {
+        const bodyHtml = `${result.intro_text}\n\n${result.seo_content}`;
+        await updateCollectionSEO(col.shopifyId!, col.shopifyType!, {
+          body_html: bodyHtml,
+          meta_title: result.meta_title,
+          meta_description: result.meta_description,
+        });
+        setPushed(prev => new Set(prev).add(col.id));
+      } catch (e: any) {
+        console.error(`Failed to push SEO for ${col.title}:`, e);
+      }
+      setPushProgress({ done: i + 1, total: pushable.length });
+      if (i < pushable.length - 1) await new Promise(r => setTimeout(r, 500));
+    }
+    setPushingAll(false);
+    toast.success("SEO pushed to all collections");
   };
 
   const generateSEO = async () => {
@@ -199,9 +294,15 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
 
       {/* Load & Add */}
       <div className="space-y-2 mb-4">
-        <Button variant="outline" size="sm" className="w-full gap-2" onClick={loadFromLocal}>
-          <Search className="w-3.5 h-3.5" /> Load collections from products
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={loadFromLocal}>
+            <Search className="w-3.5 h-3.5" /> From products
+          </Button>
+          <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={loadFromShopify} disabled={loading}>
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+            From Shopify
+          </Button>
+        </div>
         <div className="flex gap-2">
           <input
             value={manualTitle}
@@ -226,6 +327,22 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
             <><RefreshCw className="w-4 h-4 animate-spin" /> Generating {progress.done}/{progress.total}</>
           ) : (
             <><Sparkles className="w-4 h-4" /> Generate SEO for all collections</>
+          )}
+        </Button>
+      )}
+
+      {/* Push All to Shopify */}
+      {results.size > 0 && collections.some(c => c.shopifyId) && (
+        <Button
+          variant="default"
+          className="w-full mb-4 gap-2"
+          onClick={pushAllToShopify}
+          disabled={pushingAll || generating}
+        >
+          {pushingAll ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Pushing {pushProgress.done}/{pushProgress.total}</>
+          ) : (
+            <><Upload className="w-4 h-4" /> Push SEO to Shopify ({results.size} collections)</>
           )}
         </Button>
       )}
@@ -358,6 +475,22 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
                     }}>
                       <Copy className="w-3 h-3" /> Copy All HTML
                     </Button>
+                    {col.shopifyId && col.shopifyType && (
+                      <Button
+                        size="sm"
+                        className="flex-1 h-7 text-xs gap-1"
+                        onClick={() => pushSEOToShopify(col.id)}
+                        disabled={pushing === col.id || pushed.has(col.id)}
+                      >
+                        {pushed.has(col.id) ? (
+                          <><Check className="w-3 h-3" /> Pushed</>
+                        ) : pushing === col.id ? (
+                          <><Loader2 className="w-3 h-3 animate-spin" /> Pushing</>
+                        ) : (
+                          <><Upload className="w-3 h-3" /> Push to Shopify</>
+                        )}
+                      </Button>
+                    )}
                     <Button size="sm" variant="destructive" className="h-7 text-xs px-3" onClick={() => removeCollection(col.id)}>
                       Remove
                     </Button>

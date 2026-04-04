@@ -7,7 +7,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant
@@ -23,6 +23,11 @@ interface ShopifyRequestBody {
   // For collection operations
   collection?: Record<string, unknown>;
   collection_id?: number;
+  // For update_collection_seo
+  collection_type?: string;
+  body_html?: string;
+  meta_title?: string;
+  meta_description?: string;
 }
 
 Deno.serve(async (req) => {
@@ -500,6 +505,35 @@ Deno.serve(async (req) => {
           });
         }
         result = { collection: data.smart_collection };
+        break;
+      }
+
+      case "update_collection_seo": {
+        if (!body.collection_id) {
+          return new Response(JSON.stringify({ error: "Missing collection_id" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const isCustom = body.collection_type !== "smart";
+        const endpoint = isCustom
+          ? `/custom_collections/${body.collection_id}.json`
+          : `/smart_collections/${body.collection_id}.json`;
+        const key = isCustom ? "custom_collection" : "smart_collection";
+        const payload: Record<string, unknown> = { id: body.collection_id };
+        if (body.body_html !== undefined) payload.body_html = body.body_html;
+        if (body.meta_title !== undefined) payload.metafields_global_title_tag = body.meta_title;
+        if (body.meta_description !== undefined) payload.metafields_global_description_tag = body.meta_description;
+        const resp = await shopifyFetch(endpoint, {
+          method: "PUT",
+          body: JSON.stringify({ [key]: payload }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to update collection SEO", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: data[key] };
         break;
       }
 

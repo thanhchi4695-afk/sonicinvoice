@@ -249,3 +249,17 @@ export async function updateSmartCollection(collectionId: number, collection: Re
   const data = await callProxy({ action: "update_smart_collection", collection_id: collectionId, collection });
   return data.collection;
 }
+
+export async function updateCollectionSEO(
+  collectionId: number,
+  collectionType: "custom" | "smart",
+  seo: { body_html?: string; meta_title?: string; meta_description?: string }
+): Promise<ShopifyCollection> {
+  const data = await callProxy({
+    action: "update_collection_seo",
+    collection_id: collectionId,
+    collection_type: collectionType === "smart" ? "smart" : "custom",
+    ...seo,
+  });
+  return data.collection;
+}

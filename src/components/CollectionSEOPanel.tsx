@@ -331,6 +331,22 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
         </Button>
       )}
 
+      {/* Push All to Shopify */}
+      {results.size > 0 && collections.some(c => c.shopifyId) && (
+        <Button
+          variant="default"
+          className="w-full mb-4 gap-2"
+          onClick={pushAllToShopify}
+          disabled={pushingAll || generating}
+        >
+          {pushingAll ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Pushing {pushProgress.done}/{pushProgress.total}</>
+          ) : (
+            <><Upload className="w-4 h-4" /> Push SEO to Shopify ({results.size} collections)</>
+          )}
+        </Button>
+      )}
+
       {/* Collection list */}
       <div className="space-y-2">
         {collections.map(col => {

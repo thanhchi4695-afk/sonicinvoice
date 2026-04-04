@@ -285,6 +285,7 @@ const Index = () => {
           onStartCollectionSEO={() => setActiveFlow("collection_seo")}
           onStartGeoAgentic={() => setActiveFlow("geo_agentic")}
           onStartOrganicSEO={() => setActiveFlow("organic_seo")}
+          onStartMarginProtection={() => setActiveFlow("margin_protection")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

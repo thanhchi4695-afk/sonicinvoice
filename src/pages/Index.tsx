@@ -270,6 +270,7 @@ const Index = () => {
           onStartFeedHealth={() => setActiveFlow("feed_health")}
           onStartGoogleColour={() => setActiveFlow("google_colour")}
           onStartGoogleAds={() => setActiveFlow("google_ads")}
+          onStartStyleGrouping={() => setActiveFlow("style_grouping")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

@@ -34,9 +34,10 @@ interface HomeScreenProps {
   onStartCompetitorIntel?: () => void;
   onStartCollectionSEO?: () => void;
   onStartGeoAgentic?: () => void;
+  onStartOrganicSEO?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -458,6 +459,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </div>
         <Button className="w-full mt-4 h-12 text-base bg-gradient-to-r from-primary to-accent text-primary-foreground" onClick={onStartGeoAgentic}>
           Optimise <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Organic SEO Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <span className="text-lg">📈</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Organic SEO</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Build topical authority. Generate blog posts that rank on Google and drive free traffic to your products.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">topic maps · blog posts · internal links · gap analysis</p>
+          </div>
+        </div>
+        <Button className="w-full mt-4 h-12 text-base bg-primary text-primary-foreground" onClick={onStartOrganicSEO}>
+          Build topic map <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
 

@@ -39,6 +39,10 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [manualTitle, setManualTitle] = useState("");
+  const [pushing, setPushing] = useState<string | null>(null);
+  const [pushed, setPushed] = useState<Set<string>>(new Set());
+  const [pushingAll, setPushingAll] = useState(false);
+  const [pushProgress, setPushProgress] = useState({ done: 0, total: 0 });
 
   // Load collections from localStorage (same source as AutoCollectionBuilder)
   const loadFromLocal = () => {

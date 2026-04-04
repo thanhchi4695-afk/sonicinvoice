@@ -28,6 +28,12 @@ interface ShopifyRequestBody {
   body_html?: string;
   meta_title?: string;
   meta_description?: string;
+  // For get_products_page
+  page_info?: string;
+  limit?: number;
+  fields?: string;
+  // For set_metafields
+  metafields?: Array<{ ownerId: string; namespace: string; key: string; value: string; type: string }>;
 }
 
 Deno.serve(async (req) => {

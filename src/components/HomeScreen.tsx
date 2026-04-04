@@ -442,6 +442,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* GEO & Agentic Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <span className="text-lg">🤖</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">GEO & Agentic</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Get cited by AI. Get bought by AI agents. Optimise for ChatGPT, Perplexity, Google AI Mode, and UCP agentic commerce.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">answer capsules · schema · UCP · visibility</p>
+          </div>
+        </div>
+        <Button className="w-full mt-4 h-12 text-base bg-gradient-to-r from-primary to-accent text-primary-foreground" onClick={onStartGeoAgentic}>
+          Optimise <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
       {/* Competitor Intel Card */}
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">

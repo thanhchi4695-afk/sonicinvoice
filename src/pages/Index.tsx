@@ -231,6 +231,7 @@ const Index = () => {
       case "performance": return <PerformanceDashboard onBack={() => setActiveFlow(null)} />;
       case "feed_optimise": return <AIFeedOptimisation onBack={() => setActiveFlow(null)} />;
       case "feed_health": return <FeedHealthPanel onBack={() => setActiveFlow(null)} />;
+      case "google_colour": return <GoogleColourFlow onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

@@ -273,6 +273,7 @@ const Index = () => {
           onStartGoogleColour={() => setActiveFlow("google_colour")}
           onStartGoogleAds={() => setActiveFlow("google_ads")}
           onStartStyleGrouping={() => setActiveFlow("style_grouping")}
+          onStartCompetitorIntel={() => setActiveFlow("competitor_intel")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

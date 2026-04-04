@@ -541,7 +541,7 @@ const StyleGroupingFlow = ({ onBack }: StyleGroupingFlowProps) => {
                 )}
 
                 {group.confidence === "low" && !group.confirmed && (
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                  <p className="text-[10px] text-destructive">
                     ⚠ Low confidence — verify these are the same style before confirming
                   </p>
                 )}

@@ -235,6 +235,7 @@ const Index = () => {
       case "feed_health": return <FeedHealthPanel onBack={() => setActiveFlow(null)} />;
       case "google_colour": return <GoogleColourFlow onBack={() => setActiveFlow(null)} />;
       case "google_ads": return <GoogleAdsFlow onBack={() => setActiveFlow(null)} />;
+      case "style_grouping": return <StyleGroupingFlow onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

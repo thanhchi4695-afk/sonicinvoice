@@ -39,6 +39,7 @@ import GoogleColourFlow from "@/components/GoogleColourFlow";
 import GoogleAdsFlow from "@/components/GoogleAdsFlow";
 import StyleGroupingFlow from "@/components/StyleGroupingFlow";
 import CompetitorIntelFlow from "@/components/CompetitorIntelFlow";
+import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";

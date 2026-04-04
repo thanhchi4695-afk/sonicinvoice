@@ -261,6 +261,7 @@ const Index = () => {
           onStartScanMode={() => setActiveFlow("scan_mode")}
           onStartPerformance={() => setActiveFlow("performance")}
           onStartFeedOptimise={() => setActiveFlow("feed_optimise")}
+          onStartFeedHealth={() => setActiveFlow("feed_health")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

@@ -243,6 +243,7 @@ const Index = () => {
       case "competitor_intel": return <CompetitorIntelFlow onBack={() => setActiveFlow(null)} />;
       case "collection_seo": return <CollectionSEOFlow onBack={() => setActiveFlow(null)} />;
       case "geo_agentic": return <GeoAgenticFlow onBack={() => setActiveFlow(null)} />;
+      case "organic_seo": return <OrganicSEOFlow onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

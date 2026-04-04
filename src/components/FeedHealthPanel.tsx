@@ -219,6 +219,23 @@ export default function FeedHealthPanel({ onBack }: { onBack: () => void }) {
           </ol>
         </div>
 
+        {/* Connected store indicator */}
+        {directStore ? (
+          <div className="bg-success/10 border border-success/20 rounded-lg p-3 mb-4 flex items-center gap-2">
+            <Store className="w-4 h-4 text-success" />
+            <div>
+              <p className="text-xs font-medium text-success">{directStore.storeName}</p>
+              <p className="text-[10px] text-muted-foreground">{directStore.storeUrl} · {directStore.productCount} products</p>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-secondary/10 border border-secondary/20 rounded-lg p-3 mb-4">
+            <p className="text-xs text-muted-foreground">
+              <span className="font-semibold text-secondary">No store connected.</span> Go to Account → Connected Shopify stores to connect one, or use the OAuth connection.
+            </p>
+          </div>
+        )}
+
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4">
           <p className="text-xs text-muted-foreground">
             <span className="font-semibold text-primary">Why this matters:</span> Google requires gender, age_group, and color for apparel products.

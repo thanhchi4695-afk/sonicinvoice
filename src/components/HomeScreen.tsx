@@ -28,6 +28,7 @@ interface HomeScreenProps {
   onStartPerformance?: () => void;
   onStartFeedOptimise?: () => void;
   onStartFeedHealth?: () => void;
+  onStartGoogleColour?: () => void;
 }
 
 const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth }: HomeScreenProps) => {

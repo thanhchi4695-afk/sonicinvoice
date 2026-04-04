@@ -227,6 +227,7 @@ const Index = () => {
       case "lightspeed_convert": return <LightspeedConverter onBack={() => setActiveFlow(null)} />;
       case "scan_mode": return <ScanMode onBack={() => setActiveFlow(null)} />;
       case "performance": return <PerformanceDashboard onBack={() => setActiveFlow(null)} />;
+      case "feed_optimise": return <AIFeedOptimisation onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

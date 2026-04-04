@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard, Store } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   getDirectStores, saveDirectStore, removeDirectStore, setActiveStore,
   normalizeStoreUrl, type DirectStore,
 } from "@/lib/shopify-direct";
-import { supabase } from "@/integrations/supabase/client";
-import { Input } from "@/components/ui/input";
-import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { getCollectionRules, saveCollectionRules, resetCollectionRules, type CollectionRule } from "@/lib/collection-engine";
 import {
   saveConnection, testConnection, getConnection, deleteConnection,

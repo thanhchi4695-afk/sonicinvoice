@@ -1,6 +1,9 @@
 // Edge function that proxies Shopify Admin API calls using a Custom App token
 // The token is sent per-request from the client (stored in their localStorage)
-import { corsHeaders } from "@supabase/supabase-js/cors";
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
 
 const API_VERSION = "2024-01";
 

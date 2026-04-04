@@ -23,6 +23,11 @@ interface ShopifyRequestBody {
   // For collection operations
   collection?: Record<string, unknown>;
   collection_id?: number;
+  // For update_collection_seo
+  collection_type?: string;
+  body_html?: string;
+  meta_title?: string;
+  meta_description?: string;
 }
 
 Deno.serve(async (req) => {

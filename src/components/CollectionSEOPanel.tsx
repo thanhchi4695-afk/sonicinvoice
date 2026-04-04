@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { ChevronLeft, Sparkles, RefreshCw, Check, Copy, Search, Globe, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { ChevronLeft, Sparkles, RefreshCw, Check, Copy, Search, Globe, ChevronDown, ChevronUp, ExternalLink, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoreConfig } from "@/lib/prompt-builder";
+import { getCustomCollections, getSmartCollections, updateCollectionSEO, type ShopifyCollection } from "@/lib/shopify-api";
 import { toast } from "sonner";
 
 interface CollectionSEOResult {
@@ -20,6 +21,8 @@ interface CollectionSEOResult {
 
 interface CollectionInput {
   id: string;
+  shopifyId?: number;
+  shopifyType?: "custom" | "smart";
   title: string;
   collection_type: string;
   products: { title: string }[];

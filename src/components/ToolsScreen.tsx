@@ -995,6 +995,7 @@ const ToolsScreen = () => {
   if (activeTool === "auto_collections") return <AutoCollectionBuilder onBack={() => setActiveTool(null)} />;
   if (activeTool === "collection_seo") return <CollectionSEOPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "feed_optimise") return <AIFeedOptimisation onBack={() => setActiveTool(null)} />;
+  if (activeTool === "feed_health") return <FeedHealthPanel onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

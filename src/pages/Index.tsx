@@ -34,6 +34,7 @@ import GoogleAdsSetupWizard from "@/components/GoogleAdsSetupWizard";
 import MetaAdsSetupWizard from "@/components/MetaAdsSetupWizard";
 import PerformanceDashboard from "@/components/PerformanceDashboard";
 import AIFeedOptimisation from "@/components/AIFeedOptimisation";
+import FeedHealthPanel from "@/components/FeedHealthPanel";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";

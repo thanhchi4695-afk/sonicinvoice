@@ -229,6 +229,7 @@ const Index = () => {
       case "scan_mode": return <ScanMode onBack={() => setActiveFlow(null)} />;
       case "performance": return <PerformanceDashboard onBack={() => setActiveFlow(null)} />;
       case "feed_optimise": return <AIFeedOptimisation onBack={() => setActiveFlow(null)} />;
+      case "feed_health": return <FeedHealthPanel onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

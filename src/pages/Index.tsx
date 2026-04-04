@@ -37,6 +37,7 @@ import AIFeedOptimisation from "@/components/AIFeedOptimisation";
 import FeedHealthPanel from "@/components/FeedHealthPanel";
 import GoogleColourFlow from "@/components/GoogleColourFlow";
 import GoogleAdsFlow from "@/components/GoogleAdsFlow";
+import StyleGroupingFlow from "@/components/StyleGroupingFlow";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -50,7 +51,7 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
@@ -234,6 +235,7 @@ const Index = () => {
       case "feed_health": return <FeedHealthPanel onBack={() => setActiveFlow(null)} />;
       case "google_colour": return <GoogleColourFlow onBack={() => setActiveFlow(null)} />;
       case "google_ads": return <GoogleAdsFlow onBack={() => setActiveFlow(null)} />;
+      case "style_grouping": return <StyleGroupingFlow onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };
@@ -268,6 +270,7 @@ const Index = () => {
           onStartFeedHealth={() => setActiveFlow("feed_health")}
           onStartGoogleColour={() => setActiveFlow("google_colour")}
           onStartGoogleAds={() => setActiveFlow("google_ads")}
+          onStartStyleGrouping={() => setActiveFlow("style_grouping")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

@@ -30,9 +30,10 @@ interface HomeScreenProps {
   onStartFeedHealth?: () => void;
   onStartGoogleColour?: () => void;
   onStartGoogleAds?: () => void;
+  onStartStyleGrouping?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -397,6 +398,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </div>
         <Button variant="outline" className="w-full mt-4 h-12 text-base border-destructive/30 text-destructive hover:bg-destructive/10" onClick={onStartGoogleAds}>
           Fix ads <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Style Grouping Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
+            <span className="text-lg">🎨</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Style grouping</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Link same-style products so customers can switch between colours on the product page.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">related_products · colour_label · Matrixify CSV</p>
+          </div>
+        </div>
+        <Button variant="secondary" className="w-full mt-4 h-12 text-base" onClick={onStartStyleGrouping}>
+          Group styles <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
 

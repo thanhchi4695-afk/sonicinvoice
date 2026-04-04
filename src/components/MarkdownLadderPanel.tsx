@@ -170,7 +170,7 @@ const MarkdownLadderPanel = ({ onBack }: MarkdownLadderPanelProps) => {
   const checkStageMarginSafety = (stage: LadderStage, price: number, cost: number | null) => {
     if (!cost || cost <= 0) return { safe: true, maxDiscount: 100, reason: "No cost data" };
     const salePrice = price * (1 - stage.discountPercent / 100);
-    const result = checkMargin(salePrice, cost, "invoice");
+    const result = checkMargin(salePrice, { cost, source: "invoice" });
     const settings = getMarginSettings();
     const maxSafeDiscount = Math.floor((1 - (cost / (1 - settings.globalMinMargin / 100)) / price) * 100);
     return {

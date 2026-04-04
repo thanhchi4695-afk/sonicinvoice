@@ -42,6 +42,7 @@ const tools = [
   { id: "auto_collections", icon: Sparkles, label: "Auto collections AI", desc: "AI-generate smart collections from products", color: "text-primary" },
   { id: "collection_seo", icon: Globe, label: "Collection SEO AI", desc: "SEO-optimize collections for Google rankings", color: "text-success" },
   { id: "feed_optimise", icon: Sparkles, label: "AI Feed Optimisation", desc: "Generate Google Shopping product_detail attributes", color: "text-primary" },
+  { id: "feed_health", icon: Globe, label: "Google Feed Health", desc: "Fix gender, age_group, color — push to Shopify", color: "text-success" },
 ];
 
 const quickInserts = [

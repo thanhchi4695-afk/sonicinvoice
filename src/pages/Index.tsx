@@ -282,6 +282,7 @@ const Index = () => {
           onStartCompetitorIntel={() => setActiveFlow("competitor_intel")}
           onStartCollectionSEO={() => setActiveFlow("collection_seo")}
           onStartGeoAgentic={() => setActiveFlow("geo_agentic")}
+          onStartOrganicSEO={() => setActiveFlow("organic_seo")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

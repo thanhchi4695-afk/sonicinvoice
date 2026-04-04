@@ -401,7 +401,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* Style Grouping Card */}
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
+            <span className="text-lg">🎨</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Style grouping</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Link same-style products so customers can switch between colours on the product page.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">related_products · colour_label · Matrixify CSV</p>
+          </div>
+        </div>
+        <Button variant="secondary" className="w-full mt-4 h-12 text-base" onClick={onStartStyleGrouping}>
+          Group styles <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
             <Sparkles className="w-5 h-5 text-primary" />

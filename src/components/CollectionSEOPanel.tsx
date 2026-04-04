@@ -294,9 +294,15 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
 
       {/* Load & Add */}
       <div className="space-y-2 mb-4">
-        <Button variant="outline" size="sm" className="w-full gap-2" onClick={loadFromLocal}>
-          <Search className="w-3.5 h-3.5" /> Load collections from products
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={loadFromLocal}>
+            <Search className="w-3.5 h-3.5" /> From products
+          </Button>
+          <Button variant="outline" size="sm" className="flex-1 gap-2" onClick={loadFromShopify} disabled={loading}>
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+            From Shopify
+          </Button>
+        </div>
         <div className="flex gap-2">
           <input
             value={manualTitle}

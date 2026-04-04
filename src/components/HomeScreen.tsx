@@ -36,9 +36,10 @@ interface HomeScreenProps {
   onStartGeoAgentic?: () => void;
   onStartOrganicSEO?: () => void;
   onStartMarginProtection?: () => void;
+  onStartMarkdownLadder?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -501,7 +502,24 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
-      {/* Competitor Intel Card */}
+      {/* Markdown Ladder Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-warning/15 flex items-center justify-center shrink-0">
+            <span className="text-lg">📉</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Markdown Ladders</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Automatically reduce prices over time for slow-moving stock. Staged discounts with margin protection.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">staged discounts · dead stock · auto-pricing</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base border-warning/30 text-warning hover:bg-warning/10" onClick={onStartMarkdownLadder}>
+          Manage ladders <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">

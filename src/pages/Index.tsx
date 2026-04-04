@@ -288,6 +288,7 @@ const Index = () => {
           onStartGeoAgentic={() => setActiveFlow("geo_agentic")}
           onStartOrganicSEO={() => setActiveFlow("organic_seo")}
           onStartMarginProtection={() => setActiveFlow("margin_protection")}
+          onStartMarkdownLadder={() => setActiveFlow("markdown_ladder")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

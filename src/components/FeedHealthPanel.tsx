@@ -31,6 +31,25 @@ export default function FeedHealthPanel({ onBack }: { onBack: () => void }) {
   const [detailRow, setDetailRow] = useState<FeedHealthRow | null>(null);
   const [editField, setEditField] = useState<{ id: string; field: string } | null>(null);
 
+  const directStore = getActiveDirectStore();
+
+  // Helper to call the appropriate proxy
+  const callProxy = async (body: Record<string, unknown>) => {
+    if (directStore) {
+      const { data, error } = await supabase.functions.invoke("shopify-direct-proxy", {
+        body: { store_url: directStore.storeUrl, token: directStore.token, ...body },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      return data;
+    }
+    // Fallback to OAuth proxy
+    const { data, error } = await supabase.functions.invoke("shopify-proxy", { body });
+    if (error) throw new Error(error.message);
+    if (data?.error) throw new Error(data.error);
+    return data;
+  };
+
   // ── SCAN ──────────────────────────────────────
   const startScan = async () => {
     setStep("scanning");
@@ -43,16 +62,11 @@ export default function FeedHealthPanel({ onBack }: { onBack: () => void }) {
 
     try {
       do {
-        const { data, error } = await supabase.functions.invoke("shopify-proxy", {
-          body: {
-            action: "get_products_page",
-            limit: 250,
-            page_info: pageInfo || undefined,
-          },
+        const data = await callProxy({
+          action: "get_products_page",
+          limit: 250,
+          page_info: pageInfo || undefined,
         });
-
-        if (error) throw new Error(error.message);
-        if (data?.error) throw new Error(data.error);
 
         const products = (data.products || []).map((raw: any) => {
           const product = parseShopifyProduct(raw);

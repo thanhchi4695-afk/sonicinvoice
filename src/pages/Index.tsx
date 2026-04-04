@@ -237,6 +237,7 @@ const Index = () => {
       case "google_colour": return <GoogleColourFlow onBack={() => setActiveFlow(null)} />;
       case "google_ads": return <GoogleAdsFlow onBack={() => setActiveFlow(null)} />;
       case "style_grouping": return <StyleGroupingFlow onBack={() => setActiveFlow(null)} />;
+      case "competitor_intel": return <CompetitorIntelFlow onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

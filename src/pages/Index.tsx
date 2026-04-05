@@ -44,6 +44,7 @@ import GeoAgenticFlow from "@/components/GeoAgenticFlow";
 import OrganicSEOFlow from "@/components/OrganicSEOFlow";
 import MarginProtectionPanel from "@/components/MarginProtectionPanel";
 import MarkdownLadderPanel from "@/components/MarkdownLadderPanel";
+import StockMonitorPanel from "@/components/StockMonitorPanel";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";

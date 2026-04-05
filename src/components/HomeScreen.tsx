@@ -1,4 +1,4 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList, BookOpen, Mail, Link, Target, ScanLine, Sparkles } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList, BookOpen, Mail, Link, Target, ScanLine, Sparkles, Bell } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
@@ -37,9 +37,10 @@ interface HomeScreenProps {
   onStartOrganicSEO?: () => void;
   onStartMarginProtection?: () => void;
   onStartMarkdownLadder?: () => void;
+  onStartStockMonitor?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -518,6 +519,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </div>
         <Button variant="outline" className="w-full mt-4 h-12 text-base border-warning/30 text-warning hover:bg-warning/10" onClick={onStartMarkdownLadder}>
           Manage ladders <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Stock Monitor Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Bell className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Stock Monitor</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Track ongoing styles in real time. Get alerts when any size drops below your reorder threshold.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">ongoing styles · reorder alerts · size tracking</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base border-primary/30 text-primary hover:bg-primary/10" onClick={onStartStockMonitor}>
+          View alerts <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
       <div className="bg-card rounded-lg border border-border p-5 mb-3">

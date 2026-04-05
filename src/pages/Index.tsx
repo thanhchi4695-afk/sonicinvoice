@@ -291,6 +291,7 @@ const Index = () => {
           onStartOrganicSEO={() => setActiveFlow("organic_seo")}
           onStartMarginProtection={() => setActiveFlow("margin_protection")}
           onStartMarkdownLadder={() => setActiveFlow("markdown_ladder")}
+          onStartStockMonitor={() => setActiveFlow("stock_monitor")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

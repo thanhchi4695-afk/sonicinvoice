@@ -521,6 +521,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
           Manage ladders <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
+
+      {/* Stock Monitor Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Bell className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Stock Monitor</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Track ongoing styles in real time. Get alerts when any size drops below your reorder threshold.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">ongoing styles · reorder alerts · size tracking</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base border-primary/30 text-primary hover:bg-primary/10" onClick={onStartStockMonitor}>
+          View alerts <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">

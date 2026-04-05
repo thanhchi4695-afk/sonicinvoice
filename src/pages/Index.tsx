@@ -249,6 +249,7 @@ const Index = () => {
       case "organic_seo": return <OrganicSEOFlow onBack={() => setActiveFlow(null)} />;
       case "margin_protection": return <MarginProtectionPanel onBack={() => setActiveFlow(null)} />;
       case "markdown_ladder": return <MarkdownLadderPanel onBack={() => setActiveFlow(null)} />;
+      case "stock_monitor": return <StockMonitorPanel onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };

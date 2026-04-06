@@ -541,10 +541,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
           View alerts <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
+
+      {/* Social Media Card */}
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">🔎</span>
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <span className="text-lg">📣</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Social Media</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Auto-detect new arrivals, generate AI captions, and schedule posts to Facebook and Instagram.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">AI captions · drag-drop schedule · auto-detect</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base border-primary/30 text-primary hover:bg-primary/10" onClick={onStartSocialMedia}>
+          Manage queue <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold font-display">Competitor Intel</h2>

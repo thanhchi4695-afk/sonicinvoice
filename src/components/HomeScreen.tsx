@@ -560,6 +560,10 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
           Manage queue <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
+            <span className="text-lg">🔎</span>
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold font-display">Competitor Intel</h2>

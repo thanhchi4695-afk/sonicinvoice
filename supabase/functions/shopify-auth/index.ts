@@ -10,8 +10,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SHOPIFY_API_KEY = Deno.env.get("SHOPIFY_API_KEY")!;
 const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET")!;
 
-const SCOPES = "read_products,write_products,read_inventory,write_inventory";
-const API_VERSION = "2024-10";
+const SCOPES = "read_products,write_products,read_orders,read_inventory,write_inventory";
+const API_VERSION = "2025-01";
 
 function generateNonce(): string {
   const array = new Uint8Array(16);

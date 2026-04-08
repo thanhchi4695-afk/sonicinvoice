@@ -123,7 +123,7 @@ export function calculatePrice(input: PricingInput, rules?: PricingRules): Prici
   }
 
   const cat = getCategoryMarkup(input.productType);
-  let strategies: string[] = [];
+  const strategies: string[] = [];
   let rawPrice: number;
 
   // Step 1: Base price from rules

@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     }
 
     let url = "";
-    let headers: Record<string, string> = {};
+    const headers: Record<string, string> = {};
 
     if (source === "barcodeLookup") {
       if (!barcode) {

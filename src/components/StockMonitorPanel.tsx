@@ -138,8 +138,8 @@ const StockMonitorPanel = ({ onBack }: Props) => {
 
       // Fetch products via proxy
       const tags = settings.ongoingTag.split(",").map(t => t.trim().toLowerCase());
-      let allProducts: MonitoredProduct[] = [];
-      let newAlerts: StockAlert[] = [];
+      const allProducts: MonitoredProduct[] = [];
+      const newAlerts: StockAlert[] = [];
       let page = 1;
       let hasMore = true;
 

@@ -188,10 +188,8 @@ Deno.serve(async (req) => {
       // Clean up nonce
       await supabaseAdmin.from("shopify_oauth_states").delete().eq("user_id", userId);
 
-      // Redirect back to app
-      const appUrl = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/[^/]*$/, "") || "";
-      // Use a well-known redirect page
-      const redirectTarget = appUrl ? `${appUrl}/?shopify_connected=1` : "/?shopify_connected=1";
+      // Redirect back to app using stable APP_URL
+      const redirectTarget = `${APP_URL}/?shopify_connected=1`;
 
       return new Response(null, {
         status: 302,

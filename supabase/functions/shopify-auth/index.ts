@@ -1,5 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -181,9 +185,9 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from("shopify_oauth_states")
         .delete().eq("user_id", "00000000-0000-0000-0000-000000000000");
 
-      // Redirect to app with login token
-      const appUrl = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/[^/]*$/, "") || "";
-      const redirectTarget = appUrl ? `${appUrl}/?shopify_login=${loginToken}` : `/?shopify_login=${loginToken}`;
+      // Redirect to app with login token — always use APP_URL for stable redirects
+      const appUrl = Deno.env.get("APP_URL") || "https://sonicinvoice.lovable.app";
+      const redirectTarget = `${appUrl}/?shopify_login=${loginToken}`;
 
       return new Response(null, { status: 302, headers: { Location: redirectTarget } });
     }

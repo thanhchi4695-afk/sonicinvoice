@@ -74,8 +74,7 @@ RESPOND WITH JSON ONLY, no other text:
       ],
     });
 
-    const data = await response.json();
-    const rawText = data.choices?.[0]?.message?.content || '';
+    const rawText = getContent(data);
     
     // Strip markdown code fences if present
     const clean = rawText

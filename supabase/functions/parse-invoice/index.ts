@@ -108,8 +108,9 @@ Important:
     });
   } catch (error) {
     console.error("Parse invoice error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    const status = error instanceof AIGatewayError ? error.status : 500;
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

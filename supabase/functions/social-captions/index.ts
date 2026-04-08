@@ -125,10 +125,11 @@ Return as valid JSON only:
     });
   } catch (err) {
     console.error("social-captions error:", err);
+    const status = err instanceof AIGatewayError ? err.status : 500;
     return new Response(JSON.stringify({
       error: err instanceof Error ? err.message : "Caption generation failed",
     }), {
-      status: 500,
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

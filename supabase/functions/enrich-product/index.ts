@@ -113,8 +113,9 @@ RESPOND WITH JSON ONLY, no other text:
     }
   } catch (e) {
     console.error("enrich-product error:", e);
+    const status = e instanceof AIGatewayError ? e.status : 500;
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

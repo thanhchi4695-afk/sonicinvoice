@@ -66,38 +66,13 @@ RESPOND WITH JSON ONLY, no other text:
   "note": "any issue encountered or empty string"
 }`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "You are a product data enrichment assistant. Always respond with valid JSON only." },
-          { role: "user", content: prompt },
-        ],
-      }),
+    const data = await callAI({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: "You are a product data enrichment assistant. Always respond with valid JSON only." },
+        { role: "user", content: prompt },
+      ],
     });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI enrichment failed" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     const data = await response.json();
     const rawText = data.choices?.[0]?.message?.content || '';

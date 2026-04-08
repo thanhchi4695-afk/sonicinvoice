@@ -82,67 +82,40 @@ HASHTAGS (20-30): Mix brand, product, location, shopping, trending tags. All low
 Return as valid JSON only:
 {"facebook":"...","instagram":"...","youtube":"...","tiktok":"...","hashtags":["#tag1","#tag2"]}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: "You are a retail social media copywriter. Return only valid JSON." },
-          { role: "user", content: prompt },
-        ],
-        tools: [{
-          type: "function",
-          function: {
-            name: "generate_captions",
-            description: "Generate social media captions for a product",
-            parameters: {
-              type: "object",
-              properties: {
-                facebook: { type: "string", description: "Facebook caption 100-200 words" },
-                instagram: { type: "string", description: "Instagram caption 50-100 words" },
-                youtube: { type: "string", description: "YouTube short title max 100 chars" },
-                tiktok: { type: "string", description: "TikTok caption 30-60 words" },
-                hashtags: { type: "array", items: { type: "string" }, description: "20-30 hashtags" },
-              },
-              required: ["facebook", "instagram", "youtube", "tiktok", "hashtags"],
-              additionalProperties: false,
+    const data = await callAI({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: "You are a retail social media copywriter. Return only valid JSON." },
+        { role: "user", content: prompt },
+      ],
+      tools: [{
+        type: "function",
+        function: {
+          name: "generate_captions",
+          description: "Generate social media captions for a product",
+          parameters: {
+            type: "object",
+            properties: {
+              facebook: { type: "string", description: "Facebook caption 100-200 words" },
+              instagram: { type: "string", description: "Instagram caption 50-100 words" },
+              youtube: { type: "string", description: "YouTube short title max 100 chars" },
+              tiktok: { type: "string", description: "TikTok caption 30-60 words" },
+              hashtags: { type: "array", items: { type: "string" }, description: "20-30 hashtags" },
             },
+            required: ["facebook", "instagram", "youtube", "tiktok", "hashtags"],
+            additionalProperties: false,
           },
-        }],
-        tool_choice: { type: "function", function: { name: "generate_captions" } },
-      }),
+        },
+      }],
+      tool_choice: { type: "function", function: { name: "generate_captions" } },
     });
 
-    if (!response.ok) {
-      const status = response.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited, please try again later." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errText = await response.text();
-      console.error("AI gateway error:", status, errText);
-      throw new Error("AI gateway error");
-    }
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    const toolArgs = getToolArgs(data);
     let captions;
-
-    if (toolCall?.function?.arguments) {
-      captions = JSON.parse(toolCall.function.arguments);
+    if (toolArgs) {
+      captions = JSON.parse(toolArgs);
     } else {
-      // Fallback: try parsing content directly
-      const raw = data.choices?.[0]?.message?.content || "{}";
+      const raw = getContent(data) || "{}";
       const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       captions = JSON.parse(cleaned);
     }

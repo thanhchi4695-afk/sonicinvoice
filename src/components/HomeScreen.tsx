@@ -178,6 +178,9 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartPackingSlip}>
           Start <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
+      </div>
+
+      {/* Scan Mode AI Card */}
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">

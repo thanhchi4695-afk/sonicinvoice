@@ -9,6 +9,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SHOPIFY_API_KEY = Deno.env.get("SHOPIFY_API_KEY")!;
 const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET")!;
+const APP_URL = Deno.env.get("APP_URL") || "https://sonicinvoice.lovable.app";
 
 const SCOPES = "read_products,write_products,read_inventory,write_inventory";
 const API_VERSION = "2024-10";

@@ -7,13 +7,12 @@
  *   - customers/redact
  *   - shop/redact
  *
- * HMAC is verified using the raw body + SHOPIFY_API_SECRET
- * before any JSON parsing occurs.
+ * HMAC is verified using RAW BYTES (ArrayBuffer) before any text/JSON parsing.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET")!;
+const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -21,15 +20,12 @@ function getAdminClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 }
 
-// ─── HMAC verification (timing-safe) ────────────────────────────────
-// Shopify signs every webhook with HMAC-SHA256 using your app's API secret.
-// The signature is in X-Shopify-Hmac-Sha256 (base64-encoded).
-// We compare raw HMAC bytes using a constant-time loop to prevent timing attacks.
+// ─── HMAC verification using raw bytes (timing-safe) ─────────────────
 async function verifyShopifyHmac(
-  rawBody: string,
+  rawBytes: Uint8Array,
   hmacHeader: string | null
 ): Promise<boolean> {
-  if (!hmacHeader) return false;
+  if (!hmacHeader || !SHOPIFY_API_SECRET) return false;
 
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -39,10 +35,12 @@ async function verifyShopifyHmac(
     false,
     ["sign"]
   );
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(rawBody));
-  const computed = new Uint8Array(signature);
 
-  // Decode the base64 header into bytes for raw comparison
+  const signature = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, rawBytes)
+  );
+
+  // Decode the base64 header into bytes
   let expected: Uint8Array;
   try {
     const binaryStr = atob(hmacHeader);
@@ -51,95 +49,56 @@ async function verifyShopifyHmac(
       expected[i] = binaryStr.charCodeAt(i);
     }
   } catch {
-    return false; // invalid base64
+    return false;
   }
 
-  // Constant-time comparison on raw bytes
-  if (computed.byteLength !== expected.byteLength) return false;
+  // Constant-time comparison
+  if (signature.byteLength !== expected.byteLength) return false;
   let mismatch = 0;
-  for (let i = 0; i < computed.byteLength; i++) {
-    mismatch |= computed[i] ^ expected[i];
+  for (let i = 0; i < signature.byteLength; i++) {
+    mismatch |= signature[i] ^ expected[i];
   }
   return mismatch === 0;
 }
 
 // ─── Topic handlers ──────────────────────────────────────────────────
 
-/**
- * customers/data_request
- * Shopify sends this when a customer requests their data under GDPR/CCPA.
- *
- * TODO (replace placeholder):
- *   1. Look up all data stored for this customer/shop
- *   2. Export or compile it for manual review / compliance workflow
- *   3. Notify your support/compliance inbox if needed
- */
 async function handleCustomerDataRequest(shop: string, payload: Record<string, unknown>) {
   const customer = payload.customer as Record<string, unknown> | undefined;
-  console.log("Handle customers/data_request", {
-    shop,
-    customerId: customer?.id,
-    ordersRequested: payload.orders_requested,
-  });
-
-  // We don't store customer-specific PII (no emails, addresses, names in our tables).
-  // Our tables are keyed by shop/user_id (merchant), not Shopify customers.
-  // Log the request for audit purposes — no data to export.
-  console.log("customers/data_request: No customer PII stored in our system for shop:", shop);
+  console.log("customers/data_request received", { shop, customerId: customer?.id });
+  // No customer PII stored — nothing to export.
+  console.log("customers/data_request: No customer PII stored for shop:", shop);
 }
 
-/**
- * customers/redact
- * Shopify sends this when a store must redact/delete a customer's data.
- * We don't store customer PII, so this is a no-op with audit logging.
- */
 async function handleCustomerRedact(shop: string, payload: Record<string, unknown>) {
   const customer = payload.customer as Record<string, unknown> | undefined;
-  console.log("Handle customers/redact", {
-    shop,
-    customerId: customer?.id,
-  });
-
-  // No customer-specific data stored — nothing to redact.
-  console.log("customers/redact: No customer PII stored in our system for shop:", shop);
+  console.log("customers/redact received", { shop, customerId: customer?.id });
+  // No customer PII stored — nothing to redact.
+  console.log("customers/redact: No customer PII stored for shop:", shop);
 }
 
-/**
- * shop/redact
- * Shopify sends this 48 hours after a store uninstalls your app.
- * Delete ALL shop-level data: connections, tokens, push history, subscriptions, oauth states.
- */
 async function handleShopRedact(shop: string, _payload: Record<string, unknown>) {
-  console.log("Handle shop/redact — purging all data for shop:", shop);
+  console.log("shop/redact — purging all data for shop:", shop);
 
   const supabase = getAdminClient();
-  const results: Array<{ table: string; error: string | null }> = [];
+  const tables = [
+    { name: "shopify_connections", col: "store_url" },
+    { name: "shopify_push_history", col: "store_url" },
+    { name: "shopify_subscriptions", col: "shop" },
+    { name: "shopify_login_tokens", col: "shop" },
+    { name: "shopify_oauth_states", col: "shop" },
+  ];
 
-  // Delete shopify_connections by store_url
-  const r1 = await supabase.from("shopify_connections").delete().eq("store_url", shop);
-  results.push({ table: "shopify_connections", error: r1.error?.message ?? null });
+  const errors: string[] = [];
+  for (const t of tables) {
+    const { error } = await supabase.from(t.name).delete().eq(t.col, shop);
+    if (error) errors.push(`${t.name}: ${error.message}`);
+  }
 
-  // Delete shopify_push_history by store_url
-  const r2 = await supabase.from("shopify_push_history").delete().eq("store_url", shop);
-  results.push({ table: "shopify_push_history", error: r2.error?.message ?? null });
-
-  // Delete shopify_subscriptions by shop
-  const r3 = await supabase.from("shopify_subscriptions").delete().eq("shop", shop);
-  results.push({ table: "shopify_subscriptions", error: r3.error?.message ?? null });
-
-  // Delete shopify_login_tokens by shop
-  const r4 = await supabase.from("shopify_login_tokens").delete().eq("shop", shop);
-  results.push({ table: "shopify_login_tokens", error: r4.error?.message ?? null });
-
-  // Delete shopify_oauth_states by shop
-  const r5 = await supabase.from("shopify_oauth_states").delete().eq("shop", shop);
-  results.push({ table: "shopify_oauth_states", error: r5.error?.message ?? null });
-
-  const errors = results.filter((r) => r.error);
-  if (errors.length > 0) {
+  if (errors.length) {
     console.error("shop/redact partial failures:", errors);
   } else {
-    console.log("shop/redact: All data purged successfully for shop:", shop);
+    console.log("shop/redact: All data purged for shop:", shop);
   }
 }
 
@@ -148,7 +107,7 @@ async function handleShopRedact(shop: string, _payload: Record<string, unknown>)
 Deno.serve(async (req) => {
   const url = new URL(req.url);
 
-  // Health check endpoint
+  // Health check
   if (req.method === "GET" && url.pathname.endsWith("/health")) {
     return new Response(JSON.stringify({ status: "ok" }), {
       status: 200,
@@ -156,43 +115,42 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Only accept POST for webhook processing
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
-  // Check server config
   if (!SHOPIFY_API_SECRET) {
-    console.error("Missing SHOPIFY_API_SECRET");
+    console.error("SHOPIFY_API_SECRET is not set");
     return new Response("Server misconfigured", { status: 500 });
   }
 
-  // Step 1: Read raw body BEFORE parsing (same as express.raw())
-  const rawBody = await req.text();
+  // Step 1: Read request body as raw ArrayBuffer
+  const rawBytes = new Uint8Array(await req.arrayBuffer());
 
-  // Step 2: Verify HMAC — return 401 if invalid
+  // Step 2: Verify HMAC against raw bytes
   const hmacHeader = req.headers.get("x-shopify-hmac-sha256");
-  const valid = await verifyShopifyHmac(rawBody, hmacHeader);
+  const valid = await verifyShopifyHmac(rawBytes, hmacHeader);
   if (!valid) {
     console.warn("Invalid Shopify webhook HMAC");
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // Step 3: Parse JSON only AFTER HMAC verification passes
+  // Step 3: Only NOW decode to text and parse JSON
+  const decoder = new TextDecoder();
+  const rawText = decoder.decode(rawBytes);
+
   let payload: Record<string, unknown>;
   try {
-    payload = JSON.parse(rawBody);
+    payload = JSON.parse(rawText);
   } catch {
     return new Response("Bad Request", { status: 400 });
   }
 
-  // Step 4: Read topic and shop from Shopify headers
+  // Step 4: Route by topic
   const topic = req.headers.get("x-shopify-topic") || "";
   const shop = req.headers.get("x-shopify-shop-domain") || "";
+  console.log("Privacy webhook:", { topic, shop });
 
-  console.log("Privacy webhook received:", { topic, shop });
-
-  // Step 5: Handle compliance topics
   switch (topic) {
     case "customers/data_request":
       await handleCustomerDataRequest(shop, payload);
@@ -204,11 +162,10 @@ Deno.serve(async (req) => {
       await handleShopRedact(shop, payload);
       break;
     default:
-      console.warn(`Unhandled privacy webhook topic: ${topic}`);
+      console.warn("Unhandled topic:", topic);
       break;
   }
 
-  // Step 6: Respond 200 quickly as required by Shopify
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
     headers: { "Content-Type": "application/json" },

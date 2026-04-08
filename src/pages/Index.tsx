@@ -262,13 +262,15 @@ const Index = () => {
           onStartPackingSlip={() => setActiveFlow("packing_slip")}
         />
       )}
-      {activeTab === "analytics" && <AnalyticsPanel />}
-      {activeTab === "history" && <HistoryScreen />}
-      {activeTab === "tools" && <ToolsScreen />}
-      {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
-      {activeTab === "google_ads" && <AdsGuideTabs />}
-      {activeTab === "help" && <HelpCentre />}
-      {activeTab === "account" && <AccountScreen />}
+      <Suspense fallback={suspenseFallback}>
+        {activeTab === "analytics" && <AnalyticsPanel />}
+        {activeTab === "history" && <HistoryScreen />}
+        {activeTab === "tools" && <ToolsScreen />}
+        {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
+        {activeTab === "google_ads" && <AdsGuideTabs />}
+        {activeTab === "help" && <HelpCentre />}
+        {activeTab === "account" && <AccountScreen />}
+      </Suspense>
     </>
   );
 

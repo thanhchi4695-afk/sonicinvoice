@@ -39,9 +39,10 @@ interface HomeScreenProps {
   onStartMarkdownLadder?: () => void;
   onStartStockMonitor?: () => void;
   onStartSocialMedia?: () => void;
+  onStartInventoryPlanning?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -558,6 +559,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </div>
         <Button variant="outline" className="w-full mt-4 h-12 text-base border-primary/30 text-primary hover:bg-primary/10" onClick={onStartSocialMedia}>
           Manage queue <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Inventory Planning Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <span className="text-lg">🏭</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Inventory planning</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Purchase orders, demand forecasting, stocktakes, and ABC analysis — everything Stocky offered, built into Sonic Invoices.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">POs · forecasting · stocktakes · reports</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base border-primary/30 text-primary hover:bg-primary/10" onClick={onStartInventoryPlanning}>
+          Manage inventory <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
       <div className="bg-card rounded-lg border border-border p-5 mb-3">

@@ -46,6 +46,7 @@ import MarginProtectionPanel from "@/components/MarginProtectionPanel";
 import MarkdownLadderPanel from "@/components/MarkdownLadderPanel";
 import StockMonitorPanel from "@/components/StockMonitorPanel";
 import SocialMediaPanel from "@/components/SocialMediaPanel";
+import InventoryPlanningPanel from "@/components/InventoryPlanningPanel";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -59,7 +60,7 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
@@ -252,6 +253,7 @@ const Index = () => {
       case "markdown_ladder": return <MarkdownLadderPanel onBack={() => setActiveFlow(null)} />;
       case "stock_monitor": return <StockMonitorPanel onBack={() => setActiveFlow(null)} />;
       case "social_media": return <SocialMediaPanel onBack={() => setActiveFlow(null)} />;
+      case "inventory_planning": return <InventoryPlanningPanel onBack={() => setActiveFlow(null)} />;
       default: return null;
     }
   };
@@ -295,6 +297,7 @@ const Index = () => {
           onStartMarkdownLadder={() => setActiveFlow("markdown_ladder")}
           onStartStockMonitor={() => setActiveFlow("stock_monitor")}
           onStartSocialMedia={() => setActiveFlow("social_media")}
+          onStartInventoryPlanning={() => setActiveFlow("inventory_planning")}
         />
       )}
       {activeTab === "analytics" && <AnalyticsPanel />}

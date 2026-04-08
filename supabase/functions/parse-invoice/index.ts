@@ -21,13 +21,7 @@ serve(async (req) => {
       });
     }
 
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "AI API key not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // LOVABLE_API_KEY checked by callAI
 
     const isImage = ["jpg", "jpeg", "png", "webp", "heic"].includes(fileType);
     const isPdf = fileType === "pdf";

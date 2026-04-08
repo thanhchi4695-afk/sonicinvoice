@@ -64,99 +64,44 @@ const Index = () => {
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
-  const { isEmbedded, shop } = useShopifyEmbedded();
+  const { isEmbedded, shop, authState: embeddedAuthState } = useShopifyEmbedded();
 
-  // ── Session management with onAuthStateChange ──
+  // ── Standalone session management (non-embedded only) ──
+  // Embedded auth is handled entirely by ShopifyEmbeddedProvider.
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        setAuthed(true);
-        setAuthLoading(false);
-      } else {
-        // Don't set authed=false if we're in embedded mode (will handle separately)
-        if (!isEmbedded) {
-          setAuthed(false);
-        }
-        setAuthLoading(false);
-      }
+    if (isEmbedded) {
+      // Embedded mode: derive auth state from the provider
+      // No Supabase listener needed here — the provider already set the session.
+      return;
+    }
+
+    // Set up auth state listener FIRST (standalone only)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthed(!!session);
+      setAuthLoading(false);
     });
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setAuthed(true);
-      }
+      if (session) setAuthed(true);
       setAuthLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, [isEmbedded]);
 
-  // ── Embedded mode: authenticate via Shopify session token ──
+  // ── Sync embedded auth state from provider ──
   useEffect(() => {
-    if (!isEmbedded || !shop || authed) return;
-
-    const authenticateEmbedded = async () => {
-      try {
-        // Get session token from App Bridge
-        // @ts-ignore — shopify global is injected by App Bridge CDN
-        const shopify = window.shopify;
-        if (!shopify?.idToken) {
-          console.warn("App Bridge not ready for session token");
-          setAuthLoading(false);
-          return;
-        }
-
-        const sessionToken = await shopify.idToken();
-        if (!sessionToken) {
-          console.warn("No session token available");
-          setAuthLoading(false);
-          return;
-        }
-
-        // Verify session token with our backend
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/shopify-session-verify`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ session_token: sessionToken }),
-          }
-        );
-
-        if (!resp.ok) {
-          const errData = await resp.json().catch(() => ({ error: "Verification failed" }));
-          console.error("Session verify failed:", errData);
-          if (errData.needs_install) {
-            toast.error("Please install the app from the Shopify App Store first");
-          }
-          setAuthLoading(false);
-          return;
-        }
-
-        const result = await resp.json();
-        if (result.access_token && result.refresh_token) {
-          await supabase.auth.setSession({
-            access_token: result.access_token,
-            refresh_token: result.refresh_token,
-          });
-          setAuthed(true);
-          setOnboarded(true);
-          localStorage.setItem("onboarding_complete", "true");
-          addAuditEntry("Login", `Embedded session auth for ${result.shop}`);
-        }
-      } catch (err) {
-        console.error("Embedded auth error:", err);
-      } finally {
-        setAuthLoading(false);
-      }
-    };
-
-    // Wait for App Bridge to load
-    const timer = setTimeout(authenticateEmbedded, 500);
-    return () => clearTimeout(timer);
-  }, [isEmbedded, shop, authed]);
+    if (!isEmbedded) return;
+    if (embeddedAuthState === "authenticated") {
+      setAuthed(true);
+      setOnboarded(true);
+      setAuthLoading(false);
+    } else if (embeddedAuthState === "unauthenticated") {
+      setAuthLoading(false);
+    }
+    // "loading" → keep authLoading true (default)
+  }, [isEmbedded, embeddedAuthState]);
 
   // Handle Shopify OAuth callback redirect (store connection)
   useEffect(() => {
@@ -167,19 +112,20 @@ const Index = () => {
     }
   }, []);
 
-  // Handle Shopify OAuth login callback
+  // Handle Shopify OAuth login callback (standalone Shopify login, not embedded)
   useEffect(() => {
+    if (isEmbedded) return;
     const params = new URLSearchParams(window.location.search);
     const loginToken = params.get("shopify_login");
     if (loginToken) {
       window.history.replaceState({}, "", window.location.pathname);
       exchangeShopifyToken(loginToken)
-        .then(({ shop }) => {
+        .then(({ shop: shopName }) => {
           setAuthed(true);
           setOnboarded(true);
           localStorage.setItem("onboarding_complete", "true");
-          addAuditEntry("Login", `Shopify OAuth login from ${shop}`);
-          toast.success(`Signed in via Shopify (${shop})`);
+          addAuditEntry("Login", `Shopify OAuth login from ${shopName}`);
+          toast.success(`Signed in via Shopify (${shopName})`);
         })
         .catch((err) => {
           console.error("Shopify login failed:", err);
@@ -187,7 +133,7 @@ const Index = () => {
           setAuthLoading(false);
         });
     }
-  }, []);
+  }, [isEmbedded]);
 
   const handleAuth = () => {
     setAuthed(true);

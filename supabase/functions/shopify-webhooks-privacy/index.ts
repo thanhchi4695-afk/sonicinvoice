@@ -2,17 +2,24 @@
  * Shopify Mandatory Compliance Webhooks
  * Required for Shopify App Store approval.
  *
- * Equivalent to the Express route: POST /webhooks/privacy
  * Handles all three compliance topics via X-Shopify-Topic header:
  *   - customers/data_request
  *   - customers/redact
  *   - shop/redact
  *
  * HMAC is verified using the raw body + SHOPIFY_API_SECRET
- * before any JSON parsing occurs (same as express.raw() pattern).
+ * before any JSON parsing occurs.
  */
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+
 const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+function getAdminClient() {
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+}
 
 // ─── HMAC verification (timing-safe) ────────────────────────────────
 // Shopify signs every webhook with HMAC-SHA256 using your app's API secret.
@@ -75,24 +82,16 @@ async function handleCustomerDataRequest(shop: string, payload: Record<string, u
     ordersRequested: payload.orders_requested,
   });
 
-  // Example placeholder:
-  // const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  // await supabase.from("privacy_requests").insert({
-  //   type: "customers/data_request",
-  //   shop,
-  //   customer_id: customer?.id,
-  //   payload,
-  //   status: "pending"
-  // });
+  // We don't store customer-specific PII (no emails, addresses, names in our tables).
+  // Our tables are keyed by shop/user_id (merchant), not Shopify customers.
+  // Log the request for audit purposes — no data to export.
+  console.log("customers/data_request: No customer PII stored in our system for shop:", shop);
 }
 
 /**
  * customers/redact
  * Shopify sends this when a store must redact/delete a customer's data.
- *
- * TODO (replace placeholder):
- *   1. Find all data stored for this customer
- *   2. Delete or anonymize it unless legally required to retain
+ * We don't store customer PII, so this is a no-op with audit logging.
  */
 async function handleCustomerRedact(shop: string, payload: Record<string, unknown>) {
   const customer = payload.customer as Record<string, unknown> | undefined;
@@ -101,29 +100,47 @@ async function handleCustomerRedact(shop: string, payload: Record<string, unknow
     customerId: customer?.id,
   });
 
-  // Example placeholder:
-  // const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  // if (customer?.id) {
-  //   await supabase.from("customer_data").delete()
-  //     .eq("shop", shop).eq("shopify_customer_id", customer.id);
-  // }
+  // No customer-specific data stored — nothing to redact.
+  console.log("customers/redact: No customer PII stored in our system for shop:", shop);
 }
 
 /**
  * shop/redact
  * Shopify sends this 48 hours after a store uninstalls your app.
- *
- * TODO (replace placeholder):
- *   1. Delete shop-level data (tokens, cached files, settings, analytics)
- *   2. Remove all stored data for this shop where legally allowed
+ * Delete ALL shop-level data: connections, tokens, push history, subscriptions, oauth states.
  */
-async function handleShopRedact(shop: string, payload: Record<string, unknown>) {
-  console.log("Handle shop/redact", { shop, payload });
+async function handleShopRedact(shop: string, _payload: Record<string, unknown>) {
+  console.log("Handle shop/redact — purging all data for shop:", shop);
 
-  // Example placeholder:
-  // const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  // await supabase.from("shopify_connections").delete().eq("store_url", shop);
-  // await supabase.from("shopify_push_history").delete().eq("store_url", shop);
+  const supabase = getAdminClient();
+  const results: Array<{ table: string; error: string | null }> = [];
+
+  // Delete shopify_connections by store_url
+  const r1 = await supabase.from("shopify_connections").delete().eq("store_url", shop);
+  results.push({ table: "shopify_connections", error: r1.error?.message ?? null });
+
+  // Delete shopify_push_history by store_url
+  const r2 = await supabase.from("shopify_push_history").delete().eq("store_url", shop);
+  results.push({ table: "shopify_push_history", error: r2.error?.message ?? null });
+
+  // Delete shopify_subscriptions by shop
+  const r3 = await supabase.from("shopify_subscriptions").delete().eq("shop", shop);
+  results.push({ table: "shopify_subscriptions", error: r3.error?.message ?? null });
+
+  // Delete shopify_login_tokens by shop
+  const r4 = await supabase.from("shopify_login_tokens").delete().eq("shop", shop);
+  results.push({ table: "shopify_login_tokens", error: r4.error?.message ?? null });
+
+  // Delete shopify_oauth_states by shop
+  const r5 = await supabase.from("shopify_oauth_states").delete().eq("shop", shop);
+  results.push({ table: "shopify_oauth_states", error: r5.error?.message ?? null });
+
+  const errors = results.filter((r) => r.error);
+  if (errors.length > 0) {
+    console.error("shop/redact partial failures:", errors);
+  } else {
+    console.log("shop/redact: All data purged successfully for shop:", shop);
+  }
 }
 
 // ─── Main handler ────────────────────────────────────────────────────

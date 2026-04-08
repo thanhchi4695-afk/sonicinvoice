@@ -17,7 +17,7 @@ const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET")!;
 // ─── HMAC verification (timing-safe) ────────────────────────────────
 // Shopify signs every webhook with HMAC-SHA256 using your app's API secret.
 // The signature is in X-Shopify-Hmac-Sha256 (base64-encoded).
-// We use constant-time comparison to prevent timing attacks.
+// We compare raw HMAC bytes using a constant-time loop to prevent timing attacks.
 async function verifyShopifyHmac(
   rawBody: string,
   hmacHeader: string | null
@@ -33,14 +33,27 @@ async function verifyShopifyHmac(
     ["sign"]
   );
   const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(rawBody));
-  const computedBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
+  const computed = new Uint8Array(signature);
 
-  // Timing-safe comparison
-  if (computedBase64.length !== hmacHeader.length) return false;
-  const a = encoder.encode(computedBase64);
-  const b = encoder.encode(hmacHeader);
-  if (a.byteLength !== b.byteLength) return false;
-  return crypto.subtle.timingSafeEqual(a, b);
+  // Decode the base64 header into bytes for raw comparison
+  let expected: Uint8Array;
+  try {
+    const binaryStr = atob(hmacHeader);
+    expected = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      expected[i] = binaryStr.charCodeAt(i);
+    }
+  } catch {
+    return false; // invalid base64
+  }
+
+  // Constant-time comparison on raw bytes
+  if (computed.byteLength !== expected.byteLength) return false;
+  let mismatch = 0;
+  for (let i = 0; i < computed.byteLength; i++) {
+    mismatch |= computed[i] ^ expected[i];
+  }
+  return mismatch === 0;
 }
 
 // ─── Topic handlers ──────────────────────────────────────────────────

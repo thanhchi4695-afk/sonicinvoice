@@ -1,0 +1,28 @@
+# Sonic Invoices — Shopify App Configuration
+# https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = ""  # Fill from Shopify Partner Dashboard
+
+name = "Sonic Invoices"
+application_url = "https://sonicinvoice.lovable.app"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,write_products,read_orders,read_inventory,write_inventory"
+
+[auth]
+redirect_urls = [
+  "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-oauth?action=callback",
+  "https://sonicinvoice.lovable.app/auth/callback"
+]
+
+[webhooks]
+api_version = "2025-01"
+
+  [webhooks.privacy_compliance]
+  customer_deletion_url = "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-webhooks-privacy"
+  customer_data_request_url = "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-webhooks-privacy"
+  shop_deletion_url = "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-webhooks-privacy"
+
+[pos]
+embedded = false

@@ -330,7 +330,7 @@ function PurchaseOrdersView({ pos, suppliers, onSave }: { pos: PurchaseOrder[]; 
       if (po.id !== poId) return po;
       const newItems = po.lineItems.map(li => {
         const qty = receiveQtys[li.id] || 0;
-        return { ...li, quantityReceived: li.quantityReceived + qty, receivedAt: qty > 0 ? new Date().toISOString() : li.receivedAt };
+        return { ...li, quantityReceived: li.quantityReceived + qty };
       });
       const allDone = newItems.every(li => li.quantityReceived >= li.quantityOrdered);
       const anyDone = newItems.some(li => li.quantityReceived > 0);

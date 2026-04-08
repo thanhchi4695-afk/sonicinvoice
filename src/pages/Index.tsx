@@ -64,7 +64,7 @@ const Index = () => {
   const [showCapture, setShowCapture] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
-  const { isEmbedded, shop } = useShopifyEmbedded();
+  const { isEmbedded, shop, authState: embeddedAuthState } = useShopifyEmbedded();
 
   // ── Session management with onAuthStateChange ──
   useEffect(() => {

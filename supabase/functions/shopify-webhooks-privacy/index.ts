@@ -20,6 +20,10 @@ function getAdminClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 }
 
+type EdgeRuntimeLike = {
+  waitUntil?: (promise: Promise<unknown>) => void;
+};
+
 async function verifyShopifyHmac(
   rawBytes: Uint8Array,
   hmacHeader: string | null
@@ -119,6 +123,31 @@ async function handleShopRedact(
   console.log("shop/redact: All data purged for shop", { shop });
 }
 
+async function processPrivacyWebhook(
+  topic: string,
+  shop: string,
+  payload: Record<string, unknown>
+) {
+  switch (topic) {
+    case "customers/data_request":
+      await handleCustomerDataRequest(shop, payload);
+      break;
+    case "customers/redact":
+      await handleCustomerRedact(shop, payload);
+      break;
+    case "shop/redact":
+      await handleShopRedact(shop, payload);
+      break;
+    default:
+      console.warn("Unhandled privacy webhook topic", {
+        topic,
+        shop,
+        verified: true,
+      });
+      break;
+  }
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
 
@@ -167,32 +196,25 @@ Deno.serve(async (req) => {
     });
   }
 
-  try {
-    switch (topic) {
-      case "customers/data_request":
-        await handleCustomerDataRequest(shop, payload);
-        break;
-      case "customers/redact":
-        await handleCustomerRedact(shop, payload);
-        break;
-      case "shop/redact":
-        await handleShopRedact(shop, payload);
-        break;
-      default:
-        console.warn("Unhandled privacy webhook topic", {
-          topic,
-          shop,
-          verified: true,
-        });
-        break;
+  const processingPromise = processPrivacyWebhook(topic, shop, payload).catch(
+    (error) => {
+      console.error("Privacy webhook processing failed", {
+        topic,
+        shop,
+        verified: true,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
-  } catch (error) {
-    console.error("Privacy webhook processing failed", {
-      topic,
-      shop,
-      verified: true,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  );
+
+  const edgeRuntime = (globalThis as typeof globalThis & {
+    EdgeRuntime?: EdgeRuntimeLike;
+  }).EdgeRuntime;
+
+  if (edgeRuntime?.waitUntil) {
+    edgeRuntime.waitUntil(processingPromise);
+  } else {
+    await processingPromise;
   }
 
   return new Response(JSON.stringify({ ok: true }), {

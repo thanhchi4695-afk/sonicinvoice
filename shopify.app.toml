@@ -19,10 +19,9 @@ redirect_urls = [
 [webhooks]
 api_version = "2025-01"
 
-  [webhooks.privacy_compliance]
-  customer_deletion_url = "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-webhooks-privacy"
-  customer_data_request_url = "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-webhooks-privacy"
-  shop_deletion_url = "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-webhooks-privacy"
+  [[webhooks.subscriptions]]
+  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+  uri = "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-webhooks-privacy"
 
 [pos]
 embedded = false

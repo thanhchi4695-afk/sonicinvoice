@@ -57,7 +57,13 @@ Deno.serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!, {
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
+    if (!anonKey) {
+      return new Response(JSON.stringify({ error: "Server misconfigured: missing anon key" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabaseUser = createClient(SUPABASE_URL, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
@@ -147,7 +153,7 @@ Deno.serve(async (req) => {
         await supabaseAdmin.from("shopify_subscriptions").upsert({
           user_id: user.id,
           shop: store_url,
-          plan_name: activeSub.name || PLAN.name,
+          plan_name: activeSub.name || "Starter",
           shopify_subscription_id: activeSub.id,
           status: "active",
           updated_at: new Date().toISOString(),

@@ -101,7 +101,7 @@ export const COLOUR_ABBR: Record<string, string> = {
 
 export function extractColourFromTitle(title: string): string {
   if (!title) return '';
-  const dashMatch = title.match(/[-\/]\s*([^-\/]+)$/);
+  const dashMatch = title.match(/[-/]\s*([^-/]+)$/);
   if (!dashMatch) return '';
   const candidate = dashMatch[1].trim();
   const upper = candidate.toUpperCase();

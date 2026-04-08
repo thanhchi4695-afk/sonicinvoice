@@ -221,7 +221,7 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
   // Load products from localStorage (batch review / scan mode data)
   useEffect(() => {
     const sources = ["batch_review_products", "scan_items", "invoice_products"];
-    let all: ProductData[] = [];
+    const all: ProductData[] = [];
     sources.forEach((key) => {
       try {
         const raw = localStorage.getItem(key);
@@ -246,7 +246,7 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
     setLoading(true);
     try {
       // Fetch existing collections to detect duplicates
-      let existingTitles = new Set<string>();
+      const existingTitles = new Set<string>();
       try {
         const [smart, custom] = await Promise.all([getSmartCollections(), getCustomCollections()]);
         [...smart, ...custom].forEach((c) => existingTitles.add(c.title.toLowerCase()));

@@ -114,7 +114,7 @@ function normalizeBaseTitle(name: string): string {
   return name
     .replace(/\b(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|\d{1,3})\b/gi, "")
     .replace(/\b(Black|White|Navy|Red|Blue|Green|Pink|Coral|Ivory|Khaki|Grey|Gray|Cream|Beige|Tan|Brown|Purple|Yellow|Orange|Aqua|Teal|Sage|Olive|Rust|Blush|Lilac|Charcoal|Bone|Sand|Wine|Burgundy|Mauve|Mint|Rose|Stone|Nude|Taupe|Champagne)\b/gi, "")
-    .replace(/[·\-,|\/]+/g, " ")
+    .replace(/[·\-,|/]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

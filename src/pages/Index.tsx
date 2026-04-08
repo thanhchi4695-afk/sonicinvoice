@@ -1,60 +1,64 @@
-import { useState, useEffect, useCallback } from "react";
-import AuthScreen from "@/components/AuthScreen";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { addAuditEntry } from "@/lib/audit-log";
-import OnboardingFlow from "@/components/OnboardingFlow";
+import NotificationBell from "@/components/NotificationBell";
+import LoadingScreen from "@/components/ui/loading-screen";
+
+// ── Eagerly loaded (critical path) ──
+import HomeScreen from "@/components/HomeScreen";
 import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
-import HomeScreen from "@/components/HomeScreen";
-import HistoryScreen from "@/components/HistoryScreen";
-import ToolsScreen from "@/components/ToolsScreen";
-import AccountScreen from "@/components/AccountScreen";
-import InvoiceFlow from "@/components/InvoiceFlow";
-import BulkSaleFlow from "@/components/BulkSaleFlow";
-import RestockAnalytics from "@/components/RestockAnalytics";
-import PriceAdjustmentPanel from "@/components/PriceAdjustmentPanel";
-import PriceLookup from "@/components/PriceLookup";
-import LightspeedGuide from "@/components/LightspeedGuide";
-import AnalyticsPanel from "@/components/AnalyticsPanel";
-import QuickCapture from "@/components/QuickCapture";
-import ScanMode from "@/components/ScanMode";
-import OrderFormFlow from "@/components/OrderFormFlow";
-import PurchaseOrderPanel from "@/components/PurchaseOrderPanel";
-import SeasonManager from "@/components/SeasonManager";
-import ReorderPanel from "@/components/ReorderPanel";
-import SupplierPanel from "@/components/SupplierPanel";
-import HelpCentre from "@/components/HelpCentre";
-import AuditLogPanel from "@/components/AuditLogPanel";
-import CatalogMemoryPanel from "@/components/CatalogMemoryPanel";
-import EmailInboxPanel from "@/components/EmailInboxPanel";
-import CollabSEOFlow from "@/components/CollabSEOFlow";
-import NotificationBell from "@/components/NotificationBell";
-import AdsGuideTabs from "@/components/AdsGuideTabs";
-import LightspeedConverter from "@/components/LightspeedConverter";
-import GoogleAdsSetupWizard from "@/components/GoogleAdsSetupWizard";
-import MetaAdsSetupWizard from "@/components/MetaAdsSetupWizard";
-import PerformanceDashboard from "@/components/PerformanceDashboard";
-import AIFeedOptimisation from "@/components/AIFeedOptimisation";
-import FeedHealthPanel from "@/components/FeedHealthPanel";
-import GoogleColourFlow from "@/components/GoogleColourFlow";
-import GoogleAdsFlow from "@/components/GoogleAdsFlow";
-import StyleGroupingFlow from "@/components/StyleGroupingFlow";
-import CompetitorIntelFlow from "@/components/CompetitorIntelFlow";
-import CollectionSEOFlow from "@/components/CollectionSEOFlow";
-import GeoAgenticFlow from "@/components/GeoAgenticFlow";
-import OrganicSEOFlow from "@/components/OrganicSEOFlow";
-import MarginProtectionPanel from "@/components/MarginProtectionPanel";
-import MarkdownLadderPanel from "@/components/MarkdownLadderPanel";
-import StockMonitorPanel from "@/components/StockMonitorPanel";
-import SocialMediaPanel from "@/components/SocialMediaPanel";
-import InventoryPlanningPanel from "@/components/InventoryPlanningPanel";
-import PackingSlipFlow from "@/components/PackingSlipFlow";
+
+// ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
+const AuthScreen = lazy(() => import("@/components/AuthScreen"));
+const OnboardingFlow = lazy(() => import("@/components/OnboardingFlow"));
+const HistoryScreen = lazy(() => import("@/components/HistoryScreen"));
+const ToolsScreen = lazy(() => import("@/components/ToolsScreen"));
+const AccountScreen = lazy(() => import("@/components/AccountScreen"));
+const InvoiceFlow = lazy(() => import("@/components/InvoiceFlow"));
+const BulkSaleFlow = lazy(() => import("@/components/BulkSaleFlow"));
+const RestockAnalytics = lazy(() => import("@/components/RestockAnalytics"));
+const PriceAdjustmentPanel = lazy(() => import("@/components/PriceAdjustmentPanel"));
+const PriceLookup = lazy(() => import("@/components/PriceLookup"));
+const LightspeedGuide = lazy(() => import("@/components/LightspeedGuide"));
+const AnalyticsPanel = lazy(() => import("@/components/AnalyticsPanel"));
+const QuickCapture = lazy(() => import("@/components/QuickCapture"));
+const ScanMode = lazy(() => import("@/components/ScanMode"));
+const OrderFormFlow = lazy(() => import("@/components/OrderFormFlow"));
+const PurchaseOrderPanel = lazy(() => import("@/components/PurchaseOrderPanel"));
+const SeasonManager = lazy(() => import("@/components/SeasonManager"));
+const ReorderPanel = lazy(() => import("@/components/ReorderPanel"));
+const SupplierPanel = lazy(() => import("@/components/SupplierPanel"));
+const HelpCentre = lazy(() => import("@/components/HelpCentre"));
+const AuditLogPanel = lazy(() => import("@/components/AuditLogPanel"));
+const CatalogMemoryPanel = lazy(() => import("@/components/CatalogMemoryPanel"));
+const EmailInboxPanel = lazy(() => import("@/components/EmailInboxPanel"));
+const CollabSEOFlow = lazy(() => import("@/components/CollabSEOFlow"));
+const AdsGuideTabs = lazy(() => import("@/components/AdsGuideTabs"));
+const LightspeedConverter = lazy(() => import("@/components/LightspeedConverter"));
+const GoogleAdsSetupWizard = lazy(() => import("@/components/GoogleAdsSetupWizard"));
+const MetaAdsSetupWizard = lazy(() => import("@/components/MetaAdsSetupWizard"));
+const PerformanceDashboard = lazy(() => import("@/components/PerformanceDashboard"));
+const AIFeedOptimisation = lazy(() => import("@/components/AIFeedOptimisation"));
+const FeedHealthPanel = lazy(() => import("@/components/FeedHealthPanel"));
+const GoogleColourFlow = lazy(() => import("@/components/GoogleColourFlow"));
+const GoogleAdsFlow = lazy(() => import("@/components/GoogleAdsFlow"));
+const StyleGroupingFlow = lazy(() => import("@/components/StyleGroupingFlow"));
+const CompetitorIntelFlow = lazy(() => import("@/components/CompetitorIntelFlow"));
+const CollectionSEOFlow = lazy(() => import("@/components/CollectionSEOFlow"));
+const GeoAgenticFlow = lazy(() => import("@/components/GeoAgenticFlow"));
+const OrganicSEOFlow = lazy(() => import("@/components/OrganicSEOFlow"));
+const MarginProtectionPanel = lazy(() => import("@/components/MarginProtectionPanel"));
+const MarkdownLadderPanel = lazy(() => import("@/components/MarkdownLadderPanel"));
+const StockMonitorPanel = lazy(() => import("@/components/StockMonitorPanel"));
+const SocialMediaPanel = lazy(() => import("@/components/SocialMediaPanel"));
+const InventoryPlanningPanel = lazy(() => import("@/components/InventoryPlanningPanel"));
+const PackingSlipFlow = lazy(() => import("@/components/PackingSlipFlow"));
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
 import { exchangeShopifyToken } from "@/lib/shopify-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import LoadingScreen from "@/components/ui/loading-screen";
 
 const Index = () => {
   const [authed, setAuthed] = useState(false);
@@ -156,54 +160,63 @@ const Index = () => {
     );
   }
 
+  // Suspense fallback — minimal spinner to prevent CLS
+  const suspenseFallback = (
+    <div className="flex items-center justify-center min-h-[200px]">
+      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
   // When embedded in Shopify, skip standalone auth/onboarding
   // (Shopify handles auth via session tokens or OAuth install flow)
   if (!isEmbedded && !authed) {
-    return <AuthScreen onAuth={handleAuth} />;
+    return <Suspense fallback={suspenseFallback}><AuthScreen onAuth={handleAuth} /></Suspense>;
   }
 
   if (!isEmbedded && !onboarded) {
-    return <OnboardingFlow onComplete={() => setOnboarded(true)} />;
+    return <Suspense fallback={suspenseFallback}><OnboardingFlow onComplete={() => setOnboarded(true)} /></Suspense>;
   }
 
   const renderFlow = () => {
+    let flowEl: React.ReactNode = null;
     switch (activeFlow) {
-      case "invoice": return <InvoiceFlow onBack={() => setActiveFlow(null)} />;
-      case "sale": return <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />;
-      case "restock": return <RestockAnalytics onBack={() => setActiveFlow(null)} />;
-      case "price_adjust": return <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />;
-      case "price_lookup": return <PriceLookup onBack={() => setActiveFlow(null)} />;
-      case "order_form": return <OrderFormFlow onBack={() => setActiveFlow(null)} />;
-      case "seasons": return <SeasonManager onBack={() => setActiveFlow(null)} />;
-      case "reorder": return <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />;
-      case "suppliers": return <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />;
-      case "audit_log": return <AuditLogPanel onBack={() => setActiveFlow(null)} />;
-      case "purchase_orders": return <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />;
-      case "catalog_memory": return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
-      case "email_inbox": return <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />;
-      case "collab_seo": return <CollabSEOFlow onBack={() => setActiveFlow(null)} />;
-      case "google_ads_setup": return <GoogleAdsSetupWizard onBack={() => setActiveFlow(null)} />;
-      case "meta_ads_setup": return <MetaAdsSetupWizard onBack={() => setActiveFlow(null)} />;
-      case "lightspeed_convert": return <LightspeedConverter onBack={() => setActiveFlow(null)} />;
-      case "scan_mode": return <ScanMode onBack={() => setActiveFlow(null)} />;
-      case "performance": return <PerformanceDashboard onBack={() => setActiveFlow(null)} />;
-      case "feed_optimise": return <AIFeedOptimisation onBack={() => setActiveFlow(null)} />;
-      case "feed_health": return <FeedHealthPanel onBack={() => setActiveFlow(null)} />;
-      case "google_colour": return <GoogleColourFlow onBack={() => setActiveFlow(null)} />;
-      case "google_ads": return <GoogleAdsFlow onBack={() => setActiveFlow(null)} />;
-      case "style_grouping": return <StyleGroupingFlow onBack={() => setActiveFlow(null)} />;
-      case "competitor_intel": return <CompetitorIntelFlow onBack={() => setActiveFlow(null)} />;
-      case "collection_seo": return <CollectionSEOFlow onBack={() => setActiveFlow(null)} />;
-      case "geo_agentic": return <GeoAgenticFlow onBack={() => setActiveFlow(null)} />;
-      case "organic_seo": return <OrganicSEOFlow onBack={() => setActiveFlow(null)} />;
-      case "margin_protection": return <MarginProtectionPanel onBack={() => setActiveFlow(null)} />;
-      case "markdown_ladder": return <MarkdownLadderPanel onBack={() => setActiveFlow(null)} />;
-      case "stock_monitor": return <StockMonitorPanel onBack={() => setActiveFlow(null)} />;
-      case "social_media": return <SocialMediaPanel onBack={() => setActiveFlow(null)} />;
-      case "inventory_planning": return <InventoryPlanningPanel onBack={() => setActiveFlow(null)} />;
-      case "packing_slip": return <PackingSlipFlow onBack={() => setActiveFlow(null)} />;
+      case "invoice": flowEl = <InvoiceFlow onBack={() => setActiveFlow(null)} />; break;
+      case "sale": flowEl = <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />; break;
+      case "restock": flowEl = <RestockAnalytics onBack={() => setActiveFlow(null)} />; break;
+      case "price_adjust": flowEl = <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
+      case "price_lookup": flowEl = <PriceLookup onBack={() => setActiveFlow(null)} />; break;
+      case "order_form": flowEl = <OrderFormFlow onBack={() => setActiveFlow(null)} />; break;
+      case "seasons": flowEl = <SeasonManager onBack={() => setActiveFlow(null)} />; break;
+      case "reorder": flowEl = <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />; break;
+      case "suppliers": flowEl = <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />; break;
+      case "audit_log": flowEl = <AuditLogPanel onBack={() => setActiveFlow(null)} />; break;
+      case "purchase_orders": flowEl = <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />; break;
+      case "catalog_memory": flowEl = <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />; break;
+      case "email_inbox": flowEl = <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />; break;
+      case "collab_seo": flowEl = <CollabSEOFlow onBack={() => setActiveFlow(null)} />; break;
+      case "google_ads_setup": flowEl = <GoogleAdsSetupWizard onBack={() => setActiveFlow(null)} />; break;
+      case "meta_ads_setup": flowEl = <MetaAdsSetupWizard onBack={() => setActiveFlow(null)} />; break;
+      case "lightspeed_convert": flowEl = <LightspeedConverter onBack={() => setActiveFlow(null)} />; break;
+      case "scan_mode": flowEl = <ScanMode onBack={() => setActiveFlow(null)} />; break;
+      case "performance": flowEl = <PerformanceDashboard onBack={() => setActiveFlow(null)} />; break;
+      case "feed_optimise": flowEl = <AIFeedOptimisation onBack={() => setActiveFlow(null)} />; break;
+      case "feed_health": flowEl = <FeedHealthPanel onBack={() => setActiveFlow(null)} />; break;
+      case "google_colour": flowEl = <GoogleColourFlow onBack={() => setActiveFlow(null)} />; break;
+      case "google_ads": flowEl = <GoogleAdsFlow onBack={() => setActiveFlow(null)} />; break;
+      case "style_grouping": flowEl = <StyleGroupingFlow onBack={() => setActiveFlow(null)} />; break;
+      case "competitor_intel": flowEl = <CompetitorIntelFlow onBack={() => setActiveFlow(null)} />; break;
+      case "collection_seo": flowEl = <CollectionSEOFlow onBack={() => setActiveFlow(null)} />; break;
+      case "geo_agentic": flowEl = <GeoAgenticFlow onBack={() => setActiveFlow(null)} />; break;
+      case "organic_seo": flowEl = <OrganicSEOFlow onBack={() => setActiveFlow(null)} />; break;
+      case "margin_protection": flowEl = <MarginProtectionPanel onBack={() => setActiveFlow(null)} />; break;
+      case "markdown_ladder": flowEl = <MarkdownLadderPanel onBack={() => setActiveFlow(null)} />; break;
+      case "stock_monitor": flowEl = <StockMonitorPanel onBack={() => setActiveFlow(null)} />; break;
+      case "social_media": flowEl = <SocialMediaPanel onBack={() => setActiveFlow(null)} />; break;
+      case "inventory_planning": flowEl = <InventoryPlanningPanel onBack={() => setActiveFlow(null)} />; break;
+      case "packing_slip": flowEl = <PackingSlipFlow onBack={() => setActiveFlow(null)} />; break;
       default: return null;
     }
+    return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;
   };
 
   // In standalone mode, flows replace the entire screen
@@ -249,13 +262,15 @@ const Index = () => {
           onStartPackingSlip={() => setActiveFlow("packing_slip")}
         />
       )}
-      {activeTab === "analytics" && <AnalyticsPanel />}
-      {activeTab === "history" && <HistoryScreen />}
-      {activeTab === "tools" && <ToolsScreen />}
-      {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
-      {activeTab === "google_ads" && <AdsGuideTabs />}
-      {activeTab === "help" && <HelpCentre />}
-      {activeTab === "account" && <AccountScreen />}
+      <Suspense fallback={suspenseFallback}>
+        {activeTab === "analytics" && <AnalyticsPanel />}
+        {activeTab === "history" && <HistoryScreen />}
+        {activeTab === "tools" && <ToolsScreen />}
+        {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
+        {activeTab === "google_ads" && <AdsGuideTabs />}
+        {activeTab === "help" && <HelpCentre />}
+        {activeTab === "account" && <AccountScreen />}
+      </Suspense>
     </>
   );
 

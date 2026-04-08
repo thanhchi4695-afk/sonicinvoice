@@ -166,44 +166,20 @@ Return JSON ONLY in this exact format:
 }`;
 
       try {
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-pro",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  { type: "image_url", image_url: { url: p.imageUrl } },
-                  { type: "text", text: prompt },
-                ],
-              },
-            ],
-            max_tokens: 800,
-          }),
+        const aiData = await callAI({
+          model: "google/gemini-2.5-pro",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "image_url", image_url: { url: p.imageUrl } },
+                { type: "text", text: prompt },
+              ],
+            },
+          ],
+          max_tokens: 800,
         });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          console.error(`AI error for product ${i}:`, response.status, errText);
-          if (response.status === 429) {
-            results.push({ index: i, title: p.title || "Unknown", attributes: tagAttrs, confidence: "low", imageQualityNote: null, error: "Rate limited — try again later" });
-            continue;
-          }
-          if (response.status === 402) {
-            results.push({ index: i, title: p.title || "Unknown", attributes: tagAttrs, confidence: "low", imageQualityNote: null, error: "Credits exhausted — add funds in Settings" });
-            continue;
-          }
-          results.push({ index: i, title: p.title || "Unknown", attributes: tagAttrs, confidence: "low", imageQualityNote: null, error: `AI error: ${response.status}` });
-          continue;
-        }
-
-        const data = await response.json();
-        const text = data.choices?.[0]?.message?.content?.trim() || "{}";
+        const text = getContent(aiData).trim() || "{}";
         const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         const parsed = JSON.parse(clean);
         const visionAttrs: ProductDetailAttribute[] = (parsed.attributes || []).filter(

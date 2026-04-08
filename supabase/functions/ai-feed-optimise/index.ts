@@ -196,13 +196,18 @@ Return JSON ONLY in this exact format:
         });
       } catch (err) {
         console.error(`Error processing product ${i}:`, err);
+        // For rate limit / payment errors, surface to user and stop
+        if (err instanceof AIGatewayError && (err.status === 429 || err.status === 402)) {
+          results.push({
+            index: i, title: p.title || "Unknown", attributes: tagAttrs,
+            confidence: "low", imageQualityNote: null, error: err.message,
+          });
+          break; // Stop processing more products
+        }
         results.push({
-          index: i,
-          title: p.title || "Unknown",
-          attributes: tagAttrs,
-          confidence: "low",
-          imageQualityNote: null,
-          error: err instanceof Error ? err.message : "Unknown error",
+          index: i, title: p.title || "Unknown", attributes: tagAttrs,
+          confidence: "low", imageQualityNote: null,
+          error: err instanceof Error ? err.message : "AI processing failed, please retry.",
         });
       }
 

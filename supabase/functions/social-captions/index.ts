@@ -19,8 +19,7 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    // LOVABLE_API_KEY checked by callAI
 
     const brand = product.brand || product.vendor || "Brand";
     const title = product.title || "";

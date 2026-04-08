@@ -11,8 +11,7 @@ serve(async (req) => {
 
   try {
     const { products, storeName, storeCity, industry } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    // LOVABLE_API_KEY checked by callAI
 
     if (!Array.isArray(products) || products.length === 0) {
       return new Response(JSON.stringify({ error: "No products provided" }), {

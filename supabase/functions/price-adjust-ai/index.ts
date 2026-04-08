@@ -11,8 +11,7 @@ serve(async (req) => {
 
   try {
     const { instruction, brands, types, tags, priceMin, priceMax } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    // LOVABLE_API_KEY checked by callAI
 
     const systemPrompt = `You are a price adjustment interpreter for a retail product management app.
 The user describes a price adjustment in plain English. Extract the exact settings needed.

@@ -11,8 +11,7 @@ serve(async (req) => {
 
   try {
     const { action, storeName, storeUrl, storeCity, niche, checklist, pageType, pageTopic, existingIntro, products, locale } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    // LOVABLE_API_KEY checked by callAI
 
     const spelling = (locale || "AU").toUpperCase().startsWith("US") ? "American English" : "Australian/British English";
     let systemPrompt = "";

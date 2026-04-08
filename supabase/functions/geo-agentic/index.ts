@@ -68,8 +68,9 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("geo-agentic error:", e);
+    const status = e instanceof AIGatewayError ? e.status : 500;
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

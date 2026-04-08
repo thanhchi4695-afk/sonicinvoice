@@ -64,9 +64,10 @@ Return ONLY valid JSON with these fields:
     });
   } catch (e) {
     console.error("price-adjust-ai error:", e);
+    const status = e instanceof AIGatewayError ? e.status : 500;
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Failed to interpret instruction" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,8 +12,7 @@ serve(async (req) => {
   try {
     const { title, vendor, type, brandWebsite, storeName, storeCity, customInstructions } = await req.json();
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    // LOVABLE_API_KEY checked by callAI
 
     const brandSiteHint = brandWebsite ? `Brand website: ${brandWebsite}` : '';
     const customSection = customInstructions?.trim()
@@ -66,41 +66,15 @@ RESPOND WITH JSON ONLY, no other text:
   "note": "any issue encountered or empty string"
 }`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: "You are a product data enrichment assistant. Always respond with valid JSON only." },
-          { role: "user", content: prompt },
-        ],
-      }),
+    const data = await callAI({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: "You are a product data enrichment assistant. Always respond with valid JSON only." },
+        { role: "user", content: prompt },
+      ],
     });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI enrichment failed" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const data = await response.json();
-    const rawText = data.choices?.[0]?.message?.content || '';
+    const rawText = getContent(data);
     
     // Strip markdown code fences if present
     const clean = rawText
@@ -139,8 +113,9 @@ RESPOND WITH JSON ONLY, no other text:
     }
   } catch (e) {
     console.error("enrich-product error:", e);
+    const status = e instanceof AIGatewayError ? e.status : 500;
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

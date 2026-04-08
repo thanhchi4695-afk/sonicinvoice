@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,8 +11,7 @@ serve(async (req) => {
 
   try {
     const { action, storeName, storeUrl, storeCity, niche, checklist, pageType, pageTopic, existingIntro, products, locale } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    // LOVABLE_API_KEY checked by callAI
 
     const spelling = (locale || "AU").toUpperCase().startsWith("US") ? "American English" : "Australian/British English";
     let systemPrompt = "";
@@ -41,39 +41,14 @@ serve(async (req) => {
       });
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
-      }),
+    const data = await callAI({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
     });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited. Try again shortly." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI error:", response.status, t);
-      throw new Error("AI generation failed");
-    }
-
-    const data = await response.json();
-    const raw = data.choices?.[0]?.message?.content || "";
+    const raw = getContent(data);
     const clean = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
     let parsed: any = null;
@@ -93,8 +68,9 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("geo-agentic error:", e);
+    const status = e instanceof AIGatewayError ? e.status : 500;
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

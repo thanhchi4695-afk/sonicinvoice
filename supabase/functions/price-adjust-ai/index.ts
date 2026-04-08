@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,8 +11,7 @@ serve(async (req) => {
 
   try {
     const { instruction, brands, types, tags, priceMin, priceMax } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    // LOVABLE_API_KEY checked by callAI
 
     const systemPrompt = `You are a price adjustment interpreter for a retail product management app.
 The user describes a price adjustment in plain English. Extract the exact settings needed.
@@ -42,40 +42,15 @@ Return ONLY valid JSON with these fields:
   "explanation": "plain English explanation"
 }`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: instruction },
-        ],
-        temperature: 0.1,
-      }),
+    const data = await callAI({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: instruction },
+      ],
+      temperature: 0.1,
     });
-
-    if (!response.ok) {
-      const status = response.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add funds in Settings." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const text = await response.text();
-      console.error("AI gateway error:", status, text);
-      throw new Error("AI gateway error");
-    }
-
-    const data = await response.json();
+    const raw = getContent(data);
     const content = data.choices?.[0]?.message?.content || "";
 
     // Extract JSON from the response (handle markdown code blocks)
@@ -89,9 +64,10 @@ Return ONLY valid JSON with these fields:
     });
   } catch (e) {
     console.error("price-adjust-ai error:", e);
+    const status = e instanceof AIGatewayError ? e.status : 500;
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Failed to interpret instruction" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

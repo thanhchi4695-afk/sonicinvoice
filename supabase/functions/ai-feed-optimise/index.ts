@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -59,8 +60,7 @@ serve(async (req) => {
 
   try {
     const { products } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    // LOVABLE_API_KEY checked by callAI
 
     if (!Array.isArray(products) || products.length === 0) {
       return new Response(JSON.stringify({ error: "No products provided" }), {
@@ -166,44 +166,20 @@ Return JSON ONLY in this exact format:
 }`;
 
       try {
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-pro",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  { type: "image_url", image_url: { url: p.imageUrl } },
-                  { type: "text", text: prompt },
-                ],
-              },
-            ],
-            max_tokens: 800,
-          }),
+        const aiData = await callAI({
+          model: "google/gemini-2.5-pro",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "image_url", image_url: { url: p.imageUrl } },
+                { type: "text", text: prompt },
+              ],
+            },
+          ],
+          max_tokens: 800,
         });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          console.error(`AI error for product ${i}:`, response.status, errText);
-          if (response.status === 429) {
-            results.push({ index: i, title: p.title || "Unknown", attributes: tagAttrs, confidence: "low", imageQualityNote: null, error: "Rate limited — try again later" });
-            continue;
-          }
-          if (response.status === 402) {
-            results.push({ index: i, title: p.title || "Unknown", attributes: tagAttrs, confidence: "low", imageQualityNote: null, error: "Credits exhausted — add funds in Settings" });
-            continue;
-          }
-          results.push({ index: i, title: p.title || "Unknown", attributes: tagAttrs, confidence: "low", imageQualityNote: null, error: `AI error: ${response.status}` });
-          continue;
-        }
-
-        const data = await response.json();
-        const text = data.choices?.[0]?.message?.content?.trim() || "{}";
+        const text = getContent(aiData).trim() || "{}";
         const clean = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
         const parsed = JSON.parse(clean);
         const visionAttrs: ProductDetailAttribute[] = (parsed.attributes || []).filter(
@@ -220,13 +196,18 @@ Return JSON ONLY in this exact format:
         });
       } catch (err) {
         console.error(`Error processing product ${i}:`, err);
+        // For rate limit / payment errors, surface to user and stop
+        if (err instanceof AIGatewayError && (err.status === 429 || err.status === 402)) {
+          results.push({
+            index: i, title: p.title || "Unknown", attributes: tagAttrs,
+            confidence: "low", imageQualityNote: null, error: err.message,
+          });
+          break; // Stop processing more products
+        }
         results.push({
-          index: i,
-          title: p.title || "Unknown",
-          attributes: tagAttrs,
-          confidence: "low",
-          imageQualityNote: null,
-          error: err instanceof Error ? err.message : "Unknown error",
+          index: i, title: p.title || "Unknown", attributes: tagAttrs,
+          confidence: "low", imageQualityNote: null,
+          error: err instanceof Error ? err.message : "AI processing failed, please retry.",
         });
       }
 

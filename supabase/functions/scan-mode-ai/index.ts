@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,8 +11,7 @@ serve(async (req) => {
 
   try {
     const { input, mode, storeName, storeCity, ocrMode } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    // LOVABLE_API_KEY checked by callAI
 
     const systemPrompt = `You are a retail product identification assistant for ${storeName || "a retail store"} in ${storeCity || "Australia"}.
 
@@ -70,36 +70,11 @@ RESPOND WITH JSON ONLY:
       });
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: mode === "image" ? "google/gemini-2.5-flash" : "google/gemini-3-flash-preview",
-        messages,
-      }),
+    const data = await callAI({
+      model: mode === "image" ? "google/gemini-2.5-flash" : "google/gemini-3-flash-preview",
+      messages,
     });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited. Try again shortly." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings > Workspace > Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI error:", response.status, t);
-      throw new Error("AI generation failed");
-    }
-
-    const data = await response.json();
-    const raw = data.choices?.[0]?.message?.content || "";
+    const raw = getContent(data);
     const clean = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
 
     const tryParse = (str: string) => {

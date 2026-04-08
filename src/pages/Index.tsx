@@ -160,54 +160,63 @@ const Index = () => {
     );
   }
 
+  // Suspense fallback — minimal spinner to prevent CLS
+  const suspenseFallback = (
+    <div className="flex items-center justify-center min-h-[200px]">
+      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
   // When embedded in Shopify, skip standalone auth/onboarding
   // (Shopify handles auth via session tokens or OAuth install flow)
   if (!isEmbedded && !authed) {
-    return <AuthScreen onAuth={handleAuth} />;
+    return <Suspense fallback={suspenseFallback}><AuthScreen onAuth={handleAuth} /></Suspense>;
   }
 
   if (!isEmbedded && !onboarded) {
-    return <OnboardingFlow onComplete={() => setOnboarded(true)} />;
+    return <Suspense fallback={suspenseFallback}><OnboardingFlow onComplete={() => setOnboarded(true)} /></Suspense>;
   }
 
   const renderFlow = () => {
+    let flowEl: React.ReactNode = null;
     switch (activeFlow) {
-      case "invoice": return <InvoiceFlow onBack={() => setActiveFlow(null)} />;
-      case "sale": return <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />;
-      case "restock": return <RestockAnalytics onBack={() => setActiveFlow(null)} />;
-      case "price_adjust": return <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />;
-      case "price_lookup": return <PriceLookup onBack={() => setActiveFlow(null)} />;
-      case "order_form": return <OrderFormFlow onBack={() => setActiveFlow(null)} />;
-      case "seasons": return <SeasonManager onBack={() => setActiveFlow(null)} />;
-      case "reorder": return <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />;
-      case "suppliers": return <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />;
-      case "audit_log": return <AuditLogPanel onBack={() => setActiveFlow(null)} />;
-      case "purchase_orders": return <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />;
-      case "catalog_memory": return <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />;
-      case "email_inbox": return <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />;
-      case "collab_seo": return <CollabSEOFlow onBack={() => setActiveFlow(null)} />;
-      case "google_ads_setup": return <GoogleAdsSetupWizard onBack={() => setActiveFlow(null)} />;
-      case "meta_ads_setup": return <MetaAdsSetupWizard onBack={() => setActiveFlow(null)} />;
-      case "lightspeed_convert": return <LightspeedConverter onBack={() => setActiveFlow(null)} />;
-      case "scan_mode": return <ScanMode onBack={() => setActiveFlow(null)} />;
-      case "performance": return <PerformanceDashboard onBack={() => setActiveFlow(null)} />;
-      case "feed_optimise": return <AIFeedOptimisation onBack={() => setActiveFlow(null)} />;
-      case "feed_health": return <FeedHealthPanel onBack={() => setActiveFlow(null)} />;
-      case "google_colour": return <GoogleColourFlow onBack={() => setActiveFlow(null)} />;
-      case "google_ads": return <GoogleAdsFlow onBack={() => setActiveFlow(null)} />;
-      case "style_grouping": return <StyleGroupingFlow onBack={() => setActiveFlow(null)} />;
-      case "competitor_intel": return <CompetitorIntelFlow onBack={() => setActiveFlow(null)} />;
-      case "collection_seo": return <CollectionSEOFlow onBack={() => setActiveFlow(null)} />;
-      case "geo_agentic": return <GeoAgenticFlow onBack={() => setActiveFlow(null)} />;
-      case "organic_seo": return <OrganicSEOFlow onBack={() => setActiveFlow(null)} />;
-      case "margin_protection": return <MarginProtectionPanel onBack={() => setActiveFlow(null)} />;
-      case "markdown_ladder": return <MarkdownLadderPanel onBack={() => setActiveFlow(null)} />;
-      case "stock_monitor": return <StockMonitorPanel onBack={() => setActiveFlow(null)} />;
-      case "social_media": return <SocialMediaPanel onBack={() => setActiveFlow(null)} />;
-      case "inventory_planning": return <InventoryPlanningPanel onBack={() => setActiveFlow(null)} />;
-      case "packing_slip": return <PackingSlipFlow onBack={() => setActiveFlow(null)} />;
+      case "invoice": flowEl = <InvoiceFlow onBack={() => setActiveFlow(null)} />; break;
+      case "sale": flowEl = <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />; break;
+      case "restock": flowEl = <RestockAnalytics onBack={() => setActiveFlow(null)} />; break;
+      case "price_adjust": flowEl = <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
+      case "price_lookup": flowEl = <PriceLookup onBack={() => setActiveFlow(null)} />; break;
+      case "order_form": flowEl = <OrderFormFlow onBack={() => setActiveFlow(null)} />; break;
+      case "seasons": flowEl = <SeasonManager onBack={() => setActiveFlow(null)} />; break;
+      case "reorder": flowEl = <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />; break;
+      case "suppliers": flowEl = <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />; break;
+      case "audit_log": flowEl = <AuditLogPanel onBack={() => setActiveFlow(null)} />; break;
+      case "purchase_orders": flowEl = <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />; break;
+      case "catalog_memory": flowEl = <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />; break;
+      case "email_inbox": flowEl = <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />; break;
+      case "collab_seo": flowEl = <CollabSEOFlow onBack={() => setActiveFlow(null)} />; break;
+      case "google_ads_setup": flowEl = <GoogleAdsSetupWizard onBack={() => setActiveFlow(null)} />; break;
+      case "meta_ads_setup": flowEl = <MetaAdsSetupWizard onBack={() => setActiveFlow(null)} />; break;
+      case "lightspeed_convert": flowEl = <LightspeedConverter onBack={() => setActiveFlow(null)} />; break;
+      case "scan_mode": flowEl = <ScanMode onBack={() => setActiveFlow(null)} />; break;
+      case "performance": flowEl = <PerformanceDashboard onBack={() => setActiveFlow(null)} />; break;
+      case "feed_optimise": flowEl = <AIFeedOptimisation onBack={() => setActiveFlow(null)} />; break;
+      case "feed_health": flowEl = <FeedHealthPanel onBack={() => setActiveFlow(null)} />; break;
+      case "google_colour": flowEl = <GoogleColourFlow onBack={() => setActiveFlow(null)} />; break;
+      case "google_ads": flowEl = <GoogleAdsFlow onBack={() => setActiveFlow(null)} />; break;
+      case "style_grouping": flowEl = <StyleGroupingFlow onBack={() => setActiveFlow(null)} />; break;
+      case "competitor_intel": flowEl = <CompetitorIntelFlow onBack={() => setActiveFlow(null)} />; break;
+      case "collection_seo": flowEl = <CollectionSEOFlow onBack={() => setActiveFlow(null)} />; break;
+      case "geo_agentic": flowEl = <GeoAgenticFlow onBack={() => setActiveFlow(null)} />; break;
+      case "organic_seo": flowEl = <OrganicSEOFlow onBack={() => setActiveFlow(null)} />; break;
+      case "margin_protection": flowEl = <MarginProtectionPanel onBack={() => setActiveFlow(null)} />; break;
+      case "markdown_ladder": flowEl = <MarkdownLadderPanel onBack={() => setActiveFlow(null)} />; break;
+      case "stock_monitor": flowEl = <StockMonitorPanel onBack={() => setActiveFlow(null)} />; break;
+      case "social_media": flowEl = <SocialMediaPanel onBack={() => setActiveFlow(null)} />; break;
+      case "inventory_planning": flowEl = <InventoryPlanningPanel onBack={() => setActiveFlow(null)} />; break;
+      case "packing_slip": flowEl = <PackingSlipFlow onBack={() => setActiveFlow(null)} />; break;
       default: return null;
     }
+    return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;
   };
 
   // In standalone mode, flows replace the entire screen

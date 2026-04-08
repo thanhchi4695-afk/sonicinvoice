@@ -1,4 +1,4 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList, BookOpen, Mail, Link, Target, ScanLine, Sparkles, Bell } from "lucide-react";
+import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList, BookOpen, Mail, Link, Target, ScanLine, Sparkles, Bell, Package } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
@@ -40,9 +40,10 @@ interface HomeScreenProps {
   onStartStockMonitor?: () => void;
   onStartSocialMedia?: () => void;
   onStartInventoryPlanning?: () => void;
+  onStartPackingSlip?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning, onStartPackingSlip }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -156,6 +157,25 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
           </div>
         </div>
         <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartInvoice}>
+          Start <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Packing Slip Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Package className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Packing slip</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Extract products from delivery dockets — no pricing needed.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">PDF · Image · Excel · CSV</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartPackingSlip}>
           Start <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>

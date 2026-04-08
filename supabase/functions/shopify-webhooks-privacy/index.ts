@@ -2,17 +2,24 @@
  * Shopify Mandatory Compliance Webhooks
  * Required for Shopify App Store approval.
  *
- * Equivalent to the Express route: POST /webhooks/privacy
  * Handles all three compliance topics via X-Shopify-Topic header:
  *   - customers/data_request
  *   - customers/redact
  *   - shop/redact
  *
  * HMAC is verified using the raw body + SHOPIFY_API_SECRET
- * before any JSON parsing occurs (same as express.raw() pattern).
+ * before any JSON parsing occurs.
  */
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+
 const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+function getAdminClient() {
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+}
 
 // ─── HMAC verification (timing-safe) ────────────────────────────────
 // Shopify signs every webhook with HMAC-SHA256 using your app's API secret.

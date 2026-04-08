@@ -9,6 +9,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SHOPIFY_API_KEY = Deno.env.get("SHOPIFY_API_KEY")!;
 const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET")!;
+const APP_URL = Deno.env.get("APP_URL") || "https://sonicinvoice.lovable.app";
 
 const SCOPES = "read_products,write_products,read_inventory,write_inventory";
 const API_VERSION = "2024-10";
@@ -187,10 +188,8 @@ Deno.serve(async (req) => {
       // Clean up nonce
       await supabaseAdmin.from("shopify_oauth_states").delete().eq("user_id", userId);
 
-      // Redirect back to app
-      const appUrl = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/[^/]*$/, "") || "";
-      // Use a well-known redirect page
-      const redirectTarget = appUrl ? `${appUrl}/?shopify_connected=1` : "/?shopify_connected=1";
+      // Redirect back to app using stable APP_URL
+      const redirectTarget = `${APP_URL}/?shopify_connected=1`;
 
       return new Response(null, {
         status: 302,

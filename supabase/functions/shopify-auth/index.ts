@@ -185,9 +185,9 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from("shopify_oauth_states")
         .delete().eq("user_id", "00000000-0000-0000-0000-000000000000");
 
-      // Redirect to app with login token
-      const appUrl = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/[^/]*$/, "") || "";
-      const redirectTarget = appUrl ? `${appUrl}/?shopify_login=${loginToken}` : `/?shopify_login=${loginToken}`;
+      // Redirect to app with login token — always use APP_URL for stable redirects
+      const appUrl = Deno.env.get("APP_URL") || "https://sonicinvoice.lovable.app";
+      const redirectTarget = `${appUrl}/?shopify_login=${loginToken}`;
 
       return new Response(null, { status: 302, headers: { Location: redirectTarget } });
     }

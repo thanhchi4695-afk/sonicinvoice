@@ -57,47 +57,36 @@ export interface AccountingBillReviewProps {
 const ALL_CODES = getAllAccountCodes();
 const FREIGHT_CODE = "61700";
 
-function buildReviewData(invoice: AccountingBillReviewProps["invoice"]): BillReviewData {
+function buildReviewData(ub: UnifiedBill): BillReviewData {
   const headerClassification = classifyInvoice(
-    invoice.supplier,
+    ub.supplierName,
     "",
-    invoice.line_items?.map((li) => ({ description: li.description || li.product_name }))
+    ub.lineItems.map((li) => ({ description: li.description }))
   );
 
-  const lines: BillReviewLine[] = (invoice.line_items || []).map((li) => {
-    const desc = li.description || li.product_name || "";
-    const freight = isFreightLine(desc);
-    const unitPrice = li.unit_price || li.unit_price_inc_gst || 0;
-    const totalIncGst = li.total_inc_gst || unitPrice * (li.quantity || 1);
-    const gst = totalIncGst / 11;
-    const totalExGst = totalIncGst - gst;
-
+  const lines: BillReviewLine[] = ub.lineItems.map((li) => {
+    const freight = isFreightLine(li.description);
     return {
-      description: desc,
-      quantity: li.quantity || 1,
-      unitPrice,
-      totalExGst,
-      gstAmount: gst,
-      accountCode: freight ? FREIGHT_CODE : headerClassification.accountCode,
-      accountName: freight
-        ? "Freight & Cartage"
-        : headerClassification.accountName,
+      description: li.description,
+      quantity: li.quantity,
+      unitPrice: li.unitPrice,
+      totalExGst: li.totalExGst,
+      gstAmount: li.gstAmount,
+      accountCode: freight ? FREIGHT_CODE : (li.accountCode || headerClassification.accountCode),
+      accountName: freight ? "Freight & Cartage" : headerClassification.accountName,
       isFreight: freight,
       aiConfidence: freight ? 90 : headerClassification.confidence,
       aiMethod: freight ? "keyword" : headerClassification.method,
     };
   });
 
-  // If no line items, create a single summary line
   if (lines.length === 0) {
-    const total = invoice.total || 0;
-    const gst = invoice.gst || total / 11;
     lines.push({
-      description: `${invoice.supplier} — ${invoice.category || "Stock purchase"}`,
+      description: `${ub.supplierName} — ${ub.accountCategory || "Stock purchase"}`,
       quantity: 1,
-      unitPrice: total,
-      totalExGst: total - gst,
-      gstAmount: gst,
+      unitPrice: ub.totalIncGst,
+      totalExGst: ub.subtotalExGst,
+      gstAmount: ub.gstAmount,
       accountCode: headerClassification.accountCode,
       accountName: headerClassification.accountName,
       isFreight: false,
@@ -107,13 +96,13 @@ function buildReviewData(invoice: AccountingBillReviewProps["invoice"]): BillRev
   }
 
   return {
-    supplierName: invoice.supplier || "",
-    invoiceNumber: invoice.invoice_number || "",
-    invoiceDate: invoice.invoice_date || new Date().toISOString().split("T")[0],
-    dueDate: invoice.due_date || "",
-    subtotalExGst: invoice.subtotal || lines.reduce((s, l) => s + l.totalExGst, 0),
-    gstAmount: invoice.gst || lines.reduce((s, l) => s + l.gstAmount, 0),
-    totalIncGst: invoice.total || lines.reduce((s, l) => s + l.totalExGst + l.gstAmount, 0),
+    supplierName: ub.supplierName,
+    invoiceNumber: ub.invoiceNumber,
+    invoiceDate: ub.invoiceDate,
+    dueDate: ub.dueDate,
+    subtotalExGst: ub.subtotalExGst || lines.reduce((s, l) => s + l.totalExGst, 0),
+    gstAmount: ub.gstAmount || lines.reduce((s, l) => s + l.gstAmount, 0),
+    totalIncGst: ub.totalIncGst || lines.reduce((s, l) => s + l.totalExGst + l.gstAmount, 0),
     lines,
     headerAccountCode: headerClassification.accountCode,
     headerAccountName: headerClassification.accountName,

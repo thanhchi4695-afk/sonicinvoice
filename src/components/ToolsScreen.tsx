@@ -978,6 +978,169 @@ function ImageHelperPanel({ onBack }: { onBack: () => void }) {
     </div>
   );
 }
+// ── Learning Memory Panel ──────────────────────────────────
+import { getMemoryList, deleteMemory, type InvoiceMemory } from "@/lib/invoice-learning";
+import { getLayoutLabel } from "@/lib/invoice-templates";
+
+function LearningMemoryPanel({ onBack }: { onBack: () => void }) {
+  const [memories, setMemories] = useState<InvoiceMemory[]>(getMemoryList());
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const refresh = () => setMemories(getMemoryList());
+  const handleDelete = (supplier: string) => {
+    deleteMemory(supplier);
+    refresh();
+  };
+
+  return (
+    <div className="px-4 pt-6 pb-24 animate-fade-in">
+      <button onClick={onBack} className="flex items-center gap-1 text-xs text-muted-foreground mb-4 hover:text-foreground transition-colors">
+        <ChevronLeft className="w-3.5 h-3.5" /> Back to Tools
+      </button>
+      <h2 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
+        <Brain className="w-5 h-5 text-secondary" /> Learning Memory
+      </h2>
+      <p className="text-xs text-muted-foreground mb-4">
+        Invoice patterns learned from your uploads. The more you parse, the smarter extraction becomes.
+      </p>
+
+      {memories.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Brain className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="text-sm font-medium">No patterns learned yet</p>
+          <p className="text-xs mt-1">Upload and parse an invoice to start building memory.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-card border border-border rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-foreground">{memories.length}</p>
+              <p className="text-[10px] text-muted-foreground">Suppliers learned</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-foreground">{memories.reduce((s, m) => s + m.totalParses, 0)}</p>
+              <p className="text-[10px] text-muted-foreground">Total parses</p>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-foreground">{memories.reduce((s, m) => s + m.totalCorrections, 0)}</p>
+              <p className="text-[10px] text-muted-foreground">Corrections learned</p>
+            </div>
+          </div>
+
+          {memories.map(mem => {
+            const isOpen = expanded === mem.supplierName;
+            return (
+              <div key={mem.supplierName} className="border border-border rounded-lg bg-card overflow-hidden">
+                <button
+                  onClick={() => setExpanded(isOpen ? null : mem.supplierName)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{mem.supplierName}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {getLayoutLabel(mem.fingerprint.layoutType as any)} • {mem.totalParses} parse{mem.totalParses !== 1 ? "s" : ""}
+                      {mem.confidenceBoost > 0 && <span className="text-success ml-1">+{mem.confidenceBoost} boost</span>}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {mem.totalCorrections > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary/15 text-secondary">
+                        {mem.totalCorrections} corrections
+                      </span>
+                    )}
+                    {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="border-t border-border px-4 py-3 space-y-3 text-xs">
+                    <div>
+                      <p className="font-semibold text-foreground mb-1.5">📐 Layout Fingerprint</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                        <div className="flex gap-2"><span className="text-muted-foreground w-24 shrink-0">Layout:</span><span className="text-foreground">{mem.fingerprint.layoutType}</span></div>
+                        <div className="flex gap-2"><span className="text-muted-foreground w-24 shrink-0">Variant method:</span><span className="text-foreground">{mem.fingerprint.variantMethod}</span></div>
+                        <div className="flex gap-2"><span className="text-muted-foreground w-24 shrink-0">Size system:</span><span className="text-foreground">{mem.fingerprint.sizeSystem}</span></div>
+                        <div className="flex gap-2"><span className="text-muted-foreground w-24 shrink-0">Grouping:</span><span className="text-foreground">{mem.fingerprint.groupingRequired ? "Yes" : "No"}</span></div>
+                        {mem.fingerprint.costFieldRule && <div className="flex gap-2 col-span-2"><span className="text-muted-foreground w-24 shrink-0">Cost field:</span><span className="text-foreground">{mem.fingerprint.costFieldRule}</span></div>}
+                        {mem.fingerprint.quantityFieldRule && <div className="flex gap-2 col-span-2"><span className="text-muted-foreground w-24 shrink-0">Qty field:</span><span className="text-foreground">{mem.fingerprint.quantityFieldRule}</span></div>}
+                        {mem.fingerprint.lineItemZone && <div className="flex gap-2 col-span-2"><span className="text-muted-foreground w-24 shrink-0">Line-item zone:</span><span className="text-foreground">{mem.fingerprint.lineItemZone}</span></div>}
+                      </div>
+                      {mem.fingerprint.tableHeaders.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {mem.fingerprint.tableHeaders.map((h, i) => (
+                            <span key={i} className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-[9px]">{h}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-foreground mb-1.5">📊 Stats</p>
+                      <div className="flex gap-4 text-[11px]">
+                        <span>Parses: <strong>{mem.totalParses}</strong></span>
+                        <span>Corrections: <strong>{mem.totalCorrections}</strong></span>
+                        <span>Boost: <strong className="text-success">+{mem.confidenceBoost}</strong></span>
+                        <span>Noise: <strong>{mem.noisePatterns.length}</strong></span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">Last parsed: {new Date(mem.lastParsed).toLocaleDateString()}</p>
+                    </div>
+
+                    {mem.fieldCorrections.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-foreground mb-1.5">✏️ Learned Corrections ({mem.fieldCorrections.length})</p>
+                        <div className="space-y-0.5 max-h-32 overflow-y-auto">
+                          {mem.fieldCorrections.map((fc, i) => (
+                            <div key={i} className="flex items-center gap-2 text-[10px]">
+                              <span className="px-1 py-0.5 rounded bg-primary/10 text-primary">{fc.field}</span>
+                              <span className="text-muted-foreground line-through">{fc.pattern}</span>
+                              <span className="text-foreground">→</span>
+                              <span className="text-success font-medium">{fc.corrected}</span>
+                              <span className="text-muted-foreground ml-auto">×{fc.occurrences}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {mem.noisePatterns.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-foreground mb-1.5">🚫 Noise Patterns ({mem.noisePatterns.length})</p>
+                        <div className="space-y-0.5 max-h-24 overflow-y-auto">
+                          {mem.noisePatterns.slice(0, 10).map((np, i) => (
+                            <div key={i} className="flex items-center gap-2 text-[10px]">
+                              <span className="text-muted-foreground truncate max-w-[200px]">"{np.text}"</span>
+                              <span className="text-destructive text-[9px]">{np.reason}</span>
+                              <span className="text-muted-foreground ml-auto">×{np.occurrences}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {mem.groupingRules.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-foreground mb-1.5">🔗 Grouping Rules</p>
+                        {mem.groupingRules.map((g, i) => (
+                          <p key={i} className="text-[10px] text-muted-foreground">• {g.description} (×{g.occurrences})</p>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-2 border-t border-border">
+                      <Button variant="outline" size="sm" className="text-[10px] h-7 gap-1 text-destructive" onClick={() => handleDelete(mem.supplierName)}>
+                        <Trash2 className="w-3 h-3" /> Delete Memory
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const ToolsScreen = () => {
   const [activeTool, setActiveTool] = useState<string | null>(null);

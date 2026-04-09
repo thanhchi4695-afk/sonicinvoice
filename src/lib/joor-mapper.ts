@@ -1,3 +1,9 @@
+import { deriveArrivalMonth } from "./wholesale-mapper";
+import type { GroupedProduct, SourceMeta } from "./unified-types";
+
+// Re-export for backwards compatibility
+export type { GroupedProduct as MappedProduct };
+
 export interface JoorLineItem {
   style_name: string;
   style_number: string;
@@ -18,34 +24,25 @@ export interface JoorLineItem {
   image_url?: string;
 }
 
-export interface MappedProduct {
-  title: string;
-  sku: string;
-  barcode: string;
-  description: string;
-  vendor: string;
-  productType: string;
-  price: string;
-  costPrice: string;
-  colour: string;
-  size: string;
-  collection: string;
-  season: string;
-  fabrication: string;
-  imageUrl: string;
-  brand: string;
-  priceStatus: "full_price" | "sale";
-  isNew: boolean;
-  arrivalMonth: string;
-  sizes?: string[];
-  barcodes?: string[];
-  quantities?: number[];
+function buildSource(
+  item: JoorLineItem,
+  orderMeta: { season_code?: string; delivery_name?: string }
+): SourceMeta {
+  return {
+    sourceType: "wholesale",
+    sourcePlatform: "joor",
+    sourceDocumentId: "",
+    sourceSupplier: item.brand || "",
+    sourceDate: new Date().toISOString(),
+    sourceCurrency: "AUD",
+    importedAt: new Date().toISOString(),
+  };
 }
 
 export function mapJoorLineItemToProduct(
   item: JoorLineItem,
   orderMeta: { season_code?: string; delivery_name?: string }
-): MappedProduct {
+): GroupedProduct {
   const month = deriveArrivalMonth(item.season_year || orderMeta.season_code || "");
 
   return {
@@ -57,40 +54,35 @@ export function mapJoorLineItemToProduct(
     description: item.style_description || "",
     vendor: item.brand || "",
     productType: item.silhouette || "",
-    price: item.price_retail?.toFixed(2) || "0.00",
-    costPrice: item.price_wholesale?.toFixed(2) || "0.00",
+    retailPrice: item.price_retail || 0,
+    wholesaleCost: item.price_wholesale || 0,
     colour: item.color_name || "",
+    colourCode: item.color_code || "",
     size: item.size_name || "",
     collection: item.delivery_name || orderMeta.delivery_name || "",
     season: item.season_name || orderMeta.season_code || "",
     fabrication: item.fabrication || "",
     imageUrl: item.image_url || "",
     brand: item.brand || "",
-    priceStatus: "full_price",
-    isNew: true,
+    tags: [item.brand, item.color_name, item.delivery_name || orderMeta.delivery_name, "full_price", "new"].filter(Boolean) as string[],
     arrivalMonth: month,
+    sizes: [item.size_name],
+    barcodes: [item.upc || ""],
+    quantities: [item.quantity_ordered],
+    source: buildSource(item, orderMeta),
   };
 }
 
 export function groupJoorItemsIntoProducts(
   items: JoorLineItem[],
   orderMeta: { season_code?: string; delivery_name?: string }
-): MappedProduct[] {
-  const grouped = new Map<
-    string,
-    MappedProduct & { sizes: string[]; barcodes: string[]; quantities: number[] }
-  >();
+): GroupedProduct[] {
+  const grouped = new Map<string, GroupedProduct>();
 
   for (const item of items) {
     const key = `${item.style_number}||${item.color_name}`;
     if (!grouped.has(key)) {
-      const base = mapJoorLineItemToProduct(item, orderMeta);
-      grouped.set(key, {
-        ...base,
-        sizes: [item.size_name],
-        barcodes: [item.upc || ""],
-        quantities: [item.quantity_ordered],
-      });
+      grouped.set(key, mapJoorLineItemToProduct(item, orderMeta));
     } else {
       const existing = grouped.get(key)!;
       existing.sizes.push(item.size_name);
@@ -105,22 +97,9 @@ export function groupJoorItemsIntoProducts(
   }));
 }
 
-export function deriveArrivalMonth(seasonCode: string): string {
-  if (!seasonCode) return "";
-  const upper = seasonCode.toUpperCase();
-  const year = seasonCode.match(/\d{2,4}/)?.[0];
-  const fullYear = year
-    ? year.length === 2
-      ? `20${year}`
-      : year
-    : new Date().getFullYear().toString();
-  if (upper.startsWith("SS") || upper.startsWith("SP")) return `Jan ${fullYear}`;
-  if (upper.startsWith("AW") || upper.startsWith("FW")) return `Jul ${fullYear}`;
-  if (upper.startsWith("RE")) return `Apr ${fullYear}`;
-  return "";
-}
+export { deriveArrivalMonth };
 
-export function buildShopifyCSV(products: MappedProduct[]): string {
+export function buildShopifyCSV(products: GroupedProduct[]): string {
   const headers = [
     "Handle", "Title", "Body (HTML)", "Vendor", "Product Category",
     "Type", "Tags", "Published", "Option1 Name", "Option1 Value",
@@ -130,8 +109,8 @@ export function buildShopifyCSV(products: MappedProduct[]): string {
 
   const rows: string[][] = [];
   for (const p of products) {
-    const sizes = p.sizes || [p.size];
-    const barcodes = p.barcodes || [p.barcode];
+    const sizes = p.sizes.length ? p.sizes : [p.size];
+    const barcodes = p.barcodes.length ? p.barcodes : [p.barcode];
 
     for (let i = 0; i < sizes.length; i++) {
       const isFirst = i === 0;
@@ -142,19 +121,15 @@ export function buildShopifyCSV(products: MappedProduct[]): string {
         isFirst ? p.vendor : "",
         "",
         isFirst ? p.productType : "",
-        isFirst
-          ? [p.brand, p.colour, p.collection, "full_price", "new"]
-              .filter(Boolean)
-              .join(", ")
-          : "",
+        isFirst ? p.tags.join(", ") : "",
         isFirst ? "TRUE" : "",
         "Colour",
         p.colour,
         "Size",
         sizes[i],
         `${p.sku.split("-").slice(0, 2).join("-")}-${sizes[i]}`.toUpperCase().replace(/\s+/g, "-"),
-        p.price,
-        p.costPrice,
+        p.retailPrice.toFixed(2),
+        p.wholesaleCost.toFixed(2),
         barcodes[i] || "",
         isFirst ? p.imageUrl : "",
         isFirst ? p.collection : "",
@@ -163,11 +138,10 @@ export function buildShopifyCSV(products: MappedProduct[]): string {
   }
 
   const escape = (v: string) => `"${(v || "").replace(/"/g, '""')}"`;
-
   return [headers.map(escape).join(","), ...rows.map((r) => r.map(escape).join(","))].join("\n");
 }
 
-export function buildLightspeedCSV(products: MappedProduct[]): string {
+export function buildLightspeedCSV(products: GroupedProduct[]): string {
   const headers = [
     "Handle", "Title", "Option1 Name", "Option1 Value",
     "Option2 Name", "Option2 Value", "Variant SKU",
@@ -178,8 +152,8 @@ export function buildLightspeedCSV(products: MappedProduct[]): string {
 
   const rows: string[][] = [];
   for (const p of products) {
-    const sizes = p.sizes || [p.size];
-    const barcodes = p.barcodes || [p.barcode];
+    const sizes = p.sizes.length ? p.sizes : [p.size];
+    const barcodes = p.barcodes.length ? p.barcodes : [p.barcode];
 
     for (let i = 0; i < sizes.length; i++) {
       const isFirst = i === 0;
@@ -191,16 +165,12 @@ export function buildLightspeedCSV(products: MappedProduct[]): string {
         "Size",
         sizes[i],
         `${p.sku.split("-").slice(0, 2).join("-")}-${sizes[i]}`.toUpperCase().replace(/\s+/g, "-"),
-        p.price,
-        p.costPrice,
+        p.retailPrice.toFixed(2),
+        p.wholesaleCost.toFixed(2),
         barcodes[i] || "",
         isFirst ? p.vendor : "",
         isFirst ? p.productType : "",
-        isFirst
-          ? [p.brand, p.colour, p.collection, "full_price", "new"]
-              .filter(Boolean)
-              .join(", ")
-          : "",
+        isFirst ? p.tags.join(", ") : "",
         isFirst ? p.description : "",
         isFirst ? p.imageUrl : "",
         "TRUE",
@@ -210,7 +180,6 @@ export function buildLightspeedCSV(products: MappedProduct[]): string {
   }
 
   const escape = (v: string) => `"${(v || "").replace(/"/g, '""')}"`;
-
   return [headers.map(escape).join(","), ...rows.map((r) => r.map(escape).join(","))].join("\n");
 }
 

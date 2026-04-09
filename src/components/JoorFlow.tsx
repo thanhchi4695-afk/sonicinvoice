@@ -275,6 +275,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
                   { name: "Colour", values: [p.colour] },
                   { name: "Size", values: p.sizes || [p.size] },
                 ],
+                images: p.imageUrl ? [{ src: p.imageUrl }] : [],
               },
             }),
           }
@@ -397,26 +398,38 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
       const enriched = await enrichJoorProducts(
         fileProducts,
         fileParseResult?.brand || "",
-        session.access_token
+        session.access_token,
+        true // searchImages
       );
       setFileProducts(enriched);
 
-      // Rebuild grouped products with enriched data
+      // Rebuild grouped products with enriched data (including images)
       if (fileParseResult?.orders?.[0]) {
         const order = fileParseResult.orders[0];
-        // Update line items with enriched descriptions
         const updatedItems = order.lineItems.map(li => {
           const enrichedProduct = enriched.find(p => p.styleNumber === li.styleNumber && p.colour === li.colour);
-          return enrichedProduct ? { ...li, description: enrichedProduct.description, productType: enrichedProduct.category || li.productType } : li;
+          if (!enrichedProduct) return li;
+          return {
+            ...li,
+            description: enrichedProduct.description,
+            productType: enrichedProduct.category || li.productType,
+            imageUrl: enrichedProduct.imageUrl || li.imageUrl,
+          };
         });
         const grouped = groupJoorItemsIntoProducts(updatedItems as any, {
           season_code: order.season,
           delivery_name: order.collection,
         });
-        setFileGroupedProducts(grouped);
+        // Attach image URLs to grouped products
+        const groupedWithImages = grouped.map(gp => {
+          const match = enriched.find(ep => ep.styleNumber === gp.sku?.split("-")?.[0] || ep.styleName === gp.title);
+          return match?.imageUrl ? { ...gp, imageUrl: match.imageUrl } : gp;
+        });
+        setFileGroupedProducts(groupedWithImages);
       }
 
-      toast.success("AI enrichment complete — descriptions and product types added");
+      const imagesFound = enriched.filter(p => p.imageUrl).length;
+      toast.success(`AI enrichment complete — descriptions, types${imagesFound > 0 ? `, and ${imagesFound} images` : ""} added`);
     } catch (err: any) {
       toast.error(err.message || "AI enrichment failed");
     }
@@ -708,7 +721,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
               <Sparkles className="w-5 h-5 text-primary" />
               <div>
                 <p className="text-sm font-medium">AI Product Enrichment</p>
-                <p className="text-xs text-muted-foreground">Generate descriptions, product types, and search queries for images</p>
+                <p className="text-xs text-muted-foreground">Generate descriptions, product types, tags, and find product images</p>
               </div>
             </div>
             <Button size="sm" onClick={handleAIEnrich} disabled={fileEnriching}>
@@ -727,6 +740,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
+                  <th className="text-left p-3 font-medium w-16">Image</th>
                   <th className="text-left p-3 font-medium">Style</th>
                   <th className="text-left p-3 font-medium">Style #</th>
                   <th className="text-left p-3 font-medium">Colour</th>
@@ -740,6 +754,20 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
               <tbody>
                 {fileProducts.map((p, i) => (
                   <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30">
+                    <td className="p-3">
+                      {p.imageUrl ? (
+                        <img
+                          src={p.imageUrl}
+                          alt={p.styleName}
+                          className="w-12 h-12 object-cover rounded border border-border"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded border border-dashed border-border flex items-center justify-center bg-muted/30">
+                          <Eye className="w-4 h-4 text-muted-foreground/40" />
+                        </div>
+                      )}
+                    </td>
                     <td className="p-3">
                       <div>
                         <span className="font-medium">{p.styleName}</span>

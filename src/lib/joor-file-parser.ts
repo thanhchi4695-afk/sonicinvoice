@@ -311,7 +311,8 @@ function productsToWholesaleOrder(
 export async function enrichJoorProducts(
   products: JoorParsedProduct[],
   brand: string,
-  accessToken: string
+  accessToken: string,
+  searchImages: boolean = true
 ): Promise<JoorParsedProduct[]> {
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   try {
@@ -323,7 +324,7 @@ export async function enrichJoorProducts(
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ products, brand }),
+        body: JSON.stringify({ products, brand, searchImages }),
       }
     );
     if (!res.ok) throw new Error(`Enrichment failed: ${res.status}`);

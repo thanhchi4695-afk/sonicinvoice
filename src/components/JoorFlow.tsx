@@ -398,26 +398,38 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
       const enriched = await enrichJoorProducts(
         fileProducts,
         fileParseResult?.brand || "",
-        session.access_token
+        session.access_token,
+        true // searchImages
       );
       setFileProducts(enriched);
 
-      // Rebuild grouped products with enriched data
+      // Rebuild grouped products with enriched data (including images)
       if (fileParseResult?.orders?.[0]) {
         const order = fileParseResult.orders[0];
-        // Update line items with enriched descriptions
         const updatedItems = order.lineItems.map(li => {
           const enrichedProduct = enriched.find(p => p.styleNumber === li.styleNumber && p.colour === li.colour);
-          return enrichedProduct ? { ...li, description: enrichedProduct.description, productType: enrichedProduct.category || li.productType } : li;
+          if (!enrichedProduct) return li;
+          return {
+            ...li,
+            description: enrichedProduct.description,
+            productType: enrichedProduct.category || li.productType,
+            imageUrl: enrichedProduct.imageUrl || li.imageUrl,
+          };
         });
         const grouped = groupJoorItemsIntoProducts(updatedItems as any, {
           season_code: order.season,
           delivery_name: order.collection,
         });
-        setFileGroupedProducts(grouped);
+        // Attach image URLs to grouped products
+        const groupedWithImages = grouped.map(gp => {
+          const match = enriched.find(ep => ep.styleNumber === gp.sku?.split("-")?.[0] || ep.styleName === gp.title);
+          return match?.imageUrl ? { ...gp, imageUrl: match.imageUrl } : gp;
+        });
+        setFileGroupedProducts(groupedWithImages);
       }
 
-      toast.success("AI enrichment complete — descriptions and product types added");
+      const imagesFound = enriched.filter(p => p.imageUrl).length;
+      toast.success(`AI enrichment complete — descriptions, types${imagesFound > 0 ? `, and ${imagesFound} images` : ""} added`);
     } catch (err: any) {
       toast.error(err.message || "AI enrichment failed");
     }

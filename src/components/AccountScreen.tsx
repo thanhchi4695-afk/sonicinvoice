@@ -1583,3 +1583,60 @@ function WholesaleConnectionsSection() {
     </Section>
   );
 }
+
+// ─── Accounting Connections (Xero / MYOB) ─────────────────────────────
+function AccountingConnectionsSection() {
+  const [connections, setConnections] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.from("accounting_connections").select("*").then(({ data }) => {
+      setConnections(data || []);
+      setLoading(false);
+    });
+  }, []);
+
+  const handleDisconnect = async (id: string) => {
+    await supabase.from("accounting_connections").delete().eq("id", id);
+    setConnections(prev => prev.filter(c => c.id !== id));
+  };
+
+  if (loading) return null;
+
+  const platforms = [
+    { id: "xero", name: "Xero", nameField: "xero_tenant_name" },
+    { id: "myob", name: "MYOB", nameField: "myob_company_file_name" },
+  ];
+
+  return (
+    <Section title="Accounting Software">
+      <p className="text-xs text-muted-foreground mb-3">
+        Push invoices directly to your accounting platform. Connect via the Accounting Integration flow on the home screen.
+      </p>
+      <div className="space-y-2">
+        {platforms.map(p => {
+          const conn = connections.find(c => c.platform === p.id);
+          return (
+            <div key={p.id} className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+              <div>
+                <span className="text-sm font-medium">{p.name}</span>
+                {conn ? (
+                  <span className="text-xs text-green-600 ml-2">
+                    ✓ {conn[p.nameField] || "Connected"}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground ml-2">Not connected</span>
+                )}
+              </div>
+              {conn && (
+                <button onClick={() => handleDisconnect(conn.id)} className="text-xs text-destructive hover:underline flex items-center gap-1">
+                  <Unplug className="w-3 h-3" /> Disconnect
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Section>
+  );
+}

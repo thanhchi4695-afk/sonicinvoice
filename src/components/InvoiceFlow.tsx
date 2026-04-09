@@ -645,7 +645,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
     // ── Post-processing validation ──
     const { products: validated, debug } = validateAndCleanProducts(products, supplierName);
-    setValidationDebug(debug);
+    setValidationDebug({
+      ...debug,
+      parsingPlan: aiParsingPlan as any,
+      rejectedByAI: aiRejectedRows,
+    });
     setValidatedProducts(validated);
 
     // Filter to accepted products only

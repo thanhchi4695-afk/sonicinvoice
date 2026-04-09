@@ -313,7 +313,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                           <span key={j} className="px-2 py-1 rounded bg-muted/50 font-mono">
                             {new Date(h.date).toLocaleDateString("en-AU", { month: "short", year: "2-digit" })}: ${h.cost.toFixed(2)}
                             {change !== null && (
-                              <span className={`ml-1 ${<span className={`ml-1 ${change > 5 ? "text-warning" : change < 0 ? "text-success" : ""}`}>}`}>
+                              <span className={`ml-1 ${change > 5 ? "text-warning" : change < 0 ? "text-success" : ""}`}>
                                 ({change > 0 ? "+" : ""}{change.toFixed(1)}%)
                               </span>
                             )}

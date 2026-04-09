@@ -278,6 +278,93 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     toast.success("All products with alt text approved");
   };
 
+  // ── Analyse Image Sizes ──
+  const analyseSizes = async () => {
+    const withImages = products.filter(p => p.imageUrl);
+    if (withImages.length === 0) { toast.info("No products with images"); return; }
+    setAnalysingSize(true);
+    try {
+      for (let i = 0; i < withImages.length; i += 50) {
+        const batch = withImages.slice(i, i + 50);
+        const { data, error } = await supabase.functions.invoke("image-compress", {
+          body: {
+            action: "analyse_sizes",
+            images: batch.map(p => ({ product_id: p.id, image_url: p.imageUrl })),
+          },
+        });
+        if (error) throw error;
+        if (data?.results) {
+          setProducts(prev => {
+            const updated = [...prev];
+            for (const r of data.results) {
+              const match = updated.find(u => u.id === r.product_id);
+              if (match) {
+                match.originalSize = r.original_size;
+                match.needsCompression = r.needs_compression;
+                match.compressionReason = r.reason;
+              }
+            }
+            return updated;
+          });
+        }
+      }
+      toast.success("Image size analysis complete");
+    } catch (e: any) { toast.error(e.message || "Size analysis failed"); }
+    setAnalysingSize(false);
+  };
+
+  // ── Compress Images ──
+  const compressImages = async (subset?: ProductImage[]) => {
+    const targets = (subset || products).filter(p => p.imageUrl && !p.compressed && (p.needsCompression !== false));
+    if (targets.length === 0) { toast.info("No images to compress"); return; }
+    setCompressing(true);
+    setCompressionProgress({ current: 0, total: targets.length });
+    let compressed = 0;
+    let totalSaved = 0;
+
+    for (let i = 0; i < targets.length; i++) {
+      setCompressionProgress({ current: i + 1, total: targets.length });
+      try {
+        // Client-side Canvas compression
+        const result = await compressImageFromUrl(targets[i].imageUrl, {
+          maxWidth: 2048,
+          maxHeight: 2048,
+          quality: 0.82,
+          format: "image/jpeg",
+        });
+
+        // Upload compressed image to storage via edge function
+        const { data, error } = await supabase.functions.invoke("image-compress", {
+          body: {
+            action: "upload_compressed",
+            product_id: targets[i].id,
+            base64: result.base64,
+            content_type: "image/jpeg",
+            original_size: result.originalSize,
+          },
+        });
+
+        if (error) throw error;
+
+        setProducts(prev => prev.map(p => p.id === targets[i].id ? {
+          ...p,
+          compressed: true,
+          originalSize: result.originalSize,
+          compressedSize: result.compressedSize,
+          compressedUrl: data?.compressed_url,
+        } : p));
+
+        totalSaved += result.originalSize - result.compressedSize;
+        compressed++;
+      } catch (e) {
+        console.warn(`Failed to compress ${targets[i].title}:`, e);
+      }
+    }
+
+    toast.success(`Compressed ${compressed} images (saved ${formatBytes(totalSaved)})`);
+    setCompressing(false);
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };

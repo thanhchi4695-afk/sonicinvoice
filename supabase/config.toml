@@ -1,1 +1,10 @@
 project_id = "xuaakgdkkrrsqxafffyj"
+
+[functions.shopify-webhooks-privacy]
+verify_jwt = false
+
+[functions.shopify-auth-callback]
+verify_jwt = false
+
+[functions.shopify-session-verify]
+verify_jwt = false

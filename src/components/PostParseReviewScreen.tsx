@@ -19,6 +19,7 @@ interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;
   products: ValidatedProduct[];
   supplierName?: string;
+  invoicePages?: string[]; // base64 or URL images per page
   onUpdateProducts: (products: ValidatedProduct[]) => void;
   onExportAccepted: () => void;
   onPushToShopify: () => void;

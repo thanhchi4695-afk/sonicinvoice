@@ -367,16 +367,16 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   };
 
   const convertToProductGroups = (products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }>) => {
-    // Group variant rows into Shopify-ready products by matching style code + product name + colour
+    // Group variant rows into Shopify-ready products by matching style code + product name
+    // Group across BOTH colours and sizes so one Shopify product has all its variants
     const groupMap = new Map<string, typeof products>();
     for (const p of products) {
-      // Build a grouping key from the base product identity
-      const baseSku = (p.sku || "").replace(/[-_]\d+$/, "").toLowerCase().trim();
+      // Strip trailing size/colour suffixes from SKU to find the base style code
+      const baseSku = (p.sku || "").replace(/[-_]?(XXS|XS|S|M|L|XL|XXL|2XL|3XL|OS|\d{1,2})$/i, "").replace(/[-_]?(BLK|BK|NVY|NY|WHT|WH|OLI|CRE|GRY|GY|RED|PNK|BRN|BLU)$/i, "").toLowerCase().trim();
       const baseName = (p.name || "").toLowerCase().trim();
-      const baseColour = (p.colour || "").toLowerCase().trim();
-      const key = baseSku
-        ? `${baseSku}::${baseColour}`
-        : `${baseName}::${baseColour}`;
+      // Key by style code OR name — do NOT include colour so variants group together
+      const key = baseSku || baseName;
+      if (!key) continue;
       if (!groupMap.has(key)) groupMap.set(key, []);
       groupMap.get(key)!.push(p);
     }
@@ -385,38 +385,61 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     for (const [, items] of groupMap) {
       const first = items[0];
       const result = matchProduct(first.barcode || "", first.sku || "", first.name || "");
-      const hasMultipleSizes = items.length > 1 || (first.size && first.size !== "One Size");
-      const hasMultipleColours = new Set(items.map(i => i.colour?.toLowerCase())).size > 1;
+      
+      const uniqueColours = new Set(items.map(i => (i.colour || "").toLowerCase()).filter(Boolean));
+      const uniqueSizes = new Set(items.map(i => (i.size || "").toLowerCase()).filter(Boolean));
+      const hasMultipleColours = uniqueColours.size > 1;
+      const hasSize = uniqueSizes.size > 0 && !uniqueSizes.has("one size");
 
       const displayName = first.brand && first.name && !first.name.toLowerCase().startsWith(first.brand.toLowerCase())
         ? `${first.brand} ${first.name}`
         : (first.name || "Unnamed Product");
+
+      // Deduplicate identical variant rows (same colour + size), summing quantities
+      const variantMap = new Map<string, { sku: string; colour: string; size: string; qty: number; price: number; rrp: number }>();
+      for (const p of items) {
+        const vKey = `${(p.colour || "").toLowerCase()}::${(p.size || "").toLowerCase()}`;
+        const existing = variantMap.get(vKey);
+        if (existing) {
+          existing.qty += p.qty || 0;
+        } else {
+          variantMap.set(vKey, {
+            sku: p.sku || "",
+            colour: p.colour || "",
+            size: p.size || "One Size",
+            qty: p.qty || 1,
+            price: p.cost || 0,
+            rrp: p.rrp || 0,
+          });
+        }
+      }
+      const dedupedVariants = Array.from(variantMap.values());
 
       groups.push({
         styleGroup: first.sku || null as any,
         name: displayName,
         brand: first.brand || supplierName || "Unknown",
         type: first.type || "General",
-        colour: first.colour || "",
-        size: items.length === 1 ? (first.size || "") : "",
+        colour: hasMultipleColours ? "" : (first.colour || ""),
+        size: dedupedVariants.length === 1 ? (dedupedVariants[0].size || "") : "",
         price: first.cost || 0,
         rrp: first.rrp || 0,
         cogs: first.cost || 0,
         status: (first.cost > 0 && first.name) ? "ready" : "review",
         metafields: {},
-        isGrouped: items.length > 1,
+        isGrouped: dedupedVariants.length > 1,
         barcode: first.barcode || "",
         vendorCode: first.sku || "",
         matchSource: result.source,
-        variants: items.map(p => ({
-          sku: p.sku || "",
-          option1Name: hasMultipleSizes ? "Size" : "Size",
-          option1Value: p.size || "One Size",
-          option2Name: hasMultipleColours ? "Colour" : (p.colour ? "Colour" : ""),
-          option2Value: hasMultipleColours ? (p.colour || "") : (p.colour || ""),
-          qty: p.qty || 1,
-          price: p.cost || 0,
-          rrp: p.rrp || 0,
+        variants: dedupedVariants.map(v => ({
+          sku: v.sku,
+          option1Name: hasSize ? "Size" : (hasMultipleColours ? "Colour" : "Size"),
+          option1Value: hasSize ? v.size : (hasMultipleColours ? v.colour : (v.size || "One Size")),
+          option2Name: hasSize && hasMultipleColours ? "Colour" : "",
+          option2Value: hasSize && hasMultipleColours ? v.colour : "",
+          qty: v.qty,
+          price: v.price,
+          rrp: v.rrp,
         })),
       });
     }

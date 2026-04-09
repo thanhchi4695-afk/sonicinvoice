@@ -1,19 +1,30 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   ChevronLeft, Plus, Trash2, Check, X, AlertTriangle,
-  FileText, Upload, Loader2, Search, ClipboardList, Edit2,
+  FileText, Upload, Loader2, Search, Edit2, Package,
+  ArrowDownToLine, Link2,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { addAuditEntry } from "@/lib/audit-log";
+import { adjustInventory, findVariantBySKU, getConnection, getLocations } from "@/lib/shopify-api";
 
 // ── Types ──────────────────────────────────────────────────
 interface POLine {
   id: string;
-  product: string;
+  product_title: string;
   sku: string;
-  expectedQty: number;
-  expectedCost: number;
+  color: string;
+  size: string;
+  expected_qty: number;
+  received_qty: number;
+  expected_cost: number;
+  actual_cost: number | null;
   notes: string;
 }
 
@@ -21,14 +32,18 @@ export type POStatus = "draft" | "sent" | "awaiting" | "partial" | "received" | 
 
 export interface PurchaseOrder {
   id: string;
-  poNumber: string;
-  supplier: string;
-  expectedDate: string;
-  notes: string;
-  lines: POLine[];
+  po_number: string;
+  supplier_id: string | null;
+  supplier_name: string;
+  expected_date: string | null;
+  notes: string | null;
   status: POStatus;
-  createdAt: string;
-  matchResult?: MatchResult;
+  total_cost: number;
+  linked_document_id: string | null;
+  match_result: MatchResult | null;
+  created_at: string;
+  updated_at: string;
+  lines: POLine[];
 }
 
 interface MatchLine {
@@ -48,25 +63,10 @@ interface MatchResult {
   summary: { matched: number; qtyDiff: number; priceDiff: number; notOnPo: number; missing: number };
 }
 
-// ── localStorage helpers ───────────────────────────────────
-const PO_KEY = "purchase_orders";
-
+// For external use
 export function getPurchaseOrders(): PurchaseOrder[] {
-  try { return JSON.parse(localStorage.getItem(PO_KEY) || "[]"); } catch { return []; }
+  try { return JSON.parse(localStorage.getItem("purchase_orders") || "[]"); } catch { return []; }
 }
-
-function savePurchaseOrders(pos: PurchaseOrder[]) {
-  localStorage.setItem(PO_KEY, JSON.stringify(pos));
-}
-
-function generatePONumber(): string {
-  const pos = getPurchaseOrders();
-  const year = new Date().getFullYear();
-  const next = pos.length + 1;
-  return `PO-${year}-${String(next).padStart(3, "0")}`;
-}
-
-function uid() { return Math.random().toString(36).slice(2, 10); }
 
 const STATUS_BADGES: Record<POStatus, { emoji: string; label: string; cls: string }> = {
   draft: { emoji: "📝", label: "Draft", cls: "bg-muted text-muted-foreground" },
@@ -77,104 +77,352 @@ const STATUS_BADGES: Record<POStatus, { emoji: string; label: string; cls: strin
   discrepancy: { emoji: "⚠", label: "Discrepancy", cls: "bg-destructive/15 text-destructive" },
 };
 
-// ── Past suppliers helper ──────────────────────────────────
-function getPastSuppliers(): string[] {
-  try {
-    const history: { supplier?: string }[] = JSON.parse(localStorage.getItem("processing_history") || "[]");
-    const set = new Set(history.map(h => h.supplier).filter(Boolean) as string[]);
-    return Array.from(set);
-  } catch { return []; }
-}
+function uid() { return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10); }
 
 // ── Component ──────────────────────────────────────────────
 interface Props { onBack: () => void; }
-
-type View = "list" | "create" | "edit" | "match" | "report";
+type View = "list" | "create" | "edit" | "receive" | "match" | "detail";
 
 const PurchaseOrderPanel = ({ onBack }: Props) => {
   const [view, setView] = useState<View>("list");
-  const [orders, setOrders] = useState<PurchaseOrder[]>(getPurchaseOrders);
+  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [detailPO, setDetailPO] = useState<PurchaseOrder | null>(null);
 
-  // Create/Edit form state
-  const [poNumber, setPoNumber] = useState(generatePONumber);
+  // Suppliers from DB
+  const [dbSuppliers, setDbSuppliers] = useState<{ id: string; name: string }[]>([]);
+
+  // Create/Edit form
+  const [poNumber, setPoNumber] = useState("");
   const [supplier, setSupplier] = useState("");
+  const [supplierId, setSupplierId] = useState<string | null>(null);
   const [expectedDate, setExpectedDate] = useState("");
   const [poNotes, setPoNotes] = useState("");
-  const [lines, setLines] = useState<POLine[]>([
-    { id: uid(), product: "", sku: "", expectedQty: 0, expectedCost: 0, notes: "" },
-  ]);
+  const [lines, setLines] = useState<POLine[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Receive state
+  const [receivePO, setReceivePO] = useState<PurchaseOrder | null>(null);
+  const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({});
+  const [receiving, setReceiving] = useState(false);
+  const [showReceiveConfirm, setShowReceiveConfirm] = useState(false);
 
   // Match state
   const [matchingPO, setMatchingPO] = useState<PurchaseOrder | null>(null);
   const [matchStep, setMatchStep] = useState<"upload" | "matching" | "result">("upload");
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
 
-  // Supplier autocomplete
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const pastSuppliers = useMemo(() => getPastSuppliers(), []);
-  const filteredSuppliers = supplier.trim()
-    ? pastSuppliers.filter(s => s.toLowerCase().includes(supplier.toLowerCase()))
-    : pastSuppliers;
+  // Linked documents
+  const [linkedDocs, setLinkedDocs] = useState<{ id: string; document_number: string | null; date: string | null; total: number }[]>([]);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [availableDocs, setAvailableDocs] = useState<{ id: string; document_number: string | null; supplier_name: string | null; date: string | null; total: number }[]>([]);
 
-  const poTotal = lines.reduce((s, l) => s + l.expectedQty * l.expectedCost, 0);
+  // Shopify connection for inventory sync
+  const [hasShopify, setHasShopify] = useState(false);
+  const [shopifyLocationId, setShopifyLocationId] = useState<string | null>(null);
+
+  // ── Load data ───────────────────────────────────────────
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoading(false); return; }
+
+    const { data: pos } = await supabase
+      .from("purchase_orders")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!pos) { setLoading(false); return; }
+
+    // Load lines for all POs
+    const poIds = pos.map(p => p.id);
+    const { data: allLines } = poIds.length > 0
+      ? await supabase.from("purchase_order_lines").select("*").in("purchase_order_id", poIds)
+      : { data: [] };
+
+    const linesByPO: Record<string, POLine[]> = {};
+    for (const line of (allLines || [])) {
+      if (!linesByPO[line.purchase_order_id]) linesByPO[line.purchase_order_id] = [];
+      linesByPO[line.purchase_order_id].push({
+        id: line.id,
+        product_title: line.product_title,
+        sku: line.sku || "",
+        color: line.color || "",
+        size: line.size || "",
+        expected_qty: line.expected_qty,
+        received_qty: line.received_qty,
+        expected_cost: Number(line.expected_cost),
+        actual_cost: line.actual_cost ? Number(line.actual_cost) : null,
+        notes: line.notes || "",
+      });
+    }
+
+    const mapped: PurchaseOrder[] = pos.map(po => ({
+      id: po.id,
+      po_number: po.po_number,
+      supplier_id: po.supplier_id,
+      supplier_name: po.supplier_name,
+      expected_date: po.expected_date,
+      notes: po.notes,
+      status: po.status as POStatus,
+      total_cost: Number(po.total_cost),
+      linked_document_id: po.linked_document_id,
+      match_result: po.match_result as MatchResult | null,
+      created_at: po.created_at,
+      updated_at: po.updated_at,
+      lines: linesByPO[po.id] || [],
+    }));
+
+    setOrders(mapped);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadOrders(); }, [loadOrders]);
+
+  // Load suppliers
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("suppliers").select("id, name").order("name");
+      setDbSuppliers(data || []);
+    })();
+  }, []);
+
+  // Check Shopify
+  useEffect(() => {
+    (async () => {
+      const conn = await getConnection();
+      if (conn) {
+        setHasShopify(true);
+        if (conn.default_location_id) setShopifyLocationId(conn.default_location_id);
+        else {
+          const locs = await getLocations();
+          const active = locs.find(l => l.active);
+          if (active) setShopifyLocationId(active.id);
+        }
+      }
+    })();
+  }, []);
+
+  const filteredSuppliers = supplier.trim()
+    ? dbSuppliers.filter(s => s.name.toLowerCase().includes(supplier.toLowerCase()))
+    : dbSuppliers;
+
+  const poTotal = lines.reduce((s, l) => s + l.expected_qty * l.expected_cost, 0);
+
+  // ── Generate PO number ──────────────────────────────────
+  const generatePONumber = () => {
+    const year = new Date().getFullYear();
+    const next = orders.length + 1;
+    return `PO-${year}-${String(next).padStart(3, "0")}`;
+  };
+
+  const newLine = (): POLine => ({
+    id: uid(), product_title: "", sku: "", color: "", size: "",
+    expected_qty: 0, received_qty: 0, expected_cost: 0, actual_cost: null, notes: "",
+  });
 
   const resetForm = () => {
     setPoNumber(generatePONumber());
     setSupplier("");
+    setSupplierId(null);
     setExpectedDate("");
     setPoNotes("");
-    setLines([{ id: uid(), product: "", sku: "", expectedQty: 0, expectedCost: 0, notes: "" }]);
+    setLines([newLine()]);
     setEditingId(null);
   };
 
-  const handleSave = (asDraft: boolean) => {
-    const po: PurchaseOrder = {
-      id: editingId || uid(),
-      poNumber,
-      supplier,
-      expectedDate,
-      notes: poNotes,
-      lines: lines.filter(l => l.product.trim()),
-      status: asDraft ? "draft" : "sent",
-      createdAt: new Date().toISOString(),
-    };
-    let updated: PurchaseOrder[];
+  // ── Save PO ─────────────────────────────────────────────
+  const handleSave = async (asDraft: boolean) => {
+    if (!supplier.trim()) { toast.error("Supplier name required"); return; }
+    setSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setSaving(false); return; }
+
+    const validLines = lines.filter(l => l.product_title.trim());
+    const total = validLines.reduce((s, l) => s + l.expected_qty * l.expected_cost, 0);
+
     if (editingId) {
-      updated = orders.map(o => o.id === editingId ? po : o);
+      // Update existing PO
+      const { error } = await supabase.from("purchase_orders").update({
+        po_number: poNumber,
+        supplier_id: supplierId,
+        supplier_name: supplier,
+        expected_date: expectedDate || null,
+        notes: poNotes || null,
+        status: asDraft ? "draft" : "sent",
+        total_cost: total,
+      }).eq("id", editingId);
+
+      if (error) { toast.error("Failed to save PO"); setSaving(false); return; }
+
+      // Delete old lines and reinsert
+      await supabase.from("purchase_order_lines").delete().eq("purchase_order_id", editingId);
+      if (validLines.length > 0) {
+        await supabase.from("purchase_order_lines").insert(
+          validLines.map(l => ({
+            user_id: session.user.id,
+            purchase_order_id: editingId,
+            product_title: l.product_title,
+            sku: l.sku || null,
+            color: l.color || null,
+            size: l.size || null,
+            expected_qty: l.expected_qty,
+            received_qty: l.received_qty,
+            expected_cost: l.expected_cost,
+            actual_cost: l.actual_cost,
+            notes: l.notes || null,
+          }))
+        );
+      }
     } else {
-      updated = [po, ...orders];
+      // Create new PO
+      const { data: po, error } = await supabase.from("purchase_orders").insert({
+        user_id: session.user.id,
+        po_number: poNumber,
+        supplier_id: supplierId,
+        supplier_name: supplier,
+        expected_date: expectedDate || null,
+        notes: poNotes || null,
+        status: asDraft ? "draft" : "sent",
+        total_cost: total,
+      }).select("id").single();
+
+      if (error || !po) { toast.error("Failed to create PO"); setSaving(false); return; }
+
+      if (validLines.length > 0) {
+        await supabase.from("purchase_order_lines").insert(
+          validLines.map(l => ({
+            user_id: session.user.id,
+            purchase_order_id: po.id,
+            product_title: l.product_title,
+            sku: l.sku || null,
+            color: l.color || null,
+            size: l.size || null,
+            expected_qty: l.expected_qty,
+            expected_cost: l.expected_cost,
+            notes: l.notes || null,
+          }))
+        );
+      }
     }
-    setOrders(updated);
-    savePurchaseOrders(updated);
-    addAuditEntry("PO", `PO created: ${po.poNumber} — supplier: ${supplier} — ${po.lines.length} lines`);
+
+    addAuditEntry("PO", `PO ${asDraft ? "drafted" : "created"}: ${poNumber} — ${supplier} — ${validLines.length} lines`);
+    toast.success(editingId ? "PO updated" : "PO created");
     resetForm();
+    await loadOrders();
     setView("list");
+    setSaving(false);
   };
 
+  // ── Status change ───────────────────────────────────────
+  const handleStatusChange = async (id: string, status: POStatus) => {
+    await supabase.from("purchase_orders").update({ status }).eq("id", id);
+    await loadOrders();
+  };
+
+  // ── Delete PO ───────────────────────────────────────────
+  const handleDelete = async (id: string) => {
+    const po = orders.find(o => o.id === id);
+    if (!confirm(`Delete ${po?.po_number}?`)) return;
+    await supabase.from("purchase_orders").delete().eq("id", id);
+    toast.success("PO deleted");
+    await loadOrders();
+  };
+
+  // ── Edit PO ─────────────────────────────────────────────
   const handleEdit = (po: PurchaseOrder) => {
     setEditingId(po.id);
-    setPoNumber(po.poNumber);
-    setSupplier(po.supplier);
-    setExpectedDate(po.expectedDate);
-    setPoNotes(po.notes);
-    setLines(po.lines.length > 0 ? po.lines : [{ id: uid(), product: "", sku: "", expectedQty: 0, expectedCost: 0, notes: "" }]);
+    setPoNumber(po.po_number);
+    setSupplier(po.supplier_name);
+    setSupplierId(po.supplier_id);
+    setExpectedDate(po.expected_date || "");
+    setPoNotes(po.notes || "");
+    setLines(po.lines.length > 0 ? po.lines : [newLine()]);
     setView("edit");
   };
 
-  const handleDelete = (id: string) => {
-    const updated = orders.filter(o => o.id !== id);
-    setOrders(updated);
-    savePurchaseOrders(updated);
+  // ── Receive stock ───────────────────────────────────────
+  const startReceive = (po: PurchaseOrder) => {
+    setReceivePO(po);
+    const qtys: Record<string, number> = {};
+    po.lines.forEach(l => { qtys[l.id] = l.expected_qty - l.received_qty; });
+    setReceiveQtys(qtys);
+    setView("receive");
   };
 
-  const handleStatusChange = (id: string, status: POStatus) => {
-    const updated = orders.map(o => o.id === id ? { ...o, status } : o);
-    setOrders(updated);
-    savePurchaseOrders(updated);
+  const handleReceive = async () => {
+    if (!receivePO) return;
+    setShowReceiveConfirm(false);
+    setReceiving(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setReceiving(false); return; }
+
+    // Update received_qty on each line
+    for (const line of receivePO.lines) {
+      const qty = receiveQtys[line.id] || 0;
+      if (qty > 0) {
+        const newReceived = line.received_qty + qty;
+        await supabase.from("purchase_order_lines").update({
+          received_qty: newReceived,
+        }).eq("id", line.id);
+
+        // Sync inventory to Shopify if connected
+        if (hasShopify && shopifyLocationId && line.sku) {
+          try {
+            const match = await findVariantBySKU(line.sku);
+            if (match?.inventory_item_id) {
+              await adjustInventory(shopifyLocationId, match.inventory_item_id, qty);
+            }
+          } catch (err) {
+            console.error(`Shopify inventory sync failed for ${line.sku}:`, err);
+          }
+        }
+      }
+    }
+
+    // Determine new PO status
+    const updatedLines = receivePO.lines.map(l => ({
+      ...l,
+      received_qty: l.received_qty + (receiveQtys[l.id] || 0),
+    }));
+    const allReceived = updatedLines.every(l => l.received_qty >= l.expected_qty);
+    const anyReceived = updatedLines.some(l => l.received_qty > 0);
+    const newStatus: POStatus = allReceived ? "received" : anyReceived ? "partial" : receivePO.status;
+
+    await supabase.from("purchase_orders").update({ status: newStatus }).eq("id", receivePO.id);
+
+    const totalReceived = Object.values(receiveQtys).reduce((a, b) => a + b, 0);
+    addAuditEntry("PO", `Received ${totalReceived} units on ${receivePO.po_number} — status: ${newStatus}`);
+    toast.success(`${totalReceived} units received`);
+
+    setReceiving(false);
+    await loadOrders();
+    setView("list");
   };
 
-  // ── Match invoice simulation ─────────────────────────────
+  // ── Link invoice ────────────────────────────────────────
+  const openLinkDialog = async (po: PurchaseOrder) => {
+    setDetailPO(po);
+    const { data } = await supabase.from("documents")
+      .select("id, document_number, supplier_name, date, total")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setAvailableDocs(data || []);
+    setShowLinkDialog(true);
+  };
+
+  const linkDocument = async (docId: string) => {
+    if (!detailPO) return;
+    await supabase.from("purchase_orders").update({ linked_document_id: docId }).eq("id", detailPO.id);
+    toast.success("Invoice linked to PO");
+    setShowLinkDialog(false);
+    await loadOrders();
+  };
+
+  // ── Match invoice (simulation — uses PO lines vs uploaded invoice) ──
   const startMatch = (po: PurchaseOrder) => {
     setMatchingPO(po);
     setMatchStep("upload");
@@ -182,65 +430,102 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
     setView("match");
   };
 
-  const runMatch = () => {
+  const runMatch = async () => {
     if (!matchingPO) return;
     setMatchStep("matching");
 
-    setTimeout(() => {
-      const matchLines: MatchLine[] = matchingPO.lines.map((line, i) => {
-        if (i === 0) return { product: line.product, sku: line.sku, poQty: line.expectedQty, invoiceQty: line.expectedQty, poCost: line.expectedCost, invoiceCost: line.expectedCost, status: "match" as const };
-        if (i === 1) return { product: line.product, sku: line.sku, poQty: line.expectedQty, invoiceQty: Math.max(1, line.expectedQty - 3), poCost: line.expectedCost, invoiceCost: line.expectedCost, status: "qty_diff" as const };
-        if (i === 2) return { product: line.product, sku: line.sku, poQty: line.expectedQty, invoiceQty: line.expectedQty, poCost: line.expectedCost, invoiceCost: +(line.expectedCost * 1.04).toFixed(2), status: "price_diff" as const };
-        return { product: line.product, sku: line.sku, poQty: line.expectedQty, invoiceQty: line.expectedQty, poCost: line.expectedCost, invoiceCost: line.expectedCost, status: "match" as const };
-      });
-      // Add a "not on PO" line
-      if (matchLines.length > 0) {
-        matchLines.push({ product: "Surprise Freebie Sample", sku: "SAMPLE-001", poQty: 0, invoiceQty: 1, poCost: 0, invoiceCost: 0, status: "not_on_po" });
+    // If PO has a linked document, match against its lines
+    if (matchingPO.linked_document_id) {
+      const { data: docLines } = await supabase
+        .from("document_lines")
+        .select("product_title, sku, quantity, unit_cost")
+        .eq("document_id", matchingPO.linked_document_id);
+
+      if (docLines && docLines.length > 0) {
+        const matchLines: MatchLine[] = matchingPO.lines.map(poLine => {
+          const invLine = docLines.find(d =>
+            (d.sku && poLine.sku && d.sku.toLowerCase() === poLine.sku.toLowerCase()) ||
+            (d.product_title && poLine.product_title && d.product_title.toLowerCase().includes(poLine.product_title.toLowerCase()))
+          );
+          if (!invLine) {
+            return { product: poLine.product_title, sku: poLine.sku, poQty: poLine.expected_qty, invoiceQty: 0, poCost: poLine.expected_cost, invoiceCost: 0, status: "missing" as const };
+          }
+          const qtyMatch = invLine.quantity === poLine.expected_qty;
+          const costMatch = Math.abs(Number(invLine.unit_cost) - poLine.expected_cost) < 0.01;
+          return {
+            product: poLine.product_title,
+            sku: poLine.sku,
+            poQty: poLine.expected_qty,
+            invoiceQty: invLine.quantity,
+            poCost: poLine.expected_cost,
+            invoiceCost: Number(invLine.unit_cost),
+            status: (!qtyMatch ? "qty_diff" : !costMatch ? "price_diff" : "match") as MatchLine["status"],
+          };
+        });
+
+        // Check for invoice lines not on PO
+        for (const inv of docLines) {
+          const onPO = matchingPO.lines.some(pl =>
+            (pl.sku && inv.sku && pl.sku.toLowerCase() === inv.sku.toLowerCase()) ||
+            (pl.product_title && inv.product_title && inv.product_title.toLowerCase().includes(pl.product_title.toLowerCase()))
+          );
+          if (!onPO) {
+            matchLines.push({ product: inv.product_title || "Unknown", sku: inv.sku || "", poQty: 0, invoiceQty: inv.quantity, poCost: 0, invoiceCost: Number(inv.unit_cost), status: "not_on_po" });
+          }
+        }
+
+        const summary = {
+          matched: matchLines.filter(l => l.status === "match").length,
+          qtyDiff: matchLines.filter(l => l.status === "qty_diff").length,
+          priceDiff: matchLines.filter(l => l.status === "price_diff").length,
+          notOnPo: matchLines.filter(l => l.status === "not_on_po").length,
+          missing: matchLines.filter(l => l.status === "missing").length,
+        };
+
+        const result: MatchResult = { matchedAt: new Date().toISOString(), invoiceName: "Linked invoice", lines: matchLines, summary };
+        setMatchResult(result);
+        setMatchStep("result");
+
+        const hasIssues = summary.qtyDiff + summary.priceDiff + summary.notOnPo + summary.missing > 0;
+        await supabase.from("purchase_orders").update({
+          status: hasIssues ? "discrepancy" : "received",
+          match_result: result as any,
+        }).eq("id", matchingPO.id);
+        await loadOrders();
+        return;
       }
+    }
+
+    // Simulated match if no linked doc
+    setTimeout(async () => {
+      const matchLines: MatchLine[] = matchingPO.lines.map((line, i) => {
+        if (i % 3 === 0) return { product: line.product_title, sku: line.sku, poQty: line.expected_qty, invoiceQty: line.expected_qty, poCost: line.expected_cost, invoiceCost: line.expected_cost, status: "match" as const };
+        if (i % 3 === 1) return { product: line.product_title, sku: line.sku, poQty: line.expected_qty, invoiceQty: Math.max(1, line.expected_qty - 2), poCost: line.expected_cost, invoiceCost: line.expected_cost, status: "qty_diff" as const };
+        return { product: line.product_title, sku: line.sku, poQty: line.expected_qty, invoiceQty: line.expected_qty, poCost: line.expected_cost, invoiceCost: +(line.expected_cost * 1.05).toFixed(2), status: "price_diff" as const };
+      });
 
       const summary = {
         matched: matchLines.filter(l => l.status === "match").length,
         qtyDiff: matchLines.filter(l => l.status === "qty_diff").length,
         priceDiff: matchLines.filter(l => l.status === "price_diff").length,
-        notOnPo: matchLines.filter(l => l.status === "not_on_po").length,
-        missing: matchLines.filter(l => l.status === "missing").length,
+        notOnPo: 0,
+        missing: 0,
       };
 
-      const result: MatchResult = {
-        matchedAt: new Date().toISOString(),
-        invoiceName: `${matchingPO.supplier}_invoice.pdf`,
-        lines: matchLines,
-        summary,
-      };
+      const result: MatchResult = { matchedAt: new Date().toISOString(), invoiceName: "Uploaded invoice", lines: matchLines, summary };
       setMatchResult(result);
       setMatchStep("result");
 
-      // Update PO
-      const hasIssues = summary.qtyDiff + summary.priceDiff + summary.notOnPo + summary.missing > 0;
-      const newStatus: POStatus = hasIssues ? "discrepancy" : "received";
-      const updated = orders.map(o => o.id === matchingPO.id ? { ...o, status: newStatus, matchResult: result } : o);
-      setOrders(updated);
-      savePurchaseOrders(updated);
-
-      addAuditEntry("PO", `PO matched against invoice: ${summary.matched} matches, ${summary.qtyDiff + summary.priceDiff + summary.notOnPo + summary.missing} discrepancies`);
+      const hasIssues = summary.qtyDiff + summary.priceDiff > 0;
+      await supabase.from("purchase_orders").update({
+        status: hasIssues ? "discrepancy" : "received",
+        match_result: result as any,
+      }).eq("id", matchingPO.id);
+      await loadOrders();
     }, 2000);
   };
 
-  const handleAcceptAll = () => {
-    if (!matchingPO) return;
-    handleStatusChange(matchingPO.id, "received");
-    addAuditEntry("PO", `PO ${matchingPO.poNumber} marked as Received`);
-    setView("list");
-  };
-
-  const handleReject = () => {
-    if (!matchingPO) return;
-    handleStatusChange(matchingPO.id, "discrepancy");
-    addAuditEntry("PO", `PO ${matchingPO.poNumber} marked as Disputed`);
-    setView("list");
-  };
-
-  // ── Render ───────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
       <button onClick={view === "list" ? onBack : () => { resetForm(); setView("list"); }}
@@ -261,7 +546,9 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
             </Button>
           </div>
 
-          {orders.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-16 text-sm text-muted-foreground">Loading…</div>
+          ) : orders.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-4xl mb-3">📋</p>
               <p className="text-sm font-medium">No purchase orders yet</p>
@@ -272,47 +559,74 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
             </div>
           ) : (
             <div className="space-y-2">
+              {/* Summary */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="bg-card rounded-lg border border-border p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Total POs</p>
+                  <p className="text-lg font-bold">{orders.length}</p>
+                </div>
+                <div className="bg-card rounded-lg border border-border p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Open</p>
+                  <p className="text-lg font-bold">{orders.filter(o => !["received", "discrepancy"].includes(o.status)).length}</p>
+                </div>
+                <div className="bg-card rounded-lg border border-border p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Total value</p>
+                  <p className="text-lg font-bold">${orders.reduce((a, o) => a + o.total_cost, 0).toLocaleString()}</p>
+                </div>
+              </div>
+
               {orders.map(po => {
                 const badge = STATUS_BADGES[po.status];
+                const receivedUnits = po.lines.reduce((a, l) => a + l.received_qty, 0);
+                const expectedUnits = po.lines.reduce((a, l) => a + l.expected_qty, 0);
                 return (
                   <div key={po.id} className="bg-card rounded-lg border border-border p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold font-mono-data">{po.poNumber}</span>
+                        <span className="text-sm font-semibold font-mono">{po.po_number}</span>
                         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${badge.cls}`}>
                           {badge.emoji} {badge.label}
                         </span>
                       </div>
-                      <span className="text-[10px] text-muted-foreground font-mono-data">
-                        {po.expectedDate || "No date"}
+                      <span className="text-[10px] text-muted-foreground">
+                        {po.expected_date || "No date"}
                       </span>
                     </div>
-                    <p className="text-sm font-medium">{po.supplier || "No supplier"}</p>
+                    <p className="text-sm font-medium">{po.supplier_name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {po.lines.length} line{po.lines.length !== 1 ? "s" : ""} · ${po.lines.reduce((s, l) => s + l.expectedQty * l.expectedCost, 0).toFixed(2)} total
+                      {po.lines.length} line{po.lines.length !== 1 ? "s" : ""} · ${po.total_cost.toFixed(2)}
+                      {receivedUnits > 0 && ` · ${receivedUnits}/${expectedUnits} received`}
                     </p>
+                    {po.linked_document_id && (
+                      <p className="text-[10px] text-primary flex items-center gap-1 mt-1">
+                        <Link2 className="w-3 h-3" /> Invoice linked
+                      </p>
+                    )}
                     <div className="flex gap-2 mt-3 flex-wrap">
-                      {(po.status === "sent" || po.status === "awaiting" || po.status === "draft") && (
+                      {["draft", "sent", "awaiting", "partial"].includes(po.status) && (
+                        <Button variant="teal" size="sm" className="h-7 text-xs" onClick={() => startReceive(po)}>
+                          <ArrowDownToLine className="w-3 h-3 mr-1" /> Receive stock
+                        </Button>
+                      )}
+                      {["sent", "awaiting", "draft"].includes(po.status) && (
                         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => startMatch(po)}>
                           <Search className="w-3 h-3 mr-1" /> Match invoice
                         </Button>
                       )}
-                      {po.matchResult && (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setMatchingPO(po); setMatchResult(po.matchResult!); setMatchStep("result"); setView("match"); }}>
-                          <FileText className="w-3 h-3 mr-1" /> View report
-                        </Button>
-                      )}
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openLinkDialog(po)}>
+                        <Link2 className="w-3 h-3 mr-1" /> Link invoice
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleEdit(po)}>
                         <Edit2 className="w-3 h-3 mr-1" /> Edit
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => handleDelete(po.id)}>
-                        <Trash2 className="w-3 h-3 mr-1" /> Delete
                       </Button>
                       {po.status === "draft" && (
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleStatusChange(po.id, "sent")}>
                           📤 Mark sent
                         </Button>
                       )}
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => handleDelete(po.id)}>
+                        <Trash2 className="w-3 h-3 mr-1" /> Delete
+                      </Button>
                     </div>
                   </div>
                 );
@@ -332,14 +646,14 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
           <div className="space-y-4">
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">PO Number</label>
-              <Input value={poNumber} onChange={e => setPoNumber(e.target.value)} className="font-mono-data" />
+              <Input value={poNumber} onChange={e => setPoNumber(e.target.value)} className="font-mono" />
             </div>
 
             <div className="relative">
               <label className="text-xs text-muted-foreground mb-1 block">Supplier</label>
               <Input
                 value={supplier}
-                onChange={e => { setSupplier(e.target.value); setShowSuggestions(true); }}
+                onChange={e => { setSupplier(e.target.value); setSupplierId(null); setShowSuggestions(true); }}
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                 placeholder="e.g. Jantzen, Seafolly..."
@@ -347,8 +661,9 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
               {showSuggestions && filteredSuppliers.length > 0 && (
                 <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-md max-h-32 overflow-y-auto">
                   {filteredSuppliers.map(s => (
-                    <button key={s} className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted" onMouseDown={() => { setSupplier(s); setShowSuggestions(false); }}>
-                      {s}
+                    <button key={s.id} className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted"
+                      onMouseDown={() => { setSupplier(s.name); setSupplierId(s.id); setShowSuggestions(false); }}>
+                      {s.name}
                     </button>
                   ))}
                 </div>
@@ -380,35 +695,42 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
                     <div className="grid grid-cols-2 gap-2 mb-2">
                       <Input
                         placeholder="Product name"
-                        value={line.product}
-                        onChange={e => { const u = [...lines]; u[i] = { ...u[i], product: e.target.value }; setLines(u); }}
+                        value={line.product_title}
+                        onChange={e => { const u = [...lines]; u[i] = { ...u[i], product_title: e.target.value }; setLines(u); }}
                         className="text-xs h-9"
                       />
                       <Input
                         placeholder="SKU"
                         value={line.sku}
                         onChange={e => { const u = [...lines]; u[i] = { ...u[i], sku: e.target.value }; setLines(u); }}
-                        className="text-xs h-9 font-mono-data"
+                        className="text-xs h-9 font-mono"
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                       <div>
                         <label className="text-[10px] text-muted-foreground">Qty</label>
                         <Input
                           type="number"
-                          value={line.expectedQty || ""}
-                          onChange={e => { const u = [...lines]; u[i] = { ...u[i], expectedQty: +e.target.value }; setLines(u); }}
-                          className="text-xs h-9 font-mono-data"
+                          value={line.expected_qty || ""}
+                          onChange={e => { const u = [...lines]; u[i] = { ...u[i], expected_qty: +e.target.value }; setLines(u); }}
+                          className="text-xs h-9 font-mono"
                         />
                       </div>
                       <div>
                         <label className="text-[10px] text-muted-foreground">Cost ($)</label>
                         <Input
-                          type="number"
-                          step="0.01"
-                          value={line.expectedCost || ""}
-                          onChange={e => { const u = [...lines]; u[i] = { ...u[i], expectedCost: +e.target.value }; setLines(u); }}
-                          className="text-xs h-9 font-mono-data"
+                          type="number" step="0.01"
+                          value={line.expected_cost || ""}
+                          onChange={e => { const u = [...lines]; u[i] = { ...u[i], expected_cost: +e.target.value }; setLines(u); }}
+                          className="text-xs h-9 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground">Colour</label>
+                        <Input
+                          value={line.color}
+                          onChange={e => { const u = [...lines]; u[i] = { ...u[i], color: e.target.value }; setLines(u); }}
+                          className="text-xs h-9"
                         />
                       </div>
                       <div className="flex items-end">
@@ -422,26 +744,87 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
                   </div>
                 ))}
               </div>
-              <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={() => setLines([...lines, { id: uid(), product: "", sku: "", expectedQty: 0, expectedCost: 0, notes: "" }])}>
+              <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={() => setLines([...lines, newLine()])}>
                 <Plus className="w-3 h-3 mr-1" /> Add line
               </Button>
             </div>
 
-            {/* PO Total */}
             <div className="bg-card rounded-lg border border-border p-3 flex items-center justify-between">
               <span className="text-sm font-medium">PO Total</span>
-              <span className="text-lg font-bold font-mono-data">${poTotal.toFixed(2)}</span>
+              <span className="text-lg font-bold font-mono">${poTotal.toFixed(2)}</span>
             </div>
 
-            {/* Action buttons */}
             <div className="flex gap-2">
-              <Button variant="teal" className="flex-1 h-11" onClick={() => handleSave(false)}>
-                <Check className="w-4 h-4 mr-1" /> Save PO
+              <Button variant="teal" className="flex-1 h-11" onClick={() => handleSave(false)} disabled={saving}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Check className="w-4 h-4 mr-1" />} Save PO
               </Button>
-              <Button variant="outline" className="flex-1 h-11" onClick={() => handleSave(true)}>
+              <Button variant="outline" className="flex-1 h-11" onClick={() => handleSave(true)} disabled={saving}>
                 Save as draft
               </Button>
             </div>
+          </div>
+        </>
+      )}
+
+      {/* ── RECEIVE VIEW ──────────────────────────────────── */}
+      {view === "receive" && receivePO && (
+        <>
+          <h1 className="text-xl font-bold font-display mb-1">Receive Stock</h1>
+          <p className="text-sm text-muted-foreground mb-4">
+            {receivePO.po_number} — {receivePO.supplier_name}
+          </p>
+
+          <div className="space-y-2 mb-6">
+            {receivePO.lines.map(line => {
+              const remaining = line.expected_qty - line.received_qty;
+              const qty = receiveQtys[line.id] || 0;
+              return (
+                <div key={line.id} className="bg-card rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{line.product_title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {line.sku && `SKU: ${line.sku} · `}Expected: {line.expected_qty} · Received: {line.received_qty} · Remaining: {remaining}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-muted-foreground shrink-0">Receiving:</label>
+                    <Input
+                      type="number"
+                      value={qty || ""}
+                      onChange={e => setReceiveQtys({ ...receiveQtys, [line.id]: Math.min(+e.target.value, remaining) })}
+                      className="w-20 h-8 text-xs font-mono"
+                      max={remaining}
+                    />
+                    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setReceiveQtys({ ...receiveQtys, [line.id]: remaining })}>
+                      All ({remaining})
+                    </Button>
+                  </div>
+                  {qty >= 50 && (
+                    <p className="text-[10px] text-warning flex items-center gap-1 mt-1">
+                      <AlertTriangle className="w-3 h-3" /> High quantity — please confirm
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {hasShopify && (
+            <p className="text-xs text-primary flex items-center gap-1 mb-3">
+              <Package className="w-3 h-3" /> Shopify inventory will be updated automatically
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <Button variant="teal" className="flex-1 h-11"
+              onClick={() => setShowReceiveConfirm(true)}
+              disabled={Object.values(receiveQtys).every(q => !q)}>
+              <ArrowDownToLine className="w-4 h-4 mr-1" />
+              Receive {Object.values(receiveQtys).reduce((a, b) => a + b, 0)} units
+            </Button>
+            <Button variant="outline" className="h-11" onClick={() => setView("list")}>Cancel</Button>
           </div>
         </>
       )}
@@ -453,27 +836,30 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
             <>
               <h1 className="text-xl font-bold font-display mb-1">Match Invoice</h1>
               <p className="text-sm text-muted-foreground mb-4">
-                Upload the invoice to match against <span className="font-semibold">{matchingPO.poNumber}</span>
+                Match against <span className="font-semibold">{matchingPO.po_number}</span>
+                {matchingPO.linked_document_id && " (linked invoice found)"}
               </p>
 
-              {/* PO summary */}
               <div className="bg-card rounded-lg border border-border p-4 mb-4">
-                <h3 className="text-sm font-semibold mb-2">{matchingPO.poNumber} — {matchingPO.supplier}</h3>
+                <h3 className="text-sm font-semibold mb-2">{matchingPO.po_number} — {matchingPO.supplier_name}</h3>
                 <div className="space-y-1">
                   {matchingPO.lines.map((l, i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
-                      <span className="truncate flex-1">{l.product}</span>
-                      <span className="font-mono-data text-muted-foreground ml-2">{l.expectedQty} × ${l.expectedCost.toFixed(2)}</span>
+                      <span className="truncate flex-1">{l.product_title}</span>
+                      <span className="text-muted-foreground ml-2 font-mono">{l.expected_qty} × ${l.expected_cost.toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Upload area */}
               <button onClick={runMatch} className="w-full h-36 rounded-lg border-2 border-dashed border-border bg-card flex flex-col items-center justify-center gap-2 active:bg-muted transition-colors">
                 <Upload className="w-8 h-8 text-primary" />
-                <p className="text-sm font-medium">Upload invoice to match</p>
-                <p className="text-xs text-muted-foreground">PDF · Excel · CSV · Photo</p>
+                <p className="text-sm font-medium">
+                  {matchingPO.linked_document_id ? "Match against linked invoice" : "Upload invoice to match"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {matchingPO.linked_document_id ? "Click to compare PO vs invoice lines" : "PDF · Excel · CSV · Photo"}
+                </p>
               </button>
             </>
           )}
@@ -482,7 +868,7 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
             <div className="flex flex-col items-center justify-center pt-20">
               <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
               <h3 className="text-lg font-semibold font-display mb-1">Matching invoice...</h3>
-              <p className="text-sm text-muted-foreground">Comparing {matchingPO.lines.length} PO lines against invoice</p>
+              <p className="text-sm text-muted-foreground">Comparing {matchingPO.lines.length} PO lines</p>
             </div>
           )}
 
@@ -490,10 +876,9 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
             <>
               <h1 className="text-xl font-bold font-display mb-1">Discrepancy Report</h1>
               <p className="text-xs text-muted-foreground mb-4">
-                {matchingPO.poNumber} vs {matchResult.invoiceName} · Matched {new Date(matchResult.matchedAt).toLocaleDateString()}
+                {matchingPO.po_number} vs {matchResult.invoiceName}
               </p>
 
-              {/* Summary */}
               <div className="bg-card rounded-lg border border-border p-3 mb-4">
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
                   <span className="text-success">✅ {matchResult.summary.matched} matched</span>
@@ -504,20 +889,18 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
                 </div>
               </div>
 
-              {/* Detailed lines */}
               <div className="space-y-2 mb-6">
                 {matchResult.lines.map((line, i) => (
                   <div key={i} className={`rounded-lg border p-3 ${
                     line.status === "match" ? "border-success/30 bg-success/5" :
-                    line.status === "not_on_po" ? "border-destructive/30 bg-destructive/5" :
+                    line.status === "not_on_po" || line.status === "missing" ? "border-destructive/30 bg-destructive/5" :
                     "border-secondary/30 bg-secondary/5"
                   }`}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium truncate">{line.product}</span>
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
                         line.status === "match" ? "bg-success/15 text-success" :
-                        line.status === "not_on_po" ? "bg-destructive/15 text-destructive" :
-                        line.status === "missing" ? "bg-destructive/15 text-destructive" :
+                        line.status === "not_on_po" || line.status === "missing" ? "bg-destructive/15 text-destructive" :
                         "bg-secondary/15 text-secondary"
                       }`}>
                         {line.status === "match" && "✅ Match"}
@@ -529,44 +912,94 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
                     </div>
                     {line.status === "qty_diff" && (
                       <p className="text-xs text-muted-foreground">
-                        PO: <span className="font-mono-data">{line.poQty} units</span> · Invoice: <span className="font-mono-data font-semibold text-secondary">{line.invoiceQty} units</span>
+                        PO: <span className="font-mono">{line.poQty}</span> · Invoice: <span className="font-mono font-semibold text-secondary">{line.invoiceQty}</span>
                       </p>
                     )}
                     {line.status === "price_diff" && (
                       <p className="text-xs text-muted-foreground">
-                        PO: <span className="font-mono-data">${line.poCost.toFixed(2)}</span> · Invoice: <span className="font-mono-data font-semibold text-secondary">${line.invoiceCost.toFixed(2)}</span>
-                      </p>
-                    )}
-                    {line.status === "not_on_po" && (
-                      <p className="text-xs text-muted-foreground">
-                        Invoice has <span className="font-mono-data">{line.invoiceQty}</span> units — not in original PO
+                        PO: <span className="font-mono">${line.poCost.toFixed(2)}</span> · Invoice: <span className="font-mono font-semibold text-secondary">${line.invoiceCost.toFixed(2)}</span>
                       </p>
                     )}
                     {line.status === "match" && (
-                      <p className="text-xs text-muted-foreground font-mono-data">
-                        {line.poQty} units · ${line.poCost.toFixed(2)}
-                      </p>
+                      <p className="text-xs text-muted-foreground font-mono">{line.poQty} units · ${line.poCost.toFixed(2)}</p>
                     )}
                   </div>
                 ))}
               </div>
 
-              {/* Actions */}
               <div className="flex gap-2">
-                <Button variant="teal" className="flex-1 h-11" onClick={handleAcceptAll}>
+                <Button variant="teal" className="flex-1 h-11" onClick={async () => {
+                  await handleStatusChange(matchingPO.id, "received");
+                  toast.success("PO marked as received");
+                  setView("list");
+                }}>
                   <Check className="w-4 h-4 mr-1" /> Accept all
                 </Button>
-                <Button variant="outline" className="flex-1 h-11" onClick={handleAcceptAll}>
-                  Accept with notes
+                <Button variant="outline" className="flex-1 h-11" onClick={async () => {
+                  await handleStatusChange(matchingPO.id, "discrepancy");
+                  toast("Marked as disputed");
+                  setView("list");
+                }}>
+                  <X className="w-4 h-4 mr-1" /> Dispute
                 </Button>
               </div>
-              <Button variant="ghost" className="w-full mt-2 text-destructive hover:text-destructive h-10" onClick={handleReject}>
-                <X className="w-4 h-4 mr-1" /> Reject invoice
-              </Button>
             </>
           )}
         </>
       )}
+
+      {/* ── Link Invoice Dialog ───────────────────────────── */}
+      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Link Invoice to PO</DialogTitle>
+            <DialogDescription>Select a processed invoice to link.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-64 overflow-y-auto divide-y divide-border">
+            {availableDocs.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">No invoices found. Process an invoice first.</p>
+            ) : (
+              availableDocs.map(doc => (
+                <button key={doc.id} className="w-full text-left px-3 py-2.5 hover:bg-muted text-sm" onClick={() => linkDocument(doc.id)}>
+                  <p className="font-medium">{doc.document_number || "No number"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {doc.supplier_name || "Unknown"} · {doc.date || "No date"} · ${Number(doc.total).toFixed(2)}
+                  </p>
+                </button>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Receive Confirmation Dialog ───────────────────── */}
+      <Dialog open={showReceiveConfirm} onOpenChange={setShowReceiveConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Confirm Receiving</DialogTitle>
+            <DialogDescription>
+              Receive {Object.values(receiveQtys).reduce((a, b) => a + b, 0)} units on {receivePO?.po_number}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-xs space-y-1.5">
+            <p className="flex items-center gap-1.5">
+              <Check className="w-3 h-3 text-success" /> Stock levels will be adjusted
+            </p>
+            {hasShopify && (
+              <p className="flex items-center gap-1.5">
+                <Check className="w-3 h-3 text-success" /> Shopify inventory will sync via SKU match
+              </p>
+            )}
+          </div>
+          <DialogFooter className="flex-row gap-2">
+            <Button variant="ghost" onClick={() => setShowReceiveConfirm(false)} className="flex-1">Cancel</Button>
+            <Button variant="teal" onClick={handleReceive} disabled={receiving} className="flex-1">
+              {receiving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <ArrowDownToLine className="w-4 h-4 mr-1" />}
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

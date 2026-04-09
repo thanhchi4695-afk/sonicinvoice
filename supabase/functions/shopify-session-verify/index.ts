@@ -147,28 +147,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Step 4: Generate a magic link to create a session
-    const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: "magiclink",
-      email: userData.user.email!,
-    });
+    // Step 4: Create a direct session for this user
+    const { data: sessionData, error: sessionErr } =
+      await supabaseAdmin.auth.admin.createSession({
+        user_id: conn.user_id,
+      });
 
-    if (linkErr || !linkData) {
-      console.error("Failed to generate session:", linkErr);
-      return new Response(JSON.stringify({ error: "Failed to generate session" }), {
+    if (sessionErr || !sessionData?.session) {
+      console.error("Failed to create session:", sessionErr);
+      return new Response(JSON.stringify({ error: "Failed to create session" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Extract tokens from the magic link
-    const linkUrl = new URL(linkData.properties?.action_link || "");
-    const hashFragment = linkUrl.hash.substring(1);
-    const hashParams = new URLSearchParams(hashFragment);
-
     return new Response(JSON.stringify({
-      access_token: hashParams.get("access_token"),
-      refresh_token: hashParams.get("refresh_token"),
+      access_token: sessionData.session.access_token,
+      refresh_token: sessionData.session.refresh_token,
       shop,
       shop_name: conn.shop_name,
     }), {

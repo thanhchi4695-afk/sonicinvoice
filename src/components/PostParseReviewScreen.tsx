@@ -3,7 +3,7 @@ import {
   Check, X, AlertTriangle, ChevronDown, ChevronRight, RotateCcw,
   ShieldCheck, Bug, Search, Filter, CheckCheck, ArrowRight,
   Edit3, Download, Zap, ArrowUpRight, Layers, Merge, Scissors,
-  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash
+  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash, MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
 import { toast } from "sonner";
+import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;

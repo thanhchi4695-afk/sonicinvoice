@@ -56,6 +56,7 @@ export default function PostParseReviewScreen({
   debug,
   products,
   supplierName,
+  invoicePages = [],
   onUpdateProducts,
   onExportAccepted,
   onPushToShopify,

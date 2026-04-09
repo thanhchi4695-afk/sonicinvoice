@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import type { WholesaleOrder } from "@/lib/unified-types";
 import {
   buildWholesaleShopifyCSV,
   buildWholesaleLightspeedCSV,
-  type WholesaleOrder,
 } from "@/lib/wholesale-mapper";
 import {
   parseJoorOrders,

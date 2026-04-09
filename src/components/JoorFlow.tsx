@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import type { GroupedProduct } from "@/lib/unified-types";
 import {
   groupJoorItemsIntoProducts,
   buildShopifyCSV,
   buildLightspeedCSV,
-  type MappedProduct,
   type JoorLineItem,
 } from "@/lib/joor-mapper";
 import {
@@ -61,7 +61,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
 
   // Detail step
   const [activeOrder, setActiveOrder] = useState<JoorOrder | null>(null);
-  const [groupedProducts, setGroupedProducts] = useState<MappedProduct[]>([]);
+  const [groupedProducts, setGroupedProducts] = useState<GroupedProduct[]>([]);
   const [pushing, setPushing] = useState(false);
   const [pushProgress, setPushProgress] = useState({ current: 0, total: 0 });
 
@@ -71,7 +71,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
   const [fileParsing, setFileParsing] = useState(false);
   const [fileEnriching, setFileEnriching] = useState(false);
   const [fileProducts, setFileProducts] = useState<JoorParsedProduct[]>([]);
-  const [fileGroupedProducts, setFileGroupedProducts] = useState<MappedProduct[]>([]);
+  const [fileGroupedProducts, setFileGroupedProducts] = useState<GroupedProduct[]>([]);
 
   // Check existing connection
   useEffect(() => {
@@ -231,7 +231,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
     toast.success(`${type === "shopify" ? "Shopify" : "Lightspeed"} CSV downloaded (${groupedProducts.length} products)`);
   };
 
-  const pushToShopify = async (products: MappedProduct[]) => {
+  const pushToShopify = async (products: GroupedProduct[]) => {
     setPushing(true);
     setPushProgress({ current: 0, total: products.length });
     let errors = 0;
@@ -242,8 +242,8 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
         const p = products[i];
         const variants = (p.sizes || [p.size]).map((sz, idx) => ({
           sku: `${p.sku.split("-").slice(0, 2).join("-")}-${sz}`.toUpperCase().replace(/\s+/g, "-"),
-          price: p.price,
-          cost: p.costPrice,
+          price: p.retailPrice.toFixed(2),
+          cost: p.wholesaleCost.toFixed(2),
           barcode: (p.barcodes || [p.barcode])?.[idx] || "",
           option1: p.colour,
           option2: sz,
@@ -316,7 +316,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
 
   const handleBulkDownload = () => {
     const selected = orders.filter((o) => selectedOrders.has(o.order_id));
-    const allProducts: MappedProduct[] = [];
+    const allProducts: GroupedProduct[] = [];
     for (const order of selected) {
       const products = groupJoorItemsIntoProducts(order.line_items || [], {
         season_code: order.order_season_code,
@@ -611,8 +611,8 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
                     <td className="p-3 font-mono text-xs">{p.sku.split("-")[0]}</td>
                     <td className="p-3">{p.colour}</td>
                     <td className="p-3 text-xs">{p.sizes?.join(", ") || p.size}</td>
-                    <td className="p-3 text-right">${p.price}</td>
-                    <td className="p-3 text-right text-muted-foreground">${p.costPrice}</td>
+                    <td className="p-3 text-right">${p.retailPrice.toFixed(2)}</td>
+                    <td className="p-3 text-right text-muted-foreground">${p.wholesaleCost.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

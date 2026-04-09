@@ -169,7 +169,7 @@ const Index = () => {
 
   // When embedded in Shopify, skip standalone auth/onboarding
   // (Shopify handles auth via session tokens or OAuth install flow)
-  if (!isEmbedded && !authed) {
+  if (!authed) {
     return <Suspense fallback={suspenseFallback}><AuthScreen onAuth={handleAuth} /></Suspense>;
   }
 

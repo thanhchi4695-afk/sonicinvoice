@@ -143,6 +143,7 @@ const LookbookImportFlow = ({ onBack }: Props) => {
     setProducts(extracted);
     setScreen("review");
     toast.success(`Extracted ${extracted.length} products from ${imageFiles.length} images`);
+    import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "lookbook", productCount: extracted.length }));
   };
 
   // Analyse images with AI
@@ -189,6 +190,7 @@ const LookbookImportFlow = ({ onBack }: Props) => {
     setProducts(extracted);
     setScreen("review");
     toast.success(`Extracted ${extracted.length} products from ${imgs.length} images`);
+    import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "lookbook", productCount: extracted.length }));
   };
 
   // Toggle product selection

@@ -16,7 +16,7 @@ const API_VERSION = "2025-01";
 
 function getRedirectUri(req: Request): string {
   // Build callback URL pointing to this same edge function
-  return `${SUPABASE_URL}/functions/v1/shopify-oauth?action=callback`;
+  return `${SUPABASE_URL}/functions/v1/shopify-auth-callback`;
 }
 
 function generateNonce(): string {

@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
         created_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
 
-      const redirectUri = `${SUPABASE_URL}/functions/v1/shopify-auth?action=callback`;
+      const redirectUri = `${SUPABASE_URL}/functions/v1/shopify-auth-callback`;
       const installUrl = `https://${shop}/admin/oauth/authorize?client_id=${SHOPIFY_API_KEY}&scope=${SCOPES}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
 
       return new Response(JSON.stringify({ install_url: installUrl }), {

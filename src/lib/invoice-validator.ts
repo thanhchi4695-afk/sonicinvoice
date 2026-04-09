@@ -51,6 +51,8 @@ export interface ValidatedProduct extends RawProduct {
   _suggestedTitle: string;
   _suggestedPrice: number;
   _suggestedVendor: string;
+  _parseNotes?: string;
+  _extractionReason?: string;
 }
 
 export interface ValidationDebugInfo {

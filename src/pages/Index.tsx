@@ -67,6 +67,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("home");
   const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
   const { isEmbedded, shop, authState: embeddedAuthState } = useShopifyEmbedded();
@@ -280,12 +281,22 @@ const Index = () => {
       <div className="flex h-screen overflow-hidden bg-background">
         <EmbeddedNav
           activeTab={activeFlow ? "" : activeTab}
-          onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
-          onFlowChange={(flow) => setActiveFlow(flow as any)}
+          onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); setMobileNavOpen(false); }}
+          onFlowChange={(flow) => { setActiveFlow(flow as any); setMobileNavOpen(false); }}
+          open={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
         />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto min-w-0">
           <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-0 border-b border-border mb-0">
             <div className="flex items-center gap-2">
+              {/* Mobile hamburger */}
+              <button
+                onClick={() => setMobileNavOpen(true)}
+                className="lg:hidden p-1.5 rounded-md hover:bg-muted text-muted-foreground"
+                aria-label="Open menu"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </button>
               {activeFlow && (
                 <button
                   onClick={() => setActiveFlow(null)}

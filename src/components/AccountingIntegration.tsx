@@ -1,9 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Check, X, Loader2, ExternalLink, Unplug, RefreshCw, FileText, ChevronRight, Filter } from "lucide-react";
+import { ArrowLeft, Check, X, Loader2, ExternalLink, Unplug, RefreshCw, FileText, ChevronRight, Filter, Brain, Upload, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import Papa from "papaparse";
+import {
+  classifyInvoice, isFreightLine, recordSuccessfulPush, recordCorrection,
+  seedFromXeroBillsCSV, getClassificationStats, getAllAccountCodes,
+  getSupplierHistory, type InvoiceCategorisation,
+} from "@/lib/invoice-category-ai";
 
 interface AccountingConnection {
   id: string;

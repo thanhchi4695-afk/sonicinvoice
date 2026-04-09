@@ -148,6 +148,7 @@ export function recordParseSuccess(
         .slice(0, 30),
       fieldCorrections: [],
       groupingRules: [],
+      reclassifications: [],
       totalParses: 1,
       totalCorrections: 0,
       lastParsed: new Date().toISOString(),

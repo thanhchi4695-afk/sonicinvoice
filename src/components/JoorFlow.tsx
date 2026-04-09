@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import type { GroupedProduct } from "@/lib/unified-types";
 import {
   groupJoorItemsIntoProducts,
   buildShopifyCSV,
   buildLightspeedCSV,
-  type MappedProduct,
   type JoorLineItem,
 } from "@/lib/joor-mapper";
 import {

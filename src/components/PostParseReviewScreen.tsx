@@ -1001,6 +1001,88 @@ function ReviewRow({
   );
 }
 
+// ── Why AI Did This Panel ──
+function WhyAIPanel({ product, parsingPlan }: { product: ReviewProduct; parsingPlan?: import("@/lib/invoice-validator").ParsingPlan }) {
+  // Build intelligent explanations based on product data + parsing plan
+  const explanations = useMemo(() => {
+    const items: { icon: string; label: string; value: string }[] = [];
+
+    // Document & layout
+    if (parsingPlan?.document_type) items.push({ icon: "📄", label: "Document type", value: parsingPlan.document_type });
+    if (parsingPlan?.layout_type) items.push({ icon: "📐", label: "Layout type", value: parsingPlan.layout_type });
+    if (parsingPlan?.variant_method) items.push({ icon: "🔀", label: "Variant method", value: parsingPlan.variant_method });
+    if (parsingPlan?.cost_field) items.push({ icon: "💰", label: "Cost field", value: parsingPlan.cost_field });
+    if (parsingPlan?.quantity_field) items.push({ icon: "📦", label: "Quantity field", value: parsingPlan.quantity_field });
+    if (parsingPlan?.line_item_zone) items.push({ icon: "🎯", label: "Line-item zone", value: parsingPlan.line_item_zone });
+
+    // Grouping
+    if (parsingPlan?.grouping_required) {
+      items.push({ icon: "🔗", label: "Grouping", value: parsingPlan.grouping_reason || "Grouped by style code and colour" });
+    }
+
+    // Source field mapping
+    const fieldMap: string[] = [];
+    if (product.name) fieldMap.push(`Title: "${product.name}"`);
+    if (product.colour) fieldMap.push(`Colour: "${product.colour}"`);
+    if (product.size) fieldMap.push(`Size: "${product.size}"`);
+    if (product.sku) fieldMap.push(`SKU: "${product.sku}"`);
+    if (fieldMap.length > 0) items.push({ icon: "🗺️", label: "Extracted fields", value: fieldMap.join(" · ") });
+
+    // Cost derivation
+    if (product.cost > 0 && product.qty > 0) {
+      const lineTotal = product.cost * product.qty;
+      items.push({ icon: "🧮", label: "Cost calculation", value: `$${product.cost.toFixed(2)} × ${product.qty} = $${lineTotal.toFixed(2)}` });
+    } else if (product.cost > 0) {
+      items.push({ icon: "💲", label: "Unit cost", value: `$${product.cost.toFixed(2)} (direct from invoice)` });
+    } else {
+      items.push({ icon: "⚠️", label: "Cost", value: "No cost detected — may need manual entry" });
+    }
+
+    // Why confidence level
+    const confReasons: string[] = [];
+    if (product._confidenceLevel === "high") {
+      confReasons.push("All key fields present (title, cost, quantity)");
+      if (product.sku) confReasons.push("SKU detected");
+      if (product.colour || product.size) confReasons.push("Variant info found");
+    } else if (product._confidenceLevel === "medium") {
+      if (!product.cost || product.cost <= 0) confReasons.push("Missing unit cost");
+      if (!product.size && !product.colour) confReasons.push("No variant info detected");
+      if ((product.name || "").length < 5) confReasons.push("Short or ambiguous title");
+      if (!product.sku) confReasons.push("No SKU/style code found");
+    } else {
+      if (product._rejected) confReasons.push(product._rejectReason || "Row data doesn't match product pattern");
+      else confReasons.push("Insufficient product fields");
+    }
+    items.push({ icon: product._confidenceLevel === "high" ? "🟢" : product._confidenceLevel === "medium" ? "🟡" : "🔴", label: `Why ${product._confidenceLevel} confidence`, value: confReasons.join("; ") });
+
+    // Why accepted/rejected/grouped
+    if (product._rejected) {
+      items.push({ icon: "❌", label: "Why rejected", value: product._rejectReason || "Matched noise/non-product pattern" });
+    } else {
+      items.push({ icon: "✅", label: "Why accepted", value: product._extractionReason || "Matched product line pattern with sufficient fields" });
+    }
+
+    // Strategy explanation
+    if (parsingPlan?.strategy_explanation) {
+      items.push({ icon: "💡", label: "AI strategy", value: parsingPlan.strategy_explanation });
+    }
+
+    return items;
+  }, [product, parsingPlan]);
+
+  return (
+    <div className="px-2.5 py-2 bg-card space-y-1">
+      {explanations.map((e, i) => (
+        <div key={i} className="flex items-start gap-2 text-[10px]">
+          <span className="shrink-0 w-4 text-center">{e.icon}</span>
+          <span className="text-muted-foreground shrink-0 w-28 font-medium">{e.label}:</span>
+          <span className="text-foreground">{e.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Teach AI Panel ──
 function TeachAIPanel({ product, supplierName, onClose }: { product: ReviewProduct; supplierName?: string; onClose: () => void }) {
   const [savedRules, setSavedRules] = useState<string[]>([]);

@@ -71,28 +71,46 @@ const ShopifyEmbeddedProvider = ({ children }: Props) => {
           return;
         }
 
-        // Step 2: Exchange session token for Supabase session
-        const { data, error } = await supabase.functions.invoke("shopify-session-verify", {
-          body: { session_token: token },
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        if (!supabaseUrl) {
+          console.warn("[embedded-auth] Missing backend URL");
+          setAuthState("unauthenticated");
+          return;
+        }
+
+        // Step 2: Exchange session token for backend session
+        const response = await fetch(`${supabaseUrl}/functions/v1/shopify-session-verify`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ session_token: token }),
         });
+        const data = await response.json().catch(() => null);
 
         if (cancelled) return;
 
-        if (error || !data?.access_token) {
-          console.warn("[embedded-auth] Session verify failed:", error || data?.error);
+        if (!response.ok || !data?.access_token || !data?.refresh_token) {
+          console.warn("[embedded-auth] Session verify failed:", data?.error || response.statusText);
           setAuthState("unauthenticated");
           return;
         }
 
         // Step 3: Set Supabase session (single call — no other component should do this)
-        await supabase.auth.setSession({
+        const { error: sessionError } = await supabase.auth.setSession({
           access_token: data.access_token,
           refresh_token: data.refresh_token,
         });
 
+        if (sessionError) {
+          console.warn("[embedded-auth] Failed to set session:", sessionError);
+          setAuthState("unauthenticated");
+          return;
+        }
+
         if (!cancelled) {
           setAuthState("authenticated");
-          // Auto-complete onboarding for embedded merchants
           localStorage.setItem("onboarding_complete", "true");
           addAuditEntry("Login", `Embedded session auth for ${data.shop || base.shop}`);
         }

@@ -89,14 +89,23 @@ function extractShopDomain(issOrDest: string): string {
   }
 }
 
+function getSessionTokenFromRequest(req: Request): string | null {
+  const authHeader = req.headers.get("Authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.slice("Bearer ".length).trim();
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const body = await req.json();
-    const sessionToken = body.session_token;
+    const body = await req.json().catch(() => ({}));
+    const sessionToken = getSessionTokenFromRequest(req) || body.session_token;
 
     if (!sessionToken) {
       return new Response(JSON.stringify({ error: "Missing session_token" }), {

@@ -490,17 +490,29 @@ export default function AccountingIntegration({ onBack }: { onBack: () => void }
   );
 }
 
-// ── Inline push panel for InvoiceFlow / WholesaleImportFlow ──
+// ── Inline push panel with AI category intelligence ──
 export function AccountingPushPanel({ invoice }: { invoice: any }) {
   const [connections, setConnections] = useState<AccountingConnection[]>([]);
   const [pushing, setPushing] = useState<string | null>(null);
   const [result, setResult] = useState<{ platform: string; success: boolean; url?: string; error?: string } | null>(null);
+  const [classification, setClassification] = useState<InvoiceCategorisation | null>(null);
+  const [selectedCode, setSelectedCode] = useState("");
+  const allCodes = getAllAccountCodes();
 
   useEffect(() => {
     supabase.from("accounting_connections").select("*").then(({ data }) => {
       setConnections((data as any[]) || []);
     });
   }, []);
+
+  // Run AI classification when invoice data is available
+  useEffect(() => {
+    if (invoice?.supplier) {
+      const result = classifyInvoice(invoice.supplier, invoice.description || "", invoice.line_items);
+      setClassification(result);
+      setSelectedCode(result.accountCode);
+    }
+  }, [invoice?.supplier]);
 
   const handlePush = async (platform: "xero" | "myob") => {
     const conn = connections.find(c => c.platform === platform);
@@ -510,7 +522,6 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
     setResult(null);
 
     try {
-      // Find or create contact
       const contactAction = platform === "xero" ? "find_or_create_contact" : "find_or_create_supplier";
       const { data: contactData, error: contactError } = await supabase.functions.invoke("accounting-proxy", {
         body: { action: contactAction, platform, supplier_name: invoice.supplier || "Unknown Supplier" },
@@ -518,7 +529,8 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
       if (contactError) throw contactError;
 
       const contactId = platform === "xero" ? contactData.contactId : contactData.uid;
-      const accountCode = conn.account_mappings?.["swimwear"] || conn.account_mappings?.["other"] || "";
+      // Use AI-selected code, falling back to manual mapping
+      const accountCode = selectedCode || conn.account_mappings?.["swimwear"] || conn.account_mappings?.["other"] || "";
 
       const pushBody: any = { action: "push_bill", platform, invoice };
       if (platform === "xero") {
@@ -534,6 +546,15 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
       if (error) throw error;
 
       if (data?.success) {
+        // Record success for learning
+        const codeDef = allCodes.find(c => c.code === accountCode);
+        recordSuccessfulPush(invoice.supplier, accountCode, codeDef?.name || "", codeDef?.category || "", "GST on Expenses");
+
+        // If user changed the AI suggestion, record correction
+        if (classification && accountCode !== classification.accountCode) {
+          recordCorrection(invoice.supplier, classification.accountCode, accountCode, codeDef?.name || "", codeDef?.category || "", "GST on Expenses");
+        }
+
         setResult({ platform, success: true, url: data.external_url });
         toast.success(`Bill sent to ${platform === "xero" ? "Xero" : "MYOB"} as draft`);
       } else {
@@ -564,9 +585,7 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
           <Check className="w-5 h-5" />
           <span className="font-medium">Bill sent to {result.platform === "xero" ? "Xero" : "MYOB"}</span>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Your accountant will see this as a draft bill ready to review and authorise.
-        </p>
+        <p className="text-sm text-muted-foreground">Your accountant will see this as a draft bill ready to review.</p>
         {result.url && (
           <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1 mt-2">
             View in {result.platform === "xero" ? "Xero" : "MYOB"} <ExternalLink className="w-3 h-3" />
@@ -578,12 +597,43 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
 
   return (
     <div className="bg-card rounded-lg border border-border p-4 mt-4 space-y-3">
-      <h3 className="text-sm font-semibold">Send to accounting software</h3>
-      <div className="text-xs text-muted-foreground space-y-1">
-        <p>Supplier: {invoice.supplier || "—"}</p>
-        <p>Total: ${Number(invoice.total || 0).toFixed(2)} {invoice.gst ? `(inc GST $${Number(invoice.gst).toFixed(2)})` : ""}</p>
-        <p>Category: {invoice.category || "Stock purchase"}</p>
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-semibold">Send to accounting software</h3>
+        {classification && (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/15 text-primary flex items-center gap-1">
+            <Sparkles className="w-3 h-3" /> AI classified
+          </span>
+        )}
       </div>
+
+      <div className="text-xs text-muted-foreground space-y-1">
+        <p>Supplier: <span className="font-medium text-foreground">{invoice.supplier || "—"}</span></p>
+        <p>Total: <span className="font-medium text-foreground">${Number(invoice.total || 0).toFixed(2)}</span> {invoice.gst ? `(inc GST $${Number(invoice.gst).toFixed(2)})` : ""}</p>
+        <p>Date: <span className="font-medium text-foreground">{invoice.invoice_date || "—"}</span></p>
+      </div>
+
+      {/* AI classification with editable dropdown */}
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Account category:</label>
+        <select
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={selectedCode}
+          onChange={e => setSelectedCode(e.target.value)}
+        >
+          {allCodes.map(c => (
+            <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
+          ))}
+        </select>
+        {classification && (
+          <div className="flex items-center gap-2 mt-1">
+            <div className={`w-2 h-2 rounded-full ${classification.confidence >= 70 ? "bg-green-500" : classification.confidence >= 40 ? "bg-yellow-500" : "bg-destructive"}`} />
+            <span className="text-[11px] text-muted-foreground">
+              {classification.confidence}% confidence — {classification.explanation}
+            </span>
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-2">
         {connections.map(conn => (
           <Button
@@ -598,9 +648,7 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
           </Button>
         ))}
       </div>
-      {result?.error && (
-        <p className="text-xs text-destructive">{result.error}</p>
-      )}
+      {result?.error && <p className="text-xs text-destructive">{result.error}</p>}
     </div>
   );
 }

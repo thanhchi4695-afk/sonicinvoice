@@ -68,6 +68,8 @@ export default function ImageOptimisePanel({ onBack }: Props) {
   const [analysing, setAnalysing] = useState(false);
   const [validating, setValidating] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [pushingCompressed, setPushingCompressed] = useState(false);
+  const [pushCompressedProgress, setPushCompressedProgress] = useState({ current: 0, total: 0 });
   const [compressing, setCompressing] = useState(false);
   const [analysingSize, setAnalysingSize] = useState(false);
   const [auditingConversion, setAuditingConversion] = useState(false);

@@ -65,6 +65,14 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
   const [pushing, setPushing] = useState(false);
   const [pushProgress, setPushProgress] = useState({ current: 0, total: 0 });
 
+  // File import step
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [fileParseResult, setFileParseResult] = useState<JoorFileParseResult | null>(null);
+  const [fileParsing, setFileParsing] = useState(false);
+  const [fileEnriching, setFileEnriching] = useState(false);
+  const [fileProducts, setFileProducts] = useState<JoorParsedProduct[]>([]);
+  const [fileGroupedProducts, setFileGroupedProducts] = useState<MappedProduct[]>([]);
+
   // Check existing connection
   useEffect(() => {
     checkConnection();

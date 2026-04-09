@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail, CalendarDays, ShoppingCart, Image, Sparkles } from "lucide-react";
+import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail, CalendarDays, ShoppingCart, Image, Sparkles, Brain, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PriceLookup from "@/components/PriceLookup";
 import SupplierEmails from "@/components/SupplierEmails";
@@ -43,6 +43,7 @@ const tools = [
   { id: "collection_seo", icon: Globe, label: "Collection SEO AI", desc: "SEO-optimize collections for Google rankings", color: "text-success" },
   { id: "feed_optimise", icon: Sparkles, label: "AI Feed Optimisation", desc: "Generate Google Shopping product_detail attributes", color: "text-primary" },
   { id: "feed_health", icon: Globe, label: "Google Feed Health", desc: "Fix gender, age_group, color — push to Shopify", color: "text-success" },
+  { id: "learning_memory", icon: Brain, label: "Learning memory", desc: "View learned invoice patterns by supplier", color: "text-secondary" },
 ];
 
 const quickInserts = [
@@ -996,6 +997,7 @@ const ToolsScreen = () => {
   if (activeTool === "collection_seo") return <CollectionSEOPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "feed_optimise") return <AIFeedOptimisation onBack={() => setActiveTool(null)} />;
   if (activeTool === "feed_health") return <FeedHealthPanel onBack={() => setActiveTool(null)} />;
+  if (activeTool === "learning_memory") return <LearningMemoryPanel onBack={() => setActiveTool(null)} />;
 
   if (activeTool === "ai") {
     return (

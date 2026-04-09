@@ -36,6 +36,34 @@ export interface ConfidenceSignal {
   delta: number;
 }
 
+// Source trace bounding box for highlighting invoice regions
+export interface SourceBoundingBox {
+  page: number;
+  x: number;      // normalized 0-1
+  y: number;      // normalized 0-1
+  width: number;  // normalized 0-1
+  height: number; // normalized 0-1
+  text: string;
+  fieldType?: "title" | "sku" | "colour" | "size" | "quantity" | "cost" | "vendor" | "barcode" | "unknown";
+}
+
+// Per-field source trace mapping
+export interface FieldSourceTrace {
+  field: string;
+  value: string;
+  page: number;
+  boxes: SourceBoundingBox[];
+  extractionMethod?: string; // e.g. "grid column", "inline text", "inferred from description"
+}
+
+// Full source trace for a product row
+export interface SourceTrace {
+  page: number;
+  fieldTraces: FieldSourceTrace[];
+  allBoxes: SourceBoundingBox[];
+  approximated?: boolean; // true when exact coords unavailable
+}
+
 export interface ValidatedProduct extends RawProduct {
   _rowIndex: number;
   _rawName: string;
@@ -53,6 +81,7 @@ export interface ValidatedProduct extends RawProduct {
   _suggestedVendor: string;
   _parseNotes?: string;
   _extractionReason?: string;
+  _sourceTrace?: SourceTrace;
 }
 
 export interface ParsingPlan {

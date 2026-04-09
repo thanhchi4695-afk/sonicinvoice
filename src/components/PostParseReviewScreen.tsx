@@ -3,7 +3,7 @@ import {
   Check, X, AlertTriangle, ChevronDown, ChevronRight, RotateCcw,
   ShieldCheck, Bug, Search, Filter, CheckCheck, ArrowRight,
   Edit3, Download, Zap, ArrowUpRight, Layers, Merge, Scissors,
-  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash
+  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash, MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,11 +13,13 @@ import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
 import { toast } from "sonner";
+import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;
   products: ValidatedProduct[];
   supplierName?: string;
+  invoicePages?: string[]; // base64 or URL images per page
   onUpdateProducts: (products: ValidatedProduct[]) => void;
   onExportAccepted: () => void;
   onPushToShopify: () => void;
@@ -54,6 +56,7 @@ export default function PostParseReviewScreen({
   debug,
   products,
   supplierName,
+  invoicePages = [],
   onUpdateProducts,
   onExportAccepted,
   onPushToShopify,
@@ -72,6 +75,8 @@ export default function PostParseReviewScreen({
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [showTeachAI, setShowTeachAI] = useState<number | null>(null);
   const [bulkVendor, setBulkVendor] = useState("");
+  const [sourceTraceProduct, setSourceTraceProduct] = useState<ValidatedProduct | null>(null);
+  const [showDebugZones, setShowDebugZones] = useState(false);
 
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
@@ -552,6 +557,8 @@ export default function PostParseReviewScreen({
                   onToggleTeachAI={() => setShowTeachAI(showTeachAI === p._rowIndex ? null : p._rowIndex)}
                   supplierName={supplierName}
                   parsingPlan={debug.parsingPlan}
+                  invoicePages={invoicePages}
+                  onShowSourceTrace={(prod) => setSourceTraceProduct(prod)}
                 />
               ))}
             </div>
@@ -626,6 +633,21 @@ export default function PostParseReviewScreen({
                 Review Remaining
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Source Trace Viewer Modal */}
+      {sourceTraceProduct && invoicePages.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-center justify-center">
+          <div className="w-full max-w-5xl h-[80vh]">
+            <SourceTraceViewer
+              product={sourceTraceProduct}
+              invoicePages={invoicePages}
+              onClose={() => setSourceTraceProduct(null)}
+              allProducts={products}
+              showDebugZones={showDebugZones}
+            />
           </div>
         </div>
       )}
@@ -760,6 +782,7 @@ function ReviewRow({
   onApprove, onReject, onMoveToReview, onRestore,
   onUpdateField, onMarkAs, onSplit,
   showTeachAI, onToggleTeachAI, supplierName, parsingPlan,
+  invoicePages, onShowSourceTrace,
 }: {
   product: ReviewProduct;
   tab: ReviewTab;
@@ -779,6 +802,8 @@ function ReviewRow({
   onToggleTeachAI: () => void;
   supplierName?: string;
   parsingPlan?: import("@/lib/invoice-validator").ParsingPlan;
+  invoicePages?: string[];
+  onShowSourceTrace?: (product: ReviewProduct) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showWhyAI, setShowWhyAI] = useState(false);
@@ -861,6 +886,25 @@ function ReviewRow({
             )}
           </p>
         </div>
+
+        {/* Inline source preview thumbnail */}
+        {invoicePages && invoicePages.length > 0 && p._sourceTrace && (
+          <InlineSourcePreview
+            product={p}
+            invoicePages={invoicePages}
+            onClick={() => onShowSourceTrace?.(p)}
+          />
+        )}
+        {/* Source trace button (when no trace data but pages exist) */}
+        {invoicePages && invoicePages.length > 0 && !p._sourceTrace && (
+          <button
+            onClick={() => onShowSourceTrace?.(p)}
+            className="w-8 h-8 rounded border border-border flex items-center justify-center shrink-0 hover:bg-muted/30 transition-colors"
+            title="View source page"
+          >
+            <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+          </button>
+        )}
 
         {/* Actions */}
         <div className="flex gap-0.5 shrink-0">

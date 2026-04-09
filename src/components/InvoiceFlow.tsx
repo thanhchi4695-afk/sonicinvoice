@@ -2203,6 +2203,8 @@ function LightspeedRestockSection({ products, supplierName }: {
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
     toast.success("CSV downloaded", { description: filename });
+    // Auto-trigger image SEO optimization
+    import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "invoice", productCount: products.length }));
   };
 
   const handleDownload = () => {

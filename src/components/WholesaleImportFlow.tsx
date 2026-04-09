@@ -236,7 +236,9 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
     if (!parsed.length) { toast.error("No orders found in file"); return; }
 
     setOrders(parsed);
-    toast.success(`${parsed.length} order(s) imported (${parsed.reduce((s, o) => s + o.lineItems.length, 0)} line items)`);
+    const totalItems = parsed.reduce((s, o) => s + o.lineItems.length, 0);
+    toast.success(`${parsed.length} order(s) imported (${totalItems} line items)`);
+    import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "wholesale", productCount: totalItems }));
     setScreen("orders");
   };
 

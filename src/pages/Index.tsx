@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { addAuditEntry } from "@/lib/audit-log";
+import { onImageSeoTrigger } from "@/lib/image-seo-trigger";
 import NotificationBell from "@/components/NotificationBell";
 import LoadingScreen from "@/components/ui/loading-screen";
 
@@ -151,6 +152,20 @@ const Index = () => {
         });
     }
   }, [isEmbedded]);
+
+  // ── Auto-trigger image SEO after imports ──
+  useEffect(() => {
+    return onImageSeoTrigger(({ source, productCount }) => {
+      toast(`${productCount} products imported from ${source}`, {
+        description: "Run Image SEO to generate alt text & keywords",
+        action: {
+          label: "Optimise Images",
+          onClick: () => setActiveFlow("image_optimise"),
+        },
+        duration: 8000,
+      });
+    });
+  }, []);
 
   const handleAuth = () => {
     setAuthed(true);

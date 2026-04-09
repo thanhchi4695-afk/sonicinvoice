@@ -281,6 +281,9 @@ const AccountScreen = () => {
       {/* Wholesale Platform Connections */}
       <WholesaleConnectionsSection />
 
+      {/* Accounting Connections */}
+      <AccountingConnectionsSection />
+
       {/* Connected Shopify Stores (Custom App tokens) */}
       <DirectStoresSection />
 

@@ -242,8 +242,8 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
         const p = products[i];
         const variants = (p.sizes || [p.size]).map((sz, idx) => ({
           sku: `${p.sku.split("-").slice(0, 2).join("-")}-${sz}`.toUpperCase().replace(/\s+/g, "-"),
-          price: p.price,
-          cost: p.costPrice,
+          price: p.retailPrice.toFixed(2),
+          cost: p.wholesaleCost.toFixed(2),
           barcode: (p.barcodes || [p.barcode])?.[idx] || "",
           option1: p.colour,
           option2: sz,
@@ -611,8 +611,8 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
                     <td className="p-3 font-mono text-xs">{p.sku.split("-")[0]}</td>
                     <td className="p-3">{p.colour}</td>
                     <td className="p-3 text-xs">{p.sizes?.join(", ") || p.size}</td>
-                    <td className="p-3 text-right">${p.price}</td>
-                    <td className="p-3 text-right text-muted-foreground">${p.costPrice}</td>
+                    <td className="p-3 text-right">${p.retailPrice.toFixed(2)}</td>
+                    <td className="p-3 text-right text-muted-foreground">${p.wholesaleCost.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -425,6 +425,125 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_order_lines: {
+        Row: {
+          actual_cost: number | null
+          color: string | null
+          created_at: string
+          expected_cost: number
+          expected_qty: number
+          id: string
+          notes: string | null
+          product_title: string
+          purchase_order_id: string
+          received_qty: number
+          size: string | null
+          sku: string | null
+          user_id: string
+        }
+        Insert: {
+          actual_cost?: number | null
+          color?: string | null
+          created_at?: string
+          expected_cost?: number
+          expected_qty?: number
+          id?: string
+          notes?: string | null
+          product_title?: string
+          purchase_order_id: string
+          received_qty?: number
+          size?: string | null
+          sku?: string | null
+          user_id: string
+        }
+        Update: {
+          actual_cost?: number | null
+          color?: string | null
+          created_at?: string
+          expected_cost?: number
+          expected_qty?: number
+          id?: string
+          notes?: string | null
+          product_title?: string
+          purchase_order_id?: string
+          received_qty?: number
+          size?: string | null
+          sku?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_lines_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          created_at: string
+          expected_date: string | null
+          id: string
+          linked_document_id: string | null
+          match_result: Json | null
+          notes: string | null
+          po_number: string
+          status: string
+          supplier_id: string | null
+          supplier_name: string
+          total_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expected_date?: string | null
+          id?: string
+          linked_document_id?: string | null
+          match_result?: Json | null
+          notes?: string | null
+          po_number: string
+          status?: string
+          supplier_id?: string | null
+          supplier_name: string
+          total_cost?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expected_date?: string | null
+          id?: string
+          linked_document_id?: string | null
+          match_result?: Json | null
+          notes?: string | null
+          po_number?: string
+          status?: string
+          supplier_id?: string | null
+          supplier_name?: string
+          total_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_linked_document_id_fkey"
+            columns: ["linked_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shopify_connections: {
         Row: {
           access_token: string

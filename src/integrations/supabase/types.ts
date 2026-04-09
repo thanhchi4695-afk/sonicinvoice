@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      joor_connections: {
+        Row: {
+          connected_at: string
+          id: string
+          last_synced: string | null
+          oauth_token: string
+          token_label: string | null
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string
+          id?: string
+          last_synced?: string | null
+          oauth_token: string
+          token_label?: string | null
+          user_id: string
+        }
+        Update: {
+          connected_at?: string
+          id?: string
+          last_synced?: string | null
+          oauth_token?: string
+          token_label?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       shopify_connections: {
         Row: {
           access_token: string

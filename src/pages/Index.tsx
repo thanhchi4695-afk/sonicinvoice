@@ -218,6 +218,7 @@ const Index = () => {
       case "inventory_planning": flowEl = <InventoryPlanningPanel onBack={() => setActiveFlow(null)} />; break;
       case "packing_slip": flowEl = <PackingSlipFlow onBack={() => setActiveFlow(null)} />; break;
       case "joor": flowEl = <JoorFlow onBack={() => setActiveFlow(null)} />; break;
+      case "wholesale_import": flowEl = <WholesaleImportFlow onBack={() => setActiveFlow(null)} />; break;
       default: return null;
     }
     return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;
@@ -265,6 +266,7 @@ const Index = () => {
           onStartInventoryPlanning={() => setActiveFlow("inventory_planning")}
           onStartPackingSlip={() => setActiveFlow("packing_slip")}
           onStartJoor={() => setActiveFlow("joor")}
+          onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
         />
       )}
       <Suspense fallback={suspenseFallback}>

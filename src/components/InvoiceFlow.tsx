@@ -581,6 +581,13 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           );
         }
       }
+      // Store parsing plan and rejected rows for debug
+      if (data.parsing_plan) {
+        setAiParsingPlan(data.parsing_plan);
+      }
+      if (data.rejected_rows) {
+        setAiRejectedRows(data.rejected_rows);
+      }
       return data.products || [];
     } catch (err) {
       console.error("AI parse error:", err);

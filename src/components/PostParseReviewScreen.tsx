@@ -636,16 +636,18 @@ function StatCard({ label, value, icon, colorClass }: { label: string; value: st
 
 // ── Grouped Product Card (Fashion view) ──
 function GroupedProductCard({
-  group, onUpdateField, onRejectVariant, onSplitVariant, supplierName,
+  group, onUpdateField, onRejectVariant, onSplitVariant, supplierName, parsingPlan,
 }: {
   group: ProductGroup;
   onUpdateField: (rowIndex: number, field: string, value: string | number) => void;
   onRejectVariant: (rowIndex: number) => void;
   onSplitVariant: (rowIndex: number) => void;
   supplierName?: string;
+  parsingPlan?: import("@/lib/invoice-validator").ParsingPlan;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [editingParent, setEditingParent] = useState(false);
+  const [showWhyAI, setShowWhyAI] = useState(false);
 
   return (
     <div className="px-4 py-3">
@@ -718,7 +720,7 @@ function ReviewRow({
   onToggleSelect, onStartEdit, onStopEdit,
   onApprove, onReject, onMoveToReview, onRestore,
   onUpdateField, onMarkAs, onSplit,
-  showTeachAI, onToggleTeachAI, supplierName,
+  showTeachAI, onToggleTeachAI, supplierName, parsingPlan,
 }: {
   product: ReviewProduct;
   tab: ReviewTab;
@@ -737,8 +739,10 @@ function ReviewRow({
   showTeachAI: boolean;
   onToggleTeachAI: () => void;
   supplierName?: string;
+  parsingPlan?: import("@/lib/invoice-validator").ParsingPlan;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showWhyAI, setShowWhyAI] = useState(false);
 
   return (
     <div className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""}`}>

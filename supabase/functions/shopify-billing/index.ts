@@ -23,24 +23,36 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Plan configuration
-const PLANS = {
-  monthly: {
-    name: "Starter (Monthly)",
+// Plan configuration — 3 tiers, AUD pricing
+const PLANS: Record<string, {
+  name: string; handle: string; price: number;
+  currency: string; trialDays: number; interval: string; test: boolean;
+}> = {
+  starter: {
+    name: "Starter",
     handle: "starter",
-    price: 19.00,
-    currency: "USD",
-    trialDays: 7,
+    price: 29.00,
+    currency: "AUD",
+    trialDays: 14,
     interval: "EVERY_30_DAYS",
     test: false,
   },
-  yearly: {
-    name: "Starter (Yearly)",
-    handle: "starter",
-    price: 190.00,
-    currency: "USD",
-    trialDays: 7,
-    interval: "ANNUAL",
+  pro: {
+    name: "Pro",
+    handle: "pro",
+    price: 59.00,
+    currency: "AUD",
+    trialDays: 14,
+    interval: "EVERY_30_DAYS",
+    test: false,
+  },
+  growth: {
+    name: "Growth",
+    handle: "growth",
+    price: 99.00,
+    currency: "AUD",
+    trialDays: 14,
+    interval: "EVERY_30_DAYS",
     test: false,
   },
 };
@@ -186,7 +198,8 @@ Deno.serve(async (req) => {
 
     // ── ACTION: create — Create new subscription ──
     if (action === "create") {
-      const billing = body.interval === "yearly" ? PLANS.yearly : PLANS.monthly;
+      const planKey = body.plan || "starter";
+      const billing = PLANS[planKey] || PLANS.starter;
       const returnUrl = body.return_url || `https://${store_url}/admin/apps`;
       const isTest = body.test !== undefined ? body.test : billing.test;
 

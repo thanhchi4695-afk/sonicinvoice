@@ -477,6 +477,7 @@ export type Database = {
           selection_value: string
           stages: Json
           status: string
+          sync_to_shopify: boolean
           trigger_type: string
           updated_at: string
           user_id: string
@@ -493,6 +494,7 @@ export type Database = {
           selection_value?: string
           stages?: Json
           status?: string
+          sync_to_shopify?: boolean
           trigger_type?: string
           updated_at?: string
           user_id: string
@@ -509,6 +511,7 @@ export type Database = {
           selection_value?: string
           stages?: Json
           status?: string
+          sync_to_shopify?: boolean
           trigger_type?: string
           updated_at?: string
           user_id?: string

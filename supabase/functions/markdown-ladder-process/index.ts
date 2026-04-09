@@ -11,6 +11,79 @@ interface LadderStage {
   triggerDays: number;
 }
 
+async function syncPriceToShopify(
+  supabase: any,
+  userId: string,
+  variantId: string,
+  newPrice: number,
+  originalPrice: number,
+) {
+  // Look up the Shopify variant ID from our variants table
+  const { data: variant } = await supabase
+    .from("variants")
+    .select("shopify_variant_id")
+    .eq("id", variantId)
+    .eq("user_id", userId)
+    .single();
+
+  if (!variant?.shopify_variant_id) return { synced: false, reason: "no_shopify_variant" };
+
+  // Get the user's Shopify connection
+  const { data: conn } = await supabase
+    .from("shopify_connections")
+    .select("store_url, access_token, api_version")
+    .eq("user_id", userId)
+    .single();
+
+  if (!conn) return { synced: false, reason: "no_shopify_connection" };
+
+  const { store_url, access_token, api_version } = conn;
+  const url = `https://${store_url}/admin/api/${api_version}/variants/${variant.shopify_variant_id}.json`;
+
+  const resp = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": access_token,
+    },
+    body: JSON.stringify({
+      variant: {
+        id: parseInt(variant.shopify_variant_id),
+        price: newPrice.toFixed(2),
+        compare_at_price: originalPrice.toFixed(2),
+      },
+    }),
+  });
+
+  if (resp.status === 429) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const retry = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": access_token,
+      },
+      body: JSON.stringify({
+        variant: {
+          id: parseInt(variant.shopify_variant_id),
+          price: newPrice.toFixed(2),
+          compare_at_price: originalPrice.toFixed(2),
+        },
+      }),
+    });
+    if (!retry.ok) return { synced: false, reason: `shopify_error_${retry.status}` };
+    return { synced: true };
+  }
+
+  if (!resp.ok) {
+    const err = await resp.text().catch(() => "");
+    console.error("Shopify price sync failed:", resp.status, err);
+    return { synced: false, reason: `shopify_error_${resp.status}` };
+  }
+
+  return { synced: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -37,10 +110,12 @@ Deno.serve(async (req) => {
     let totalProcessed = 0;
     let totalAdvanced = 0;
     let totalBlocked = 0;
+    let totalShopifySynced = 0;
 
     for (const ladder of ladders) {
       const stages = (Array.isArray(ladder.stages) ? ladder.stages : JSON.parse(ladder.stages)) as LadderStage[];
       const minMargin = Number(ladder.min_margin_pct) || 0;
+      const syncToShopify = !!ladder.sync_to_shopify;
 
       // Get active items for this ladder that need checking
       const { data: items, error: iErr } = await supabase
@@ -59,15 +134,13 @@ Deno.serve(async (req) => {
         const nextStage = stages.find((s: LadderStage) => s.stageNumber === nextStageNum);
 
         if (!nextStage) {
-          // All stages complete
           await supabase.from("markdown_ladder_items").update({ status: "completed" }).eq("id", item.id);
           continue;
         }
 
-        // Check if enough days have passed since last sale
+        // Check days since last sale
         const daysSinceLastSale = item.days_since_last_sale || 0;
 
-        // Update days_since_last_sale from sales_data
         if (item.variant_id) {
           const { data: lastSale } = await supabase
             .from("sales_data")
@@ -85,9 +158,7 @@ Deno.serve(async (req) => {
               last_sale_at: lastSale[0].sold_at,
             }).eq("id", item.id);
 
-            // If sold recently, don't advance
             if (updatedDays < nextStage.triggerDays) {
-              // Schedule next check
               const nextCheck = new Date();
               nextCheck.setDate(nextCheck.getDate() + (ladder.check_frequency === "weekly" ? 7 : 1));
               await supabase.from("markdown_ladder_items").update({
@@ -98,7 +169,6 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Check if trigger days met
         if (daysSinceLastSale < nextStage.triggerDays && !item.variant_id) {
           const nextCheck = new Date();
           nextCheck.setDate(nextCheck.getDate() + (ladder.check_frequency === "weekly" ? 7 : 1));
@@ -144,6 +214,27 @@ Deno.serve(async (req) => {
         }).eq("id", item.id);
 
         totalAdvanced++;
+
+        // Sync to Shopify if enabled
+        if (syncToShopify && item.variant_id) {
+          try {
+            const result = await syncPriceToShopify(
+              supabase,
+              ladder.user_id,
+              item.variant_id,
+              newPrice,
+              originalPrice,
+            );
+            if (result.synced) {
+              totalShopifySynced++;
+              console.log(`Shopify price synced: variant ${item.variant_id} → $${newPrice} (was $${originalPrice})`);
+            } else {
+              console.warn(`Shopify sync skipped for variant ${item.variant_id}: ${result.reason}`);
+            }
+          } catch (syncErr) {
+            console.error(`Shopify sync error for variant ${item.variant_id}:`, syncErr);
+          }
+        }
       }
 
       // Check if all items in ladder are completed/blocked
@@ -162,6 +253,7 @@ Deno.serve(async (req) => {
       processed: totalProcessed,
       advanced: totalAdvanced,
       blocked: totalBlocked,
+      shopify_synced: totalShopifySynced,
       ladders: ladders.length,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

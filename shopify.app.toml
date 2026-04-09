@@ -1,7 +1,7 @@
 # Sonic Invoices — Shopify App Configuration
 # https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "37a7e9655d5bc1b195a4e2173d8684c3"
+client_id = "aebbc68f4f67197beb20489d6d2987e4"
 
 name = "Sonic Invoices"
 application_url = "https://sonicinvoice.lovable.app"

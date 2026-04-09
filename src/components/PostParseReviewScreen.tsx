@@ -557,6 +557,8 @@ export default function PostParseReviewScreen({
                   onToggleTeachAI={() => setShowTeachAI(showTeachAI === p._rowIndex ? null : p._rowIndex)}
                   supplierName={supplierName}
                   parsingPlan={debug.parsingPlan}
+                  invoicePages={invoicePages}
+                  onShowSourceTrace={(prod) => setSourceTraceProduct(prod)}
                 />
               ))}
             </div>

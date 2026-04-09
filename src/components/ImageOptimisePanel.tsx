@@ -20,6 +20,7 @@ interface ProductImage {
   description: string;
   imageUrl: string;
   tags: string[];
+  shopifyProductId?: string | null;
   altText?: string;
   seoFilename?: string;
   keywords?: string[];
@@ -33,6 +34,7 @@ interface ProductImage {
   matchReason?: string;
   approved?: boolean;
   edited?: boolean;
+  synced?: boolean;
 }
 
 interface Props { onBack: () => void; }
@@ -43,6 +45,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
   const [generating, setGenerating] = useState(false);
   const [analysing, setAnalysing] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -59,7 +62,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
       if (!session) { setLoading(false); return; }
       const { data: prods } = await supabase
         .from("products")
-        .select("id, title, vendor, product_type, image_url, description")
+        .select("id, title, vendor, product_type, image_url, description, shopify_product_id")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false })
         .limit(500);
@@ -68,6 +71,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
           id: p.id, title: p.title || "", vendor: p.vendor || "",
           productType: p.product_type || "", colour: "", description: p.description || "",
           imageUrl: p.image_url || "", tags: [],
+          shopifyProductId: p.shopify_product_id,
           qualityStatus: p.image_url ? undefined : "missing",
         })));
       }

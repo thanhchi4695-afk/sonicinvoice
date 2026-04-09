@@ -709,6 +709,21 @@ function GroupedProductCard({
             </div>
           ))}
         </div>
+
+        {/* Why AI did this for grouped product */}
+        <div className="ml-10 mt-2 border border-primary/15 rounded-md overflow-hidden">
+          <button
+            onClick={() => setShowWhyAI(!showWhyAI)}
+            className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+          >
+            <Bug className="w-3 h-3" />
+            Why AI grouped this
+            {showWhyAI ? <ChevronDown className="w-3 h-3 ml-auto" /> : <ChevronRight className="w-3 h-3 ml-auto" />}
+          </button>
+          {showWhyAI && (
+            <WhyAIPanel product={group.variants[0]} parsingPlan={parsingPlan} />
+          )}
+        </div>
       )}
     </div>
   );

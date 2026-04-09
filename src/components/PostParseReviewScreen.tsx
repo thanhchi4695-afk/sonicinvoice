@@ -170,7 +170,11 @@ export default function PostParseReviewScreen({
   const rejectRow = (rowIndex: number, reason?: string) => {
     const product = products.find(p => p._rowIndex === rowIndex);
     if (supplierName && product) {
-      recordNoiseRejection(supplierName, product._rawName || product.name || "", reason || "Manually rejected by merchant");
+      const rejectReason = reason || "Manually rejected by merchant";
+      recordNoiseRejection(supplierName, product._rawName || product.name || "", rejectReason);
+      const from = product._confidenceLevel === "high" ? "accepted" : "review";
+      recordReclassification(supplierName, product._rawName || product.name || "", from as any, "rejected", rejectReason);
+      toast.info("AI learned: row rejected", { description: `Future invoices will auto-reject similar rows`, duration: 2000 });
     }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
@@ -180,6 +184,10 @@ export default function PostParseReviewScreen({
   };
 
   const moveToReview = (rowIndex: number) => {
+    const product = products.find(p => p._rowIndex === rowIndex);
+    if (supplierName && product) {
+      recordReclassification(supplierName, product._rawName || product.name || "", "accepted", "review", "Moved to review — needs verification");
+    }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
         ? { ...p, _rejected: false, _confidenceLevel: "medium" as const, _confidence: Math.min(p._confidence, 70) }
@@ -188,6 +196,11 @@ export default function PostParseReviewScreen({
   };
 
   const restoreToReview = (rowIndex: number) => {
+    const product = products.find(p => p._rowIndex === rowIndex);
+    if (supplierName && product) {
+      recordReclassification(supplierName, product._rawName || product.name || "", "rejected", "review", "Restored from rejected — may be a product");
+      toast.success("AI learned: row restored", { description: `Similar rows will get higher confidence next time`, duration: 2000 });
+    }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
         ? { ...p, _rejected: false, _confidenceLevel: "medium" as const, _confidence: 50, _rejectReason: undefined }

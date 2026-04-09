@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,11 +9,17 @@ import {
   type MappedProduct,
   type JoorLineItem,
 } from "@/lib/joor-mapper";
+import {
+  parseJoorFile,
+  enrichJoorProducts,
+  type JoorParsedProduct,
+  type JoorFileParseResult,
+} from "@/lib/joor-file-parser";
 import { toast } from "sonner";
 import {
   ArrowLeft, Check, Loader2, RefreshCw, Download,
   Upload, Search, Filter, ChevronRight, Link2, Unplug,
-  Package, AlertTriangle,
+  Package, AlertTriangle, FileUp, Sparkles, Eye,
 } from "lucide-react";
 
 interface JoorFlowProps {

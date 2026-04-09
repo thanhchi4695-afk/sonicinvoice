@@ -381,8 +381,7 @@ function BillingSection() {
     status: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [subscribing, setSubscribing] = useState(false);
-  const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">("monthly");
+  const [subscribing, setSubscribing] = useState<string | null>(null);
 
   useEffect(() => {
     checkBillingStatus();
@@ -403,12 +402,12 @@ function BillingSection() {
     }
   };
 
-  const handleSubscribe = async () => {
-    setSubscribing(true);
+  const handleSubscribe = async (plan: string) => {
+    setSubscribing(plan);
     try {
       const returnUrl = window.location.href;
       const { data, error } = await supabase.functions.invoke("shopify-billing", {
-        body: { action: "create", return_url: returnUrl, interval: billingInterval, test: true },
+        body: { action: "create", plan, return_url: returnUrl, test: true },
       });
       if (error) throw new Error(error.message);
       if (data?.confirmation_url) {
@@ -417,7 +416,7 @@ function BillingSection() {
     } catch (err) {
       console.error("Subscribe failed:", err);
     } finally {
-      setSubscribing(false);
+      setSubscribing(null);
     }
   };
 
@@ -447,49 +446,45 @@ function BillingSection() {
           </p>
         </div>
       ) : (
-        <div className="bg-muted/30 rounded-xl p-4 space-y-3">
-          <div className="text-center">
-            <p className="text-sm font-semibold mb-2">Sonic Invoice Starter</p>
-            {/* Monthly / Yearly toggle */}
-            <div className="inline-flex items-center bg-muted rounded-full p-0.5 mb-2">
-              <button
-                onClick={() => setBillingInterval("monthly")}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${billingInterval === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setBillingInterval("yearly")}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${billingInterval === "yearly" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-              >
-                Yearly
-              </button>
-            </div>
-            {billingInterval === "monthly" ? (
-              <p className="text-2xl font-bold font-display">$19<span className="text-sm text-muted-foreground font-normal">/month</span></p>
-            ) : (
-              <div>
-                <p className="text-2xl font-bold font-display">$190<span className="text-sm text-muted-foreground font-normal">/year</span></p>
-                <p className="text-xs text-primary font-medium mt-0.5">Save 20% vs monthly</p>
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">Choose a plan to get started. All plans include a 14-day free trial.</p>
+          {[
+            { key: "starter", name: "Starter", price: 29, highlight: false },
+            { key: "pro", name: "Pro", price: 59, highlight: true },
+            { key: "growth", name: "Growth", price: 99, highlight: false },
+          ].map((plan) => (
+            <div
+              key={plan.key}
+              className={`rounded-xl p-4 space-y-2 ${
+                plan.highlight ? "bg-primary/10 border border-primary" : "bg-muted/30 border border-border"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-semibold text-foreground">{plan.name}</span>
+                  {plan.highlight && (
+                    <span className="ml-2 text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-medium">
+                      Most popular
+                    </span>
+                  )}
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-bold text-foreground">${plan.price}</span>
+                  <span className="text-xs text-muted-foreground">/mo AUD</span>
+                </div>
               </div>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">7-day free trial included</p>
-          </div>
-          <ul className="text-xs text-muted-foreground space-y-1">
-            <li className="flex items-center gap-1.5"><Check className="w-3 h-3 text-primary" /> Unlimited invoice processing</li>
-            <li className="flex items-center gap-1.5"><Check className="w-3 h-3 text-primary" /> Direct Shopify product push</li>
-            <li className="flex items-center gap-1.5"><Check className="w-3 h-3 text-primary" /> AI enrichment & SEO</li>
-            <li className="flex items-center gap-1.5"><Check className="w-3 h-3 text-primary" /> Restock analytics</li>
-          </ul>
-          <Button
-            variant="teal"
-            className="w-full h-10"
-            onClick={handleSubscribe}
-            disabled={subscribing}
-          >
-            {subscribing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            Start 7-day free trial
-          </Button>
+              <Button
+                variant={plan.highlight ? "teal" : "outline"}
+                size="sm"
+                className="w-full"
+                onClick={() => handleSubscribe(plan.key)}
+                disabled={subscribing !== null}
+              >
+                {subscribing === plan.key ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                Start 14-day free trial
+              </Button>
+            </div>
+          ))}
           <p className="text-[10px] text-muted-foreground text-center">
             You'll be redirected to Shopify to approve. No charge until trial ends.
           </p>

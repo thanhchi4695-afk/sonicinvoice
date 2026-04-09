@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/lib/invoice-validator";
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
-import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule } from "@/lib/invoice-learning";
+import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
+import { toast } from "sonner";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;
@@ -151,6 +152,14 @@ export default function PostParseReviewScreen({
 
   // ── Actions ──
   const approveRow = (rowIndex: number) => {
+    const product = products.find(p => p._rowIndex === rowIndex);
+    if (supplierName && product) {
+      const from = product._rejected ? "rejected" : product._confidenceLevel === "high" ? "accepted" : "review";
+      if (from !== "accepted") {
+        recordReclassification(supplierName, product._rawName || product.name || "", from as any, "accepted", "Manually accepted by merchant");
+        toast.success("AI learned: row accepted", { description: `"${(product.name || product._rawName || "").slice(0, 40)}" saved as product pattern`, duration: 2000 });
+      }
+    }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
         ? { ...p, _rejected: false, _confidenceLevel: "high" as const, _confidence: Math.max(p._confidence, 80) }
@@ -161,7 +170,11 @@ export default function PostParseReviewScreen({
   const rejectRow = (rowIndex: number, reason?: string) => {
     const product = products.find(p => p._rowIndex === rowIndex);
     if (supplierName && product) {
-      recordNoiseRejection(supplierName, product._rawName || product.name || "", reason || "Manually rejected by merchant");
+      const rejectReason = reason || "Manually rejected by merchant";
+      recordNoiseRejection(supplierName, product._rawName || product.name || "", rejectReason);
+      const from = product._confidenceLevel === "high" ? "accepted" : "review";
+      recordReclassification(supplierName, product._rawName || product.name || "", from as any, "rejected", rejectReason);
+      toast.info("AI learned: row rejected", { description: `Future invoices will auto-reject similar rows`, duration: 2000 });
     }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
@@ -171,6 +184,10 @@ export default function PostParseReviewScreen({
   };
 
   const moveToReview = (rowIndex: number) => {
+    const product = products.find(p => p._rowIndex === rowIndex);
+    if (supplierName && product) {
+      recordReclassification(supplierName, product._rawName || product.name || "", "accepted", "review", "Moved to review — needs verification");
+    }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
         ? { ...p, _rejected: false, _confidenceLevel: "medium" as const, _confidence: Math.min(p._confidence, 70) }
@@ -179,6 +196,11 @@ export default function PostParseReviewScreen({
   };
 
   const restoreToReview = (rowIndex: number) => {
+    const product = products.find(p => p._rowIndex === rowIndex);
+    if (supplierName && product) {
+      recordReclassification(supplierName, product._rawName || product.name || "", "rejected", "review", "Restored from rejected — may be a product");
+      toast.success("AI learned: row restored", { description: `Similar rows will get higher confidence next time`, duration: 2000 });
+    }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
         ? { ...p, _rejected: false, _confidenceLevel: "medium" as const, _confidence: 50, _rejectReason: undefined }
@@ -196,6 +218,8 @@ export default function PostParseReviewScreen({
     const product = products.find(p => p._rowIndex === rowIndex);
     if (supplierName && product) {
       recordNoiseRejection(supplierName, product._rawName || product.name || "", labels[markAs]);
+      recordReclassification(supplierName, product._rawName || product.name || "", "review", "rejected", labels[markAs]);
+      toast.info(`AI learned: ${labels[markAs].toLowerCase()}`, { description: "Similar rows will be auto-rejected next time", duration: 2000 });
     }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex

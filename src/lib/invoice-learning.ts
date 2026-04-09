@@ -28,10 +28,31 @@ export interface FieldCorrectionRule {
   pattern: string;              // the AI's original extraction
   corrected: string;            // what the merchant changed it to
   occurrences: number;
+  category?: CorrectionCategory; // structured correction type
 }
+
+export type CorrectionCategory =
+  | "non_product_pattern"       // row was not a product (freight, GST, etc.)
+  | "cost_field_mapping"        // AI picked wrong cost field
+  | "size_interpretation"       // size grid / size system correction
+  | "colour_extraction"         // colour was wrong or missing
+  | "title_cleanup"             // title needed cleanup or rewrite
+  | "grouping_rule"             // variant grouping was wrong
+  | "vendor_mapping"            // vendor/brand was wrong
+  | "quantity_mapping"          // quantity field was wrong
+  | "reclassification"          // row moved between accepted/review/rejected
+  | "general";                  // catch-all
 
 export interface GroupingRule {
   description: string;          // e.g. "group by style_code ignoring colour suffix"
+  occurrences: number;
+}
+
+export interface ReclassificationPattern {
+  rawText: string;
+  from: "accepted" | "review" | "rejected";
+  to: "accepted" | "review" | "rejected";
+  reason: string;
   occurrences: number;
 }
 
@@ -44,6 +65,7 @@ export interface InvoiceMemory {
   noisePatterns: NoisePattern[];
   fieldCorrections: FieldCorrectionRule[];
   groupingRules: GroupingRule[];
+  reclassifications: ReclassificationPattern[];  // NEW: tab movement patterns
 
   // Stats
   totalParses: number;
@@ -126,6 +148,7 @@ export function recordParseSuccess(
         .slice(0, 30),
       fieldCorrections: [],
       groupingRules: [],
+      reclassifications: [],
       totalParses: 1,
       totalCorrections: 0,
       lastParsed: new Date().toISOString(),
@@ -139,31 +162,82 @@ export function recordParseSuccess(
   saveAllMemories(memories);
 }
 
-/** Record a merchant field correction */
+/** Infer a structured correction category from field name */
+export function inferCorrectionCategory(field: string): CorrectionCategory {
+  const map: Record<string, CorrectionCategory> = {
+    title: "title_cleanup", name: "title_cleanup",
+    colour: "colour_extraction", color: "colour_extraction",
+    size: "size_interpretation",
+    cost: "cost_field_mapping", price: "cost_field_mapping",
+    sku: "general", barcode: "general",
+    qty: "quantity_mapping", quantity: "quantity_mapping",
+    vendor: "vendor_mapping", brand: "vendor_mapping",
+    ai_teaching: "general",
+  };
+  return map[field.toLowerCase()] || "general";
+}
+
+/** Record a merchant field correction with structured category */
 export function recordFieldCorrection(
   supplier: string,
   field: string,
   original: string,
   corrected: string,
+  category?: CorrectionCategory,
 ) {
   const memories = getAllMemories();
   const supKey = supplierKey(supplier);
   const memory = memories[supKey];
   if (!memory) return;
 
+  const cat = category || inferCorrectionCategory(field);
   const existing = memory.fieldCorrections.find(
     fc => fc.field === field && fc.pattern === original && fc.corrected === corrected
   );
   if (existing) {
     existing.occurrences += 1;
+    existing.category = cat;
   } else {
-    memory.fieldCorrections.push({ field, pattern: original, corrected, occurrences: 1 });
+    memory.fieldCorrections.push({ field, pattern: original, corrected, occurrences: 1, category: cat });
   }
   // Keep top 50 corrections
   memory.fieldCorrections.sort((a, b) => b.occurrences - a.occurrences);
   memory.fieldCorrections = memory.fieldCorrections.slice(0, 50);
   memory.totalCorrections += 1;
   // Confidence drops slightly with corrections (AI got it wrong)
+  memory.confidenceBoost = Math.max(0, memory.confidenceBoost - 1);
+
+  saveAllMemories(memories);
+}
+
+/** Record a reclassification (row moved between tabs) */
+export function recordReclassification(
+  supplier: string,
+  rawText: string,
+  from: "accepted" | "review" | "rejected",
+  to: "accepted" | "review" | "rejected",
+  reason: string,
+) {
+  const memories = getAllMemories();
+  const supKey = supplierKey(supplier);
+  const memory = memories[supKey];
+  if (!memory) return;
+
+  // Initialize if missing (backward compat)
+  if (!memory.reclassifications) memory.reclassifications = [];
+
+  const text = rawText.toLowerCase().trim();
+  const existing = memory.reclassifications.find(
+    r => r.rawText === text && r.from === from && r.to === to
+  );
+  if (existing) {
+    existing.occurrences += 1;
+  } else {
+    memory.reclassifications.push({ rawText: text, from, to, reason, occurrences: 1 });
+  }
+  memory.reclassifications.sort((a, b) => b.occurrences - a.occurrences);
+  memory.reclassifications = memory.reclassifications.slice(0, 30);
+  memory.totalCorrections += 1;
   memory.confidenceBoost = Math.max(0, memory.confidenceBoost - 1);
 
   saveAllMemories(memories);
@@ -274,17 +348,34 @@ export function buildMemoryHint(supplier?: string): Record<string, unknown> | nu
       .map(n => `Reject rows matching: "${n.text}" (reason: ${n.reason})`);
   }
 
-  // Add field corrections as rules
+  // Add field corrections as categorized rules
   if (memory.fieldCorrections.length > 0) {
     hint.corrections = memory.fieldCorrections
       .filter(fc => fc.occurrences >= 1)
       .slice(0, 20)
-      .map(fc => `In field "${fc.field}": replace "${fc.pattern}" with "${fc.corrected}"`);
+      .map(fc => `[${fc.category || "general"}] In field "${fc.field}": replace "${fc.pattern}" with "${fc.corrected}" (seen ${fc.occurrences}x)`);
+
+    // Also provide category-specific summaries for stronger AI guidance
+    const categories = new Map<string, number>();
+    memory.fieldCorrections.forEach(fc => {
+      const cat = fc.category || "general";
+      categories.set(cat, (categories.get(cat) || 0) + fc.occurrences);
+    });
+    hint.correctionSummary = Object.fromEntries(categories);
   }
 
   // Add grouping rules
   if (memory.groupingRules.length > 0) {
     hint.groupingRules = memory.groupingRules.map(g => g.description);
+  }
+
+  // Add reclassification patterns
+  const reclasses = memory.reclassifications || [];
+  if (reclasses.length > 0) {
+    hint.reclassifications = reclasses
+      .filter(r => r.occurrences >= 2)
+      .slice(0, 10)
+      .map(r => `Rows like "${r.rawText}" should be ${r.to} (was ${r.from}, reason: ${r.reason}, seen ${r.occurrences}x)`);
   }
 
   return hint;

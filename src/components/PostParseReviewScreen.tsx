@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/lib/invoice-validator";
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
-import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule } from "@/lib/invoice-learning";
+import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
+import { toast } from "sonner";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;

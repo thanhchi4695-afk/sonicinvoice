@@ -267,6 +267,107 @@ export default function AccountingIntegration({ onBack }: { onBack: () => void }
     );
   }
 
+  // ── AI TRAINING SCREEN ──
+  if (screen === "training") {
+    const stats = trainingStats;
+    const supplierHistory = getSupplierHistory();
+
+    const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const seeded = seedFromXeroBillsCSV(results.data as Record<string, string>[]);
+          setTrainingStats(getClassificationStats());
+          toast.success(`Learned from ${seeded} new supplier→category rules`);
+        },
+      });
+    };
+
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        <button onClick={() => setScreen("select")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+        <div className="flex items-center gap-3">
+          <Brain className="w-6 h-6 text-primary" />
+          <div>
+            <h1 className="text-xl font-semibold">AI Category Intelligence</h1>
+            <p className="text-sm text-muted-foreground">Train the AI to auto-categorise invoices by uploading your Xero bills export</p>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-card rounded-lg border border-border p-3 text-center">
+            <div className="text-2xl font-bold text-primary">{stats.totalSuppliers}</div>
+            <div className="text-xs text-muted-foreground">Suppliers learned</div>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-3 text-center">
+            <div className="text-2xl font-bold text-primary">{stats.totalRules}</div>
+            <div className="text-xs text-muted-foreground">Account codes</div>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-3 text-center">
+            <div className="text-2xl font-bold text-primary">{supplierHistory.length}</div>
+            <div className="text-xs text-muted-foreground">Classification rules</div>
+          </div>
+        </div>
+
+        {/* Upload */}
+        <div className="bg-card rounded-lg border-2 border-dashed border-border p-6 text-center space-y-3">
+          <Upload className="w-8 h-8 text-muted-foreground mx-auto" />
+          <div>
+            <p className="text-sm font-medium">Upload Xero Bills Export (CSV)</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              In Xero: Accounting → Reports → Aged Payables Detail → Export as CSV.
+              Or: Business → Bills → Export.
+            </p>
+          </div>
+          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleCSVUpload} className="hidden" />
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-2" /> Choose CSV file
+          </Button>
+        </div>
+
+        {/* Top categories */}
+        {stats.topCategories.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Learned categories</h3>
+            {stats.topCategories.map(cat => (
+              <div key={cat.category} className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+                <span className="text-sm">{cat.category}</span>
+                <span className="text-xs text-muted-foreground">{cat.suppliers} suppliers</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Supplier rules preview */}
+        {supplierHistory.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Supplier rules ({supplierHistory.length})</h3>
+            <div className="max-h-64 overflow-y-auto space-y-1">
+              {supplierHistory
+                .sort((a, b) => b.confidence - a.confidence)
+                .slice(0, 30)
+                .map((r, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs bg-muted/20 rounded px-3 py-2">
+                    <span className="font-medium truncate flex-1">{r.supplierName}</span>
+                    <span className="text-muted-foreground mx-2">{r.accountCode} — {r.category}</span>
+                    <span className={`font-mono ${r.confidence >= 70 ? "text-green-600" : r.confidence >= 40 ? "text-yellow-600" : "text-destructive"}`}>
+                      {r.confidence}%
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // ── PLATFORM SELECTOR (default) ──
   const xeroConn = getConnection("xero");
   const myobConn = getConnection("myob");

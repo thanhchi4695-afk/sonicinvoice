@@ -644,7 +644,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     setShowCompletionSummary(false);
     cancelledRef.current = false;
     setStep(2);
+    setInvoicePageImages([]);
     setEnrichLines([{ name: "Reading file...", status: "searching", action: "Parsing invoice data...", confidence: 0 }]);
+
+    // Capture invoice page image(s) for source trace viewer
+    const fileExt = fName.split(".").pop()?.toLowerCase() || "";
+    if (["jpg", "jpeg", "png", "webp"].includes(fileExt)) {
+      try {
+        const imgReader = new FileReader();
+        imgReader.onload = () => {
+          if (imgReader.result) setInvoicePageImages([imgReader.result as string]);
+        };
+        imgReader.readAsDataURL(file);
+      } catch {}
+    }
 
     let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = [];
 
@@ -774,6 +787,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
   const [validationDebug, setValidationDebug] = useState<ValidationDebugInfo | null>(null);
   const [validatedProducts, setValidatedProducts] = useState<ValidatedProduct[]>([]);
+  const [invoicePageImages, setInvoicePageImages] = useState<string[]>([]);
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
 
@@ -1461,6 +1475,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 debug={validationDebug}
                 products={validatedProducts}
                 supplierName={supplierName}
+                invoicePages={invoicePageImages}
                 onUpdateProducts={(updated) => {
                   setValidatedProducts(updated);
                   // Rebuild product groups from accepted products

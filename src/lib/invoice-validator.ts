@@ -265,6 +265,99 @@ function tryMergeFragmentedRows(products: RawProduct[], vendorName: string): Raw
   return merged;
 }
 
+// ── Source trace builder ──
+
+interface AISourceRegion {
+  page?: number;
+  y_position?: number;
+  extraction_method?: string;
+}
+
+function buildSourceTrace(
+  product: RawProduct & { _sourceRegions?: Record<string, AISourceRegion> | null },
+  rowIndex: number,
+  totalRows: number,
+  rejected: boolean,
+): SourceTrace | undefined {
+  const regions = product._sourceRegions;
+  const fieldMap: Record<string, { field: string; value: string }> = {
+    title: { field: "title", value: product.name || "" },
+    sku: { field: "sku", value: product.sku || "" },
+    colour: { field: "colour", value: product.colour || "" },
+    size: { field: "size", value: product.size || "" },
+    quantity: { field: "quantity", value: String(product.qty || "") },
+    cost: { field: "cost", value: String(product.cost || "") },
+  };
+
+  const hasAIRegions = regions && Object.keys(regions).length > 0;
+
+  // Build bounding boxes and field traces
+  const allBoxes: SourceBoundingBox[] = [];
+  const fieldTraces: FieldSourceTrace[] = [];
+  let primaryPage = 1;
+
+  for (const [key, info] of Object.entries(fieldMap)) {
+    if (!info.value || info.value === "0") continue;
+
+    let page = 1;
+    let yPos: number;
+    let method: string;
+
+    if (hasAIRegions && regions[key]) {
+      const r = regions[key];
+      page = r.page || 1;
+      yPos = typeof r.y_position === "number" ? r.y_position : (rowIndex / Math.max(totalRows, 1));
+      method = r.extraction_method || "AI detected";
+    } else {
+      // Approximate: distribute rows evenly across page
+      // Assume header takes ~10% and line items fill 10-90%
+      yPos = 0.1 + (rowIndex / Math.max(totalRows, 1)) * 0.8;
+      method = "approximated from row position";
+    }
+
+    // Build a bounding box (approximate width based on field type)
+    const widths: Record<string, { x: number; w: number }> = {
+      title: { x: 0.15, w: 0.35 },
+      sku: { x: 0.02, w: 0.12 },
+      colour: { x: 0.52, w: 0.12 },
+      size: { x: 0.65, w: 0.08 },
+      quantity: { x: 0.74, w: 0.08 },
+      cost: { x: 0.83, w: 0.12 },
+    };
+
+    const dims = widths[key] || { x: 0.15, w: 0.2 };
+    const box: SourceBoundingBox = {
+      page,
+      x: dims.x,
+      y: yPos,
+      width: dims.w,
+      height: 0.018,
+      text: info.value,
+      fieldType: key as SourceBoundingBox["fieldType"],
+    };
+
+    allBoxes.push(box);
+    fieldTraces.push({
+      field: key,
+      value: info.value,
+      page,
+      boxes: [box],
+      extractionMethod: method,
+    });
+
+    if (key === "title") primaryPage = page;
+  }
+
+  if (allBoxes.length === 0) return undefined;
+
+  return {
+    page: primaryPage,
+    fieldTraces,
+    allBoxes,
+    approximated: !hasAIRegions,
+  };
+}
+
 // ── Main validator ──
 
 export function validateAndCleanProducts(
@@ -492,6 +585,9 @@ export function validateAndCleanProducts(
       if (rowCorrections.length > 0) extractionParts.push(`${rowCorrections.length} auto-correction(s)`);
     }
 
+    // ── Build source trace from AI-provided regions ──
+    const sourceTrace = buildSourceTrace(p as any, i, merged.length, rejected);
+
     results.push({
       ...p,
       _rowIndex: i,
@@ -512,6 +608,7 @@ export function validateAndCleanProducts(
       _extractionReason: rejected
         ? rejectReason || "Invalid row"
         : extractionParts.join(" · ") || "Extracted by AI",
+      _sourceTrace: sourceTrace,
     });
   }
 

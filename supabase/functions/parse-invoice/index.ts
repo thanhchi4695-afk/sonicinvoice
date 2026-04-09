@@ -180,7 +180,15 @@ Return ONLY valid JSON (no markdown, no explanation):
       "product_type": "e.g. One Piece, Dress, Pant, Top",
       "confidence": 0-100,
       "parse_notes": "any issues, ambiguity, or extraction strategy used",
-      "extraction_reason": "brief explanation of why this row was identified as a product"
+      "extraction_reason": "brief explanation of why this row was identified as a product",
+      "source_regions": {
+        "title": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. description column, inline text" },
+        "sku": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. style code column" },
+        "colour": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. colour column, description suffix" },
+        "size": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. size grid column, inline" },
+        "quantity": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. qty column, grid cell" },
+        "cost": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. unit price column" }
+      }
     }
   ],
   "rejected_rows": [
@@ -190,6 +198,8 @@ Return ONLY valid JSON (no markdown, no explanation):
     }
   ]
 }
+
+For source_regions: y_position is a normalized 0-1 value indicating the vertical position on the page where this field's data was found (0 = top, 1 = bottom). page is 1-indexed. Only include fields that were actually detected. This data is used for visual source tracing.
 
 CRITICAL RULES:
 - Create ONE output row per size+colour variant where quantity > 0
@@ -361,6 +371,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
           confidence: Number(p.confidence) || 70,
           parse_notes: p.parse_notes || "",
           extraction_reason: p.extraction_reason || "",
+          _sourceRegions: p.source_regions || null,
         })),
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -383,6 +394,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
       _parseNotes: p.parse_notes || "",
       _lineTotal: Number(p.line_total) || 0,
       _extractionReason: p.extraction_reason || "",
+      _sourceRegions: p.source_regions || null,
     }));
 
     return new Response(JSON.stringify({

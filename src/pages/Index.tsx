@@ -153,6 +153,20 @@ const Index = () => {
     }
   }, [isEmbedded]);
 
+  // ── Auto-trigger image SEO after imports ──
+  useEffect(() => {
+    return onImageSeoTrigger(({ source, productCount }) => {
+      toast(`${productCount} products imported from ${source}`, {
+        description: "Run Image SEO to generate alt text & keywords",
+        action: {
+          label: "Optimise Images",
+          onClick: () => setActiveFlow("image_optimise"),
+        },
+        duration: 8000,
+      });
+    });
+  }, []);
+
   const handleAuth = () => {
     setAuthed(true);
     addAuditEntry("Login", `User logged in`);

@@ -497,10 +497,45 @@ export function validateAndCleanProducts(
       corrections.push({ row: i, field: "brand", from: "", to: detectedVendor, reason: "Assigned detected vendor" });
     }
 
-    // ── Price validation ──
-    if (p.cost <= 0 && p.rrp > 0) {
-      issues.push("No cost price, using RRP as reference");
+    // ── Price validation + cost derivation ──
+    const lineTotal = (p as any)._lineTotal || 0;
+    let costSource = (p as any).cost_source || "direct";
+    let mathCheck: "pass" | "fail" | "skipped" = "skipped";
+
+    // Rule: Derive cost from line_total if missing
+    if (p.cost <= 0 && lineTotal > 0 && p.qty > 0) {
+      const derived = Math.round((lineTotal / p.qty) * 100) / 100;
+      rowCorrections.push({ field: "cost", from: "0", to: String(derived), reason: `Cost derived from line total: $${lineTotal} / ${p.qty} = $${derived}` });
+      corrections.push({ row: i, field: "cost", from: "0", to: String(derived), reason: `Cost derived from line total` });
+      p.cost = derived;
+      costSource = "derived_from_line_total";
+      issues.push(`Cost derived from line total ($${lineTotal} / ${p.qty})`);
     }
+
+    // Rule: Cost must not equal RRP (likely column swap)
+    if (p.cost > 0 && p.rrp > 0 && p.cost >= p.rrp) {
+      issues.push(`Warning: cost ($${p.cost}) >= RRP ($${p.rrp}) — possible column swap`);
+    }
+
+    // Rule: Math cross-check (unit_cost × qty ≈ line_total)
+    if (p.cost > 0 && p.qty > 0 && lineTotal > 0) {
+      const expected = p.cost * p.qty;
+      const tolerance = Math.max(expected * 0.02, 1);
+      if (Math.abs(expected - lineTotal) <= tolerance) {
+        mathCheck = "pass";
+      } else {
+        mathCheck = "fail";
+        issues.push(`Math mismatch: ${p.cost} × ${p.qty} = ${expected.toFixed(2)}, line_total = ${lineTotal.toFixed(2)}`);
+      }
+    }
+
+    if (p.cost <= 0 && p.rrp > 0) {
+      issues.push("No cost price — RRP available but NOT used as cost");
+    }
+
+    // ── Group key ──
+    const groupKey = (p as any).group_key || (p.sku ? `${p.sku}|${p.colour || ""}` : "");
+
 
     // ── Confidence scoring with positive/negative signals ──
     const signals: ConfidenceSignal[] = [];

@@ -65,6 +65,7 @@ export interface InvoiceMemory {
   noisePatterns: NoisePattern[];
   fieldCorrections: FieldCorrectionRule[];
   groupingRules: GroupingRule[];
+  reclassifications: ReclassificationPattern[];  // NEW: tab movement patterns
 
   // Stats
   totalParses: number;

@@ -145,11 +145,11 @@ function buildReviewData(invoice: AccountingBillReviewProps["invoice"]): BillRev
 // ── Main Component ──
 
 export default function AccountingBillReview({
-  invoice,
+  bill: unifiedBill,
   onBack,
   onPushComplete,
 }: AccountingBillReviewProps) {
-  const [bill, setBill] = useState<BillReviewData>(() => buildReviewData(invoice));
+  const [bill, setBill] = useState<BillReviewData>(() => buildReviewData(unifiedBill));
   const [connections, setConnections] = useState<any[]>([]);
   const [pushing, setPushing] = useState<string | null>(null);
   const [pushResult, setPushResult] = useState<{

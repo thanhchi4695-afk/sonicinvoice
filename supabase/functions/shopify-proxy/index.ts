@@ -743,6 +743,44 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "update_image_alt": {
+        if (!body.image_updates || body.image_updates.length === 0) {
+          return new Response(JSON.stringify({ error: "Missing image_updates" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const results: { shopify_product_id: string; status: string; error?: string }[] = [];
+        for (const update of body.image_updates) {
+          try {
+            // Get product images
+            const imgResp = await shopifyFetch(`/products/${update.shopify_product_id}/images.json`);
+            const imgData = await imgResp.json();
+            if (!imgResp.ok || !imgData.images?.length) {
+              results.push({ shopify_product_id: update.shopify_product_id, status: "error", error: "No images found" });
+              continue;
+            }
+            // Update first image alt text
+            const imageId = imgData.images[0].id;
+            const putResp = await shopifyFetch(`/products/${update.shopify_product_id}/images/${imageId}.json`, {
+              method: "PUT",
+              body: JSON.stringify({ image: { id: imageId, alt: update.alt_text } }),
+            });
+            if (!putResp.ok) {
+              const errData = await putResp.json();
+              results.push({ shopify_product_id: update.shopify_product_id, status: "error", error: JSON.stringify(errData) });
+            } else {
+              results.push({ shopify_product_id: update.shopify_product_id, status: "success" });
+            }
+            // Rate limit
+            await new Promise(r => setTimeout(r, 300));
+          } catch (e) {
+            results.push({ shopify_product_id: update.shopify_product_id, status: "error", error: e instanceof Error ? e.message : "Unknown" });
+          }
+        }
+        result = { results };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

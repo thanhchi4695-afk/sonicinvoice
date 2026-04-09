@@ -887,6 +887,25 @@ function ReviewRow({
           </p>
         </div>
 
+        {/* Inline source preview thumbnail */}
+        {invoicePages && invoicePages.length > 0 && p._sourceTrace && (
+          <InlineSourcePreview
+            product={p}
+            invoicePages={invoicePages}
+            onClick={() => onShowSourceTrace?.(p)}
+          />
+        )}
+        {/* Source trace button (when no trace data but pages exist) */}
+        {invoicePages && invoicePages.length > 0 && !p._sourceTrace && (
+          <button
+            onClick={() => onShowSourceTrace?.(p)}
+            className="w-8 h-8 rounded border border-border flex items-center justify-center shrink-0 hover:bg-muted/30 transition-colors"
+            title="View source page"
+          >
+            <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+          </button>
+        )}
+
         {/* Actions */}
         <div className="flex gap-0.5 shrink-0">
           {tab === "accepted" && (

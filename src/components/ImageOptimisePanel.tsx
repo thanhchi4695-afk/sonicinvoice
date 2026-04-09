@@ -385,6 +385,74 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     setCompressing(false);
   };
 
+  // ── Conversion Audit ──
+  const runConversionAudit = async () => {
+    const withImages = products.filter(p => p.imageUrl);
+    if (withImages.length === 0) { toast.info("No products with images to audit"); return; }
+    setAuditingConversion(true);
+    try {
+      for (let i = 0; i < withImages.length; i += 25) {
+        const batch = withImages.slice(i, i + 25);
+        const { data, error } = await supabase.functions.invoke("image-optimise", {
+          body: {
+            action: "conversion_audit",
+            products: batch.map(p => ({
+              title: p.title, vendor: p.vendor, colour: p.colour,
+              productType: p.productType, imageUrl: p.imageUrl,
+              variantCount: 0, hasMultipleImages: false, imageDimensions: "",
+            })),
+          },
+        });
+        if (error) throw error;
+        if (data?.results) {
+          setProducts(prev => {
+            const updated = [...prev];
+            batch.forEach((bp, idx) => {
+              const match = updated.find(u => u.id === bp.id);
+              const r = data.results.find((rr: any) => rr.index === idx);
+              if (match && r) {
+                match.conversionScore = r.overall_score;
+                match.consistency = r.consistency;
+                match.consistencyNote = r.consistency_note;
+                match.variantMapping = r.variant_mapping;
+                match.variantNote = r.variant_note;
+                match.zoomReadiness = r.zoom_readiness;
+                match.zoomNote = r.zoom_note;
+                match.mobileOptimization = r.mobile_optimization;
+                match.mobileNote = r.mobile_note;
+                match.heroScore = r.hero_score;
+                match.heroNote = r.hero_note;
+                match.topIssue = r.top_issue;
+                match.conversionRecommendation = r.recommendation;
+              }
+            });
+            return updated;
+          });
+        }
+      }
+      toast.success("Conversion audit complete");
+    } catch (e: any) { toast.error(e.message || "Conversion audit failed"); }
+    setAuditingConversion(false);
+  };
+
+  const conversionStats = useMemo(() => {
+    const audited = products.filter(p => p.conversionScore != null);
+    if (audited.length === 0) return null;
+    const avg = (key: keyof ProductImage) => Math.round(audited.reduce((s, p) => s + ((p[key] as number) || 0), 0) / audited.length);
+    return {
+      count: audited.length,
+      overall: avg("conversionScore"),
+      consistency: avg("consistency"),
+      variantMapping: avg("variantMapping"),
+      zoomReadiness: avg("zoomReadiness"),
+      mobileOptimization: avg("mobileOptimization"),
+      heroScore: avg("heroScore"),
+    };
+  }, [products]);
+
+  const scoreColor = (score: number) => score >= 80 ? "text-green-600" : score >= 50 ? "text-yellow-600" : "text-destructive";
+  const scoreBg = (score: number) => score >= 80 ? "bg-green-500" : score >= 50 ? "bg-yellow-500" : "bg-destructive";
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };

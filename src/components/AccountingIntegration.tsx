@@ -457,6 +457,21 @@ export default function AccountingIntegration({ onBack }: { onBack: () => void }
         </div>
       </div>
 
+      {/* AI Training link */}
+      <button
+        onClick={() => setScreen("training")}
+        className="w-full bg-card rounded-lg border border-border p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors"
+      >
+        <Brain className="w-5 h-5 text-primary" />
+        <div className="flex-1 text-left">
+          <span className="text-sm font-medium">AI Category Intelligence</span>
+          <span className="text-xs text-muted-foreground ml-2">
+            {trainingStats.totalSuppliers > 0 ? `${trainingStats.totalSuppliers} suppliers learned` : "Upload Xero bills to train"}
+          </span>
+        </div>
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      </button>
+
       {/* Push history link */}
       {history.length > 0 && (
         <button

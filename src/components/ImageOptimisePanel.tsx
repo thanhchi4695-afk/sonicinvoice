@@ -754,6 +754,9 @@ export default function ImageOptimisePanel({ onBack }: Props) {
                 <Button size="sm" onClick={() => compressImages()} disabled={compressing} className="gap-1">
                   <Minimize2 className="w-3 h-3" />{compressing ? `Compressing ${compressionProgress.current}/${compressionProgress.total}…` : "Compress All"}
                 </Button>
+                <Button size="sm" onClick={pushCompressedToShopify} disabled={pushingCompressed || products.filter(p => p.compressed && p.shopifyProductId && !p.compressedUrl?.includes("pushed")).length === 0} className="gap-1">
+                  <Upload className="w-3 h-3" />{pushingCompressed ? `Pushing ${pushCompressedProgress.current}/${pushCompressedProgress.total}…` : `Push to Shopify (${products.filter(p => p.compressed && p.shopifyProductId && !p.compressedUrl?.includes("pushed")).length})`}
+                </Button>
               </div>
             </CardContent>
           </Card>

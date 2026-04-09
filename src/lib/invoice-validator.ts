@@ -633,13 +633,32 @@ export function validateAndCleanProducts(
     // ── Build source trace from AI-provided regions ──
     const sourceTrace = buildSourceTrace(p as any, i, merged.length, rejected);
 
+    // Add math cross-check bonus/penalty to confidence
+    if (!rejected) {
+      if (mathCheck === "pass") {
+        signals.push({ label: "Math cross-check passed", delta: 5 });
+        confidence += 5;
+      } else if (mathCheck === "fail") {
+        signals.push({ label: "Math cross-check failed", delta: -10 });
+        confidence -= 10;
+      }
+      if (costSource === "derived_from_line_total") {
+        signals.push({ label: "Cost derived from line total", delta: -5 });
+        confidence -= 5;
+      }
+      confidence = Math.max(0, Math.min(100, confidence));
+    }
+
+    const finalConfidenceLevel: "high" | "medium" | "low" =
+      rejected ? "low" : confidence >= 90 ? "high" : confidence >= 70 ? "medium" : "low";
+
     results.push({
       ...p,
       _rowIndex: i,
       _rawName: rawName,
       _rawCost: rawCost,
       _confidence: rejected ? 0 : confidence,
-      _confidenceLevel: confidenceLevel,
+      _confidenceLevel: finalConfidenceLevel,
       _confidenceReasons: signals,
       _issues: issues,
       _corrections: rowCorrections,
@@ -654,6 +673,9 @@ export function validateAndCleanProducts(
         ? rejectReason || "Invalid row"
         : extractionParts.join(" · ") || "Extracted by AI",
       _sourceTrace: sourceTrace,
+      _groupKey: groupKey,
+      _costSource: costSource,
+      _mathCheck: mathCheck,
     });
   }
 

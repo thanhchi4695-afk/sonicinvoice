@@ -797,6 +797,18 @@ export default function ImageOptimisePanel({ onBack }: Props) {
             </Card>
           )}
 
+          {pushingCompressed && (
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Pushing compressed images to Shopify…</span>
+                  <span>{pushCompressedProgress.current}/{pushCompressedProgress.total}</span>
+                </div>
+                <Progress value={(pushCompressedProgress.current / pushCompressedProgress.total) * 100} className="h-2" />
+              </CardContent>
+            </Card>
+          )}
+
           <div className="space-y-2 max-h-[45vh] overflow-y-auto">
             {products
               .filter(p => p.imageUrl && (p.originalSize != null || p.compressed))

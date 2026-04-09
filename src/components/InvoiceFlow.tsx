@@ -235,6 +235,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [useTemplate, setUseTemplate] = useState<boolean | null>(null);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [savedTemplate, setSavedTemplate] = useState(false);
+  const [processAs, setProcessAs] = useState<ProcessAsMode>("auto");
+  const [detectedLayout, setDetectedLayout] = useState<LayoutType | null>(null);
 
   // Processing timer state
   const [processStartTime, setProcessStartTime] = useState<number | null>(null);

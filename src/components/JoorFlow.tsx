@@ -679,7 +679,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
                         {order._processed ? (
                           <span className="text-xs bg-muted px-2 py-0.5 rounded-full">Processed</span>
                         ) : (
-                          <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Ready</span>
+                          <span className="text-xs bg-secondary text-secondary-foreground px-2 py-0.5 rounded-full">Ready</span>
                         )}
                       </td>
                       <td className="p-3">

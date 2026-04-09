@@ -275,6 +275,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
                   { name: "Colour", values: [p.colour] },
                   { name: "Size", values: p.sizes || [p.size] },
                 ],
+                images: p.imageUrl ? [{ src: p.imageUrl }] : [],
               },
             }),
           }

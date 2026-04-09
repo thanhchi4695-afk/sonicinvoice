@@ -235,6 +235,7 @@ const Index = () => {
       }} />; break;
       case "stocky_migration": flowEl = <StockyMigration onBack={() => setActiveFlow("stocky_hub")} onComplete={() => setActiveFlow("stocky_hub")} />; break;
       case "inventory_dashboard": flowEl = <InventoryDashboard onBack={() => setActiveFlow("stocky_hub")} />; break;
+      case "product_health": flowEl = <ProductHealthPanel onBack={() => setActiveFlow("stocky_hub")} />; break;
       default: return null;
     }
     return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;

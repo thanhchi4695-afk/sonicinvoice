@@ -193,6 +193,7 @@ export default function StockyHub({ onBack, onNavigate }: StockyHubProps) {
   /* ─── Module quick nav cards ─── */
   const modules = [
     { id: "inventory_dashboard", label: "Inventory Dashboard", desc: "Real-time health overview", icon: <BarChart3 className="w-5 h-5" />, count: null, target: "inventory_dashboard" },
+    { id: "product_health", label: "Product Health Scores", desc: "Green / Amber / Red scoring", icon: <Sparkles className="w-5 h-5" />, count: null, target: "product_health" },
     { id: "purchase_orders", label: "Purchase Orders", desc: "Track incoming stock", icon: <FileText className="w-5 h-5" />, count: stats.poCount, target: "purchase_orders" },
     { id: "suppliers", label: "Supplier Intelligence", desc: "Spend, margins & history", icon: <Users className="w-5 h-5" />, count: stats.supplierCount, target: "suppliers" },
     { id: "stock_monitor", label: "Stock Monitor", desc: "Low stock alerts", icon: <AlertTriangle className="w-5 h-5" />, count: stats.outOfStockCount, target: "stock_monitor" },

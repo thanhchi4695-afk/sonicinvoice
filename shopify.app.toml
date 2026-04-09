@@ -12,8 +12,9 @@ scopes = "read_products,write_products,read_orders,read_inventory,write_inventor
 
 [auth]
 redirect_urls = [
-  "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-oauth?action=callback",
-  "https://sonicinvoice.lovable.app/auth/callback"
+  "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-auth-callback",
+  "https://sonicinvoice.lovable.app/auth",
+  "https://sonicinvoice.lovable.app"
 ]
 
 [webhooks]

@@ -19,6 +19,7 @@ import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource
 import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugInfo } from "@/lib/invoice-validator";
 import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
+import { AccountingPushPanel } from "@/components/AccountingIntegration";
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -1923,6 +1924,27 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             supplierName={supplierName}
             onBack={() => setStep(3)}
           />
+
+          {/* Accounting Push Panel */}
+          <div className="px-0 mt-2">
+            <AccountingPushPanel invoice={{
+              id: `inv-${Date.now()}`,
+              supplier: supplierName,
+              invoice_number: "",
+              invoice_date: new Date().toISOString().split("T")[0],
+              subtotal: mockProducts.reduce((s, p) => s + p.price, 0),
+              gst: mockProducts.reduce((s, p) => s + p.price, 0) * 0.1,
+              total: mockProducts.reduce((s, p) => s + p.price, 0) * 1.1,
+              category: mockProducts[0]?.type || "Swimwear",
+              line_items: mockProducts.map(p => ({
+                product_name: p.name,
+                quantity: 1,
+                unit_price_inc_gst: p.price * 1.1,
+                total_inc_gst: p.price * 1.1,
+                description: `${p.brand} ${p.name}`,
+              })),
+            }} />
+          </div>
         </div>
       )}
     </div>

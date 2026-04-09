@@ -53,8 +53,8 @@ Deno.serve(async (req) => {
     const shop  = url.searchParams.get("shop")  || "";
     const state = url.searchParams.get("state") || "";
 
-    if (!code || !shop || !state) {
-      return new Response("Missing required parameters", { status: 400 });
+    if (!code || !shop) {
+      return new Response("Missing required parameters (code, shop)", { status: 400 });
     }
 
     const valid = await verifyHmac(url.searchParams);
@@ -64,7 +64,11 @@ Deno.serve(async (req) => {
 
     const supabase    = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const isLoginFlow = state.startsWith("login:");
+    const isConnectFlow = state.includes(":") && !isLoginFlow;
+    // If state doesn't match our patterns, it's a Shopify-initiated install
+    const isShopifyInitiated = !isLoginFlow && !isConnectFlow;
 
+    // Validate state against DB only for self-initiated flows
     if (isLoginFlow) {
       const nonce = state.replace("login:", "");
       const { data: stored } = await supabase
@@ -75,7 +79,7 @@ Deno.serve(async (req) => {
       if (!stored || stored.nonce !== nonce) {
         return new Response("Invalid or expired state", { status: 403 });
       }
-    } else {
+    } else if (isConnectFlow) {
       const [userId, nonce] = state.split(":");
       if (!userId || !nonce) return new Response("Invalid state parameter", { status: 400 });
       const { data: stored } = await supabase
@@ -87,6 +91,7 @@ Deno.serve(async (req) => {
         return new Response("Invalid or expired state", { status: 403 });
       }
     }
+    // For Shopify-initiated installs, HMAC verification is sufficient
 
     const tokenResp = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: "POST",

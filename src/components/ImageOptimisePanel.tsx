@@ -880,6 +880,107 @@ export default function ImageOptimisePanel({ onBack }: Props) {
           </div>
         </TabsContent>
 
+        {/* ── Conversion ── */}
+        <TabsContent value="conversion" className="space-y-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Target className="w-4 h-4 text-primary" />Conversion Rate Optimization Audit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs text-muted-foreground space-y-3">
+              <p>AI analyses your product images for conversion-critical factors: visual consistency, variant coverage, zoom quality, mobile readiness, and hero image selection.</p>
+              <Button onClick={runConversionAudit} disabled={auditingConversion} className="gap-2">
+                <Target className="w-4 h-4" />{auditingConversion ? "Auditing…" : "Run Conversion Audit"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {conversionStats && (
+            <>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium">Overall Conversion Score</span>
+                    <span className={`text-2xl font-bold ${scoreColor(conversionStats.overall)}`}>{conversionStats.overall}/100</span>
+                  </div>
+                  <Progress value={conversionStats.overall} className="h-3" />
+                  <div className="text-xs text-muted-foreground mt-1">{conversionStats.count} products audited</div>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-5 gap-2">
+                {[
+                  { label: "Consistency", value: conversionStats.consistency, icon: Layers },
+                  { label: "Variant Map", value: conversionStats.variantMapping, icon: Copy },
+                  { label: "Zoom Ready", value: conversionStats.zoomReadiness, icon: ZoomIn },
+                  { label: "Mobile", value: conversionStats.mobileOptimization, icon: Smartphone },
+                  { label: "Hero Image", value: conversionStats.heroScore, icon: Star },
+                ].map(s => (
+                  <Card key={s.label}>
+                    <CardContent className="p-3 text-center">
+                      <s.icon className={`w-4 h-4 mx-auto mb-1 ${scoreColor(s.value)}`} />
+                      <div className={`text-lg font-bold ${scoreColor(s.value)}`}>{s.value}</div>
+                      <div className="text-[10px] text-muted-foreground">{s.label}</div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+            {products
+              .filter(p => p.conversionScore != null)
+              .sort((a, b) => (a.conversionScore || 0) - (b.conversionScore || 0))
+              .map(p => (
+                <Card key={p.id} className={p.conversionScore! < 50 ? "border-destructive/30" : p.conversionScore! < 80 ? "border-yellow-500/30" : "border-green-500/30"}>
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex gap-3 items-center">
+                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {p.imageUrl ? <img src={p.imageUrl} alt="" className="w-full h-full object-cover" /> : <Image className="w-4 h-4 text-muted-foreground" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{p.title}</div>
+                        <div className="text-xs text-muted-foreground">{p.vendor}</div>
+                      </div>
+                      <div className={`text-lg font-bold ${scoreColor(p.conversionScore!)}`}>{p.conversionScore}</div>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-1">
+                      {[
+                        { label: "Style", value: p.consistency, note: p.consistencyNote },
+                        { label: "Variants", value: p.variantMapping, note: p.variantNote },
+                        { label: "Zoom", value: p.zoomReadiness, note: p.zoomNote },
+                        { label: "Mobile", value: p.mobileOptimization, note: p.mobileNote },
+                        { label: "Hero", value: p.heroScore, note: p.heroNote },
+                      ].map(d => (
+                        <div key={d.label} className="text-center" title={d.note || ""}>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className={`h-full ${scoreBg(d.value || 0)} transition-all`} style={{ width: `${d.value || 0}%` }} />
+                          </div>
+                          <div className="text-[9px] text-muted-foreground mt-0.5">{d.label}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {p.topIssue && (
+                      <div className="text-xs text-yellow-600 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 flex-shrink-0" />{p.topIssue}
+                      </div>
+                    )}
+                    {p.conversionRecommendation && (
+                      <div className="text-[10px] text-muted-foreground">💡 {p.conversionRecommendation}</div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            {!products.some(p => p.conversionScore != null) && (
+              <div className="text-center py-8 text-muted-foreground text-sm">Run the conversion audit to score your product images.</div>
+            )}
+          </div>
+        </TabsContent>
+
         {/* ── Review ── */}
         <TabsContent value="review" className="space-y-3">
           <div className="flex gap-2 flex-wrap">

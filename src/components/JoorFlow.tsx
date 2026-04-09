@@ -727,6 +727,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
+                  <th className="text-left p-3 font-medium w-16">Image</th>
                   <th className="text-left p-3 font-medium">Style</th>
                   <th className="text-left p-3 font-medium">Style #</th>
                   <th className="text-left p-3 font-medium">Colour</th>
@@ -740,6 +741,20 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
               <tbody>
                 {fileProducts.map((p, i) => (
                   <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30">
+                    <td className="p-3">
+                      {p.imageUrl ? (
+                        <img
+                          src={p.imageUrl}
+                          alt={p.styleName}
+                          className="w-12 h-12 object-cover rounded border border-border"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded border border-dashed border-border flex items-center justify-center bg-muted/30">
+                          <Eye className="w-4 h-4 text-muted-foreground/40" />
+                        </div>
+                      )}
+                    </td>
                     <td className="p-3">
                       <div>
                         <span className="font-medium">{p.styleName}</span>

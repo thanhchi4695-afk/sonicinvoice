@@ -429,7 +429,7 @@ export default function AccountingBillReview({
             size="sm"
             className="text-xs shrink-0"
             onClick={() => {
-              const original = buildReviewData(invoice);
+              const original = buildReviewData(unifiedBill);
               setAllLinesToCode(original.headerAccountCode);
               toast.info("Reset to AI suggestion");
             }}

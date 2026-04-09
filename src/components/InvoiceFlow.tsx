@@ -1426,6 +1426,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               <PostParseReviewScreen
                 debug={validationDebug}
                 products={validatedProducts}
+                supplierName={supplierName}
                 onUpdateProducts={(updated) => {
                   setValidatedProducts(updated);
                   // Rebuild product groups from accepted products

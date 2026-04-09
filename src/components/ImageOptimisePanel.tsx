@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ChevronLeft, Image, Sparkles, AlertTriangle, CheckCircle2, XCircle, Search, RefreshCw, Edit3, Eye, FileText, Copy, ShieldCheck, Link2, Upload } from "lucide-react";
+import { ChevronLeft, Image, Sparkles, AlertTriangle, CheckCircle2, XCircle, Search, RefreshCw, Edit3, Eye, FileText, Copy, ShieldCheck, Link2, Upload, Minimize2, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { compressImageFromUrl, formatBytes } from "@/lib/image-compress";
 
 interface ProductImage {
   id: string;
@@ -35,6 +36,13 @@ interface ProductImage {
   approved?: boolean;
   edited?: boolean;
   synced?: boolean;
+  // Compression fields
+  originalSize?: number;
+  compressedSize?: number;
+  compressedUrl?: string;
+  compressed?: boolean;
+  needsCompression?: boolean;
+  compressionReason?: string;
 }
 
 interface Props { onBack: () => void; }
@@ -46,6 +54,9 @@ export default function ImageOptimisePanel({ onBack }: Props) {
   const [analysing, setAnalysing] = useState(false);
   const [validating, setValidating] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [compressing, setCompressing] = useState(false);
+  const [analysingSize, setAnalysingSize] = useState(false);
+  const [compressionProgress, setCompressionProgress] = useState({ current: 0, total: 0 });
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -87,7 +98,12 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     const duplicates = products.filter(p => p.qualityStatus === "duplicate").length;
     const mismatches = products.filter(p => p.qualityStatus === "mismatch" || p.matchStatus === "mismatch").length;
     const optimized = products.filter(p => p.altText && p.approved).length;
-    return { total, missingAlt, missingImage, issues, duplicates, mismatches, optimized };
+    const needsCompression = products.filter(p => p.needsCompression).length;
+    const compressed = products.filter(p => p.compressed).length;
+    const totalOriginalSize = products.reduce((s, p) => s + (p.originalSize || 0), 0);
+    const totalCompressedSize = products.reduce((s, p) => s + (p.compressedSize || p.originalSize || 0), 0);
+    const totalSaved = totalOriginalSize - totalCompressedSize;
+    return { total, missingAlt, missingImage, issues, duplicates, mismatches, optimized, needsCompression, compressed, totalOriginalSize, totalSaved };
   }, [products]);
 
   const filtered = useMemo(() => {
@@ -267,6 +283,93 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     toast.success("All products with alt text approved");
   };
 
+  // ── Analyse Image Sizes ──
+  const analyseSizes = async () => {
+    const withImages = products.filter(p => p.imageUrl);
+    if (withImages.length === 0) { toast.info("No products with images"); return; }
+    setAnalysingSize(true);
+    try {
+      for (let i = 0; i < withImages.length; i += 50) {
+        const batch = withImages.slice(i, i + 50);
+        const { data, error } = await supabase.functions.invoke("image-compress", {
+          body: {
+            action: "analyse_sizes",
+            images: batch.map(p => ({ product_id: p.id, image_url: p.imageUrl })),
+          },
+        });
+        if (error) throw error;
+        if (data?.results) {
+          setProducts(prev => {
+            const updated = [...prev];
+            for (const r of data.results) {
+              const match = updated.find(u => u.id === r.product_id);
+              if (match) {
+                match.originalSize = r.original_size;
+                match.needsCompression = r.needs_compression;
+                match.compressionReason = r.reason;
+              }
+            }
+            return updated;
+          });
+        }
+      }
+      toast.success("Image size analysis complete");
+    } catch (e: any) { toast.error(e.message || "Size analysis failed"); }
+    setAnalysingSize(false);
+  };
+
+  // ── Compress Images ──
+  const compressImages = async (subset?: ProductImage[]) => {
+    const targets = (subset || products).filter(p => p.imageUrl && !p.compressed && (p.needsCompression !== false));
+    if (targets.length === 0) { toast.info("No images to compress"); return; }
+    setCompressing(true);
+    setCompressionProgress({ current: 0, total: targets.length });
+    let compressed = 0;
+    let totalSaved = 0;
+
+    for (let i = 0; i < targets.length; i++) {
+      setCompressionProgress({ current: i + 1, total: targets.length });
+      try {
+        // Client-side Canvas compression
+        const result = await compressImageFromUrl(targets[i].imageUrl, {
+          maxWidth: 2048,
+          maxHeight: 2048,
+          quality: 0.82,
+          format: "image/jpeg",
+        });
+
+        // Upload compressed image to storage via edge function
+        const { data, error } = await supabase.functions.invoke("image-compress", {
+          body: {
+            action: "upload_compressed",
+            product_id: targets[i].id,
+            base64: result.base64,
+            content_type: "image/jpeg",
+            original_size: result.originalSize,
+          },
+        });
+
+        if (error) throw error;
+
+        setProducts(prev => prev.map(p => p.id === targets[i].id ? {
+          ...p,
+          compressed: true,
+          originalSize: result.originalSize,
+          compressedSize: result.compressedSize,
+          compressedUrl: data?.compressed_url,
+        } : p));
+
+        totalSaved += result.originalSize - result.compressedSize;
+        compressed++;
+      } catch (e) {
+        console.warn(`Failed to compress ${targets[i].title}:`, e);
+      }
+    }
+
+    toast.success(`Compressed ${compressed} images (saved ${formatBytes(totalSaved)})`);
+    setCompressing(false);
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
@@ -323,9 +426,10 @@ export default function ImageOptimisePanel({ onBack }: Props) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full grid grid-cols-5">
+        <TabsList className="w-full grid grid-cols-6">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="alt_text">Alt Text</TabsTrigger>
+          <TabsTrigger value="compress">Compress</TabsTrigger>
           <TabsTrigger value="quality">Quality</TabsTrigger>
           <TabsTrigger value="validation">Validation</TabsTrigger>
           <TabsTrigger value="review">Review</TabsTrigger>
@@ -481,6 +585,104 @@ export default function ImageOptimisePanel({ onBack }: Props) {
             {filtered.length === 0 && (
               <div className="text-center py-8 text-muted-foreground text-sm">
                 {products.length === 0 ? "No products found. Import products first." : "No matching products."}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── Compress ── */}
+        <TabsContent value="compress" className="space-y-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Minimize2 className="w-4 h-4 text-primary" />Image Compression
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs text-muted-foreground space-y-3">
+              <p>Compress product images for faster page loads and better Shopify performance. Images are resized to max 2048×2048 and re-encoded at optimal quality.</p>
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" onClick={analyseSizes} disabled={analysingSize} className="gap-1">
+                  <HardDrive className="w-3 h-3" />{analysingSize ? "Analysing…" : "Analyse File Sizes"}
+                </Button>
+                <Button size="sm" onClick={() => compressImages()} disabled={compressing} className="gap-1">
+                  <Minimize2 className="w-3 h-3" />{compressing ? `Compressing ${compressionProgress.current}/${compressionProgress.total}…` : "Compress All"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Compression stats */}
+          {(stats.compressed > 0 || stats.needsCompression > 0) && (
+            <div className="grid grid-cols-3 gap-3">
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-lg font-bold text-yellow-500">{stats.needsCompression}</div>
+                  <div className="text-xs text-muted-foreground">Need Compression</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-lg font-bold text-green-500">{stats.compressed}</div>
+                  <div className="text-xs text-muted-foreground">Compressed</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-lg font-bold text-primary">{formatBytes(stats.totalSaved)}</div>
+                  <div className="text-xs text-muted-foreground">Total Saved</div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {compressing && (
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Compressing images…</span>
+                  <span>{compressionProgress.current}/{compressionProgress.total}</span>
+                </div>
+                <Progress value={(compressionProgress.current / compressionProgress.total) * 100} className="h-2" />
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+            {products
+              .filter(p => p.imageUrl && (p.originalSize != null || p.compressed))
+              .sort((a, b) => (b.originalSize || 0) - (a.originalSize || 0))
+              .map(p => (
+                <Card key={p.id} className={p.compressed ? "border-green-500/30" : p.needsCompression ? "border-yellow-500/30" : ""}>
+                  <CardContent className="p-3 flex gap-3 items-center">
+                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {p.imageUrl ? <img src={p.imageUrl} alt="" className="w-full h-full object-cover" /> : <Image className="w-4 h-4 text-muted-foreground" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{p.title}</div>
+                      <div className="text-xs text-muted-foreground">{p.vendor}</div>
+                      {p.compressionReason && <div className="text-xs text-yellow-600">{p.compressionReason}</div>}
+                    </div>
+                    <div className="text-right flex-shrink-0 space-y-0.5">
+                      <div className="text-xs font-medium">{formatBytes(p.originalSize || 0)}</div>
+                      {p.compressed && p.compressedSize != null && (
+                        <div className="text-[10px] text-green-600">→ {formatBytes(p.compressedSize)} ({Math.round((1 - p.compressedSize / (p.originalSize || 1)) * 100)}% saved)</div>
+                      )}
+                    </div>
+                    {p.compressed ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    ) : p.needsCompression ? (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => compressImages([p])} disabled={compressing}>
+                        Compress
+                      </Button>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">OK</Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            {!products.some(p => p.originalSize != null) && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Run "Analyse File Sizes" to check which images need compression.
               </div>
             )}
           </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ChevronLeft, Image, Sparkles, AlertTriangle, CheckCircle2, XCircle, Search, RefreshCw, Edit3, Eye, FileText, Copy, ShieldCheck, Link2, Upload } from "lucide-react";
+import { ChevronLeft, Image, Sparkles, AlertTriangle, CheckCircle2, XCircle, Search, RefreshCw, Edit3, Eye, FileText, Copy, ShieldCheck, Link2, Upload, Minimize2, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { compressImageFromUrl, formatBytes } from "@/lib/image-compress";
 
 interface ProductImage {
   id: string;
@@ -35,6 +36,13 @@ interface ProductImage {
   approved?: boolean;
   edited?: boolean;
   synced?: boolean;
+  // Compression fields
+  originalSize?: number;
+  compressedSize?: number;
+  compressedUrl?: string;
+  compressed?: boolean;
+  needsCompression?: boolean;
+  compressionReason?: string;
 }
 
 interface Props { onBack: () => void; }

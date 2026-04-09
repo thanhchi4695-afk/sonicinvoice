@@ -113,7 +113,8 @@ Deno.serve(async (req) => {
     const shopName  = shopData.shop?.name || shop;
     const cleanShop = shop.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
-    if (isLoginFlow) {
+    if (isLoginFlow || isShopifyInitiated) {
+      // Login flow or Shopify-initiated install: find/create user by shop email
       const { data: existingUsers } = await supabase.auth.admin.listUsers();
       const existing = existingUsers?.users?.find((u: { email?: string }) => u.email === shopEmail);
 
@@ -142,15 +143,23 @@ Deno.serve(async (req) => {
         token: loginToken, user_id: userId, shop: cleanShop, access_token: accessToken,
       });
 
-      await supabase.from("shopify_oauth_states")
-        .delete().eq("user_id", "00000000-0000-0000-0000-000000000000");
+      if (isLoginFlow) {
+        await supabase.from("shopify_oauth_states")
+          .delete().eq("user_id", "00000000-0000-0000-0000-000000000000");
+      }
+
+      // For embedded apps, redirect back into the Shopify Admin iframe
+      const redirectUrl = isShopifyInitiated
+        ? `https://${shop}/admin/apps/${SHOPIFY_API_KEY}`
+        : `${APP_URL}/?shopify_login=${loginToken}`;
 
       return new Response(null, {
         status: 302,
-        headers: { Location: `${APP_URL}/?shopify_login=${loginToken}` },
+        headers: { Location: redirectUrl },
       });
 
     } else {
+      // Connect flow: user already logged in, linking store
       const [userId] = state.split(":");
       await supabase.from("shopify_connections").upsert({
         user_id: userId, store_url: cleanShop, access_token: accessToken,

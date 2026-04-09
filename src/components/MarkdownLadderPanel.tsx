@@ -38,6 +38,7 @@ interface Ladder {
   rollback_days: number | null;
   check_frequency: string;
   min_margin_pct: number;
+  sync_to_shopify: boolean;
   created_at: string;
 }
 
@@ -102,6 +103,7 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
     rollback_days: 14,
     check_frequency: "daily",
     min_margin_pct: 30,
+    sync_to_shopify: false,
   });
 
   const fetchData = useCallback(async () => {
@@ -213,6 +215,7 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
           rollback_days: newLadder.auto_rollback ? newLadder.rollback_days : null,
           check_frequency: newLadder.check_frequency,
           min_margin_pct: newLadder.min_margin_pct,
+          sync_to_shopify: newLadder.sync_to_shopify,
         })
         .select()
         .single();
@@ -531,6 +534,14 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
               </div>
             </div>
 
+            <div className="flex items-center gap-3 bg-muted/50 rounded-lg p-3">
+              <Switch checked={newLadder.sync_to_shopify} onCheckedChange={v => setNewLadder({ ...newLadder, sync_to_shopify: v })} />
+              <div>
+                <p className="text-sm font-medium">Sync to Shopify</p>
+                <p className="text-xs text-muted-foreground">Automatically update sale price and compare-at price on your Shopify store</p>
+              </div>
+            </div>
+
             {newLadder.auto_rollback && (
               <div>
                 <label className="text-xs text-muted-foreground">Rollback after (days from final stage)</label>
@@ -558,6 +569,7 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
                 <span className="text-muted-foreground">Frequency:</span><span className="font-medium">{newLadder.check_frequency}</span>
                 <span className="text-muted-foreground">Min margin:</span><span className="font-medium">{newLadder.min_margin_pct}%</span>
                 <span className="text-muted-foreground">Auto-rollback:</span><span className="font-medium">{newLadder.auto_rollback ? `${newLadder.rollback_days}d` : "No"}</span>
+                <span className="text-muted-foreground">Shopify sync:</span><span className="font-medium">{newLadder.sync_to_shopify ? "Yes" : "No"}</span>
               </div>
             </Card>
 

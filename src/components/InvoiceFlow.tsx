@@ -19,7 +19,7 @@ import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource
 import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugInfo } from "@/lib/invoice-validator";
 import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
-import { AccountingPushPanel } from "@/components/AccountingIntegration";
+import AccountingBillReview from "@/components/AccountingBillReview";
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -1925,9 +1925,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             onBack={() => setStep(3)}
           />
 
-          {/* Accounting Push Panel */}
-          <div className="px-0 mt-2">
-            <AccountingPushPanel invoice={{
+          {/* Accounting Bill Review */}
+          <div className="px-0 mt-4">
+            <AccountingBillReview invoice={{
               id: `inv-${Date.now()}`,
               supplier: supplierName,
               invoice_number: "",

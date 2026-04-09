@@ -6,66 +6,149 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PACKING_SLIP_SYSTEM = `You are a packing slip / delivery docket extraction AI for a retail product management app called Sonic Invoice.
+// ── Multi-stage extraction system prompt ────────────────────
+const SYSTEM_PROMPT = `You are an expert invoice data extraction AI for a retail product management app (Sonic Invoice).
+You handle fashion wholesale invoices that vary wildly in layout. Your job is to classify the document layout, then extract every product with full variant detail.
 
-FIRST: Determine if this document is a packing slip / packing list / delivery docket. Look for signals:
-- Title contains "PACKING LIST", "PACKING SLIP", "DELIVERY DOCKET", "DELIVERY NOTE"
-- Table headers like "Style Code", "Colour Code", "Style Description", "Size", "Qty"
-- Absence of cost/unit price/totals per line item
-- Carton grouping rows
+## STEP 1 — CLASSIFY THE DOCUMENT
 
-Return a JSON object with:
+Determine the document_type:
+- "invoice" — has pricing (cost/unit price)
+- "packing_slip" — has items and quantities but NO pricing
+- "unknown" — cannot determine
+
+Determine the layout_type:
+- "size_grid" — products in rows with size columns across the top (e.g. 6, 8, 10, 12, 14, 16) and quantities underneath. Examples: Seafolly, some Skye Group invoices.
+- "size_matrix_inline" — sizes and quantities listed inline in a cell like "10, 12, 14, 16" on one row and "1, 1, 2, 2" on the next row. Example: Skye Group / Jantzen.
+- "size_block" — each product has a sub-table or options field with "Size: 06 08 10 12 / Qty: (1) (2) (2) (1)". Example: Rhythm.
+- "size_row_below" — product row followed by a size breakdown row like "XS (1) S (2) M (2) L (1)". Example: Sea Level / Bond-Eye.
+- "colour_size_in_description" — colour and size are embedded in the description text like "LISA DRESS B2140D NAVY XS". Example: Donna Donna.
+- "simple_flat" — simple table with qty, description, price, total. No variants. Example: OM Designs, handwritten invoices.
+- "packing_list" — item code + description + quantity, no prices. Example: Kung Fu Mary, delivery dockets.
+- "unknown" — mixed or unrecognised layout.
+
+## STEP 2 — EXTRACT PRODUCTS
+
+### For ALL layout types, extract into this JSON structure:
+
 {
-  "document_type": "packing_slip" | "invoice" | "unknown",
-  "confidence": 0-100,
-  "supplier": "supplier name if visible",
-  "supplier_order_number": "if visible",
-  "customer_order_number": "if visible",
+  "document_type": "invoice" | "packing_slip" | "unknown",
+  "layout_type": "<one of the types above>",
+  "supplier": "detected supplier name",
+  "invoice_number": "if visible",
+  "currency": "AUD" or detected currency,
   "products": [
     {
-      "style_code": "raw style/article code",
-      "colour_code": "colour code as shown",
-      "style_description": "product description",
+      "style_code": "raw style/article/product code",
+      "product_title": "clean product name without colour/size",
+      "colour": "colour name (expanded, not abbreviated)",
       "size": "size value",
       "quantity": number,
-      "carton_number": "if visible",
-      "barcode": "if visible"
+      "unit_cost": number or null,
+      "rrp": number or null,
+      "line_total": number or null,
+      "barcode": "if visible",
+      "product_type": "e.g. One Piece, Dress, Pant, Top",
+      "confidence": 0-100,
+      "parse_notes": "any issues or ambiguity"
     }
   ]
 }
 
-Important rules:
-- Extract EVERY product line, do not skip any
-- Do NOT include carton separator rows (e.g. "Carton 1 [barcode]") as products
-- Do NOT include summary/total rows as products
-- Do NOT include repeated header rows as products
-- Do NOT try to extract prices — packing slips typically don't have them
-- If sizes appear as columns in a matrix, expand each size into a separate row
-- Parse quantity as integer
-- Keep style_code, colour_code exactly as shown (do not normalize)
-- Keep style_description as the raw text`;
+### CRITICAL RULES BY LAYOUT TYPE:
 
-const INVOICE_SYSTEM = `You are an invoice data extraction AI for a retail product management app called Sonic Invoice.
+#### size_grid (e.g. Seafolly)
+- Size labels appear as column headers (6, 8, 10, 12, 14, 16, 18, 20)
+- Quantities may be circled, struck through, or underlined — these ARE the ordered quantities
+- A strikethrough/underline on a size column means that size WAS ordered — extract it
+- Create one product row PER size that has quantity > 0
+- The "Total Qty" column confirms the sum
+- unit_cost is the "Price (Tax excl.)" column, NOT the "Net" (which is the line total)
 
-Extract ALL product lines from the invoice/document provided. For each product, extract:
-- name: Full product name
-- brand: Brand/vendor name
-- sku: SKU or style code if visible
-- barcode: Barcode/EAN if visible
-- type: Product type/category (e.g. "Tops", "Dresses", "One Piece")
-- colour: Colour if mentioned
-- size: Size or size range
-- qty: Quantity ordered
-- cost: Cost/wholesale price per unit
-- rrp: Retail/RRP price per unit (if shown, otherwise 0)
+#### size_matrix_inline (e.g. Skye Group / Jantzen)
+- Product code and description on one row with sizes listed as "10, 12, 14, 16, 18, 20, 22, 24"
+- Next row has quantities as "1, 1, 2, 2, 1" — these map positionally to the sizes above
+- Match each quantity to its corresponding size
+- Only create rows for sizes with quantity > 0
+- If a size is highlighted/marked (e.g. <mark>18</mark>), that's just formatting — still include it
+- Colour codes: BK=Black, NY=Navy, IK=Ink, SW=Seaweed, KH=Khaki, WH=White, etc.
 
-Important:
-- Extract EVERY product line, do not skip any
-- Do NOT include freight/shipping lines as products
-- If a field is not visible, use empty string for text or 0 for numbers
-- Parse prices as numbers (remove currency symbols)
-- If sizes are listed as a range (e.g. 8-16), keep as string
-- Detect variant patterns (same product, different size/colour) and list each as separate line`;
+#### size_block (e.g. Rhythm)
+- Each product has a main row with Qty, Code, Item, Options, Unit Price, Subtotal
+- Below it is an "Options" or detail line with "Size: 06 08 10 12 / Qty: (1) (2) (2) (1)"
+- Parse the Size and Qty pairs from the options text
+- The colour is in the "Options" column (e.g. "OLIVE OLI")
+- Create one row per size with quantity > 0
+- unit_cost is from the "Unit Price" column
+
+#### size_row_below (e.g. Sea Level / Bond-Eye)
+- Product row: Style, Product Description, Units, RRP, SP (Supplier Price), Disc%, Value, GST, Total
+- Next row: "XS (1) S (2) M (2) L (1) XL (1)" — these are the size/qty pairs
+- Colour is embedded in the product description (e.g. "Shore Linen Palazzo Pant - White")
+- Extract colour from the " - Colour" suffix in description
+- unit_cost = SP (Supplier Price) column, NOT RRP
+- rrp = RRP column
+- Story/collection headers (e.g. "Shore Linen") are NOT products — skip them
+- Create one row per size
+
+#### colour_size_in_description (e.g. Donna Donna)
+- Each row has: Item code, Description, Quantity, Unit Price, GST, Amount
+- Colour and size are embedded in Description: "LISA DRESS B2140D NAVY XS"
+- Parse the description to extract: base product name, colour, size
+- Common patterns: "NAME CODE COLOUR SIZE" or "NAME CODE COLOUR PRINT SIZE"
+- Size values: XS, S/M, SM, L/XL, LXL, O/S, OS, 06, 08, 10, 12, 14, 16
+- Group rows with same base product name + code as variants
+- "No charge" or "customer replacement" items: set unit_cost to 0, note in parse_notes
+
+#### simple_flat (e.g. OM Designs, handwritten)
+- Simple: QTY, DESCRIPTION, PRICE, TOTAL
+- No variant detail — create single rows
+- "No charge" = unit_cost 0
+- "(customer replacement)" lines are notes, not separate products — attach to previous product
+- Confidence should be lower (60-70) due to lack of structured data
+- Do NOT invent colour or size if not visible
+
+#### packing_list (e.g. Kung Fu Mary, delivery dockets)
+- Items + Quantities only, NO prices
+- Set unit_cost and rrp to null
+- Set document_type to "packing_slip"
+- Extract clean product names and quantities
+- Strikethrough quantities (e.g. ~~5 of 5~~) mean the item IS included
+
+## STEP 3 — NOISE FILTERING
+
+NEVER include these as products:
+- Freight / Shipping charges
+- GST / Tax lines
+- Subtotal / Total lines
+- ASN / Consignment references
+- Bank details
+- Payment terms
+- "Continued on next page"
+- Carton/box identifiers
+- Empty rows
+- Column headers repeated mid-page
+
+## STEP 4 — COLOUR ABBREVIATION EXPANSION
+
+Expand common colour abbreviations:
+BK/BLK = Black, NY/NVY = Navy, WH/WHT = White, IK = Ink, SW = Seaweed,
+KH = Khaki, OLI = Olive, CRE = Cream, LBL = Light Blue, RD = Red,
+PK = Pink, GY/GRY = Grey, BG = Beige, BRN = Brown, COR = Coral,
+AQ = Aqua, TQ = Turquoise, MU/MUL = Multi, PR = Print, FL = Floral
+
+## STEP 5 — CONFIDENCE SCORING
+
+Score each row 0-100:
+- Has product title with 3+ characters: +20
+- Has valid unit_cost > 0: +20
+- Has recognisable size: +15
+- Has colour: +15
+- Has style code / SKU: +15
+- Has quantity > 0: +15
+- Deductions: missing price -20, ambiguous text -10, handwritten -15
+
+Return ONLY valid JSON. No markdown, no explanation.`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -85,57 +168,19 @@ serve(async (req) => {
     const isImage = ["jpg", "jpeg", "png", "webp", "heic"].includes(fileType);
     const isPdf = fileType === "pdf";
 
-    // If forceMode is set, use that directly; otherwise let AI detect
-    const isPackingSlipMode = forceMode === "packing_slip";
-    const isInvoiceMode = forceMode === "invoice";
+    let systemPrompt = SYSTEM_PROMPT;
 
-    // Build system prompt based on mode
-    let systemPrompt: string;
-
-    if (isPackingSlipMode) {
-      systemPrompt = PACKING_SLIP_SYSTEM;
-    } else if (isInvoiceMode) {
-      systemPrompt = INVOICE_SYSTEM;
-    } else {
-      // Auto-detect mode: ask AI to classify first then extract
-      systemPrompt = `You are a document extraction AI for a retail product management app called Sonic Invoice.
-
-STEP 1: Classify this document as one of:
-- "packing_slip" — if it's a packing slip, packing list, delivery docket, or delivery note
-- "invoice" — if it's a supplier invoice with pricing
-- "unknown" — if unclear
-
-Packing slip signals:
-- Title contains "PACKING LIST", "PACKING SLIP", "DELIVERY DOCKET", "DELIVERY NOTE"
-- Headers like "Style Code", "Colour Code", "Style Description", "Size", "Qty"
-- No cost/unit price columns
-- Carton grouping
-
-Invoice signals:
-- Has "INVOICE" in title
-- Has cost/price/amount columns
-- Has totals, GST, subtotal
-
-STEP 2: Extract products based on detected type.
-
-If packing_slip, return:
-${PACKING_SLIP_SYSTEM.split('Return a JSON object with:')[1]?.split('Important rules:')[0] || ''}
-
-If invoice, return:
-{
-  "document_type": "invoice",
-  "supplier": "supplier name",
-  "products": [{ "name", "brand", "sku", "barcode", "type", "colour", "size", "qty", "cost", "rrp" }]
-}
-
-Return JSON only.`;
+    if (forceMode === "packing_slip") {
+      systemPrompt += `\n\nIMPORTANT: The user has confirmed this is a PACKING SLIP. Set document_type to "packing_slip". Do NOT extract prices.`;
+    } else if (forceMode === "invoice") {
+      systemPrompt += `\n\nIMPORTANT: The user has confirmed this is an INVOICE. Set document_type to "invoice". Extract prices.`;
     }
 
     if (customInstructions) {
-      systemPrompt += `\n\nAdditional instructions from the user:\n${customInstructions}`;
+      systemPrompt += `\n\n## USER CUSTOM INSTRUCTIONS (follow these exactly):\n${customInstructions}`;
     }
     if (supplierName) {
-      systemPrompt += `\nSupplier name: ${supplierName}`;
+      systemPrompt += `\nKnown supplier: ${supplierName}`;
     }
 
     let messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>;
@@ -158,11 +203,7 @@ Return JSON only.`;
             },
             {
               type: "text",
-              text: isPackingSlipMode
-                ? "Extract all product data from this packing slip. Return JSON only."
-                : isInvoiceMode
-                ? "Extract all product data from this invoice. Return JSON only."
-                : "Classify this document and extract all product data. Return JSON only.",
+              text: "Classify this document layout, then extract ALL products with full variant breakdown. Create one row per size/colour variant. Return JSON only.",
             },
           ],
         },
@@ -172,11 +213,7 @@ Return JSON only.`;
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: isPackingSlipMode
-            ? `Extract all product data from this packing slip content:\n\n${fileContent}\n\nReturn JSON only.`
-            : isInvoiceMode
-            ? `Extract all product data from this invoice/spreadsheet content:\n\n${fileContent}\n\nReturn JSON only.`
-            : `Classify this document and extract all product data:\n\n${fileContent}\n\nReturn JSON only.`,
+          content: `Classify this document layout, then extract ALL products with full variant breakdown. Create one row per size/colour variant. Return JSON only.\n\nDocument content:\n${fileContent}`,
         },
       ];
     }
@@ -188,51 +225,76 @@ Return JSON only.`;
     });
     const content = getContent(data);
 
-    // Extract JSON from response (handle markdown code blocks)
+    // Extract JSON from response
     const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
     const jsonStr = (jsonMatch[1] || content).trim();
     const parsed = JSON.parse(jsonStr);
 
-    // Determine document type from response
-    const detectedType = parsed.document_type || (forceMode || "invoice");
+    const docType = parsed.document_type || (forceMode || "invoice");
+    const layoutType = parsed.layout_type || "unknown";
 
-    if (detectedType === "packing_slip") {
-      // Packing slip response — filter noise and normalize
-      const rawProducts: Array<Record<string, unknown>> = parsed.products || [];
-      const filtered = rawProducts.filter((p: Record<string, unknown>) => {
-        const desc = String(p.style_description || "").toLowerCase();
-        const code = String(p.style_code || "");
-        // Filter carton rows, barcode-only rows, summary rows
-        if (/^carton\s/i.test(desc) || /^carton\s/i.test(code)) return false;
-        if (/^total/i.test(desc)) return false;
-        if (!desc && !code) return false;
-        // Barcode-only: all digits, length > 8
-        if (/^\d{8,}$/.test(code) && !desc) return false;
-        return true;
-      });
+    // Normalize products into the legacy format the frontend expects
+    const rawProducts: Array<Record<string, unknown>> = parsed.products || [];
 
+    // Filter noise
+    const filtered = rawProducts.filter((p: Record<string, unknown>) => {
+      const title = String(p.product_title || p.style_description || p.name || "").toLowerCase();
+      const code = String(p.style_code || p.sku || "");
+      if (!title && !code) return false;
+      if (/^(total|subtotal|sub total|freight|shipping|gst|tax|delivery)$/i.test(title)) return false;
+      if (/^carton\s/i.test(title) || /^carton\s/i.test(code)) return false;
+      return true;
+    });
+
+    if (docType === "packing_slip") {
+      // Packing slip response
       return new Response(JSON.stringify({
         document_type: "packing_slip",
+        layout_type: layoutType,
         confidence: parsed.confidence || 85,
         supplier: parsed.supplier || supplierName || "",
-        supplier_order_number: parsed.supplier_order_number || "",
-        customer_order_number: parsed.customer_order_number || "",
-        products: filtered,
+        supplier_order_number: parsed.supplier_order_number || parsed.invoice_number || "",
+        products: filtered.map((p: Record<string, unknown>) => ({
+          style_code: p.style_code || p.sku || "",
+          colour_code: p.colour || "",
+          style_description: p.product_title || p.name || "",
+          size: p.size || "",
+          quantity: Number(p.quantity) || 0,
+          barcode: p.barcode || "",
+          confidence: Number(p.confidence) || 70,
+          parse_notes: p.parse_notes || "",
+        })),
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Invoice response — normalize as before
-    const result = Array.isArray(parsed)
-      ? { document_type: "invoice", supplier: supplierName || "", products: parsed }
-      : {
-          document_type: detectedType,
-          supplier: parsed.supplier || supplierName || "",
-          products: parsed.products || [],
-        };
+    // Invoice response — normalize to legacy format
+    const normalizedProducts = filtered.map((p: Record<string, unknown>) => ({
+      name: p.product_title || p.name || "",
+      brand: parsed.supplier || supplierName || String(p.brand || ""),
+      sku: p.style_code || p.sku || "",
+      barcode: p.barcode || "",
+      type: p.product_type || p.type || "",
+      colour: p.colour || "",
+      size: p.size || "",
+      qty: Number(p.quantity || p.qty) || 0,
+      cost: Number(p.unit_cost || p.cost) || 0,
+      rrp: Number(p.rrp) || 0,
+      // Extended fields
+      _confidence: Number(p.confidence) || 70,
+      _parseNotes: p.parse_notes || "",
+      _lineTotal: Number(p.line_total) || 0,
+    }));
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({
+      document_type: docType,
+      layout_type: layoutType,
+      supplier: parsed.supplier || supplierName || "",
+      invoice_number: parsed.invoice_number || "",
+      currency: parsed.currency || "AUD",
+      products: normalizedProducts,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

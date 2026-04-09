@@ -152,6 +152,14 @@ export default function PostParseReviewScreen({
 
   // ── Actions ──
   const approveRow = (rowIndex: number) => {
+    const product = products.find(p => p._rowIndex === rowIndex);
+    if (supplierName && product) {
+      const from = product._rejected ? "rejected" : product._confidenceLevel === "high" ? "accepted" : "review";
+      if (from !== "accepted") {
+        recordReclassification(supplierName, product._rawName || product.name || "", from as any, "accepted", "Manually accepted by merchant");
+        toast.success("AI learned: row accepted", { description: `"${(product.name || product._rawName || "").slice(0, 40)}" saved as product pattern`, duration: 2000 });
+      }
+    }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
         ? { ...p, _rejected: false, _confidenceLevel: "high" as const, _confidence: Math.max(p._confidence, 80) }

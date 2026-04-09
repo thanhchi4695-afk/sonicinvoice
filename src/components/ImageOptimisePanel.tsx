@@ -123,7 +123,14 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     const totalOriginalSize = products.reduce((s, p) => s + (p.originalSize || 0), 0);
     const totalCompressedSize = products.reduce((s, p) => s + (p.compressedSize || p.originalSize || 0), 0);
     const totalSaved = totalOriginalSize - totalCompressedSize;
-    return { total, missingAlt, missingImage, issues, duplicates, mismatches, optimized, needsCompression, compressed, totalOriginalSize, totalSaved };
+    // Format-specific aggregates
+    const compressedProducts = products.filter(p => p.compressed && p.originalSize);
+    const totalWebpSize = compressedProducts.reduce((s, p) => s + (p.webpSize || p.compressedSize || 0), 0);
+    const totalJpegSize = compressedProducts.reduce((s, p) => s + (p.jpegSize || p.compressedSize || 0), 0);
+    const totalOrigCompressed = compressedProducts.reduce((s, p) => s + (p.originalSize || 0), 0);
+    const webpSavingsPct = totalOrigCompressed > 0 ? Math.round((1 - totalWebpSize / totalOrigCompressed) * 100) : 0;
+    const jpegSavingsPct = totalOrigCompressed > 0 ? Math.round((1 - totalJpegSize / totalOrigCompressed) * 100) : 0;
+    return { total, missingAlt, missingImage, issues, duplicates, mismatches, optimized, needsCompression, compressed, totalOriginalSize, totalSaved, webpSavingsPct, jpegSavingsPct, totalWebpSize, totalJpegSize, totalOrigCompressed };
   }, [products]);
 
   const filtered = useMemo(() => {

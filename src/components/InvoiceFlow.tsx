@@ -9,6 +9,7 @@ import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { generateXSeriesCSV, getXSeriesSettings, saveXSeriesSettings, type XSeriesSettings, type XSeriesProduct } from "@/lib/lightspeed-xseries";
 import { findTemplate, saveFormatTemplate, incrementTemplateUse, saveLayoutTemplate, buildTemplateHint, saveCorrection, getTemplateList, getLayoutLabel, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping, type ProcessAsMode, type LayoutType, type CorrectionPattern } from "@/lib/invoice-templates";
+import { buildMemoryHint, recordParseSuccess, recordFieldCorrection, recordNoiseRejection, getMemoryStats, type LayoutFingerprint } from "@/lib/invoice-learning";
 import { getStoreLocations } from "@/components/AccountScreen";
 import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCount, type InventoryItem } from "@/lib/inventory-sim";
 import { addAuditEntry } from "@/lib/audit-log";
@@ -533,8 +534,19 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       const base64 = btoa(binary);
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
 
-      // Build template hint from learned patterns
-      const templateHint = supplierName ? buildTemplateHint(supplierName) : null;
+      // Build learning memory hint (structure-based, not brand-specific)
+      const memoryHint = buildMemoryHint(supplierName || undefined);
+      // Also check the old template system as fallback
+      const templateHint = !memoryHint && supplierName ? buildTemplateHint(supplierName) : null;
+      const combinedHint = memoryHint || templateHint;
+
+      // Show memory stats if available
+      if (supplierName) {
+        const stats = getMemoryStats(supplierName);
+        if (stats && stats.parses > 1) {
+          console.log(`[Sonic Invoice] Memory found: ${stats.parses} parses, ${stats.corrections} corrections, +${stats.boost} confidence boost`);
+        }
+      }
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
         method: "POST",
@@ -549,7 +561,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             : processAs === "packing_slip" ? "packing_slip"
             : processAs === "handwritten" ? "handwritten"
             : undefined,
-          templateHint: templateHint || undefined,
+          templateHint: combinedHint || undefined,
         }),
       });
 

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import {
-  ChevronLeft, Package, Users, FileText, TrendingUp, TrendingDown, ShoppingCart,
+  ChevronLeft, Package, Users, FileText, TrendingUp, TrendingDown,
   AlertTriangle, ShoppingCart, BarChart3, ArrowRight, Zap, Shield,
   Clock, DollarSign, Tag, Truck, RefreshCw, Sparkles,
 } from "lucide-react";

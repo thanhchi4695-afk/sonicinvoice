@@ -61,7 +61,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
 
   // Detail step
   const [activeOrder, setActiveOrder] = useState<JoorOrder | null>(null);
-  const [groupedProducts, setGroupedProducts] = useState<MappedProduct[]>([]);
+  const [groupedProducts, setGroupedProducts] = useState<GroupedProduct[]>([]);
   const [pushing, setPushing] = useState(false);
   const [pushProgress, setPushProgress] = useState({ current: 0, total: 0 });
 
@@ -71,7 +71,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
   const [fileParsing, setFileParsing] = useState(false);
   const [fileEnriching, setFileEnriching] = useState(false);
   const [fileProducts, setFileProducts] = useState<JoorParsedProduct[]>([]);
-  const [fileGroupedProducts, setFileGroupedProducts] = useState<MappedProduct[]>([]);
+  const [fileGroupedProducts, setFileGroupedProducts] = useState<GroupedProduct[]>([]);
 
   // Check existing connection
   useEffect(() => {
@@ -231,7 +231,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
     toast.success(`${type === "shopify" ? "Shopify" : "Lightspeed"} CSV downloaded (${groupedProducts.length} products)`);
   };
 
-  const pushToShopify = async (products: MappedProduct[]) => {
+  const pushToShopify = async (products: GroupedProduct[]) => {
     setPushing(true);
     setPushProgress({ current: 0, total: products.length });
     let errors = 0;
@@ -316,7 +316,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
 
   const handleBulkDownload = () => {
     const selected = orders.filter((o) => selectedOrders.has(o.order_id));
-    const allProducts: MappedProduct[] = [];
+    const allProducts: GroupedProduct[] = [];
     for (const order of selected) {
       const products = groupJoorItemsIntoProducts(order.line_items || [], {
         season_code: order.order_season_code,

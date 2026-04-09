@@ -94,11 +94,15 @@ export interface ParsingPlan {
   document_type?: string;
   layout_type?: string;
   variant_method?: string;
+  size_system?: string;
   line_item_zone?: string;
   quantity_field?: string;
   cost_field?: string;
+  cost_derivation?: string;
   grouping_required?: boolean;
   grouping_reason?: string;
+  total_products_expected?: number;
+  total_variants_expected?: number;
   expected_review_level?: string;
   review_reason?: string;
   strategy_explanation?: string;

@@ -292,6 +292,7 @@ const Index = () => {
           onStartLookbookImport={() => setActiveFlow("lookbook_import")}
            onStartAccounting={() => setActiveFlow("accounting")}
            onStartProfitLoss={() => setActiveFlow("profit_loss")}
+           onStartImageOptimise={() => setActiveFlow("image_optimise")}
         />
       )}
       <Suspense fallback={suspenseFallback}>

@@ -392,6 +392,9 @@ export default function ImageOptimisePanel({ onBack }: Props) {
             <Button variant="outline" onClick={approveAll} className="gap-2">
               <CheckCircle2 className="w-4 h-4" />Approve All
             </Button>
+            <Button onClick={pushToShopify} disabled={syncing || products.filter(p => p.approved && p.shopifyProductId && !p.synced).length === 0} className="gap-2 col-span-full">
+              <Upload className="w-4 h-4" />{syncing ? "Pushing to Shopify…" : `Push to Shopify (${products.filter(p => p.approved && p.shopifyProductId && !p.synced).length})`}
+            </Button>
           </div>
         </TabsContent>
 

@@ -492,6 +492,9 @@ export function validateAndCleanProducts(
       if (rowCorrections.length > 0) extractionParts.push(`${rowCorrections.length} auto-correction(s)`);
     }
 
+    // ── Build source trace from AI-provided regions ──
+    const sourceTrace = buildSourceTrace(p as any, i, merged.length, rejected);
+
     results.push({
       ...p,
       _rowIndex: i,
@@ -512,6 +515,7 @@ export function validateAndCleanProducts(
       _extractionReason: rejected
         ? rejectReason || "Invalid row"
         : extractionParts.join(" · ") || "Extracted by AI",
+      _sourceTrace: sourceTrace,
     });
   }
 

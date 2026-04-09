@@ -129,15 +129,64 @@ NEVER include these as products:
 - Empty rows
 - Column headers repeated mid-page
 
-## STEP 4 — COLOUR ABBREVIATION EXPANSION
+## STEP 4 — SIZE SYSTEM DETECTION
+
+Recognise ALL size systems used in fashion:
+- Numeric AU/UK: 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24
+- Numeric US: 0, 2, 4, 6, 8, 10, 12, 14
+- Alpha: XXS, XS, S, M, L, XL, XXL, XXXL, 2XL, 3XL
+- Combined/dual: S/M, M/L, L/XL, SM, ML
+- One size: O/S, OS, One Size, OSFA, FREE
+- Cup sizes (swimwear): 8C, 10D, 12DD, 14E, 8-10, 10-12
+- Denim: 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36
+
+When sizes appear as column headers or inline lists, map quantities positionally.
+If a size column has no quantity (0 or blank), do NOT create a variant row for it.
+
+## STEP 5 — COLOUR ABBREVIATION EXPANSION
 
 Expand common colour abbreviations:
 BK/BLK = Black, NY/NVY = Navy, WH/WHT = White, IK = Ink, SW = Seaweed,
-KH = Khaki, OLI = Olive, CRE = Cream, LBL = Light Blue, RD = Red,
+KH = Khaki, OLI/OL = Olive, CRE/CR = Cream, LBL = Light Blue, RD = Red,
 PK = Pink, GY/GRY = Grey, BG = Beige, BRN = Brown, COR = Coral,
-AQ = Aqua, TQ = Turquoise, MU/MUL = Multi, PR = Print, FL = Floral
+AQ = Aqua, TQ = Turquoise, MU/MUL = Multi, PR = Print, FL = Floral,
+RST = Rust, SAG = Sage, LAV = Lavender, TAN = Tan, PLM = Plum,
+MAR = Maroon, CHAR = Charcoal, NAT = Natural, SNW = Snow, SKY = Sky Blue,
+EMR = Emerald, MINT = Mint, PEA = Peach, OATML = Oatmeal, LIL = Lilac,
+TER = Terracotta, OCH = Ochre, BUR = Burgundy, FUC = Fuchsia, MAU = Mauve
 
-## STEP 5 — CONFIDENCE SCORING
+Detect colour from (in priority order):
+1. Explicit "Colour" or "Color" column
+2. Product description suffix after " - " (e.g. "Palazzo Pant - White")
+3. Product description suffix after last space if it matches a known colour
+4. Style code suffix if it matches a known abbreviation (e.g. "-NVY", "_BLK")
+5. Options/notes field
+
+## STEP 6 — HANDWRITTEN / CIRCLED QUANTITY HANDLING
+
+For invoices with handwritten or circled quantities:
+- Circled numbers ARE the ordered quantities — extract them
+- Struck-through numbers may mean cancelled OR ordered — check context
+- If quantity is ambiguous (unclear handwriting), set confidence to 50-60 and add parse_notes: "handwritten quantity uncertain"
+- If a number appears circled/highlighted in a size column, that IS the quantity for that size
+- Never assume quantity = 1 if a different number is visible but hard to read
+- Ticked/checked boxes next to sizes mean quantity = 1 for that size
+
+## STEP 7 — VARIANT GROUPING RULES
+
+CRITICAL: Each product row you return must represent ONE specific size+colour variant.
+- Same style_code + same colour + different sizes = separate rows (same product, different variants)
+- Same style_code + different colours = separate rows (same product, different colour variants)
+- product_title should be the CLEAN base name WITHOUT colour or size appended
+- The "colour" field should contain ONLY the colour
+- The "size" field should contain ONLY the size
+
+Example: "Shore Linen Palazzo Pant" in White, sizes S/M/L with qty 1/2/1 = 3 rows:
+  { product_title: "Shore Linen Palazzo Pant", colour: "White", size: "S", quantity: 1 }
+  { product_title: "Shore Linen Palazzo Pant", colour: "White", size: "M", quantity: 2 }
+  { product_title: "Shore Linen Palazzo Pant", colour: "White", size: "L", quantity: 1 }
+
+## STEP 8 — CONFIDENCE SCORING
 
 Score each row 0-100:
 - Has product title with 3+ characters: +20
@@ -146,7 +195,7 @@ Score each row 0-100:
 - Has colour: +15
 - Has style code / SKU: +15
 - Has quantity > 0: +15
-- Deductions: missing price -20, ambiguous text -10, handwritten -15
+- Deductions: missing price -20, ambiguous text -10, handwritten -15, uncertain quantity -10
 
 Return ONLY valid JSON. No markdown, no explanation.`;
 

@@ -713,7 +713,24 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
-      {/* Local Collab SEO Card */}
+      {/* JOOR Integration Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Link className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">JOOR Orders</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Pull wholesale orders from JOOR and push products directly to Shopify. No manual entry — one click from order to Shopify.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">wholesale · orders · styles · push to Shopify</p>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartJoor}>
+          Open JOOR → <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
       <div className="bg-card rounded-lg border border-border p-5 mb-6">
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">

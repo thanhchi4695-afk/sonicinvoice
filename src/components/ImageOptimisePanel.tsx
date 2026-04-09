@@ -813,6 +813,38 @@ export default function ImageOptimisePanel({ onBack }: Props) {
             </div>
           )}
 
+          {/* Format comparison card */}
+          {stats.compressed > 0 && stats.totalOrigCompressed > 0 && (
+            <Card className="border-primary/20">
+              <CardContent className="p-3 space-y-2">
+                <div className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-primary" />Format Comparison
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1 rounded-md bg-muted p-2 text-center">
+                    <div className="text-sm font-bold text-primary">{stats.webpSavingsPct}%</div>
+                    <div className="text-[10px] text-muted-foreground">WebP savings</div>
+                    <div className="text-[10px] text-muted-foreground">{formatBytes(stats.totalOrigCompressed)} → {formatBytes(stats.totalWebpSize)}</div>
+                  </div>
+                  <div className="flex-1 rounded-md bg-muted p-2 text-center">
+                    <div className="text-sm font-bold text-foreground">{stats.jpegSavingsPct}%</div>
+                    <div className="text-[10px] text-muted-foreground">JPEG savings</div>
+                    <div className="text-[10px] text-muted-foreground">{formatBytes(stats.totalOrigCompressed)} → {formatBytes(stats.totalJpegSize)}</div>
+                  </div>
+                </div>
+                {stats.webpSavingsPct > stats.jpegSavingsPct && (
+                  <div className="text-[10px] text-primary font-medium text-center">
+                    WebP saves {stats.webpSavingsPct - stats.jpegSavingsPct}% more than JPEG — {formatBytes(stats.totalJpegSize - stats.totalWebpSize)} extra savings
+                  </div>
+                )}
+                {stats.jpegSavingsPct >= stats.webpSavingsPct && stats.compressed > 0 && (
+                  <div className="text-[10px] text-muted-foreground text-center">
+                    JPEG matches WebP savings for these images
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
           {compressing && (
             <Card>
               <CardContent className="p-4 space-y-2">

@@ -47,9 +47,10 @@ interface HomeScreenProps {
   onStartLookbookImport?: () => void;
   onStartAccounting?: () => void;
   onStartProfitLoss?: () => void;
+  onStartImageOptimise?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning, onStartStockyHub, onStartPackingSlip, onStartJoor, onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning, onStartStockyHub, onStartPackingSlip, onStartJoor, onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss, onStartImageOptimise }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [

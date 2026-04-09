@@ -799,6 +799,28 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* Profit & Loss */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-success/15 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-5 h-5 text-success" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold font-display">Profit & Loss</h2>
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-success/15 text-success px-1.5 py-0.5 rounded">New</span>
+            </div>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              True P&L beyond Shopify's basic margin — track all expenses including ads, apps, staff, rent, shipping, and custom categories.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Custom date range · Import CSV · Export report</p>
+          </div>
+        </div>
+        <Button variant="success" className="w-full mt-4 h-12 text-base" onClick={onStartProfitLoss}>
+          View Profit & Loss → <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
       <div className="bg-card rounded-lg border border-border p-5 mb-6">
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">

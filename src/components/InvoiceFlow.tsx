@@ -365,36 +365,59 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   };
 
   const convertToProductGroups = (products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }>) => {
-    const groups: ProductGroup[] = products.map(p => {
-      const result = matchProduct(p.barcode, p.sku, p.name);
-      return {
-        styleGroup: null as any,
-        name: p.brand && p.name && !p.name.toLowerCase().startsWith(p.brand.toLowerCase()) ? `${p.brand} ${p.name}` : (p.name || "Unnamed Product"),
-        brand: p.brand || supplierName || "Unknown",
-        type: p.type || "General",
-        colour: p.colour || "",
-        size: p.size || "",
-        price: p.cost || 0,
-        rrp: p.rrp || 0,
-        cogs: p.cost || 0,
-        status: (p.cost > 0 && p.name) ? "ready" : "review",
+    // Group variant rows into Shopify-ready products by matching style code + product name + colour
+    const groupMap = new Map<string, typeof products>();
+    for (const p of products) {
+      // Build a grouping key from the base product identity
+      const baseSku = (p.sku || "").replace(/[-_]\d+$/, "").toLowerCase().trim();
+      const baseName = (p.name || "").toLowerCase().trim();
+      const baseColour = (p.colour || "").toLowerCase().trim();
+      const key = baseSku
+        ? `${baseSku}::${baseColour}`
+        : `${baseName}::${baseColour}`;
+      if (!groupMap.has(key)) groupMap.set(key, []);
+      groupMap.get(key)!.push(p);
+    }
+
+    const groups: ProductGroup[] = [];
+    for (const [, items] of groupMap) {
+      const first = items[0];
+      const result = matchProduct(first.barcode || "", first.sku || "", first.name || "");
+      const hasMultipleSizes = items.length > 1 || (first.size && first.size !== "One Size");
+      const hasMultipleColours = new Set(items.map(i => i.colour?.toLowerCase())).size > 1;
+
+      const displayName = first.brand && first.name && !first.name.toLowerCase().startsWith(first.brand.toLowerCase())
+        ? `${first.brand} ${first.name}`
+        : (first.name || "Unnamed Product");
+
+      groups.push({
+        styleGroup: first.sku || null as any,
+        name: displayName,
+        brand: first.brand || supplierName || "Unknown",
+        type: first.type || "General",
+        colour: first.colour || "",
+        size: items.length === 1 ? (first.size || "") : "",
+        price: first.cost || 0,
+        rrp: first.rrp || 0,
+        cogs: first.cost || 0,
+        status: (first.cost > 0 && first.name) ? "ready" : "review",
         metafields: {},
-        isGrouped: false,
-        barcode: p.barcode || "",
-        vendorCode: p.sku || "",
+        isGrouped: items.length > 1,
+        barcode: first.barcode || "",
+        vendorCode: first.sku || "",
         matchSource: result.source,
-        variants: [{
+        variants: items.map(p => ({
           sku: p.sku || "",
-          option1Name: "Size",
+          option1Name: hasMultipleSizes ? "Size" : "Size",
           option1Value: p.size || "One Size",
-          option2Name: p.colour ? "Colour" : "",
-          option2Value: p.colour || "",
+          option2Name: hasMultipleColours ? "Colour" : (p.colour ? "Colour" : ""),
+          option2Value: hasMultipleColours ? (p.colour || "") : (p.colour || ""),
           qty: p.qty || 1,
           price: p.cost || 0,
           rrp: p.rrp || 0,
-        }],
-      };
-    });
+        })),
+      });
+    }
     return groups;
   };
 

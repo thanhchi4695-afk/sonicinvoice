@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ChevronLeft, Image, Sparkles, AlertTriangle, CheckCircle2, XCircle, Search, RefreshCw, Edit3, Eye, FileText, Copy, ShieldCheck, Link2 } from "lucide-react";
+import { ChevronLeft, Image, Sparkles, AlertTriangle, CheckCircle2, XCircle, Search, RefreshCw, Edit3, Eye, FileText, Copy, ShieldCheck, Link2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ interface ProductImage {
   description: string;
   imageUrl: string;
   tags: string[];
+  shopifyProductId?: string | null;
   altText?: string;
   seoFilename?: string;
   keywords?: string[];
@@ -33,6 +34,7 @@ interface ProductImage {
   matchReason?: string;
   approved?: boolean;
   edited?: boolean;
+  synced?: boolean;
 }
 
 interface Props { onBack: () => void; }
@@ -43,6 +45,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
   const [generating, setGenerating] = useState(false);
   const [analysing, setAnalysing] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -59,7 +62,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
       if (!session) { setLoading(false); return; }
       const { data: prods } = await supabase
         .from("products")
-        .select("id, title, vendor, product_type, image_url, description")
+        .select("id, title, vendor, product_type, image_url, description, shopify_product_id")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false })
         .limit(500);
@@ -68,6 +71,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
           id: p.id, title: p.title || "", vendor: p.vendor || "",
           productType: p.product_type || "", colour: "", description: p.description || "",
           imageUrl: p.image_url || "", tags: [],
+          shopifyProductId: p.shopify_product_id,
           qualityStatus: p.image_url ? undefined : "missing",
         })));
       }
@@ -215,6 +219,49 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     setValidating(false);
   };
 
+  // ── Push to Shopify ──
+  const pushToShopify = async () => {
+    const approved = products.filter(p => p.approved && p.altText && p.shopifyProductId && !p.synced);
+    if (approved.length === 0) { toast.info("No approved products with Shopify links to sync"); return; }
+    setSyncing(true);
+    try {
+      let synced = 0;
+      for (let i = 0; i < approved.length; i += 10) {
+        const batch = approved.slice(i, i + 10);
+        const { data, error } = await supabase.functions.invoke("shopify-proxy", {
+          body: {
+            action: "update_image_alt",
+            image_updates: batch.map(p => ({
+              shopify_product_id: p.shopifyProductId,
+              alt_text: p.altText,
+              seo_filename: p.seoFilename,
+              keywords: p.keywords,
+            })),
+          },
+        });
+        if (error) throw error;
+        if (data?.results) {
+          const successIds = new Set(
+            data.results.filter((r: any) => r.status === "success").map((r: any) => r.shopify_product_id)
+          );
+          setProducts(prev => prev.map(p => {
+            if (p.shopifyProductId && successIds.has(p.shopifyProductId)) {
+              return { ...p, synced: true };
+            }
+            return p;
+          }));
+          synced += successIds.size;
+          const errors = data.results.filter((r: any) => r.status === "error");
+          if (errors.length > 0) {
+            console.warn("Shopify sync errors:", errors);
+          }
+        }
+      }
+      toast.success(`Pushed alt text to ${synced} Shopify products`);
+    } catch (e: any) { toast.error(e.message || "Shopify sync failed"); }
+    setSyncing(false);
+  };
+
   const approveAll = () => {
     setProducts(prev => prev.map(p => p.altText ? { ...p, approved: true } : p));
     toast.success("All products with alt text approved");
@@ -344,6 +391,9 @@ export default function ImageOptimisePanel({ onBack }: Props) {
             </Button>
             <Button variant="outline" onClick={approveAll} className="gap-2">
               <CheckCircle2 className="w-4 h-4" />Approve All
+            </Button>
+            <Button onClick={pushToShopify} disabled={syncing || products.filter(p => p.approved && p.shopifyProductId && !p.synced).length === 0} className="gap-2 col-span-full">
+              <Upload className="w-4 h-4" />{syncing ? "Pushing to Shopify…" : `Push to Shopify (${products.filter(p => p.approved && p.shopifyProductId && !p.synced).length})`}
             </Button>
           </div>
         </TabsContent>
@@ -548,7 +598,11 @@ export default function ImageOptimisePanel({ onBack }: Props) {
         <TabsContent value="review" className="space-y-3">
           <div className="flex gap-2 flex-wrap">
             <Button size="sm" onClick={approveAll} className="gap-1"><CheckCircle2 className="w-3 h-3" />Approve All</Button>
+            <Button size="sm" onClick={pushToShopify} disabled={syncing || products.filter(p => p.approved && p.shopifyProductId && !p.synced).length === 0} className="gap-1">
+              <Upload className="w-3 h-3" />{syncing ? "Pushing…" : "Push to Shopify"}
+            </Button>
             <Badge variant="outline">{products.filter(p => p.altText && !p.approved).length} pending</Badge>
+            <Badge variant="outline" className="text-green-600">{products.filter(p => p.synced).length} synced</Badge>
           </div>
 
           <div className="space-y-2 max-h-[55vh] overflow-y-auto">

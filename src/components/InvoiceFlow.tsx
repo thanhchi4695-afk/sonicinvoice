@@ -648,14 +648,14 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     setEnrichLines([{ name: "Reading file...", status: "searching", action: "Parsing invoice data...", confidence: 0 }]);
 
     // Capture invoice page image(s) for source trace viewer
-    const ext = fName.split(".").pop()?.toLowerCase() || "";
-    if (["jpg", "jpeg", "png", "webp"].includes(ext)) {
+    const fileExt = fName.split(".").pop()?.toLowerCase() || "";
+    if (["jpg", "jpeg", "png", "webp"].includes(fileExt)) {
       try {
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (reader.result) setInvoicePageImages([reader.result as string]);
+        const imgReader = new FileReader();
+        imgReader.onload = () => {
+          if (imgReader.result) setInvoicePageImages([imgReader.result as string]);
         };
-        reader.readAsDataURL(file);
+        imgReader.readAsDataURL(file);
       } catch {}
     }
 

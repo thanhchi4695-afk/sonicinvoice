@@ -78,6 +78,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("dashboard");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [compressionFormat, setCompressionFormat] = useState<"image/jpeg" | "image/webp">("image/webp");
   const [editAltText, setEditAltText] = useState("");
   const [filterTab, setFilterTab] = useState<"all" | "missing_alt" | "missing_img" | "issues" | "duplicates" | "mismatches">("all");
 

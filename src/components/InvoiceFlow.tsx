@@ -519,6 +519,14 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           fileType: ext,
           customInstructions,
           supplierName,
+          forceMode: processAs === "invoice" ? "invoice"
+            : processAs === "packing_slip" ? "packing_slip"
+            : processAs === "handwritten" ? "invoice"
+            : processAs === "supplier_template" && matchedTemplate?.layoutType
+              ? "invoice"
+              : undefined,
+          ...(processAs === "handwritten" ? { customInstructions: (customInstructions ? customInstructions + "\n" : "") + "This is a handwritten or semi-structured invoice. Extract carefully, flag low confidence. Do not invent variants." } : {}),
+          ...(processAs === "supplier_template" && matchedTemplate?.layoutType ? { customInstructions: (customInstructions ? customInstructions + "\n" : "") + `Known layout type: ${matchedTemplate.layoutType}. Supplier: ${matchedTemplate.supplier}. Parse using this template pattern.` } : {}),
         }),
       });
 

@@ -1,9 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Check, X, Loader2, ExternalLink, Unplug, RefreshCw, FileText, ChevronRight, Filter } from "lucide-react";
+import { ArrowLeft, Check, X, Loader2, ExternalLink, Unplug, RefreshCw, FileText, ChevronRight, Filter, Brain, Upload, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import Papa from "papaparse";
+import {
+  classifyInvoice, isFreightLine, recordSuccessfulPush, recordCorrection,
+  seedFromXeroBillsCSV, getClassificationStats, getAllAccountCodes,
+  getSupplierHistory, type InvoiceCategorisation,
+} from "@/lib/invoice-category-ai";
 
 interface AccountingConnection {
   id: string;
@@ -41,7 +47,7 @@ const CATEGORIES = [
 
 // ── Main component ──
 export default function AccountingIntegration({ onBack }: { onBack: () => void }) {
-  const [screen, setScreen] = useState<"select" | "mapping" | "history">("select");
+  const [screen, setScreen] = useState<"select" | "mapping" | "history" | "training">("select");
   const [connections, setConnections] = useState<AccountingConnection[]>([]);
   const [history, setHistory] = useState<PushRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +57,8 @@ export default function AccountingIntegration({ onBack }: { onBack: () => void }
   const [mappings, setMappings] = useState<Record<string, string>>({});
   const [savingMappings, setSavingMappings] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<string>("all");
+  const [trainingStats, setTrainingStats] = useState(getClassificationStats());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadConnections();
@@ -259,6 +267,107 @@ export default function AccountingIntegration({ onBack }: { onBack: () => void }
     );
   }
 
+  // ── AI TRAINING SCREEN ──
+  if (screen === "training") {
+    const stats = trainingStats;
+    const supplierHistory = getSupplierHistory();
+
+    const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const seeded = seedFromXeroBillsCSV(results.data as Record<string, string>[]);
+          setTrainingStats(getClassificationStats());
+          toast.success(`Learned from ${seeded} new supplier→category rules`);
+        },
+      });
+    };
+
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        <button onClick={() => setScreen("select")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+        <div className="flex items-center gap-3">
+          <Brain className="w-6 h-6 text-primary" />
+          <div>
+            <h1 className="text-xl font-semibold">AI Category Intelligence</h1>
+            <p className="text-sm text-muted-foreground">Train the AI to auto-categorise invoices by uploading your Xero bills export</p>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-card rounded-lg border border-border p-3 text-center">
+            <div className="text-2xl font-bold text-primary">{stats.totalSuppliers}</div>
+            <div className="text-xs text-muted-foreground">Suppliers learned</div>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-3 text-center">
+            <div className="text-2xl font-bold text-primary">{stats.totalRules}</div>
+            <div className="text-xs text-muted-foreground">Account codes</div>
+          </div>
+          <div className="bg-card rounded-lg border border-border p-3 text-center">
+            <div className="text-2xl font-bold text-primary">{supplierHistory.length}</div>
+            <div className="text-xs text-muted-foreground">Classification rules</div>
+          </div>
+        </div>
+
+        {/* Upload */}
+        <div className="bg-card rounded-lg border-2 border-dashed border-border p-6 text-center space-y-3">
+          <Upload className="w-8 h-8 text-muted-foreground mx-auto" />
+          <div>
+            <p className="text-sm font-medium">Upload Xero Bills Export (CSV)</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              In Xero: Accounting → Reports → Aged Payables Detail → Export as CSV.
+              Or: Business → Bills → Export.
+            </p>
+          </div>
+          <input ref={fileInputRef} type="file" accept=".csv" onChange={handleCSVUpload} className="hidden" />
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-2" /> Choose CSV file
+          </Button>
+        </div>
+
+        {/* Top categories */}
+        {stats.topCategories.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Learned categories</h3>
+            {stats.topCategories.map(cat => (
+              <div key={cat.category} className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+                <span className="text-sm">{cat.category}</span>
+                <span className="text-xs text-muted-foreground">{cat.suppliers} suppliers</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Supplier rules preview */}
+        {supplierHistory.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold">Supplier rules ({supplierHistory.length})</h3>
+            <div className="max-h-64 overflow-y-auto space-y-1">
+              {supplierHistory
+                .sort((a, b) => b.confidence - a.confidence)
+                .slice(0, 30)
+                .map((r, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs bg-muted/20 rounded px-3 py-2">
+                    <span className="font-medium truncate flex-1">{r.supplierName}</span>
+                    <span className="text-muted-foreground mx-2">{r.accountCode} — {r.category}</span>
+                    <span className={`font-mono ${r.confidence >= 70 ? "text-green-600" : r.confidence >= 40 ? "text-yellow-600" : "text-destructive"}`}>
+                      {r.confidence}%
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // ── PLATFORM SELECTOR (default) ──
   const xeroConn = getConnection("xero");
   const myobConn = getConnection("myob");
@@ -348,6 +457,21 @@ export default function AccountingIntegration({ onBack }: { onBack: () => void }
         </div>
       </div>
 
+      {/* AI Training link */}
+      <button
+        onClick={() => setScreen("training")}
+        className="w-full bg-card rounded-lg border border-border p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors"
+      >
+        <Brain className="w-5 h-5 text-primary" />
+        <div className="flex-1 text-left">
+          <span className="text-sm font-medium">AI Category Intelligence</span>
+          <span className="text-xs text-muted-foreground ml-2">
+            {trainingStats.totalSuppliers > 0 ? `${trainingStats.totalSuppliers} suppliers learned` : "Upload Xero bills to train"}
+          </span>
+        </div>
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      </button>
+
       {/* Push history link */}
       {history.length > 0 && (
         <button
@@ -366,17 +490,29 @@ export default function AccountingIntegration({ onBack }: { onBack: () => void }
   );
 }
 
-// ── Inline push panel for InvoiceFlow / WholesaleImportFlow ──
+// ── Inline push panel with AI category intelligence ──
 export function AccountingPushPanel({ invoice }: { invoice: any }) {
   const [connections, setConnections] = useState<AccountingConnection[]>([]);
   const [pushing, setPushing] = useState<string | null>(null);
   const [result, setResult] = useState<{ platform: string; success: boolean; url?: string; error?: string } | null>(null);
+  const [classification, setClassification] = useState<InvoiceCategorisation | null>(null);
+  const [selectedCode, setSelectedCode] = useState("");
+  const allCodes = getAllAccountCodes();
 
   useEffect(() => {
     supabase.from("accounting_connections").select("*").then(({ data }) => {
       setConnections((data as any[]) || []);
     });
   }, []);
+
+  // Run AI classification when invoice data is available
+  useEffect(() => {
+    if (invoice?.supplier) {
+      const result = classifyInvoice(invoice.supplier, invoice.description || "", invoice.line_items);
+      setClassification(result);
+      setSelectedCode(result.accountCode);
+    }
+  }, [invoice?.supplier]);
 
   const handlePush = async (platform: "xero" | "myob") => {
     const conn = connections.find(c => c.platform === platform);
@@ -386,7 +522,6 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
     setResult(null);
 
     try {
-      // Find or create contact
       const contactAction = platform === "xero" ? "find_or_create_contact" : "find_or_create_supplier";
       const { data: contactData, error: contactError } = await supabase.functions.invoke("accounting-proxy", {
         body: { action: contactAction, platform, supplier_name: invoice.supplier || "Unknown Supplier" },
@@ -394,7 +529,8 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
       if (contactError) throw contactError;
 
       const contactId = platform === "xero" ? contactData.contactId : contactData.uid;
-      const accountCode = conn.account_mappings?.["swimwear"] || conn.account_mappings?.["other"] || "";
+      // Use AI-selected code, falling back to manual mapping
+      const accountCode = selectedCode || conn.account_mappings?.["swimwear"] || conn.account_mappings?.["other"] || "";
 
       const pushBody: any = { action: "push_bill", platform, invoice };
       if (platform === "xero") {
@@ -410,6 +546,15 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
       if (error) throw error;
 
       if (data?.success) {
+        // Record success for learning
+        const codeDef = allCodes.find(c => c.code === accountCode);
+        recordSuccessfulPush(invoice.supplier, accountCode, codeDef?.name || "", codeDef?.category || "", "GST on Expenses");
+
+        // If user changed the AI suggestion, record correction
+        if (classification && accountCode !== classification.accountCode) {
+          recordCorrection(invoice.supplier, classification.accountCode, accountCode, codeDef?.name || "", codeDef?.category || "", "GST on Expenses");
+        }
+
         setResult({ platform, success: true, url: data.external_url });
         toast.success(`Bill sent to ${platform === "xero" ? "Xero" : "MYOB"} as draft`);
       } else {
@@ -440,9 +585,7 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
           <Check className="w-5 h-5" />
           <span className="font-medium">Bill sent to {result.platform === "xero" ? "Xero" : "MYOB"}</span>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Your accountant will see this as a draft bill ready to review and authorise.
-        </p>
+        <p className="text-sm text-muted-foreground">Your accountant will see this as a draft bill ready to review.</p>
         {result.url && (
           <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1 mt-2">
             View in {result.platform === "xero" ? "Xero" : "MYOB"} <ExternalLink className="w-3 h-3" />
@@ -454,12 +597,43 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
 
   return (
     <div className="bg-card rounded-lg border border-border p-4 mt-4 space-y-3">
-      <h3 className="text-sm font-semibold">Send to accounting software</h3>
-      <div className="text-xs text-muted-foreground space-y-1">
-        <p>Supplier: {invoice.supplier || "—"}</p>
-        <p>Total: ${Number(invoice.total || 0).toFixed(2)} {invoice.gst ? `(inc GST $${Number(invoice.gst).toFixed(2)})` : ""}</p>
-        <p>Category: {invoice.category || "Stock purchase"}</p>
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-semibold">Send to accounting software</h3>
+        {classification && (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-primary/15 text-primary flex items-center gap-1">
+            <Sparkles className="w-3 h-3" /> AI classified
+          </span>
+        )}
       </div>
+
+      <div className="text-xs text-muted-foreground space-y-1">
+        <p>Supplier: <span className="font-medium text-foreground">{invoice.supplier || "—"}</span></p>
+        <p>Total: <span className="font-medium text-foreground">${Number(invoice.total || 0).toFixed(2)}</span> {invoice.gst ? `(inc GST $${Number(invoice.gst).toFixed(2)})` : ""}</p>
+        <p>Date: <span className="font-medium text-foreground">{invoice.invoice_date || "—"}</span></p>
+      </div>
+
+      {/* AI classification with editable dropdown */}
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Account category:</label>
+        <select
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={selectedCode}
+          onChange={e => setSelectedCode(e.target.value)}
+        >
+          {allCodes.map(c => (
+            <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
+          ))}
+        </select>
+        {classification && (
+          <div className="flex items-center gap-2 mt-1">
+            <div className={`w-2 h-2 rounded-full ${classification.confidence >= 70 ? "bg-green-500" : classification.confidence >= 40 ? "bg-yellow-500" : "bg-destructive"}`} />
+            <span className="text-[11px] text-muted-foreground">
+              {classification.confidence}% confidence — {classification.explanation}
+            </span>
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-2">
         {connections.map(conn => (
           <Button
@@ -474,9 +648,7 @@ export function AccountingPushPanel({ invoice }: { invoice: any }) {
           </Button>
         ))}
       </div>
-      {result?.error && (
-        <p className="text-xs text-destructive">{result.error}</p>
-      )}
+      {result?.error && <p className="text-xs text-destructive">{result.error}</p>}
     </div>
   );
 }

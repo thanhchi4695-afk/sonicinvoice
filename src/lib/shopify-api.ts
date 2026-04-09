@@ -329,3 +329,12 @@ export async function getProductsPage(pageInfo?: string, limit: number = 250): P
   const data = await callProxy({ action: "get_products_page", page_info: pageInfo, limit });
   return { products: data.products || [], nextPageInfo: data.nextPageInfo || null };
 }
+
+/* ─── Image Alt Text Sync ─── */
+
+export async function updateImageAlt(
+  updates: Array<{ shopify_product_id: string; alt_text: string; seo_filename?: string; keywords?: string[] }>
+): Promise<{ shopify_product_id: string; status: string; error?: string }[]> {
+  const data = await callProxy({ action: "update_image_alt", image_updates: updates });
+  return data.results || [];
+}

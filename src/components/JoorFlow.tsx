@@ -708,7 +708,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
               <Sparkles className="w-5 h-5 text-primary" />
               <div>
                 <p className="text-sm font-medium">AI Product Enrichment</p>
-                <p className="text-xs text-muted-foreground">Generate descriptions, product types, and search queries for images</p>
+                <p className="text-xs text-muted-foreground">Generate descriptions, product types, tags, and find product images</p>
               </div>
             </div>
             <Button size="sm" onClick={handleAIEnrich} disabled={fileEnriching}>

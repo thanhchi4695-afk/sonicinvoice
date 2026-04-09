@@ -387,6 +387,67 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     setCompressing(false);
   };
 
+  // ── Push Compressed Images to Shopify ──
+  const pushCompressedToShopify = async () => {
+    const targets = products.filter(p => p.compressed && p.shopifyProductId && !p.compressedUrl?.includes("pushed"));
+    if (targets.length === 0) { toast.info("No compressed images with Shopify links to push"); return; }
+    setPushingCompressed(true);
+    setPushCompressedProgress({ current: 0, total: targets.length });
+    let pushed = 0;
+
+    for (let i = 0; i < targets.length; i += 5) {
+      const batch = targets.slice(i, i + 5);
+      setPushCompressedProgress({ current: i, total: targets.length });
+
+      try {
+        // Re-compress to get fresh base64 for each in batch
+        const replacements: Array<{ shopify_product_id: string; image_base64: string; alt_text?: string; filename?: string }> = [];
+
+        for (const p of batch) {
+          try {
+            const result = await compressImageFromUrl(p.imageUrl, {
+              maxWidth: 2048, maxHeight: 2048, quality: 0.82, format: "image/jpeg",
+            });
+            replacements.push({
+              shopify_product_id: p.shopifyProductId!,
+              image_base64: result.base64,
+              alt_text: p.altText,
+              filename: p.seoFilename || undefined,
+            });
+          } catch (e) {
+            console.warn(`Failed to compress ${p.title} for push:`, e);
+          }
+        }
+
+        if (replacements.length > 0) {
+          const { data, error } = await supabase.functions.invoke("shopify-proxy", {
+            body: { action: "replace_product_image", image_replacements: replacements },
+          });
+          if (error) throw error;
+
+          if (data?.results) {
+            const successIds = new Set(
+              data.results.filter((r: any) => r.status === "success").map((r: any) => r.shopify_product_id)
+            );
+            setProducts(prev => prev.map(p => {
+              if (p.shopifyProductId && successIds.has(p.shopifyProductId)) {
+                return { ...p, compressedUrl: (p.compressedUrl || "") + ":pushed" };
+              }
+              return p;
+            }));
+            pushed += successIds.size;
+          }
+        }
+      } catch (e: any) {
+        toast.error(e.message || "Failed to push batch");
+      }
+    }
+
+    setPushCompressedProgress({ current: targets.length, total: targets.length });
+    toast.success(`Pushed ${pushed} compressed images to Shopify`);
+    setPushingCompressed(false);
+  };
+
   // ── Conversion Audit ──
   const runConversionAudit = async () => {
     const withImages = products.filter(p => p.imageUrl);

@@ -9,10 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/lib/invoice-validator";
+import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;
   products: ValidatedProduct[];
+  supplierName?: string;
   onUpdateProducts: (products: ValidatedProduct[]) => void;
   onExportAccepted: () => void;
   onPushToShopify: () => void;
@@ -25,6 +27,7 @@ type ConfFilter = "all" | "high" | "medium" | "low";
 export default function PostParseReviewScreen({
   debug,
   products,
+  supplierName,
   onUpdateProducts,
   onExportAccepted,
   onPushToShopify,
@@ -132,6 +135,20 @@ export default function PostParseReviewScreen({
   const updateField = (rowIndex: number, field: string, value: string | number) => {
     onUpdateProducts(products.map(p => {
       if (p._rowIndex !== rowIndex) return p;
+      // Save correction for learning
+      const originalValue = String((p as any)[field] || "");
+      const newValue = String(value);
+      if (supplierName && originalValue !== newValue && originalValue) {
+        const fieldLabels: Record<string, string> = { name: "title", colour: "colour", size: "size", cost: "cost", sku: "sku", qty: "quantity" };
+        const fieldLabel = fieldLabels[field] || field;
+        saveCorrection(supplierName, {
+          field: fieldLabel,
+          original: originalValue,
+          corrected: newValue,
+          rule: `When parsing ${supplierName}: "${originalValue}" in ${fieldLabel} should be "${newValue}"`,
+          timestamp: new Date().toISOString(),
+        });
+      }
       const updated = { ...p, [field]: value, _manuallyEdited: true } as any;
       // Recalculate confidence
       let conf = 0;

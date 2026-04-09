@@ -8,7 +8,7 @@ import { matchCollectionsWithBrand, checkCoverage } from "@/lib/collection-engin
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { generateXSeriesCSV, getXSeriesSettings, saveXSeriesSettings, type XSeriesSettings, type XSeriesProduct } from "@/lib/lightspeed-xseries";
-import { findTemplate, saveFormatTemplate, incrementTemplateUse, saveLayoutTemplate, getTemplateList, getLayoutLabel, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping, type ProcessAsMode, type LayoutType } from "@/lib/invoice-templates";
+import { findTemplate, saveFormatTemplate, incrementTemplateUse, saveLayoutTemplate, buildTemplateHint, saveCorrection, getTemplateList, getLayoutLabel, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping, type ProcessAsMode, type LayoutType, type CorrectionPattern } from "@/lib/invoice-templates";
 import { getStoreLocations } from "@/components/AccountScreen";
 import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCount, type InventoryItem } from "@/lib/inventory-sim";
 import { addAuditEntry } from "@/lib/audit-log";
@@ -533,6 +533,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       const base64 = btoa(binary);
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
 
+      // Build template hint from learned patterns
+      const templateHint = supplierName ? buildTemplateHint(supplierName) : null;
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
@@ -544,12 +547,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           supplierName,
           forceMode: processAs === "invoice" ? "invoice"
             : processAs === "packing_slip" ? "packing_slip"
-            : processAs === "handwritten" ? "invoice"
-            : processAs === "supplier_template" && matchedTemplate?.layoutType
-              ? "invoice"
-              : undefined,
-          ...(processAs === "handwritten" ? { customInstructions: (customInstructions ? customInstructions + "\n" : "") + "This is a handwritten or semi-structured invoice. Extract carefully, flag low confidence. Do not invent variants." } : {}),
-          ...(processAs === "supplier_template" && matchedTemplate?.layoutType ? { customInstructions: (customInstructions ? customInstructions + "\n" : "") + `Known layout type: ${matchedTemplate.layoutType}. Supplier: ${matchedTemplate.supplier}. Parse using this template pattern.` } : {}),
+            : processAs === "handwritten" ? "handwritten"
+            : undefined,
+          templateHint: templateHint || undefined,
         }),
       });
 
@@ -564,12 +564,21 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       }
       if (data.layout_type) {
         setDetectedLayout(data.layout_type as LayoutType);
-        console.log(`[Sonic Invoice] Layout detected: ${data.layout_type}, Supplier: ${data.supplier || 'unknown'}`);
-        toast(`Layout: ${getLayoutLabel(data.layout_type)}`, { description: `Detected supplier: ${data.supplier || supplierName || 'Unknown'}` });
-        // Auto-save layout template for this supplier
+        console.log(`[Sonic Invoice] Layout: ${data.layout_type}, Variant method: ${data.variant_method}, Size system: ${data.detected_size_system}`);
+        toast(`Layout: ${getLayoutLabel(data.layout_type)}`, { description: `Supplier: ${data.supplier || supplierName || 'Unknown'} • ${data.variant_method || ''}` });
+        // Save learned template
         const sup = data.supplier || supplierName;
         if (sup) {
-          saveLayoutTemplate(sup, data.layout_type as LayoutType, 85, ext as any, customInstructions || undefined);
+          saveLayoutTemplate(
+            sup,
+            data.layout_type as LayoutType,
+            85,
+            ext as any,
+            customInstructions || undefined,
+            data.variant_method,
+            data.detected_size_system,
+            data.detected_fields,
+          );
         }
       }
       return data.products || [];
@@ -1417,6 +1426,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               <PostParseReviewScreen
                 debug={validationDebug}
                 products={validatedProducts}
+                supplierName={supplierName}
                 onUpdateProducts={(updated) => {
                   setValidatedProducts(updated);
                   // Rebuild product groups from accepted products

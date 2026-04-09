@@ -6,42 +6,161 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// ── Multi-stage extraction system prompt ────────────────────
-const SYSTEM_PROMPT = `You are an expert invoice data extraction AI for a retail product management app (Sonic Invoice).
-You handle fashion wholesale invoices that vary wildly in layout. Your job is to classify the document layout, then extract every product with full variant detail.
+// ── Concept-based extraction system prompt ──────────────────
+const SYSTEM_PROMPT = `You are an expert document intelligence AI for extracting structured product data from fashion wholesale invoices, packing slips, and delivery dockets.
 
-## STEP 1 — CLASSIFY THE DOCUMENT
+You do NOT rely on supplier names or brand-specific rules. Instead you analyse document STRUCTURE, LAYOUT, and SEMANTICS to extract data correctly from any supplier.
 
-Determine the document_type:
-- "invoice" — has pricing (cost/unit price)
+## STAGE A — DOCUMENT TYPE CLASSIFICATION
+
+Classify the document into one of:
+- "tax_invoice" — has line items with pricing (unit cost / wholesale price)
+- "statement" — summary of multiple invoices, no individual line items to extract
 - "packing_slip" — has items and quantities but NO pricing
+- "handwritten_invoice" — handwritten or semi-structured with pricing
 - "unknown" — cannot determine
 
-Determine the layout_type:
-- "size_grid" — products in rows with size columns across the top (e.g. 6, 8, 10, 12, 14, 16) and quantities underneath. Examples: Seafolly, some Skye Group invoices.
-- "size_matrix_inline" — sizes and quantities listed inline in a cell like "10, 12, 14, 16" on one row and "1, 1, 2, 2" on the next row. Example: Skye Group / Jantzen.
-- "size_block" — each product has a sub-table or options field with "Size: 06 08 10 12 / Qty: (1) (2) (2) (1)". Example: Rhythm.
-- "size_row_below" — product row followed by a size breakdown row like "XS (1) S (2) M (2) L (1)". Example: Sea Level / Bond-Eye.
-- "colour_size_in_description" — colour and size are embedded in the description text like "LISA DRESS B2140D NAVY XS". Example: Donna Donna.
-- "simple_flat" — simple table with qty, description, price, total. No variants. Example: OM Designs, handwritten invoices.
-- "packing_list" — item code + description + quantity, no prices. Example: Kung Fu Mary, delivery dockets.
-- "unknown" — mixed or unrecognised layout.
+## STAGE B — LAYOUT CLASSIFICATION
 
-## STEP 2 — EXTRACT PRODUCTS
+Detect the document's structural layout:
+- "row_table" — standard table with one product per row, columns for qty/description/price
+- "size_grid" — products in rows with size labels as column headers (numeric or alpha) and quantities in cells below
+- "size_matrix_inline" — sizes and quantities listed inline or in adjacent cells, mapped positionally
+- "product_block" — each product appears as a visual block with a nested size/qty sub-table or options section
+- "size_row_below" — product row followed by a separate size breakdown row (e.g. "XS (1) S (2) M (2)")
+- "description_embedded" — colour, size, and sometimes style code are embedded in the description text
+- "low_structure" — handwritten, loosely formatted, or non-tabular
+- "mixed" — multiple layout patterns in the same document
 
-### For ALL layout types, extract into this JSON structure:
+## STAGE C — SEMANTIC FIELD DETECTION
+
+Identify which areas of the document contain:
+- **Supplier identity**: company name, logo text, ABN, address in header/footer
+- **Document metadata**: invoice number, date, order reference, customer name
+- **Line-item zone**: the area containing actual product rows (NOT totals, NOT headers)
+- **Product fields**: style code/SKU, product title/description, colour, size, quantity, unit cost, RRP, line total, barcode
+- **Noise zones**: subtotals, freight, GST, bank details, payment terms, carton identifiers, page continuations
+
+Key field detection rules:
+- **Cost vs RRP**: If two price columns exist, the LOWER value is usually wholesale cost; the HIGHER is RRP. Look for column headers like "SP", "Cost", "Unit Price", "Price (Tax excl.)" for cost. "RRP", "Retail", "Rec. Retail" for retail price.
+- **Quantity**: May be in a "Qty", "Units", "Ordered" column, or marked/circled in size grid cells
+- **Size**: May be column headers (6,8,10,12), inline text (XS,S,M,L), or embedded in description
+- **Colour**: May be a separate column, a suffix after " - " in descriptions, or an abbreviation in the style code
+
+## STAGE D — VARIANT EXTRACTION METHOD DETECTION
+
+Before extracting, determine HOW variants are expressed in this document:
+
+**Method 1: One row per variant**
+Each line represents a single size+colour combination. Extract directly.
+
+**Method 2: Size grid matrix**
+Size labels appear as column headers. Quantities are in cells below each size.
+- Circled, underlined, or highlighted numbers ARE quantities — extract them
+- Empty or zero cells mean that size was NOT ordered — skip it
+- A "Total Qty" column should confirm the sum of all size quantities
+- Create one output row per size with quantity > 0
+
+**Method 3: Product block with nested size/qty table**
+A product entry contains a main row (code, name, colour, price) plus a sub-section listing sizes and quantities.
+- Parse the sub-section to extract size→quantity pairs
+- Colour is usually in the main row or options field
+- Create one output row per size
+
+**Method 4: Size breakdown row below product**
+Product data on one row, then a following row with patterns like "XS (1) S (2) M (2) L (1)" or "10, 12, 14 / 1, 2, 1"
+- Parse the size labels and quantities from the breakdown row
+- Create one output row per size
+
+**Method 5: Variants embedded in description**
+The product description contains colour and size: "LISA DRESS NAVY XS"
+- Split into: base product name, colour token, size token
+- Size tokens: XS, S, SM, S/M, M, L, ML, M/L, XL, L/XL, XXL, 2XL, 3XL, O/S, OS, OSFA, One Size, FREE, and numeric 00-30
+- Colour tokens: match against known colour vocabulary (see below)
+
+**Method 6: Handwritten / low-structure**
+Quantities, descriptions, and prices in loose handwritten format.
+- Extract what you can see: qty, description, unit price, total
+- Do NOT invent colour or size if not visible
+- Set confidence lower (50-70)
+
+## STAGE E — SIZE SYSTEM RECOGNITION
+
+Detect which size system(s) appear in the document:
+- Numeric AU/UK: 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24
+- Numeric US: 0, 2, 4, 6, 8, 10, 12, 14
+- Alpha: XXS, XS, S, M, L, XL, XXL, XXXL, 2XL, 3XL
+- Combined/dual: S/M, M/L, L/XL, SM, ML
+- One size: O/S, OS, One Size, OSFA, FREE
+- Cup sizes (swimwear): 8C, 10D, 12DD, 14E
+- Denim waist: 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36
+
+## STAGE F — COLOUR VOCABULARY
+
+Recognise and expand colour abbreviations:
+BK/BLK = Black, NY/NVY = Navy, WH/WHT = White, IK = Ink, SW = Seaweed,
+KH = Khaki, OLI/OL = Olive, CRE/CR = Cream, LBL = Light Blue, RD = Red,
+PK/PNK = Pink, GY/GRY = Grey, BG = Beige, BRN = Brown, COR = Coral,
+AQ = Aqua, TQ = Turquoise, MU/MUL = Multi, PR = Print, FL = Floral,
+RST = Rust, SAG = Sage, LAV = Lavender, TAN = Tan, PLM = Plum,
+MAR = Maroon, CHAR = Charcoal, NAT = Natural, SKY = Sky Blue,
+EMR = Emerald, MINT = Mint, PEA = Peach, LIL = Lilac,
+TER = Terracotta, OCH = Ochre, BUR = Burgundy, FUC = Fuchsia, MAU = Mauve,
+SNW = Snow, OATML = Oatmeal, IND = Indigo, TEA = Teal, ROS = Rose,
+CHA = Chambray, DEN = Denim, STO = Stone, SAN = Sand, ECRU = Ecru
+
+Detect colour from (priority order):
+1. Explicit colour column
+2. Description suffix after " - " (e.g. "Palazzo Pant - White")
+3. Description suffix matching known colour after last space
+4. Style code suffix matching abbreviation (e.g. "-NVY", "_BLK")
+5. Options/notes field
+
+## NOISE FILTERING
+
+NEVER include these as products:
+- Freight / Shipping / Delivery charges
+- GST / Tax / VAT lines
+- Subtotal / Total / Grand Total lines
+- Discount lines
+- ASN / Consignment / Carton references
+- Bank details / Payment terms
+- Customer address blocks
+- "Continued on next page" / page markers
+- Empty rows / repeated column headers
+- Story/collection/season headers that contain no product data
+
+Identify product rows by: having a descriptive title (3+ chars, not just a number), and at least one of: quantity, price, or style code.
+
+## CONFIDENCE SCORING
+
+Score each extracted row 0-100:
+- Has product title with 3+ meaningful characters: +20
+- Has valid unit_cost > 0: +20
+- Has recognisable size value: +15
+- Has colour: +15
+- Has style code / SKU: +15
+- Has quantity > 0: +15
+- Deductions: missing price -20, ambiguous text -10, handwritten uncertainty -15, uncertain quantity -10
+
+## OUTPUT FORMAT
+
+Return ONLY valid JSON (no markdown, no explanation):
 
 {
-  "document_type": "invoice" | "packing_slip" | "unknown",
-  "layout_type": "<one of the types above>",
+  "document_type": "tax_invoice" | "packing_slip" | "handwritten_invoice" | "statement" | "unknown",
+  "layout_type": "<one of the layout types above>",
+  "variant_method": "<which variant extraction method was used>",
   "supplier": "detected supplier name",
   "invoice_number": "if visible",
   "currency": "AUD" or detected currency,
+  "detected_size_system": "numeric_au" | "alpha" | "combined" | "cup" | "denim" | "mixed" | "none",
+  "detected_fields": ["list", "of", "field", "names", "found"],
   "products": [
     {
       "style_code": "raw style/article/product code",
-      "product_title": "clean product name without colour/size",
-      "colour": "colour name (expanded, not abbreviated)",
+      "product_title": "clean base product name WITHOUT colour or size",
+      "colour": "expanded colour name",
       "size": "size value",
       "quantity": number,
       "unit_cost": number or null,
@@ -50,154 +169,25 @@ Determine the layout_type:
       "barcode": "if visible",
       "product_type": "e.g. One Piece, Dress, Pant, Top",
       "confidence": 0-100,
-      "parse_notes": "any issues or ambiguity"
+      "parse_notes": "any issues, ambiguity, or extraction strategy used",
+      "extraction_reason": "brief explanation of why this row was identified as a product"
+    }
+  ],
+  "rejected_rows": [
+    {
+      "raw_text": "the original text of the rejected row",
+      "rejection_reason": "why this was not a product"
     }
   ]
 }
 
-### CRITICAL RULES BY LAYOUT TYPE:
-
-#### size_grid (e.g. Seafolly)
-- Size labels appear as column headers (6, 8, 10, 12, 14, 16, 18, 20)
-- Quantities may be circled, struck through, or underlined — these ARE the ordered quantities
-- A strikethrough/underline on a size column means that size WAS ordered — extract it
-- Create one product row PER size that has quantity > 0
-- The "Total Qty" column confirms the sum
-- unit_cost is the "Price (Tax excl.)" column, NOT the "Net" (which is the line total)
-
-#### size_matrix_inline (e.g. Skye Group / Jantzen)
-- Product code and description on one row with sizes listed as "10, 12, 14, 16, 18, 20, 22, 24"
-- Next row has quantities as "1, 1, 2, 2, 1" — these map positionally to the sizes above
-- Match each quantity to its corresponding size
-- Only create rows for sizes with quantity > 0
-- If a size is highlighted/marked (e.g. <mark>18</mark>), that's just formatting — still include it
-- Colour codes: BK=Black, NY=Navy, IK=Ink, SW=Seaweed, KH=Khaki, WH=White, etc.
-
-#### size_block (e.g. Rhythm)
-- Each product has a main row with Qty, Code, Item, Options, Unit Price, Subtotal
-- Below it is an "Options" or detail line with "Size: 06 08 10 12 / Qty: (1) (2) (2) (1)"
-- Parse the Size and Qty pairs from the options text
-- The colour is in the "Options" column (e.g. "OLIVE OLI")
-- Create one row per size with quantity > 0
-- unit_cost is from the "Unit Price" column
-
-#### size_row_below (e.g. Sea Level / Bond-Eye)
-- Product row: Style, Product Description, Units, RRP, SP (Supplier Price), Disc%, Value, GST, Total
-- Next row: "XS (1) S (2) M (2) L (1) XL (1)" — these are the size/qty pairs
-- Colour is embedded in the product description (e.g. "Shore Linen Palazzo Pant - White")
-- Extract colour from the " - Colour" suffix in description
-- unit_cost = SP (Supplier Price) column, NOT RRP
-- rrp = RRP column
-- Story/collection headers (e.g. "Shore Linen") are NOT products — skip them
-- Create one row per size
-
-#### colour_size_in_description (e.g. Donna Donna)
-- Each row has: Item code, Description, Quantity, Unit Price, GST, Amount
-- Colour and size are embedded in Description: "LISA DRESS B2140D NAVY XS"
-- Parse the description to extract: base product name, colour, size
-- Common patterns: "NAME CODE COLOUR SIZE" or "NAME CODE COLOUR PRINT SIZE"
-- Size values: XS, S/M, SM, L/XL, LXL, O/S, OS, 06, 08, 10, 12, 14, 16
-- Group rows with same base product name + code as variants
-- "No charge" or "customer replacement" items: set unit_cost to 0, note in parse_notes
-
-#### simple_flat (e.g. OM Designs, handwritten)
-- Simple: QTY, DESCRIPTION, PRICE, TOTAL
-- No variant detail — create single rows
-- "No charge" = unit_cost 0
-- "(customer replacement)" lines are notes, not separate products — attach to previous product
-- Confidence should be lower (60-70) due to lack of structured data
-- Do NOT invent colour or size if not visible
-
-#### packing_list (e.g. Kung Fu Mary, delivery dockets)
-- Items + Quantities only, NO prices
-- Set unit_cost and rrp to null
-- Set document_type to "packing_slip"
-- Extract clean product names and quantities
-- Strikethrough quantities (e.g. ~~5 of 5~~) mean the item IS included
-
-## STEP 3 — NOISE FILTERING
-
-NEVER include these as products:
-- Freight / Shipping charges
-- GST / Tax lines
-- Subtotal / Total lines
-- ASN / Consignment references
-- Bank details
-- Payment terms
-- "Continued on next page"
-- Carton/box identifiers
-- Empty rows
-- Column headers repeated mid-page
-
-## STEP 4 — SIZE SYSTEM DETECTION
-
-Recognise ALL size systems used in fashion:
-- Numeric AU/UK: 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24
-- Numeric US: 0, 2, 4, 6, 8, 10, 12, 14
-- Alpha: XXS, XS, S, M, L, XL, XXL, XXXL, 2XL, 3XL
-- Combined/dual: S/M, M/L, L/XL, SM, ML
-- One size: O/S, OS, One Size, OSFA, FREE
-- Cup sizes (swimwear): 8C, 10D, 12DD, 14E, 8-10, 10-12
-- Denim: 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36
-
-When sizes appear as column headers or inline lists, map quantities positionally.
-If a size column has no quantity (0 or blank), do NOT create a variant row for it.
-
-## STEP 5 — COLOUR ABBREVIATION EXPANSION
-
-Expand common colour abbreviations:
-BK/BLK = Black, NY/NVY = Navy, WH/WHT = White, IK = Ink, SW = Seaweed,
-KH = Khaki, OLI/OL = Olive, CRE/CR = Cream, LBL = Light Blue, RD = Red,
-PK = Pink, GY/GRY = Grey, BG = Beige, BRN = Brown, COR = Coral,
-AQ = Aqua, TQ = Turquoise, MU/MUL = Multi, PR = Print, FL = Floral,
-RST = Rust, SAG = Sage, LAV = Lavender, TAN = Tan, PLM = Plum,
-MAR = Maroon, CHAR = Charcoal, NAT = Natural, SNW = Snow, SKY = Sky Blue,
-EMR = Emerald, MINT = Mint, PEA = Peach, OATML = Oatmeal, LIL = Lilac,
-TER = Terracotta, OCH = Ochre, BUR = Burgundy, FUC = Fuchsia, MAU = Mauve
-
-Detect colour from (in priority order):
-1. Explicit "Colour" or "Color" column
-2. Product description suffix after " - " (e.g. "Palazzo Pant - White")
-3. Product description suffix after last space if it matches a known colour
-4. Style code suffix if it matches a known abbreviation (e.g. "-NVY", "_BLK")
-5. Options/notes field
-
-## STEP 6 — HANDWRITTEN / CIRCLED QUANTITY HANDLING
-
-For invoices with handwritten or circled quantities:
-- Circled numbers ARE the ordered quantities — extract them
-- Struck-through numbers may mean cancelled OR ordered — check context
-- If quantity is ambiguous (unclear handwriting), set confidence to 50-60 and add parse_notes: "handwritten quantity uncertain"
-- If a number appears circled/highlighted in a size column, that IS the quantity for that size
-- Never assume quantity = 1 if a different number is visible but hard to read
-- Ticked/checked boxes next to sizes mean quantity = 1 for that size
-
-## STEP 7 — VARIANT GROUPING RULES
-
-CRITICAL: Each product row you return must represent ONE specific size+colour variant.
-- Same style_code + same colour + different sizes = separate rows (same product, different variants)
-- Same style_code + different colours = separate rows (same product, different colour variants)
-- product_title should be the CLEAN base name WITHOUT colour or size appended
-- The "colour" field should contain ONLY the colour
-- The "size" field should contain ONLY the size
-
-Example: "Shore Linen Palazzo Pant" in White, sizes S/M/L with qty 1/2/1 = 3 rows:
-  { product_title: "Shore Linen Palazzo Pant", colour: "White", size: "S", quantity: 1 }
-  { product_title: "Shore Linen Palazzo Pant", colour: "White", size: "M", quantity: 2 }
-  { product_title: "Shore Linen Palazzo Pant", colour: "White", size: "L", quantity: 1 }
-
-## STEP 8 — CONFIDENCE SCORING
-
-Score each row 0-100:
-- Has product title with 3+ characters: +20
-- Has valid unit_cost > 0: +20
-- Has recognisable size: +15
-- Has colour: +15
-- Has style code / SKU: +15
-- Has quantity > 0: +15
-- Deductions: missing price -20, ambiguous text -10, handwritten -15, uncertain quantity -10
-
-Return ONLY valid JSON. No markdown, no explanation.`;
+CRITICAL RULES:
+- Create ONE output row per size+colour variant where quantity > 0
+- product_title must be the CLEAN base name without colour or size appended
+- Do NOT hallucinate data that is not visible in the document
+- If cost is missing, set unit_cost to null — do not guess
+- For packing slips: set unit_cost and rrp to null, focus on qty extraction
+- For handwritten documents: lower confidence, flag uncertain readings`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -205,7 +195,7 @@ serve(async (req) => {
   }
 
   try {
-    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode } = await req.json();
+    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint } = await req.json();
 
     if (!fileContent) {
       return new Response(JSON.stringify({ error: "No file content provided" }), {
@@ -219,10 +209,26 @@ serve(async (req) => {
 
     let systemPrompt = SYSTEM_PROMPT;
 
+    // Force mode overrides
     if (forceMode === "packing_slip") {
-      systemPrompt += `\n\nIMPORTANT: The user has confirmed this is a PACKING SLIP. Set document_type to "packing_slip". Do NOT extract prices.`;
+      systemPrompt += `\n\nIMPORTANT: The user has confirmed this is a PACKING SLIP. Set document_type to "packing_slip". Do NOT extract prices — set unit_cost and rrp to null.`;
     } else if (forceMode === "invoice") {
-      systemPrompt += `\n\nIMPORTANT: The user has confirmed this is an INVOICE. Set document_type to "invoice". Extract prices.`;
+      systemPrompt += `\n\nIMPORTANT: The user has confirmed this is an INVOICE. Set document_type to "tax_invoice". Extract prices.`;
+    } else if (forceMode === "handwritten") {
+      systemPrompt += `\n\nIMPORTANT: The user has confirmed this is a HANDWRITTEN INVOICE. Set document_type to "handwritten_invoice". Extract carefully, flag low confidence, do not invent variants.`;
+    }
+
+    // Template hint from learned patterns
+    if (templateHint) {
+      systemPrompt += `\n\n## LEARNED TEMPLATE HINT (from previous successful parses of this supplier)
+This supplier has been parsed before. Use these hints to guide extraction:
+- Layout type previously detected: ${templateHint.layoutType || "unknown"}
+- Variant method previously used: ${templateHint.variantMethod || "unknown"}
+- Size system detected: ${templateHint.sizeSystem || "unknown"}
+- Fields detected previously: ${(templateHint.detectedFields || []).join(", ") || "unknown"}
+${templateHint.corrections?.length ? `- Merchant corrections to apply:\n${templateHint.corrections.map((c: string) => `  • ${c}`).join("\n")}` : ""}
+${templateHint.customInstructions ? `- Custom parsing instructions: ${templateHint.customInstructions}` : ""}
+Use this as guidance but verify against the actual document structure. If the document layout differs, override the hints.`;
     }
 
     if (customInstructions) {
@@ -252,7 +258,7 @@ serve(async (req) => {
             },
             {
               type: "text",
-              text: "Classify this document layout, then extract ALL products with full variant breakdown. Create one row per size/colour variant. Return JSON only.",
+              text: "Analyse this document's structure and layout. Classify the document type, detect the layout pattern, identify the variant expression method, then extract ALL products with full variant breakdown. Create one row per size/colour variant. Return JSON only.",
             },
           ],
         },
@@ -262,7 +268,7 @@ serve(async (req) => {
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Classify this document layout, then extract ALL products with full variant breakdown. Create one row per size/colour variant. Return JSON only.\n\nDocument content:\n${fileContent}`,
+          content: `Analyse this document's structure and layout. Classify the document type, detect the layout pattern, identify the variant expression method, then extract ALL products with full variant breakdown. Create one row per size/colour variant. Return JSON only.\n\nDocument content:\n${fileContent}`,
         },
       ];
     }
@@ -279,30 +285,36 @@ serve(async (req) => {
     const jsonStr = (jsonMatch[1] || content).trim();
     const parsed = JSON.parse(jsonStr);
 
-    const docType = parsed.document_type || (forceMode || "invoice");
+    const docType = parsed.document_type || (forceMode || "tax_invoice");
     const layoutType = parsed.layout_type || "unknown";
+    const variantMethod = parsed.variant_method || "unknown";
+    const detectedFields = parsed.detected_fields || [];
+    const detectedSizeSystem = parsed.detected_size_system || "none";
 
-    // Normalize products into the legacy format the frontend expects
     const rawProducts: Array<Record<string, unknown>> = parsed.products || [];
+    const rejectedRows: Array<Record<string, unknown>> = parsed.rejected_rows || [];
 
-    // Filter noise
+    // Server-side noise filter
     const filtered = rawProducts.filter((p: Record<string, unknown>) => {
       const title = String(p.product_title || p.style_description || p.name || "").toLowerCase();
       const code = String(p.style_code || p.sku || "");
       if (!title && !code) return false;
-      if (/^(total|subtotal|sub total|freight|shipping|gst|tax|delivery)$/i.test(title)) return false;
+      if (/^(total|subtotal|sub total|freight|shipping|gst|tax|delivery|discount)$/i.test(title)) return false;
       if (/^carton\s/i.test(title) || /^carton\s/i.test(code)) return false;
       return true;
     });
 
     if (docType === "packing_slip") {
-      // Packing slip response
       return new Response(JSON.stringify({
         document_type: "packing_slip",
         layout_type: layoutType,
+        variant_method: variantMethod,
+        detected_fields: detectedFields,
+        detected_size_system: detectedSizeSystem,
         confidence: parsed.confidence || 85,
         supplier: parsed.supplier || supplierName || "",
         supplier_order_number: parsed.supplier_order_number || parsed.invoice_number || "",
+        rejected_rows: rejectedRows,
         products: filtered.map((p: Record<string, unknown>) => ({
           style_code: p.style_code || p.sku || "",
           colour_code: p.colour || "",
@@ -312,13 +324,14 @@ serve(async (req) => {
           barcode: p.barcode || "",
           confidence: Number(p.confidence) || 70,
           parse_notes: p.parse_notes || "",
+          extraction_reason: p.extraction_reason || "",
         })),
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Invoice response — normalize to legacy format
+    // Invoice response
     const normalizedProducts = filtered.map((p: Record<string, unknown>) => ({
       name: p.product_title || p.name || "",
       brand: parsed.supplier || supplierName || String(p.brand || ""),
@@ -330,18 +343,22 @@ serve(async (req) => {
       qty: Number(p.quantity || p.qty) || 0,
       cost: Number(p.unit_cost || p.cost) || 0,
       rrp: Number(p.rrp) || 0,
-      // Extended fields
       _confidence: Number(p.confidence) || 70,
       _parseNotes: p.parse_notes || "",
       _lineTotal: Number(p.line_total) || 0,
+      _extractionReason: p.extraction_reason || "",
     }));
 
     return new Response(JSON.stringify({
       document_type: docType,
       layout_type: layoutType,
+      variant_method: variantMethod,
+      detected_fields: detectedFields,
+      detected_size_system: detectedSizeSystem,
       supplier: parsed.supplier || supplierName || "",
       invoice_number: parsed.invoice_number || "",
       currency: parsed.currency || "AUD",
+      rejected_rows: rejectedRows,
       products: normalizedProducts,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

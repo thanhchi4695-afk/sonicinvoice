@@ -11,7 +11,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant / find_by_barcode
@@ -44,6 +44,8 @@ interface ShopifyRequestBody {
   metafields?: Array<{ ownerId: string; namespace: string; key: string; value: string; type: string }>;
   // For update_image_alt (batch)
   image_updates?: Array<{ shopify_product_id: string; alt_text: string; seo_filename?: string; keywords?: string[] }>;
+  // For replace_product_image (batch)
+  image_replacements?: Array<{ shopify_product_id: string; image_base64: string; alt_text?: string; filename?: string }>;
 }
 
 Deno.serve(async (req) => {
@@ -778,6 +780,56 @@ Deno.serve(async (req) => {
           }
         }
         result = { results };
+        break;
+      }
+
+      case "replace_product_image": {
+        if (!body.image_replacements || body.image_replacements.length === 0) {
+          return new Response(JSON.stringify({ error: "Missing image_replacements" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const replaceResults: { shopify_product_id: string; status: string; error?: string }[] = [];
+        for (const rep of body.image_replacements) {
+          try {
+            // Get existing images
+            const imgResp = await shopifyFetch(`/products/${rep.shopify_product_id}/images.json`);
+            const imgData = await imgResp.json();
+
+            // Upload new image with base64 attachment
+            const newImage: Record<string, unknown> = {
+              attachment: rep.image_base64,
+              position: 1,
+            };
+            if (rep.alt_text) newImage.alt = rep.alt_text;
+            if (rep.filename) newImage.filename = rep.filename;
+
+            const postResp = await shopifyFetch(`/products/${rep.shopify_product_id}/images.json`, {
+              method: "POST",
+              body: JSON.stringify({ image: newImage }),
+            });
+
+            if (!postResp.ok) {
+              const errData = await postResp.json();
+              replaceResults.push({ shopify_product_id: rep.shopify_product_id, status: "error", error: JSON.stringify(errData) });
+              await new Promise(r => setTimeout(r, 500));
+              continue;
+            }
+
+            // Delete old primary image if it existed
+            if (imgResp.ok && imgData.images?.length > 0) {
+              const oldImageId = imgData.images[0].id;
+              await shopifyFetch(`/products/${rep.shopify_product_id}/images/${oldImageId}.json`, { method: "DELETE" });
+              await new Promise(r => setTimeout(r, 300));
+            }
+
+            replaceResults.push({ shopify_product_id: rep.shopify_product_id, status: "success" });
+            await new Promise(r => setTimeout(r, 500));
+          } catch (e) {
+            replaceResults.push({ shopify_product_id: rep.shopify_product_id, status: "error", error: e instanceof Error ? e.message : "Unknown" });
+          }
+        }
+        result = { results: replaceResults };
         break;
       }
 

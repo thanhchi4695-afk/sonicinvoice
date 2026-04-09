@@ -774,6 +774,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
   const [validationDebug, setValidationDebug] = useState<ValidationDebugInfo | null>(null);
   const [validatedProducts, setValidatedProducts] = useState<ValidatedProduct[]>([]);
+  const [invoicePageImages, setInvoicePageImages] = useState<string[]>([]);
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
 

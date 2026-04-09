@@ -1,4 +1,4 @@
-// Invoice Template Recognition & Memory Engine
+// Invoice Template Learning Engine — stores layout fingerprints and merchant corrections
 
 export interface ColumnMapping {
   title?: string;
@@ -13,16 +13,25 @@ export interface ColumnMapping {
 }
 
 export type LayoutType =
+  | "row_table"
   | "size_grid"
   | "size_matrix_inline"
-  | "size_block"
+  | "product_block"
   | "size_row_below"
-  | "colour_size_in_description"
-  | "simple_flat"
-  | "packing_list"
+  | "description_embedded"
+  | "low_structure"
+  | "mixed"
   | "unknown";
 
 export type ProcessAsMode = "auto" | "invoice" | "packing_slip" | "handwritten" | "supplier_template";
+
+export interface CorrectionPattern {
+  field: string;          // e.g. "colour", "size", "cost", "title", "grouping"
+  original: string;       // what the AI extracted
+  corrected: string;      // what the merchant changed it to
+  rule: string;           // human-readable rule derived from the correction
+  timestamp: string;
+}
 
 export interface InvoiceTemplate {
   supplier: string;
@@ -37,31 +46,17 @@ export interface InvoiceTemplate {
   isShared?: boolean;
   // AI layout memory
   layoutType?: LayoutType;
+  variantMethod?: string;
+  sizeSystem?: string;
   detectedFields?: string[];
   lastLayoutConfidence?: number;
   customInstructions?: string;
+  // Correction-based learning
+  corrections?: CorrectionPattern[];
 }
 
 const STORAGE_KEY = "invoice_format_templates";
-
-// ── Shared AU Swimwear Templates ───────────────────────────
-export const SHARED_AU_TEMPLATES: InvoiceTemplate[] = [
-  { supplier: "Jantzen", fileType: "xlsx", headerRow: 3, columns: { title: "B", sku: "A", colour: "C", size: "D", qty: "F", cost: "G" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_matrix_inline" },
-  { supplier: "Seafolly", fileType: "pdf", headerRow: 1, columns: { title: "A", sku: "B", colour: "C", size: "D", qty: "E", cost: "F", rrp: "G" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_grid" },
-  { supplier: "Bond Eye", fileType: "pdf", headerRow: 1, columns: { title: "A", sku: "B", colour: "C", size: "D", qty: "E", cost: "F" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_row_below" },
-  { supplier: "Sea Level", fileType: "xlsx", headerRow: 2, columns: { title: "B", sku: "A", colour: "C", size: "D", qty: "E", cost: "F", rrp: "G" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_row_below" },
-  { supplier: "Baku", fileType: "pdf", headerRow: 1, columns: { title: "A", sku: "B", colour: "C", size: "D", qty: "E", cost: "F" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_grid" },
-  { supplier: "Jets", fileType: "xlsx", headerRow: 2, columns: { title: "B", sku: "A", colour: "C", size: "D", qty: "E", cost: "F" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_grid" },
-  { supplier: "Speedo AU", fileType: "xlsx", headerRow: 3, columns: { title: "B", sku: "A", colour: "C", size: "D", qty: "F", cost: "G" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_grid" },
-  { supplier: "Funkita", fileType: "pdf", headerRow: 1, columns: { title: "A", sku: "B", colour: "C", size: "D", qty: "E", cost: "F" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_grid" },
-  { supplier: "Sunseeker", fileType: "pdf", headerRow: 1, columns: { title: "A", sku: "B", colour: "C", size: "D", qty: "E", cost: "F" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_grid" },
-  { supplier: "Tigerlily", fileType: "pdf", headerRow: 1, columns: { title: "A", sku: "B", colour: "D", size: "C", qty: "E", cost: "F" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_grid" },
-  { supplier: "Skye Group", fileType: "pdf", headerRow: 1, columns: { title: "C", sku: "A", colour: "B", size: "D", qty: "E", cost: "F" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_matrix_inline" },
-  { supplier: "Rhythm", fileType: "pdf", headerRow: 1, columns: { title: "C", sku: "B", colour: "D", size: "D", qty: "A", cost: "E" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "size_block" },
-  { supplier: "Donna Donna", fileType: "pdf", headerRow: 1, columns: { title: "B", sku: "A", qty: "C", cost: "D" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "colour_size_in_description" },
-  { supplier: "OM Designs", fileType: "pdf", headerRow: 1, columns: { title: "B", qty: "A", cost: "C" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "simple_flat" },
-  { supplier: "Kung Fu Mary", fileType: "pdf", headerRow: 1, columns: { title: "A", qty: "B" }, successCount: 0, errorCount: 0, lastUsed: "", createdAt: "2025-01-01", notes: "", isShared: true, layoutType: "packing_list" },
-];
+const CORRECTIONS_KEY = "invoice_corrections";
 
 // ── CRUD ───────────────────────────────────────────────────
 export function getFormatTemplates(): Record<string, InvoiceTemplate> {
@@ -107,6 +102,9 @@ export function saveLayoutTemplate(
   confidence: number,
   fileType: InvoiceTemplate["fileType"],
   customInstructions?: string,
+  variantMethod?: string,
+  sizeSystem?: string,
+  detectedFields?: string[],
 ) {
   const all = getFormatTemplates();
   const key = supplier.toLowerCase().trim();
@@ -117,6 +115,9 @@ export function saveLayoutTemplate(
     existing.successCount += 1;
     existing.lastUsed = new Date().toISOString();
     if (customInstructions) existing.customInstructions = customInstructions;
+    if (variantMethod) existing.variantMethod = variantMethod;
+    if (sizeSystem) existing.sizeSystem = sizeSystem;
+    if (detectedFields) existing.detectedFields = detectedFields;
     all[key] = existing;
   } else {
     all[key] = {
@@ -132,18 +133,64 @@ export function saveLayoutTemplate(
       layoutType,
       lastLayoutConfidence: confidence,
       customInstructions,
+      variantMethod,
+      sizeSystem,
+      detectedFields,
     };
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 }
 
+// ── Correction-based learning ──────────────────────────────
+
+/** Save a merchant correction for a supplier */
+export function saveCorrection(supplier: string, correction: CorrectionPattern) {
+  const all = getFormatTemplates();
+  const key = supplier.toLowerCase().trim();
+  if (all[key]) {
+    if (!all[key].corrections) all[key].corrections = [];
+    // Don't duplicate identical corrections
+    const isDup = all[key].corrections!.some(
+      c => c.field === correction.field && c.original === correction.original && c.corrected === correction.corrected
+    );
+    if (!isDup) {
+      all[key].corrections!.push(correction);
+      // Keep max 50 corrections per supplier
+      if (all[key].corrections!.length > 50) {
+        all[key].corrections = all[key].corrections!.slice(-50);
+      }
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  }
+}
+
+/** Get correction rules as human-readable strings for AI prompt injection */
+export function getCorrectionRules(supplier: string): string[] {
+  const template = findTemplate(supplier);
+  if (!template?.corrections?.length) return [];
+  // Deduplicate and return unique rules
+  const rules = new Set(template.corrections.map(c => c.rule));
+  return Array.from(rules);
+}
+
+/** Build a template hint object to pass to the edge function */
+export function buildTemplateHint(supplier: string): Record<string, unknown> | null {
+  const template = findTemplate(supplier);
+  if (!template) return null;
+  return {
+    layoutType: template.layoutType,
+    variantMethod: template.variantMethod,
+    sizeSystem: template.sizeSystem,
+    detectedFields: template.detectedFields,
+    customInstructions: template.customInstructions,
+    corrections: getCorrectionRules(supplier),
+  };
+}
+
 /** Get all saved templates as a sorted list */
 export function getTemplateList(): InvoiceTemplate[] {
   const user = Object.values(getFormatTemplates());
-  const shared = SHARED_AU_TEMPLATES.filter(
-    s => !user.some(u => u.supplier.toLowerCase() === s.supplier.toLowerCase())
-  );
-  return [...user, ...shared].sort((a, b) => {
+  return user.sort((a, b) => {
     if (a.lastUsed && b.lastUsed) return b.lastUsed.localeCompare(a.lastUsed);
     return b.successCount - a.successCount;
   });
@@ -154,21 +201,15 @@ export function findTemplate(supplier: string): InvoiceTemplate | null {
   if (!supplier) return null;
   const key = supplier.toLowerCase().trim();
 
-  // Check user-saved templates first
   const all = getFormatTemplates();
   if (all[key]) return all[key];
 
-  // Fuzzy match on user templates
+  // Fuzzy match
   for (const [k, t] of Object.entries(all)) {
     if (key.includes(k) || k.includes(key)) return t;
   }
 
-  // Check shared AU templates (exact and fuzzy)
-  const shared = SHARED_AU_TEMPLATES.find(t => {
-    const tKey = t.supplier.toLowerCase();
-    return tKey === key || key.includes(tKey) || tKey.includes(key);
-  });
-  return shared || null;
+  return null;
 }
 
 // ── Quality indicator ──────────────────────────────────────
@@ -183,13 +224,14 @@ export function getTemplateQuality(t: InvoiceTemplate): { label: string; color: 
 
 export function getLayoutLabel(layout?: LayoutType): string {
   switch (layout) {
-    case "size_grid": return "Size Grid (e.g. Seafolly)";
-    case "size_matrix_inline": return "Size Matrix Inline (e.g. Skye Group)";
-    case "size_block": return "Size Block (e.g. Rhythm)";
-    case "size_row_below": return "Size Row Below (e.g. Sea Level)";
-    case "colour_size_in_description": return "Colour+Size in Description (e.g. Donna Donna)";
-    case "simple_flat": return "Simple Flat Table (e.g. OM Designs)";
-    case "packing_list": return "Packing List / Manifest";
+    case "row_table": return "Row-based Table";
+    case "size_grid": return "Size Grid Matrix";
+    case "size_matrix_inline": return "Inline Size Matrix";
+    case "product_block": return "Product Blocks with Nested Sizes";
+    case "size_row_below": return "Size Breakdown Row";
+    case "description_embedded": return "Variants in Description";
+    case "low_structure": return "Low Structure / Handwritten";
+    case "mixed": return "Mixed Layout";
     case "unknown": return "Unknown Layout";
     default: return "Not detected";
   }

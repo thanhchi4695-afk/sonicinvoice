@@ -43,6 +43,20 @@ interface ProductImage {
   compressed?: boolean;
   needsCompression?: boolean;
   compressionReason?: string;
+  // Conversion audit fields
+  conversionScore?: number;
+  consistency?: number;
+  consistencyNote?: string;
+  variantMapping?: number;
+  variantNote?: string;
+  zoomReadiness?: number;
+  zoomNote?: string;
+  mobileOptimization?: number;
+  mobileNote?: string;
+  heroScore?: number;
+  heroNote?: string;
+  topIssue?: string;
+  conversionRecommendation?: string;
 }
 
 interface Props { onBack: () => void; }

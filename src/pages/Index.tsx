@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { addAuditEntry } from "@/lib/audit-log";
+import { onImageSeoTrigger } from "@/lib/image-seo-trigger";
 import NotificationBell from "@/components/NotificationBell";
 import LoadingScreen from "@/components/ui/loading-screen";
 

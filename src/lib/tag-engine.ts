@@ -103,9 +103,14 @@ export const TYPE_OPTIONS = [
   // ── MENS ──
   'Mens Swimwear',
   'Boardshorts',
+  'Mens Briefs & Jammers',
+  'Mens Rashies',
   'Mens Shorts',
-  'Mens Shirt',
+  'Mens Shirts',
+  'Mens Tees & Singlets',
   'Mens Accessories',
+  'Mens Hats & Caps',
+  'Mens Shoes & Thongs',
   // ── KIDS ──
   'Kids Swimwear',
   'Girls 00-7',
@@ -216,8 +221,10 @@ const KIDS_TYPES = [
 ];
 
 const MENS_TYPES = [
-  'Mens Swimwear', 'Boardshorts', 'Mens Shorts', 'Mens Shirt',
-  'Mens Accessories',
+  'Mens Swimwear', 'Boardshorts', 'Mens Briefs & Jammers',
+  'Mens Rashies', 'Mens Shorts', 'Mens Shirts',
+  'Mens Tees & Singlets', 'Mens Accessories',
+  'Mens Hats & Caps', 'Mens Shoes & Thongs',
 ];
 
 const WOMENS_SWIM_TYPES = [
@@ -313,10 +320,16 @@ const TYPE_TAG_MAP: Record<string, string> = {
   'Grooming & Toiletries': 'home & living',
 
   // Mens
-  'Boardshorts':         'boardshorts',
-  'Mens Swimwear':       'mens swim',
-  'Mens Shorts':         'mens shorts',
-  'Mens Shirt':          'mens shirts',
+  'Boardshorts':           'boardshorts',
+  'Mens Swimwear':         'mens swim',
+  'Mens Briefs & Jammers': 'mens briefs',
+  'Mens Rashies':          'mens rashies',
+  'Mens Shorts':           'mens shorts',
+  'Mens Shirts':           'mens shirts',
+  'Mens Tees & Singlets':  'mens tees',
+  'Mens Accessories':      'accessories',
+  'Mens Hats & Caps':      'hats',
+  'Mens Shoes & Thongs':   'footwear',
 
   // Kids
   'Kids Swimwear':       'Girls swimwear',
@@ -384,9 +397,9 @@ export function generateTags(input: TagInput, config?: TagConfig): string[] {
       tags.push('kids accessories');
     }
   } else if (gender === 'mens') {
-    if (['Mens Swimwear', 'Boardshorts'].includes(type)) {
+    if (['Mens Swimwear', 'Boardshorts', 'Mens Briefs & Jammers', 'Mens Rashies'].includes(type)) {
       tags.push('mens swim');
-    } else if (['Mens Shorts', 'Mens Shirt'].includes(type)) {
+    } else if (['Mens Shorts', 'Mens Shirts', 'Mens Tees & Singlets'].includes(type)) {
       tags.push('mens clothing');
     } else {
       tags.push('accessories');
@@ -417,6 +430,8 @@ export function generateTags(input: TagInput, config?: TagConfig): string[] {
   if (type === 'Sarongs') tags.push('sarong');
   if (type === 'Kaftans & Cover Ups') tags.push('cover ups');
   if (type === 'Boardshorts' && gender === 'mens') tags.push('mens boardies');
+  if (type === 'Mens Briefs & Jammers') tags.push('mens jammers');
+  if (type === 'Mens Tees & Singlets') tags.push('mens singlets');
 
   // Swim Skirts and Swim Leggings also get "bikini bottoms" tag
   // per manager's handwritten notes (right column of notebook page 3)

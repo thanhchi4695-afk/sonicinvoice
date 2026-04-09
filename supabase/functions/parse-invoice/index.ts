@@ -371,6 +371,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
           confidence: Number(p.confidence) || 70,
           parse_notes: p.parse_notes || "",
           extraction_reason: p.extraction_reason || "",
+          _sourceRegions: p.source_regions || null,
         })),
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -393,6 +394,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
       _parseNotes: p.parse_notes || "",
       _lineTotal: Number(p.line_total) || 0,
       _extractionReason: p.extraction_reason || "",
+      _sourceRegions: p.source_regions || null,
     }));
 
     return new Response(JSON.stringify({

@@ -44,7 +44,7 @@ export interface TagConfig {
 
 // ── Complete Type Options ──────────────────────────────────
 export const TYPE_OPTIONS = [
-  // ── WOMENS SWIMWEAR ──────────────────────────────
+  // ── WOMENS SWIMWEAR ──
   'One Pieces',
   'Bikini Tops',
   'Bikini Bottoms',
@@ -53,11 +53,12 @@ export const TYPE_OPTIONS = [
   'Swimdress',
   'Rashies & Sunsuits',
   'Blouson',
-  'Swim Skirts & Pants',
   'Boyleg',
+  'Swim Skirts',
+  'Swim Leggings',
   'Swim Rompers',
   'Suit Saver',
-  // ── WOMENS CLOTHING ─────────────────────────────
+  // ── WOMENS CLOTHING ──
   'Dresses',
   'Tops',
   'Pants',
@@ -69,27 +70,43 @@ export const TYPE_OPTIONS = [
   'Sarongs',
   'Belts',
   'Shirts',
-  // ── ACCESSORIES ─────────────────────────────────
+  'Womens Boardshorts',
+  // ── ACCESSORIES ──
   'Hats',
   'Sunnies',
   'Goggles',
+  'Earplugs',
+  'Swim Caps',
   'Bags',
   'Beach Towels',
   'Accessories',
+  'Swim Accessories',
   'Water Shoes',
-  'Swimwear Accessories',
   'Jewellery',
   'Earrings',
   'Necklaces',
   'Bracelets',
   'Wallets',
-  // ── MENS ────────────────────────────────────────
+  'Sunscreen & Lotions',
+  'Floaties & Pool Toys',
+  // ── HOME & LIVING ──
+  'Candles',
+  'Coasters',
+  'Greeting Cards',
+  'Christmas Decor',
+  'Books',
+  'Mixers & Alcohol',
+  'Smelly Balls',
+  'Perfume',
+  'Hair Wraps',
+  'Grooming & Toiletries',
+  // ── MENS ──
   'Mens Swimwear',
   'Boardshorts',
   'Mens Shorts',
   'Mens Shirt',
   'Mens Accessories',
-  // ── KIDS ────────────────────────────────────────
+  // ── KIDS ──
   'Kids Swimwear',
   'Girls 00-7',
   'Girls 8-16',
@@ -100,19 +117,21 @@ export const TYPE_OPTIONS = [
 
 // ── Complete Specials List ─────────────────────────────────
 export const SPECIALS_LIST = [
-  { val: 'chlorine resist', label: 'Chlorine Resistant' },
-  { val: 'underwire', label: 'Underwire' },
-  { val: 'plus size', label: 'Plus Size' },
-  { val: 'tummy control', label: 'Tummy Control' },
-  { val: 'd-g', label: 'D–G Cup' },
-  { val: 'A-DD', label: 'A–DD Cup' },
-  { val: 'mastectomy', label: 'Mastectomy' },
-  { val: 'Maternity', label: 'Maternity' },
-  { val: 'Sun Protection', label: 'Sun Protection' },
-  { val: 'Period Swimwear', label: 'Period Swimwear' },
-  { val: 'Tie Side Bikini Bottom', label: 'Tie Side' },
-  { val: 'gifting', label: 'Gifting' },
-  { val: 'new swim', label: 'New Swim' },
+  { val: 'chlorine resist',      label: 'Chlorine Resistant' },
+  { val: 'underwire',            label: 'Underwire' },
+  { val: 'plus size',            label: 'Plus Size' },
+  { val: 'tummy control',        label: 'Tummy Control' },
+  { val: 'd-g',                  label: 'D–G Cup' },
+  { val: 'a-dd',                 label: 'A–DD Cup' },
+  { val: 'd-dd',                 label: 'D–DD Cup' },
+  { val: 'mastectomy',           label: 'Mastectomy' },
+  { val: 'sun protection',       label: 'Sun Protection' },
+  { val: 'period swim',          label: 'Period Swim' },
+  { val: 'maternity',            label: 'Maternity' },
+  { val: 'boyleg',               label: 'Boyleg' },
+  { val: 'tie side',             label: 'Tie Side' },
+  { val: 'gifting',              label: 'Gifting' },
+  { val: 'new swim',             label: 'New Swim' },
 ];
 
 // ── Storage ────────────────────────────────────────────────
@@ -204,20 +223,28 @@ const MENS_TYPES = [
 const WOMENS_SWIM_TYPES = [
   'One Pieces', 'Bikini Tops', 'Bikini Bottoms', 'Bikini Set',
   'Tankini Tops', 'Rashies & Sunsuits', 'Swimdress',
-  'Blouson', 'Swim Skirts & Pants', 'Boyleg', 'Swim Rompers',
-  'Suit Saver',
+  'Blouson', 'Swim Skirts', 'Swim Leggings', 'Boyleg',
+  'Swim Rompers', 'Suit Saver',
 ];
 
 const CLOTHING_TYPES = [
   'Dresses', 'Tops', 'Pants', 'Skirts', 'Shorts',
   'Playsuits & Jumpsuits', 'Kimonos',
   'Kaftans & Cover Ups', 'Sarongs', 'Belts', 'Shirts',
-  'Womens Clothing',
+  'Womens Boardshorts', 'Womens Clothing',
 ];
 
 const ACC_TYPES = [
-  'Hats', 'Sunnies', 'Accessories', 'Bags', 'Beach Towels',
-  'Goggles', 'Water Shoes', 'Swimwear Accessories', 'Wallets',
+  'Hats', 'Sunnies', 'Accessories', 'Swim Accessories',
+  'Bags', 'Beach Towels', 'Goggles', 'Earplugs', 'Swim Caps',
+  'Water Shoes', 'Swimwear Accessories', 'Wallets',
+  'Sunscreen & Lotions', 'Floaties & Pool Toys',
+];
+
+const HOME_TYPES = [
+  'Candles', 'Coasters', 'Greeting Cards', 'Christmas Decor',
+  'Books', 'Mixers & Alcohol', 'Smelly Balls', 'Perfume',
+  'Hair Wraps', 'Grooming & Toiletries',
 ];
 
 const JEWELLERY_TYPES = [
@@ -226,47 +253,77 @@ const JEWELLERY_TYPES = [
 
 // ── Type Tag Map ───────────────────────────────────────────
 const TYPE_TAG_MAP: Record<string, string> = {
-  'One Pieces': 'One Pieces',
-  'Bikini Tops': 'Bikini Tops',
-  'Bikini Bottoms': 'bikini bottoms',
-  'Bikini Set': 'Bikini Set',
-  'Tankini Tops': 'tankini tops',
-  'Swimdress': 'One Pieces',
-  'Rashies & Sunsuits': 'rashies & sunsuits',
-  'Blouson': 'Blouson',
-  'Swim Skirts & Pants': 'swim skirts & pants',
-  'Boyleg': 'Boyleg',
-  'Swim Rompers': 'swim rompers',
-  'Suit Saver': 'suit saver',
-  'Dresses': 'Dresses',
-  'Tops': 'tops',
-  'Pants': 'pants',
-  'Skirts': 'skirts',
-  'Shorts': 'shorts',
+  // Womens Swimwear — tags exactly as written in notebook
+  'One Pieces':          'One Pieces',
+  'Bikini Tops':         'Bikini Tops',
+  'Bikini Bottoms':      'bikini bottoms',
+  'Bikini Set':          'Bikini Set',
+  'Tankini Tops':        'tankini tops',
+  'Swimdress':           'One Pieces',       // maps to One Pieces + swimdress (see Layer 3)
+  'Rashies & Sunsuits':  'rashies & sunsuits',
+  'Blouson':             'Blouson',
+  'Boyleg':              'boyleg',
+  'Swim Skirts':         'swim skirts',
+  'Swim Leggings':       'swim leggings',
+  'Swim Rompers':        'swim rompers',
+  'Suit Saver':          'suit saver',
+
+  // Womens Clothing
+  'Dresses':             'Dresses',
+  'Tops':                'tops',
+  'Pants':               'pants',
+  'Skirts':              'skirts',
+  'Shorts':              'shorts',
   'Playsuits & Jumpsuits': 'playsuits & jumpsuits',
-  'Kimonos': 'kimonos',
+  'Kimonos':             'kimonos',
   'Kaftans & Cover Ups': 'kaftans & cover ups',
-  'Sarongs': 'Sarongs',
-  'Belts': 'belts',
-  'Shirts': 'shirts',
-  'Hats': 'hats',
-  'Goggles': 'goggles',
-  'Water Shoes': 'water shoes',
-  'Swimwear Accessories': 'swim accessories',
-  'Wallets': 'wallets',
-  'Jewellery': 'JEWELLERY',
-  'Earrings': 'JEWELLERY',
-  'Necklaces': 'JEWELLERY',
-  'Bracelets': 'JEWELLERY',
-  'Boardshorts': 'boardshorts',
-  'Mens Swimwear': 'mens swim',
-  'Mens Shorts': 'mens shorts',
-  'Mens Shirt': 'mens shirts',
-  'Kids Swimwear': 'Girls swimwear',
-  'Girls 00-7': 'Girls swimwear',
-  'Girls 8-16': 'Girls swimwear',
-  'Boys 00-7': 'boys swim',
-  'Boys 8-16': 'boys swim',
+  'Sarongs':             'Sarongs',
+  'Belts':               'belts',
+  'Shirts':              'shirts',
+  'Womens Boardshorts':  'womens boardshorts',
+
+  // Accessories
+  'Hats':                'hats',
+  'Goggles':             'goggles',
+  'Earplugs':            'earplug',
+  'Swim Caps':           'swim caps',
+  'Water Shoes':         'water shoes',
+  'Swim Accessories':    'swim accessories',
+  'Swimwear Accessories':'swim accessories',
+  'Wallets':             'wallets',
+  'Sunscreen & Lotions': 'sunscreen & lotions',
+  'Floaties & Pool Toys':'floaties & pool toys',
+
+  // Jewellery
+  'Jewellery':           'JEWELLERY',
+  'Earrings':            'JEWELLERY',
+  'Necklaces':           'JEWELLERY',
+  'Bracelets':           'JEWELLERY',
+
+  // Home & Living
+  'Candles':             'home & living',
+  'Coasters':            'home & living',
+  'Greeting Cards':      'home & living',
+  'Christmas Decor':     'home & living',
+  'Books':               'home & living',
+  'Mixers & Alcohol':    'home & living',
+  'Smelly Balls':        'home & living',
+  'Perfume':             'home & living',
+  'Hair Wraps':          'home & living',
+  'Grooming & Toiletries': 'home & living',
+
+  // Mens
+  'Boardshorts':         'boardshorts',
+  'Mens Swimwear':       'mens swim',
+  'Mens Shorts':         'mens shorts',
+  'Mens Shirt':          'mens shirts',
+
+  // Kids
+  'Kids Swimwear':       'Girls swimwear',
+  'Girls 00-7':          'Girls swimwear',
+  'Girls 8-16':          'Girls swimwear',
+  'Boys 00-7':           'boys swim',
+  'Boys 8-16':           'boys swim',
 };
 
 // ── Tag Generation (7-Layer Formula) ───────────────────────
@@ -320,7 +377,7 @@ export function generateTags(input: TagInput, config?: TagConfig): string[] {
     tags.push('Swimwear');
     tags.push('womens swim');
   } else if (gender === 'kids') {
-    if (['Kids Swimwear', 'Girls 00-7', 'Girls 8-16', 'Boys 00-7', 'Boys 8-16'].includes(type)) {
+    if (['Kids Swimwear','Girls 00-7','Girls 8-16','Boys 00-7','Boys 8-16'].includes(type)) {
       tags.push('Swimwear');
     } else {
       tags.push('accessories');
@@ -337,10 +394,12 @@ export function generateTags(input: TagInput, config?: TagConfig): string[] {
   } else if (CLOTHING_TYPES.includes(type)) {
     tags.push('clothing');
     tags.push('womens clothing');
+  } else if (HOME_TYPES.includes(type)) {
+    tags.push('home & living');
   } else if (ACC_TYPES.includes(type)) {
     tags.push('accessories');
   } else if (JEWELLERY_TYPES.includes(type)) {
-    // Jewellery: NO gender, NO accessories — just JEWELLERY handled in Layer 3
+    // Jewellery: NO gender, NO accessories — handled in Layer 3
   }
 
   // ── LAYER 3 — PRODUCT TYPE TAG ───────────────────
@@ -358,6 +417,22 @@ export function generateTags(input: TagInput, config?: TagConfig): string[] {
   if (type === 'Sarongs') tags.push('sarong');
   if (type === 'Kaftans & Cover Ups') tags.push('cover ups');
   if (type === 'Boardshorts' && gender === 'mens') tags.push('mens boardies');
+
+  // Swim Skirts and Swim Leggings also get "bikini bottoms" tag
+  // per manager's handwritten notes (right column of notebook page 3)
+  if (type === 'Swim Skirts') tags.push('bikini bottoms');
+  if (type === 'Swim Leggings') tags.push('bikini bottoms');
+  // Boyleg also gets "bikini bottoms" tag
+  if (type === 'Boyleg') tags.push('bikini bottoms');
+
+  // Home & Living types each get their own specific tag too
+  if (HOME_TYPES.includes(type)) {
+    const specificTag = type.toLowerCase();
+    if (!tags.includes(specificTag)) tags.push(specificTag);
+  }
+
+  // Womens Boardshorts
+  if (type === 'Womens Boardshorts') tags.push('boardshorts');
 
   // Jewellery sub-types
   if (type === 'Earrings') tags.push('earrings');
@@ -410,6 +485,18 @@ export function generateTags(input: TagInput, config?: TagConfig): string[] {
         ? 'Chlorine Resistant'
         : 'chlorine resist';
       if (!tags.includes(chlorineTag)) tags.push(chlorineTag);
+    } else if (s === 'd-g') {
+      if (!tags.includes('d-g')) tags.push('d-g');
+      if (!tags.includes('larger cup')) tags.push('larger cup');
+    } else if (s === 'a-dd') {
+      if (!tags.includes('a-dd')) tags.push('a-dd');
+    } else if (s === 'd-dd') {
+      if (!tags.includes('d-dd')) tags.push('d-dd');
+      if (!tags.includes('larger cup')) tags.push('larger cup');
+    } else if (s === 'boyleg') {
+      if (!tags.includes('boyleg')) tags.push('boyleg');
+    } else if (s === 'period swim') {
+      if (!tags.includes('period swim')) tags.push('period swim');
     } else {
       if (!tags.includes(s)) tags.push(s);
     }

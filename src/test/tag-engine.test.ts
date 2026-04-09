@@ -10,7 +10,7 @@ describe('7-Layer Tag Formula', () => {
     expect(tags).toEqual([
       'Womens', 'Swimwear', 'womens swim', 'One Pieces',
       'jantzen', 'Apr26', 'full_price', 'new', 'new arrivals',
-      'new swim', 'd-g',
+      'new swim', 'd-g', 'larger cup',
     ]);
   });
 

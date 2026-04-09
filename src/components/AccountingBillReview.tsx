@@ -262,7 +262,7 @@ export default function AccountingBillReview({
         );
 
         // Record corrections if user changed the AI suggestion
-        const original = buildReviewData(invoice);
+        const original = buildReviewData(unifiedBill);
         if (bill.headerAccountCode !== original.headerAccountCode) {
           const newDef = ALL_CODES.find((c) => c.code === bill.headerAccountCode);
           recordCorrection(

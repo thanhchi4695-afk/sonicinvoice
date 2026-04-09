@@ -140,7 +140,8 @@ export default function PostParseReviewScreen({
 
   const updateField = (rowIndex: number, field: string, value: string | number) => {
     onUpdateProducts(products.map(p => {
-      if (p._rowIndex !== rowIndex) return p;
+      const originalValue = String((p as any)[field] || "");
+      const newValue = String(value);
       // Save correction to both systems for learning
       if (supplierName && originalValue !== newValue && originalValue) {
         const fieldLabels: Record<string, string> = { name: "title", colour: "colour", size: "size", cost: "cost", sku: "sku", qty: "quantity" };

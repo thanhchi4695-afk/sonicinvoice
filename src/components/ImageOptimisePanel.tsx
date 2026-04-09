@@ -590,6 +590,104 @@ export default function ImageOptimisePanel({ onBack }: Props) {
           </div>
         </TabsContent>
 
+        {/* ── Compress ── */}
+        <TabsContent value="compress" className="space-y-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Minimize2 className="w-4 h-4 text-primary" />Image Compression
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs text-muted-foreground space-y-3">
+              <p>Compress product images for faster page loads and better Shopify performance. Images are resized to max 2048×2048 and re-encoded at optimal quality.</p>
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" onClick={analyseSizes} disabled={analysingSize} className="gap-1">
+                  <HardDrive className="w-3 h-3" />{analysingSize ? "Analysing…" : "Analyse File Sizes"}
+                </Button>
+                <Button size="sm" onClick={() => compressImages()} disabled={compressing} className="gap-1">
+                  <Minimize2 className="w-3 h-3" />{compressing ? `Compressing ${compressionProgress.current}/${compressionProgress.total}…` : "Compress All"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Compression stats */}
+          {(stats.compressed > 0 || stats.needsCompression > 0) && (
+            <div className="grid grid-cols-3 gap-3">
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-lg font-bold text-yellow-500">{stats.needsCompression}</div>
+                  <div className="text-xs text-muted-foreground">Need Compression</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-lg font-bold text-green-500">{stats.compressed}</div>
+                  <div className="text-xs text-muted-foreground">Compressed</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-3 text-center">
+                  <div className="text-lg font-bold text-primary">{formatBytes(stats.totalSaved)}</div>
+                  <div className="text-xs text-muted-foreground">Total Saved</div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {compressing && (
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Compressing images…</span>
+                  <span>{compressionProgress.current}/{compressionProgress.total}</span>
+                </div>
+                <Progress value={(compressionProgress.current / compressionProgress.total) * 100} className="h-2" />
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+            {products
+              .filter(p => p.imageUrl && (p.originalSize != null || p.compressed))
+              .sort((a, b) => (b.originalSize || 0) - (a.originalSize || 0))
+              .map(p => (
+                <Card key={p.id} className={p.compressed ? "border-green-500/30" : p.needsCompression ? "border-yellow-500/30" : ""}>
+                  <CardContent className="p-3 flex gap-3 items-center">
+                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {p.imageUrl ? <img src={p.imageUrl} alt="" className="w-full h-full object-cover" /> : <Image className="w-4 h-4 text-muted-foreground" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{p.title}</div>
+                      <div className="text-xs text-muted-foreground">{p.vendor}</div>
+                      {p.compressionReason && <div className="text-xs text-yellow-600">{p.compressionReason}</div>}
+                    </div>
+                    <div className="text-right flex-shrink-0 space-y-0.5">
+                      <div className="text-xs font-medium">{formatBytes(p.originalSize || 0)}</div>
+                      {p.compressed && p.compressedSize != null && (
+                        <div className="text-[10px] text-green-600">→ {formatBytes(p.compressedSize)} ({Math.round((1 - p.compressedSize / (p.originalSize || 1)) * 100)}% saved)</div>
+                      )}
+                    </div>
+                    {p.compressed ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    ) : p.needsCompression ? (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => compressImages([p])} disabled={compressing}>
+                        Compress
+                      </Button>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">OK</Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            {!products.some(p => p.originalSize != null) && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Run "Analyse File Sizes" to check which images need compression.
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
         {/* ── Quality ── */}
         <TabsContent value="quality" className="space-y-3">
           <div className="flex gap-2 flex-wrap">

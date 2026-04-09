@@ -12,6 +12,9 @@ export interface RawProduct {
   qty: number;
   cost: number;
   rrp: number;
+  group_key?: string;
+  cost_source?: string;
+  _lineTotal?: number;
 }
 
 export type CellClassification =
@@ -82,6 +85,9 @@ export interface ValidatedProduct extends RawProduct {
   _parseNotes?: string;
   _extractionReason?: string;
   _sourceTrace?: SourceTrace;
+  _groupKey?: string;
+  _costSource?: string;
+  _mathCheck?: "pass" | "fail" | "skipped";
 }
 
 export interface ParsingPlan {

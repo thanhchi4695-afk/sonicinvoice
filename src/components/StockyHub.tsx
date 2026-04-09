@@ -201,6 +201,7 @@ export default function StockyHub({ onBack, onNavigate }: StockyHubProps) {
     { id: "margin_protection", label: "Margin Protection", desc: "Block below-cost sales", icon: <Shield className="w-5 h-5" />, count: null, target: "margin_protection" },
     { id: "markdown_ladder", label: "Markdown Ladder", desc: "Auto discount progression", icon: <Tag className="w-5 h-5" />, count: null, target: "markdown_ladder" },
     { id: "restock_analytics", label: "Restock Analytics", desc: "Best sellers & slow movers", icon: <BarChart3 className="w-5 h-5" />, count: null, target: "restock_analytics" },
+    { id: "order_sync", label: "Shopify Order Sync", desc: "Import sales for velocity data", icon: <ShoppingCart className="w-5 h-5" />, count: null, target: "order_sync" },
     { id: "migration", label: "Stocky Migration", desc: "Import from Stocky", icon: <RefreshCw className="w-5 h-5" />, count: null, target: "stocky_migration" },
   ];
 

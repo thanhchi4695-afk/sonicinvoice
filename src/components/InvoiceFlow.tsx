@@ -749,6 +749,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
   const [validationDebug, setValidationDebug] = useState<ValidationDebugInfo | null>(null);
   const [validatedProducts, setValidatedProducts] = useState<ValidatedProduct[]>([]);
+  const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
+  const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
 
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {

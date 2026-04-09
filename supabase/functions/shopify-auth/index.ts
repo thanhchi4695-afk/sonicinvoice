@@ -224,47 +224,26 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Generate session for user
-      const { data: sessionData, error: sessionErr } = await supabaseAdmin.auth.admin.generateLink({
-        type: "magiclink",
-        email: "", // we'll get it from user
-      });
+      // Delete the one-time token before creating session
+      await supabaseAdmin.from("shopify_login_tokens").delete().eq("token", token);
 
-      // Instead, use admin to get user and create a custom approach
-      // We'll use signInWithPassword won't work... Let's use a different approach
-      // Generate a magic link and extract the token from it
-      const { data: userData } = await supabaseAdmin.auth.admin.getUserById(loginData.user_id);
-      if (!userData?.user?.email) {
-        return new Response(JSON.stringify({ error: "User not found" }), {
-          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      // Use createSession() — the correct Supabase v2 way to issue tokens
+      // for a known user_id. generateLink() in Supabase v2 returns a
+      // token_hash inside a redirect URL, not access/refresh tokens directly,
+      // so hashParams.get("access_token") always returns null.
+      const { data: sessionData, error: sessionErr } =
+        await supabaseAdmin.auth.admin.createSession({ user_id: loginData.user_id });
 
-      const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-        type: "magiclink",
-        email: userData.user.email,
-      });
-
-      if (linkErr || !linkData) {
-        console.error("Failed to generate magic link:", linkErr);
-        return new Response(JSON.stringify({ error: "Failed to generate session" }), {
+      if (sessionErr || !sessionData?.session) {
+        console.error("Failed to create session:", sessionErr);
+        return new Response(JSON.stringify({ error: "Failed to create session" }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Delete the one-time token
-      await supabaseAdmin.from("shopify_login_tokens").delete().eq("token", token);
-
-      // Extract the hashed_token and verification type from the link
-      const linkUrl = new URL(linkData.properties?.action_link || "");
-      const hashFragment = linkUrl.hash.substring(1); // remove #
-      const hashParams = new URLSearchParams(hashFragment);
-
       return new Response(JSON.stringify({
-        action_link: linkData.properties?.action_link,
-        access_token: hashParams.get("access_token"),
-        refresh_token: hashParams.get("refresh_token"),
-        type: hashParams.get("type"),
+        access_token:  sessionData.session.access_token,
+        refresh_token: sessionData.session.refresh_token,
         shop: loginData.shop,
       }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },

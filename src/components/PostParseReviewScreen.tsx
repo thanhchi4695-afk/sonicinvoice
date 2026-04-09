@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   Check, X, AlertTriangle, ChevronDown, ChevronRight, RotateCcw,
   ShieldCheck, Bug, Search, Filter, CheckCheck, ArrowRight,
-  Edit3, Download, Zap, ArrowUpRight
+  Edit3, Download, Zap, ArrowUpRight, Layers, Merge, Scissors,
+  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/lib/invoice-validator";
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
-import { recordFieldCorrection, recordNoiseRejection } from "@/lib/invoice-learning";
+import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule } from "@/lib/invoice-learning";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;
@@ -24,6 +25,29 @@ interface PostParseReviewScreenProps {
 
 type ReviewTab = "accepted" | "review" | "rejected";
 type ConfFilter = "all" | "high" | "medium" | "low";
+type ViewMode = "flat" | "grouped";
+
+// Extended product type with extra flags
+interface ReviewProduct extends ValidatedProduct {
+  _manuallyEdited?: boolean;
+  _markedAs?: "freight" | "tax" | "summary" | "non-product";
+  _extractionReason?: string;
+  _parseNotes?: string;
+  _sourcePage?: number;
+  _groupId?: string;
+}
+
+// Grouped product structure
+interface ProductGroup {
+  groupId: string;
+  parentTitle: string;
+  styleCode: string;
+  colour: string;
+  vendor: string;
+  unitCost: number;
+  totalUnits: number;
+  variants: ReviewProduct[];
+}
 
 export default function PostParseReviewScreen({
   debug,
@@ -43,6 +67,10 @@ export default function PostParseReviewScreen({
   const [showDebug, setShowDebug] = useState(false);
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [showExportWarning, setShowExportWarning] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("flat");
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [showTeachAI, setShowTeachAI] = useState<number | null>(null);
+  const [bulkVendor, setBulkVendor] = useState("");
 
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
@@ -55,11 +83,46 @@ export default function PostParseReviewScreen({
     return Array.from(set).sort();
   }, [products]);
 
-  // Average confidence
+  // Summary stats
   const avgConfidence = useMemo(() => {
     const nonRejected = products.filter(p => !p._rejected);
     if (nonRejected.length === 0) return 0;
     return Math.round(nonRejected.reduce((s, p) => s + p._confidence, 0) / nonRejected.length);
+  }, [products]);
+
+  const totalEstimatedCost = useMemo(() => {
+    return products.filter(p => !p._rejected).reduce((s, p) => s + (p.cost || 0) * (p.qty || 1), 0);
+  }, [products]);
+
+  const missingCostCount = useMemo(() => {
+    return products.filter(p => !p._rejected && (!p.cost || p.cost <= 0)).length;
+  }, [products]);
+
+  // Grouped products for fashion view
+  const groupedProducts = useMemo((): ProductGroup[] => {
+    const nonRejected = products.filter(p => !p._rejected) as ReviewProduct[];
+    const groups = new Map<string, ReviewProduct[]>();
+
+    for (const p of nonRejected) {
+      // Group by normalized base title + vendor + cost
+      const baseTitle = (p.name || "").replace(/\s*-\s*(XS|S|M|L|XL|XXL|\d+|O\/S)\s*$/i, "").trim();
+      const key = `${baseTitle}::${p.brand || ""}::${p.cost || 0}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(p);
+    }
+
+    return Array.from(groups.entries())
+      .filter(([_, items]) => items.length > 1)
+      .map(([key, items]) => ({
+        groupId: key,
+        parentTitle: items[0].name?.replace(/\s*-\s*(XS|S|M|L|XL|XXL|\d+|O\/S)\s*$/i, "").trim() || "",
+        styleCode: items[0].sku || "",
+        colour: items[0].colour || "",
+        vendor: items[0].brand || "",
+        unitCost: items[0].cost || 0,
+        totalUnits: items.reduce((s, i) => s + (i.qty || 0), 0),
+        variants: items,
+      }));
   }, [products]);
 
   // Get filtered list for current tab
@@ -76,31 +139,17 @@ export default function PostParseReviewScreen({
       );
     }
 
-    if (vendorFilter !== "all") {
-      list = list.filter(p => p.brand?.trim() === vendorFilter);
-    }
+    if (vendorFilter !== "all") list = list.filter(p => p.brand?.trim() === vendorFilter);
+    if (confFilter !== "all") list = list.filter(p => p._confidenceLevel === confFilter);
+    if (showEditedOnly) list = list.filter(p => (p as ReviewProduct)._manuallyEdited);
+    if (showCorrectedOnly) list = list.filter(p => p._corrections.length > 0);
 
-    if (confFilter !== "all") {
-      list = list.filter(p => p._confidenceLevel === confFilter);
-    }
-
-    if (showEditedOnly) {
-      list = list.filter(p => (p as any)._manuallyEdited);
-    }
-
-    if (showCorrectedOnly) {
-      list = list.filter(p => p._corrections.length > 0);
-    }
-
-    // Sort accepted by confidence descending
-    if (activeTab === "accepted") {
-      list = [...list].sort((a, b) => b._confidence - a._confidence);
-    }
+    if (activeTab === "accepted") list = [...list].sort((a, b) => b._confidence - a._confidence);
 
     return list;
   }, [activeTab, accepted, needsReview, rejected, searchQuery, vendorFilter, confFilter, showEditedOnly, showCorrectedOnly]);
 
-  // Actions
+  // ── Actions ──
   const approveRow = (rowIndex: number) => {
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
@@ -109,15 +158,14 @@ export default function PostParseReviewScreen({
     ));
   };
 
-  const rejectRow = (rowIndex: number) => {
-    // Record noise rejection for learning
+  const rejectRow = (rowIndex: number, reason?: string) => {
     const product = products.find(p => p._rowIndex === rowIndex);
     if (supplierName && product) {
-      recordNoiseRejection(supplierName, product._rawName || product.name || "", "Manually rejected by merchant");
+      recordNoiseRejection(supplierName, product._rawName || product.name || "", reason || "Manually rejected by merchant");
     }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
-        ? { ...p, _rejected: true, _rejectReason: "Manually rejected", _confidenceLevel: "low" as const, _confidence: 0 }
+        ? { ...p, _rejected: true, _rejectReason: reason || "Manually rejected", _confidenceLevel: "low" as const, _confidence: 0 }
         : p
     ));
   };
@@ -138,23 +186,37 @@ export default function PostParseReviewScreen({
     ));
   };
 
+  const markRowAs = (rowIndex: number, markAs: "freight" | "tax" | "summary" | "non-product") => {
+    const labels: Record<string, string> = {
+      freight: "Marked as freight/shipping",
+      tax: "Marked as tax/GST",
+      summary: "Marked as subtotal/summary",
+      "non-product": "Marked as non-product",
+    };
+    const product = products.find(p => p._rowIndex === rowIndex);
+    if (supplierName && product) {
+      recordNoiseRejection(supplierName, product._rawName || product.name || "", labels[markAs]);
+    }
+    onUpdateProducts(products.map(p =>
+      p._rowIndex === rowIndex
+        ? { ...p, _rejected: true, _rejectReason: labels[markAs], _confidenceLevel: "low" as const, _confidence: 0, _markedAs: markAs } as any
+        : p
+    ));
+  };
+
   const updateField = (rowIndex: number, field: string, value: string | number) => {
     onUpdateProducts(products.map(p => {
+      if (p._rowIndex !== rowIndex) return p;
       const originalValue = String((p as any)[field] || "");
       const newValue = String(value);
-      // Save correction to both systems for learning
       if (supplierName && originalValue !== newValue && originalValue) {
-        const fieldLabels: Record<string, string> = { name: "title", colour: "colour", size: "size", cost: "cost", sku: "sku", qty: "quantity" };
+        const fieldLabels: Record<string, string> = { name: "title", colour: "colour", size: "size", cost: "cost", sku: "sku", qty: "quantity", brand: "vendor" };
         const fieldLabel = fieldLabels[field] || field;
-        // Old template system
         saveCorrection(supplierName, {
-          field: fieldLabel,
-          original: originalValue,
-          corrected: newValue,
+          field: fieldLabel, original: originalValue, corrected: newValue,
           rule: `In ${fieldLabel}: "${originalValue}" → "${newValue}"`,
           timestamp: new Date().toISOString(),
         });
-        // New learning memory system
         recordFieldCorrection(supplierName, fieldLabel, originalValue, newValue);
       }
       const updated = { ...p, [field]: value, _manuallyEdited: true } as any;
@@ -176,11 +238,58 @@ export default function PostParseReviewScreen({
     }));
   };
 
-  // Bulk actions
+  // Merge selected rows into one product with variants
+  const mergeSelected = () => {
+    if (selectedRows.size < 2) return;
+    const indices = Array.from(selectedRows);
+    const baseProduct = products.find(p => p._rowIndex === indices[0]);
+    if (!baseProduct) return;
+
+    if (supplierName) {
+      recordGroupingRule(supplierName, `Merge rows by similar title under "${baseProduct.name}"`);
+    }
+
+    // Keep first row, mark others with group reference
+    onUpdateProducts(products.map(p => {
+      if (indices.includes(p._rowIndex) && p._rowIndex !== indices[0]) {
+        return { ...p, _rejected: true, _rejectReason: `Merged into "${baseProduct.name}"` };
+      }
+      if (p._rowIndex === indices[0]) {
+        const totalQty = indices.reduce((s, idx) => {
+          const found = products.find(pp => pp._rowIndex === idx);
+          return s + (found?.qty || 0);
+        }, 0);
+        return { ...p, qty: totalQty, _manuallyEdited: true } as any;
+      }
+      return p;
+    }));
+    setSelectedRows(new Set());
+  };
+
+  // Split a product row into standalone
+  const splitRow = (rowIndex: number) => {
+    // Simply reset any grouping and mark as standalone
+    onUpdateProducts(products.map(p =>
+      p._rowIndex === rowIndex ? { ...p, _groupId: undefined, _manuallyEdited: true } as any : p
+    ));
+  };
+
+  // ── Bulk Actions ──
   const acceptAllHighConfidence = () => {
     onUpdateProducts(products.map(p =>
       !p._rejected && p._confidence >= 80 ? { ...p, _confidenceLevel: "high" as const } : p
     ));
+  };
+
+  const rejectAllSummaryRows = () => {
+    onUpdateProducts(products.map(p => {
+      if (p._rejected) return p;
+      const name = (p.name || "").toLowerCase().trim();
+      if (/^(subtotal|total|gst|tax|freight|shipping|carton|bank|bsb|account|abn|thank|terms|payment)/i.test(name)) {
+        return { ...p, _rejected: true, _rejectReason: "Bulk rejected: summary/non-product row", _confidenceLevel: "low" as const, _confidence: 0 };
+      }
+      return p;
+    }));
   };
 
   const rejectAllNumericOnly = () => {
@@ -193,12 +302,37 @@ export default function PostParseReviewScreen({
     }));
   };
 
+  const applyBulkVendor = () => {
+    if (!bulkVendor.trim() || selectedRows.size === 0) return;
+    onUpdateProducts(products.map(p =>
+      selectedRows.has(p._rowIndex) ? { ...p, brand: bulkVendor.trim(), _manuallyEdited: true } as any : p
+    ));
+    setSelectedRows(new Set());
+    setBulkVendor("");
+  };
+
+  const markSelectedAsFreight = () => {
+    selectedRows.forEach(idx => markRowAs(idx, "freight"));
+    setSelectedRows(new Set());
+  };
+
+  const toggleSelectRow = (rowIndex: number) => {
+    setSelectedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(rowIndex)) next.delete(rowIndex); else next.add(rowIndex);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedRows(new Set(currentList.map(p => p._rowIndex)));
+  };
+
+  const clearSelection = () => setSelectedRows(new Set());
+
   const handleExportClick = () => {
-    if (needsReview.length > 0) {
-      setShowExportWarning(true);
-    } else {
-      onExportAccepted();
-    }
+    if (needsReview.length > 0) setShowExportWarning(true);
+    else onExportAccepted();
   };
 
   const tabs: { key: ReviewTab; label: string; count: number; icon: React.ReactNode; colorClass: string }[] = [
@@ -215,153 +349,203 @@ export default function PostParseReviewScreen({
           <ShieldCheck className="w-5 h-5 text-primary" />
           <h2 className="text-lg font-semibold font-display">Review Products</h2>
         </div>
-        <p className="text-xs text-muted-foreground">Check AI-corrected products before sending to Shopify</p>
+        <p className="text-xs text-muted-foreground">Review, fix, and teach the AI before exporting</p>
       </div>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
+      {/* Summary Panel */}
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
+        <StatCard label="Total Rows" value={products.length} icon={<FileText className="w-3.5 h-3.5" />} colorClass="text-foreground bg-muted/30 border-border" />
         <StatCard label="Accepted" value={accepted.length} icon={<Check className="w-3.5 h-3.5" />} colorClass="text-success bg-success/10 border-success/20" />
         <StatCard label="Review" value={needsReview.length} icon={<AlertTriangle className="w-3.5 h-3.5" />} colorClass="text-secondary bg-secondary/10 border-secondary/20" />
         <StatCard label="Rejected" value={rejected.length} icon={<X className="w-3.5 h-3.5" />} colorClass="text-destructive bg-destructive/10 border-destructive/20" />
-        <StatCard label="Avg Confidence" value={`${avgConfidence}%`} icon={<Zap className="w-3.5 h-3.5" />} colorClass="text-primary bg-primary/10 border-primary/20" />
+        <StatCard label="Est. Cost" value={`$${totalEstimatedCost.toFixed(0)}`} icon={<DollarSign className="w-3.5 h-3.5" />} colorClass="text-primary bg-primary/10 border-primary/20" />
+        <StatCard label="Missing Cost" value={missingCostCount} icon={<AlertTriangle className="w-3.5 h-3.5" />} colorClass={missingCostCount > 0 ? "text-secondary bg-secondary/10 border-secondary/20" : "text-success bg-success/10 border-success/20"} />
       </div>
 
-      {/* Tab bar */}
-      <div className="flex bg-muted/30 rounded-lg p-1 mb-3">
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-xs font-medium transition-colors ${
-              activeTab === t.key
-                ? "bg-card shadow-sm text-foreground"
-                : "text-muted-foreground hover:bg-muted/50"
-            }`}
-          >
-            <span className={t.colorClass}>{t.icon}</span>
-            {t.label}
-            <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-              activeTab === t.key ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
-            }`}>
-              {t.count}
-            </span>
-          </button>
-        ))}
+      {/* Groups count + avg confidence */}
+      <div className="flex items-center gap-3 mb-3 text-xs text-muted-foreground">
+        <span><Layers className="w-3 h-3 inline mr-1" />{groupedProducts.length} grouped products</span>
+        <span>·</span>
+        <span>Avg confidence: <span className={avgConfidence >= 80 ? "text-success font-semibold" : avgConfidence >= 50 ? "text-secondary font-semibold" : "text-destructive font-semibold"}>{avgConfidence}%</span></span>
+      </div>
+
+      {/* Tab bar + view toggle */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex flex-1 bg-muted/30 rounded-lg p-1">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => { setActiveTab(t.key); setSelectedRows(new Set()); }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-xs font-medium transition-colors ${
+                activeTab === t.key ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:bg-muted/50"
+              }`}
+            >
+              <span className={t.colorClass}>{t.icon}</span>
+              {t.label}
+              <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                activeTab === t.key ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+              }`}>{t.count}</span>
+            </button>
+          ))}
+        </div>
+        {activeTab !== "rejected" && (
+          <div className="flex bg-muted/30 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode("flat")}
+              className={`px-2.5 py-2 rounded-md text-[10px] font-medium transition-colors ${viewMode === "flat" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+            >
+              <FileText className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => setViewMode("grouped")}
+              className={`px-2.5 py-2 rounded-md text-[10px] font-medium transition-colors ${viewMode === "grouped" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+            >
+              <Layers className="w-3 h-3" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-3 items-center">
-        <div className="relative flex-1 min-w-[160px]">
+        <div className="relative flex-1 min-w-[140px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search products..."
-            className="h-8 pl-8 text-xs"
-          />
+          <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search products..." className="h-8 pl-8 text-xs" />
         </div>
-        <select
-          value={vendorFilter}
-          onChange={e => setVendorFilter(e.target.value)}
-          className="h-8 rounded-md bg-input border border-border px-2 text-xs min-w-[120px]"
-        >
+        <select value={vendorFilter} onChange={e => setVendorFilter(e.target.value)} className="h-8 rounded-md bg-input border border-border px-2 text-xs min-w-[100px]">
           <option value="all">All vendors</option>
           {vendors.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
-        <select
-          value={confFilter}
-          onChange={e => setConfFilter(e.target.value as ConfFilter)}
-          className="h-8 rounded-md bg-input border border-border px-2 text-xs"
-        >
+        <select value={confFilter} onChange={e => setConfFilter(e.target.value as ConfFilter)} className="h-8 rounded-md bg-input border border-border px-2 text-xs">
           <option value="all">All confidence</option>
           <option value="high">High (90-100%)</option>
           <option value="medium">Medium (50-89%)</option>
           <option value="low">Low (&lt;50%)</option>
         </select>
-        <button
-          onClick={() => setShowEditedOnly(!showEditedOnly)}
-          className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium border transition-colors ${
-            showEditedOnly ? "bg-primary/10 border-primary text-primary" : "bg-muted border-border text-muted-foreground"
-          }`}
-        >
+        <button onClick={() => setShowEditedOnly(!showEditedOnly)} className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium border transition-colors ${showEditedOnly ? "bg-primary/10 border-primary text-primary" : "bg-muted border-border text-muted-foreground"}`}>
           <Edit3 className="w-3 h-3 inline mr-1" />Edited
         </button>
-        <button
-          onClick={() => setShowCorrectedOnly(!showCorrectedOnly)}
-          className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium border transition-colors ${
-            showCorrectedOnly ? "bg-primary/10 border-primary text-primary" : "bg-muted border-border text-muted-foreground"
-          }`}
-        >
+        <button onClick={() => setShowCorrectedOnly(!showCorrectedOnly)} className={`px-2.5 py-1.5 rounded-md text-[10px] font-medium border transition-colors ${showCorrectedOnly ? "bg-primary/10 border-primary text-primary" : "bg-muted border-border text-muted-foreground"}`}>
           <Zap className="w-3 h-3 inline mr-1" />Auto-corrected
         </button>
       </div>
 
-      {/* Bulk actions */}
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {activeTab === "review" && needsReview.length > 0 && (
-          <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={acceptAllHighConfidence}>
-            <CheckCheck className="w-3 h-3" /> Accept all high-confidence
-          </Button>
+      {/* Bulk actions bar */}
+      <div className="flex flex-wrap gap-1.5 mb-3 items-center">
+        {selectedRows.size > 0 && (
+          <>
+            <Badge variant="outline" className="text-[10px] h-6">{selectedRows.size} selected</Badge>
+            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={clearSelection}>Clear</Button>
+            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 text-success" onClick={() => selectedRows.forEach(idx => approveRow(idx))}>
+              <Check className="w-3 h-3" /> Accept selected
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 text-destructive" onClick={() => { selectedRows.forEach(idx => rejectRow(idx)); setSelectedRows(new Set()); }}>
+              <X className="w-3 h-3" /> Reject selected
+            </Button>
+            {selectedRows.size >= 2 && (
+              <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={mergeSelected}>
+                <Merge className="w-3 h-3" /> Merge selected
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={markSelectedAsFreight}>
+              <Truck className="w-3 h-3" /> Mark freight/tax
+            </Button>
+            <div className="flex items-center gap-1">
+              <Input value={bulkVendor} onChange={e => setBulkVendor(e.target.value)} placeholder="Vendor..." className="h-7 text-[10px] w-24" />
+              <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={applyBulkVendor} disabled={!bulkVendor.trim()}>Apply</Button>
+            </div>
+          </>
         )}
-        {activeTab === "review" && (
-          <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 text-destructive border-destructive/30" onClick={rejectAllNumericOnly}>
-            <X className="w-3 h-3" /> Reject all numeric-only
-          </Button>
+        {selectedRows.size === 0 && (
+          <>
+            <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 text-muted-foreground" onClick={selectAll}>Select all</Button>
+            {activeTab === "review" && needsReview.length > 0 && (
+              <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1" onClick={acceptAllHighConfidence}>
+                <CheckCheck className="w-3 h-3" /> Accept high-confidence
+              </Button>
+            )}
+            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 text-destructive border-destructive/30" onClick={rejectAllSummaryRows}>
+              <Receipt className="w-3 h-3" /> Reject summary rows
+            </Button>
+            <Button variant="outline" size="sm" className="h-7 text-[10px] gap-1 text-destructive border-destructive/30" onClick={rejectAllNumericOnly}>
+              <Hash className="w-3 h-3" /> Reject numeric-only
+            </Button>
+          </>
         )}
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto max-h-[500px] border border-border rounded-lg bg-card">
-        {currentList.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              {activeTab === "accepted" && "No accepted products yet"}
-              {activeTab === "review" && "✓ No rows need review — all clean!"}
-              {activeTab === "rejected" && "No rows were rejected"}
-            </p>
-          </div>
+        {viewMode === "grouped" && activeTab !== "rejected" ? (
+          /* ── Grouped Product View ── */
+          groupedProducts.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">No grouped products detected — switch to flat view</div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {groupedProducts.map(group => (
+                <GroupedProductCard
+                  key={group.groupId}
+                  group={group}
+                  onUpdateField={updateField}
+                  onRejectVariant={(idx) => rejectRow(idx)}
+                  onSplitVariant={splitRow}
+                  supplierName={supplierName}
+                />
+              ))}
+            </div>
+          )
         ) : (
-          <div className="divide-y divide-border/50">
-            {currentList.map(p => (
-              <ReviewRow
-                key={p._rowIndex}
-                product={p}
-                tab={activeTab}
-                isEditing={editingRow === p._rowIndex}
-                onStartEdit={() => setEditingRow(p._rowIndex)}
-                onStopEdit={() => setEditingRow(null)}
-                onApprove={() => approveRow(p._rowIndex)}
-                onReject={() => rejectRow(p._rowIndex)}
-                onMoveToReview={() => moveToReview(p._rowIndex)}
-                onRestore={() => restoreToReview(p._rowIndex)}
-                onUpdateField={(field, value) => updateField(p._rowIndex, field, value)}
-              />
-            ))}
-          </div>
+          /* ── Flat Row View ── */
+          currentList.length === 0 ? (
+            <div className="p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                {activeTab === "accepted" && "No accepted products yet"}
+                {activeTab === "review" && "✓ No rows need review — all clean!"}
+                {activeTab === "rejected" && "No rows were rejected"}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {currentList.map(p => (
+                <ReviewRow
+                  key={p._rowIndex}
+                  product={p as ReviewProduct}
+                  tab={activeTab}
+                  isEditing={editingRow === p._rowIndex}
+                  isSelected={selectedRows.has(p._rowIndex)}
+                  onToggleSelect={() => toggleSelectRow(p._rowIndex)}
+                  onStartEdit={() => setEditingRow(p._rowIndex)}
+                  onStopEdit={() => setEditingRow(null)}
+                  onApprove={() => approveRow(p._rowIndex)}
+                  onReject={() => rejectRow(p._rowIndex)}
+                  onMoveToReview={() => moveToReview(p._rowIndex)}
+                  onRestore={() => restoreToReview(p._rowIndex)}
+                  onUpdateField={(field, value) => updateField(p._rowIndex, field, value)}
+                  onMarkAs={(markAs) => markRowAs(p._rowIndex, markAs)}
+                  onSplit={() => splitRow(p._rowIndex)}
+                  showTeachAI={showTeachAI === p._rowIndex}
+                  onToggleTeachAI={() => setShowTeachAI(showTeachAI === p._rowIndex ? null : p._rowIndex)}
+                  supplierName={supplierName}
+                />
+              ))}
+            </div>
+          )
         )}
       </div>
 
       {/* Debug panel */}
       <div className="mt-3 border border-border rounded-lg bg-card overflow-hidden">
-        <button
-          onClick={() => setShowDebug(!showDebug)}
-          className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors"
-        >
+        <button onClick={() => setShowDebug(!showDebug)} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors">
           <Bug className="w-3.5 h-3.5" />
           <span className="font-medium">AI Parsing Details</span>
-          <span className="text-[10px] ml-auto mr-2">
-            {debug.corrections.length} corrections · {debug.detectedVendor}
-          </span>
+          <span className="text-[10px] ml-auto mr-2">{debug.corrections.length} corrections · {debug.detectedVendor}</span>
           {showDebug ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
         {showDebug && (
           <div className="border-t border-border">
-            {/* Parsing Plan */}
             {debug.parsingPlan && (
               <div className="px-4 py-3 bg-muted/10 border-b border-border">
-                <p className="text-[10px] font-semibold text-foreground mb-2 flex items-center gap-1">
-                  <Zap className="w-3 h-3" /> Parsing Strategy Plan
-                </p>
+                <p className="text-[10px] font-semibold text-foreground mb-2 flex items-center gap-1"><Zap className="w-3 h-3" /> Parsing Strategy Plan</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
                   <DetailRow label="Document type" value={debug.parsingPlan.document_type || "—"} />
                   <DetailRow label="Layout type" value={debug.parsingPlan.layout_type || "—"} />
@@ -373,24 +557,13 @@ export default function PostParseReviewScreen({
                   <DetailRow label="Expected review" value={debug.parsingPlan.expected_review_level || "—"} highlight />
                 </div>
                 {debug.parsingPlan.strategy_explanation && (
-                  <p className="mt-2 text-[10px] text-muted-foreground italic border-t border-border/30 pt-1.5">
-                    💡 {debug.parsingPlan.strategy_explanation}
-                  </p>
-                )}
-                {debug.parsingPlan.review_reason && (
-                  <p className="text-[10px] text-muted-foreground">
-                    Review reason: {debug.parsingPlan.review_reason}
-                  </p>
+                  <p className="mt-2 text-[10px] text-muted-foreground italic border-t border-border/30 pt-1.5">💡 {debug.parsingPlan.strategy_explanation}</p>
                 )}
               </div>
             )}
-
-            {/* AI Rejected Rows */}
             {debug.rejectedByAI && debug.rejectedByAI.length > 0 && (
               <div className="px-4 py-2 bg-destructive/5 border-b border-border">
-                <p className="text-[10px] font-semibold text-destructive mb-1">
-                  🚫 Rows Rejected by AI ({debug.rejectedByAI.length})
-                </p>
+                <p className="text-[10px] font-semibold text-destructive mb-1">🚫 Rows Rejected by AI ({debug.rejectedByAI.length})</p>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
                   {debug.rejectedByAI.map((r, i) => (
                     <div key={i} className="flex gap-2 text-[9px]">
@@ -401,52 +574,8 @@ export default function PostParseReviewScreen({
                 </div>
               </div>
             )}
-
             <div className="px-4 py-2 bg-muted/20 text-[10px] text-muted-foreground">
               {debug.totalRaw} rows parsed → {debug.accepted} accepted, {debug.needsReview} flagged, {debug.rejected} rejected
-            </div>
-            <div className="max-h-60 overflow-y-auto">
-              <table className="w-full text-[9px]">
-                <thead className="sticky top-0 bg-card">
-                  <tr className="border-b border-border text-left text-muted-foreground">
-                    <th className="py-1.5 px-2">#</th>
-                    <th className="py-1.5 px-2">Raw Text</th>
-                    <th className="py-1.5 px-2">Classification</th>
-                    <th className="py-1.5 px-2">→ Title</th>
-                    <th className="py-1.5 px-2">→ Price</th>
-                    <th className="py-1.5 px-2">→ Vendor</th>
-                    <th className="py-1.5 px-2">Score</th>
-                    <th className="py-1.5 px-2">Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map(p => (
-                    <tr key={p._rowIndex} className={`border-b border-border/20 ${p._rejected ? "opacity-40" : ""}`}>
-                      <td className="py-1 px-2 font-mono">{p._rowIndex + 1}</td>
-                      <td className="py-1 px-2 max-w-[120px] truncate">{p._rawName || "—"}</td>
-                      <td className="py-1 px-2">
-                        <span className={`px-1 py-0.5 rounded text-[8px] ${
-                          p._classification === "product_title" ? "bg-success/15 text-success" :
-                          p._classification === "vendor" ? "bg-primary/15 text-primary" :
-                          p._classification === "unit_price" ? "bg-secondary/15 text-secondary" :
-                          "bg-muted text-muted-foreground"
-                        }`}>
-                          {p._classification}
-                        </span>
-                      </td>
-                      <td className="py-1 px-2 max-w-[120px] truncate">{p._suggestedTitle || "—"}</td>
-                      <td className="py-1 px-2 font-mono">{p._suggestedPrice > 0 ? `$${p._suggestedPrice.toFixed(2)}` : "—"}</td>
-                      <td className="py-1 px-2 max-w-[80px] truncate">{p._suggestedVendor}</td>
-                      <td className="py-1 px-2">
-                        <ConfidenceBadgeInline confidence={p._confidence} level={p._confidenceLevel} />
-                      </td>
-                      <td className="py-1 px-2 max-w-[140px] truncate text-muted-foreground">
-                        {p._rejectReason || (p._corrections.length > 0 ? `${p._corrections.length} fix(es)` : "—")}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
         )}
@@ -461,8 +590,7 @@ export default function PostParseReviewScreen({
               <h3 className="font-semibold text-sm">Some rows still need review</h3>
             </div>
             <p className="text-xs text-muted-foreground">
-              {needsReview.length} row{needsReview.length > 1 ? "s" : ""} still need review.
-              Export accepted rows only or review them first.
+              {needsReview.length} row{needsReview.length > 1 ? "s" : ""} still need review. Export accepted rows only or review them first.
             </p>
             <div className="flex gap-2">
               <Button variant="teal" size="sm" className="flex-1 h-9 text-xs" onClick={() => { setShowExportWarning(false); onExportAccepted(); }}>
@@ -496,36 +624,105 @@ export default function PostParseReviewScreen({
 // ── Stat Card ──
 function StatCard({ label, value, icon, colorClass }: { label: string; value: string | number; icon: React.ReactNode; colorClass: string }) {
   return (
-    <div className={`rounded-lg border p-3 text-center ${colorClass}`}>
-      <div className="flex items-center justify-center gap-1 mb-1">{icon}</div>
-      <p className="text-lg font-bold font-display">{value}</p>
-      <p className="text-[10px] opacity-80">{label}</p>
+    <div className={`rounded-lg border p-2.5 text-center ${colorClass}`}>
+      <div className="flex items-center justify-center gap-1 mb-0.5">{icon}</div>
+      <p className="text-base font-bold font-display">{value}</p>
+      <p className="text-[9px] opacity-80">{label}</p>
     </div>
   );
 }
 
-// ── Confidence Badge Inline ──
-function ConfidenceBadgeInline({ confidence, level }: { confidence: number; level: string }) {
-  const cls = level === "high" ? "text-success" : level === "medium" ? "text-secondary" : "text-destructive";
-  return <span className={`font-bold text-[10px] ${cls}`}>{confidence}%</span>;
+// ── Grouped Product Card (Fashion view) ──
+function GroupedProductCard({
+  group, onUpdateField, onRejectVariant, onSplitVariant, supplierName,
+}: {
+  group: ProductGroup;
+  onUpdateField: (rowIndex: number, field: string, value: string | number) => void;
+  onRejectVariant: (rowIndex: number) => void;
+  onSplitVariant: (rowIndex: number) => void;
+  supplierName?: string;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const [editingParent, setEditingParent] = useState(false);
+
+  return (
+    <div className="px-4 py-3">
+      <div className="flex items-start gap-3">
+        <button onClick={() => setExpanded(!expanded)} className="mt-1 text-muted-foreground">
+          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <Package className="w-4 h-4 text-primary" />
+            {editingParent ? (
+              <Input
+                defaultValue={group.parentTitle}
+                onBlur={e => {
+                  group.variants.forEach(v => onUpdateField(v._rowIndex, "name", e.target.value + (v.size ? ` - ${v.size}` : "")));
+                  setEditingParent(false);
+                }}
+                className="h-7 text-sm font-semibold flex-1"
+                autoFocus
+              />
+            ) : (
+              <span className="text-sm font-semibold truncate cursor-pointer hover:text-primary" onClick={() => setEditingParent(true)}>
+                {group.parentTitle}
+              </span>
+            )}
+            <Badge variant="outline" className="text-[9px] h-5 shrink-0">{group.variants.length} variants</Badge>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-muted-foreground">
+            {group.styleCode && <span><Hash className="w-3 h-3 inline mr-0.5" />{group.styleCode}</span>}
+            {group.colour && <span>Colour: {group.colour}</span>}
+            <span>{group.vendor}</span>
+            <span>${group.unitCost.toFixed(2)} ea</span>
+            <span className="font-semibold text-foreground">{group.totalUnits} total units</span>
+          </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="ml-10 mt-2 bg-muted/20 rounded-lg border border-border/50 divide-y divide-border/30">
+          <div className="grid grid-cols-[1fr_60px_50px_40px] gap-2 px-3 py-1.5 text-[9px] text-muted-foreground font-semibold uppercase tracking-wide">
+            <span>Size</span>
+            <span>Colour</span>
+            <span>Qty</span>
+            <span></span>
+          </div>
+          {group.variants.map(v => (
+            <div key={v._rowIndex} className="grid grid-cols-[1fr_60px_50px_40px] gap-2 px-3 py-2 items-center text-xs">
+              <span className="font-medium">{v.size || "—"}</span>
+              <span className="text-muted-foreground">{v.colour || group.colour || "—"}</span>
+              <span className="font-mono font-semibold">{v.qty || 0}</span>
+              <div className="flex gap-0.5">
+                <button onClick={() => onSplitVariant(v._rowIndex)} className="p-1 rounded hover:bg-muted" title="Split out">
+                  <Scissors className="w-3 h-3 text-muted-foreground" />
+                </button>
+                <button onClick={() => onRejectVariant(v._rowIndex)} className="p-1 rounded hover:bg-destructive/10" title="Remove variant">
+                  <X className="w-3 h-3 text-destructive" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
-// ── Review Row ──
+// ── Review Row (Flat view) ──
 function ReviewRow({
-  product: p,
-  tab,
-  isEditing,
-  onStartEdit,
-  onStopEdit,
-  onApprove,
-  onReject,
-  onMoveToReview,
-  onRestore,
-  onUpdateField,
+  product: p, tab, isEditing, isSelected,
+  onToggleSelect, onStartEdit, onStopEdit,
+  onApprove, onReject, onMoveToReview, onRestore,
+  onUpdateField, onMarkAs, onSplit,
+  showTeachAI, onToggleTeachAI, supplierName,
 }: {
-  product: ValidatedProduct & { _manuallyEdited?: boolean };
+  product: ReviewProduct;
   tab: ReviewTab;
   isEditing: boolean;
+  isSelected: boolean;
+  onToggleSelect: () => void;
   onStartEdit: () => void;
   onStopEdit: () => void;
   onApprove: () => void;
@@ -533,18 +730,31 @@ function ReviewRow({
   onMoveToReview: () => void;
   onRestore: () => void;
   onUpdateField: (field: string, value: string | number) => void;
+  onMarkAs: (markAs: "freight" | "tax" | "summary" | "non-product") => void;
+  onSplit: () => void;
+  showTeachAI: boolean;
+  onToggleTeachAI: () => void;
+  supplierName?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""}`}>
+    <div className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""}`}>
       {/* Main row */}
-      <div className="px-4 py-3 flex items-center gap-3">
+      <div className="px-4 py-3 flex items-center gap-2">
+        {/* Select checkbox */}
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={onToggleSelect}
+          className="w-3.5 h-3.5 rounded border-border accent-primary shrink-0"
+        />
+
         <button onClick={() => setExpanded(!expanded)} className="shrink-0 text-muted-foreground">
           {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
 
-        {/* Confidence with tooltip */}
+        {/* Confidence */}
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -552,21 +762,24 @@ function ReviewRow({
                 <span className={`text-sm font-bold font-mono ${
                   p._confidenceLevel === "high" ? "text-success" :
                   p._confidenceLevel === "medium" ? "text-secondary" : "text-destructive"
-                }`}>
-                  {p._confidence}%
-                </span>
+                }`}>{p._confidence}%</span>
               </div>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-[220px] p-2">
+            <TooltipContent side="top" className="max-w-[240px] p-2">
               <p className="text-[10px] font-semibold mb-1">Score breakdown</p>
               <div className="space-y-0.5">
-                {(p._confidenceReasons || []).slice(0, 5).map((r, i) => (
+                {(p._confidenceReasons || []).slice(0, 6).map((r, i) => (
                   <div key={i} className={`text-[9px] flex items-center gap-1 ${r.delta > 0 ? "text-success" : "text-destructive"}`}>
                     <span className="font-mono">{r.delta > 0 ? "+" : ""}{r.delta}</span>
                     <span className="text-muted-foreground">{r.label}</span>
                   </div>
                 ))}
               </div>
+              {p._extractionReason && (
+                <p className="text-[9px] text-muted-foreground mt-1 pt-1 border-t border-border/50">
+                  {p._extractionReason}
+                </p>
+              )}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -578,14 +791,13 @@ function ReviewRow({
               {p._rejected ? (p._rawName || "(empty)") : (p.name || p._rawName || "(empty)")}
             </p>
             {p._corrections.length > 0 && !p._rejected && (
-              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-primary/30 text-primary shrink-0">
-                Auto-corrected
-              </Badge>
+              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-primary/30 text-primary shrink-0">Auto-corrected</Badge>
             )}
-            {(p as any)._manuallyEdited && (
-              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-secondary/30 text-secondary shrink-0">
-                Edited
-              </Badge>
+            {p._manuallyEdited && (
+              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-secondary/30 text-secondary shrink-0">Edited</Badge>
+            )}
+            {p._sourcePage && (
+              <Badge variant="outline" className="text-[8px] px-1 py-0 h-4 border-muted-foreground/30 text-muted-foreground shrink-0">p.{p._sourcePage}</Badge>
             )}
           </div>
           <p className="text-[11px] text-muted-foreground truncate mt-0.5">
@@ -594,160 +806,129 @@ function ReviewRow({
             ) : (
               <>
                 {p.brand && <span>{p.brand}</span>}
+                {p.sku && <span> · {p.sku}</span>}
+                {p.colour && <span> · {p.colour}</span>}
+                {p.size && <span> · {p.size}</span>}
                 {p.cost > 0 && <span> · ${p.cost.toFixed(2)}</span>}
                 {p.qty > 0 && <span> · Qty: {p.qty}</span>}
-                {p.sku && <span> · {p.sku}</span>}
-                {p.size && <span> · {p.size}</span>}
+                {p.cost > 0 && p.qty > 0 && <span className="text-foreground font-medium"> · Line: ${(p.cost * p.qty).toFixed(2)}</span>}
               </>
             )}
           </p>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-1 shrink-0">
+        <div className="flex gap-0.5 shrink-0">
           {tab === "accepted" && (
             <>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onStartEdit} title="Edit">
-                <Edit3 className="w-3.5 h-3.5 text-muted-foreground" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onMoveToReview} title="Move to Review">
-                <AlertTriangle className="w-3.5 h-3.5 text-secondary" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onReject} title="Reject">
-                <X className="w-3.5 h-3.5 text-destructive" />
-              </Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onStartEdit} title="Edit"><Edit3 className="w-3.5 h-3.5 text-muted-foreground" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onToggleTeachAI} title="Teach AI"><Brain className="w-3.5 h-3.5 text-primary" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onMoveToReview} title="Move to Review"><AlertTriangle className="w-3.5 h-3.5 text-secondary" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onReject} title="Reject"><X className="w-3.5 h-3.5 text-destructive" /></Button>
             </>
           )}
           {tab === "review" && (
             <>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-success gap-1" onClick={onApprove}>
-                <Check className="w-3.5 h-3.5" /> Accept
-              </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onStartEdit} title="Edit">
-                <Edit3 className="w-3.5 h-3.5 text-muted-foreground" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onReject} title="Reject">
-                <X className="w-3.5 h-3.5 text-destructive" />
-              </Button>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-success gap-1" onClick={onApprove}><Check className="w-3.5 h-3.5" /> Accept</Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onStartEdit} title="Edit"><Edit3 className="w-3.5 h-3.5 text-muted-foreground" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onToggleTeachAI} title="Teach AI"><Brain className="w-3.5 h-3.5 text-primary" /></Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onReject} title="Reject"><X className="w-3.5 h-3.5 text-destructive" /></Button>
             </>
           )}
           {tab === "rejected" && (
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] gap-1" onClick={onRestore}>
-              <RotateCcw className="w-3 h-3" /> Restore
-            </Button>
+            <>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] gap-1" onClick={onRestore}><RotateCcw className="w-3 h-3" /> Restore</Button>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] gap-1" onClick={onApprove}><Check className="w-3 h-3" /> Accept</Button>
+            </>
           )}
         </div>
       </div>
 
-      {/* Expanded detail / edit area */}
-      {(expanded || isEditing) && (
+      {/* Expanded detail / edit / teach AI area */}
+      {(expanded || isEditing || showTeachAI) && (
         <div className="px-4 pb-4 ml-[52px]">
           {isEditing ? (
             <div className="bg-muted/30 rounded-lg p-3 space-y-2">
               <div>
                 <label className="text-[10px] text-muted-foreground mb-0.5 block">Product Title</label>
-                <Input
-                  defaultValue={p.name}
-                  onBlur={e => onUpdateField("name", e.target.value)}
-                  className="h-8 text-xs"
-                />
+                <Input defaultValue={p.name} onBlur={e => onUpdateField("name", e.target.value)} className="h-8 text-xs" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Vendor</label>
-                  <Input
-                    defaultValue={p.brand}
-                    onBlur={e => onUpdateField("brand", e.target.value)}
-                    className="h-8 text-xs"
-                  />
+                  <Input defaultValue={p.brand} onBlur={e => onUpdateField("brand", e.target.value)} className="h-8 text-xs" />
                 </div>
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Price</label>
-                  <Input
-                    type="number"
-                    defaultValue={p.cost}
-                    onBlur={e => onUpdateField("cost", parseFloat(e.target.value) || 0)}
-                    className="h-8 text-xs"
-                  />
+                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Style Code / SKU</label>
+                  <Input defaultValue={p.sku} onBlur={e => onUpdateField("sku", e.target.value)} className="h-8 text-xs" />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Quantity</label>
-                  <Input
-                    type="number"
-                    defaultValue={p.qty}
-                    onBlur={e => onUpdateField("qty", parseInt(e.target.value) || 0)}
-                    className="h-8 text-xs"
-                  />
+                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Unit Cost</label>
+                  <Input type="number" defaultValue={p.cost} onBlur={e => onUpdateField("cost", parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Qty</label>
+                  <Input type="number" defaultValue={p.qty} onBlur={e => onUpdateField("qty", parseInt(e.target.value) || 0)} className="h-8 text-xs" />
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Size</label>
-                  <Input
-                    defaultValue={p.size}
-                    onBlur={e => onUpdateField("size", e.target.value)}
-                    className="h-8 text-xs"
-                  />
+                  <Input defaultValue={p.size} onBlur={e => onUpdateField("size", e.target.value)} className="h-8 text-xs" />
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Colour</label>
-                  <Input
-                    defaultValue={p.colour}
-                    onBlur={e => onUpdateField("colour", e.target.value)}
-                    className="h-8 text-xs"
-                  />
+                  <Input defaultValue={p.colour} onBlur={e => onUpdateField("colour", e.target.value)} className="h-8 text-xs" />
                 </div>
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-between items-center">
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 text-muted-foreground" onClick={onSplit}>
+                    <Scissors className="w-3 h-3" /> Split
+                  </Button>
+                </div>
                 <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={onStopEdit}>Done editing</Button>
               </div>
             </div>
+          ) : showTeachAI ? (
+            <TeachAIPanel product={p} supplierName={supplierName} onClose={onToggleTeachAI} />
           ) : (
             <div className="bg-muted/20 rounded-lg p-3 space-y-2 text-[11px]">
-              {/* Why this row was extracted / rejected */}
+              {/* Why extracted/rejected */}
               <div className="bg-primary/5 border border-primary/10 rounded-md p-2">
                 <span className="text-[10px] font-semibold text-primary block mb-0.5">
-                  {p._rejected ? "❌ Why this row was rejected:" : "✅ Why this row was extracted:"}
+                  {p._rejected ? "❌ Why rejected:" : "✅ Why extracted:"}
                 </span>
                 <p className="text-[10px] text-muted-foreground">
-                  {p._rejected
-                    ? (p._rejectReason || "Invalid row data")
-                    : ((p as any)._extractionReason || "Extracted by AI parser")}
+                  {p._rejected ? (p._rejectReason || "Invalid row data") : (p._extractionReason || "Extracted by AI parser")}
                 </p>
               </div>
 
-              {/* AI parse notes if present */}
-              {(p as any)._parseNotes && (
+              {p._parseNotes && (
                 <div className="bg-secondary/5 border border-secondary/10 rounded-md p-2">
                   <span className="text-[10px] font-semibold text-secondary block mb-0.5">🤖 AI Parse Note:</span>
-                  <p className="text-[10px] text-muted-foreground">{(p as any)._parseNotes}</p>
+                  <p className="text-[10px] text-muted-foreground">{p._parseNotes}</p>
                 </div>
               )}
 
-              {/* Raw vs suggested */}
-              {tab === "review" && (
-                <div className="space-y-1.5">
-                  <DetailRow label="Raw extracted text" value={p._rawName || "(empty)"} mono />
-                  <DetailRow label="Suggested title" value={p._suggestedTitle || "—"} highlight />
-                  <DetailRow label="Suggested vendor" value={p._suggestedVendor} />
-                  <DetailRow label="Suggested price" value={p._suggestedPrice > 0 ? `$${p._suggestedPrice.toFixed(2)}` : "—"} />
-                  {p._issues.length > 0 && (
-                    <div className="pt-1.5 border-t border-border/50">
-                      <span className="text-muted-foreground font-medium">Reason for review:</span>
-                      {p._issues.map((issue, i) => (
-                        <p key={i} className="text-secondary mt-0.5">⚠ {issue}</p>
-                      ))}
-                    </div>
-                  )}
-                  {p._rejectReason && !p._rejected && (
-                    <p className="text-secondary">⚠ {p._rejectReason}</p>
-                  )}
-                </div>
-              )}
+              {/* Full field detail */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                <DetailRow label="Raw text" value={p._rawName || "(empty)"} mono />
+                <DetailRow label="Title" value={p.name || "—"} highlight />
+                <DetailRow label="Vendor" value={p.brand || "—"} />
+                <DetailRow label="SKU" value={p.sku || "—"} mono />
+                <DetailRow label="Colour" value={p.colour || "—"} />
+                <DetailRow label="Size" value={p.size || "—"} />
+                <DetailRow label="Unit cost" value={p.cost > 0 ? `$${p.cost.toFixed(2)}` : "—"} />
+                <DetailRow label="Quantity" value={String(p.qty || 0)} />
+                <DetailRow label="Line total" value={p.cost > 0 && p.qty > 0 ? `$${(p.cost * p.qty).toFixed(2)}` : "—"} />
+                {p._sourcePage && <DetailRow label="Source page" value={`Page ${p._sourcePage}`} />}
+                <DetailRow label="Classification" value={p._classification} />
+              </div>
 
               {/* Corrections */}
               {p._corrections.length > 0 && (
-                <div className={tab === "review" ? "pt-1.5 border-t border-border/50" : ""}>
+                <div className="pt-1.5 border-t border-border/50">
                   <span className="text-muted-foreground font-medium">Auto-corrections:</span>
                   {p._corrections.map((c, i) => (
                     <div key={i} className="flex items-center gap-1 mt-0.5">
@@ -761,14 +942,13 @@ function ReviewRow({
                 </div>
               )}
 
-              {/* Confidence breakdown with signals */}
+              {/* Confidence breakdown */}
               <div className="pt-1.5 border-t border-border/50">
                 <DetailRow
                   label="Confidence"
                   value={`${p._confidence}% (${p._confidenceLevel})`}
                   color={p._confidenceLevel === "high" ? "text-success" : p._confidenceLevel === "medium" ? "text-secondary" : "text-destructive"}
                 />
-                <DetailRow label="Classification" value={p._classification} />
                 {(p._confidenceReasons || []).length > 0 && (
                   <div className="mt-1 space-y-0.5">
                     <span className="text-muted-foreground text-[9px]">Score factors:</span>
@@ -782,10 +962,14 @@ function ReviewRow({
                 )}
               </div>
 
-              {/* Rejection reason for rejected tab */}
-              {tab === "rejected" && p._rejectReason && (
-                <div className="pt-1.5 border-t border-border/50">
-                  <DetailRow label="Rejection reason" value={p._rejectReason} color="text-destructive" />
+              {/* Mark-as buttons for review/rejected tabs */}
+              {(tab === "review" || tab === "rejected") && !p._rejected && (
+                <div className="pt-1.5 border-t border-border/50 flex flex-wrap gap-1">
+                  <span className="text-[9px] text-muted-foreground mr-1 self-center">Mark as:</span>
+                  <Button variant="ghost" size="sm" className="h-6 text-[9px] gap-1 px-2" onClick={() => onMarkAs("freight")}><Truck className="w-2.5 h-2.5" /> Freight</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-[9px] gap-1 px-2" onClick={() => onMarkAs("tax")}><Receipt className="w-2.5 h-2.5" /> Tax/GST</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-[9px] gap-1 px-2" onClick={() => onMarkAs("summary")}><DollarSign className="w-2.5 h-2.5" /> Subtotal</Button>
+                  <Button variant="ghost" size="sm" className="h-6 text-[9px] gap-1 px-2" onClick={() => onMarkAs("non-product")}><X className="w-2.5 h-2.5" /> Non-product</Button>
                 </div>
               )}
             </div>
@@ -796,13 +980,83 @@ function ReviewRow({
   );
 }
 
+// ── Teach AI Panel ──
+function TeachAIPanel({ product, supplierName, onClose }: { product: ReviewProduct; supplierName?: string; onClose: () => void }) {
+  const [savedRules, setSavedRules] = useState<string[]>([]);
+
+  const teachRules = [
+    { label: "This column is unit cost", rule: `column_is_cost: The field containing "${product.cost}" is the unit cost field` },
+    { label: "This text pattern means colour", rule: `colour_pattern: "${product.colour}" should be recognized as colour` },
+    { label: "This row type is freight", rule: `noise_type: Rows like "${product._rawName}" are freight/shipping` },
+    { label: "This size grid maps to variants", rule: `variant_method: Size values like "${product.size}" should create separate variants` },
+    { label: "Group rows by style code", rule: `grouping: Group rows by style code prefix, similar to "${product.sku}"` },
+    { label: "This supplier uses this format", rule: `layout: This supplier's invoices use the detected layout format` },
+  ];
+
+  const saveRule = (rule: string, description: string) => {
+    if (!supplierName) return;
+    saveCorrection(supplierName, {
+      field: "ai_teaching",
+      original: product._rawName || "",
+      corrected: rule,
+      rule: description,
+      timestamp: new Date().toISOString(),
+    });
+    if (rule.startsWith("grouping:")) {
+      recordGroupingRule(supplierName, description);
+    } else if (rule.startsWith("noise_type:")) {
+      recordNoiseRejection(supplierName, product._rawName || "", description);
+    } else {
+      recordFieldCorrection(supplierName, "ai_teaching", product._rawName || "", rule);
+    }
+    setSavedRules(prev => [...prev, description]);
+  };
+
+  return (
+    <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Brain className="w-4 h-4 text-primary" />
+          <span className="text-xs font-semibold text-primary">Teach AI — Save Correction Rule</span>
+        </div>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}><X className="w-3 h-3" /></Button>
+      </div>
+      <p className="text-[10px] text-muted-foreground">Click a rule to save it. The AI will remember this for future invoices from this supplier.</p>
+      <div className="space-y-1">
+        {teachRules.map((tr, i) => {
+          const isSaved = savedRules.includes(tr.label);
+          return (
+            <button
+              key={i}
+              onClick={() => !isSaved && saveRule(tr.rule, tr.label)}
+              disabled={isSaved || !supplierName}
+              className={`w-full text-left px-3 py-2 rounded-md text-[10px] transition-colors border ${
+                isSaved
+                  ? "bg-success/10 border-success/30 text-success"
+                  : "bg-card border-border hover:bg-muted/50 text-foreground"
+              }`}
+            >
+              <span className="font-medium">{isSaved ? "✓ " : ""}{tr.label}</span>
+              <p className="text-[9px] text-muted-foreground mt-0.5 truncate">{tr.rule}</p>
+            </button>
+          );
+        })}
+      </div>
+      {!supplierName && (
+        <p className="text-[9px] text-destructive">⚠ No supplier detected — cannot save rules</p>
+      )}
+    </div>
+  );
+}
+
+// ── Detail Row ──
 function DetailRow({ label, value, mono, highlight, color }: {
   label: string; value: string; mono?: boolean; highlight?: boolean; color?: string;
 }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="text-muted-foreground shrink-0 w-28">{label}:</span>
-      <span className={`${mono ? "font-mono" : ""} ${highlight ? "font-medium text-foreground" : ""} ${color || ""}`}>
+      <span className="text-muted-foreground shrink-0 w-24">{label}:</span>
+      <span className={`${mono ? "font-mono text-[10px]" : ""} ${highlight ? "font-medium text-foreground" : ""} ${color || ""} truncate`}>
         {value}
       </span>
     </div>

@@ -540,8 +540,14 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         setSupplierName(data.supplier);
       }
       if (data.layout_type) {
+        setDetectedLayout(data.layout_type as LayoutType);
         console.log(`[Sonic Invoice] Layout detected: ${data.layout_type}, Supplier: ${data.supplier || 'unknown'}`);
-        toast(`Layout: ${data.layout_type}`, { description: `Detected supplier: ${data.supplier || supplierName || 'Unknown'}` });
+        toast(`Layout: ${getLayoutLabel(data.layout_type)}`, { description: `Detected supplier: ${data.supplier || supplierName || 'Unknown'}` });
+        // Auto-save layout template for this supplier
+        const sup = data.supplier || supplierName;
+        if (sup) {
+          saveLayoutTemplate(sup, data.layout_type as LayoutType, 85, ext as any, customInstructions || undefined);
+        }
       }
       return data.products || [];
     } catch (err) {

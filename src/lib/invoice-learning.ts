@@ -28,10 +28,31 @@ export interface FieldCorrectionRule {
   pattern: string;              // the AI's original extraction
   corrected: string;            // what the merchant changed it to
   occurrences: number;
+  category?: CorrectionCategory; // structured correction type
 }
+
+export type CorrectionCategory =
+  | "non_product_pattern"       // row was not a product (freight, GST, etc.)
+  | "cost_field_mapping"        // AI picked wrong cost field
+  | "size_interpretation"       // size grid / size system correction
+  | "colour_extraction"         // colour was wrong or missing
+  | "title_cleanup"             // title needed cleanup or rewrite
+  | "grouping_rule"             // variant grouping was wrong
+  | "vendor_mapping"            // vendor/brand was wrong
+  | "quantity_mapping"          // quantity field was wrong
+  | "reclassification"          // row moved between accepted/review/rejected
+  | "general";                  // catch-all
 
 export interface GroupingRule {
   description: string;          // e.g. "group by style_code ignoring colour suffix"
+  occurrences: number;
+}
+
+export interface ReclassificationPattern {
+  rawText: string;
+  from: "accepted" | "review" | "rejected";
+  to: "accepted" | "review" | "rejected";
+  reason: string;
   occurrences: number;
 }
 

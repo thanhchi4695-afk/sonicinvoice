@@ -12,6 +12,9 @@ export interface RawProduct {
   qty: number;
   cost: number;
   rrp: number;
+  group_key?: string;
+  cost_source?: string;
+  _lineTotal?: number;
 }
 
 export type CellClassification =
@@ -82,17 +85,24 @@ export interface ValidatedProduct extends RawProduct {
   _parseNotes?: string;
   _extractionReason?: string;
   _sourceTrace?: SourceTrace;
+  _groupKey?: string;
+  _costSource?: string;
+  _mathCheck?: "pass" | "fail" | "skipped";
 }
 
 export interface ParsingPlan {
   document_type?: string;
   layout_type?: string;
   variant_method?: string;
+  size_system?: string;
   line_item_zone?: string;
   quantity_field?: string;
   cost_field?: string;
+  cost_derivation?: string;
   grouping_required?: boolean;
   grouping_reason?: string;
+  total_products_expected?: number;
+  total_variants_expected?: number;
   expected_review_level?: string;
   review_reason?: string;
   strategy_explanation?: string;
@@ -487,10 +497,45 @@ export function validateAndCleanProducts(
       corrections.push({ row: i, field: "brand", from: "", to: detectedVendor, reason: "Assigned detected vendor" });
     }
 
-    // ── Price validation ──
-    if (p.cost <= 0 && p.rrp > 0) {
-      issues.push("No cost price, using RRP as reference");
+    // ── Price validation + cost derivation ──
+    const lineTotal = (p as any)._lineTotal || 0;
+    let costSource = (p as any).cost_source || "direct";
+    let mathCheck: "pass" | "fail" | "skipped" = "skipped";
+
+    // Rule: Derive cost from line_total if missing
+    if (p.cost <= 0 && lineTotal > 0 && p.qty > 0) {
+      const derived = Math.round((lineTotal / p.qty) * 100) / 100;
+      rowCorrections.push({ field: "cost", from: "0", to: String(derived), reason: `Cost derived from line total: $${lineTotal} / ${p.qty} = $${derived}` });
+      corrections.push({ row: i, field: "cost", from: "0", to: String(derived), reason: `Cost derived from line total` });
+      p.cost = derived;
+      costSource = "derived_from_line_total";
+      issues.push(`Cost derived from line total ($${lineTotal} / ${p.qty})`);
     }
+
+    // Rule: Cost must not equal RRP (likely column swap)
+    if (p.cost > 0 && p.rrp > 0 && p.cost >= p.rrp) {
+      issues.push(`Warning: cost ($${p.cost}) >= RRP ($${p.rrp}) — possible column swap`);
+    }
+
+    // Rule: Math cross-check (unit_cost × qty ≈ line_total)
+    if (p.cost > 0 && p.qty > 0 && lineTotal > 0) {
+      const expected = p.cost * p.qty;
+      const tolerance = Math.max(expected * 0.02, 1);
+      if (Math.abs(expected - lineTotal) <= tolerance) {
+        mathCheck = "pass";
+      } else {
+        mathCheck = "fail";
+        issues.push(`Math mismatch: ${p.cost} × ${p.qty} = ${expected.toFixed(2)}, line_total = ${lineTotal.toFixed(2)}`);
+      }
+    }
+
+    if (p.cost <= 0 && p.rrp > 0) {
+      issues.push("No cost price — RRP available but NOT used as cost");
+    }
+
+    // ── Group key ──
+    const groupKey = (p as any).group_key || (p.sku ? `${p.sku}|${p.colour || ""}` : "");
+
 
     // ── Confidence scoring with positive/negative signals ──
     const signals: ConfidenceSignal[] = [];
@@ -565,9 +610,6 @@ export function validateAndCleanProducts(
 
     confidence = Math.max(0, Math.min(100, confidence));
 
-    const confidenceLevel: "high" | "medium" | "low" =
-      rejected ? "low" : confidence >= 90 ? "high" : confidence >= 70 ? "medium" : "low";
-
     if (rejected) {
       signals.push({ label: rejectReason || "Invalid row", delta: -100 });
       rejectedRows.push({ row: i, name: rawName || "(empty)", reason: rejectReason || "Invalid" });
@@ -588,13 +630,32 @@ export function validateAndCleanProducts(
     // ── Build source trace from AI-provided regions ──
     const sourceTrace = buildSourceTrace(p as any, i, merged.length, rejected);
 
+    // Add math cross-check bonus/penalty to confidence
+    if (!rejected) {
+      if (mathCheck === "pass") {
+        signals.push({ label: "Math cross-check passed", delta: 5 });
+        confidence += 5;
+      } else if (mathCheck === "fail") {
+        signals.push({ label: "Math cross-check failed", delta: -10 });
+        confidence -= 10;
+      }
+      if (costSource === "derived_from_line_total") {
+        signals.push({ label: "Cost derived from line total", delta: -5 });
+        confidence -= 5;
+      }
+      confidence = Math.max(0, Math.min(100, confidence));
+    }
+
+    const finalConfidenceLevel: "high" | "medium" | "low" =
+      rejected ? "low" : confidence >= 90 ? "high" : confidence >= 70 ? "medium" : "low";
+
     results.push({
       ...p,
       _rowIndex: i,
       _rawName: rawName,
       _rawCost: rawCost,
       _confidence: rejected ? 0 : confidence,
-      _confidenceLevel: confidenceLevel,
+      _confidenceLevel: finalConfidenceLevel,
       _confidenceReasons: signals,
       _issues: issues,
       _corrections: rowCorrections,
@@ -609,6 +670,9 @@ export function validateAndCleanProducts(
         ? rejectReason || "Invalid row"
         : extractionParts.join(" · ") || "Extracted by AI",
       _sourceTrace: sourceTrace,
+      _groupKey: groupKey,
+      _costSource: costSource,
+      _mathCheck: mathCheck,
     });
   }
 
@@ -647,4 +711,69 @@ export function validateAndCleanProducts(
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// ── Product Grouping Utility ────────────────────────────────
+// Groups validated products by style_code + colour into Shopify-ready products
+
+export interface GroupedProductResult {
+  groupKey: string;
+  title: string;
+  sku: string;
+  vendor: string;
+  productType: string;
+  colour: string;
+  cost: number;
+  rrp: number;
+  imageUrl: string;
+  variants: { size: string; qty: number; barcode: string; confidence: number }[];
+  avgConfidence: number;
+  confidenceLevel: "high" | "medium" | "low";
+}
+
+export function groupValidatedProducts(products: ValidatedProduct[]): GroupedProductResult[] {
+  const accepted = products.filter(p => !p._rejected);
+  const groups = new Map<string, ValidatedProduct[]>();
+
+  for (const p of accepted) {
+    const key = p._groupKey || `${p.sku}|${p.colour}`;
+    if (!key || key === "|") {
+      // Ungroupable — treat as standalone
+      const soloKey = `solo_${p._rowIndex}`;
+      groups.set(soloKey, [p]);
+      continue;
+    }
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(p);
+  }
+
+  const results: GroupedProductResult[] = [];
+
+  for (const [key, items] of groups) {
+    const first = items[0];
+    const totalConfidence = items.reduce((sum, p) => sum + p._confidence, 0);
+    const avgConfidence = Math.round(totalConfidence / items.length);
+
+    results.push({
+      groupKey: key,
+      title: first.name,
+      sku: first.sku,
+      vendor: first.brand,
+      productType: first.type,
+      colour: first.colour,
+      cost: first.cost,
+      rrp: first.rrp,
+      imageUrl: "",
+      variants: items.map(p => ({
+        size: p.size,
+        qty: p.qty,
+        barcode: p.barcode,
+        confidence: p._confidence,
+      })),
+      avgConfidence,
+      confidenceLevel: avgConfidence >= 90 ? "high" : avgConfidence >= 70 ? "medium" : "low",
+    });
+  }
+
+  return results.sort((a, b) => b.avgConfidence - a.avgConfidence);
 }

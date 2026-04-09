@@ -11,11 +11,15 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
-  // For find_variant
+  // For find_variant / find_by_barcode
   sku?: string;
+  barcode?: string;
+  // For update_variant_cost
+  variant_id?: string;
+  cost?: string;
   // For adjust_inventory
   location_id?: string;
   inventory_item_id?: string;
@@ -609,6 +613,131 @@ Deno.serve(async (req) => {
           });
         }
         result = { metafields: gqlData.data?.metafieldsSet?.metafields || [], success: true };
+        break;
+      }
+
+      case "find_by_barcode": {
+        if (!body.barcode) {
+          return new Response(JSON.stringify({ error: "Missing barcode" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // GraphQL is the only reliable way to search by barcode
+        const barcodeGqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+        const barcodeQuery = `{
+          productVariants(first: 5, query: "barcode:${body.barcode}") {
+            edges {
+              node {
+                id
+                sku
+                barcode
+                price
+                inventoryItem { id unitCost { amount currencyCode } }
+                product { id title handle vendor }
+              }
+            }
+          }
+        }`;
+        const barcodeResp = await fetch(barcodeGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({ query: barcodeQuery }),
+        });
+        const barcodeData = await barcodeResp.json();
+        const barcodeEdges = barcodeData.data?.productVariants?.edges || [];
+        const barcodeVariants = barcodeEdges.map((e: any) => ({
+          variant_id: e.node.id,
+          sku: e.node.sku,
+          barcode: e.node.barcode,
+          price: e.node.price,
+          cost: e.node.inventoryItem?.unitCost?.amount || null,
+          inventory_item_id: e.node.inventoryItem?.id,
+          product_id: e.node.product?.id,
+          product_title: e.node.product?.title,
+          vendor: e.node.product?.vendor,
+        }));
+        result = { variants: barcodeVariants };
+        break;
+      }
+
+      case "get_inventory_levels": {
+        if (!body.location_id) {
+          return new Response(JSON.stringify({ error: "Missing location_id" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const allLevels: unknown[] = [];
+        let invPageInfo: string | null = null;
+        do {
+          const url = invPageInfo
+            ? `/inventory_levels.json?limit=250&page_info=${invPageInfo}`
+            : `/inventory_levels.json?location_ids=${body.location_id}&limit=250`;
+          const resp = await shopifyFetch(url);
+          const data = await resp.json();
+          if (!resp.ok) {
+            return new Response(JSON.stringify({ error: "Failed to fetch inventory", details: data }), {
+              status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          allLevels.push(...(data.inventory_levels || []));
+          const linkHeader = resp.headers.get("link") || "";
+          const nextMatch = linkHeader.match(/page_info=([^>&]+)>;\s*rel="next"/);
+          invPageInfo = nextMatch ? nextMatch[1] : null;
+        } while (invPageInfo);
+        result = { inventory_levels: allLevels };
+        break;
+      }
+
+      case "update_variant_cost": {
+        if (!body.variant_id || body.cost === undefined) {
+          return new Response(JSON.stringify({ error: "Missing variant_id or cost" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Use GraphQL to update variant cost via inventoryItem
+        const costGqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+        // First get the inventory item ID
+        const getItemQuery = `{
+          productVariant(id: "${body.variant_id}") {
+            inventoryItem { id }
+          }
+        }`;
+        const getItemResp = await fetch(costGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({ query: getItemQuery }),
+        });
+        const getItemData = await getItemResp.json();
+        const inventoryItemId = getItemData.data?.productVariant?.inventoryItem?.id;
+        if (!inventoryItemId) {
+          return new Response(JSON.stringify({ error: "Variant not found" }), {
+            status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const updateCostMutation = `
+          mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
+            inventoryItemUpdate(id: $id, input: $input) {
+              inventoryItem { id unitCost { amount currencyCode } }
+              userErrors { field message }
+            }
+          }
+        `;
+        const updateResp = await fetch(costGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({
+            query: updateCostMutation,
+            variables: { id: inventoryItemId, input: { cost: parseFloat(body.cost) } },
+          }),
+        });
+        const updateData = await updateResp.json();
+        const costErrors = updateData.data?.inventoryItemUpdate?.userErrors || [];
+        if (costErrors.length > 0) {
+          return new Response(JSON.stringify({ error: costErrors.map((e: any) => e.message).join(", ") }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { inventoryItem: updateData.data?.inventoryItemUpdate?.inventoryItem, success: true };
         break;
       }
 

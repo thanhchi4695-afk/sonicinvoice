@@ -263,3 +263,69 @@ export async function updateCollectionSEO(
   });
   return data.collection;
 }
+
+/* ─── Inventory Sync ─── */
+
+export interface ShopifyVariantMatch {
+  variant_id: string;
+  sku: string | null;
+  barcode: string | null;
+  price: string;
+  cost: string | null;
+  inventory_item_id: string;
+  product_id: string;
+  product_title: string;
+  vendor: string | null;
+}
+
+export async function findVariantBySKU(sku: string): Promise<ShopifyVariantMatch | null> {
+  const data = await callProxy({ action: "find_variant", sku });
+  return data.variant || null;
+}
+
+export async function findVariantByBarcode(barcode: string): Promise<ShopifyVariantMatch[]> {
+  const data = await callProxy({ action: "find_by_barcode", barcode });
+  return data.variants || [];
+}
+
+export async function getInventoryLevels(locationId: string): Promise<{ inventory_item_id: string; available: number; location_id: string }[]> {
+  const data = await callProxy({ action: "get_inventory_levels", location_id: locationId });
+  return data.inventory_levels || [];
+}
+
+export async function adjustInventory(locationId: string, inventoryItemId: string, adjustment: number): Promise<void> {
+  await callProxy({
+    action: "adjust_inventory",
+    location_id: locationId,
+    inventory_item_id: inventoryItemId,
+    available_adjustment: adjustment,
+  });
+}
+
+export async function updateVariantCost(variantId: string, cost: string): Promise<void> {
+  await callProxy({ action: "update_variant_cost", variant_id: variantId, cost });
+}
+
+export async function getProductsPage(pageInfo?: string, limit: number = 250): Promise<{
+  products: Array<{
+    id: number;
+    title: string;
+    handle: string;
+    vendor: string;
+    product_type: string;
+    tags: string;
+    variants: Array<{
+      id: number;
+      sku: string | null;
+      barcode: string | null;
+      price: string;
+      inventory_item_id: number;
+      inventory_quantity: number;
+    }>;
+    images: Array<{ src: string }>;
+  }>;
+  nextPageInfo: string | null;
+}> {
+  const data = await callProxy({ action: "get_products_page", page_info: pageInfo, limit });
+  return { products: data.products || [], nextPageInfo: data.nextPageInfo || null };
+}

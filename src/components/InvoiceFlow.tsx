@@ -529,6 +529,10 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       if (data.supplier && !supplierName) {
         setSupplierName(data.supplier);
       }
+      if (data.layout_type) {
+        console.log(`[Sonic Invoice] Layout detected: ${data.layout_type}, Supplier: ${data.supplier || 'unknown'}`);
+        toast(`Layout: ${data.layout_type}`, { description: `Detected supplier: ${data.supplier || supplierName || 'Unknown'}` });
+      }
       return data.products || [];
     } catch (err) {
       console.error("AI parse error:", err);

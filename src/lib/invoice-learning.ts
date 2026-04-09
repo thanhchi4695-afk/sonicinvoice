@@ -162,31 +162,82 @@ export function recordParseSuccess(
   saveAllMemories(memories);
 }
 
-/** Record a merchant field correction */
+/** Infer a structured correction category from field name */
+export function inferCorrectionCategory(field: string): CorrectionCategory {
+  const map: Record<string, CorrectionCategory> = {
+    title: "title_cleanup", name: "title_cleanup",
+    colour: "colour_extraction", color: "colour_extraction",
+    size: "size_interpretation",
+    cost: "cost_field_mapping", price: "cost_field_mapping",
+    sku: "general", barcode: "general",
+    qty: "quantity_mapping", quantity: "quantity_mapping",
+    vendor: "vendor_mapping", brand: "vendor_mapping",
+    ai_teaching: "general",
+  };
+  return map[field.toLowerCase()] || "general";
+}
+
+/** Record a merchant field correction with structured category */
 export function recordFieldCorrection(
   supplier: string,
   field: string,
   original: string,
   corrected: string,
+  category?: CorrectionCategory,
 ) {
   const memories = getAllMemories();
   const supKey = supplierKey(supplier);
   const memory = memories[supKey];
   if (!memory) return;
 
+  const cat = category || inferCorrectionCategory(field);
   const existing = memory.fieldCorrections.find(
     fc => fc.field === field && fc.pattern === original && fc.corrected === corrected
   );
   if (existing) {
     existing.occurrences += 1;
+    existing.category = cat;
   } else {
-    memory.fieldCorrections.push({ field, pattern: original, corrected, occurrences: 1 });
+    memory.fieldCorrections.push({ field, pattern: original, corrected, occurrences: 1, category: cat });
   }
   // Keep top 50 corrections
   memory.fieldCorrections.sort((a, b) => b.occurrences - a.occurrences);
   memory.fieldCorrections = memory.fieldCorrections.slice(0, 50);
   memory.totalCorrections += 1;
   // Confidence drops slightly with corrections (AI got it wrong)
+  memory.confidenceBoost = Math.max(0, memory.confidenceBoost - 1);
+
+  saveAllMemories(memories);
+}
+
+/** Record a reclassification (row moved between tabs) */
+export function recordReclassification(
+  supplier: string,
+  rawText: string,
+  from: "accepted" | "review" | "rejected",
+  to: "accepted" | "review" | "rejected",
+  reason: string,
+) {
+  const memories = getAllMemories();
+  const supKey = supplierKey(supplier);
+  const memory = memories[supKey];
+  if (!memory) return;
+
+  // Initialize if missing (backward compat)
+  if (!memory.reclassifications) memory.reclassifications = [];
+
+  const text = rawText.toLowerCase().trim();
+  const existing = memory.reclassifications.find(
+    r => r.rawText === text && r.from === from && r.to === to
+  );
+  if (existing) {
+    existing.occurrences += 1;
+  } else {
+    memory.reclassifications.push({ rawText: text, from, to, reason, occurrences: 1 });
+  }
+  memory.reclassifications.sort((a, b) => b.occurrences - a.occurrences);
+  memory.reclassifications = memory.reclassifications.slice(0, 30);
+  memory.totalCorrections += 1;
   memory.confidenceBoost = Math.max(0, memory.confidenceBoost - 1);
 
   saveAllMemories(memories);

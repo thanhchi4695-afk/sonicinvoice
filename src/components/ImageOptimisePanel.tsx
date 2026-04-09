@@ -350,15 +350,16 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     for (let i = 0; i < targets.length; i++) {
       setCompressionProgress({ current: i + 1, total: targets.length });
       try {
-        // Client-side Canvas compression
-        const result = await compressImageFromUrl(targets[i].imageUrl, {
-          maxWidth: 2048,
-          maxHeight: 2048,
-          quality: compressionFormat === "image/webp" ? 0.80 : 0.82,
-          format: compressionFormat,
-        });
+        // Trial both formats to record savings comparison
+        const [webpResult, jpegResult] = await Promise.all([
+          compressImageFromUrl(targets[i].imageUrl, { maxWidth: 2048, maxHeight: 2048, quality: 0.80, format: "image/webp" }),
+          compressImageFromUrl(targets[i].imageUrl, { maxWidth: 2048, maxHeight: 2048, quality: 0.82, format: "image/jpeg" }),
+        ]);
 
+        // Use the selected format for the actual upload
+        const result = compressionFormat === "image/webp" ? webpResult : jpegResult;
         const ext = compressionFormat === "image/webp" ? "webp" : "jpeg";
+
         // Upload compressed image to storage via edge function
         const { data, error } = await supabase.functions.invoke("image-compress", {
           body: {
@@ -378,6 +379,8 @@ export default function ImageOptimisePanel({ onBack }: Props) {
           originalSize: result.originalSize,
           compressedSize: result.compressedSize,
           compressedUrl: data?.compressed_url,
+          webpSize: webpResult.compressedSize,
+          jpegSize: jpegResult.compressedSize,
         } : p));
 
         totalSaved += result.originalSize - result.compressedSize;

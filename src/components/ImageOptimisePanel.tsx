@@ -352,17 +352,18 @@ export default function ImageOptimisePanel({ onBack }: Props) {
         const result = await compressImageFromUrl(targets[i].imageUrl, {
           maxWidth: 2048,
           maxHeight: 2048,
-          quality: 0.82,
-          format: "image/jpeg",
+          quality: compressionFormat === "image/webp" ? 0.80 : 0.82,
+          format: compressionFormat,
         });
 
+        const ext = compressionFormat === "image/webp" ? "webp" : "jpeg";
         // Upload compressed image to storage via edge function
         const { data, error } = await supabase.functions.invoke("image-compress", {
           body: {
             action: "upload_compressed",
             product_id: targets[i].id,
             base64: result.base64,
-            content_type: "image/jpeg",
+            content_type: `image/${ext}`,
             original_size: result.originalSize,
           },
         });
@@ -407,7 +408,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
         for (const p of batch) {
           try {
             const result = await compressImageFromUrl(p.imageUrl, {
-              maxWidth: 2048, maxHeight: 2048, quality: 0.82, format: "image/jpeg",
+              maxWidth: 2048, maxHeight: 2048, quality: compressionFormat === "image/webp" ? 0.80 : 0.82, format: compressionFormat,
             });
             replacements.push({
               shopify_product_id: p.shopifyProductId!,
@@ -748,12 +749,26 @@ export default function ImageOptimisePanel({ onBack }: Props) {
             </CardHeader>
             <CardContent className="text-xs text-muted-foreground space-y-3">
               <p>Compress product images for faster page loads and better Shopify performance. Images are resized to max 2048×2048 and re-encoded at optimal quality.</p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-medium text-foreground">Format:</span>
+                <div className="flex rounded-md border border-border overflow-hidden">
+                  <button
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${compressionFormat === "image/webp" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"}`}
+                    onClick={() => setCompressionFormat("image/webp")}
+                  >WebP</button>
+                  <button
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${compressionFormat === "image/jpeg" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent"}`}
+                    onClick={() => setCompressionFormat("image/jpeg")}
+                  >JPEG</button>
+                </div>
+                <span className="text-xs text-muted-foreground">{compressionFormat === "image/webp" ? "Best compression, modern browsers" : "Universal compatibility"}</span>
+              </div>
               <div className="flex gap-2 flex-wrap">
                 <Button size="sm" onClick={analyseSizes} disabled={analysingSize} className="gap-1">
                   <HardDrive className="w-3 h-3" />{analysingSize ? "Analysing…" : "Analyse File Sizes"}
                 </Button>
                 <Button size="sm" onClick={() => compressImages()} disabled={compressing} className="gap-1">
-                  <Minimize2 className="w-3 h-3" />{compressing ? `Compressing ${compressionProgress.current}/${compressionProgress.total}…` : "Compress All"}
+                  <Minimize2 className="w-3 h-3" />{compressing ? `Compressing ${compressionProgress.current}/${compressionProgress.total}…` : `Compress All (${compressionFormat === "image/webp" ? "WebP" : "JPEG"})`}
                 </Button>
                 <Button size="sm" onClick={pushCompressedToShopify} disabled={pushingCompressed || products.filter(p => p.compressed && p.shopifyProductId && !p.compressedUrl?.includes("pushed")).length === 0} className="gap-1">
                   <Upload className="w-3 h-3" />{pushingCompressed ? `Pushing ${pushCompressedProgress.current}/${pushCompressedProgress.total}…` : `Push to Shopify (${products.filter(p => p.compressed && p.shopifyProductId && !p.compressedUrl?.includes("pushed")).length})`}

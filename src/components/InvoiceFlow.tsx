@@ -644,7 +644,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     setShowCompletionSummary(false);
     cancelledRef.current = false;
     setStep(2);
+    setInvoicePageImages([]);
     setEnrichLines([{ name: "Reading file...", status: "searching", action: "Parsing invoice data...", confidence: 0 }]);
+
+    // Capture invoice page image(s) for source trace viewer
+    const ext = fName.split(".").pop()?.toLowerCase() || "";
+    if (["jpg", "jpeg", "png", "webp"].includes(ext)) {
+      try {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (reader.result) setInvoicePageImages([reader.result as string]);
+        };
+        reader.readAsDataURL(file);
+      } catch {}
+    }
 
     let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = [];
 

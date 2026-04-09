@@ -23,8 +23,8 @@ export interface CompressionResult {
 const DEFAULTS: Required<CompressionOptions> = {
   maxWidth: 2048,
   maxHeight: 2048,
-  quality: 0.82,
-  format: "image/jpeg",
+  quality: 0.80,
+  format: "image/webp",
 };
 
 /**

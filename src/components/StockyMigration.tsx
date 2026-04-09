@@ -633,7 +633,7 @@ export default function StockyMigration({ onBack, onComplete }: StockyMigrationP
           </div>
         </div>
 
-        <Button className="w-full" onClick={() => onComplete?.() || onBack()}>
+        <Button className="w-full" onClick={() => { if (onComplete) onComplete(); else onBack(); }}>
           Go to Inventory Dashboard <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </Card>

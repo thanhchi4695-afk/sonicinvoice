@@ -40,6 +40,7 @@ interface HomeScreenProps {
   onStartStockMonitor?: () => void;
   onStartSocialMedia?: () => void;
   onStartInventoryPlanning?: () => void;
+  onStartStockyHub?: () => void;
   onStartPackingSlip?: () => void;
   onStartJoor?: () => void;
   onStartWholesaleImport?: () => void;
@@ -48,7 +49,7 @@ interface HomeScreenProps {
   onStartProfitLoss?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning, onStartPackingSlip, onStartJoor, onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning, onStartStockyHub, onStartPackingSlip, onStartJoor, onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -594,16 +595,21 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
             <span className="text-lg">🏭</span>
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Inventory planning</h2>
+            <h2 className="text-lg font-semibold font-display">Inventory Intelligence</h2>
             <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Purchase orders, demand forecasting, stocktakes, and ABC analysis — everything Stocky offered, built into Sonic Invoices.
+              Your complete Stocky replacement — purchase orders, demand forecasting, dead stock detection, and AI-powered reorder intelligence.
             </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">POs · forecasting · stocktakes · reports</p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">POs · health scores · dead stock · margin protection</p>
           </div>
         </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base border-primary/30 text-primary hover:bg-primary/10" onClick={onStartInventoryPlanning}>
-          Manage inventory <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
+        <div className="flex gap-2 mt-4">
+          <Button variant="default" className="flex-1 h-12 text-base" onClick={onStartStockyHub}>
+            Inventory Hub <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+          <Button variant="outline" className="h-12 text-base border-primary/30 text-primary hover:bg-primary/10" onClick={onStartInventoryPlanning}>
+            Advanced
+          </Button>
+        </div>
       </div>
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">

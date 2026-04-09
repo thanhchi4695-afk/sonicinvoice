@@ -228,17 +228,41 @@ serve(async (req) => {
       systemPrompt += `\n\nIMPORTANT: The user has confirmed this is a HANDWRITTEN INVOICE. Set document_type to "handwritten_invoice". Extract carefully, flag low confidence, do not invent variants.`;
     }
 
-    // Template hint from learned patterns
+    // Template hint from learned memory patterns
     if (templateHint) {
-      systemPrompt += `\n\n## LEARNED TEMPLATE HINT (from previous successful parses of this supplier)
-This supplier has been parsed before. Use these hints to guide extraction:
-- Layout type previously detected: ${templateHint.layoutType || "unknown"}
-- Variant method previously used: ${templateHint.variantMethod || "unknown"}
-- Size system detected: ${templateHint.sizeSystem || "unknown"}
-- Fields detected previously: ${(templateHint.detectedFields || []).join(", ") || "unknown"}
-${templateHint.corrections?.length ? `- Merchant corrections to apply:\n${templateHint.corrections.map((c: string) => `  • ${c}`).join("\n")}` : ""}
-${templateHint.customInstructions ? `- Custom parsing instructions: ${templateHint.customInstructions}` : ""}
-Use this as guidance but verify against the actual document structure. If the document layout differs, override the hints.`;
+      systemPrompt += `\n\n## LEARNED MEMORY (from ${templateHint.totalParses || 0} previous parses of this supplier)
+This supplier has been parsed before. The system has learned these patterns — use them to improve extraction accuracy.
+
+### Document structure learned:
+- Layout type: ${templateHint.layoutType || "unknown"}
+- Variant method: ${templateHint.variantMethod || "unknown"}
+- Size system: ${templateHint.sizeSystem || "unknown"}
+- Table headers detected: ${(templateHint.tableHeaders || []).join(", ") || "unknown"}
+- Line-item zone: ${templateHint.lineItemZone || "unknown"}
+- Cost field: ${templateHint.costFieldRule || "unknown"}
+- Quantity field: ${templateHint.quantityFieldRule || "unknown"}
+- Grouping required: ${templateHint.groupingRequired ?? "unknown"}
+${templateHint.confidenceBoost > 0 ? `- Confidence boost earned: +${templateHint.confidenceBoost} (add this to each row's confidence score)` : ""}`;
+
+      // Noise exclusions from learned patterns
+      if (templateHint.noiseExclusions?.length) {
+        systemPrompt += `\n\n### Learned noise patterns (ALWAYS reject these):
+${templateHint.noiseExclusions.map((n: string) => `• ${n}`).join("\n")}`;
+      }
+
+      // Field corrections from merchant edits
+      if (templateHint.corrections?.length) {
+        systemPrompt += `\n\n### Learned field corrections (APPLY these automatically):
+${templateHint.corrections.map((c: string) => `• ${c}`).join("\n")}`;
+      }
+
+      // Grouping rules
+      if (templateHint.groupingRules?.length) {
+        systemPrompt += `\n\n### Learned grouping rules:
+${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
+      }
+
+      systemPrompt += `\n\nUse this learned memory as primary guidance. Verify against the actual document structure — if the layout has changed significantly, override the hints and note the difference.`;
     }
 
     if (customInstructions) {

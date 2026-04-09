@@ -9,6 +9,7 @@ import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { generateXSeriesCSV, getXSeriesSettings, saveXSeriesSettings, type XSeriesSettings, type XSeriesProduct } from "@/lib/lightspeed-xseries";
 import { findTemplate, saveFormatTemplate, incrementTemplateUse, saveLayoutTemplate, buildTemplateHint, saveCorrection, getTemplateList, getLayoutLabel, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping, type ProcessAsMode, type LayoutType, type CorrectionPattern } from "@/lib/invoice-templates";
+import { buildMemoryHint, recordParseSuccess, recordFieldCorrection, recordNoiseRejection, getMemoryStats, type LayoutFingerprint } from "@/lib/invoice-learning";
 import { getStoreLocations } from "@/components/AccountScreen";
 import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCount, type InventoryItem } from "@/lib/inventory-sim";
 import { addAuditEntry } from "@/lib/audit-log";
@@ -533,8 +534,19 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       const base64 = btoa(binary);
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
 
-      // Build template hint from learned patterns
-      const templateHint = supplierName ? buildTemplateHint(supplierName) : null;
+      // Build learning memory hint (structure-based, not brand-specific)
+      const memoryHint = buildMemoryHint(supplierName || undefined);
+      // Also check the old template system as fallback
+      const templateHint = !memoryHint && supplierName ? buildTemplateHint(supplierName) : null;
+      const combinedHint = memoryHint || templateHint;
+
+      // Show memory stats if available
+      if (supplierName) {
+        const stats = getMemoryStats(supplierName);
+        if (stats && stats.parses > 1) {
+          console.log(`[Sonic Invoice] Memory found: ${stats.parses} parses, ${stats.corrections} corrections, +${stats.boost} confidence boost`);
+        }
+      }
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
         method: "POST",
@@ -549,7 +561,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             : processAs === "packing_slip" ? "packing_slip"
             : processAs === "handwritten" ? "handwritten"
             : undefined,
-          templateHint: templateHint || undefined,
+          templateHint: combinedHint || undefined,
         }),
       });
 
@@ -564,24 +576,33 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       }
       if (data.layout_type) {
         setDetectedLayout(data.layout_type as LayoutType);
-        console.log(`[Sonic Invoice] Layout: ${data.layout_type}, Variant method: ${data.variant_method}, Size system: ${data.detected_size_system}`);
-        toast(`Layout: ${getLayoutLabel(data.layout_type)}`, { description: `Supplier: ${data.supplier || supplierName || 'Unknown'} • ${data.variant_method || ''}` });
-        // Save learned template
+        const plan = data.parsing_plan || {};
         const sup = data.supplier || supplierName;
+        const memStats = sup ? getMemoryStats(sup) : null;
+        const boostInfo = memStats && memStats.boost > 0 ? ` • +${memStats.boost} learned` : "";
+        console.log(`[Sonic Invoice] Layout: ${data.layout_type}, Variant: ${data.variant_method}, Size: ${data.detected_size_system}${boostInfo}`);
+        toast(`Layout: ${getLayoutLabel(data.layout_type)}`, {
+          description: `${sup || 'Unknown'}${boostInfo}${memStats ? ` • ${memStats.parses} prior parses` : ""}`,
+        });
+
+        // Save to both template system and learning memory
         if (sup) {
-          saveLayoutTemplate(
-            sup,
-            data.layout_type as LayoutType,
-            85,
-            ext as any,
-            customInstructions || undefined,
-            data.variant_method,
-            data.detected_size_system,
-            data.detected_fields,
-          );
+          saveLayoutTemplate(sup, data.layout_type as LayoutType, 85, ext as any, customInstructions || undefined, data.variant_method, data.detected_size_system, data.detected_fields);
+
+          // Record to learning memory with full fingerprint
+          const fingerprint: LayoutFingerprint = {
+            layoutType: data.layout_type,
+            variantMethod: plan.variant_method || data.variant_method || "unknown",
+            sizeSystem: data.detected_size_system || "none",
+            tableHeaders: data.detected_fields || [],
+            lineItemZone: plan.line_item_zone || "",
+            costFieldRule: plan.cost_field || "",
+            quantityFieldRule: plan.quantity_field || "",
+            groupingRequired: plan.grouping_required || false,
+          };
+          recordParseSuccess(sup, fingerprint, data.rejected_rows);
         }
       }
-      // Store parsing plan and rejected rows for debug
       if (data.parsing_plan) {
         setAiParsingPlan(data.parsing_plan);
       }

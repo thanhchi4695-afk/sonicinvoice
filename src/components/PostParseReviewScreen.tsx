@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/lib/invoice-validator";
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
+import { recordFieldCorrection, recordNoiseRejection } from "@/lib/invoice-learning";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;
@@ -109,6 +110,11 @@ export default function PostParseReviewScreen({
   };
 
   const rejectRow = (rowIndex: number) => {
+    // Record noise rejection for learning
+    const product = products.find(p => p._rowIndex === rowIndex);
+    if (supplierName && product) {
+      recordNoiseRejection(supplierName, product._rawName || product.name || "", "Manually rejected by merchant");
+    }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex
         ? { ...p, _rejected: true, _rejectReason: "Manually rejected", _confidenceLevel: "low" as const, _confidence: 0 }
@@ -134,20 +140,22 @@ export default function PostParseReviewScreen({
 
   const updateField = (rowIndex: number, field: string, value: string | number) => {
     onUpdateProducts(products.map(p => {
-      if (p._rowIndex !== rowIndex) return p;
-      // Save correction for learning
       const originalValue = String((p as any)[field] || "");
       const newValue = String(value);
+      // Save correction to both systems for learning
       if (supplierName && originalValue !== newValue && originalValue) {
         const fieldLabels: Record<string, string> = { name: "title", colour: "colour", size: "size", cost: "cost", sku: "sku", qty: "quantity" };
         const fieldLabel = fieldLabels[field] || field;
+        // Old template system
         saveCorrection(supplierName, {
           field: fieldLabel,
           original: originalValue,
           corrected: newValue,
-          rule: `When parsing ${supplierName}: "${originalValue}" in ${fieldLabel} should be "${newValue}"`,
+          rule: `In ${fieldLabel}: "${originalValue}" → "${newValue}"`,
           timestamp: new Date().toISOString(),
         });
+        // New learning memory system
+        recordFieldCorrection(supplierName, fieldLabel, originalValue, newValue);
       }
       const updated = { ...p, [field]: value, _manuallyEdited: true } as any;
       // Recalculate confidence

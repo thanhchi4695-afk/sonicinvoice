@@ -43,6 +43,8 @@ interface ProductImage {
   compressed?: boolean;
   needsCompression?: boolean;
   compressionReason?: string;
+  webpSize?: number;
+  jpegSize?: number;
   // Conversion audit fields
   conversionScore?: number;
   consistency?: number;
@@ -121,7 +123,14 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     const totalOriginalSize = products.reduce((s, p) => s + (p.originalSize || 0), 0);
     const totalCompressedSize = products.reduce((s, p) => s + (p.compressedSize || p.originalSize || 0), 0);
     const totalSaved = totalOriginalSize - totalCompressedSize;
-    return { total, missingAlt, missingImage, issues, duplicates, mismatches, optimized, needsCompression, compressed, totalOriginalSize, totalSaved };
+    // Format-specific aggregates
+    const compressedProducts = products.filter(p => p.compressed && p.originalSize);
+    const totalWebpSize = compressedProducts.reduce((s, p) => s + (p.webpSize || p.compressedSize || 0), 0);
+    const totalJpegSize = compressedProducts.reduce((s, p) => s + (p.jpegSize || p.compressedSize || 0), 0);
+    const totalOrigCompressed = compressedProducts.reduce((s, p) => s + (p.originalSize || 0), 0);
+    const webpSavingsPct = totalOrigCompressed > 0 ? Math.round((1 - totalWebpSize / totalOrigCompressed) * 100) : 0;
+    const jpegSavingsPct = totalOrigCompressed > 0 ? Math.round((1 - totalJpegSize / totalOrigCompressed) * 100) : 0;
+    return { total, missingAlt, missingImage, issues, duplicates, mismatches, optimized, needsCompression, compressed, totalOriginalSize, totalSaved, webpSavingsPct, jpegSavingsPct, totalWebpSize, totalJpegSize, totalOrigCompressed };
   }, [products]);
 
   const filtered = useMemo(() => {
@@ -348,15 +357,16 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     for (let i = 0; i < targets.length; i++) {
       setCompressionProgress({ current: i + 1, total: targets.length });
       try {
-        // Client-side Canvas compression
-        const result = await compressImageFromUrl(targets[i].imageUrl, {
-          maxWidth: 2048,
-          maxHeight: 2048,
-          quality: compressionFormat === "image/webp" ? 0.80 : 0.82,
-          format: compressionFormat,
-        });
+        // Trial both formats to record savings comparison
+        const [webpResult, jpegResult] = await Promise.all([
+          compressImageFromUrl(targets[i].imageUrl, { maxWidth: 2048, maxHeight: 2048, quality: 0.80, format: "image/webp" }),
+          compressImageFromUrl(targets[i].imageUrl, { maxWidth: 2048, maxHeight: 2048, quality: 0.82, format: "image/jpeg" }),
+        ]);
 
+        // Use the selected format for the actual upload
+        const result = compressionFormat === "image/webp" ? webpResult : jpegResult;
         const ext = compressionFormat === "image/webp" ? "webp" : "jpeg";
+
         // Upload compressed image to storage via edge function
         const { data, error } = await supabase.functions.invoke("image-compress", {
           body: {
@@ -376,6 +386,8 @@ export default function ImageOptimisePanel({ onBack }: Props) {
           originalSize: result.originalSize,
           compressedSize: result.compressedSize,
           compressedUrl: data?.compressed_url,
+          webpSize: webpResult.compressedSize,
+          jpegSize: jpegResult.compressedSize,
         } : p));
 
         totalSaved += result.originalSize - result.compressedSize;
@@ -801,6 +813,38 @@ export default function ImageOptimisePanel({ onBack }: Props) {
             </div>
           )}
 
+          {/* Format comparison card */}
+          {stats.compressed > 0 && stats.totalOrigCompressed > 0 && (
+            <Card className="border-primary/20">
+              <CardContent className="p-3 space-y-2">
+                <div className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-primary" />Format Comparison
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1 rounded-md bg-muted p-2 text-center">
+                    <div className="text-sm font-bold text-primary">{stats.webpSavingsPct}%</div>
+                    <div className="text-[10px] text-muted-foreground">WebP savings</div>
+                    <div className="text-[10px] text-muted-foreground">{formatBytes(stats.totalOrigCompressed)} → {formatBytes(stats.totalWebpSize)}</div>
+                  </div>
+                  <div className="flex-1 rounded-md bg-muted p-2 text-center">
+                    <div className="text-sm font-bold text-foreground">{stats.jpegSavingsPct}%</div>
+                    <div className="text-[10px] text-muted-foreground">JPEG savings</div>
+                    <div className="text-[10px] text-muted-foreground">{formatBytes(stats.totalOrigCompressed)} → {formatBytes(stats.totalJpegSize)}</div>
+                  </div>
+                </div>
+                {stats.webpSavingsPct > stats.jpegSavingsPct && (
+                  <div className="text-[10px] text-primary font-medium text-center">
+                    WebP saves {stats.webpSavingsPct - stats.jpegSavingsPct}% more than JPEG — {formatBytes(stats.totalJpegSize - stats.totalWebpSize)} extra savings
+                  </div>
+                )}
+                {stats.jpegSavingsPct >= stats.webpSavingsPct && stats.compressed > 0 && (
+                  <div className="text-[10px] text-muted-foreground text-center">
+                    JPEG matches WebP savings for these images
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
           {compressing && (
             <Card>
               <CardContent className="p-4 space-y-2">
@@ -844,6 +888,11 @@ export default function ImageOptimisePanel({ onBack }: Props) {
                       <div className="text-xs font-medium">{formatBytes(p.originalSize || 0)}</div>
                       {p.compressed && p.compressedSize != null && (
                         <div className="text-[10px] text-green-600">→ {formatBytes(p.compressedSize)} ({Math.round((1 - p.compressedSize / (p.originalSize || 1)) * 100)}% saved)</div>
+                      )}
+                      {p.compressed && p.webpSize != null && p.jpegSize != null && p.originalSize && (
+                        <div className="text-[10px] text-muted-foreground">
+                          WebP {Math.round((1 - p.webpSize / p.originalSize) * 100)}% · JPEG {Math.round((1 - p.jpegSize / p.originalSize) * 100)}%
+                        </div>
                       )}
                     </div>
                     {p.compressed ? (

@@ -98,7 +98,12 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     const duplicates = products.filter(p => p.qualityStatus === "duplicate").length;
     const mismatches = products.filter(p => p.qualityStatus === "mismatch" || p.matchStatus === "mismatch").length;
     const optimized = products.filter(p => p.altText && p.approved).length;
-    return { total, missingAlt, missingImage, issues, duplicates, mismatches, optimized };
+    const needsCompression = products.filter(p => p.needsCompression).length;
+    const compressed = products.filter(p => p.compressed).length;
+    const totalOriginalSize = products.reduce((s, p) => s + (p.originalSize || 0), 0);
+    const totalCompressedSize = products.reduce((s, p) => s + (p.compressedSize || p.originalSize || 0), 0);
+    const totalSaved = totalOriginalSize - totalCompressedSize;
+    return { total, missingAlt, missingImage, issues, duplicates, mismatches, optimized, needsCompression, compressed, totalOriginalSize, totalSaved };
   }, [products]);
 
   const filtered = useMemo(() => {

@@ -286,7 +286,7 @@ const Index = () => {
           open={mobileNavOpen}
           onClose={() => setMobileNavOpen(false)}
         />
-        <main className="flex-1 overflow-y-auto min-w-0">
+        <main className="flex-1 overflow-y-auto min-w-0 pb-20 lg:pb-0">
           <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-0 border-b border-border mb-0">
             <div className="flex items-center gap-2">
               {/* Mobile hamburger */}
@@ -324,6 +324,10 @@ const Index = () => {
           </div>
           {activeFlow ? renderFlow() : mainContent}
         </main>
+        {/* Mobile bottom tabs for embedded mode */}
+        <div className="lg:hidden">
+          <BottomTabBar activeTab={activeTab} onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }} />
+        </div>
       </div>
     );
   }

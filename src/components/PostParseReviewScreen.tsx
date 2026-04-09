@@ -490,6 +490,7 @@ export default function PostParseReviewScreen({
                   onRejectVariant={(idx) => rejectRow(idx)}
                   onSplitVariant={splitRow}
                   supplierName={supplierName}
+                  parsingPlan={debug.parsingPlan}
                 />
               ))}
             </div>
@@ -526,6 +527,7 @@ export default function PostParseReviewScreen({
                   showTeachAI={showTeachAI === p._rowIndex}
                   onToggleTeachAI={() => setShowTeachAI(showTeachAI === p._rowIndex ? null : p._rowIndex)}
                   supplierName={supplierName}
+                  parsingPlan={debug.parsingPlan}
                 />
               ))}
             </div>

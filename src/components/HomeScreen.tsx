@@ -42,9 +42,10 @@ interface HomeScreenProps {
   onStartInventoryPlanning?: () => void;
   onStartPackingSlip?: () => void;
   onStartJoor?: () => void;
+  onStartWholesaleImport?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning, onStartPackingSlip, onStartJoor }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning, onStartPackingSlip, onStartJoor, onStartWholesaleImport }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -731,6 +732,26 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
           Open JOOR → <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
+
+      {/* Wholesale Import Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Package className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Wholesale Import</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Import orders from JOOR, NuOrder, Brandscope, Brandboom, Faire, or any CSV export. Push products directly to Shopify in one click.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">JOOR · NuOrder · Brandscope · Brandboom · Faire · CSV</p>
+          </div>
+        </div>
+        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartWholesaleImport}>
+          Import orders → <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
       <div className="bg-card rounded-lg border border-border p-5 mb-6">
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">

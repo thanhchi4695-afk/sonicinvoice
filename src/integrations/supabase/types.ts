@@ -203,6 +203,36 @@ export type Database = {
         }
         Relationships: []
       }
+      wholesale_connections: {
+        Row: {
+          connected_at: string
+          credentials: Json
+          id: string
+          label: string | null
+          last_synced: string | null
+          platform: string
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string
+          credentials?: Json
+          id?: string
+          label?: string | null
+          last_synced?: string | null
+          platform: string
+          user_id: string
+        }
+        Update: {
+          connected_at?: string
+          credentials?: Json
+          id?: string
+          label?: string | null
+          last_synced?: string | null
+          platform?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -60,6 +60,7 @@ const AccountingIntegration = lazy(() => import("@/components/AccountingIntegrat
 const ProfitLossPanel = lazy(() => import("@/components/ProfitLossPanel"));
 const StockyHub = lazy(() => import("@/components/StockyHub"));
 const StockyMigration = lazy(() => import("@/components/StockyMigration"));
+const InventoryDashboard = lazy(() => import("@/components/InventoryDashboard"));
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -72,7 +73,7 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "inventory_dashboard" | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const mode = useStoreMode();
@@ -228,10 +229,11 @@ const Index = () => {
       case "accounting": flowEl = <AccountingIntegration onBack={() => setActiveFlow(null)} />; break;
       case "profit_loss": flowEl = <ProfitLossPanel onBack={() => setActiveFlow(null)} />; break;
       case "stocky_hub": flowEl = <StockyHub onBack={() => setActiveFlow(null)} onNavigate={(t) => {
-        const map: Record<string, any> = { purchase_orders: "purchase_orders", suppliers: "suppliers", stock_monitor: "stock_monitor", reorder: "reorder", margin_protection: "margin_protection", markdown_ladder: "markdown_ladder", restock_analytics: "restock", stocky_migration: "stocky_migration" };
+        const map: Record<string, any> = { purchase_orders: "purchase_orders", suppliers: "suppliers", stock_monitor: "stock_monitor", reorder: "reorder", margin_protection: "margin_protection", markdown_ladder: "markdown_ladder", restock_analytics: "restock", stocky_migration: "stocky_migration", inventory_dashboard: "inventory_dashboard" };
         setActiveFlow(map[t] || t);
       }} />; break;
       case "stocky_migration": flowEl = <StockyMigration onBack={() => setActiveFlow("stocky_hub")} onComplete={() => setActiveFlow("stocky_hub")} />; break;
+      case "inventory_dashboard": flowEl = <InventoryDashboard onBack={() => setActiveFlow("stocky_hub")} />; break;
       default: return null;
     }
     return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;

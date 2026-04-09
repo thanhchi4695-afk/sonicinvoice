@@ -295,9 +295,10 @@ Use this as guidance but verify against the actual document structure. If the do
     const jsonStr = (jsonMatch[1] || content).trim();
     const parsed = JSON.parse(jsonStr);
 
-    const docType = parsed.document_type || (forceMode || "tax_invoice");
-    const layoutType = parsed.layout_type || "unknown";
-    const variantMethod = parsed.variant_method || "unknown";
+    const parsingPlan = parsed.parsing_plan || {};
+    const docType = parsingPlan.document_type || parsed.document_type || (forceMode || "tax_invoice");
+    const layoutType = parsingPlan.layout_type || parsed.layout_type || "unknown";
+    const variantMethod = parsingPlan.variant_method || parsed.variant_method || "unknown";
     const detectedFields = parsed.detected_fields || [];
     const detectedSizeSystem = parsed.detected_size_system || "none";
 
@@ -319,6 +320,7 @@ Use this as guidance but verify against the actual document structure. If the do
         document_type: "packing_slip",
         layout_type: layoutType,
         variant_method: variantMethod,
+        parsing_plan: parsingPlan,
         detected_fields: detectedFields,
         detected_size_system: detectedSizeSystem,
         confidence: parsed.confidence || 85,
@@ -363,6 +365,7 @@ Use this as guidance but verify against the actual document structure. If the do
       document_type: docType,
       layout_type: layoutType,
       variant_method: variantMethod,
+      parsing_plan: parsingPlan,
       detected_fields: detectedFields,
       detected_size_system: detectedSizeSystem,
       supplier: parsed.supplier || supplierName || "",

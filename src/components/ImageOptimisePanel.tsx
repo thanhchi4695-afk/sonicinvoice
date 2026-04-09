@@ -43,6 +43,8 @@ interface ProductImage {
   compressed?: boolean;
   needsCompression?: boolean;
   compressionReason?: string;
+  webpSize?: number;
+  jpegSize?: number;
   // Conversion audit fields
   conversionScore?: number;
   consistency?: number;

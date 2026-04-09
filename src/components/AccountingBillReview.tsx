@@ -49,25 +49,7 @@ interface BillReviewData {
 }
 
 export interface AccountingBillReviewProps {
-  invoice: {
-    id?: string;
-    supplier: string;
-    invoice_number?: string;
-    invoice_date?: string;
-    due_date?: string;
-    subtotal?: number;
-    gst?: number;
-    total?: number;
-    category?: string;
-    line_items?: {
-      description?: string;
-      product_name?: string;
-      quantity?: number;
-      unit_price?: number;
-      unit_price_inc_gst?: number;
-      total_inc_gst?: number;
-    }[];
-  };
+  bill: UnifiedBill;
   onBack?: () => void;
   onPushComplete?: (result: { platform: string; externalUrl?: string }) => void;
 }

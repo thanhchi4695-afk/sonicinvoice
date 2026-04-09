@@ -1927,22 +1927,41 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
           {/* Accounting Bill Review */}
           <div className="px-0 mt-4">
-            <AccountingBillReview invoice={{
+            <AccountingBillReview bill={{
               id: `inv-${Date.now()}`,
-              supplier: supplierName,
-              invoice_number: "",
-              invoice_date: new Date().toISOString().split("T")[0],
-              subtotal: mockProducts.reduce((s, p) => s + p.price, 0),
-              gst: mockProducts.reduce((s, p) => s + p.price, 0) * 0.1,
-              total: mockProducts.reduce((s, p) => s + p.price, 0) * 1.1,
-              category: mockProducts[0]?.type || "Swimwear",
-              line_items: mockProducts.map(p => ({
-                product_name: p.name,
-                quantity: 1,
-                unit_price_inc_gst: p.price * 1.1,
-                total_inc_gst: p.price * 1.1,
+              supplierName: supplierName,
+              invoiceNumber: "",
+              invoiceDate: new Date().toISOString().split("T")[0],
+              dueDate: "",
+              subtotalExGst: mockProducts.reduce((s, p) => s + p.price, 0),
+              gstAmount: mockProducts.reduce((s, p) => s + p.price, 0) * 0.1,
+              totalIncGst: mockProducts.reduce((s, p) => s + p.price, 0) * 1.1,
+              accountCategory: mockProducts[0]?.type || "Swimwear",
+              accountCode: "",
+              gstCode: "GST on Expenses",
+              status: "draft",
+              accountingPlatform: "manual",
+              externalId: "",
+              externalUrl: "",
+              lineItems: mockProducts.map(p => ({
                 description: `${p.brand} ${p.name}`,
+                quantity: 1,
+                unitPrice: p.price * 1.1,
+                totalExGst: p.price,
+                gstAmount: p.price * 0.1,
+                accountCategory: mockProducts[0]?.type || "Swimwear",
+                accountCode: "",
+                gstCode: "GST on Expenses",
               })),
+              source: {
+                sourceType: "invoice",
+                sourcePlatform: "manual",
+                sourceDocumentId: "",
+                sourceSupplier: supplierName,
+                sourceDate: new Date().toISOString(),
+                sourceCurrency: "AUD",
+                importedAt: new Date().toISOString(),
+              },
             }} />
           </div>
         </div>

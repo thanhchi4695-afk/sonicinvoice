@@ -49,25 +49,7 @@ interface BillReviewData {
 }
 
 export interface AccountingBillReviewProps {
-  invoice: {
-    id?: string;
-    supplier: string;
-    invoice_number?: string;
-    invoice_date?: string;
-    due_date?: string;
-    subtotal?: number;
-    gst?: number;
-    total?: number;
-    category?: string;
-    line_items?: {
-      description?: string;
-      product_name?: string;
-      quantity?: number;
-      unit_price?: number;
-      unit_price_inc_gst?: number;
-      total_inc_gst?: number;
-    }[];
-  };
+  bill: UnifiedBill;
   onBack?: () => void;
   onPushComplete?: (result: { platform: string; externalUrl?: string }) => void;
 }
@@ -75,47 +57,36 @@ export interface AccountingBillReviewProps {
 const ALL_CODES = getAllAccountCodes();
 const FREIGHT_CODE = "61700";
 
-function buildReviewData(invoice: AccountingBillReviewProps["invoice"]): BillReviewData {
+function buildReviewData(ub: UnifiedBill): BillReviewData {
   const headerClassification = classifyInvoice(
-    invoice.supplier,
+    ub.supplierName,
     "",
-    invoice.line_items?.map((li) => ({ description: li.description || li.product_name }))
+    ub.lineItems.map((li) => ({ description: li.description }))
   );
 
-  const lines: BillReviewLine[] = (invoice.line_items || []).map((li) => {
-    const desc = li.description || li.product_name || "";
-    const freight = isFreightLine(desc);
-    const unitPrice = li.unit_price || li.unit_price_inc_gst || 0;
-    const totalIncGst = li.total_inc_gst || unitPrice * (li.quantity || 1);
-    const gst = totalIncGst / 11;
-    const totalExGst = totalIncGst - gst;
-
+  const lines: BillReviewLine[] = ub.lineItems.map((li) => {
+    const freight = isFreightLine(li.description);
     return {
-      description: desc,
-      quantity: li.quantity || 1,
-      unitPrice,
-      totalExGst,
-      gstAmount: gst,
-      accountCode: freight ? FREIGHT_CODE : headerClassification.accountCode,
-      accountName: freight
-        ? "Freight & Cartage"
-        : headerClassification.accountName,
+      description: li.description,
+      quantity: li.quantity,
+      unitPrice: li.unitPrice,
+      totalExGst: li.totalExGst,
+      gstAmount: li.gstAmount,
+      accountCode: freight ? FREIGHT_CODE : (li.accountCode || headerClassification.accountCode),
+      accountName: freight ? "Freight & Cartage" : headerClassification.accountName,
       isFreight: freight,
       aiConfidence: freight ? 90 : headerClassification.confidence,
       aiMethod: freight ? "keyword" : headerClassification.method,
     };
   });
 
-  // If no line items, create a single summary line
   if (lines.length === 0) {
-    const total = invoice.total || 0;
-    const gst = invoice.gst || total / 11;
     lines.push({
-      description: `${invoice.supplier} — ${invoice.category || "Stock purchase"}`,
+      description: `${ub.supplierName} — ${ub.accountCategory || "Stock purchase"}`,
       quantity: 1,
-      unitPrice: total,
-      totalExGst: total - gst,
-      gstAmount: gst,
+      unitPrice: ub.totalIncGst,
+      totalExGst: ub.subtotalExGst,
+      gstAmount: ub.gstAmount,
       accountCode: headerClassification.accountCode,
       accountName: headerClassification.accountName,
       isFreight: false,
@@ -125,13 +96,13 @@ function buildReviewData(invoice: AccountingBillReviewProps["invoice"]): BillRev
   }
 
   return {
-    supplierName: invoice.supplier || "",
-    invoiceNumber: invoice.invoice_number || "",
-    invoiceDate: invoice.invoice_date || new Date().toISOString().split("T")[0],
-    dueDate: invoice.due_date || "",
-    subtotalExGst: invoice.subtotal || lines.reduce((s, l) => s + l.totalExGst, 0),
-    gstAmount: invoice.gst || lines.reduce((s, l) => s + l.gstAmount, 0),
-    totalIncGst: invoice.total || lines.reduce((s, l) => s + l.totalExGst + l.gstAmount, 0),
+    supplierName: ub.supplierName,
+    invoiceNumber: ub.invoiceNumber,
+    invoiceDate: ub.invoiceDate,
+    dueDate: ub.dueDate,
+    subtotalExGst: ub.subtotalExGst || lines.reduce((s, l) => s + l.totalExGst, 0),
+    gstAmount: ub.gstAmount || lines.reduce((s, l) => s + l.gstAmount, 0),
+    totalIncGst: ub.totalIncGst || lines.reduce((s, l) => s + l.totalExGst + l.gstAmount, 0),
     lines,
     headerAccountCode: headerClassification.accountCode,
     headerAccountName: headerClassification.accountName,
@@ -145,11 +116,11 @@ function buildReviewData(invoice: AccountingBillReviewProps["invoice"]): BillRev
 // ── Main Component ──
 
 export default function AccountingBillReview({
-  invoice,
+  bill: unifiedBill,
   onBack,
   onPushComplete,
 }: AccountingBillReviewProps) {
-  const [bill, setBill] = useState<BillReviewData>(() => buildReviewData(invoice));
+  const [bill, setBill] = useState<BillReviewData>(() => buildReviewData(unifiedBill));
   const [connections, setConnections] = useState<any[]>([]);
   const [pushing, setPushing] = useState<string | null>(null);
   const [pushResult, setPushResult] = useState<{
@@ -219,7 +190,7 @@ export default function AccountingBillReview({
 
       // Build invoice payload with per-line account codes
       const invoicePayload = {
-        id: invoice.id || `inv-${Date.now()}`,
+        id: unifiedBill.id || `inv-${Date.now()}`,
         supplier: bill.supplierName,
         invoice_number: bill.invoiceNumber,
         invoice_date: bill.invoiceDate,
@@ -262,7 +233,7 @@ export default function AccountingBillReview({
         );
 
         // Record corrections if user changed the AI suggestion
-        const original = buildReviewData(invoice);
+        const original = buildReviewData(unifiedBill);
         if (bill.headerAccountCode !== original.headerAccountCode) {
           const newDef = ALL_CODES.find((c) => c.code === bill.headerAccountCode);
           recordCorrection(
@@ -429,7 +400,7 @@ export default function AccountingBillReview({
             size="sm"
             className="text-xs shrink-0"
             onClick={() => {
-              const original = buildReviewData(invoice);
+              const original = buildReviewData(unifiedBill);
               setAllLinesToCode(original.headerAccountCode);
               toast.info("Reset to AI suggestion");
             }}

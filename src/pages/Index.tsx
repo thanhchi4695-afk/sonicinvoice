@@ -266,7 +266,7 @@ const Index = () => {
         {activeTab === "analytics" && <AnalyticsPanel />}
         {activeTab === "history" && <HistoryScreen />}
         {activeTab === "tools" && <ToolsScreen />}
-        {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => setActiveFlow(f as any)} />}
+        {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => { if (f === "invoice" || f === "lightspeed_convert") setActiveFlow(f); }} />}
         {activeTab === "google_ads" && <AdsGuideTabs />}
         {activeTab === "help" && <HelpCentre />}
         {activeTab === "account" && <AccountScreen />}

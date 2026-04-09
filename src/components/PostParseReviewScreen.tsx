@@ -917,6 +917,21 @@ function ReviewRow({
                 </div>
               )}
 
+              {/* Why AI did this — per-row debug */}
+              <div className="border border-primary/15 rounded-md overflow-hidden">
+                <button
+                  onClick={() => setShowWhyAI(!showWhyAI)}
+                  className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+                >
+                  <Bug className="w-3 h-3" />
+                  Why AI did this
+                  {showWhyAI ? <ChevronDown className="w-3 h-3 ml-auto" /> : <ChevronRight className="w-3 h-3 ml-auto" />}
+                </button>
+                {showWhyAI && (
+                  <WhyAIPanel product={p} parsingPlan={parsingPlan} />
+                )}
+              </div>
+
               {/* Full field detail */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 <DetailRow label="Raw text" value={p._rawName || "(empty)"} mono />

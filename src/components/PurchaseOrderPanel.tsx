@@ -169,7 +169,7 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
       status: po.status as POStatus,
       total_cost: Number(po.total_cost),
       linked_document_id: po.linked_document_id,
-      match_result: po.match_result as MatchResult | null,
+      match_result: po.match_result as unknown as MatchResult | null,
       created_at: po.created_at,
       updated_at: po.updated_at,
       lines: linesByPO[po.id] || [],

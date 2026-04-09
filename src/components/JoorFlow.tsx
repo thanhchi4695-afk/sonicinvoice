@@ -38,7 +38,7 @@ interface JoorOrder {
   _processed?: boolean;
 }
 
-type Step = "connect" | "orders" | "detail";
+type Step = "connect" | "orders" | "detail" | "file_import" | "file_review";
 
 const JoorFlow = ({ onBack }: JoorFlowProps) => {
   const [step, setStep] = useState<Step>("connect");

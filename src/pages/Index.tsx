@@ -276,7 +276,8 @@ const Index = () => {
           onStartMarkdownLadder={() => setActiveFlow("markdown_ladder")}
           onStartStockMonitor={() => setActiveFlow("stock_monitor")}
           onStartSocialMedia={() => setActiveFlow("social_media")}
-          onStartInventoryPlanning={() => setActiveFlow("inventory_planning")}
+           onStartInventoryPlanning={() => setActiveFlow("inventory_planning")}
+           onStartStockyHub={() => setActiveFlow("stocky_hub")}
           onStartPackingSlip={() => setActiveFlow("packing_slip")}
           onStartJoor={() => setActiveFlow("joor")}
           onStartWholesaleImport={() => setActiveFlow("wholesale_import")}

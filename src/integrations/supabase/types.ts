@@ -119,6 +119,246 @@ export type Database = {
         }
         Relationships: []
       }
+      document_lines: {
+        Row: {
+          accounting_category: string | null
+          accounting_code: string | null
+          color: string | null
+          confidence: number | null
+          created_at: string
+          document_id: string
+          gst: number
+          id: string
+          parse_strategy: string | null
+          product_title: string | null
+          quantity: number
+          size: string | null
+          sku: string | null
+          total_cost: number
+          unit_cost: number
+          user_id: string
+        }
+        Insert: {
+          accounting_category?: string | null
+          accounting_code?: string | null
+          color?: string | null
+          confidence?: number | null
+          created_at?: string
+          document_id: string
+          gst?: number
+          id?: string
+          parse_strategy?: string | null
+          product_title?: string | null
+          quantity?: number
+          size?: string | null
+          sku?: string | null
+          total_cost?: number
+          unit_cost?: number
+          user_id: string
+        }
+        Update: {
+          accounting_category?: string | null
+          accounting_code?: string | null
+          color?: string | null
+          confidence?: number | null
+          created_at?: string
+          document_id?: string
+          gst?: number
+          id?: string
+          parse_strategy?: string | null
+          product_title?: string | null
+          quantity?: number
+          size?: string | null
+          sku?: string | null
+          total_cost?: number
+          unit_cost?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_lines_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          accounting_category: string | null
+          accounting_code: string | null
+          created_at: string
+          currency: string
+          date: string | null
+          document_number: string | null
+          due_date: string | null
+          external_id: string | null
+          external_url: string | null
+          gst: number
+          id: string
+          source_type: string
+          status: string
+          subtotal: number
+          supplier_id: string | null
+          supplier_name: string | null
+          total: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accounting_category?: string | null
+          accounting_code?: string | null
+          created_at?: string
+          currency?: string
+          date?: string | null
+          document_number?: string | null
+          due_date?: string | null
+          external_id?: string | null
+          external_url?: string | null
+          gst?: number
+          id?: string
+          source_type?: string
+          status?: string
+          subtotal?: number
+          supplier_id?: string | null
+          supplier_name?: string | null
+          total?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accounting_category?: string | null
+          accounting_code?: string | null
+          created_at?: string
+          currency?: string
+          date?: string | null
+          document_number?: string | null
+          due_date?: string | null
+          external_id?: string | null
+          external_url?: string | null
+          gst?: number
+          id?: string
+          source_type?: string
+          status?: string
+          subtotal?: number
+          supplier_id?: string | null
+          supplier_name?: string | null
+          total?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          date: string
+          description: string | null
+          document_id: string | null
+          gst: number
+          id: string
+          period_end: string | null
+          period_start: string | null
+          subcategory: string | null
+          supplier_id: string | null
+          supplier_name: string | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          category: string
+          created_at?: string
+          date: string
+          description?: string | null
+          document_id?: string | null
+          gst?: number
+          id?: string
+          period_end?: string | null
+          period_start?: string | null
+          subcategory?: string | null
+          supplier_id?: string | null
+          supplier_name?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          date?: string
+          description?: string | null
+          document_id?: string | null
+          gst?: number
+          id?: string
+          period_end?: string | null
+          period_start?: string | null
+          subcategory?: string | null
+          supplier_id?: string | null
+          supplier_name?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory: {
+        Row: {
+          id: string
+          last_updated: string
+          location: string
+          quantity: number
+          user_id: string
+          variant_id: string
+        }
+        Insert: {
+          id?: string
+          last_updated?: string
+          location?: string
+          quantity?: number
+          user_id: string
+          variant_id: string
+        }
+        Update: {
+          id?: string
+          last_updated?: string
+          location?: string
+          quantity?: number
+          user_id?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       joor_connections: {
         Row: {
           connected_at: string
@@ -143,6 +383,45 @@ export type Database = {
           oauth_token?: string
           token_label?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          product_type: string | null
+          shopify_product_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          vendor: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          product_type?: string | null
+          shopify_product_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          vendor?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          product_type?: string | null
+          shopify_product_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          vendor?: string | null
         }
         Relationships: []
       }
@@ -307,6 +586,101 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      suppliers: {
+        Row: {
+          avg_margin: number | null
+          contact_info: Json
+          created_at: string
+          currency: string
+          id: string
+          name: string
+          notes: string | null
+          total_spend: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_margin?: number | null
+          contact_info?: Json
+          created_at?: string
+          currency?: string
+          id?: string
+          name: string
+          notes?: string | null
+          total_spend?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_margin?: number | null
+          contact_info?: Json
+          created_at?: string
+          currency?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          total_spend?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      variants: {
+        Row: {
+          barcode: string | null
+          color: string | null
+          cost: number
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+          retail_price: number
+          shopify_variant_id: string | null
+          size: string | null
+          sku: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          barcode?: string | null
+          color?: string | null
+          cost?: number
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity?: number
+          retail_price?: number
+          shopify_variant_id?: string | null
+          size?: string | null
+          sku?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          barcode?: string | null
+          color?: string | null
+          cost?: number
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          retail_price?: number
+          shopify_variant_id?: string | null
+          size?: string | null
+          sku?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wholesale_connections: {
         Row: {

@@ -47,7 +47,7 @@ const CATEGORIES = [
 
 // ── Main component ──
 export default function AccountingIntegration({ onBack }: { onBack: () => void }) {
-  const [screen, setScreen] = useState<"select" | "mapping" | "history">("select");
+  const [screen, setScreen] = useState<"select" | "mapping" | "history" | "training">("select");
   const [connections, setConnections] = useState<AccountingConnection[]>([]);
   const [history, setHistory] = useState<PushRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +57,8 @@ export default function AccountingIntegration({ onBack }: { onBack: () => void }
   const [mappings, setMappings] = useState<Record<string, string>>({});
   const [savingMappings, setSavingMappings] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<string>("all");
+  const [trainingStats, setTrainingStats] = useState(getClassificationStats());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadConnections();

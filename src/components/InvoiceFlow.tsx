@@ -1048,9 +1048,54 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           )}
 
 
+          {/* Process As selector */}
+          <div className="mt-4 bg-card rounded-lg border border-border p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Settings className="w-4 h-4 text-primary" />
+              <span className="text-xs font-semibold">Process as:</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {([
+                { value: "auto", label: "🤖 Auto-detect", desc: "AI classifies the document type" },
+                { value: "invoice", label: "📄 Invoice", desc: "Has prices & quantities" },
+                { value: "packing_slip", label: "📦 Packing Slip", desc: "Items & qty, no prices" },
+                { value: "handwritten", label: "✍️ Handwritten", desc: "Low-structure document" },
+              ] as { value: ProcessAsMode; label: string; desc: string }[]).map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setProcessAs(opt.value)}
+                  className={`text-left px-3 py-2 rounded-md border text-xs transition-colors ${
+                    processAs === opt.value
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-muted/30 text-muted-foreground"
+                  }`}
+                >
+                  <span className="font-medium block">{opt.label}</span>
+                  <span className="text-[10px] opacity-70">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+            {/* Supplier template option */}
+            {matchedTemplate && (
+              <button
+                onClick={() => setProcessAs("supplier_template")}
+                className={`w-full mt-1.5 text-left px-3 py-2 rounded-md border text-xs transition-colors ${
+                  processAs === "supplier_template"
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border bg-muted/30 text-muted-foreground"
+                }`}
+              >
+                <span className="font-medium block">⚡ Use {matchedTemplate.supplier} Template</span>
+                <span className="text-[10px] opacity-70">
+                  {getLayoutLabel(matchedTemplate.layoutType)} · {matchedTemplate.successCount} uses
+                </span>
+              </button>
+            )}
+          </div>
+
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center gap-2 mt-6 text-sm text-muted-foreground"
+            className="flex items-center gap-2 mt-4 text-sm text-muted-foreground"
           >
             <ChevronDown className={`w-4 h-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
             Invoice details

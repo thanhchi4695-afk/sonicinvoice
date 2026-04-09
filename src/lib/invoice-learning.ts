@@ -348,17 +348,34 @@ export function buildMemoryHint(supplier?: string): Record<string, unknown> | nu
       .map(n => `Reject rows matching: "${n.text}" (reason: ${n.reason})`);
   }
 
-  // Add field corrections as rules
+  // Add field corrections as categorized rules
   if (memory.fieldCorrections.length > 0) {
     hint.corrections = memory.fieldCorrections
       .filter(fc => fc.occurrences >= 1)
       .slice(0, 20)
-      .map(fc => `In field "${fc.field}": replace "${fc.pattern}" with "${fc.corrected}"`);
+      .map(fc => `[${fc.category || "general"}] In field "${fc.field}": replace "${fc.pattern}" with "${fc.corrected}" (seen ${fc.occurrences}x)`);
+
+    // Also provide category-specific summaries for stronger AI guidance
+    const categories = new Map<string, number>();
+    memory.fieldCorrections.forEach(fc => {
+      const cat = fc.category || "general";
+      categories.set(cat, (categories.get(cat) || 0) + fc.occurrences);
+    });
+    hint.correctionSummary = Object.fromEntries(categories);
   }
 
   // Add grouping rules
   if (memory.groupingRules.length > 0) {
     hint.groupingRules = memory.groupingRules.map(g => g.description);
+  }
+
+  // Add reclassification patterns
+  const reclasses = memory.reclassifications || [];
+  if (reclasses.length > 0) {
+    hint.reclassifications = reclasses
+      .filter(r => r.occurrences >= 2)
+      .slice(0, 10)
+      .map(r => `Rows like "${r.rawText}" should be ${r.to} (was ${r.from}, reason: ${r.reason}, seen ${r.occurrences}x)`);
   }
 
   return hint;

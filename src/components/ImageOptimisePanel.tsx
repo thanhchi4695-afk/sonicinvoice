@@ -70,6 +70,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
   const [syncing, setSyncing] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [analysingSize, setAnalysingSize] = useState(false);
+  const [auditingConversion, setAuditingConversion] = useState(false);
   const [compressionProgress, setCompressionProgress] = useState({ current: 0, total: 0 });
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

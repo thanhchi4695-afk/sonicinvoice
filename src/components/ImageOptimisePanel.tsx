@@ -844,7 +844,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
                 )}
               </CardContent>
             </Card>
-
+          )}
           {compressing && (
             <Card>
               <CardContent className="p-4 space-y-2">

@@ -348,6 +348,52 @@ export default function PostParseReviewScreen({
         </button>
         {showDebug && (
           <div className="border-t border-border">
+            {/* Parsing Plan */}
+            {debug.parsingPlan && (
+              <div className="px-4 py-3 bg-muted/10 border-b border-border">
+                <p className="text-[10px] font-semibold text-foreground mb-2 flex items-center gap-1">
+                  <Zap className="w-3 h-3" /> Parsing Strategy Plan
+                </p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+                  <DetailRow label="Document type" value={debug.parsingPlan.document_type || "—"} />
+                  <DetailRow label="Layout type" value={debug.parsingPlan.layout_type || "—"} />
+                  <DetailRow label="Variant method" value={debug.parsingPlan.variant_method || "—"} />
+                  <DetailRow label="Line-item zone" value={debug.parsingPlan.line_item_zone || "—"} />
+                  <DetailRow label="Quantity field" value={debug.parsingPlan.quantity_field || "—"} />
+                  <DetailRow label="Cost field" value={debug.parsingPlan.cost_field || "—"} />
+                  <DetailRow label="Grouping required" value={debug.parsingPlan.grouping_required ? `Yes — ${debug.parsingPlan.grouping_reason || ""}` : "No"} />
+                  <DetailRow label="Expected review" value={debug.parsingPlan.expected_review_level || "—"} highlight />
+                </div>
+                {debug.parsingPlan.strategy_explanation && (
+                  <p className="mt-2 text-[10px] text-muted-foreground italic border-t border-border/30 pt-1.5">
+                    💡 {debug.parsingPlan.strategy_explanation}
+                  </p>
+                )}
+                {debug.parsingPlan.review_reason && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Review reason: {debug.parsingPlan.review_reason}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* AI Rejected Rows */}
+            {debug.rejectedByAI && debug.rejectedByAI.length > 0 && (
+              <div className="px-4 py-2 bg-destructive/5 border-b border-border">
+                <p className="text-[10px] font-semibold text-destructive mb-1">
+                  🚫 Rows Rejected by AI ({debug.rejectedByAI.length})
+                </p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {debug.rejectedByAI.map((r, i) => (
+                    <div key={i} className="flex gap-2 text-[9px]">
+                      <span className="text-muted-foreground max-w-[200px] truncate">{r.raw_text}</span>
+                      <span className="text-destructive">→ {r.rejection_reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="px-4 py-2 bg-muted/20 text-[10px] text-muted-foreground">
               {debug.totalRaw} rows parsed → {debug.accepted} accepted, {debug.needsReview} flagged, {debug.rejected} rejected
             </div>

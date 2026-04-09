@@ -148,9 +148,19 @@ Score each extracted row 0-100:
 Return ONLY valid JSON (no markdown, no explanation):
 
 {
-  "document_type": "tax_invoice" | "packing_slip" | "handwritten_invoice" | "statement" | "unknown",
-  "layout_type": "<one of the layout types above>",
-  "variant_method": "<which variant extraction method was used>",
+  "parsing_plan": {
+    "document_type": "tax_invoice" | "packing_slip" | "handwritten_invoice" | "statement" | "unknown",
+    "layout_type": "<one of the layout types from Stage B>",
+    "variant_method": "one_row_per_variant" | "size_grid_matrix" | "product_block_nested" | "size_row_below" | "description_embedded" | "handwritten" | "none",
+    "line_item_zone": "description of where the product rows are located (e.g. 'rows 5-45 of the main table')",
+    "quantity_field": "description of where/how quantity is expressed (e.g. 'Qty column', 'circled numbers in size grid', 'inline after size labels')",
+    "cost_field": "description of which field contains wholesale cost (e.g. 'Unit Price column', 'SP column — not RRP')",
+    "grouping_required": true | false,
+    "grouping_reason": "why grouping is or isn't needed (e.g. 'multiple size rows share the same style code')",
+    "expected_review_level": "low" | "medium" | "high",
+    "review_reason": "why this review level (e.g. 'clean structured table, high confidence' or 'handwritten, many uncertain quantities')",
+    "strategy_explanation": "1-2 sentence explanation of the overall extraction approach chosen"
+  },
   "supplier": "detected supplier name",
   "invoice_number": "if visible",
   "currency": "AUD" or detected currency,
@@ -285,9 +295,10 @@ Use this as guidance but verify against the actual document structure. If the do
     const jsonStr = (jsonMatch[1] || content).trim();
     const parsed = JSON.parse(jsonStr);
 
-    const docType = parsed.document_type || (forceMode || "tax_invoice");
-    const layoutType = parsed.layout_type || "unknown";
-    const variantMethod = parsed.variant_method || "unknown";
+    const parsingPlan = parsed.parsing_plan || {};
+    const docType = parsingPlan.document_type || parsed.document_type || (forceMode || "tax_invoice");
+    const layoutType = parsingPlan.layout_type || parsed.layout_type || "unknown";
+    const variantMethod = parsingPlan.variant_method || parsed.variant_method || "unknown";
     const detectedFields = parsed.detected_fields || [];
     const detectedSizeSystem = parsed.detected_size_system || "none";
 
@@ -309,6 +320,7 @@ Use this as guidance but verify against the actual document structure. If the do
         document_type: "packing_slip",
         layout_type: layoutType,
         variant_method: variantMethod,
+        parsing_plan: parsingPlan,
         detected_fields: detectedFields,
         detected_size_system: detectedSizeSystem,
         confidence: parsed.confidence || 85,
@@ -353,6 +365,7 @@ Use this as guidance but verify against the actual document structure. If the do
       document_type: docType,
       layout_type: layoutType,
       variant_method: variantMethod,
+      parsing_plan: parsingPlan,
       detected_fields: detectedFields,
       detected_size_system: detectedSizeSystem,
       supplier: parsed.supplier || supplierName || "",

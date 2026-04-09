@@ -55,6 +55,20 @@ export interface ValidatedProduct extends RawProduct {
   _extractionReason?: string;
 }
 
+export interface ParsingPlan {
+  document_type?: string;
+  layout_type?: string;
+  variant_method?: string;
+  line_item_zone?: string;
+  quantity_field?: string;
+  cost_field?: string;
+  grouping_required?: boolean;
+  grouping_reason?: string;
+  expected_review_level?: string;
+  review_reason?: string;
+  strategy_explanation?: string;
+}
+
 export interface ValidationDebugInfo {
   totalRaw: number;
   accepted: number;
@@ -63,6 +77,8 @@ export interface ValidationDebugInfo {
   rejectedRows: { row: number; name: string; reason: string }[];
   detectedVendor: string;
   corrections: { row: number; field: string; from: string; to: string; reason: string }[];
+  parsingPlan?: ParsingPlan;
+  rejectedByAI?: { raw_text: string; rejection_reason: string }[];
 }
 
 // ── Pattern matchers ──

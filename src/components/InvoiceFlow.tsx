@@ -581,6 +581,13 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           );
         }
       }
+      // Store parsing plan and rejected rows for debug
+      if (data.parsing_plan) {
+        setAiParsingPlan(data.parsing_plan);
+      }
+      if (data.rejected_rows) {
+        setAiRejectedRows(data.rejected_rows);
+      }
       return data.products || [];
     } catch (err) {
       console.error("AI parse error:", err);
@@ -638,7 +645,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
     // ── Post-processing validation ──
     const { products: validated, debug } = validateAndCleanProducts(products, supplierName);
-    setValidationDebug(debug);
+    setValidationDebug({
+      ...debug,
+      parsingPlan: aiParsingPlan as any,
+      rejectedByAI: aiRejectedRows,
+    });
     setValidatedProducts(validated);
 
     // Filter to accepted products only
@@ -742,6 +753,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
   const [validationDebug, setValidationDebug] = useState<ValidationDebugInfo | null>(null);
   const [validatedProducts, setValidatedProducts] = useState<ValidatedProduct[]>([]);
+  const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
+  const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
 
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {

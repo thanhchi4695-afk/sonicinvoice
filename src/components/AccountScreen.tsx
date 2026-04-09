@@ -19,7 +19,7 @@ import { CURRENCIES, LOCALES } from "@/lib/i18n";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { loadPreferences, savePreferences, type NotificationPreferences } from "@/hooks/use-notifications";
 import { Switch } from "@/components/ui/switch";
-import { getFormatTemplates, deleteFormatTemplate, SHARED_AU_TEMPLATES, getTemplateQuality, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
+import { getFormatTemplates, deleteFormatTemplate, getTemplateQuality, getTemplateList, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
 import { getMetafieldConfig, saveMetafieldConfig, type MetafieldDefinition } from "@/lib/metafields";
 import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
 
@@ -1141,19 +1141,21 @@ function InvoiceTemplatesSection() {
         </div>
       )}
 
-      {/* Shared AU templates */}
-      <div className="mt-3 pt-3 border-t">
-        <p className="text-xs font-semibold text-muted-foreground mb-2">🇦🇺 Shared AU Templates</p>
-        <p className="text-[11px] text-muted-foreground mb-2">Pre-configured for common AU swimwear supplier invoice formats.</p>
-        <div className="space-y-1">
-          {SHARED_AU_TEMPLATES.map(t => (
-            <div key={t.supplier} className="flex items-center justify-between text-xs bg-muted/30 rounded-lg px-3 py-1.5">
-              <span className="font-medium text-foreground">{t.supplier}</span>
-              <span className="text-muted-foreground">{t.fileType.toUpperCase()}</span>
-            </div>
-          ))}
+      {/* Learned templates */}
+      {getTemplateList().length > 0 && (
+        <div className="mt-3 pt-3 border-t">
+          <p className="text-xs font-semibold text-muted-foreground mb-2">📚 Learned Templates</p>
+          <p className="text-[11px] text-muted-foreground mb-2">Templates learned from your invoice uploads.</p>
+          <div className="space-y-1">
+            {getTemplateList().filter(t => t.successCount > 0).map(t => (
+              <div key={t.supplier} className="flex items-center justify-between text-xs bg-muted/30 rounded-lg px-3 py-1.5">
+                <span className="font-medium text-foreground">{t.supplier}</span>
+                <span className="text-muted-foreground">{t.successCount} uses • {t.corrections?.length || 0} corrections</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </Section>
   );
 }

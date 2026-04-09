@@ -421,7 +421,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-bold">{s.name}</p>
-                        {s.avg_margin && Number(s.avg_margin) >= 60 && <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />}
+                        {s.avg_margin && Number(s.avg_margin) >= 60 && <TrendingUp className="w-3.5 h-3.5 text-success" />}
                         {s.avg_margin && Number(s.avg_margin) < 50 && <TrendingDown className="w-3.5 h-3.5 text-destructive" />}
                         {(!s.avg_margin || (Number(s.avg_margin) >= 50 && Number(s.avg_margin) < 60)) && <Minus className="w-3.5 h-3.5 text-muted-foreground" />}
                       </div>

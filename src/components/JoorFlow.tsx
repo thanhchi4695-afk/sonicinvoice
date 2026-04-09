@@ -822,10 +822,22 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
 
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold font-display">JOOR Orders</h1>
-        <Button variant="outline" size="sm" onClick={loadOrders} disabled={ordersLoading}>
-          <RefreshCw className={`w-4 h-4 mr-1.5 ${ordersLoading ? "animate-spin" : ""}`} />
-          Pull latest
-        </Button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.pdf"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+            <FileUp className="w-4 h-4 mr-1.5" /> Import file
+          </Button>
+          <Button variant="outline" size="sm" onClick={loadOrders} disabled={ordersLoading}>
+            <RefreshCw className={`w-4 h-4 mr-1.5 ${ordersLoading ? "animate-spin" : ""}`} />
+            Pull latest
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

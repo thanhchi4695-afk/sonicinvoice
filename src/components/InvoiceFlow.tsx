@@ -576,24 +576,33 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       }
       if (data.layout_type) {
         setDetectedLayout(data.layout_type as LayoutType);
-        console.log(`[Sonic Invoice] Layout: ${data.layout_type}, Variant method: ${data.variant_method}, Size system: ${data.detected_size_system}`);
-        toast(`Layout: ${getLayoutLabel(data.layout_type)}`, { description: `Supplier: ${data.supplier || supplierName || 'Unknown'} • ${data.variant_method || ''}` });
-        // Save learned template
+        const plan = data.parsing_plan || {};
         const sup = data.supplier || supplierName;
+        const memStats = sup ? getMemoryStats(sup) : null;
+        const boostInfo = memStats && memStats.boost > 0 ? ` • +${memStats.boost} learned` : "";
+        console.log(`[Sonic Invoice] Layout: ${data.layout_type}, Variant: ${data.variant_method}, Size: ${data.detected_size_system}${boostInfo}`);
+        toast(`Layout: ${getLayoutLabel(data.layout_type)}`, {
+          description: `${sup || 'Unknown'}${boostInfo}${memStats ? ` • ${memStats.parses} prior parses` : ""}`,
+        });
+
+        // Save to both template system and learning memory
         if (sup) {
-          saveLayoutTemplate(
-            sup,
-            data.layout_type as LayoutType,
-            85,
-            ext as any,
-            customInstructions || undefined,
-            data.variant_method,
-            data.detected_size_system,
-            data.detected_fields,
-          );
+          saveLayoutTemplate(sup, data.layout_type as LayoutType, 85, ext as any, customInstructions || undefined, data.variant_method, data.detected_size_system, data.detected_fields);
+
+          // Record to learning memory with full fingerprint
+          const fingerprint: LayoutFingerprint = {
+            layoutType: data.layout_type,
+            variantMethod: plan.variant_method || data.variant_method || "unknown",
+            sizeSystem: data.detected_size_system || "none",
+            tableHeaders: data.detected_fields || [],
+            lineItemZone: plan.line_item_zone || "",
+            costFieldRule: plan.cost_field || "",
+            quantityFieldRule: plan.quantity_field || "",
+            groupingRequired: plan.grouping_required || false,
+          };
+          recordParseSuccess(sup, fingerprint, data.rejected_rows);
         }
       }
-      // Store parsing plan and rejected rows for debug
       if (data.parsing_plan) {
         setAiParsingPlan(data.parsing_plan);
       }

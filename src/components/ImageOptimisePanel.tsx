@@ -219,6 +219,49 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     setValidating(false);
   };
 
+  // ── Push to Shopify ──
+  const pushToShopify = async () => {
+    const approved = products.filter(p => p.approved && p.altText && p.shopifyProductId && !p.synced);
+    if (approved.length === 0) { toast.info("No approved products with Shopify links to sync"); return; }
+    setSyncing(true);
+    try {
+      let synced = 0;
+      for (let i = 0; i < approved.length; i += 10) {
+        const batch = approved.slice(i, i + 10);
+        const { data, error } = await supabase.functions.invoke("shopify-proxy", {
+          body: {
+            action: "update_image_alt",
+            image_updates: batch.map(p => ({
+              shopify_product_id: p.shopifyProductId,
+              alt_text: p.altText,
+              seo_filename: p.seoFilename,
+              keywords: p.keywords,
+            })),
+          },
+        });
+        if (error) throw error;
+        if (data?.results) {
+          const successIds = new Set(
+            data.results.filter((r: any) => r.status === "success").map((r: any) => r.shopify_product_id)
+          );
+          setProducts(prev => prev.map(p => {
+            if (p.shopifyProductId && successIds.has(p.shopifyProductId)) {
+              return { ...p, synced: true };
+            }
+            return p;
+          }));
+          synced += successIds.size;
+          const errors = data.results.filter((r: any) => r.status === "error");
+          if (errors.length > 0) {
+            console.warn("Shopify sync errors:", errors);
+          }
+        }
+      }
+      toast.success(`Pushed alt text to ${synced} Shopify products`);
+    } catch (e: any) { toast.error(e.message || "Shopify sync failed"); }
+    setSyncing(false);
+  };
+
   const approveAll = () => {
     setProducts(prev => prev.map(p => p.altText ? { ...p, approved: true } : p));
     toast.success("All products with alt text approved");

@@ -782,6 +782,7 @@ function ReviewRow({
   onApprove, onReject, onMoveToReview, onRestore,
   onUpdateField, onMarkAs, onSplit,
   showTeachAI, onToggleTeachAI, supplierName, parsingPlan,
+  invoicePages, onShowSourceTrace,
 }: {
   product: ReviewProduct;
   tab: ReviewTab;
@@ -801,6 +802,8 @@ function ReviewRow({
   onToggleTeachAI: () => void;
   supplierName?: string;
   parsingPlan?: import("@/lib/invoice-validator").ParsingPlan;
+  invoicePages?: string[];
+  onShowSourceTrace?: (product: ReviewProduct) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showWhyAI, setShowWhyAI] = useState(false);

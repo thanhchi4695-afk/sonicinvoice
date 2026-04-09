@@ -103,9 +103,14 @@ export const TYPE_OPTIONS = [
   // ── MENS ──
   'Mens Swimwear',
   'Boardshorts',
+  'Mens Briefs & Jammers',
+  'Mens Rashies',
   'Mens Shorts',
-  'Mens Shirt',
+  'Mens Shirts',
+  'Mens Tees & Singlets',
   'Mens Accessories',
+  'Mens Hats & Caps',
+  'Mens Shoes & Thongs',
   // ── KIDS ──
   'Kids Swimwear',
   'Girls 00-7',
@@ -216,8 +221,10 @@ const KIDS_TYPES = [
 ];
 
 const MENS_TYPES = [
-  'Mens Swimwear', 'Boardshorts', 'Mens Shorts', 'Mens Shirt',
-  'Mens Accessories',
+  'Mens Swimwear', 'Boardshorts', 'Mens Briefs & Jammers',
+  'Mens Rashies', 'Mens Shorts', 'Mens Shirts',
+  'Mens Tees & Singlets', 'Mens Accessories',
+  'Mens Hats & Caps', 'Mens Shoes & Thongs',
 ];
 
 const WOMENS_SWIM_TYPES = [
@@ -313,10 +320,16 @@ const TYPE_TAG_MAP: Record<string, string> = {
   'Grooming & Toiletries': 'home & living',
 
   // Mens
-  'Boardshorts':         'boardshorts',
-  'Mens Swimwear':       'mens swim',
-  'Mens Shorts':         'mens shorts',
-  'Mens Shirt':          'mens shirts',
+  'Boardshorts':           'boardshorts',
+  'Mens Swimwear':         'mens swim',
+  'Mens Briefs & Jammers': 'mens briefs',
+  'Mens Rashies':          'mens rashies',
+  'Mens Shorts':           'mens shorts',
+  'Mens Shirts':           'mens shirts',
+  'Mens Tees & Singlets':  'mens tees',
+  'Mens Accessories':      'accessories',
+  'Mens Hats & Caps':      'hats',
+  'Mens Shoes & Thongs':   'footwear',
 
   // Kids
   'Kids Swimwear':       'Girls swimwear',

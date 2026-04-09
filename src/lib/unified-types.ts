@@ -109,6 +109,33 @@ export interface UnifiedPeriodReport {
   netProfit: number;
 }
 
+// ── Grouped Product (display wrapper for multi-size variants) ──
+
+export interface GroupedProduct {
+  title: string;
+  sku: string;
+  barcode: string;
+  description: string;
+  vendor: string;
+  productType: string;
+  retailPrice: number;
+  wholesaleCost: number;
+  colour: string;
+  colourCode: string;
+  size: string;
+  collection: string;
+  season: string;
+  fabrication: string;
+  imageUrl: string;
+  brand: string;
+  tags: string[];
+  arrivalMonth: string;
+  sizes: string[];
+  barcodes: string[];
+  quantities: number[];
+  source: SourceMeta;
+}
+
 // ── Wholesale Order (already exists, re-exported) ────────
 
 export type { WholesaleOrder, WholesaleLineItem } from "./wholesale-mapper";

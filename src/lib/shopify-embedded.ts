@@ -39,7 +39,15 @@ export function getHostFromUrl(): string | null {
   return params.get("host");
 }
 
-/** Get the Shopify API key from env */
+/** Get the Shopify API key from env or the hardcoded meta tag */
 export function getApiKey(): string {
-  return import.meta.env.VITE_SHOPIFY_API_KEY || "";
+  const envKey = import.meta.env.VITE_SHOPIFY_API_KEY;
+  if (envKey) return envKey;
+
+  if (typeof document !== "undefined") {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="shopify-api-key"]');
+    return meta?.content || "";
+  }
+
+  return "";
 }

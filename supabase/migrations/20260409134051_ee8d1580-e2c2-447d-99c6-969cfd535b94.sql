@@ -1,0 +1,1 @@
+ALTER TABLE public.markdown_ladders ADD COLUMN sync_to_shopify boolean NOT NULL DEFAULT false;

@@ -43,6 +43,8 @@ Identify which areas of the document contain:
 
 Key field detection rules:
 - **Cost vs RRP**: If two price columns exist, the LOWER value is usually wholesale cost; the HIGHER is RRP. Look for column headers like "SP", "Cost", "Unit Price", "Price (Tax excl.)" for cost. "RRP", "Retail", "Rec. Retail" for retail price.
+- **CRITICAL COST RULE**: NEVER use RRP as cost. If only one price column exists and it's labelled "RRP" or "Retail", set unit_cost to null. Only use wholesale/cost/unit price columns.
+- **Cost derivation**: If line_total and quantity are both available but unit_cost is missing, derive unit_cost = line_total / quantity. Always verify: unit_cost × quantity should approximately equal line_total (within 2% tolerance for rounding).
 - **Quantity**: May be in a "Qty", "Units", "Ordered" column, or marked/circled in size grid cells
 - **Size**: May be column headers (6,8,10,12), inline text (XS,S,M,L), or embedded in description
 - **Colour**: May be a separate column, a suffix after " - " in descriptions, or an abbreviation in the style code
@@ -116,6 +118,13 @@ Detect colour from (priority order):
 4. Style code suffix matching abbreviation (e.g. "-NVY", "_BLK")
 5. Options/notes field
 
+## STAGE G — PRODUCT GROUPING
+
+After extraction, identify which rows should be grouped as variants of the same product:
+- Rows with the SAME style_code AND colour but DIFFERENT sizes → variants of one product
+- Rows with the SAME style_code but DIFFERENT colours → separate products (one per colour)
+- Set "group_key" to "style_code|colour" for grouping
+
 ## NOISE FILTERING
 
 NEVER include these as products:
@@ -136,12 +145,13 @@ Identify product rows by: having a descriptive title (3+ chars, not just a numbe
 
 Score each extracted row 0-100:
 - Has product title with 3+ meaningful characters: +20
-- Has valid unit_cost > 0: +20
+- Has valid unit_cost > 0 (NOT derived from RRP): +20
 - Has recognisable size value: +15
 - Has colour: +15
 - Has style code / SKU: +15
 - Has quantity > 0: +15
-- Deductions: missing price -20, ambiguous text -10, handwritten uncertainty -15, uncertain quantity -10
+- Math cross-check passes (unit_cost × qty ≈ line_total): +5
+- Deductions: missing price -20, ambiguous text -10, handwritten uncertainty -15, uncertain quantity -10, cost derived from line_total -5
 
 ## OUTPUT FORMAT
 
@@ -152,18 +162,27 @@ Return ONLY valid JSON (no markdown, no explanation):
     "document_type": "tax_invoice" | "packing_slip" | "handwritten_invoice" | "statement" | "unknown",
     "layout_type": "<one of the layout types from Stage B>",
     "variant_method": "one_row_per_variant" | "size_grid_matrix" | "product_block_nested" | "size_row_below" | "description_embedded" | "handwritten" | "none",
-    "line_item_zone": "description of where the product rows are located (e.g. 'rows 5-45 of the main table')",
-    "quantity_field": "description of where/how quantity is expressed (e.g. 'Qty column', 'circled numbers in size grid', 'inline after size labels')",
-    "cost_field": "description of which field contains wholesale cost (e.g. 'Unit Price column', 'SP column — not RRP')",
+    "size_system": "numeric_au" | "numeric_us" | "alpha" | "combined" | "cup" | "denim" | "one_size" | "mixed" | "none",
+    "line_item_zone": "description of where the product rows are located",
+    "quantity_field": "description of where/how quantity is expressed",
+    "cost_field": "description of which field contains wholesale cost",
+    "cost_derivation": "direct" | "from_line_total" | "missing",
     "grouping_required": true | false,
-    "grouping_reason": "why grouping is or isn't needed (e.g. 'multiple size rows share the same style code')",
+    "grouping_reason": "why grouping is or isn't needed",
+    "total_products_expected": number,
+    "total_variants_expected": number,
     "expected_review_level": "low" | "medium" | "high",
-    "review_reason": "why this review level (e.g. 'clean structured table, high confidence' or 'handwritten, many uncertain quantities')",
+    "review_reason": "why this review level",
     "strategy_explanation": "1-2 sentence explanation of the overall extraction approach chosen"
   },
   "supplier": "detected supplier name",
   "invoice_number": "if visible",
+  "invoice_date": "YYYY-MM-DD if visible",
+  "due_date": "YYYY-MM-DD if visible",
   "currency": "AUD" or detected currency,
+  "subtotal": number or null,
+  "gst": number or null,
+  "total": number or null,
   "detected_size_system": "numeric_au" | "alpha" | "combined" | "cup" | "denim" | "mixed" | "none",
   "detected_fields": ["list", "of", "field", "names", "found"],
   "products": [
@@ -178,15 +197,17 @@ Return ONLY valid JSON (no markdown, no explanation):
       "line_total": number or null,
       "barcode": "if visible",
       "product_type": "e.g. One Piece, Dress, Pant, Top",
+      "group_key": "style_code|colour for grouping variants",
       "confidence": 0-100,
       "parse_notes": "any issues, ambiguity, or extraction strategy used",
       "extraction_reason": "brief explanation of why this row was identified as a product",
+      "cost_source": "direct" | "derived_from_line_total" | "missing",
       "source_regions": {
-        "title": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. description column, inline text" },
+        "title": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. description column" },
         "sku": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. style code column" },
-        "colour": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. colour column, description suffix" },
-        "size": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. size grid column, inline" },
-        "quantity": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. qty column, grid cell" },
+        "colour": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. colour column" },
+        "size": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. size grid column" },
+        "quantity": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. qty column" },
         "cost": { "page": 1, "y_position": 0.0-1.0, "extraction_method": "e.g. unit price column" }
       }
     }
@@ -199,15 +220,112 @@ Return ONLY valid JSON (no markdown, no explanation):
   ]
 }
 
-For source_regions: y_position is a normalized 0-1 value indicating the vertical position on the page where this field's data was found (0 = top, 1 = bottom). page is 1-indexed. Only include fields that were actually detected. This data is used for visual source tracing.
+For source_regions: y_position is a normalized 0-1 value indicating the vertical position on the page where this field's data was found (0 = top, 1 = bottom). page is 1-indexed. Only include fields that were actually detected.
 
 CRITICAL RULES:
 - Create ONE output row per size+colour variant where quantity > 0
 - product_title must be the CLEAN base name without colour or size appended
 - Do NOT hallucinate data that is not visible in the document
 - If cost is missing, set unit_cost to null — do not guess
+- NEVER use RRP as cost — if only RRP is visible, set unit_cost to null
+- If line_total and quantity exist but unit_cost is missing, DERIVE unit_cost = line_total / quantity and set cost_source to "derived_from_line_total"
 - For packing slips: set unit_cost and rrp to null, focus on qty extraction
-- For handwritten documents: lower confidence, flag uncertain readings`;
+- For handwritten documents: lower confidence, flag uncertain readings
+- Always set group_key so the client can group variants correctly`;
+
+// ── Server-side post-AI validation ──────────────────────────
+function crossValidateProducts(products: Record<string, unknown>[]): Record<string, unknown>[] {
+  return products.map(p => {
+    const unitCost = Number(p.unit_cost) || 0;
+    const qty = Number(p.quantity) || 0;
+    const lineTotal = Number(p.line_total) || 0;
+    const rrp = Number(p.rrp) || 0;
+    let confidence = Number(p.confidence) || 50;
+    const notes: string[] = [String(p.parse_notes || "")].filter(Boolean);
+    let costSource = String(p.cost_source || "direct");
+
+    // Rule 1: Derive cost from line_total if missing
+    if (unitCost === 0 && lineTotal > 0 && qty > 0) {
+      const derived = Math.round((lineTotal / qty) * 100) / 100;
+      p.unit_cost = derived;
+      costSource = "derived_from_line_total";
+      notes.push(`Cost derived: $${lineTotal} / ${qty} = $${derived}`);
+      confidence = Math.max(0, confidence - 5);
+    }
+
+    // Rule 2: Math cross-check
+    if (unitCost > 0 && qty > 0 && lineTotal > 0) {
+      const expected = unitCost * qty;
+      const tolerance = expected * 0.02;
+      if (Math.abs(expected - lineTotal) > tolerance && Math.abs(expected - lineTotal) > 1) {
+        notes.push(`Math mismatch: ${unitCost} × ${qty} = ${expected.toFixed(2)}, but line_total = ${lineTotal.toFixed(2)}`);
+        confidence = Math.max(0, confidence - 10);
+      }
+    }
+
+    // Rule 3: Cost should be less than RRP
+    const finalCost = Number(p.unit_cost) || 0;
+    if (finalCost > 0 && rrp > 0 && finalCost >= rrp) {
+      notes.push(`Warning: cost ($${finalCost}) >= RRP ($${rrp}) — possible column swap`);
+      confidence = Math.max(0, confidence - 15);
+    }
+
+    // Rule 4: Suspiciously high cost (> $500 for fashion)
+    if (finalCost > 500) {
+      notes.push(`Warning: cost ($${finalCost}) unusually high — verify manually`);
+      confidence = Math.max(0, confidence - 5);
+    }
+
+    // Rule 5: Zero quantity
+    if (qty <= 0) {
+      notes.push("Zero or missing quantity");
+      confidence = Math.max(0, confidence - 10);
+    }
+
+    // Rule 6: Generate group_key if missing
+    if (!p.group_key) {
+      const styleCode = String(p.style_code || "");
+      const colour = String(p.colour || "");
+      p.group_key = styleCode ? `${styleCode}|${colour}` : "";
+    }
+
+    p.confidence = Math.min(100, Math.max(0, confidence));
+    p.parse_notes = notes.filter(Boolean).join("; ");
+    p.cost_source = costSource;
+    return p;
+  });
+}
+
+// ── Server-side noise filter ──────────────────────────────
+function filterNoise(products: Record<string, unknown>[]): { kept: Record<string, unknown>[]; rejected: Record<string, unknown>[] } {
+  const kept: Record<string, unknown>[] = [];
+  const rejected: Record<string, unknown>[] = [];
+
+  for (const p of products) {
+    const title = String(p.product_title || p.style_description || p.name || "").trim().toLowerCase();
+    const code = String(p.style_code || p.sku || "").trim();
+
+    if (!title && !code) {
+      rejected.push({ raw_text: JSON.stringify(p), rejection_reason: "Empty title and code" });
+      continue;
+    }
+    if (/^(total|subtotal|sub total|freight|shipping|gst|tax|delivery|discount|amount due|balance|payment|deposit)$/i.test(title)) {
+      rejected.push({ raw_text: title, rejection_reason: `Noise term: "${title}"` });
+      continue;
+    }
+    if (/^carton\s/i.test(title) || /^carton\s/i.test(code)) {
+      rejected.push({ raw_text: title || code, rejection_reason: "Carton reference" });
+      continue;
+    }
+    if (/^\d+[.,]\d{2}$/.test(title)) {
+      rejected.push({ raw_text: title, rejection_reason: "Title is a price value" });
+      continue;
+    }
+    kept.push(p);
+  }
+
+  return { kept, rejected };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -254,19 +372,16 @@ This supplier has been parsed before. The system has learned these patterns — 
 - Grouping required: ${templateHint.groupingRequired ?? "unknown"}
 ${templateHint.confidenceBoost > 0 ? `- Confidence boost earned: +${templateHint.confidenceBoost} (add this to each row's confidence score)` : ""}`;
 
-      // Noise exclusions from learned patterns
       if (templateHint.noiseExclusions?.length) {
         systemPrompt += `\n\n### Learned noise patterns (ALWAYS reject these):
 ${templateHint.noiseExclusions.map((n: string) => `• ${n}`).join("\n")}`;
       }
 
-      // Field corrections from merchant edits
       if (templateHint.corrections?.length) {
         systemPrompt += `\n\n### Learned field corrections (APPLY these automatically):
 ${templateHint.corrections.map((c: string) => `• ${c}`).join("\n")}`;
       }
 
-      // Grouping rules
       if (templateHint.groupingRules?.length) {
         systemPrompt += `\n\n### Learned grouping rules:
 ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
@@ -317,8 +432,11 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
       ];
     }
 
+    // Use Pro model for complex documents (PDFs, images), Flash for text
+    const model = (isPdf || isImage) ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+
     const data = await callAI({
-      model: "google/gemini-2.5-flash",
+      model,
       messages,
       temperature: 0.1,
     });
@@ -334,20 +452,17 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
     const layoutType = parsingPlan.layout_type || parsed.layout_type || "unknown";
     const variantMethod = parsingPlan.variant_method || parsed.variant_method || "unknown";
     const detectedFields = parsed.detected_fields || [];
-    const detectedSizeSystem = parsed.detected_size_system || "none";
+    const detectedSizeSystem = parsed.detected_size_system || parsingPlan.size_system || "none";
 
     const rawProducts: Array<Record<string, unknown>> = parsed.products || [];
-    const rejectedRows: Array<Record<string, unknown>> = parsed.rejected_rows || [];
+    const aiRejected: Array<Record<string, unknown>> = parsed.rejected_rows || [];
 
     // Server-side noise filter
-    const filtered = rawProducts.filter((p: Record<string, unknown>) => {
-      const title = String(p.product_title || p.style_description || p.name || "").toLowerCase();
-      const code = String(p.style_code || p.sku || "");
-      if (!title && !code) return false;
-      if (/^(total|subtotal|sub total|freight|shipping|gst|tax|delivery|discount)$/i.test(title)) return false;
-      if (/^carton\s/i.test(title) || /^carton\s/i.test(code)) return false;
-      return true;
-    });
+    const { kept: filtered, rejected: noiseRejected } = filterNoise(rawProducts);
+    const allRejected = [...aiRejected, ...noiseRejected];
+
+    // Server-side cross-validation
+    const validated = crossValidateProducts(filtered);
 
     if (docType === "packing_slip") {
       return new Response(JSON.stringify({
@@ -360,14 +475,16 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
         confidence: parsed.confidence || 85,
         supplier: parsed.supplier || supplierName || "",
         supplier_order_number: parsed.supplier_order_number || parsed.invoice_number || "",
-        rejected_rows: rejectedRows,
-        products: filtered.map((p: Record<string, unknown>) => ({
+        invoice_date: parsed.invoice_date || "",
+        rejected_rows: allRejected,
+        products: validated.map((p: Record<string, unknown>) => ({
           style_code: p.style_code || p.sku || "",
           colour_code: p.colour || "",
           style_description: p.product_title || p.name || "",
           size: p.size || "",
           quantity: Number(p.quantity) || 0,
           barcode: p.barcode || "",
+          group_key: p.group_key || "",
           confidence: Number(p.confidence) || 70,
           parse_notes: p.parse_notes || "",
           extraction_reason: p.extraction_reason || "",
@@ -379,7 +496,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
     }
 
     // Invoice response
-    const normalizedProducts = filtered.map((p: Record<string, unknown>) => ({
+    const normalizedProducts = validated.map((p: Record<string, unknown>) => ({
       name: p.product_title || p.name || "",
       brand: parsed.supplier || supplierName || String(p.brand || ""),
       sku: p.style_code || p.sku || "",
@@ -390,6 +507,8 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
       qty: Number(p.quantity || p.qty) || 0,
       cost: Number(p.unit_cost || p.cost) || 0,
       rrp: Number(p.rrp) || 0,
+      group_key: p.group_key || "",
+      cost_source: p.cost_source || "direct",
       _confidence: Number(p.confidence) || 70,
       _parseNotes: p.parse_notes || "",
       _lineTotal: Number(p.line_total) || 0,
@@ -406,8 +525,13 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
       detected_size_system: detectedSizeSystem,
       supplier: parsed.supplier || supplierName || "",
       invoice_number: parsed.invoice_number || "",
+      invoice_date: parsed.invoice_date || "",
+      due_date: parsed.due_date || "",
       currency: parsed.currency || "AUD",
-      rejected_rows: rejectedRows,
+      subtotal: parsed.subtotal ?? null,
+      gst: parsed.gst ?? null,
+      total: parsed.total ?? null,
+      rejected_rows: allRejected,
       products: normalizedProducts,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

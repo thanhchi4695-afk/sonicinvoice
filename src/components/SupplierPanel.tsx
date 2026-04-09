@@ -1,6 +1,13 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, FileText, Package, BarChart3, Clock, Star, Minus } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
+  TrendingUp, TrendingDown, Minus, FileText, Package,
+  BarChart3, Clock, DollarSign, Save, X, Search, RefreshCw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import type { DbSupplier } from "@/lib/db-schema-types";
 import { getCostHistory } from "@/components/InvoiceFlow";
 
 interface SupplierPanelProps {
@@ -8,182 +15,265 @@ interface SupplierPanelProps {
   onStartInvoice: () => void;
 }
 
-interface SupplierSummary {
-  name: string;
-  invoiceCount: number;
-  productCount: number;
-  lastInvoiceDate: string;
-  matchRate: number;
-  trend: "up" | "down" | "stable";
-  products: { name: string; timesOrdered: number; totalUnits: number; lastOrdered: string }[];
-  invoices: { date: string; lines: number; matched: number; manual: number; notFound: number }[];
-}
+type SupplierRow = DbSupplier;
 
-// Build supplier data from localStorage history + cost history
-function buildSupplierData(): SupplierSummary[] {
-  const processingHistory: { supplier: string; lines: number; processingTime: number; matchRate: number; date: string }[] = (() => {
-    try { return JSON.parse(localStorage.getItem("processing_history") || "[]"); } catch { return []; }
-  })();
-
-  const costHistory = getCostHistory();
-
-  // Seed demo data if history is sparse
-  const suppliers: Record<string, SupplierSummary> = {};
-
-  // From processing history
-  for (const entry of processingHistory) {
-    const name = entry.supplier || "Unknown";
-    if (!suppliers[name]) {
-      suppliers[name] = { name, invoiceCount: 0, productCount: 0, lastInvoiceDate: "", matchRate: 0, trend: "stable", products: [], invoices: [] };
-    }
-    suppliers[name].invoiceCount++;
-    suppliers[name].productCount += entry.lines || 0;
-    if (!suppliers[name].lastInvoiceDate || entry.date > suppliers[name].lastInvoiceDate) {
-      suppliers[name].lastInvoiceDate = entry.date;
-    }
-    suppliers[name].matchRate = entry.matchRate || 94;
-    const matched = Math.round((entry.matchRate || 94) / 100 * (entry.lines || 4));
-    suppliers[name].invoices.push({
-      date: entry.date,
-      lines: entry.lines || 4,
-      matched,
-      manual: Math.max(0, (entry.lines || 4) - matched - 1),
-      notFound: 1,
-    });
-  }
-
-  // From cost history — extract supplier names
-  for (const [sku, entries] of Object.entries(costHistory)) {
-    for (const e of entries) {
-      const name = e.supplier;
-      if (!suppliers[name]) {
-        suppliers[name] = { name, invoiceCount: 0, productCount: 0, lastInvoiceDate: "", matchRate: 0, trend: "stable", products: [], invoices: [] };
-      }
-    }
-  }
-
-  // Always show demo suppliers if nothing built
-  const demos: SupplierSummary[] = [
-    {
-      name: "Jantzen", invoiceCount: 12, productCount: 247, lastInvoiceDate: "2026-03-28", matchRate: 94, trend: "up",
-      products: [
-        { name: "Mood Bandeau Blouson Singlet", timesOrdered: 8, totalUnits: 96, lastOrdered: "2026-03-28" },
-        { name: "Retro Racerback One Piece", timesOrdered: 6, totalUnits: 72, lastOrdered: "2026-03-28" },
-        { name: "Sahara Kaftan", timesOrdered: 5, totalUnits: 40, lastOrdered: "2026-02-10" },
-        { name: "Seashells Sarong", timesOrdered: 4, totalUnits: 48, lastOrdered: "2026-01-15" },
-        { name: "Classic Bikini Bottom", timesOrdered: 3, totalUnits: 36, lastOrdered: "2026-03-28" },
-      ],
-      invoices: [
-        { date: "2026-03-28", lines: 18, matched: 17, manual: 1, notFound: 0 },
-        { date: "2026-02-10", lines: 14, matched: 13, manual: 1, notFound: 0 },
-        { date: "2026-01-15", lines: 22, matched: 20, manual: 1, notFound: 1 },
-        { date: "2025-12-01", lines: 16, matched: 15, manual: 1, notFound: 0 },
-      ],
-    },
-    {
-      name: "Seafolly", invoiceCount: 8, productCount: 186, lastInvoiceDate: "2026-02-15", matchRate: 91, trend: "stable",
-      products: [
-        { name: "Collective Bikini Top", timesOrdered: 6, totalUnits: 72, lastOrdered: "2026-02-15" },
-        { name: "Classic One Piece", timesOrdered: 5, totalUnits: 60, lastOrdered: "2026-02-15" },
-        { name: "Beach Basics Sarong", timesOrdered: 4, totalUnits: 32, lastOrdered: "2025-11-20" },
-      ],
-      invoices: [
-        { date: "2026-02-15", lines: 24, matched: 22, manual: 1, notFound: 1 },
-        { date: "2025-11-20", lines: 18, matched: 16, manual: 1, notFound: 1 },
-      ],
-    },
-    {
-      name: "Bond Eye", invoiceCount: 5, productCount: 62, lastInvoiceDate: "2026-01-15", matchRate: 96, trend: "up",
-      products: [
-        { name: "Mara One Piece", timesOrdered: 4, totalUnits: 48, lastOrdered: "2026-01-15" },
-        { name: "Lissio Bikini Top", timesOrdered: 3, totalUnits: 24, lastOrdered: "2026-01-15" },
-      ],
-      invoices: [
-        { date: "2026-01-15", lines: 12, matched: 12, manual: 0, notFound: 0 },
-        { date: "2025-10-05", lines: 10, matched: 9, manual: 1, notFound: 0 },
-      ],
-    },
-    {
-      name: "Baku", invoiceCount: 6, productCount: 94, lastInvoiceDate: "2026-03-28", matchRate: 88, trend: "down",
-      products: [
-        { name: "Riviera High Waist Pant", timesOrdered: 4, totalUnits: 32, lastOrdered: "2026-03-28" },
-        { name: "Paradise Bandeau", timesOrdered: 3, totalUnits: 24, lastOrdered: "2026-01-20" },
-      ],
-      invoices: [
-        { date: "2026-03-28", lines: 14, matched: 12, manual: 1, notFound: 1 },
-        { date: "2026-01-20", lines: 10, matched: 9, manual: 1, notFound: 0 },
-      ],
-    },
-  ];
-
-  // Merge demos with real data
-  for (const demo of demos) {
-    if (!suppliers[demo.name]) {
-      suppliers[demo.name] = demo;
-    } else {
-      const s = suppliers[demo.name];
-      if (s.invoiceCount < demo.invoiceCount) s.invoiceCount = demo.invoiceCount;
-      if (s.productCount < demo.productCount) s.productCount = demo.productCount;
-      if (s.products.length === 0) s.products = demo.products;
-      if (s.invoices.length < demo.invoices.length) s.invoices = demo.invoices;
-      if (!s.lastInvoiceDate) s.lastInvoiceDate = demo.lastInvoiceDate;
-      s.matchRate = s.matchRate || demo.matchRate;
-      s.trend = demo.trend;
-    }
-  }
-
-  return Object.values(suppliers).sort((a, b) => b.invoiceCount - a.invoiceCount);
-}
+// ── Seed demo suppliers if table is empty ─────────────────
+const DEMO_SUPPLIERS: Omit<SupplierRow, "id" | "user_id" | "created_at" | "updated_at">[] = [
+  { name: "Jantzen", contact_info: { email: "orders@jantzen.com.au", rep: "Sarah M" }, currency: "AUD", notes: "MOQ $2,000. Net 30.", total_spend: 48500, avg_margin: 62 },
+  { name: "Seafolly", contact_info: { email: "wholesale@seafolly.com.au", rep: "Tom B" }, currency: "AUD", notes: "Pre-season deadline Feb 28.", total_spend: 34200, avg_margin: 58 },
+  { name: "Bond Eye", contact_info: { email: "sales@bondeye.com.au" }, currency: "AUD", notes: "Drop ship available.", total_spend: 18900, avg_margin: 65 },
+  { name: "Baku", contact_info: { email: "orders@baku.com.au", rep: "Liz K" }, currency: "AUD", notes: "Returns within 14 days.", total_spend: 22100, avg_margin: 55 },
+];
 
 const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
-  const [suppliers] = useState<SupplierSummary[]>(buildSupplierData);
-  const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
-  const [notes, setNotes] = useState<Record<string, string>>(() => {
-    try { return JSON.parse(localStorage.getItem("supplier_notes") || "{}"); } catch { return {}; }
-  });
+  const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [addMode, setAddMode] = useState(false);
+  const [search, setSearch] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
-  const saveNote = (supplier: string, text: string) => {
-    const updated = { ...notes, [supplier]: text };
-    setNotes(updated);
-    localStorage.setItem("supplier_notes", JSON.stringify(updated));
+  // Form state
+  const [form, setForm] = useState({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
+
+  // ── Load suppliers ──────────────────────────────────────
+  const loadSuppliers = useCallback(async () => {
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoading(false); return; }
+
+    const { data, error } = await supabase
+      .from("suppliers")
+      .select("*")
+      .order("total_spend", { ascending: false });
+
+    if (error) {
+      toast.error("Failed to load suppliers");
+      setLoading(false);
+      return;
+    }
+
+    // Seed demos if empty
+    if (!data || data.length === 0) {
+      const inserts = DEMO_SUPPLIERS.map(d => ({
+        ...d,
+        user_id: session.user.id,
+        contact_info: d.contact_info as Record<string, string>,
+      }));
+      const { data: seeded } = await supabase.from("suppliers").insert(inserts).select();
+      setSuppliers((seeded || []) as unknown as SupplierRow[]);
+    } else {
+      setSuppliers(data as unknown as SupplierRow[]);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadSuppliers(); }, [loadSuppliers]);
+
+  // ── Sync spend from accounting_push_history ─────────────
+  const syncSpend = async () => {
+    setSyncing(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setSyncing(false); return; }
+
+    const { data: pushHistory } = await supabase
+      .from("accounting_push_history")
+      .select("supplier_name, total_inc_gst")
+      .eq("user_id", session.user.id);
+
+    if (pushHistory && pushHistory.length > 0) {
+      const spendMap: Record<string, number> = {};
+      for (const row of pushHistory) {
+        const name = row.supplier_name || "";
+        spendMap[name] = (spendMap[name] || 0) + (Number(row.total_inc_gst) || 0);
+      }
+
+      for (const supplier of suppliers) {
+        const spend = spendMap[supplier.name];
+        if (spend && spend !== supplier.total_spend) {
+          await supabase.from("suppliers").update({ total_spend: spend }).eq("id", supplier.id);
+        }
+      }
+      await loadSuppliers();
+      toast.success("Spend synced from accounting history");
+    } else {
+      toast("No accounting history found to sync");
+    }
+    setSyncing(false);
   };
 
-  const detail = suppliers.find(s => s.name === selectedSupplier);
-  const costHistory = getCostHistory();
+  // ── Add supplier ────────────────────────────────────────
+  const handleAdd = async () => {
+    if (!form.name.trim()) { toast.error("Name is required"); return; }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
-  // Get price history for a supplier's products
+    const contactInfo: Record<string, string> = {};
+    if (form.email) contactInfo.email = form.email;
+    if (form.rep) contactInfo.rep = form.rep;
+    if (form.phone) contactInfo.phone = form.phone;
+
+    const { error } = await supabase.from("suppliers").insert({
+      user_id: session.user.id,
+      name: form.name.trim(),
+      contact_info: contactInfo,
+      currency: form.currency || "AUD",
+      notes: form.notes || null,
+      total_spend: 0,
+      avg_margin: null,
+    });
+
+    if (error) { toast.error("Failed to add supplier"); return; }
+    toast.success(`${form.name} added`);
+    setAddMode(false);
+    setForm({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
+    loadSuppliers();
+  };
+
+  // ── Update supplier ─────────────────────────────────────
+  const handleUpdate = async () => {
+    if (!selectedId || !form.name.trim()) return;
+    const contactInfo: Record<string, string> = {};
+    if (form.email) contactInfo.email = form.email;
+    if (form.rep) contactInfo.rep = form.rep;
+    if (form.phone) contactInfo.phone = form.phone;
+
+    const { error } = await supabase.from("suppliers").update({
+      name: form.name.trim(),
+      contact_info: contactInfo,
+      currency: form.currency,
+      notes: form.notes || null,
+    }).eq("id", selectedId);
+
+    if (error) { toast.error("Failed to update"); return; }
+    toast.success("Supplier updated");
+    setEditMode(false);
+    loadSuppliers();
+  };
+
+  // ── Delete supplier ─────────────────────────────────────
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
+    const { error } = await supabase.from("suppliers").delete().eq("id", id);
+    if (error) { toast.error("Failed to delete"); return; }
+    toast.success(`${name} deleted`);
+    setSelectedId(null);
+    loadSuppliers();
+  };
+
+  // ── Save notes inline ──────────────────────────────────
+  const saveNotes = async (id: string, notes: string) => {
+    await supabase.from("suppliers").update({ notes }).eq("id", id);
+  };
+
+  const detail = suppliers.find(s => s.id === selectedId);
+  const costHistory = getCostHistory();
+  const filtered = suppliers.filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
+
   const getPriceHistory = (supplierName: string) => {
     const results: { product: string; history: { date: string; cost: number; invoice: string }[] }[] = [];
     for (const [sku, entries] of Object.entries(costHistory)) {
-      const supplierEntries = entries.filter(e => e.supplier === supplierName);
+      const supplierEntries = entries.filter((e: any) => e.supplier === supplierName);
       if (supplierEntries.length > 0) {
-        results.push({ product: sku, history: supplierEntries.map(e => ({ date: e.date, cost: e.cost, invoice: e.invoice })) });
+        results.push({ product: sku, history: supplierEntries.map((e: any) => ({ date: e.date, cost: e.cost, invoice: e.invoice })) });
       }
     }
     return results;
   };
 
-  if (detail) {
-    const priceHistory = getPriceHistory(detail.name);
+  // ── Form view (add / edit) ─────────────────────────────
+  if (addMode || editMode) {
     return (
       <div className="min-h-screen pb-24 animate-fade-in">
         <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
           <div className="flex items-center gap-3">
-            <button onClick={() => setSelectedSupplier(null)} className="text-muted-foreground">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-semibold font-display">{detail.name}</h2>
+            <button onClick={() => { setAddMode(false); setEditMode(false); }} className="text-muted-foreground"><X className="w-5 h-5" /></button>
+            <h2 className="text-lg font-semibold font-display">{addMode ? "Add Supplier" : "Edit Supplier"}</h2>
+          </div>
+        </div>
+        <div className="px-4 pt-4 space-y-4">
+          {[
+            { label: "Supplier name *", key: "name", placeholder: "e.g. Seafolly" },
+            { label: "Email", key: "email", placeholder: "orders@example.com" },
+            { label: "Sales rep", key: "rep", placeholder: "Contact name" },
+            { label: "Phone", key: "phone", placeholder: "+61 ..." },
+            { label: "Currency", key: "currency", placeholder: "AUD" },
+          ].map(f => (
+            <div key={f.key}>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">{f.label}</label>
+              <input
+                value={(form as any)[f.key]}
+                onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                placeholder={f.placeholder}
+                className="w-full rounded-md bg-input border border-border px-3 py-2.5 text-sm"
+              />
+            </div>
+          ))}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Notes</label>
+            <textarea
+              value={form.notes}
+              onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
+              placeholder="MOQ, payment terms, etc."
+              rows={3}
+              className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm resize-none"
+            />
+          </div>
+          <Button className="w-full" onClick={addMode ? handleAdd : handleUpdate}>
+            <Save className="w-4 h-4 mr-2" />{addMode ? "Add Supplier" : "Save Changes"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Detail view ─────────────────────────────────────────
+  if (detail) {
+    const ci = (detail.contact_info || {}) as Record<string, string>;
+    const priceHistory = getPriceHistory(detail.name);
+    const margin = detail.avg_margin;
+
+    return (
+      <div className="min-h-screen pb-24 animate-fade-in">
+        <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSelectedId(null)} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
+              <h2 className="text-lg font-semibold font-display">{detail.name}</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setForm({
+                    name: detail.name,
+                    email: ci.email || "",
+                    rep: ci.rep || "",
+                    phone: ci.phone || "",
+                    currency: detail.currency,
+                    notes: detail.notes || "",
+                  });
+                  setEditMode(true);
+                }}
+                className="p-2 rounded-lg text-muted-foreground hover:bg-muted"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+              <button onClick={() => handleDelete(detail.id, detail.name)} className="p-2 rounded-lg text-destructive hover:bg-destructive/10">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="px-4 pt-4 space-y-4">
-          {/* Stats row */}
+          {/* KPIs */}
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: "Total invoices", value: detail.invoiceCount, icon: FileText },
-              { label: "Products imported", value: detail.productCount, icon: Package },
-              { label: "Avg match rate", value: `${detail.matchRate}%`, icon: BarChart3 },
-              { label: "Last delivery", value: new Date(detail.lastInvoiceDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "2-digit" }), icon: Clock },
+              { label: "Total spend", value: `$${Number(detail.total_spend).toLocaleString()}`, icon: DollarSign },
+              { label: "Avg margin", value: margin ? `${margin}%` : "—", icon: BarChart3 },
+              { label: "Currency", value: detail.currency, icon: FileText },
+              { label: "Since", value: new Date(detail.created_at).toLocaleDateString("en-AU", { month: "short", year: "numeric" }), icon: Clock },
             ].map((s, i) => (
               <div key={i} className="bg-card rounded-lg border border-border p-3">
                 <div className="flex items-center gap-1.5 mb-1">
@@ -195,36 +285,19 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
             ))}
           </div>
 
-          {/* Invoice history */}
-          <div className="bg-card rounded-lg border border-border p-4">
-            <h3 className="text-sm font-semibold mb-3">Invoice history</h3>
-            <div className="space-y-1.5">
-              {detail.invoices.map((inv, i) => (
-                <div key={i} className="flex items-center justify-between text-xs bg-muted/30 rounded-lg px-3 py-2">
-                  <span className="font-medium">{new Date(inv.date).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "2-digit" })}</span>
-                  <span className="text-muted-foreground">{inv.lines} lines</span>
-                  <span className="text-success">{inv.matched} matched</span>
-                  <span className="text-warning">{inv.manual} manual</span>
-                  <span className="text-destructive">{inv.notFound} missing</span>
-                </div>
-              ))}
+          {/* Contact info */}
+          {Object.keys(ci).length > 0 && (
+            <div className="bg-card rounded-lg border border-border p-4">
+              <h3 className="text-sm font-semibold mb-2">Contact</h3>
+              <div className="space-y-1 text-xs">
+                {ci.email && <p><span className="text-muted-foreground">Email:</span> {ci.email}</p>}
+                {ci.rep && <p><span className="text-muted-foreground">Rep:</span> {ci.rep}</p>}
+                {ci.phone && <p><span className="text-muted-foreground">Phone:</span> {ci.phone}</p>}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Most ordered products */}
-          <div className="bg-card rounded-lg border border-border p-4">
-            <h3 className="text-sm font-semibold mb-3">Most ordered products</h3>
-            <div className="space-y-1.5">
-              {detail.products.map((p, i) => (
-                <div key={i} className="flex items-center justify-between text-xs bg-muted/30 rounded-lg px-3 py-2">
-                  <span className="font-medium flex-1 truncate mr-2">{p.name}</span>
-                  <span className="text-muted-foreground shrink-0">{p.timesOrdered}× · {p.totalUnits} units</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Price history */}
+          {/* Cost history */}
           {priceHistory.length > 0 && (
             <div className="bg-card rounded-lg border border-border p-4">
               <h3 className="text-sm font-semibold mb-3">Cost history</h3>
@@ -237,10 +310,10 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                         const prev = j > 0 ? ph.history[j - 1].cost : null;
                         const change = prev ? ((h.cost - prev) / prev * 100) : null;
                         return (
-                          <span key={j} className="px-2 py-1 rounded bg-muted/50 font-mono-data">
+                          <span key={j} className="px-2 py-1 rounded bg-muted/50 font-mono">
                             {new Date(h.date).toLocaleDateString("en-AU", { month: "short", year: "2-digit" })}: ${h.cost.toFixed(2)}
                             {change !== null && (
-                              <span className={`ml-1 ${change > 0 ? "text-warning" : change < 0 ? "text-success" : ""}`}>
+                              <span className={`ml-1 ${change > 5 ? "text-amber-500" : change < 0 ? "text-emerald-500" : ""}`}>
                                 ({change > 0 ? "+" : ""}{change.toFixed(1)}%)
                               </span>
                             )}
@@ -258,8 +331,8 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
           <div className="bg-card rounded-lg border border-border p-4">
             <h3 className="text-sm font-semibold mb-2">Notes</h3>
             <textarea
-              value={notes[detail.name] || ""}
-              onChange={e => saveNote(detail.name, e.target.value)}
+              defaultValue={detail.notes || ""}
+              onBlur={e => saveNotes(detail.id, e.target.value)}
               placeholder={`Notes about ${detail.name}...`}
               rows={3}
               className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm resize-none placeholder:text-muted-foreground/50"
@@ -270,54 +343,102 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     );
   }
 
-  // List view
+  // ── List view ───────────────────────────────────────────
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
       <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-muted-foreground">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h2 className="text-lg font-semibold font-display">📊 Suppliers</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
+            <h2 className="text-lg font-semibold font-display">📊 Suppliers</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={syncSpend} disabled={syncing} className="p-2 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-50">
+              <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+            </button>
+            <Button size="sm" onClick={() => { setForm({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" }); setAddMode(true); }}>
+              <Plus className="w-4 h-4 mr-1" /> Add
+            </Button>
+          </div>
+        </div>
+        {/* Search */}
+        <div className="mt-3 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search suppliers…"
+            className="w-full pl-9 pr-3 py-2 rounded-md bg-input border border-border text-sm"
+          />
         </div>
       </div>
 
       <div className="px-4 pt-4">
-        {suppliers.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-12 text-sm text-muted-foreground">Loading suppliers…</div>
+        ) : filtered.length === 0 ? (
           <div className="bg-card border border-border rounded-lg p-8 text-center">
-            <p className="text-sm text-muted-foreground mb-2">No supplier data yet.</p>
-            <p className="text-xs text-muted-foreground mb-4">Process your first invoice and supplier stats will appear here automatically.</p>
-            <Button onClick={onStartInvoice}>→ Upload first invoice</Button>
+            <p className="text-sm text-muted-foreground mb-2">{search ? "No matches found." : "No suppliers yet."}</p>
+            {!search && (
+              <>
+                <p className="text-xs text-muted-foreground mb-4">Add a supplier or process your first invoice.</p>
+                <Button onClick={onStartInvoice}>→ Upload first invoice</Button>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
-            {suppliers.map(s => (
-              <button
-                key={s.name}
-                onClick={() => setSelectedSupplier(s.name)}
-                className="w-full bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold">{s.name}</p>
-                      {s.trend === "up" && <TrendingUp className="w-3.5 h-3.5 text-success" />}
-                      {s.trend === "down" && <TrendingDown className="w-3.5 h-3.5 text-destructive" />}
-                      {s.trend === "stable" && <Minus className="w-3.5 h-3.5 text-muted-foreground" />}
+            {/* Summary bar */}
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className="text-xs text-muted-foreground">Suppliers</p>
+                <p className="text-lg font-bold">{suppliers.length}</p>
+              </div>
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className="text-xs text-muted-foreground">Total spend</p>
+                <p className="text-lg font-bold">${suppliers.reduce((a, s) => a + Number(s.total_spend), 0).toLocaleString()}</p>
+              </div>
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className="text-xs text-muted-foreground">Avg margin</p>
+                <p className="text-lg font-bold">
+                  {(() => {
+                    const withMargin = suppliers.filter(s => s.avg_margin);
+                    return withMargin.length ? `${Math.round(withMargin.reduce((a, s) => a + Number(s.avg_margin), 0) / withMargin.length)}%` : "—";
+                  })()}
+                </p>
+              </div>
+            </div>
+
+            {filtered.map(s => {
+              const spend = Number(s.total_spend);
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedId(s.id)}
+                  className="w-full bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold">{s.name}</p>
+                        {s.avg_margin && Number(s.avg_margin) >= 60 && <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />}
+                        {s.avg_margin && Number(s.avg_margin) < 50 && <TrendingDown className="w-3.5 h-3.5 text-destructive" />}
+                        {(!s.avg_margin || (Number(s.avg_margin) >= 50 && Number(s.avg_margin) < 60)) && <Minus className="w-3.5 h-3.5 text-muted-foreground" />}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-muted-foreground">
+                        <span>${spend.toLocaleString()} spend</span>
+                        {s.avg_margin && <span>{s.avg_margin}% margin</span>}
+                        <span>{s.currency}</span>
+                      </div>
+                      {s.notes && (
+                        <p className="text-[10px] text-muted-foreground mt-1 truncate">{s.notes}</p>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-muted-foreground">
-                      <span>{s.invoiceCount} invoices</span>
-                      <span>{s.productCount} products</span>
-                      <span>{s.matchRate}% matched</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Last: {new Date(s.lastInvoiceDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "2-digit" })}
-                    </p>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
                   </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

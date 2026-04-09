@@ -386,6 +386,135 @@ export type Database = {
         }
         Relationships: []
       }
+      markdown_ladder_items: {
+        Row: {
+          block_reason: string | null
+          cost: number | null
+          created_at: string
+          current_price: number
+          current_stage: number
+          days_since_last_sale: number
+          id: string
+          ladder_id: string
+          last_sale_at: string | null
+          margin_pct: number | null
+          next_check_at: string
+          original_price: number
+          product_title: string
+          stage_applied_at: string | null
+          status: string
+          user_id: string
+          variant_id: string | null
+          variant_info: string | null
+        }
+        Insert: {
+          block_reason?: string | null
+          cost?: number | null
+          created_at?: string
+          current_price?: number
+          current_stage?: number
+          days_since_last_sale?: number
+          id?: string
+          ladder_id: string
+          last_sale_at?: string | null
+          margin_pct?: number | null
+          next_check_at?: string
+          original_price?: number
+          product_title?: string
+          stage_applied_at?: string | null
+          status?: string
+          user_id: string
+          variant_id?: string | null
+          variant_info?: string | null
+        }
+        Update: {
+          block_reason?: string | null
+          cost?: number | null
+          created_at?: string
+          current_price?: number
+          current_stage?: number
+          days_since_last_sale?: number
+          id?: string
+          ladder_id?: string
+          last_sale_at?: string | null
+          margin_pct?: number | null
+          next_check_at?: string
+          original_price?: number
+          product_title?: string
+          stage_applied_at?: string | null
+          status?: string
+          user_id?: string
+          variant_id?: string | null
+          variant_info?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "markdown_ladder_items_ladder_id_fkey"
+            columns: ["ladder_id"]
+            isOneToOne: false
+            referencedRelation: "markdown_ladders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "markdown_ladder_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      markdown_ladders: {
+        Row: {
+          auto_rollback: boolean
+          check_frequency: string
+          created_at: string
+          id: string
+          min_margin_pct: number
+          name: string
+          rollback_days: number | null
+          selection_type: string
+          selection_value: string
+          stages: Json
+          status: string
+          trigger_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_rollback?: boolean
+          check_frequency?: string
+          created_at?: string
+          id?: string
+          min_margin_pct?: number
+          name: string
+          rollback_days?: number | null
+          selection_type?: string
+          selection_value?: string
+          stages?: Json
+          status?: string
+          trigger_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_rollback?: boolean
+          check_frequency?: string
+          created_at?: string
+          id?: string
+          min_margin_pct?: number
+          name?: string
+          rollback_days?: number | null
+          selection_type?: string
+          selection_value?: string
+          stages?: Json
+          status?: string
+          trigger_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           created_at: string

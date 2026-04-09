@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ChevronLeft, Image, Sparkles, AlertTriangle, CheckCircle2, XCircle, Search, RefreshCw, Edit3, Eye, FileText, Copy, ShieldCheck, Link2, Upload, Minimize2, HardDrive } from "lucide-react";
+import { ChevronLeft, Image, Sparkles, AlertTriangle, CheckCircle2, XCircle, Search, RefreshCw, Edit3, Eye, FileText, Copy, ShieldCheck, Link2, Upload, Minimize2, HardDrive, Target, Layers, ZoomIn, Smartphone, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +43,20 @@ interface ProductImage {
   compressed?: boolean;
   needsCompression?: boolean;
   compressionReason?: string;
+  // Conversion audit fields
+  conversionScore?: number;
+  consistency?: number;
+  consistencyNote?: string;
+  variantMapping?: number;
+  variantNote?: string;
+  zoomReadiness?: number;
+  zoomNote?: string;
+  mobileOptimization?: number;
+  mobileNote?: string;
+  heroScore?: number;
+  heroNote?: string;
+  topIssue?: string;
+  conversionRecommendation?: string;
 }
 
 interface Props { onBack: () => void; }
@@ -56,6 +70,7 @@ export default function ImageOptimisePanel({ onBack }: Props) {
   const [syncing, setSyncing] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [analysingSize, setAnalysingSize] = useState(false);
+  const [auditingConversion, setAuditingConversion] = useState(false);
   const [compressionProgress, setCompressionProgress] = useState({ current: 0, total: 0 });
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -370,6 +385,74 @@ export default function ImageOptimisePanel({ onBack }: Props) {
     setCompressing(false);
   };
 
+  // ── Conversion Audit ──
+  const runConversionAudit = async () => {
+    const withImages = products.filter(p => p.imageUrl);
+    if (withImages.length === 0) { toast.info("No products with images to audit"); return; }
+    setAuditingConversion(true);
+    try {
+      for (let i = 0; i < withImages.length; i += 25) {
+        const batch = withImages.slice(i, i + 25);
+        const { data, error } = await supabase.functions.invoke("image-optimise", {
+          body: {
+            action: "conversion_audit",
+            products: batch.map(p => ({
+              title: p.title, vendor: p.vendor, colour: p.colour,
+              productType: p.productType, imageUrl: p.imageUrl,
+              variantCount: 0, hasMultipleImages: false, imageDimensions: "",
+            })),
+          },
+        });
+        if (error) throw error;
+        if (data?.results) {
+          setProducts(prev => {
+            const updated = [...prev];
+            batch.forEach((bp, idx) => {
+              const match = updated.find(u => u.id === bp.id);
+              const r = data.results.find((rr: any) => rr.index === idx);
+              if (match && r) {
+                match.conversionScore = r.overall_score;
+                match.consistency = r.consistency;
+                match.consistencyNote = r.consistency_note;
+                match.variantMapping = r.variant_mapping;
+                match.variantNote = r.variant_note;
+                match.zoomReadiness = r.zoom_readiness;
+                match.zoomNote = r.zoom_note;
+                match.mobileOptimization = r.mobile_optimization;
+                match.mobileNote = r.mobile_note;
+                match.heroScore = r.hero_score;
+                match.heroNote = r.hero_note;
+                match.topIssue = r.top_issue;
+                match.conversionRecommendation = r.recommendation;
+              }
+            });
+            return updated;
+          });
+        }
+      }
+      toast.success("Conversion audit complete");
+    } catch (e: any) { toast.error(e.message || "Conversion audit failed"); }
+    setAuditingConversion(false);
+  };
+
+  const conversionStats = useMemo(() => {
+    const audited = products.filter(p => p.conversionScore != null);
+    if (audited.length === 0) return null;
+    const avg = (key: keyof ProductImage) => Math.round(audited.reduce((s, p) => s + ((p[key] as number) || 0), 0) / audited.length);
+    return {
+      count: audited.length,
+      overall: avg("conversionScore"),
+      consistency: avg("consistency"),
+      variantMapping: avg("variantMapping"),
+      zoomReadiness: avg("zoomReadiness"),
+      mobileOptimization: avg("mobileOptimization"),
+      heroScore: avg("heroScore"),
+    };
+  }, [products]);
+
+  const scoreColor = (score: number) => score >= 80 ? "text-green-600" : score >= 50 ? "text-yellow-600" : "text-destructive";
+  const scoreBg = (score: number) => score >= 80 ? "bg-green-500" : score >= 50 ? "bg-yellow-500" : "bg-destructive";
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
@@ -426,12 +509,13 @@ export default function ImageOptimisePanel({ onBack }: Props) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full grid grid-cols-6">
+        <TabsList className="w-full grid grid-cols-7">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="alt_text">Alt Text</TabsTrigger>
           <TabsTrigger value="compress">Compress</TabsTrigger>
           <TabsTrigger value="quality">Quality</TabsTrigger>
           <TabsTrigger value="validation">Validation</TabsTrigger>
+          <TabsTrigger value="conversion">Conversion</TabsTrigger>
           <TabsTrigger value="review">Review</TabsTrigger>
         </TabsList>
 
@@ -792,6 +876,107 @@ export default function ImageOptimisePanel({ onBack }: Props) {
               ))}
             {!products.some(p => p.matchStatus) && (
               <div className="text-center py-8 text-muted-foreground text-sm">Run validation to check image-to-product matches.</div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── Conversion ── */}
+        <TabsContent value="conversion" className="space-y-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Target className="w-4 h-4 text-primary" />Conversion Rate Optimization Audit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs text-muted-foreground space-y-3">
+              <p>AI analyses your product images for conversion-critical factors: visual consistency, variant coverage, zoom quality, mobile readiness, and hero image selection.</p>
+              <Button onClick={runConversionAudit} disabled={auditingConversion} className="gap-2">
+                <Target className="w-4 h-4" />{auditingConversion ? "Auditing…" : "Run Conversion Audit"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {conversionStats && (
+            <>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium">Overall Conversion Score</span>
+                    <span className={`text-2xl font-bold ${scoreColor(conversionStats.overall)}`}>{conversionStats.overall}/100</span>
+                  </div>
+                  <Progress value={conversionStats.overall} className="h-3" />
+                  <div className="text-xs text-muted-foreground mt-1">{conversionStats.count} products audited</div>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-5 gap-2">
+                {[
+                  { label: "Consistency", value: conversionStats.consistency, icon: Layers },
+                  { label: "Variant Map", value: conversionStats.variantMapping, icon: Copy },
+                  { label: "Zoom Ready", value: conversionStats.zoomReadiness, icon: ZoomIn },
+                  { label: "Mobile", value: conversionStats.mobileOptimization, icon: Smartphone },
+                  { label: "Hero Image", value: conversionStats.heroScore, icon: Star },
+                ].map(s => (
+                  <Card key={s.label}>
+                    <CardContent className="p-3 text-center">
+                      <s.icon className={`w-4 h-4 mx-auto mb-1 ${scoreColor(s.value)}`} />
+                      <div className={`text-lg font-bold ${scoreColor(s.value)}`}>{s.value}</div>
+                      <div className="text-[10px] text-muted-foreground">{s.label}</div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="space-y-2 max-h-[45vh] overflow-y-auto">
+            {products
+              .filter(p => p.conversionScore != null)
+              .sort((a, b) => (a.conversionScore || 0) - (b.conversionScore || 0))
+              .map(p => (
+                <Card key={p.id} className={p.conversionScore! < 50 ? "border-destructive/30" : p.conversionScore! < 80 ? "border-yellow-500/30" : "border-green-500/30"}>
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex gap-3 items-center">
+                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {p.imageUrl ? <img src={p.imageUrl} alt="" className="w-full h-full object-cover" /> : <Image className="w-4 h-4 text-muted-foreground" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{p.title}</div>
+                        <div className="text-xs text-muted-foreground">{p.vendor}</div>
+                      </div>
+                      <div className={`text-lg font-bold ${scoreColor(p.conversionScore!)}`}>{p.conversionScore}</div>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-1">
+                      {[
+                        { label: "Style", value: p.consistency, note: p.consistencyNote },
+                        { label: "Variants", value: p.variantMapping, note: p.variantNote },
+                        { label: "Zoom", value: p.zoomReadiness, note: p.zoomNote },
+                        { label: "Mobile", value: p.mobileOptimization, note: p.mobileNote },
+                        { label: "Hero", value: p.heroScore, note: p.heroNote },
+                      ].map(d => (
+                        <div key={d.label} className="text-center" title={d.note || ""}>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className={`h-full ${scoreBg(d.value || 0)} transition-all`} style={{ width: `${d.value || 0}%` }} />
+                          </div>
+                          <div className="text-[9px] text-muted-foreground mt-0.5">{d.label}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {p.topIssue && (
+                      <div className="text-xs text-yellow-600 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 flex-shrink-0" />{p.topIssue}
+                      </div>
+                    )}
+                    {p.conversionRecommendation && (
+                      <div className="text-[10px] text-muted-foreground">💡 {p.conversionRecommendation}</div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            {!products.some(p => p.conversionScore != null) && (
+              <div className="text-center py-8 text-muted-foreground text-sm">Run the conversion audit to score your product images.</div>
             )}
           </div>
         </TabsContent>

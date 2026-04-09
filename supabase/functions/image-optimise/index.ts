@@ -247,6 +247,93 @@ Return JSON array: [{"index": 0, "match": "likely"|"uncertain"|"mismatch", "conf
       });
     }
 
+    // ── 4. Conversion-focused audit ──
+    if (action === "conversion_audit") {
+      if (!products || !Array.isArray(products) || products.length === 0) {
+        return new Response(JSON.stringify({ error: "products array required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const productList = products.slice(0, 25).map((p: any, i: number) =>
+        `${i + 1}. Title: "${p.title || "Unknown"}", Vendor: "${p.vendor || ""}", Colour: "${p.colour || ""}", Type: "${p.productType || ""}", Image URL: "${p.imageUrl || "NONE"}", Variant Count: ${p.variantCount || 0}, Has Multiple Images: ${p.hasMultipleImages || false}, Image Dimensions: "${p.imageDimensions || "unknown"}"`
+      ).join("\n");
+
+      const response = await callAI({
+        model: "google/gemini-3-flash-preview",
+        temperature: 0.3,
+        messages: [
+          {
+            role: "system",
+            content: `You are an e-commerce conversion rate optimization (CRO) image auditor. For each product, analyse and score across 5 dimensions:
+
+1. CONSISTENCY (0-100): Does the image URL suggest a consistent brand style? Look for:
+   - Same CDN/domain patterns across products from same vendor
+   - Similar filename conventions (suggesting same photographer/studio)
+   - Flag any outliers that likely have different backgrounds or styles
+
+2. VARIANT_MAPPING (0-100): How well are images mapped to variants?
+   - If product has colour variants, does it likely have colour-specific images?
+   - Flag products with multiple variants but only one image URL
+   - Score higher if URL contains colour/variant identifiers
+
+3. ZOOM_READINESS (0-100): Is the image likely high-resolution enough for zoom?
+   - Check URL for size hints (e.g. 2048x, _large, _2000x)
+   - Flag thumbnails or small images (64x, 100x, _small, _thumb)
+   - Score based on likely resolution from URL patterns
+
+4. MOBILE_OPTIMIZATION (0-100): Is the image likely optimised for mobile?
+   - Check if CDN supports responsive images (Shopify CDN does)
+   - Flag very large images without CDN resize parameters
+   - Note if format supports modern compression (webp/avif hints)
+
+5. HERO_SCORE (0-100): How suitable is this image as the main product image?
+   - Higher for front/flat-lay/lifestyle images (from URL hints)
+   - Lower for detail/back/side images
+   - Consider if filename suggests primary image (_1, main, front, hero)
+
+Return JSON array: [{"index": 0, "consistency": 85, "consistency_note": "...", "variant_mapping": 60, "variant_note": "...", "zoom_readiness": 90, "zoom_note": "...", "mobile_optimization": 75, "mobile_note": "...", "hero_score": 95, "hero_note": "...", "overall_score": 81, "top_issue": "...", "recommendation": "..."}]`,
+          },
+          {
+            role: "user",
+            content: `Audit these product images for conversion optimization:\n${productList}`,
+          },
+        ],
+      });
+
+      const raw = getContent(response);
+      let results: any[];
+      try {
+        const jsonMatch = raw.match(/\[[\s\S]*\]/);
+        results = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+      } catch { results = []; }
+
+      // Ensure all results have index
+      const output = products.slice(0, 25).map((_: any, i: number) => {
+        const match = results.find((r: any) => r.index === i) || {};
+        return {
+          index: i,
+          consistency: match.consistency ?? 50,
+          consistency_note: match.consistency_note || "",
+          variant_mapping: match.variant_mapping ?? 50,
+          variant_note: match.variant_note || "",
+          zoom_readiness: match.zoom_readiness ?? 50,
+          zoom_note: match.zoom_note || "",
+          mobile_optimization: match.mobile_optimization ?? 50,
+          mobile_note: match.mobile_note || "",
+          hero_score: match.hero_score ?? 50,
+          hero_note: match.hero_note || "",
+          overall_score: match.overall_score ?? 50,
+          top_issue: match.top_issue || "",
+          recommendation: match.recommendation || "",
+        };
+      });
+
+      return new Response(JSON.stringify({ results: output }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

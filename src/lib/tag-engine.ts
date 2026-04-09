@@ -397,9 +397,9 @@ export function generateTags(input: TagInput, config?: TagConfig): string[] {
       tags.push('kids accessories');
     }
   } else if (gender === 'mens') {
-    if (['Mens Swimwear', 'Boardshorts'].includes(type)) {
+    if (['Mens Swimwear', 'Boardshorts', 'Mens Briefs & Jammers', 'Mens Rashies'].includes(type)) {
       tags.push('mens swim');
-    } else if (['Mens Shorts', 'Mens Shirt'].includes(type)) {
+    } else if (['Mens Shorts', 'Mens Shirts', 'Mens Tees & Singlets'].includes(type)) {
       tags.push('mens clothing');
     } else {
       tags.push('accessories');
@@ -430,6 +430,8 @@ export function generateTags(input: TagInput, config?: TagConfig): string[] {
   if (type === 'Sarongs') tags.push('sarong');
   if (type === 'Kaftans & Cover Ups') tags.push('cover ups');
   if (type === 'Boardshorts' && gender === 'mens') tags.push('mens boardies');
+  if (type === 'Mens Briefs & Jammers') tags.push('mens jammers');
+  if (type === 'Mens Tees & Singlets') tags.push('mens singlets');
 
   // Swim Skirts and Swim Leggings also get "bikini bottoms" tag
   // per manager's handwritten notes (right column of notebook page 3)

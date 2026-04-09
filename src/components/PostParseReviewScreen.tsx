@@ -218,6 +218,8 @@ export default function PostParseReviewScreen({
     const product = products.find(p => p._rowIndex === rowIndex);
     if (supplierName && product) {
       recordNoiseRejection(supplierName, product._rawName || product.name || "", labels[markAs]);
+      recordReclassification(supplierName, product._rawName || product.name || "", "review", "rejected", labels[markAs]);
+      toast.info(`AI learned: ${labels[markAs].toLowerCase()}`, { description: "Similar rows will be auto-rejected next time", duration: 2000 });
     }
     onUpdateProducts(products.map(p =>
       p._rowIndex === rowIndex

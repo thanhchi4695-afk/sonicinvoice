@@ -29,7 +29,7 @@ interface Props {
   onBack: () => void;
 }
 
-type Platform = "joor" | "nuorder" | "brandscope" | "brandboom" | "faire" | "csv";
+type Platform = "joor" | "nuorder" | "brandscope" | "brandboom" | "faire" | "csv" | "lookbook";
 type Screen = "select" | "connect_api" | "upload_csv" | "orders" | "detail";
 
 const PLATFORMS: {
@@ -45,6 +45,7 @@ const PLATFORMS: {
   { id: "brandboom", name: "Brandboom", method: "csv", geo: "US (indie fashion)", brands: "Independent fashion brands, US designers" },
   { id: "faire", name: "Faire", method: "api", geo: "Global (boutique)", brands: "Independent boutique, gift & homewares" },
   { id: "csv", name: "Generic CSV", method: "csv", geo: "Any platform", brands: "Any brand — email orders, Excel invoices" },
+  { id: "lookbook", name: "Lookbook / Image Link", method: "csv", geo: "Dropbox, Drive, OneDrive", brands: "Paste a cloud link — AI extracts products from images" },
 ];
 
 const WholesaleImportFlow = ({ onBack }: Props) => {

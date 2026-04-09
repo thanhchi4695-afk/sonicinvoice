@@ -734,6 +734,28 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
+      {/* Lookbook Import Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold font-display">Lookbook Import</h2>
+              <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded-full font-medium">New</span>
+            </div>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Paste any Dropbox, Google Drive, WeTransfer, or OneDrive link from your supplier. AI reads the images and creates products automatically.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Dropbox · Google Drive · WeTransfer · OneDrive</p>
+          </div>
+        </div>
+        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartLookbookImport}>
+          Import lookbook → <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
       {/* Wholesale Import Card */}
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">

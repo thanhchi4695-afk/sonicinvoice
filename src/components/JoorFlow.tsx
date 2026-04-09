@@ -655,6 +655,156 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
     );
   }
 
+  // ─── STEP: FILE IMPORT (parsing) ───
+  if (step === "file_import") {
+    return (
+      <div className="px-4 pt-4 pb-24 animate-fade-in max-w-2xl mx-auto">
+        <button onClick={() => setStep("orders")} className="flex items-center gap-1 text-muted-foreground text-sm mb-4 hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 animate-spin text-primary mr-3" />
+          <span className="text-sm text-muted-foreground">Parsing JOOR file...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── STEP: FILE REVIEW ───
+  if (step === "file_review" && fileProducts.length > 0) {
+    const totalUnits = fileProducts.reduce((s, p) => s + p.totalUnits, 0);
+    const totalValue = fileProducts.reduce((s, p) => s + p.totalValue, 0);
+
+    return (
+      <div className="px-4 pt-4 pb-24 animate-fade-in max-w-4xl mx-auto">
+        <button onClick={() => { setStep("orders"); setFileProducts([]); setFileParseResult(null); }} className="flex items-center gap-1 text-muted-foreground text-sm mb-4 hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" /> Back to orders
+        </button>
+
+        {/* Header */}
+        <div className="bg-card rounded-lg border border-border p-5 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold font-display">
+                {fileParseResult?.brand || "JOOR"} — File Import
+              </h2>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted-foreground">
+                {fileParseResult?.poNumber && <span>PO# {fileParseResult.poNumber}</span>}
+                {fileParseResult?.season && <span>{fileParseResult.season}</span>}
+                <span className="capitalize">{fileParseResult?.format.replace("_", " ")}</span>
+              </div>
+            </div>
+            <div className="text-right text-sm">
+              <p className="font-medium">{fileProducts.length} styles</p>
+              <p className="text-muted-foreground">{totalUnits} units · AUD ${totalValue.toFixed(2)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* AI Enrich button */}
+        <div className="bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <div>
+                <p className="text-sm font-medium">AI Product Enrichment</p>
+                <p className="text-xs text-muted-foreground">Generate descriptions, product types, and search queries for images</p>
+              </div>
+            </div>
+            <Button size="sm" onClick={handleAIEnrich} disabled={fileEnriching}>
+              {fileEnriching ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Enriching...</>
+              ) : (
+                <><Sparkles className="w-4 h-4 mr-2" /> Enrich with AI</>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Product table */}
+        <div className="bg-card rounded-lg border border-border overflow-hidden mb-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="text-left p-3 font-medium">Style</th>
+                  <th className="text-left p-3 font-medium">Style #</th>
+                  <th className="text-left p-3 font-medium">Colour</th>
+                  <th className="text-left p-3 font-medium">Fabrication</th>
+                  <th className="text-left p-3 font-medium">Sizes</th>
+                  <th className="text-right p-3 font-medium">RRP</th>
+                  <th className="text-right p-3 font-medium">Wholesale</th>
+                  <th className="text-right p-3 font-medium">Units</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fileProducts.map((p, i) => (
+                  <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30">
+                    <td className="p-3">
+                      <div>
+                        <span className="font-medium">{p.styleName}</span>
+                        {p.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>
+                        )}
+                        {(p as any).tags && (
+                          <p className="text-xs text-primary/70 mt-0.5">{(p as any).tags}</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3 font-mono text-xs">{p.styleNumber}</td>
+                    <td className="p-3">{p.colour}</td>
+                    <td className="p-3 text-xs max-w-[150px] truncate" title={p.fabrication || p.materials}>
+                      {p.fabrication || p.materials || "—"}
+                    </td>
+                    <td className="p-3 text-xs">{p.sizes.join(", ") || "—"}</td>
+                    <td className="p-3 text-right">${p.rrp.toFixed(2)}</td>
+                    <td className="p-3 text-right text-muted-foreground">${p.wholesale.toFixed(2)}</td>
+                    <td className="p-3 text-right">{p.totalUnits}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Pushing progress */}
+        {pushing && (
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <span className="text-sm font-medium">
+                Pushing products to Shopify ({pushProgress.current} / {pushProgress.total})...
+              </span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-2">
+              <div className="bg-primary rounded-full h-2 transition-all" style={{ width: `${(pushProgress.current / pushProgress.total) * 100}%` }} />
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Button variant="outline" onClick={() => downloadFileCSV("shopify")} disabled={pushing}>
+            <Download className="w-4 h-4 mr-2" /> Shopify CSV
+          </Button>
+          <Button variant="outline" onClick={() => downloadFileCSV("lightspeed")} disabled={pushing}>
+            <Download className="w-4 h-4 mr-2" /> Lightspeed CSV
+          </Button>
+          <Button
+            onClick={() => {
+              if (confirm(`Push ${fileGroupedProducts.length} products to Shopify?`)) {
+                pushToShopify(fileGroupedProducts);
+              }
+            }}
+            disabled={pushing || fileGroupedProducts.length === 0}
+          >
+            <Upload className="w-4 h-4 mr-2" /> Push all to Shopify
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // ─── STEP: ORDER LIST ───
   return (
     <div className="px-4 pt-4 pb-24 animate-fade-in max-w-4xl mx-auto">

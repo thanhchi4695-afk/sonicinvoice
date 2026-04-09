@@ -490,6 +490,7 @@ export default function PostParseReviewScreen({
                   onRejectVariant={(idx) => rejectRow(idx)}
                   onSplitVariant={splitRow}
                   supplierName={supplierName}
+                  parsingPlan={debug.parsingPlan}
                 />
               ))}
             </div>
@@ -526,6 +527,7 @@ export default function PostParseReviewScreen({
                   showTeachAI={showTeachAI === p._rowIndex}
                   onToggleTeachAI={() => setShowTeachAI(showTeachAI === p._rowIndex ? null : p._rowIndex)}
                   supplierName={supplierName}
+                  parsingPlan={debug.parsingPlan}
                 />
               ))}
             </div>
@@ -634,16 +636,18 @@ function StatCard({ label, value, icon, colorClass }: { label: string; value: st
 
 // ── Grouped Product Card (Fashion view) ──
 function GroupedProductCard({
-  group, onUpdateField, onRejectVariant, onSplitVariant, supplierName,
+  group, onUpdateField, onRejectVariant, onSplitVariant, supplierName, parsingPlan,
 }: {
   group: ProductGroup;
   onUpdateField: (rowIndex: number, field: string, value: string | number) => void;
   onRejectVariant: (rowIndex: number) => void;
   onSplitVariant: (rowIndex: number) => void;
   supplierName?: string;
+  parsingPlan?: import("@/lib/invoice-validator").ParsingPlan;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [editingParent, setEditingParent] = useState(false);
+  const [showWhyAI, setShowWhyAI] = useState(false);
 
   return (
     <div className="px-4 py-3">
@@ -682,29 +686,44 @@ function GroupedProductCard({
       </div>
 
       {expanded && (
-        <div className="ml-10 mt-2 bg-muted/20 rounded-lg border border-border/50 divide-y divide-border/30">
-          <div className="grid grid-cols-[1fr_60px_50px_40px] gap-2 px-3 py-1.5 text-[9px] text-muted-foreground font-semibold uppercase tracking-wide">
-            <span>Size</span>
-            <span>Colour</span>
-            <span>Qty</span>
-            <span></span>
-          </div>
-          {group.variants.map(v => (
-            <div key={v._rowIndex} className="grid grid-cols-[1fr_60px_50px_40px] gap-2 px-3 py-2 items-center text-xs">
-              <span className="font-medium">{v.size || "—"}</span>
-              <span className="text-muted-foreground">{v.colour || group.colour || "—"}</span>
-              <span className="font-mono font-semibold">{v.qty || 0}</span>
-              <div className="flex gap-0.5">
-                <button onClick={() => onSplitVariant(v._rowIndex)} className="p-1 rounded hover:bg-muted" title="Split out">
-                  <Scissors className="w-3 h-3 text-muted-foreground" />
-                </button>
-                <button onClick={() => onRejectVariant(v._rowIndex)} className="p-1 rounded hover:bg-destructive/10" title="Remove variant">
-                  <X className="w-3 h-3 text-destructive" />
-                </button>
-              </div>
+        <>
+          <div className="ml-10 mt-2 bg-muted/20 rounded-lg border border-border/50 divide-y divide-border/30">
+            <div className="grid grid-cols-[1fr_60px_50px_40px] gap-2 px-3 py-1.5 text-[9px] text-muted-foreground font-semibold uppercase tracking-wide">
+              <span>Size</span>
+              <span>Colour</span>
+              <span>Qty</span>
+              <span></span>
             </div>
-          ))}
-        </div>
+            {group.variants.map(v => (
+              <div key={v._rowIndex} className="grid grid-cols-[1fr_60px_50px_40px] gap-2 px-3 py-2 items-center text-xs">
+                <span className="font-medium">{v.size || "—"}</span>
+                <span className="text-muted-foreground">{v.colour || group.colour || "—"}</span>
+                <span className="font-mono font-semibold">{v.qty || 0}</span>
+                <div className="flex gap-0.5">
+                  <button onClick={() => onSplitVariant(v._rowIndex)} className="p-1 rounded hover:bg-muted" title="Split out">
+                    <Scissors className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                  <button onClick={() => onRejectVariant(v._rowIndex)} className="p-1 rounded hover:bg-destructive/10" title="Remove variant">
+                    <X className="w-3 h-3 text-destructive" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="ml-10 mt-2 border border-primary/15 rounded-md overflow-hidden">
+            <button
+              onClick={() => setShowWhyAI(!showWhyAI)}
+              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+            >
+              <Bug className="w-3 h-3" />
+              Why AI grouped this
+              {showWhyAI ? <ChevronDown className="w-3 h-3 ml-auto" /> : <ChevronRight className="w-3 h-3 ml-auto" />}
+            </button>
+            {showWhyAI && (
+              <WhyAIPanel product={group.variants[0]} parsingPlan={parsingPlan} />
+            )}
+          </div>
+        </>
       )}
     </div>
   );
@@ -716,7 +735,7 @@ function ReviewRow({
   onToggleSelect, onStartEdit, onStopEdit,
   onApprove, onReject, onMoveToReview, onRestore,
   onUpdateField, onMarkAs, onSplit,
-  showTeachAI, onToggleTeachAI, supplierName,
+  showTeachAI, onToggleTeachAI, supplierName, parsingPlan,
 }: {
   product: ReviewProduct;
   tab: ReviewTab;
@@ -735,8 +754,10 @@ function ReviewRow({
   showTeachAI: boolean;
   onToggleTeachAI: () => void;
   supplierName?: string;
+  parsingPlan?: import("@/lib/invoice-validator").ParsingPlan;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showWhyAI, setShowWhyAI] = useState(false);
 
   return (
     <div className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""}`}>
@@ -911,6 +932,21 @@ function ReviewRow({
                 </div>
               )}
 
+              {/* Why AI did this — per-row debug */}
+              <div className="border border-primary/15 rounded-md overflow-hidden">
+                <button
+                  onClick={() => setShowWhyAI(!showWhyAI)}
+                  className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+                >
+                  <Bug className="w-3 h-3" />
+                  Why AI did this
+                  {showWhyAI ? <ChevronDown className="w-3 h-3 ml-auto" /> : <ChevronRight className="w-3 h-3 ml-auto" />}
+                </button>
+                {showWhyAI && (
+                  <WhyAIPanel product={p} parsingPlan={parsingPlan} />
+                )}
+              </div>
+
               {/* Full field detail */}
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 <DetailRow label="Raw text" value={p._rawName || "(empty)"} mono />
@@ -976,6 +1012,88 @@ function ReviewRow({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Why AI Did This Panel ──
+function WhyAIPanel({ product, parsingPlan }: { product: ReviewProduct; parsingPlan?: import("@/lib/invoice-validator").ParsingPlan }) {
+  // Build intelligent explanations based on product data + parsing plan
+  const explanations = useMemo(() => {
+    const items: { icon: string; label: string; value: string }[] = [];
+
+    // Document & layout
+    if (parsingPlan?.document_type) items.push({ icon: "📄", label: "Document type", value: parsingPlan.document_type });
+    if (parsingPlan?.layout_type) items.push({ icon: "📐", label: "Layout type", value: parsingPlan.layout_type });
+    if (parsingPlan?.variant_method) items.push({ icon: "🔀", label: "Variant method", value: parsingPlan.variant_method });
+    if (parsingPlan?.cost_field) items.push({ icon: "💰", label: "Cost field", value: parsingPlan.cost_field });
+    if (parsingPlan?.quantity_field) items.push({ icon: "📦", label: "Quantity field", value: parsingPlan.quantity_field });
+    if (parsingPlan?.line_item_zone) items.push({ icon: "🎯", label: "Line-item zone", value: parsingPlan.line_item_zone });
+
+    // Grouping
+    if (parsingPlan?.grouping_required) {
+      items.push({ icon: "🔗", label: "Grouping", value: parsingPlan.grouping_reason || "Grouped by style code and colour" });
+    }
+
+    // Source field mapping
+    const fieldMap: string[] = [];
+    if (product.name) fieldMap.push(`Title: "${product.name}"`);
+    if (product.colour) fieldMap.push(`Colour: "${product.colour}"`);
+    if (product.size) fieldMap.push(`Size: "${product.size}"`);
+    if (product.sku) fieldMap.push(`SKU: "${product.sku}"`);
+    if (fieldMap.length > 0) items.push({ icon: "🗺️", label: "Extracted fields", value: fieldMap.join(" · ") });
+
+    // Cost derivation
+    if (product.cost > 0 && product.qty > 0) {
+      const lineTotal = product.cost * product.qty;
+      items.push({ icon: "🧮", label: "Cost calculation", value: `$${product.cost.toFixed(2)} × ${product.qty} = $${lineTotal.toFixed(2)}` });
+    } else if (product.cost > 0) {
+      items.push({ icon: "💲", label: "Unit cost", value: `$${product.cost.toFixed(2)} (direct from invoice)` });
+    } else {
+      items.push({ icon: "⚠️", label: "Cost", value: "No cost detected — may need manual entry" });
+    }
+
+    // Why confidence level
+    const confReasons: string[] = [];
+    if (product._confidenceLevel === "high") {
+      confReasons.push("All key fields present (title, cost, quantity)");
+      if (product.sku) confReasons.push("SKU detected");
+      if (product.colour || product.size) confReasons.push("Variant info found");
+    } else if (product._confidenceLevel === "medium") {
+      if (!product.cost || product.cost <= 0) confReasons.push("Missing unit cost");
+      if (!product.size && !product.colour) confReasons.push("No variant info detected");
+      if ((product.name || "").length < 5) confReasons.push("Short or ambiguous title");
+      if (!product.sku) confReasons.push("No SKU/style code found");
+    } else {
+      if (product._rejected) confReasons.push(product._rejectReason || "Row data doesn't match product pattern");
+      else confReasons.push("Insufficient product fields");
+    }
+    items.push({ icon: product._confidenceLevel === "high" ? "🟢" : product._confidenceLevel === "medium" ? "🟡" : "🔴", label: `Why ${product._confidenceLevel} confidence`, value: confReasons.join("; ") });
+
+    // Why accepted/rejected/grouped
+    if (product._rejected) {
+      items.push({ icon: "❌", label: "Why rejected", value: product._rejectReason || "Matched noise/non-product pattern" });
+    } else {
+      items.push({ icon: "✅", label: "Why accepted", value: product._extractionReason || "Matched product line pattern with sufficient fields" });
+    }
+
+    // Strategy explanation
+    if (parsingPlan?.strategy_explanation) {
+      items.push({ icon: "💡", label: "AI strategy", value: parsingPlan.strategy_explanation });
+    }
+
+    return items;
+  }, [product, parsingPlan]);
+
+  return (
+    <div className="px-2.5 py-2 bg-card space-y-1">
+      {explanations.map((e, i) => (
+        <div key={i} className="flex items-start gap-2 text-[10px]">
+          <span className="shrink-0 w-4 text-center">{e.icon}</span>
+          <span className="text-muted-foreground shrink-0 w-28 font-medium">{e.label}:</span>
+          <span className="text-foreground">{e.value}</span>
+        </div>
+      ))}
     </div>
   );
 }

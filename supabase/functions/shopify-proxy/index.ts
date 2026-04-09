@@ -11,7 +11,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant / find_by_barcode
@@ -44,6 +44,8 @@ interface ShopifyRequestBody {
   metafields?: Array<{ ownerId: string; namespace: string; key: string; value: string; type: string }>;
   // For update_image_alt (batch)
   image_updates?: Array<{ shopify_product_id: string; alt_text: string; seo_filename?: string; keywords?: string[] }>;
+  // For replace_product_image (batch)
+  image_replacements?: Array<{ shopify_product_id: string; image_base64: string; alt_text?: string; filename?: string }>;
 }
 
 Deno.serve(async (req) => {

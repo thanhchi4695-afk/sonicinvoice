@@ -14,6 +14,111 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounting_connections: {
+        Row: {
+          access_token: string | null
+          account_mappings: Json
+          connected_at: string
+          id: string
+          last_synced: string | null
+          myob_company_file_id: string | null
+          myob_company_file_name: string | null
+          myob_company_file_uri: string | null
+          platform: string
+          refresh_token: string | null
+          token_expires_at: string | null
+          user_id: string
+          xero_tenant_id: string | null
+          xero_tenant_name: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          account_mappings?: Json
+          connected_at?: string
+          id?: string
+          last_synced?: string | null
+          myob_company_file_id?: string | null
+          myob_company_file_name?: string | null
+          myob_company_file_uri?: string | null
+          platform: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          user_id: string
+          xero_tenant_id?: string | null
+          xero_tenant_name?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          account_mappings?: Json
+          connected_at?: string
+          id?: string
+          last_synced?: string | null
+          myob_company_file_id?: string | null
+          myob_company_file_name?: string | null
+          myob_company_file_uri?: string | null
+          platform?: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          user_id?: string
+          xero_tenant_id?: string | null
+          xero_tenant_name?: string | null
+        }
+        Relationships: []
+      }
+      accounting_push_history: {
+        Row: {
+          category: string | null
+          error_message: string | null
+          external_id: string | null
+          external_url: string | null
+          gst_amount: number | null
+          id: string
+          invoice_date: string | null
+          invoice_id: string
+          platform: string
+          pushed_at: string
+          status: string | null
+          supplier_name: string | null
+          total_ex_gst: number | null
+          total_inc_gst: number | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          error_message?: string | null
+          external_id?: string | null
+          external_url?: string | null
+          gst_amount?: number | null
+          id?: string
+          invoice_date?: string | null
+          invoice_id: string
+          platform: string
+          pushed_at?: string
+          status?: string | null
+          supplier_name?: string | null
+          total_ex_gst?: number | null
+          total_inc_gst?: number | null
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          error_message?: string | null
+          external_id?: string | null
+          external_url?: string | null
+          gst_amount?: number | null
+          id?: string
+          invoice_date?: string | null
+          invoice_id?: string
+          platform?: string
+          pushed_at?: string
+          status?: string | null
+          supplier_name?: string | null
+          total_ex_gst?: number | null
+          total_inc_gst?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       joor_connections: {
         Row: {
           connected_at: string

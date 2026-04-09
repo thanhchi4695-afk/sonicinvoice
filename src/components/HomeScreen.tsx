@@ -44,9 +44,10 @@ interface HomeScreenProps {
   onStartJoor?: () => void;
   onStartWholesaleImport?: () => void;
   onStartLookbookImport?: () => void;
+  onStartAccounting?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning, onStartPackingSlip, onStartJoor, onStartWholesaleImport, onStartLookbookImport }: HomeScreenProps) => {
+const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning, onStartPackingSlip, onStartJoor, onStartWholesaleImport, onStartLookbookImport, onStartAccounting }: HomeScreenProps) => {
   const mode = useStoreMode();
 
   const recentActivity = [
@@ -772,6 +773,28 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </div>
         <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartWholesaleImport}>
           Import orders → <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
+      </div>
+
+      {/* Accounting Integration */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-6">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <DollarSign className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold font-display">Accounting push</h2>
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/15 text-primary px-1.5 py-0.5 rounded">New</span>
+            </div>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Push supplier invoices directly to Xero or MYOB — GST, total, category and supplier all pre-filled. Zero double entry.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Xero · MYOB · GST auto-mapped · draft bills</p>
+          </div>
+        </div>
+        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartAccounting}>
+          Connect accounting → <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
 

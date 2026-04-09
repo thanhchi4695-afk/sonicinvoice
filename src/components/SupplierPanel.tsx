@@ -3,6 +3,7 @@ import {
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   TrendingUp, TrendingDown, Minus, FileText, Package,
   BarChart3, Clock, DollarSign, Save, X, Search, RefreshCw,
+  Receipt, ShoppingBag, AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +17,27 @@ interface SupplierPanelProps {
 }
 
 type SupplierRow = DbSupplier;
+
+interface LinkedInvoice {
+  id: string;
+  document_number: string | null;
+  date: string | null;
+  total: number;
+  gst: number;
+  status: string;
+  source_type: string;
+}
+
+interface ProductCostSummary {
+  product_title: string;
+  sku: string | null;
+  avgCost: number;
+  minCost: number;
+  maxCost: number;
+  totalQty: number;
+  entries: number;
+  costTrend: "up" | "down" | "stable";
+}
 
 // ── Seed demo suppliers if table is empty ─────────────────
 const DEMO_SUPPLIERS: Omit<SupplierRow, "id" | "user_id" | "created_at" | "updated_at">[] = [
@@ -33,6 +55,12 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   const [addMode, setAddMode] = useState(false);
   const [search, setSearch] = useState("");
   const [syncing, setSyncing] = useState(false);
+
+  // Detail sub-data
+  const [linkedInvoices, setLinkedInvoices] = useState<LinkedInvoice[]>([]);
+  const [productCosts, setProductCosts] = useState<ProductCostSummary[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailTab, setDetailTab] = useState<"overview" | "invoices" | "costs">("overview");
 
   // Form state
   const [form, setForm] = useState({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
@@ -54,7 +82,6 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
       return;
     }
 
-    // Seed demos if empty
     if (!data || data.length === 0) {
       const inserts = DEMO_SUPPLIERS.map(d => ({
         ...d,
@@ -71,39 +98,126 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
 
   useEffect(() => { loadSuppliers(); }, [loadSuppliers]);
 
-  // ── Sync spend from accounting_push_history ─────────────
+  // ── Load detail data when supplier selected ────────────
+  const loadSupplierDetail = useCallback(async (supplier: SupplierRow) => {
+    setLoadingDetail(true);
+    setDetailTab("overview");
+
+    // Load linked invoices (by supplier_name or supplier_id)
+    const { data: docs } = await supabase
+      .from("documents")
+      .select("id, document_number, date, total, gst, status, source_type")
+      .or(`supplier_name.ilike.${supplier.name},supplier_id.eq.${supplier.id}`)
+      .order("date", { ascending: false })
+      .limit(50);
+
+    setLinkedInvoices((docs || []) as LinkedInvoice[]);
+
+    // Load document lines for cost analysis
+    if (docs && docs.length > 0) {
+      const docIds = docs.map(d => d.id);
+      const { data: lines } = await supabase
+        .from("document_lines")
+        .select("product_title, sku, unit_cost, quantity, document_id")
+        .in("document_id", docIds);
+
+      if (lines && lines.length > 0) {
+        // Group by product_title + sku
+        const groups: Record<string, { costs: number[]; qtys: number[]; title: string; sku: string | null }> = {};
+        for (const line of lines) {
+          const key = `${line.product_title || "Unknown"}::${line.sku || ""}`;
+          if (!groups[key]) {
+            groups[key] = { costs: [], qtys: [], title: line.product_title || "Unknown", sku: line.sku };
+          }
+          groups[key].costs.push(Number(line.unit_cost));
+          groups[key].qtys.push(Number(line.quantity));
+        }
+
+        const summaries: ProductCostSummary[] = Object.values(groups).map(g => {
+          const avgCost = g.costs.reduce((a, b) => a + b, 0) / g.costs.length;
+          const totalQty = g.qtys.reduce((a, b) => a + b, 0);
+          const lastTwo = g.costs.slice(-2);
+          const costTrend = lastTwo.length >= 2
+            ? lastTwo[1] > lastTwo[0] * 1.02 ? "up" : lastTwo[1] < lastTwo[0] * 0.98 ? "down" : "stable"
+            : "stable";
+          return {
+            product_title: g.title,
+            sku: g.sku,
+            avgCost,
+            minCost: Math.min(...g.costs),
+            maxCost: Math.max(...g.costs),
+            totalQty,
+            entries: g.costs.length,
+            costTrend,
+          };
+        });
+
+        summaries.sort((a, b) => b.totalQty - a.totalQty);
+        setProductCosts(summaries);
+      } else {
+        setProductCosts([]);
+      }
+    } else {
+      setProductCosts([]);
+    }
+
+    setLoadingDetail(false);
+  }, []);
+
+  useEffect(() => {
+    const supplier = suppliers.find(s => s.id === selectedId);
+    if (supplier) loadSupplierDetail(supplier);
+  }, [selectedId, suppliers, loadSupplierDetail]);
+
+  // ── Sync spend from documents table ─────────────────────
   const syncSpend = async () => {
     setSyncing(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setSyncing(false); return; }
 
+    // Sum totals from documents grouped by supplier_name
+    const { data: docs } = await supabase
+      .from("documents")
+      .select("supplier_name, total")
+      .eq("user_id", session.user.id);
+
+    // Also check accounting_push_history
     const { data: pushHistory } = await supabase
       .from("accounting_push_history")
       .select("supplier_name, total_inc_gst")
       .eq("user_id", session.user.id);
 
-    if (pushHistory && pushHistory.length > 0) {
-      const spendMap: Record<string, number> = {};
+    const spendMap: Record<string, number> = {};
+
+    if (docs) {
+      for (const row of docs) {
+        const name = row.supplier_name || "";
+        if (name) spendMap[name] = (spendMap[name] || 0) + (Number(row.total) || 0);
+      }
+    }
+
+    if (pushHistory) {
       for (const row of pushHistory) {
         const name = row.supplier_name || "";
-        spendMap[name] = (spendMap[name] || 0) + (Number(row.total_inc_gst) || 0);
+        if (name) spendMap[name] = Math.max(spendMap[name] || 0, (spendMap[name] || 0) + (Number(row.total_inc_gst) || 0));
       }
-
-      for (const supplier of suppliers) {
-        const spend = spendMap[supplier.name];
-        if (spend && spend !== supplier.total_spend) {
-          await supabase.from("suppliers").update({ total_spend: spend }).eq("id", supplier.id);
-        }
-      }
-      await loadSuppliers();
-      toast.success("Spend synced from accounting history");
-    } else {
-      toast("No accounting history found to sync");
     }
+
+    let updated = 0;
+    for (const supplier of suppliers) {
+      const spend = spendMap[supplier.name];
+      if (spend && Math.abs(spend - Number(supplier.total_spend)) > 0.01) {
+        await supabase.from("suppliers").update({ total_spend: spend }).eq("id", supplier.id);
+        updated++;
+      }
+    }
+
+    await loadSuppliers();
+    toast.success(updated > 0 ? `${updated} supplier(s) spend updated` : "All spend is up to date");
     setSyncing(false);
   };
 
-  // ── Add supplier ────────────────────────────────────────
+  // ── CRUD handlers ──────────────────────────────────────
   const handleAdd = async () => {
     if (!form.name.trim()) { toast.error("Name is required"); return; }
     const { data: { session } } = await supabase.auth.getSession();
@@ -131,7 +245,6 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     loadSuppliers();
   };
 
-  // ── Update supplier ─────────────────────────────────────
   const handleUpdate = async () => {
     if (!selectedId || !form.name.trim()) return;
     const contactInfo: Record<string, string> = {};
@@ -152,7 +265,6 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     loadSuppliers();
   };
 
-  // ── Delete supplier ─────────────────────────────────────
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
     const { error } = await supabase.from("suppliers").delete().eq("id", id);
@@ -162,7 +274,6 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     loadSuppliers();
   };
 
-  // ── Save notes inline ──────────────────────────────────
   const saveNotes = async (id: string, notes: string) => {
     await supabase.from("suppliers").update({ notes }).eq("id", id);
   };
@@ -234,6 +345,12 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     const priceHistory = getPriceHistory(detail.name);
     const margin = detail.avg_margin;
 
+    // Performance metrics
+    const invoiceCount = linkedInvoices.length;
+    const totalProducts = productCosts.length;
+    const avgOrderValue = invoiceCount > 0 ? linkedInvoices.reduce((a, inv) => a + Number(inv.total), 0) / invoiceCount : 0;
+    const costIncreases = productCosts.filter(p => p.costTrend === "up").length;
+
     return (
       <div className="min-h-screen pb-24 animate-fade-in">
         <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
@@ -272,7 +389,9 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
             {[
               { label: "Total spend", value: `$${Number(detail.total_spend).toLocaleString()}`, icon: DollarSign },
               { label: "Avg margin", value: margin ? `${margin}%` : "—", icon: BarChart3 },
-              { label: "Currency", value: detail.currency, icon: FileText },
+              { label: "Invoices", value: String(invoiceCount), icon: Receipt },
+              { label: "Products", value: String(totalProducts), icon: Package },
+              { label: "Avg order", value: avgOrderValue > 0 ? `$${Math.round(avgOrderValue).toLocaleString()}` : "—", icon: ShoppingBag },
               { label: "Since", value: new Date(detail.created_at).toLocaleDateString("en-AU", { month: "short", year: "numeric" }), icon: Clock },
             ].map((s, i) => (
               <div key={i} className="bg-card rounded-lg border border-border p-3">
@@ -285,59 +404,204 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
             ))}
           </div>
 
-          {/* Contact info */}
-          {Object.keys(ci).length > 0 && (
-            <div className="bg-card rounded-lg border border-border p-4">
-              <h3 className="text-sm font-semibold mb-2">Contact</h3>
-              <div className="space-y-1 text-xs">
-                {ci.email && <p><span className="text-muted-foreground">Email:</span> {ci.email}</p>}
-                {ci.rep && <p><span className="text-muted-foreground">Rep:</span> {ci.rep}</p>}
-                {ci.phone && <p><span className="text-muted-foreground">Phone:</span> {ci.phone}</p>}
-              </div>
+          {/* Cost increase warning */}
+          {costIncreases > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-warning/10 border border-warning/30 rounded-lg text-xs text-warning">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              {costIncreases} product(s) show recent cost increases
             </div>
           )}
 
-          {/* Cost history */}
-          {priceHistory.length > 0 && (
-            <div className="bg-card rounded-lg border border-border p-4">
-              <h3 className="text-sm font-semibold mb-3">Cost history</h3>
-              <div className="space-y-2">
-                {priceHistory.map((ph, i) => (
-                  <div key={i} className="text-xs">
-                    <p className="font-medium mb-1">{ph.product}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {ph.history.map((h, j) => {
-                        const prev = j > 0 ? ph.history[j - 1].cost : null;
-                        const change = prev ? ((h.cost - prev) / prev * 100) : null;
-                        return (
-                          <span key={j} className="px-2 py-1 rounded bg-muted/50 font-mono">
-                            {new Date(h.date).toLocaleDateString("en-AU", { month: "short", year: "2-digit" })}: ${h.cost.toFixed(2)}
-                            {change !== null && (
-                              <span className={`ml-1 ${change > 5 ? "text-warning" : change < 0 ? "text-success" : ""}`}>
-                                ({change > 0 ? "+" : ""}{change.toFixed(1)}%)
-                              </span>
-                            )}
-                          </span>
-                        );
-                      })}
+          {/* Tab bar */}
+          <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
+            {(["overview", "invoices", "costs"] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setDetailTab(tab)}
+                className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${detailTab === tab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+              >
+                {tab === "overview" ? "Overview" : tab === "invoices" ? `Invoices (${invoiceCount})` : `Costs (${totalProducts})`}
+              </button>
+            ))}
+          </div>
+
+          {loadingDetail ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">Loading…</div>
+          ) : (
+            <>
+              {/* Overview tab */}
+              {detailTab === "overview" && (
+                <div className="space-y-4">
+                  {/* Contact info */}
+                  {Object.keys(ci).length > 0 && (
+                    <div className="bg-card rounded-lg border border-border p-4">
+                      <h3 className="text-sm font-semibold mb-2">Contact</h3>
+                      <div className="space-y-1 text-xs">
+                        {ci.email && <p><span className="text-muted-foreground">Email:</span> {ci.email}</p>}
+                        {ci.rep && <p><span className="text-muted-foreground">Rep:</span> {ci.rep}</p>}
+                        {ci.phone && <p><span className="text-muted-foreground">Phone:</span> {ci.phone}</p>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Supplier performance */}
+                  <div className="bg-card rounded-lg border border-border p-4">
+                    <h3 className="text-sm font-semibold mb-3">Performance</h3>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total units ordered</span>
+                        <span className="font-medium">{productCosts.reduce((a, p) => a + p.totalQty, 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Unique products</span>
+                        <span className="font-medium">{totalProducts}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Cost stability</span>
+                        <span className="font-medium">
+                          {productCosts.length === 0 ? "—" :
+                            costIncreases === 0 ? "✅ Stable" :
+                            `⚠️ ${costIncreases} increase${costIncreases > 1 ? "s" : ""}`}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Last invoice</span>
+                        <span className="font-medium">
+                          {linkedInvoices.length > 0 && linkedInvoices[0].date
+                            ? new Date(linkedInvoices[0].date).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
+                            : "—"}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* Notes */}
-          <div className="bg-card rounded-lg border border-border p-4">
-            <h3 className="text-sm font-semibold mb-2">Notes</h3>
-            <textarea
-              defaultValue={detail.notes || ""}
-              onBlur={e => saveNotes(detail.id, e.target.value)}
-              placeholder={`Notes about ${detail.name}...`}
-              rows={3}
-              className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm resize-none placeholder:text-muted-foreground/50"
-            />
-          </div>
+                  {/* Cost history from localStorage (legacy) */}
+                  {priceHistory.length > 0 && (
+                    <div className="bg-card rounded-lg border border-border p-4">
+                      <h3 className="text-sm font-semibold mb-3">Cost history (local)</h3>
+                      <div className="space-y-2">
+                        {priceHistory.slice(0, 5).map((ph, i) => (
+                          <div key={i} className="text-xs">
+                            <p className="font-medium mb-1">{ph.product}</p>
+                            <div className="flex flex-wrap gap-2">
+                              {ph.history.map((h, j) => {
+                                const prev = j > 0 ? ph.history[j - 1].cost : null;
+                                const change = prev ? ((h.cost - prev) / prev * 100) : null;
+                                return (
+                                  <span key={j} className="px-2 py-1 rounded bg-muted/50 font-mono">
+                                    {new Date(h.date).toLocaleDateString("en-AU", { month: "short", year: "2-digit" })}: ${h.cost.toFixed(2)}
+                                    {change !== null && (
+                                      <span className={`ml-1 ${change > 5 ? "text-warning" : change < 0 ? "text-success" : ""}`}>
+                                        ({change > 0 ? "+" : ""}{change.toFixed(1)}%)
+                                      </span>
+                                    )}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  <div className="bg-card rounded-lg border border-border p-4">
+                    <h3 className="text-sm font-semibold mb-2">Notes</h3>
+                    <textarea
+                      defaultValue={detail.notes || ""}
+                      onBlur={e => saveNotes(detail.id, e.target.value)}
+                      placeholder={`Notes about ${detail.name}...`}
+                      rows={3}
+                      className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm resize-none placeholder:text-muted-foreground/50"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Invoices tab */}
+              {detailTab === "invoices" && (
+                <div className="space-y-2">
+                  {linkedInvoices.length === 0 ? (
+                    <div className="bg-card rounded-lg border border-border p-6 text-center">
+                      <Receipt className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No invoices found for {detail.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Process an invoice to link it automatically</p>
+                    </div>
+                  ) : (
+                    linkedInvoices.map(inv => (
+                      <div key={inv.id} className="bg-card rounded-lg border border-border p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">{inv.document_number || "No number"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {inv.date ? new Date(inv.date).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "No date"}
+                              {" · "}{inv.source_type}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold">${Number(inv.total).toFixed(2)}</p>
+                            {inv.gst > 0 && <p className="text-[10px] text-muted-foreground">GST ${Number(inv.gst).toFixed(2)}</p>}
+                          </div>
+                        </div>
+                        <div className="mt-1">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${inv.status === "pushed" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
+                            {inv.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Costs tab */}
+              {detailTab === "costs" && (
+                <div className="space-y-2">
+                  {productCosts.length === 0 ? (
+                    <div className="bg-card rounded-lg border border-border p-6 text-center">
+                      <DollarSign className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No cost data yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">Cost tracking starts when invoices are processed</p>
+                    </div>
+                  ) : (
+                    productCosts.map((pc, i) => (
+                      <div key={i} className="bg-card rounded-lg border border-border p-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{pc.product_title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {pc.sku && `SKU: ${pc.sku} · `}{pc.totalQty} units across {pc.entries} invoice{pc.entries > 1 ? "s" : ""}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {pc.costTrend === "up" && <TrendingUp className="w-3 h-3 text-warning" />}
+                            {pc.costTrend === "down" && <TrendingDown className="w-3 h-3 text-success" />}
+                            {pc.costTrend === "stable" && <Minus className="w-3 h-3 text-muted-foreground" />}
+                          </div>
+                        </div>
+                        <div className="flex gap-3 mt-2 text-[10px]">
+                          <span className="px-2 py-0.5 rounded bg-muted">
+                            Avg: <span className="font-mono font-bold">${pc.avgCost.toFixed(2)}</span>
+                          </span>
+                          {pc.minCost !== pc.maxCost && (
+                            <>
+                              <span className="px-2 py-0.5 rounded bg-muted">
+                                Min: <span className="font-mono">${pc.minCost.toFixed(2)}</span>
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-muted">
+                                Max: <span className="font-mono">${pc.maxCost.toFixed(2)}</span>
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     );

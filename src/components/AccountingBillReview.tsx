@@ -219,7 +219,7 @@ export default function AccountingBillReview({
 
       // Build invoice payload with per-line account codes
       const invoicePayload = {
-        id: invoice.id || `inv-${Date.now()}`,
+        id: unifiedBill.id || `inv-${Date.now()}`,
         supplier: bill.supplierName,
         invoice_number: bill.invoiceNumber,
         invoice_date: bill.invoiceDate,

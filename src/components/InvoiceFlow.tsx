@@ -8,7 +8,7 @@ import { matchCollectionsWithBrand, checkCoverage } from "@/lib/collection-engin
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 import { generateXSeriesCSV, getXSeriesSettings, saveXSeriesSettings, type XSeriesSettings, type XSeriesProduct } from "@/lib/lightspeed-xseries";
-import { findTemplate, saveFormatTemplate, incrementTemplateUse, saveLayoutTemplate, getTemplateList, getLayoutLabel, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping, type ProcessAsMode, type LayoutType } from "@/lib/invoice-templates";
+import { findTemplate, saveFormatTemplate, incrementTemplateUse, saveLayoutTemplate, buildTemplateHint, saveCorrection, getTemplateList, getLayoutLabel, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping, type ProcessAsMode, type LayoutType, type CorrectionPattern } from "@/lib/invoice-templates";
 import { getStoreLocations } from "@/components/AccountScreen";
 import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCount, type InventoryItem } from "@/lib/inventory-sim";
 import { addAuditEntry } from "@/lib/audit-log";

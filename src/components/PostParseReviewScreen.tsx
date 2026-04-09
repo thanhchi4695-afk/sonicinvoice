@@ -633,6 +633,26 @@ function ReviewRow({
             </div>
           ) : (
             <div className="bg-muted/20 rounded-lg p-3 space-y-2 text-[11px]">
+              {/* Why this row was extracted / rejected */}
+              <div className="bg-primary/5 border border-primary/10 rounded-md p-2">
+                <span className="text-[10px] font-semibold text-primary block mb-0.5">
+                  {p._rejected ? "❌ Why this row was rejected:" : "✅ Why this row was extracted:"}
+                </span>
+                <p className="text-[10px] text-muted-foreground">
+                  {p._rejected
+                    ? (p._rejectReason || "Invalid row data")
+                    : ((p as any)._extractionReason || "Extracted by AI parser")}
+                </p>
+              </div>
+
+              {/* AI parse notes if present */}
+              {(p as any)._parseNotes && (
+                <div className="bg-secondary/5 border border-secondary/10 rounded-md p-2">
+                  <span className="text-[10px] font-semibold text-secondary block mb-0.5">🤖 AI Parse Note:</span>
+                  <p className="text-[10px] text-muted-foreground">{(p as any)._parseNotes}</p>
+                </div>
+              )}
+
               {/* Raw vs suggested */}
               {tab === "review" && (
                 <div className="space-y-1.5">

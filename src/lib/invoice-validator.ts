@@ -51,6 +51,8 @@ export interface ValidatedProduct extends RawProduct {
   _suggestedTitle: string;
   _suggestedPrice: number;
   _suggestedVendor: string;
+  _parseNotes?: string;
+  _extractionReason?: string;
 }
 
 export interface ValidationDebugInfo {
@@ -433,6 +435,18 @@ export function validateAndCleanProducts(
       rejectedRows.push({ row: i, name: rawName || "(empty)", reason: rejectReason || "Invalid" });
     }
 
+    // Build extraction reason
+    const extractionParts: string[] = [];
+    if (!rejected) {
+      if (isValidTitle(p.name)) extractionParts.push("Valid product title detected");
+      if (p.cost > 0) extractionParts.push(`Cost $${p.cost.toFixed(2)} found`);
+      if (p.qty > 0) extractionParts.push(`Qty ${p.qty}`);
+      if (p.sku?.trim()) extractionParts.push(`SKU: ${p.sku}`);
+      if (p.colour?.trim()) extractionParts.push(`Colour: ${p.colour}`);
+      if (p.size?.trim()) extractionParts.push(`Size: ${p.size}`);
+      if (rowCorrections.length > 0) extractionParts.push(`${rowCorrections.length} auto-correction(s)`);
+    }
+
     results.push({
       ...p,
       _rowIndex: i,
@@ -449,6 +463,10 @@ export function validateAndCleanProducts(
       _suggestedTitle: rejected ? "" : p.name,
       _suggestedPrice: p.cost,
       _suggestedVendor: suggestedVendor,
+      _parseNotes: (p as any)._parseNotes || "",
+      _extractionReason: rejected
+        ? rejectReason || "Invalid row"
+        : extractionParts.join(" · ") || "Extracted by AI",
     });
   }
 

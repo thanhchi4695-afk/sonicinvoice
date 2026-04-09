@@ -889,6 +889,11 @@ export default function ImageOptimisePanel({ onBack }: Props) {
                       {p.compressed && p.compressedSize != null && (
                         <div className="text-[10px] text-green-600">→ {formatBytes(p.compressedSize)} ({Math.round((1 - p.compressedSize / (p.originalSize || 1)) * 100)}% saved)</div>
                       )}
+                      {p.compressed && p.webpSize != null && p.jpegSize != null && p.originalSize && (
+                        <div className="text-[10px] text-muted-foreground">
+                          WebP {Math.round((1 - p.webpSize / p.originalSize) * 100)}% · JPEG {Math.round((1 - p.jpegSize / p.originalSize) * 100)}%
+                        </div>
+                      )}
                     </div>
                     {p.compressed ? (
                       <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />

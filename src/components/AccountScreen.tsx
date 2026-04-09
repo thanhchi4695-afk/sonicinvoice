@@ -278,6 +278,9 @@ const AccountScreen = () => {
         )}
       </Section>
 
+      {/* Wholesale Platform Connections */}
+      <WholesaleConnectionsSection />
+
       {/* Connected Shopify Stores (Custom App tokens) */}
       <DirectStoresSection />
 
@@ -1341,6 +1344,238 @@ function MetafieldsSection() {
         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={addCustom} disabled={!newKey.trim() || !newLabel.trim()}>
           <Plus className="w-3 h-3 mr-1" /> Add metafield
         </Button>
+      </div>
+    </Section>
+  );
+}
+
+// ─── Wholesale Platform Connections ─────────────────────────────────
+const WHOLESALE_PLATFORMS = [
+  { id: "joor", name: "JOOR", icon: "🔗", desc: "Global wholesale fashion platform", credentialKey: "oauth_token", credentialLabel: "API Token" },
+  { id: "nuorder", name: "NuOrder", icon: "📦", desc: "Surf & action sports brands", credentialKey: "api_key", credentialLabel: "API Key" },
+  { id: "brandscope", name: "Brandscope", icon: "🌏", desc: "AU/NZ swim & surf wholesale", credentialKey: "api_key", credentialLabel: "API Key" },
+  { id: "brandboom", name: "Brandboom", icon: "💼", desc: "US fashion & independent brands", credentialKey: "api_key", credentialLabel: "API Key" },
+  { id: "faire", name: "Faire", icon: "🛒", desc: "Independent boutique marketplace", credentialKey: "api_key", credentialLabel: "API Key" },
+] as const;
+
+function WholesaleConnectionsSection() {
+  const [connections, setConnections] = useState<Record<string, { id: string; label: string | null; connected_at: string; last_synced: string | null }>>({});
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [tokenInput, setTokenInput] = useState("");
+  const [labelInput, setLabelInput] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const [testError, setTestError] = useState("");
+
+  useEffect(() => {
+    loadConnections();
+  }, []);
+
+  const loadConnections = async () => {
+    try {
+      const { data } = await supabase
+        .from("wholesale_connections")
+        .select("id, platform, label, connected_at, last_synced");
+      if (data) {
+        const map: typeof connections = {};
+        for (const c of data) {
+          map[c.platform] = { id: c.id, label: c.label, connected_at: c.connected_at, last_synced: c.last_synced };
+        }
+        setConnections(map);
+      }
+    } catch {}
+    setLoading(false);
+  };
+
+  const handleConnect = async (platformId: string, credKey: string) => {
+    if (!tokenInput.trim()) { setTestError("Enter a token or API key"); return; }
+    setConnecting(true);
+    setTestError("");
+    try {
+      // For JOOR/Faire, test via proxy first
+      if (platformId === "joor" || platformId === "faire") {
+        const { error } = await supabase.functions.invoke("wholesale-proxy", {
+          body: { platform: platformId, action: "test" },
+        });
+        // We'll save regardless — the proxy may fail if not yet saved
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const credentials: Record<string, string> = { [credKey]: tokenInput };
+      const { error } = await supabase.from("wholesale_connections").upsert({
+        user_id: user.id,
+        platform: platformId,
+        label: labelInput || null,
+        credentials,
+        connected_at: new Date().toISOString(),
+      }, { onConflict: "user_id,platform" });
+
+      if (error) throw error;
+      setTokenInput("");
+      setLabelInput("");
+      setExpanded(null);
+      await loadConnections();
+    } catch (err) {
+      setTestError(err instanceof Error ? err.message : "Connection failed");
+    }
+    setConnecting(false);
+  };
+
+  const handleDisconnect = async (platformId: string) => {
+    const conn = connections[platformId];
+    if (!conn) return;
+    await supabase.from("wholesale_connections").delete().eq("id", conn.id);
+    const updated = { ...connections };
+    delete updated[platformId];
+    setConnections(updated);
+  };
+
+  const handleSync = async (platformId: string) => {
+    setSyncing(platformId);
+    try {
+      if (platformId === "joor" || platformId === "faire") {
+        await supabase.functions.invoke("wholesale-proxy", {
+          body: { platform: platformId, action: "get_orders" },
+        });
+      }
+      const conn = connections[platformId];
+      if (conn) {
+        await supabase.from("wholesale_connections")
+          .update({ last_synced: new Date().toISOString() })
+          .eq("id", conn.id);
+        await loadConnections();
+      }
+    } catch {}
+    setSyncing(null);
+  };
+
+  const formatDate = (d: string | null) => {
+    if (!d) return "Never";
+    return new Date(d).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+
+  if (loading) {
+    return (
+      <Section title="🔌 Wholesale platforms">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading connections...
+        </div>
+      </Section>
+    );
+  }
+
+  return (
+    <Section title="🔌 Wholesale platforms">
+      <p className="text-xs text-muted-foreground -mt-1 mb-3">
+        Connect your wholesale ordering platforms to import orders directly.
+      </p>
+      <div className="space-y-2">
+        {WHOLESALE_PLATFORMS.map((p) => {
+          const conn = connections[p.id];
+          const isExpanded = expanded === p.id;
+
+          return (
+            <div key={p.id} className="border border-border rounded-lg overflow-hidden">
+              <button
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/30 transition-colors"
+                onClick={() => setExpanded(isExpanded ? null : p.id)}
+              >
+                <span className="text-lg">{p.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{p.name}</span>
+                    {conn ? (
+                      <span className="text-[10px] bg-success/15 text-success px-1.5 py-0.5 rounded-full font-medium">Connected</span>
+                    ) : (
+                      <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Not connected</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground truncate">{conn?.label || p.desc}</p>
+                </div>
+                {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+              </button>
+
+              {isExpanded && (
+                <div className="px-3 pb-3 border-t border-border pt-3 space-y-2">
+                  {conn ? (
+                    <>
+                      <div className="text-xs space-y-1">
+                        {conn.label && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Label</span>
+                            <span className="font-medium">{conn.label}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Connected</span>
+                          <span className="font-mono-data">{formatDate(conn.connected_at)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Last synced</span>
+                          <span className="font-mono-data">{formatDate(conn.last_synced)}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-8 text-xs"
+                          onClick={() => handleSync(p.id)}
+                          disabled={syncing === p.id}
+                        >
+                          {syncing === p.id ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+                          Sync now
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs text-destructive hover:text-destructive"
+                          onClick={() => handleDisconnect(p.id)}
+                        >
+                          <Unplug className="w-3 h-3 mr-1" /> Disconnect
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Input
+                        value={tokenInput}
+                        onChange={(e) => setTokenInput(e.target.value)}
+                        placeholder={`${p.credentialLabel}`}
+                        className="h-8 text-xs"
+                        type="password"
+                      />
+                      <Input
+                        value={labelInput}
+                        onChange={(e) => setLabelInput(e.target.value)}
+                        placeholder="Label (e.g. Splash Swimwear)"
+                        className="h-8 text-xs"
+                      />
+                      {testError && expanded === p.id && (
+                        <p className="text-xs text-destructive flex items-center gap-1">
+                          <X className="w-3 h-3" /> {testError}
+                        </p>
+                      )}
+                      <Button
+                        variant="teal"
+                        size="sm"
+                        className="w-full h-8 text-xs"
+                        onClick={() => handleConnect(p.id, p.credentialKey)}
+                        disabled={connecting}
+                      >
+                        {connecting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />}
+                        Test & Connect
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Section>
   );

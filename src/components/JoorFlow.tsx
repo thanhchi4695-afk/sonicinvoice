@@ -348,6 +348,101 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
     }
   };
 
+  // ── File import handlers ──
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileParsing(true);
+    setStep("file_import");
+    try {
+      const result = await parseJoorFile(file);
+      if (result.format === "unknown" || result.rawProducts.length === 0) {
+        toast.error("Could not parse this file. Please upload a JOOR order XLSX or PDF.");
+        setStep("orders");
+        setFileParsing(false);
+        return;
+      }
+
+      setFileParseResult(result);
+      setFileProducts(result.rawProducts);
+
+      // Convert to grouped products for export
+      if (result.orders.length > 0) {
+        const order = result.orders[0];
+        const grouped = groupJoorItemsIntoProducts(order.lineItems as any, {
+          season_code: order.season,
+          delivery_name: order.collection,
+        });
+        setFileGroupedProducts(grouped);
+      }
+
+      toast.success(`Parsed ${result.rawProducts.length} products from ${result.format.replace("_", " ")} (${result.brand})`);
+      setStep("file_review");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to parse file");
+      setStep("orders");
+    }
+    setFileParsing(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleAIEnrich = async () => {
+    if (fileProducts.length === 0) return;
+    setFileEnriching(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const enriched = await enrichJoorProducts(
+        fileProducts,
+        fileParseResult?.brand || "",
+        session.access_token
+      );
+      setFileProducts(enriched);
+
+      // Rebuild grouped products with enriched data
+      if (fileParseResult?.orders?.[0]) {
+        const order = fileParseResult.orders[0];
+        // Update line items with enriched descriptions
+        const updatedItems = order.lineItems.map(li => {
+          const enrichedProduct = enriched.find(p => p.styleNumber === li.styleNumber && p.colour === li.colour);
+          return enrichedProduct ? { ...li, description: enrichedProduct.description, productType: enrichedProduct.category || li.productType } : li;
+        });
+        const grouped = groupJoorItemsIntoProducts(updatedItems as any, {
+          season_code: order.season,
+          delivery_name: order.collection,
+        });
+        setFileGroupedProducts(grouped);
+      }
+
+      toast.success("AI enrichment complete — descriptions and product types added");
+    } catch (err: any) {
+      toast.error(err.message || "AI enrichment failed");
+    }
+    setFileEnriching(false);
+  };
+
+  const downloadFileCSV = (type: "shopify" | "lightspeed") => {
+    if (fileGroupedProducts.length === 0) return;
+    const csv = type === "shopify"
+      ? buildShopifyCSV(fileGroupedProducts)
+      : buildLightspeedCSV(fileGroupedProducts);
+
+    const brand = fileParseResult?.brand || "JOOR";
+    const date = new Date().toISOString().slice(0, 10);
+    const filename = `${brand}-file-import-${date}-${type}.csv`;
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${type === "shopify" ? "Shopify" : "Lightspeed"} CSV downloaded`);
+  };
+
   // Filtering
   const filteredOrders = orders.filter((o) => {
     if (searchQuery) {

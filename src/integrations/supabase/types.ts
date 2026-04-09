@@ -544,6 +544,63 @@ export type Database = {
           },
         ]
       }
+      sales_data: {
+        Row: {
+          cost_of_goods: number
+          created_at: string
+          id: string
+          order_ref: string | null
+          product_id: string | null
+          quantity_sold: number
+          revenue: number
+          sold_at: string
+          source: string
+          user_id: string
+          variant_id: string | null
+        }
+        Insert: {
+          cost_of_goods?: number
+          created_at?: string
+          id?: string
+          order_ref?: string | null
+          product_id?: string | null
+          quantity_sold?: number
+          revenue?: number
+          sold_at?: string
+          source?: string
+          user_id: string
+          variant_id?: string | null
+        }
+        Update: {
+          cost_of_goods?: number
+          created_at?: string
+          id?: string
+          order_ref?: string | null
+          product_id?: string | null
+          quantity_sold?: number
+          revenue?: number
+          sold_at?: string
+          source?: string
+          user_id?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_data_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_data_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shopify_connections: {
         Row: {
           access_token: string

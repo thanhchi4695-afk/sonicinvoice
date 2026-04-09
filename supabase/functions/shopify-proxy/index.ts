@@ -783,6 +783,56 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "replace_product_image": {
+        if (!body.image_replacements || body.image_replacements.length === 0) {
+          return new Response(JSON.stringify({ error: "Missing image_replacements" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const replaceResults: { shopify_product_id: string; status: string; error?: string }[] = [];
+        for (const rep of body.image_replacements) {
+          try {
+            // Get existing images
+            const imgResp = await shopifyFetch(`/products/${rep.shopify_product_id}/images.json`);
+            const imgData = await imgResp.json();
+
+            // Upload new image with base64 attachment
+            const newImage: Record<string, unknown> = {
+              attachment: rep.image_base64,
+              position: 1,
+            };
+            if (rep.alt_text) newImage.alt = rep.alt_text;
+            if (rep.filename) newImage.filename = rep.filename;
+
+            const postResp = await shopifyFetch(`/products/${rep.shopify_product_id}/images.json`, {
+              method: "POST",
+              body: JSON.stringify({ image: newImage }),
+            });
+
+            if (!postResp.ok) {
+              const errData = await postResp.json();
+              replaceResults.push({ shopify_product_id: rep.shopify_product_id, status: "error", error: JSON.stringify(errData) });
+              await new Promise(r => setTimeout(r, 500));
+              continue;
+            }
+
+            // Delete old primary image if it existed
+            if (imgResp.ok && imgData.images?.length > 0) {
+              const oldImageId = imgData.images[0].id;
+              await shopifyFetch(`/products/${rep.shopify_product_id}/images/${oldImageId}.json`, { method: "DELETE" });
+              await new Promise(r => setTimeout(r, 300));
+            }
+
+            replaceResults.push({ shopify_product_id: rep.shopify_product_id, status: "success" });
+            await new Promise(r => setTimeout(r, 500));
+          } catch (e) {
+            replaceResults.push({ shopify_product_id: rep.shopify_product_id, status: "error", error: e instanceof Error ? e.message : "Unknown" });
+          }
+        }
+        result = { results: replaceResults };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

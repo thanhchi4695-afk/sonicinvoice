@@ -712,3 +712,68 @@ export function validateAndCleanProducts(
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+// ── Product Grouping Utility ────────────────────────────────
+// Groups validated products by style_code + colour into Shopify-ready products
+
+export interface GroupedProductResult {
+  groupKey: string;
+  title: string;
+  sku: string;
+  vendor: string;
+  productType: string;
+  colour: string;
+  cost: number;
+  rrp: number;
+  imageUrl: string;
+  variants: { size: string; qty: number; barcode: string; confidence: number }[];
+  avgConfidence: number;
+  confidenceLevel: "high" | "medium" | "low";
+}
+
+export function groupValidatedProducts(products: ValidatedProduct[]): GroupedProductResult[] {
+  const accepted = products.filter(p => !p._rejected);
+  const groups = new Map<string, ValidatedProduct[]>();
+
+  for (const p of accepted) {
+    const key = p._groupKey || `${p.sku}|${p.colour}`;
+    if (!key || key === "|") {
+      // Ungroupable — treat as standalone
+      const soloKey = `solo_${p._rowIndex}`;
+      groups.set(soloKey, [p]);
+      continue;
+    }
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(p);
+  }
+
+  const results: GroupedProductResult[] = [];
+
+  for (const [key, items] of groups) {
+    const first = items[0];
+    const totalConfidence = items.reduce((sum, p) => sum + p._confidence, 0);
+    const avgConfidence = Math.round(totalConfidence / items.length);
+
+    results.push({
+      groupKey: key,
+      title: first.name,
+      sku: first.sku,
+      vendor: first.brand,
+      productType: first.type,
+      colour: first.colour,
+      cost: first.cost,
+      rrp: first.rrp,
+      imageUrl: "",
+      variants: items.map(p => ({
+        size: p.size,
+        qty: p.qty,
+        barcode: p.barcode,
+        confidence: p._confidence,
+      })),
+      avgConfidence,
+      confidenceLevel: avgConfidence >= 90 ? "high" : avgConfidence >= 70 ? "medium" : "low",
+    });
+  }
+
+  return results.sort((a, b) => b.avgConfidence - a.avgConfidence);
+}

@@ -610,9 +610,6 @@ export function validateAndCleanProducts(
 
     confidence = Math.max(0, Math.min(100, confidence));
 
-    const confidenceLevel: "high" | "medium" | "low" =
-      rejected ? "low" : confidence >= 90 ? "high" : confidence >= 70 ? "medium" : "low";
-
     if (rejected) {
       signals.push({ label: rejectReason || "Invalid row", delta: -100 });
       rejectedRows.push({ row: i, name: rawName || "(empty)", reason: rejectReason || "Invalid" });

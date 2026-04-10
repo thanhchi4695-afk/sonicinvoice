@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugIn
 import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import AccountingBillReview from "@/components/AccountingBillReview";
+import StockCheckFlow from "@/components/StockCheckFlow";
+import type { InvoiceLineItem } from "@/lib/stock-matcher";
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -791,6 +793,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [invoicePageImages, setInvoicePageImages] = useState<string[]>([]);
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
+  const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
 
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {
@@ -1020,6 +1023,43 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const largePriceAlert = costChanges.find(c => c.costChange && c.costChange.changePct > 10);
   const [showCostSummary, setShowCostSummary] = useState(true);
   const [showPriceAlertModal, setShowPriceAlertModal] = useState(!!largePriceAlert);
+
+  // ── Convert product groups to InvoiceLineItems for stock check ──
+  const convertToStockCheckItems = (): InvoiceLineItem[] => {
+    const items: InvoiceLineItem[] = [];
+    for (const g of productGroups) {
+      for (const v of g.variants) {
+        items.push({
+          styleNumber: g.vendorCode || g.styleGroup || "",
+          styleName: g.name,
+          colour: v.option1Value || g.colour || "",
+          colourCode: "",
+          size: v.option2Value || g.size || "",
+          barcode: g.barcode || "",
+          sku: v.sku || "",
+          brand: g.brand,
+          quantityOrdered: v.qty,
+          rrp: v.rrp || g.rrp,
+          wholesale: v.price || g.price,
+          imageUrl: g.imageSrc || undefined,
+          description: g.desc || undefined,
+          productType: g.type || undefined,
+        });
+      }
+    }
+    return items;
+  };
+
+  // ── If stock check is active, render it instead ──
+  if (stockCheckItems) {
+    return (
+      <StockCheckFlow
+        lineItems={stockCheckItems}
+        onBack={() => setStockCheckItems(null)}
+        onComplete={() => { setStockCheckItems(null); }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
@@ -1912,6 +1952,30 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               </span>
             </div>
           )}
+
+          {/* Stock check prompt */}
+          <div className="bg-card border border-primary/20 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                <PackageCheck className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold">Before pushing to Shopify, check stock levels?</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  The stock check compares every item against your live Shopify catalog and classifies each as a refill, new colour, or new product — so you don't accidentally create duplicates.
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <Button size="sm" variant="teal" onClick={() => setStockCheckItems(convertToStockCheckItems())}>
+                    <PackageCheck className="w-3.5 h-3.5 mr-1.5" /> Yes, check Shopify first
+                  </Button>
+                  <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => {}}>
+                    Skip — push as new products
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <ExportReviewScreen
             products={mockProducts.map((p, i) => ({
               ...p,

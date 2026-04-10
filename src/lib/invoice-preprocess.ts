@@ -41,6 +41,7 @@ export interface DetectedRegions {
   totals: { y: number; height: number } | null;
   orientation: "correct" | "rotated_90_cw" | "rotated_90_ccw" | "upside_down";
   confidence: number;
+  isLandscape?: boolean;
 }
 
 // ── Main preprocessing pipeline ──
@@ -58,6 +59,9 @@ export async function preprocessInvoiceImage(
 
   // Step 2: Apply EXIF orientation correction
   const { canvas: orientedCanvas, rotation: exifDeg } = applyExifOrientation(img, exifRotation);
+
+  // Step 2.5: Detect landscape orientation (wider than tall after EXIF correction)
+  const isLandscapeRatio = orientedCanvas.width > orientedCanvas.height * 1.2;
   const orientedBase64 = canvasToBase64(orientedCanvas);
 
   // Step 3: AI-assisted region + orientation detection (if available)
@@ -68,6 +72,10 @@ export async function preprocessInvoiceImage(
       regions = await aiRegionDetect(orientedBase64);
       if (regions) {
         aiRotation = orientationToDegrees(regions.orientation);
+        // Tag landscape detection for downstream consumers
+        if (isLandscapeRatio && !regions.isLandscape) {
+          regions.isLandscape = true;
+        }
       }
     } catch (e) {
       console.warn("[Preprocess] AI region detection failed, using heuristics:", e);

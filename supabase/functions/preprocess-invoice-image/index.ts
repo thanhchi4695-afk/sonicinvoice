@@ -18,8 +18,9 @@ const ANALYSIS_PROMPT = `You are an expert document image analyser. Examine this
 
 TASKS:
 1. **Orientation**: Is the document correctly oriented for reading? If rotated, specify how.
-2. **Regions**: Identify the vertical zones of the document (normalised 0-1 where 0=top, 1=bottom).
-3. **Quality issues**: Note any problems that could affect OCR.
+2. **Landscape Detection**: Is this a landscape-format document photographed sideways? Fashion wholesale invoices are often landscape with size columns running horizontally.
+3. **Regions**: Identify the vertical zones of the document (normalised 0-1 where 0=top, 1=bottom).
+4. **Quality issues**: Note any problems that could affect OCR.
 
 ORIENTATION DETECTION:
 - Look at text direction, header position, and visual flow
@@ -27,6 +28,12 @@ ORIENTATION DETECTION:
 - "rotated_90_cw" = document is rotated 90° clockwise (text runs top-to-bottom)
 - "rotated_90_ccw" = document is rotated 90° counter-clockwise
 - "upside_down" = document is flipped 180°
+
+LANDSCAPE DETECTION:
+- If the document appears wider than tall in its natural reading orientation, it's landscape
+- Fashion wholesale invoices with size grids (XS, S, M, L, XL or 6, 8, 10, 12, 14) running horizontally are typically landscape
+- If style codes are in a vertical left column and sizes span horizontally, it's landscape
+- Set is_landscape to true if the document's natural orientation is landscape format
 
 REGION DETECTION:
 - header: company logo, supplier name, invoice title area
@@ -41,11 +48,14 @@ QUALITY ISSUES:
 - shadows: are there shadows affecting readability?
 - skew: is the document at an angle (perspective distortion)?
 - blur: is any area blurry?
+- handwritten_prices: are prices written by hand next to descriptions?
+- handwritten_ticks: are quantity ticks/marks written by hand in size grid cells?
 
 Return ONLY valid JSON:
 {
   "orientation": "correct" | "rotated_90_cw" | "rotated_90_ccw" | "upside_down",
   "orientation_confidence": 0-100,
+  "is_landscape": boolean,
   "regions": {
     "header": { "y": 0.0, "height": 0.1 },
     "address_info": { "y": 0.1, "height": 0.1 } | null,
@@ -57,6 +67,8 @@ Return ONLY valid JSON:
     "highlight_locations": "description of where highlights are",
     "handwriting": boolean,
     "handwriting_description": "what is handwritten",
+    "handwritten_prices": boolean,
+    "handwritten_ticks": boolean,
     "shadows": boolean,
     "skew_degrees": number,
     "blur_areas": "description or null",
@@ -67,7 +79,8 @@ Return ONLY valid JSON:
     "needs_perspective_correction": boolean,
     "needs_contrast_enhancement": boolean,
     "needs_highlight_removal": boolean,
-    "crop_to_line_items": boolean
+    "crop_to_line_items": boolean,
+    "is_landscape_sideways": boolean
   }
 }`;
 
@@ -121,6 +134,7 @@ Deno.serve(async (req) => {
       totals: analysis.regions?.totals || null,
       orientation: analysis.orientation || "correct",
       confidence: analysis.orientation_confidence || 80,
+      isLandscape: analysis.is_landscape || false,
     };
 
     return new Response(

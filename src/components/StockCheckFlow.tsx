@@ -714,6 +714,21 @@ function OutcomeBadge({ outcome }: { outcome: MatchOutcome }) {
   }
 }
 
+function PlatformBadge({ platform }: { platform?: "shopify" | "lightspeed_x" | "lightspeed_r" }) {
+  if (!platform) return null;
+  const labels: Record<string, { label: string; icon: string }> = {
+    shopify: { label: "Shopify", icon: "🛍" },
+    lightspeed_x: { label: "LS X-Series", icon: "⚡" },
+    lightspeed_r: { label: "LS R-Series", icon: "💡" },
+  };
+  const info = labels[platform] || { label: platform, icon: "📦" };
+  return (
+    <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-normal gap-0.5">
+      <span>{info.icon}</span> {info.label}
+    </Badge>
+  );
+}
+
 // ── Helpers ──
 
 function extractStylePrefix(sku: string): string {

@@ -58,7 +58,10 @@ export async function preprocessInvoiceImage(
   const exifRotation = await getExifRotation(file);
 
   // Step 2: Apply EXIF orientation correction
-  const { canvas: orientedCanvas, rotation: exifDeg } = applyExifOrientation(img, exifRotation);
+  const { canvas: rawOrientedCanvas, rotation: exifDeg } = applyExifOrientation(img, exifRotation);
+
+  // Step 2.1: Resize large phone photos to save bandwidth & AI context
+  const orientedCanvas = resizeIfNeeded(rawOrientedCanvas);
 
   // Step 2.5: Detect landscape orientation (wider than tall after EXIF correction)
   const isLandscapeRatio = orientedCanvas.width > orientedCanvas.height * 1.2;

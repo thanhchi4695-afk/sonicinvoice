@@ -20,9 +20,30 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
   const [shopifyLoading, setShopifyLoading] = useState(false);
   const [shopifyError, setShopifyError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    try {
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        toast.error(result.error instanceof Error ? result.error.message : "Google sign-in failed");
+        setGoogleLoading(false);
+        return;
+      }
+      if (result.redirected) return;
+      // Session set by lovable auth
+      onAuth();
+    } catch (err) {
+      toast.error("Google sign-in failed");
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

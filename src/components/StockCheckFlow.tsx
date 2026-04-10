@@ -469,15 +469,27 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
                       </div>
                     </TableCell>
                     <TableCell>
-                      <select
-                        value={outcome}
-                        onChange={e => setOutcome(g, e.target.value as MatchOutcome)}
-                        className="text-xs bg-muted rounded px-1.5 py-1 border w-full"
-                      >
-                        <option value="refill">Refill</option>
-                        <option value="new_colour">New colour</option>
-                        <option value="new_product">New product</option>
-                      </select>
+                      <div className="space-y-1.5">
+                        <select
+                          value={outcome}
+                          onChange={e => setOutcome(g, e.target.value as MatchOutcome)}
+                          className="text-xs bg-muted rounded px-1.5 py-1 border w-full"
+                        >
+                          <option value="refill">Refill</option>
+                          <option value="new_colour">New colour</option>
+                          <option value="new_product">New product</option>
+                        </select>
+                        {(outcome === "refill" || outcome === "new_colour") && !g.matchedProduct && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-[10px] h-6 w-full"
+                            onClick={() => setSearchProduct({ groupKey: `${g.styleNumber}::${g.colour}`, query: "", results: [], loading: false })}
+                          >
+                            <Search className="w-3 h-3 mr-1" /> Find product
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -485,6 +497,73 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
             </TableBody>
           </Table>
         </div>
+
+        {/* Product search overlay */}
+        {searchProduct && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-start justify-center pt-[10vh]">
+            <div className="bg-card border rounded-xl shadow-lg w-full max-w-lg mx-4 max-h-[70vh] flex flex-col">
+              <div className="flex items-center gap-2 p-4 border-b">
+                <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                <Input
+                  autoFocus
+                  placeholder="Search Shopify products by name…"
+                  value={searchProduct.query}
+                  onChange={e => {
+                    const q = e.target.value;
+                    setSearchProduct(prev => prev ? { ...prev, query: q } : null);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") searchShopifyProducts(searchProduct.query);
+                  }}
+                  className="border-0 shadow-none focus-visible:ring-0 h-8"
+                />
+                <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => setSearchProduct(null)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="px-4 pt-2 pb-1">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="text-xs"
+                  disabled={searchProduct.query.length < 2 || searchProduct.loading}
+                  onClick={() => searchShopifyProducts(searchProduct.query)}
+                >
+                  {searchProduct.loading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Search className="w-3 h-3 mr-1" />}
+                  Search
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {searchProduct.loading && (
+                  <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> Searching…
+                  </div>
+                )}
+                {!searchProduct.loading && searchProduct.results.length === 0 && searchProduct.query.length >= 2 && (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    No products found. Try different search terms.
+                  </div>
+                )}
+                {searchProduct.results.map(v => (
+                  <button
+                    key={v.product.id}
+                    onClick={() => selectSearchedProduct(v)}
+                    className="w-full text-left rounded-lg border p-3 hover:bg-accent transition-colors"
+                  >
+                    <div className="font-medium text-sm">{v.product.title}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{v.product.vendor}{v.product.productType ? ` — ${v.product.productType}` : ""}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {v.product.variants.length} variant{v.product.variants.length !== 1 ? "s" : ""}
+                      {v.product.variants.slice(0, 3).map(pv => pv.sku).filter(Boolean).length > 0 && (
+                        <> · SKUs: {v.product.variants.slice(0, 3).map(pv => pv.sku).filter(Boolean).join(", ")}</>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

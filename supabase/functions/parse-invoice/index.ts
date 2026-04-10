@@ -569,7 +569,7 @@ serve(async (req) => {
   }
 
   try {
-    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint } = await req.json();
+    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode } = await req.json();
 
     if (!fileContent) {
       return new Response(JSON.stringify({ error: "No file content provided" }), {
@@ -582,6 +582,26 @@ serve(async (req) => {
     const isPdf = fileType === "pdf";
 
     let systemPrompt = SYSTEM_PROMPT;
+
+    // Detailed mode: stronger extraction for under-extracted invoices
+    if (detailedMode) {
+      systemPrompt += `\n\n## DETAILED MODE (REPROCESSING — MAXIMUM ACCURACY)
+
+This invoice was previously under-extracted. The merchant believes there are MORE product rows than were found.
+
+CRITICAL INSTRUCTIONS FOR DETAILED MODE:
+1. SLOW DOWN. Examine EVERY line of the document carefully. Do not skip any potential product row.
+2. Scan the ENTIRE line-item zone from top to bottom, row by row. Count every row that could be a product.
+3. For EACH row, check: does it have a style code, SKU, product description, or any product-like content? If yes, extract it.
+4. Use AGGRESSIVE style code anchoring — even partial or unclear codes should be treated as product anchors.
+5. For size grids: expand EVERY size with quantity > 0 into a separate variant row.
+6. If a row is borderline (could be product or noise), INCLUDE it with lower confidence rather than rejecting it.
+7. Check for multi-line products: if description wraps to next line, group with the style code row above.
+8. Look for products that may be hidden in: highlighted regions, handwritten annotations, stamped text, or faded print.
+9. Report total_visible_rows (your count of all potential product rows in the document) in parsing_plan.
+
+The goal is MAXIMUM RECALL — extract everything that could possibly be a product. The merchant will review and reject false positives.`;
+    }
 
     // Force mode overrides
     if (forceMode === "packing_slip") {

@@ -26,6 +26,9 @@ interface PostParseReviewScreenProps {
   onExportAccepted: () => void;
   onPushToShopify: () => void;
   onBack: () => void;
+  onReprocessDetailed?: () => void;
+  isReprocessing?: boolean;
+  underExtractionWarning?: { extractedCount: number; estimatedRows: number } | null;
 }
 
 type ReviewTab = "accepted" | "review" | "rejected";
@@ -63,6 +66,9 @@ export default function PostParseReviewScreen({
   onExportAccepted,
   onPushToShopify,
   onBack,
+  onReprocessDetailed,
+  isReprocessing = false,
+  underExtractionWarning = null,
 }: PostParseReviewScreenProps) {
   const [activeTab, setActiveTab] = useState<ReviewTab>("accepted");
   const [searchQuery, setSearchQuery] = useState("");
@@ -394,7 +400,44 @@ export default function PostParseReviewScreen({
         <StatCard label="Missing Cost" value={missingCostCount} icon={<AlertTriangle className="w-3.5 h-3.5" />} colorClass={missingCostCount > 0 ? "text-secondary bg-secondary/10 border-secondary/20" : "text-success bg-success/10 border-success/20"} />
       </div>
 
-      {/* Groups count + avg confidence */}
+      {/* Under-extraction warning */}
+      {underExtractionWarning && (
+        <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-3 mb-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-secondary mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-secondary">
+                Possible under-extraction detected
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                We found only {underExtractionWarning.extractedCount} product{underExtractionWarning.extractedCount !== 1 ? 's' : ''}, but this invoice appears to contain ~{underExtractionWarning.estimatedRows} rows. Some products may have been missed.
+              </p>
+              {onReprocessDetailed && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-2"
+                  onClick={onReprocessDetailed}
+                  disabled={isReprocessing}
+                >
+                  {isReprocessing ? (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                      Reprocessing…
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3.5 h-3.5" />
+                      Reprocess in detailed mode
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 mb-3 text-xs text-muted-foreground">
         <span><Layers className="w-3 h-3 inline mr-1" />{groupedProducts.length} grouped products</span>
         <span>·</span>

@@ -720,6 +720,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     });
     setValidatedProducts(validated);
 
+    // ── Under-extraction detection ──
+    const nonRejectedCount = validated.filter(p => !p._rejected).length;
+    const planAnchors = (aiParsingPlan as any)?.row_anchors_detected;
+    const totalVisibleRows = (aiParsingPlan as any)?.total_visible_rows;
+    const estimatedRows = totalVisibleRows || (planAnchors?.length ? planAnchors.length : 0);
+    // Flag if extracted count is less than 50% of estimated, or if only 1 product from multi-row invoice
+    if (estimatedRows > 0 && nonRejectedCount < estimatedRows * 0.5) {
+      setUnderExtractionWarning({ extractedCount: nonRejectedCount, estimatedRows });
+    } else if (nonRejectedCount <= 1 && (debug.totalRaw + debug.rejected) > 3) {
+      setUnderExtractionWarning({ extractedCount: nonRejectedCount, estimatedRows: debug.totalRaw + debug.rejected });
+    } else {
+      setUnderExtractionWarning(null);
+    }
+
     // Filter to accepted products only
     const cleanProducts = validated
       .filter(p => !p._rejected)
@@ -743,6 +757,91 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     const names = groups.map(g => g.name);
     setParsedNames(names);
     runEnrichmentSim(cancelledRef, names);
+  };
+
+  // ── Reprocess in detailed mode ──
+  const handleReprocessDetailed = async () => {
+    if (!uploadedFile || isReprocessing) return;
+    setIsReprocessing(true);
+    toast("Reprocessing in detailed mode…", { description: "Using stronger row segmentation and style code anchoring" });
+
+    try {
+      const file = uploadedFile;
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+
+      const memoryHint = buildMemoryHint(supplierName || undefined);
+      const templateHintData = !memoryHint && supplierName ? buildTemplateHint(supplierName) : null;
+      const combinedHint = memoryHint || templateHintData;
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({
+          fileContent: base64,
+          fileName: file.name,
+          fileType: ext,
+          customInstructions,
+          supplierName,
+          forceMode: processAs === "invoice" ? "invoice"
+            : processAs === "packing_slip" ? "packing_slip"
+            : processAs === "handwritten" ? "handwritten"
+            : undefined,
+          templateHint: combinedHint || undefined,
+          detailedMode: true,
+        }),
+      });
+
+      if (!response.ok) {
+        toast.error("Reprocessing failed", { description: "Could not re-extract products" });
+        setIsReprocessing(false);
+        return;
+      }
+
+      const data = await response.json();
+      const products = data.products || [];
+
+      if (data.parsing_plan) setAiParsingPlan(data.parsing_plan);
+      if (data.rejected_rows) setAiRejectedRows(data.rejected_rows);
+
+      if (products.length === 0) {
+        toast.error("No products found in detailed mode");
+        setIsReprocessing(false);
+        return;
+      }
+
+      const { products: validated, debug } = validateAndCleanProducts(products, supplierName);
+      setValidationDebug({ ...debug, parsingPlan: data.parsing_plan as any, rejectedByAI: data.rejected_rows });
+      setValidatedProducts(validated);
+
+      const nonRejectedCount = validated.filter(p => !p._rejected).length;
+      const prevCount = underExtractionWarning?.extractedCount || 0;
+      if (nonRejectedCount > prevCount) {
+        toast.success(`Found ${nonRejectedCount} products (was ${prevCount})`, { description: "Detailed mode recovered more rows" });
+        setUnderExtractionWarning(null);
+      } else {
+        toast("Same result — try manual review", { description: `${nonRejectedCount} products extracted` });
+      }
+
+      // Rebuild product groups
+      const cleanProducts = validated
+        .filter(p => !p._rejected)
+        .map(({ _confidence, _confidenceLevel, _issues, _rejected, _rejectReason, ...rest }) => rest);
+      if (cleanProducts.length > 0) {
+        const groups = convertToProductGroups(cleanProducts);
+        setProductGroups(groups);
+        setParsedNames(groups.map(g => g.name));
+      }
+    } catch (err) {
+      console.error("Detailed reprocess error:", err);
+      toast.error("Reprocessing failed");
+    } finally {
+      setIsReprocessing(false);
+    }
   };
 
   const handleCancelProcessing = () => {
@@ -825,6 +924,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
+  const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
+  const [isReprocessing, setIsReprocessing] = useState(false);
 
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {
@@ -1559,6 +1660,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 onExportAccepted={() => setStep(4)}
                 onPushToShopify={() => setStep(4)}
                 onBack={() => setStep(2)}
+                onReprocessDetailed={handleReprocessDetailed}
+                isReprocessing={isReprocessing}
+                underExtractionWarning={underExtractionWarning}
               />
             </div>
           )}

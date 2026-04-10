@@ -327,8 +327,11 @@ Return ONLY valid JSON (no markdown, no explanation):
 For source_regions: y_position is a normalized 0-1 value indicating the vertical position on the page where this field's data was found (0 = top, 1 = bottom). page is 1-indexed. Only include fields that were actually detected.
 
 CRITICAL RULES:
+- STYLE CODE FIRST: Always scan for style codes BEFORE reading descriptions. Style code is the primary product anchor.
 - SCAN THE ENTIRE LINE-ITEM TABLE. If you see 10 style codes, you MUST return products from ALL 10 rows.
 - Do NOT stop after the first product row. Do NOT return only one item when the table has many.
+- Highlighted or pen-marked style codes are STILL valid — do not skip them.
+- If consecutive rows each have a unique style code, they are SEPARATE products — never merge them.
 - Create ONE output row per size+colour variant where quantity > 0
 - product_title must be the CLEAN base name without colour or size appended
 - Do NOT hallucinate data that is not visible in the document
@@ -337,7 +340,8 @@ CRITICAL RULES:
 - If line_total and quantity exist but unit_cost is missing, DERIVE unit_cost = line_total / quantity and set cost_source to "derived_from_line_total"
 - For packing slips: set unit_cost and rrp to null, focus on qty extraction
 - For handwritten documents: lower confidence, flag uncertain readings
-- Always set group_key so the client can group variants correctly`;
+- Always set group_key so the client can group variants correctly
+- When no style codes exist, fall back to description-based grouping but flag it`;
 
 // ── Server-side post-AI validation ──────────────────────────
 function crossValidateProducts(products: Record<string, unknown>[]): Record<string, unknown>[] {

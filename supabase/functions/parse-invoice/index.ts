@@ -551,7 +551,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
     }
 
     // Invoice response
-    const normalizedProducts = validated.map((p: Record<string, unknown>) => ({
+    const normalizedProducts = validated.map((p: Record<string, unknown>, idx: number) => ({
       name: p.product_title || p.name || "",
       brand: parsed.supplier || supplierName || String(p.brand || ""),
       sku: p.style_code || p.sku || "",
@@ -569,6 +569,11 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
       _lineTotal: Number(p.line_total) || 0,
       _extractionReason: p.extraction_reason || "",
       _sourceRegions: p.source_regions || null,
+      _rowIndex: Number(p.row_index ?? idx),
+      _anchorCode: p.anchor_code || p.style_code || "",
+      _rowYStart: Number(p.row_y_start) || 0,
+      _rowYEnd: Number(p.row_y_end) || 0,
+      _rowConfidence: Number(p.row_confidence || p.confidence) || 70,
     }));
 
     return new Response(JSON.stringify({

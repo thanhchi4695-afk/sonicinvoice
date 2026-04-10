@@ -269,14 +269,22 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
   const selectSearchedProduct = (variant: ShopifyVariant) => {
     if (!searchProduct) return;
     const key = searchProduct.groupKey;
-    // Update the group's matched product so apply logic can use it
+    // Determine current override for this group
+    const currentOverride = overrides.get(key);
+    // Find the group to check if colour exists in selected product
+    const targetGroup = groups.find(g => `${g.styleNumber}::${g.colour}` === key);
+    const colourExistsInProduct = targetGroup && variant.product.variants.some(pv =>
+      (pv.option1 || "").toLowerCase().includes(targetGroup.colour.toLowerCase())
+    );
+    // If colour exists → refill; otherwise preserve current override or default to new_colour
+    const resolvedOutcome: MatchOutcome = colourExistsInProduct ? "refill" : (currentOverride === "refill" ? "new_colour" : (currentOverride || "new_colour"));
+
     setGroups(prev => prev.map(g => {
       const gKey = `${g.styleNumber}::${g.colour}`;
       if (gKey === key) {
         return {
           ...g,
           matchedProduct: variant.product,
-          // Try to match sizes to existing variants
           sizes: g.sizes.map(s => {
             const matched = variant.product.variants.find(pv =>
               (pv.option1 || "").toLowerCase().includes(g.colour.toLowerCase()) &&
@@ -284,16 +292,18 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
             );
             return matched ? { ...s, matchedVariant: matched } : s;
           }),
-          outcome: "refill" as MatchOutcome,
+          outcome: resolvedOutcome,
           reasons: [`Manually matched to "${variant.product.title}"`],
-          suggestedAction: `Add ${g.totalQty} units to "${variant.product.title}"`,
+          suggestedAction: resolvedOutcome === "refill"
+            ? `Add ${g.totalQty} units to "${variant.product.title}"`
+            : `Add "${g.colour}" as new variant to "${variant.product.title}"`,
         };
       }
       return g;
     }));
-    setOverrides(new Map(overrides).set(key, "refill"));
+    setOverrides(new Map(overrides).set(key, resolvedOutcome));
     setSearchProduct(null);
-    toast.success(`Matched to "${variant.product.title}"`);
+    toast.success(`Matched to "${variant.product.title}"${resolvedOutcome === "new_colour" ? " (new colour)" : ""}`);
   };
 
   const outcomeCounts = groups.reduce(

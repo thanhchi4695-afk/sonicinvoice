@@ -570,7 +570,21 @@ export default function PostParseReviewScreen({
       </div>
 
       {/* Debug panel */}
-      <div className="mt-3 border border-border rounded-lg bg-card overflow-hidden">
+      {invoicePages.length > 0 && (
+        <div className="mt-3 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-[10px] h-8"
+            onClick={() => setShowDebugOverlay(true)}
+          >
+            <ScanLine className="w-3.5 h-3.5" />
+            Extraction Debug View
+            <Badge variant="outline" className="text-[8px] h-4 px-1 ml-1">{products.filter(p => !p._rejected).length} rows</Badge>
+          </Button>
+        </div>
+      )}
+      <div className={`${invoicePages.length > 0 ? "mt-2" : "mt-3"} border border-border rounded-lg bg-card overflow-hidden`}>
         <button onClick={() => setShowDebug(!showDebug)} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors">
           <Bug className="w-3.5 h-3.5" />
           <span className="font-medium">AI Parsing Details</span>

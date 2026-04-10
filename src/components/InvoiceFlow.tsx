@@ -20,6 +20,8 @@ import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugIn
 import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import AccountingBillReview from "@/components/AccountingBillReview";
+import StockCheckFlow from "@/components/StockCheckFlow";
+import type { InvoiceLineItem } from "@/lib/stock-matcher";
 
 interface InvoiceFlowProps {
   onBack: () => void;

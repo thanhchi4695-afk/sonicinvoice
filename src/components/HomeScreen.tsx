@@ -188,7 +188,23 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </Button>
       </div>
 
-      {/* Scan Mode AI Card */}
+      {/* Stock Check Card */}
+      <div className="bg-card rounded-lg border border-border p-5 mb-3">
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+            <PackageCheck className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold font-display">Stock check</h2>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              Received a new invoice? Check what's already in Shopify before adding products — auto-detects refills, new colours, and new products.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2 font-mono-data">refill · new colour · new product</p>
+          </div>
+        </div>
+        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartStockCheck}>
+          Check invoice <ChevronRight className="w-4 h-4 ml-1" />
+        </Button>
       <div className="bg-card rounded-lg border border-border p-5 mb-3">
         <div className="flex items-start gap-4">
           <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">

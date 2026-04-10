@@ -18,6 +18,10 @@ import {
   type GroupedMatch, type MatchOutcome,
 } from "@/lib/stock-matcher";
 import { getLocations } from "@/lib/shopify-api";
+import { getEnabledPOSPlatforms } from "@/components/POSConnectionPanel";
+import {
+  normaliseXProduct, normaliseRItem, toShopifyVariantFormat,
+} from "@/lib/pos-normaliser";
 import Papa from "papaparse";
 
 interface StockCheckFlowProps {

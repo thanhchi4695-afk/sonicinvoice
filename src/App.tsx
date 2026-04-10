@@ -23,6 +23,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/auth/xero/callback" element={<AuthCallbackPage />} />
             <Route path="/auth/myob/callback" element={<AuthCallbackPage />} />
+            <Route path="/auth/lightspeed-x/callback" element={<AuthCallbackPage />} />
+            <Route path="/auth/lightspeed-r/callback" element={<AuthCallbackPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

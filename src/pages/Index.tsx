@@ -10,6 +10,7 @@ import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
+const InvoicesTab = lazy(() => import("@/components/InvoicesTab"));
 const AuthScreen = lazy(() => import("@/components/AuthScreen"));
 const OnboardingFlow = lazy(() => import("@/components/OnboardingFlow"));
 const HistoryScreen = lazy(() => import("@/components/HistoryScreen"));

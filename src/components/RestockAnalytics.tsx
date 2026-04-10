@@ -520,6 +520,14 @@ const RestockAnalytics = ({ onBack, onStartFlow }: Props) => {
           </section>
         )}
       </div>
+
+      {onStartFlow && analytics && (
+        <WhatsNextSuggestions
+          completedFlow="restock"
+          onStartFlow={onStartFlow}
+          onGoHome={onBack}
+        />
+      )}
     </div>
   );
 };

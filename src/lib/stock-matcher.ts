@@ -255,7 +255,7 @@ export function groupMatchResults(results: MatchResult[]): GroupedMatch[] {
         existing.reasons = r.reasons;
       }
     } else {
-      const variantPlatform = (r.matchedVariant as Record<string, unknown> | null)?._platform as GroupedMatch["platform"] | undefined;
+      const variantPlatform = (r.matchedVariant as unknown as Record<string, unknown> | null)?._platform as GroupedMatch["platform"] | undefined;
       groups.set(key, {
         styleNumber: r.lineItem.styleNumber,
         styleName: r.lineItem.styleName,

@@ -841,6 +841,289 @@ Deno.serve(async (req) => {
         break;
       }
 
+      // ═══ Stock Check: batch_lookup ═══
+      case "batch_lookup": {
+        if (!body.lookup_items || body.lookup_items.length === 0) {
+          return new Response(JSON.stringify({ error: "Missing lookup_items" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const graphqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+        const gqlHeaders = { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token };
+
+        const VARIANT_FIELDS = `
+          id sku barcode title price
+          inventoryQuantity
+          selectedOptions { name value }
+          image { url }
+          inventoryItem { id }
+          product {
+            id title vendor productType tags
+            options { name values }
+            variants(first: 100) {
+              nodes {
+                id sku barcode title
+                inventoryQuantity
+                selectedOptions { name value }
+                image { url }
+                inventoryItem { id }
+              }
+            }
+          }
+        `;
+
+        const allVariants: Record<string, unknown> = {};
+        const BATCH_SIZE = 5;
+
+        for (let i = 0; i < body.lookup_items.length; i += BATCH_SIZE) {
+          const batch = body.lookup_items.slice(i, i + BATCH_SIZE);
+          const promises = batch.flatMap((item: { sku?: string; barcode?: string; stylePrefix?: string; titleQuery?: string }) => {
+            const queries: Promise<unknown>[] = [];
+            if (item.barcode) {
+              queries.push(
+                fetch(graphqlUrl, {
+                  method: "POST", headers: gqlHeaders,
+                  body: JSON.stringify({
+                    query: `{ productVariants(first: 10, query: "barcode:${item.barcode}") { nodes { ${VARIANT_FIELDS} } } }`,
+                  }),
+                }).then(r => r.json()).catch(() => null)
+              );
+            }
+            if (item.sku) {
+              queries.push(
+                fetch(graphqlUrl, {
+                  method: "POST", headers: gqlHeaders,
+                  body: JSON.stringify({
+                    query: `{ productVariants(first: 10, query: "sku:${item.sku}") { nodes { ${VARIANT_FIELDS} } } }`,
+                  }),
+                }).then(r => r.json()).catch(() => null)
+              );
+            }
+            if (item.stylePrefix) {
+              queries.push(
+                fetch(graphqlUrl, {
+                  method: "POST", headers: gqlHeaders,
+                  body: JSON.stringify({
+                    query: `{ productVariants(first: 20, query: "sku:${item.stylePrefix}*") { nodes { ${VARIANT_FIELDS} } } }`,
+                  }),
+                }).then(r => r.json()).catch(() => null)
+              );
+            }
+            if (item.titleQuery) {
+              queries.push(
+                fetch(graphqlUrl, {
+                  method: "POST", headers: gqlHeaders,
+                  body: JSON.stringify({
+                    query: `{ products(first: 10, query: "${item.titleQuery}") { nodes { id title vendor productType tags options { name values } variants(first: 100) { nodes { id sku barcode title inventoryQuantity selectedOptions { name value } image { url } inventoryItem { id } } } } } }`,
+                  }),
+                }).then(r => r.json()).catch(() => null)
+              );
+            }
+            return queries;
+          });
+
+          const results = await Promise.all(promises);
+          for (const r of results) {
+            if (!r || typeof r !== "object") continue;
+            const data = (r as Record<string, unknown>).data as Record<string, unknown> | undefined;
+            if (!data) continue;
+            // Extract variants from productVariants query
+            const pvNodes = (data.productVariants as Record<string, unknown>)?.nodes as unknown[];
+            if (pvNodes) {
+              for (const v of pvNodes) {
+                const vObj = v as Record<string, unknown>;
+                allVariants[vObj.id as string] = vObj;
+              }
+            }
+            // Extract variants from products query
+            const pNodes = (data.products as Record<string, unknown>)?.nodes as unknown[];
+            if (pNodes) {
+              for (const p of pNodes) {
+                const pObj = p as Record<string, unknown>;
+                const vNodes = ((pObj.variants as Record<string, unknown>)?.nodes || []) as Record<string, unknown>[];
+                for (const v of vNodes) {
+                  // Attach product info to variant
+                  allVariants[v.id as string] = { ...v, product: { ...pObj, variants: { nodes: vNodes } } };
+                }
+              }
+            }
+          }
+
+          // Rate limit between batches
+          if (i + BATCH_SIZE < body.lookup_items.length) {
+            await new Promise(r => setTimeout(r, 500));
+          }
+        }
+
+        // Normalise variants for client consumption
+        const normalised = Object.values(allVariants).map((v: unknown) => {
+          const vObj = v as Record<string, unknown>;
+          const opts = (vObj.selectedOptions || []) as { name: string; value: string }[];
+          const prodRaw = vObj.product as Record<string, unknown> | undefined;
+          const prodVariantsRaw = prodRaw?.variants as Record<string, unknown> | undefined;
+          const prodVNodes = (prodVariantsRaw?.nodes || []) as Record<string, unknown>[];
+
+          const mapVariant = (vv: Record<string, unknown>) => {
+            const vOpts = (vv.selectedOptions || []) as { name: string; value: string }[];
+            return {
+              id: vv.id, sku: vv.sku || "", barcode: vv.barcode || "",
+              title: vv.title || "", inventoryQty: vv.inventoryQuantity || 0,
+              price: vv.price || "0", option1: vOpts[0]?.value || "", option2: vOpts[1]?.value || "",
+              image: (vv.image as Record<string, unknown>)?.url || undefined,
+              inventoryItemId: (vv.inventoryItem as Record<string, unknown>)?.id || "",
+            };
+          };
+
+          return {
+            ...mapVariant(vObj),
+            product: prodRaw ? {
+              id: prodRaw.id, title: prodRaw.title, vendor: prodRaw.vendor || "",
+              productType: prodRaw.productType || "", tags: prodRaw.tags || [],
+              options: prodRaw.options || [],
+              variants: prodVNodes.map(pv => ({
+                ...mapVariant(pv),
+                product: undefined as unknown,
+              })),
+            } : null,
+          };
+        });
+
+        result = { variants: normalised };
+        break;
+      }
+
+      // ═══ Stock Check: graphql_adjust_inventory ═══
+      case "graphql_adjust_inventory": {
+        if (!body.inventory_changes || body.inventory_changes.length === 0) {
+          return new Response(JSON.stringify({ error: "Missing inventory_changes" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const adjGqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+        const adjMutation = `
+          mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!) {
+            inventoryAdjustQuantities(input: $input) {
+              userErrors { field message }
+              inventoryAdjustmentGroup {
+                createdAt reason
+                changes { name delta }
+              }
+            }
+          }
+        `;
+        const changes = body.inventory_changes.map((c: { inventoryItemId: string; locationId: string; delta: number }) => ({
+          delta: c.delta,
+          inventoryItemId: c.inventoryItemId,
+          locationId: c.locationId,
+        }));
+        const adjResp = await fetch(adjGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({
+            query: adjMutation,
+            variables: {
+              input: {
+                reason: "received",
+                name: "available",
+                referenceDocumentUri: body.reference_document_uri || "sonic-invoices://stock-check",
+                changes,
+              },
+            },
+          }),
+        });
+        const adjData = await adjResp.json();
+        const adjErrors = adjData.data?.inventoryAdjustQuantities?.userErrors || [];
+        if (adjErrors.length > 0) {
+          return new Response(JSON.stringify({ error: adjErrors.map((e: { message: string }) => e.message).join(", ") }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { adjustment: adjData.data?.inventoryAdjustQuantities?.inventoryAdjustmentGroup, success: true };
+        break;
+      }
+
+      // ═══ Stock Check: graphql_create_variant ═══
+      case "graphql_create_variant": {
+        if (!body.product_id_gid || !body.new_variants || body.new_variants.length === 0) {
+          return new Response(JSON.stringify({ error: "Missing product_id_gid or new_variants" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const cvGqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+        const createVarMutation = `
+          mutation CreateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+            productVariantsBulkCreate(productId: $productId, variants: $variants) {
+              userErrors { field message }
+              productVariants {
+                id sku title
+                selectedOptions { name value }
+                inventoryItem { id }
+              }
+            }
+          }
+        `;
+        const variantInputs = body.new_variants.map((v: { price: string; sku?: string; barcode?: string; options: string[]; qty?: number; locationId?: string; cost?: string }) => {
+          const vi: Record<string, unknown> = {
+            price: v.price,
+            optionValues: v.options.map((val: string, idx: number) => ({
+              name: val,
+              optionName: idx === 0 ? "Colour" : "Size",
+            })),
+          };
+          if (v.sku) vi.sku = v.sku;
+          if (v.barcode) vi.barcode = v.barcode;
+          if (v.qty !== undefined && v.locationId) {
+            vi.inventoryQuantities = [{ availableQuantity: v.qty, locationId: v.locationId }];
+          }
+          return vi;
+        });
+
+        const cvResp = await fetch(cvGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({
+            query: createVarMutation,
+            variables: { productId: body.product_id_gid, variants: variantInputs },
+          }),
+        });
+        const cvData = await cvResp.json();
+        const cvErrors = cvData.data?.productVariantsBulkCreate?.userErrors || [];
+        if (cvErrors.length > 0) {
+          return new Response(JSON.stringify({ error: cvErrors.map((e: { message: string }) => e.message).join(", ") }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Set cost prices for new variants
+        const createdVariants = cvData.data?.productVariantsBulkCreate?.productVariants || [];
+        for (let ci = 0; ci < createdVariants.length; ci++) {
+          const cv = createdVariants[ci];
+          const inputV = body.new_variants[ci];
+          if (inputV?.cost && cv?.inventoryItem?.id) {
+            const costMut = `
+              mutation inventoryItemUpdate($id: ID!, $input: InventoryItemInput!) {
+                inventoryItemUpdate(id: $id, input: $input) {
+                  inventoryItem { id unitCost { amount } }
+                  userErrors { message }
+                }
+              }
+            `;
+            await fetch(cvGqlUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+              body: JSON.stringify({
+                query: costMut,
+                variables: { id: cv.inventoryItem.id, input: { cost: parseFloat(inputV.cost) } },
+              }),
+            });
+            await new Promise(r => setTimeout(r, 200));
+          }
+        }
+
+        result = { variants: createdVariants, success: true };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

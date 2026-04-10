@@ -235,6 +235,65 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
   const setOutcome = (g: GroupedMatch, outcome: MatchOutcome) => {
     const key = `${g.styleNumber}::${g.colour}`;
     setOverrides(new Map(overrides).set(key, outcome));
+    // When switching to refill without a matched product, open search
+    if (outcome === "refill" && !g.matchedProduct) {
+      setSearchProduct({ groupKey: key, query: "", results: [], loading: false });
+    }
+  };
+
+  const searchShopifyProducts = async (query: string) => {
+    if (!searchProduct || query.length < 2) return;
+    setSearchProduct(prev => prev ? { ...prev, query, loading: true, results: [] } : null);
+    try {
+      const { data, error } = await supabase.functions.invoke("shopify-proxy", {
+        body: { action: "batch_lookup", lookup_items: [{ titleQuery: `title:${query}` }] },
+      });
+      if (!error && data?.variants) {
+        const mapped = mapVariants(data.variants);
+        // Deduplicate by product id
+        const seenProducts = new Set<string>();
+        const unique = mapped.filter(v => {
+          if (seenProducts.has(v.product.id)) return false;
+          seenProducts.add(v.product.id);
+          return true;
+        });
+        setSearchProduct(prev => prev ? { ...prev, results: unique, loading: false } : null);
+      } else {
+        setSearchProduct(prev => prev ? { ...prev, results: [], loading: false } : null);
+      }
+    } catch {
+      setSearchProduct(prev => prev ? { ...prev, results: [], loading: false } : null);
+    }
+  };
+
+  const selectSearchedProduct = (variant: ShopifyVariant) => {
+    if (!searchProduct) return;
+    const key = searchProduct.groupKey;
+    // Update the group's matched product so apply logic can use it
+    setGroups(prev => prev.map(g => {
+      const gKey = `${g.styleNumber}::${g.colour}`;
+      if (gKey === key) {
+        return {
+          ...g,
+          matchedProduct: variant.product,
+          // Try to match sizes to existing variants
+          sizes: g.sizes.map(s => {
+            const matched = variant.product.variants.find(pv =>
+              (pv.option1 || "").toLowerCase().includes(g.colour.toLowerCase()) &&
+              (pv.option2 || "").trim().toUpperCase() === s.size.trim().toUpperCase()
+            );
+            return matched ? { ...s, matchedVariant: matched } : s;
+          }),
+          outcome: "refill" as MatchOutcome,
+          reasons: [`Manually matched to "${variant.product.title}"`],
+          suggestedAction: `Add ${g.totalQty} units to "${variant.product.title}"`,
+        };
+      }
+      return g;
+    }));
+    setOverrides(new Map(overrides).set(key, "refill"));
+    setSearchProduct(null);
+    toast.success(`Matched to "${variant.product.title}"`);
   };
 
   const outcomeCounts = groups.reduce(

@@ -9,6 +9,8 @@ import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";
 import FeatureTile from "@/components/FeatureTile";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import { getPipelineContext, clearPipelineContext } from "@/lib/pipeline-context";
+import { getPipelineById } from "@/lib/pipeline-definitions";
 
 interface HomeScreenProps {
   onStartInvoice: () => void;
@@ -54,6 +56,8 @@ interface HomeScreenProps {
   onStartPriceLookup?: () => void;
   onStartSeasons?: () => void;
   onNavigateToTab?: (tab: string) => void;
+  onStartPipeline?: (id: string) => void;
+  onStartPipelineChooser?: () => void;
 }
 
 const HomeScreen = ({
@@ -67,6 +71,7 @@ const HomeScreen = ({
   onStartInventoryPlanning, onStartStockyHub, onStartPackingSlip, onStartJoor,
   onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss,
   onStartImageOptimise, onStartStockCheck, onStartPriceLookup, onStartSeasons, onNavigateToTab,
+  onStartPipeline, onStartPipelineChooser,
 }: HomeScreenProps) => {
   const mode = useStoreMode();
   const unreadCount = getUnprocessedInboxCount();

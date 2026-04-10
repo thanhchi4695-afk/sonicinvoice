@@ -720,6 +720,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     });
     setValidatedProducts(validated);
 
+    // ── Under-extraction detection ──
+    const nonRejectedCount = validated.filter(p => !p._rejected).length;
+    const planAnchors = (aiParsingPlan as any)?.row_anchors_detected;
+    const totalVisibleRows = (aiParsingPlan as any)?.total_visible_rows;
+    const estimatedRows = totalVisibleRows || (planAnchors?.length ? planAnchors.length : 0);
+    // Flag if extracted count is less than 50% of estimated, or if only 1 product from multi-row invoice
+    if (estimatedRows > 0 && nonRejectedCount < estimatedRows * 0.5) {
+      setUnderExtractionWarning({ extractedCount: nonRejectedCount, estimatedRows });
+    } else if (nonRejectedCount <= 1 && (debug.total + debug.rejected) > 3) {
+      setUnderExtractionWarning({ extractedCount: nonRejectedCount, estimatedRows: debug.total + debug.rejected });
+    } else {
+      setUnderExtractionWarning(null);
+    }
+
     // Filter to accepted products only
     const cleanProducts = validated
       .filter(p => !p._rejected)

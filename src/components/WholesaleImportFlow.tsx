@@ -262,6 +262,30 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
     toast.success(`${type === "shopify" ? "Shopify" : "Lightspeed"} CSV downloaded (${count} items)`);
   };
 
+  // ── Stock check before push ──
+  const startStockCheck = (targetOrders: WholesaleOrder[]) => {
+    const allItems = targetOrders.flatMap((o) => o.lineItems);
+    const converted: InvoiceLineItem[] = allItems.map((it) => ({
+      styleNumber: it.styleNumber,
+      styleName: it.styleName,
+      colour: it.colour,
+      colourCode: it.colourCode,
+      size: it.size,
+      barcode: it.barcode,
+      sku: `${it.styleNumber}-${it.colourCode || it.colour}-${it.size}`.toUpperCase().replace(/\s+/g, "-"),
+      brand: it.brand,
+      quantityOrdered: it.quantityOrdered,
+      rrp: it.rrp,
+      wholesale: it.wholesale,
+      imageUrl: it.imageUrl || undefined,
+      description: it.description || undefined,
+      productType: it.productType || undefined,
+      season: it.season || undefined,
+      collection: it.collection || undefined,
+    }));
+    setStockCheckItems(converted);
+  };
+
   // ── Push to Shopify ──
   const pushToShopify = async (targetOrders: WholesaleOrder[]) => {
     const allItems = targetOrders.flatMap((o) => o.lineItems);

@@ -14,6 +14,7 @@ import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates"
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
 import { toast } from "sonner";
 import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
+import SizeGridEditor from "@/components/SizeGridEditor";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;

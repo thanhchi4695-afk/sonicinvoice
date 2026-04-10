@@ -518,6 +518,63 @@ export type Database = {
         }
         Relationships: []
       }
+      pos_connections: {
+        Row: {
+          connected_at: string
+          id: string
+          last_synced: string | null
+          ls_r_access_token: string | null
+          ls_r_account_id: string | null
+          ls_r_refresh_token: string | null
+          ls_r_token_expires_at: string | null
+          ls_x_access_token: string | null
+          ls_x_domain_prefix: string | null
+          ls_x_refresh_token: string | null
+          ls_x_token_expires_at: string | null
+          platform: string
+          shopify_access_token: string | null
+          shopify_connected: boolean | null
+          shopify_domain: string | null
+          user_id: string
+        }
+        Insert: {
+          connected_at?: string
+          id?: string
+          last_synced?: string | null
+          ls_r_access_token?: string | null
+          ls_r_account_id?: string | null
+          ls_r_refresh_token?: string | null
+          ls_r_token_expires_at?: string | null
+          ls_x_access_token?: string | null
+          ls_x_domain_prefix?: string | null
+          ls_x_refresh_token?: string | null
+          ls_x_token_expires_at?: string | null
+          platform: string
+          shopify_access_token?: string | null
+          shopify_connected?: boolean | null
+          shopify_domain?: string | null
+          user_id: string
+        }
+        Update: {
+          connected_at?: string
+          id?: string
+          last_synced?: string | null
+          ls_r_access_token?: string | null
+          ls_r_account_id?: string | null
+          ls_r_refresh_token?: string | null
+          ls_r_token_expires_at?: string | null
+          ls_x_access_token?: string | null
+          ls_x_domain_prefix?: string | null
+          ls_x_refresh_token?: string | null
+          ls_x_token_expires_at?: string | null
+          platform?: string
+          shopify_access_token?: string | null
+          shopify_connected?: boolean | null
+          shopify_domain?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           created_at: string

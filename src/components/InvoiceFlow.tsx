@@ -759,6 +759,91 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     runEnrichmentSim(cancelledRef, names);
   };
 
+  // ── Reprocess in detailed mode ──
+  const handleReprocessDetailed = async () => {
+    if (!uploadedFile || isReprocessing) return;
+    setIsReprocessing(true);
+    toast("Reprocessing in detailed mode…", { description: "Using stronger row segmentation and style code anchoring" });
+
+    try {
+      const file = uploadedFile;
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+
+      const memoryHint = buildMemoryHint(supplierName || undefined);
+      const templateHintData = !memoryHint && supplierName ? buildTemplateHint(supplierName) : null;
+      const combinedHint = memoryHint || templateHintData;
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({
+          fileContent: base64,
+          fileName: file.name,
+          fileType: ext,
+          customInstructions,
+          supplierName,
+          forceMode: processAs === "invoice" ? "invoice"
+            : processAs === "packing_slip" ? "packing_slip"
+            : processAs === "handwritten" ? "handwritten"
+            : undefined,
+          templateHint: combinedHint || undefined,
+          detailedMode: true,
+        }),
+      });
+
+      if (!response.ok) {
+        toast.error("Reprocessing failed", { description: "Could not re-extract products" });
+        setIsReprocessing(false);
+        return;
+      }
+
+      const data = await response.json();
+      const products = data.products || [];
+
+      if (data.parsing_plan) setAiParsingPlan(data.parsing_plan);
+      if (data.rejected_rows) setAiRejectedRows(data.rejected_rows);
+
+      if (products.length === 0) {
+        toast.error("No products found in detailed mode");
+        setIsReprocessing(false);
+        return;
+      }
+
+      const { products: validated, debug } = validateAndCleanProducts(products, supplierName);
+      setValidationDebug({ ...debug, parsingPlan: data.parsing_plan as any, rejectedByAI: data.rejected_rows });
+      setValidatedProducts(validated);
+
+      const nonRejectedCount = validated.filter(p => !p._rejected).length;
+      const prevCount = underExtractionWarning?.extractedCount || 0;
+      if (nonRejectedCount > prevCount) {
+        toast.success(`Found ${nonRejectedCount} products (was ${prevCount})`, { description: "Detailed mode recovered more rows" });
+        setUnderExtractionWarning(null);
+      } else {
+        toast("Same result — try manual review", { description: `${nonRejectedCount} products extracted` });
+      }
+
+      // Rebuild product groups
+      const cleanProducts = validated
+        .filter(p => !p._rejected)
+        .map(({ _confidence, _confidenceLevel, _issues, _rejected, _rejectReason, ...rest }) => rest);
+      if (cleanProducts.length > 0) {
+        const groups = convertToProductGroups(cleanProducts);
+        setProductGroups(groups);
+        setParsedNames(groups.map(g => g.name));
+      }
+    } catch (err) {
+      console.error("Detailed reprocess error:", err);
+      toast.error("Reprocessing failed");
+    } finally {
+      setIsReprocessing(false);
+    }
+  };
+
   const handleCancelProcessing = () => {
     cancelledRef.current = true;
     setProcessingCancelled(true);

@@ -735,7 +735,20 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
             },
             {
               type: "text",
-              text: "Analyse this document. FIRST check if it's a landscape/sideways photo — if text runs vertically or the table is wider than tall, mentally rotate it before extraction. Then scan the entire line-item table and identify ALL style code anchors (e.g. CF08381, CF08446, etc.) — list them in row_anchors_detected. For each style code, read across the full row: description, colour, size grid (converting handwritten ticks to quantities), unit price, and line total. Extract EVERY product row, expanding size variants. Do NOT stop after the first row. Return JSON only.",
+              text: `Analyse this document photo carefully. 
+
+STEP 1 — ORIENTATION: Check if the photo is rotated sideways (text running vertically). If so, mentally rotate it first.
+STEP 2 — LAYOUT: Determine the layout. Common types:
+  - Product blocks (each product is a visual block with image, style code, size grid)
+  - Landscape table with style codes down the left
+  - Standard row table
+  - Shoe/footwear invoices with numeric size grids (35-47)
+STEP 3 — STYLE CODES: Scan the ENTIRE line-item zone for ALL style codes / SKUs. List them in row_anchors_detected.
+STEP 4 — FOR EACH STYLE CODE: Read across the row to extract description, colour, size grid quantities (convert ticks/circles to numbers), unit price, and line total.
+STEP 5 — SIZE GRIDS: If sizes appear as column headers (XS, S, M, L or 6, 8, 10, 12 or 35, 36, 37...), read the quantity in each column cell. Handwritten ticks = 1, circled numbers = that number, empty = 0.
+STEP 6 — OUTPUT: One variant row per size with qty > 0. Do NOT stop after the first product.
+
+Return JSON only.`,
             },
           ],
         },

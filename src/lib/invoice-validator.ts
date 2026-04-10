@@ -90,6 +90,19 @@ export interface ValidatedProduct extends RawProduct {
   _mathCheck?: "pass" | "fail" | "skipped";
 }
 
+export interface PageZone {
+  y_start: number;
+  y_end: number;
+}
+
+export interface PageZones {
+  header?: PageZone;
+  invoice_info?: PageZone;
+  line_items?: PageZone;
+  totals?: PageZone;
+  footer?: PageZone;
+}
+
 export interface ParsingPlan {
   document_type?: string;
   layout_type?: string;
@@ -108,6 +121,7 @@ export interface ParsingPlan {
   expected_review_level?: string;
   review_reason?: string;
   strategy_explanation?: string;
+  page_zones?: PageZones;
 }
 
 export interface ValidationDebugInfo {

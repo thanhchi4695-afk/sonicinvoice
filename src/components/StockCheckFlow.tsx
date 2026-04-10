@@ -453,7 +453,7 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
                 <TableHead className="w-28">Status</TableHead>
                 <TableHead>Item</TableHead>
                 <TableHead>Sizes & Qty</TableHead>
-                <TableHead>Shopify match</TableHead>
+                <TableHead>POS match</TableHead>
                 <TableHead className="w-20">Conf.</TableHead>
                 <TableHead className="w-36">Override</TableHead>
               </TableRow>
@@ -492,7 +492,10 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
                     <TableCell>
                       {g.matchedProduct ? (
                         <div className="text-xs">
-                          <div className="font-medium">{g.matchedProduct.title}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium">{g.matchedProduct.title}</span>
+                            <PlatformBadge platform={g.platform} />
+                          </div>
                           {outcome === "refill" && g.sizes[0]?.matchedVariant && (
                             <div className="text-muted-foreground">
                               Current stock: {g.sizes[0].matchedVariant.inventoryQty}

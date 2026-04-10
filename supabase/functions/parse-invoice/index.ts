@@ -56,7 +56,7 @@ Many wholesale fashion invoices are LANDSCAPE format and photographed SIDEWAYS (
    - **Ticks (✓)** under size columns = quantity 1
    - **Handwritten numbers** beside descriptions = wholesale price
    - **Circled items** = selected/confirmed products
-5. Record `"orientation_detected": "landscape_sideways"` and `"rotation_applied": 90 | 270` in parsing_plan
+5. Record "orientation_detected": "landscape_sideways" and "rotation_applied": 90 or 270 in parsing_plan
 
 ### Landscape row-by-row extraction strategy:
 For each style code found in the left column:

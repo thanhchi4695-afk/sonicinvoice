@@ -230,6 +230,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   type FileParseMode = "pdf_text" | "pdf_scan" | "photo" | "spreadsheet" | "email";
   const [fileParseMode, setFileParseMode] = useState<FileParseMode | null>(null);
   const [showLowQualityWarning, setShowLowQualityWarning] = useState(false);
+  const [preprocessResult, setPreprocessResult] = useState<PreprocessResult | null>(null);
+  const [showPreprocessDebug, setShowPreprocessDebug] = useState(false);
 
   // Location state
   const storeLocations = getStoreLocations();

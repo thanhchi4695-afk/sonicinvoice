@@ -195,9 +195,12 @@ Each line represents a single size+colour combination. Extract directly.
 **Method 2: Size grid matrix (printed quantities)**
 Size labels appear as column headers across the row. Quantities are printed in cells below each size.
 - Column headers are size labels: 2XS, XS, S, M, L, XL, 2XL, 3XL — or numeric: 6, 8, 10, 12, 14, 16
-- IMPORTANT: The size labels are COLUMN HEADERS, not quantities. Do NOT treat "XS", "S", "M" etc. as product data.
+- SHOE SIZE GRIDS: Some invoices use numeric shoe sizes as column headers: 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47. These are NOT quantities — they are size labels.
+- IMPORTANT: The size labels are COLUMN HEADERS, not quantities. Do NOT treat "XS", "S", "M" or "35", "36", "37" etc. as product data.
 - The cells BELOW each size header contain the ordered quantity for that size
-- Circled, underlined, or highlighted numbers ARE quantities — extract them
+- **Circled numbers**: Numbers that are circled (drawn with a ring around them) ARE valid quantities — extract the number inside the circle
+- **Numbers with ticks/checkmarks beside them**: The number is the quantity, the tick confirms it
+- Underlined or highlighted numbers ARE quantities — extract them
 - Empty or zero cells mean that size was NOT ordered — skip it (create NO variant for that size)
 - A "Total Qty" column should confirm the sum of all size quantities
 - Create one output row per size with quantity > 0
@@ -222,6 +225,24 @@ EXTRACTION RULES for handwritten marks:
   - Lower row_confidence by 15-20 points
   - Add "handwritten_uncertain" to parse_notes
   - The client will route this to "Needs Review"
+
+**Method 2c: Product block with embedded size grid (COMMON in fashion linesheet-style invoices)**
+Each product appears as a visual BLOCK on the page with:
+- Product name/title at the top of the block
+- Style code (e.g. "Style #SD298PARO")
+- A product image (photo or swatch)
+- Wholesale price and RRP displayed prominently
+- A size grid row with column headers (XS/6, S/8, M/10, L/12, XL/14, XXL/16) and quantities below
+- Colour name in a row within the grid
+- Line total at the right edge
+
+CRITICAL: Each block is a SEPARATE product. Do NOT merge blocks. Read each block independently:
+1. Find the style code (usually starts with # or follows "Style")
+2. Read the product name (usually bold, above the style code line)
+3. Read wholesale price and RRP
+4. Read the colour from the colour row in the grid
+5. Read each size column header and its quantity (may be handwritten ticks or printed numbers)
+6. Output one variant per size with qty > 0
 
 CRITICAL: Do NOT confuse:
 - Printed size labels (XS, S, M, L) with handwritten quantities

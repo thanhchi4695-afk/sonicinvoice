@@ -66,7 +66,7 @@ const HomeScreen = ({
   onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia,
   onStartInventoryPlanning, onStartStockyHub, onStartPackingSlip, onStartJoor,
   onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss,
-  onStartImageOptimise, onStartStockCheck,
+  onStartImageOptimise, onStartStockCheck, onStartPriceLookup, onStartSeasons, onNavigateToTab,
 }: HomeScreenProps) => {
   const mode = useStoreMode();
   const unreadCount = getUnprocessedInboxCount();

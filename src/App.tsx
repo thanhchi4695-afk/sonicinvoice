@@ -9,6 +9,8 @@ import Index from "./pages/Index.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import AuthCallbackPage from "./pages/AuthCallback.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import Support from "./pages/Support.tsx";
+import Privacy from "./pages/Privacy.tsx";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,8 @@ const App = () => (
             <Route path="/auth/myob/callback" element={<AuthCallbackPage />} />
             <Route path="/auth/lightspeed-x/callback" element={<AuthCallbackPage />} />
             <Route path="/auth/lightspeed-r/callback" element={<AuthCallbackPage />} />
+            <Route path="/support" element={<Support />} />
+            <Route path="/privacy" element={<Privacy />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -79,6 +79,7 @@ export default function PostParseReviewScreen({
   const [bulkVendor, setBulkVendor] = useState("");
   const [sourceTraceProduct, setSourceTraceProduct] = useState<ValidatedProduct | null>(null);
   const [showDebugZones, setShowDebugZones] = useState(false);
+  const [showDebugOverlay, setShowDebugOverlay] = useState(false);
 
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);

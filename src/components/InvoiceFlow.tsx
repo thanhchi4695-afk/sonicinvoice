@@ -793,6 +793,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             : undefined,
           templateHint: combinedHint || undefined,
           detailedMode: true,
+          expectedProductCount: expectedRowCount || undefined,
         }),
       });
 

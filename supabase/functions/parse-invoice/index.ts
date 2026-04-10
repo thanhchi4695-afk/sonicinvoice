@@ -237,16 +237,17 @@ Identify product rows by: having a descriptive title (3+ chars, not just a numbe
 ## CONFIDENCE SCORING
 
 Score each extracted row 0-100:
-- Has product title with 3+ meaningful characters: +20
+- Has style code / SKU (primary anchor): +25
+- Has product title with 3+ meaningful characters: +15
 - Has valid unit_cost > 0 (NOT derived from RRP): +20
-- Has recognisable size value: +15
-- Has colour: +15
-- Has style code / SKU: +15
+- Has recognisable size value: +10
+- Has colour: +10
 - Has quantity > 0: +15
 - Math cross-check passes (unit_cost × qty ≈ line_total): +5
-- Deductions: missing price -20, ambiguous text -10, handwritten uncertainty -15, uncertain quantity -10, cost derived from line_total -5
+- Deductions: missing style code (description fallback) -15, missing price -20, ambiguous text -10, handwritten uncertainty -15, uncertain quantity -10, cost derived from line_total -5
+- Highlighted/marked style code still readable: no deduction
 - Handwritten tick marks clearly readable: no deduction
-- Handwritten marks ambiguous (can't distinguish 1 vs 2, or tick vs stray): -15 and flag "handwritten_uncertain"
+- Handwritten marks ambiguous: -15 and flag "handwritten_uncertain"
 - Size grid with mixed printed/handwritten: -5
 
 ## OUTPUT FORMAT

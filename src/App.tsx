@@ -9,6 +9,8 @@ import Index from "./pages/Index.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import AuthCallbackPage from "./pages/AuthCallback.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import Support from "./pages/Support.tsx";
+import Privacy from "./pages/Privacy.tsx";
 
 const queryClient = new QueryClient();
 

@@ -45,37 +45,49 @@ Before extracting any products, you MUST identify the exact boundaries of the li
 
 **CRITICAL**: Only extract products from the line-item zone. NEVER treat header text, address blocks, or footer totals as products.
 
-## STAGE B3 — ROW SEGMENTATION BY STYLE CODE ANCHORS (CRITICAL FOR MULTI-PRODUCT INVOICES)
+## STAGE B3 — STYLE CODE ANCHORING (PRIMARY DETECTION METHOD — DO THIS FIRST)
 
-This is the MOST IMPORTANT stage for invoices with many products. You MUST segment the line-item table into individual product rows BEFORE extracting data.
+This is the MOST IMPORTANT stage. Read the invoice like a wholesale buyer: find every style code FIRST, then read across each row.
 
-**Step 1: Scan for style code anchors**
-Look for a vertical sequence of style codes / SKU codes in the left column of the line-item table. Common patterns:
-- Alphanumeric codes like CF08381, CF08446, CF08448, AB1234, ST-2045
-- Codes that repeat a consistent format (same prefix, similar length)
-- Each style code marks the START of a new product row
+**PRIORITY: Style code is the PRIMARY signal for product detection.** Do NOT start by reading descriptions or prices. Start by scanning the left column for style codes / SKUs.
 
-**Step 2: Count all anchors**
-If you see style codes CF08381, CF08446, CF08448, CF08449, CF08450 in the left column, that means there are AT LEAST 5 product rows. You MUST extract ALL of them.
+**Step 1: Full left-column scan for style codes**
+Scan the ENTIRE left column of the line-item table from top to bottom. Collect every cell that looks like a style code:
+- Alphanumeric codes: CF08381, CF08446, AB1234, ST-2045, 7234-BLK, W24-101
+- Codes with a consistent pattern (same prefix, similar length, repeating format)
+- Codes that are highlighted, circled, or marked with pen — these are STILL valid style codes
+- Codes in bold, underlined, or differently formatted text
+- Even partial codes or codes with handwritten annotations beside them
 
-**Step 3: Segment one row per style code**
-Each product row spans from one style code anchor to the next. A single row may include:
-- The style code itself
-- A product description / title (same row or adjacent)
-- A colour / range name
-- A size grid or size list with quantities
-- A unit price and/or line total
+**Step 2: Each unique style code = one product family**
+Every distinct style code found in Step 1 anchors exactly one product row. If you find 8 style codes, you MUST produce at least 8 product families.
 
-**Step 4: Extract EVERY row independently**
-Do NOT stop after the first row. Do NOT collapse multiple rows into one product. Each style code = one product family. Then within each product family, expand size variants.
+**Step 3: Read across each anchored row**
+For each style code anchor, read the full row LEFT to RIGHT to extract:
+1. Style code (already found)
+2. Product description / title (next column or adjacent text)
+3. Colour / range (separate column, suffix, or embedded in description)
+4. Size grid or size list with quantities
+5. Unit price / wholesale cost
+6. Line total
+7. RRP (if present)
 
-**Step 5: Row-level debug output**
-For each detected row, record in the output:
+**Step 4: Handle multi-line product entries**
+Some products span 2-3 lines (e.g. style code on line 1, description on line 2, size grid on line 3). Group these together — the style code anchors the group.
+
+**Step 5: Fallback when NO style codes are found**
+If the left column has NO identifiable style codes:
+- Fall back to description-based detection (look for product names)
+- Lower confidence by 15 points for all rows
+- Set variant_method to indicate fallback
+- Add "no_style_codes_found" to parse_notes
+
+**Step 6: Row-level debug output**
+For each detected row, record:
 - row_index: sequential number (0, 1, 2, ...)
-- anchor_code: the style code that started this row
-- row_confidence: 0-100 confidence for this specific row
-- row_y_start: normalized 0-1 vertical position where this row starts on the page
-- row_y_end: normalized 0-1 vertical position where this row ends
+- anchor_code: the style code that started this row (or "DESCRIPTION_FALLBACK" if no code)
+- row_confidence: 0-100 for this row (higher when style code is clear)
+- row_y_start / row_y_end: normalized 0-1 vertical position
 
 ## STAGE C — SEMANTIC FIELD DETECTION
 
@@ -220,21 +232,22 @@ NEVER include these as products:
 - Story/collection/season headers that contain no product data
 - "Total Units", "Total Excl. GST", "GST Amount", "Total Incl. GST" — these are FOOTER TOTALS, not products
 
-Identify product rows by: having a descriptive title (3+ chars, not just a number), and at least one of: quantity, price, or style code.
+Identify product rows by: having a style code / SKU (primary), OR a descriptive title (3+ chars) with at least one of: quantity, price. Rows with a style code are always product candidates even if other fields are sparse.
 
 ## CONFIDENCE SCORING
 
 Score each extracted row 0-100:
-- Has product title with 3+ meaningful characters: +20
+- Has style code / SKU (primary anchor): +25
+- Has product title with 3+ meaningful characters: +15
 - Has valid unit_cost > 0 (NOT derived from RRP): +20
-- Has recognisable size value: +15
-- Has colour: +15
-- Has style code / SKU: +15
+- Has recognisable size value: +10
+- Has colour: +10
 - Has quantity > 0: +15
 - Math cross-check passes (unit_cost × qty ≈ line_total): +5
-- Deductions: missing price -20, ambiguous text -10, handwritten uncertainty -15, uncertain quantity -10, cost derived from line_total -5
+- Deductions: missing style code (description fallback) -15, missing price -20, ambiguous text -10, handwritten uncertainty -15, uncertain quantity -10, cost derived from line_total -5
+- Highlighted/marked style code still readable: no deduction
 - Handwritten tick marks clearly readable: no deduction
-- Handwritten marks ambiguous (can't distinguish 1 vs 2, or tick vs stray): -15 and flag "handwritten_uncertain"
+- Handwritten marks ambiguous: -15 and flag "handwritten_uncertain"
 - Size grid with mixed printed/handwritten: -5
 
 ## OUTPUT FORMAT
@@ -314,8 +327,11 @@ Return ONLY valid JSON (no markdown, no explanation):
 For source_regions: y_position is a normalized 0-1 value indicating the vertical position on the page where this field's data was found (0 = top, 1 = bottom). page is 1-indexed. Only include fields that were actually detected.
 
 CRITICAL RULES:
+- STYLE CODE FIRST: Always scan for style codes BEFORE reading descriptions. Style code is the primary product anchor.
 - SCAN THE ENTIRE LINE-ITEM TABLE. If you see 10 style codes, you MUST return products from ALL 10 rows.
 - Do NOT stop after the first product row. Do NOT return only one item when the table has many.
+- Highlighted or pen-marked style codes are STILL valid — do not skip them.
+- If consecutive rows each have a unique style code, they are SEPARATE products — never merge them.
 - Create ONE output row per size+colour variant where quantity > 0
 - product_title must be the CLEAN base name without colour or size appended
 - Do NOT hallucinate data that is not visible in the document
@@ -324,7 +340,8 @@ CRITICAL RULES:
 - If line_total and quantity exist but unit_cost is missing, DERIVE unit_cost = line_total / quantity and set cost_source to "derived_from_line_total"
 - For packing slips: set unit_cost and rrp to null, focus on qty extraction
 - For handwritten documents: lower confidence, flag uncertain readings
-- Always set group_key so the client can group variants correctly`;
+- Always set group_key so the client can group variants correctly
+- When no style codes exist, fall back to description-based grouping but flag it`;
 
 // ── Server-side post-AI validation ──────────────────────────
 function crossValidateProducts(products: Record<string, unknown>[]): Record<string, unknown>[] {

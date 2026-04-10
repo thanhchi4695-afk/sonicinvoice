@@ -245,7 +245,7 @@ Return ONLY valid JSON (no markdown, no explanation):
   "parsing_plan": {
     "document_type": "tax_invoice" | "packing_slip" | "handwritten_invoice" | "statement" | "unknown",
     "layout_type": "<one of the layout types from Stage B>",
-    "variant_method": "one_row_per_variant" | "size_grid_matrix" | "product_block_nested" | "size_row_below" | "description_embedded" | "handwritten" | "none",
+    "variant_method": "one_row_per_variant" | "size_grid_matrix" | "size_grid_handwritten" | "product_block_nested" | "size_row_below" | "description_embedded" | "handwritten" | "none",
     "size_system": "numeric_au" | "numeric_us" | "alpha" | "combined" | "cup" | "denim" | "one_size" | "mixed" | "none",
     "line_item_zone": "description of where the product rows are located",
     "quantity_field": "description of where/how quantity is expressed",

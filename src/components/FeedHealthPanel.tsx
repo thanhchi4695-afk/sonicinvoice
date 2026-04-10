@@ -802,7 +802,7 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
         </DialogContent>
       </Dialog>
 
-      {onStartFlow && step === "done" && (
+      {onStartFlow && rows.length > 0 && (
         <WhatsNextSuggestions
           completedFlow="feed_health"
           onStartFlow={onStartFlow}

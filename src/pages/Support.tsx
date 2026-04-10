@@ -1,9 +1,15 @@
-import { Mail, Calendar, Bug, MessageCircle } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import { Mail, Calendar, Bug } from "lucide-react";
 
 const Support = () => (
   <div className="min-h-screen bg-background text-foreground">
+    <Helmet>
+      <title>Support — Sonic Invoices | Help for Shopify Invoice Processing</title>
+      <meta name="description" content="Get help with Sonic Invoices — invoice to Shopify conversion, JOOR & Faire sync, bulk discounts, Google Shopping feed fixes, and inventory management. Email support and FAQs." />
+      <link rel="canonical" href="https://sonicinvoice.lovable.app/support" />
+    </Helmet>
     <div className="max-w-2xl mx-auto px-6 py-16">
-      <h1 className="text-3xl font-bold mb-2">Support</h1>
+      <h1 className="text-3xl font-bold mb-2">Sonic Invoices Support</h1>
       <p className="text-muted-foreground mb-10">
         Need help with Sonic Invoices? We're here for you.
       </p>
@@ -39,10 +45,13 @@ const Support = () => (
         <h2 className="text-xl font-semibold mb-4">Frequently asked questions</h2>
         <div className="space-y-4 text-sm">
           {[
+            { q: "How do I convert an invoice to Shopify products?", a: "Upload any PDF, Excel, CSV, or Word invoice. AI extracts every product and maps it to Shopify fields — title, SKU, barcode, price, cost, quantity, colour, size. Review and push to Shopify in minutes." },
+            { q: "Can I link JOOR and Faire orders to Shopify?", a: "Yes. Connect to JOOR (live API), Faire, NuOrder, Brandscope, or Brandboom. Pull wholesale orders directly and push products to Shopify in one click." },
+            { q: "How do bulk discounts work?", a: "Apply bulk discounts, markups, or exact pricing to any product selection. Put entire collections on sale or restore original prices. Margin protection ensures no product falls below cost." },
             { q: "What file types are supported?", a: "PDF (digital and scanned), Excel (XLSX/XLS), CSV, Word documents, and invoice photos (JPG/PNG)." },
             { q: "Will anything push to Shopify automatically?", a: "No. Every action requires your approval. Nothing posts to Shopify without you clicking confirm." },
             { q: "Is my data private?", a: "Yes. Each user's data is stored separately and encrypted. Users cannot see each other's invoices, history, or products." },
-            { q: "How does RRP lookup work?", a: "For each product, Sonic Invoices searches the brand's official website and trusted retail aggregators for your region. It always uses local currency prices." },
+            { q: "Does this replace Shopify Stocky?", a: "Yes. Sonic Invoices includes purchase orders, demand forecasting, dead stock detection, stocktake management, and AI-powered reorder intelligence — everything Stocky had and more." },
             { q: "Does this work with the Shopify POS?", a: "Yes. Sonic Invoices integrates with Shopify, which syncs with Shopify POS automatically." },
           ].map((item, i) => (
             <div key={i} className="rounded-lg border border-border bg-card p-4">

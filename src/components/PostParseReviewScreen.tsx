@@ -990,6 +990,25 @@ function ReviewRow({
                   <Input defaultValue={p.colour} onBlur={e => onUpdateField("colour", e.target.value)} className="h-8 text-xs" />
                 </div>
               </div>
+              {/* Size grid editor for multi-size rows */}
+              {p.size && p.size.includes(",") && (
+                <SizeGridEditor
+                  label={p.sku || undefined}
+                  unitCost={p.cost}
+                  sizes={p.size.split(",").map(s => s.trim()).filter(Boolean).map(s => ({
+                    size: s,
+                    qty: Math.round(p.qty / p.size.split(",").filter(Boolean).length),
+                    confidence: p._confidenceLevel,
+                    handwritten: (p._parseNotes || "").toLowerCase().includes("handwritten"),
+                  }))}
+                  onChange={(updated) => {
+                    const newSizes = updated.map(u => u.size).join(", ");
+                    const newQty = updated.reduce((sum, u) => sum + u.qty, 0);
+                    onUpdateField("size", newSizes);
+                    onUpdateField("qty", newQty);
+                  }}
+                />
+              )}
               <div className="flex justify-between items-center">
                 <div className="flex gap-1">
                   <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 text-muted-foreground" onClick={onSplit}>

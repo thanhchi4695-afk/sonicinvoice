@@ -679,6 +679,13 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
             <Download className="w-4 h-4 mr-2" /> Lightspeed CSV
           </Button>
           <Button
+            onClick={() => startStockCheck([activeOrder])}
+            disabled={pushing}
+          >
+            <PackageCheck className="w-4 h-4 mr-2" /> Check stock & push
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => {
               if (confirm(`Push ${activeOrder.lineItems.length} items from this order to Shopify?`)) {
                 pushToShopify([activeOrder]);
@@ -686,7 +693,7 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
             }}
             disabled={pushing}
           >
-            <Upload className="w-4 h-4 mr-2" /> Push to Shopify
+            <Upload className="w-4 h-4 mr-2" /> Push as new
           </Button>
           <Button variant="secondary" onClick={() => { setScreen("orders"); setActiveOrder(null); }} disabled={pushing}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to list

@@ -479,14 +479,14 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
                           <option value="new_colour">New colour</option>
                           <option value="new_product">New product</option>
                         </select>
-                        {(outcome === "refill" || outcome === "new_colour") && !g.matchedProduct && (
+                        {(outcome === "refill" || outcome === "new_colour") && (
                           <Button
                             variant="outline"
                             size="sm"
                             className="text-[10px] h-6 w-full"
                             onClick={() => setSearchProduct({ groupKey: `${g.styleNumber}::${g.colour}`, query: "", results: [], loading: false })}
                           >
-                            <Search className="w-3 h-3 mr-1" /> Find product
+                            <Search className="w-3 h-3 mr-1" /> {g.matchedProduct ? "Change product" : "Find product"}
                           </Button>
                         )}
                       </div>

@@ -604,7 +604,6 @@ export default function PostParseReviewScreen({
                     </div>
                   </div>
                 )}
-                </div>
                 {debug.parsingPlan.strategy_explanation && (
                   <p className="mt-2 text-[10px] text-muted-foreground italic border-t border-border/30 pt-1.5">💡 {debug.parsingPlan.strategy_explanation}</p>
                 )}

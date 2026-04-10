@@ -209,12 +209,21 @@ const Index = () => {
     return <Suspense fallback={suspenseFallback}><OnboardingFlow onComplete={() => setOnboarded(true)} /></Suspense>;
   }
 
+  const handleStartFlow = useCallback((flow: string) => {
+    if (flow.startsWith("pipeline:")) {
+      setActivePipelineId(flow.replace("pipeline:", ""));
+      setActiveFlow("pipeline");
+    } else {
+      setActiveFlow(flow as any);
+    }
+  }, []);
+
   const renderFlow = () => {
     let flowEl: React.ReactNode = null;
     switch (activeFlow) {
       case "invoice": flowEl = <InvoiceFlow onBack={() => setActiveFlow(null)} />; break;
       case "sale": flowEl = <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />; break;
-      case "restock": flowEl = <RestockAnalytics onBack={() => setActiveFlow(null)} />; break;
+      case "restock": flowEl = <RestockAnalytics onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
       case "price_adjust": flowEl = <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
       case "price_lookup": flowEl = <PriceLookup onBack={() => setActiveFlow(null)} />; break;
       case "order_form": flowEl = <OrderFormFlow onBack={() => setActiveFlow(null)} />; break;
@@ -232,18 +241,18 @@ const Index = () => {
       case "scan_mode": flowEl = <ScanMode onBack={() => setActiveFlow(null)} />; break;
       case "performance": flowEl = <PerformanceDashboard onBack={() => setActiveFlow(null)} />; break;
       case "feed_optimise": flowEl = <AIFeedOptimisation onBack={() => setActiveFlow(null)} />; break;
-      case "feed_health": flowEl = <FeedHealthPanel onBack={() => setActiveFlow(null)} />; break;
+      case "feed_health": flowEl = <FeedHealthPanel onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
       case "google_colour": flowEl = <GoogleColourFlow onBack={() => setActiveFlow(null)} />; break;
       case "google_ads": flowEl = <GoogleAdsFlow onBack={() => setActiveFlow(null)} />; break;
       case "style_grouping": flowEl = <StyleGroupingFlow onBack={() => setActiveFlow(null)} />; break;
       case "competitor_intel": flowEl = <CompetitorIntelFlow onBack={() => setActiveFlow(null)} />; break;
-      case "collection_seo": flowEl = <CollectionSEOFlow onBack={() => setActiveFlow(null)} />; break;
+      case "collection_seo": flowEl = <CollectionSEOFlow onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
       case "geo_agentic": flowEl = <GeoAgenticFlow onBack={() => setActiveFlow(null)} />; break;
       case "organic_seo": flowEl = <OrganicSEOFlow onBack={() => setActiveFlow(null)} />; break;
       case "margin_protection": flowEl = <MarginProtectionPanel onBack={() => setActiveFlow(null)} />; break;
       case "markdown_ladder": flowEl = <MarkdownLadderPanel onBack={() => setActiveFlow(null)} />; break;
       case "stock_monitor": flowEl = <StockMonitorPanel onBack={() => setActiveFlow(null)} />; break;
-      case "social_media": flowEl = <SocialMediaPanel onBack={() => setActiveFlow(null)} />; break;
+      case "social_media": flowEl = <SocialMediaPanel onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
       case "inventory_planning": flowEl = <InventoryPlanningPanel onBack={() => setActiveFlow(null)} />; break;
       case "packing_slip": flowEl = <PackingSlipFlow onBack={() => setActiveFlow(null)} />; break;
       case "joor": flowEl = <JoorFlow onBack={() => setActiveFlow(null)} />; break;
@@ -260,7 +269,7 @@ const Index = () => {
       case "product_health": flowEl = <ProductHealthPanel onBack={() => setActiveFlow("stocky_hub")} />; break;
       case "order_sync": flowEl = <ShopifyOrderSync onBack={() => setActiveFlow("stocky_hub")} />; break;
       case "image_optimise": flowEl = <ImageOptimisePanel onBack={() => setActiveFlow(null)} />; break;
-      case "stock_check": flowEl = <StockCheckFlow lineItems={[]} onBack={() => setActiveFlow(null)} />; break;
+      case "stock_check": flowEl = <StockCheckFlow lineItems={[]} onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
       case "pipeline": flowEl = activePipelineId ? <PipelineRunner pipelineId={activePipelineId} onRenderFlow={(flowKey, onComplete) => {
         const flowMap: Record<string, React.ReactNode> = {
           invoice: <InvoiceFlow onBack={onComplete} />,

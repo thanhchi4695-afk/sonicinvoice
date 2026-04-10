@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import type { WholesaleOrder } from "@/lib/unified-types";
+import type { WholesaleOrder, WholesaleLineItem } from "@/lib/unified-types";
+import type { InvoiceLineItem } from "@/lib/stock-matcher";
+import StockCheckFlow from "@/components/StockCheckFlow";
 import {
   buildWholesaleShopifyCSV,
   buildWholesaleLightspeedCSV,
@@ -70,6 +72,7 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
   const [activeOrder, setActiveOrder] = useState<WholesaleOrder | null>(null);
   const [pushing, setPushing] = useState(false);
   const [pushProgress, setPushProgress] = useState({ current: 0, total: 0 });
+  const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 

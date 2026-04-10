@@ -101,12 +101,47 @@ Before extracting, determine HOW variants are expressed in this document:
 **Method 1: One row per variant**
 Each line represents a single size+colour combination. Extract directly.
 
-**Method 2: Size grid matrix**
-Size labels appear as column headers. Quantities are in cells below each size.
+**Method 2: Size grid matrix (printed quantities)**
+Size labels appear as column headers across the row. Quantities are printed in cells below each size.
+- Column headers are size labels: 2XS, XS, S, M, L, XL, 2XL, 3XL — or numeric: 6, 8, 10, 12, 14, 16
+- IMPORTANT: The size labels are COLUMN HEADERS, not quantities. Do NOT treat "XS", "S", "M" etc. as product data.
+- The cells BELOW each size header contain the ordered quantity for that size
 - Circled, underlined, or highlighted numbers ARE quantities — extract them
-- Empty or zero cells mean that size was NOT ordered — skip it
+- Empty or zero cells mean that size was NOT ordered — skip it (create NO variant for that size)
 - A "Total Qty" column should confirm the sum of all size quantities
 - Create one output row per size with quantity > 0
+- Each output row inherits the style_code, colour, unit_cost, and product_title from the parent product row
+
+**Method 2b: Size grid with HANDWRITTEN tick marks / pen annotations (CRITICAL)**
+Many fashion wholesale invoices have a printed size grid but the QUANTITIES are written by hand — ticks (✓ / ✔), pen marks, circles, or handwritten numbers.
+
+DETECTION: If you see:
+- A row of printed size labels (2XS, XS, S, M, L, XL, 2XL, 3XL or numeric)
+- Below or beside each size label: handwritten marks, ticks, circles, or small numbers that are NOT printed text
+Then this is a handwritten size grid.
+
+EXTRACTION RULES for handwritten marks:
+- A single tick mark (✓, /, |, or a short pen stroke) under a size = quantity 1
+- A circled number or clearly written digit (e.g. "2", "3") under a size = that quantity
+- Two tick marks (// or ✓✓) = quantity 2
+- A cross (×) or dash (-) = quantity 0 (not ordered)
+- An empty cell with no mark = quantity 0 (not ordered)
+- A dot (.) may indicate 0 or be a stray mark — set quantity to 0 and flag in parse_notes
+- If the mark is ambiguous (can't tell if it's 1 or 2, or if it's a tick vs a stray line), set the quantity to your best guess but:
+  - Lower row_confidence by 15-20 points
+  - Add "handwritten_uncertain" to parse_notes
+  - The client will route this to "Needs Review"
+
+CRITICAL: Do NOT confuse:
+- Printed size labels (XS, S, M, L) with handwritten quantities
+- Handwritten notes/annotations in margins with product data
+- Circled style codes with circled quantities (context matters — style codes are in the left column, quantities are under size headers)
+
+OUTPUT: Create one variant row per size where a tick/mark/number is present. Each row gets:
+- size: the size label from the column header
+- quantity: the interpreted count (1 for tick, N for written number)
+- All other fields (style_code, colour, unit_cost, product_title) from the parent row
+- confidence: lower by 10-20 if handwritten, add "handwritten_qty" to parse_notes
 
 **Method 3: Product block with nested size/qty table**
 A product entry contains a main row (code, name, colour, price) plus a sub-section listing sizes and quantities.

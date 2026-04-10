@@ -70,6 +70,7 @@ export interface GroupedMatch {
   reasons:     string[];
   suggestedAction: string;
   imageUrl?:   string;
+  platform?:   "shopify" | "lightspeed_x" | "lightspeed_r";
   sizes: { size: string; qty: number; matchedVariant: ShopifyVariant | null; lineItem: InvoiceLineItem }[];
   totalQty:    number;
 }
@@ -254,6 +255,7 @@ export function groupMatchResults(results: MatchResult[]): GroupedMatch[] {
         existing.reasons = r.reasons;
       }
     } else {
+      const variantPlatform = (r.matchedVariant as unknown as Record<string, unknown> | null)?._platform as GroupedMatch["platform"] | undefined;
       groups.set(key, {
         styleNumber: r.lineItem.styleNumber,
         styleName: r.lineItem.styleName,
@@ -265,6 +267,7 @@ export function groupMatchResults(results: MatchResult[]): GroupedMatch[] {
         reasons: r.reasons,
         suggestedAction: r.suggestedAction,
         imageUrl: r.lineItem.imageUrl,
+        platform: variantPlatform || (r.matchedVariant ? "shopify" : undefined),
         sizes: [{
           size: r.lineItem.size,
           qty: r.lineItem.quantityOrdered,

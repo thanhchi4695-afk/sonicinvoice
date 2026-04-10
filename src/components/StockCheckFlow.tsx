@@ -453,7 +453,7 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
                 <TableHead className="w-28">Status</TableHead>
                 <TableHead>Item</TableHead>
                 <TableHead>Sizes & Qty</TableHead>
-                <TableHead>Shopify match</TableHead>
+                <TableHead>POS match</TableHead>
                 <TableHead className="w-20">Conf.</TableHead>
                 <TableHead className="w-36">Override</TableHead>
               </TableRow>
@@ -492,7 +492,10 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
                     <TableCell>
                       {g.matchedProduct ? (
                         <div className="text-xs">
-                          <div className="font-medium">{g.matchedProduct.title}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium">{g.matchedProduct.title}</span>
+                            <PlatformBadge platform={g.platform} />
+                          </div>
                           {outcome === "refill" && g.sizes[0]?.matchedVariant && (
                             <div className="text-muted-foreground">
                               Current stock: {g.sizes[0].matchedVariant.inventoryQty}
@@ -709,6 +712,21 @@ function OutcomeBadge({ outcome }: { outcome: MatchOutcome }) {
     case "new_product":
       return <Badge className="bg-rose-500/15 text-rose-600 border-rose-500/30 text-[10px]">New product</Badge>;
   }
+}
+
+function PlatformBadge({ platform }: { platform?: "shopify" | "lightspeed_x" | "lightspeed_r" }) {
+  if (!platform) return null;
+  const labels: Record<string, { label: string; icon: string }> = {
+    shopify: { label: "Shopify", icon: "🛍" },
+    lightspeed_x: { label: "LS X-Series", icon: "⚡" },
+    lightspeed_r: { label: "LS R-Series", icon: "💡" },
+  };
+  const info = labels[platform] || { label: platform, icon: "📦" };
+  return (
+    <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-normal gap-0.5">
+      <span>{info.icon}</span> {info.label}
+    </Badge>
+  );
 }
 
 // ── Helpers ──

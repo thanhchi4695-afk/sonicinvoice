@@ -1,4 +1,4 @@
-import { FilePlus, Percent, ChevronRight, BarChart3, DollarSign, Monitor, FileText, Zap, Clock, TrendingUp, MapPin, RotateCcw, Users, X, ClipboardList, BookOpen, Mail, Link, Target, ScanLine, Sparkles, Bell, Package, PackageCheck } from "lucide-react";
+import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
@@ -7,6 +7,8 @@ import { getTotalCatalogProducts } from "@/lib/catalog-memory";
 import { getUnprocessedInboxCount } from "@/components/EmailInboxPanel";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";
+import FeatureTile from "@/components/FeatureTile";
+import CollapsibleSection from "@/components/CollapsibleSection";
 
 interface HomeScreenProps {
   onStartInvoice: () => void;
@@ -51,21 +53,20 @@ interface HomeScreenProps {
   onStartStockCheck?: () => void;
 }
 
-const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm, onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory, onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup, onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise, onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping, onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO, onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia, onStartInventoryPlanning, onStartStockyHub, onStartPackingSlip, onStartJoor, onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss, onStartImageOptimise, onStartStockCheck }: HomeScreenProps) => {
+const HomeScreen = ({
+  onStartInvoice, onStartSale, onStartRestock, onStartPriceAdjust, onStartOrderForm,
+  onStartReorder, onStartSuppliers, onOpenAuditLog, onStartPurchaseOrders, onStartCatalogMemory,
+  onStartEmailInbox, onStartCollabSEO, onStartGoogleAdsSetup, onStartMetaAdsSetup,
+  onStartLightspeedConvert, onStartScanMode, onStartPerformance, onStartFeedOptimise,
+  onStartFeedHealth, onStartGoogleColour, onStartGoogleAds, onStartStyleGrouping,
+  onStartCompetitorIntel, onStartCollectionSEO, onStartGeoAgentic, onStartOrganicSEO,
+  onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia,
+  onStartInventoryPlanning, onStartStockyHub, onStartPackingSlip, onStartJoor,
+  onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss,
+  onStartImageOptimise, onStartStockCheck,
+}: HomeScreenProps) => {
   const mode = useStoreMode();
-
-  const recentActivity = [
-    {
-      type: "invoice" as const,
-      label: mode.isLightspeed ? "Lightspeed CSV downloaded — 18 products (Jantzen Mar26)" : "CSV exported — Jantzen Mar26 — 18 products",
-      time: "2 days ago",
-    },
-    {
-      type: "sale" as const,
-      label: mode.isLightspeed ? "Ready to import to Lightspeed POS" : "Baku 30% off — 48 products",
-      time: "5 days ago",
-    },
-  ];
+  const unreadCount = getUnprocessedInboxCount();
 
   // Check for incomplete onboarding
   const onboardingStep = localStorage.getItem("onboarding_step");
@@ -150,720 +151,62 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         </div>
       )}
 
-      {/* Import Invoice Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <FilePlus className="w-5 h-5 text-primary" />
+      {/* ── HERO ACTIONS ── */}
+      <div className="space-y-2 mb-4">
+        <button
+          onClick={onStartInvoice}
+          className="w-full h-14 bg-primary text-primary-foreground rounded-xl flex items-center gap-3 px-4 hover:bg-primary/90 transition-colors"
+        >
+          <span className="text-xl">📄</span>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-semibold">Process invoice</p>
+            <p className="text-[11px] opacity-80">Upload & convert to Shopify products</p>
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Import invoice</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Upload a supplier invoice and get a {mode.isLightspeed ? 'Lightspeed' : 'Shopify'}-ready product file in minutes.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">PDF · Excel · CSV · Word</p>
+          <ChevronRight className="w-4 h-4 opacity-60" />
+        </button>
+        <button
+          onClick={onStartStockCheck}
+          className="w-full h-14 bg-card border border-primary/40 rounded-xl flex items-center gap-3 px-4 hover:bg-primary/10 transition-colors"
+        >
+          <span className="text-xl">🔍</span>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-semibold text-foreground">Stock check</p>
+            <p className="text-[11px] text-muted-foreground">Detect refills, new colours & products</p>
           </div>
-        </div>
-        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartInvoice}>
-          Start <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </button>
+        <button
+          onClick={onStartEmailInbox}
+          className="w-full h-14 bg-card border border-border rounded-xl flex items-center gap-3 px-4 hover:bg-primary/10 transition-colors relative"
+        >
+          <span className="text-xl">📧</span>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-semibold text-foreground">Email inbox</p>
+            <p className="text-[11px] text-muted-foreground">Process supplier invoices from email</p>
+          </div>
+          {unreadCount > 0 && (
+            <span className="bg-primary text-primary-foreground text-[10px] rounded-full px-1.5 min-w-[18px] text-center font-semibold">
+              {unreadCount}
+            </span>
+          )}
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </button>
       </div>
 
-      {/* Packing Slip Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <Package className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Packing slip</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Extract products from delivery dockets — no pricing needed.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">PDF · Image · Excel · CSV</p>
-          </div>
+      {/* ── STATS ROW ── */}
+      <div className="flex gap-2 mb-4">
+        <div className="flex-1 bg-card rounded-lg border border-border px-3 py-2 text-center">
+          <p className="text-lg font-bold font-display">84</p>
+          <p className="text-[10px] text-muted-foreground">{mode.isLightspeed ? 'Products ready' : 'Products imported'}</p>
         </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartPackingSlip}>
-          Start <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Stock Check Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <PackageCheck className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Stock check</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Received a new invoice? Check what's already in Shopify before adding products — auto-detects refills, new colours, and new products.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">refill · new colour · new product</p>
-          </div>
+        <div className="flex-1 bg-card rounded-lg border border-border px-3 py-2 text-center">
+          <p className="text-lg font-bold font-display">{getStockUpdatesCount()}</p>
+          <p className="text-[10px] text-muted-foreground">Stock updates</p>
         </div>
-        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartStockCheck}>
-          Check invoice <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Scan Mode AI Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <ScanLine className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Scan Mode (AI)</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Scan or enter items quickly and build your product list in seconds.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">text · photo · barcode</p>
-          </div>
+        <div className="flex-1 bg-card rounded-lg border border-border px-3 py-2 text-center cursor-pointer hover:border-primary/30 transition-colors" onClick={onStartCatalogMemory}>
+          <p className="text-lg font-bold font-display">{getTotalCatalogProducts()}</p>
+          <p className="text-[10px] text-muted-foreground">Catalog</p>
         </div>
-        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartScanMode}>
-          Start <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Email Inbox Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <Mail className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold font-display">Email inbox</h2>
-              {getUnprocessedInboxCount() > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-primary text-primary-foreground">{getUnprocessedInboxCount()}</span>
-              )}
-            </div>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Suppliers email invoices directly. Process them without uploading.
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartEmailInbox}>
-          Open inbox <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
-            <Percent className="w-5 h-5 text-secondary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Bulk sale pricing</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Put a collection on sale or restore original prices. Upload your {mode.isLightspeed ? 'Lightspeed' : 'Shopify'} export.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Upload {mode.isLightspeed ? 'Lightspeed' : 'Shopify'} product export</p>
-          </div>
-        </div>
-        <Button variant="amber" className="w-full mt-4 h-12 text-base" onClick={onStartSale}>
-          Start <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Price Adjustment Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-success/15 flex items-center justify-center shrink-0">
-            <DollarSign className="w-5 h-5 text-success" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Price adjustment</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Apply bulk discounts, markups, or exact pricing to products. AI-powered or manual.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">% discount · markup · exact price · rounding</p>
-          </div>
-        </div>
-        <Button variant="success" className="w-full mt-4 h-12 text-base" onClick={onStartPriceAdjust}>
-          Start <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Restock Analytics Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-destructive/15 flex items-center justify-center shrink-0">
-            <BarChart3 className="w-5 h-5 text-destructive" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Restock analytics</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Find size holes and sold-out items. Generate JOOR reorder files instantly.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Upload {mode.isLightspeed ? 'Lightspeed' : 'Shopify'} or JOOR inventory</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base border-destructive/30 text-destructive hover:bg-destructive/10" onClick={onStartRestock}>
-          Start <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Purchase Orders Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <ClipboardList className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Purchase orders</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Create POs before goods arrive, then match invoices to verify quantities and prices.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Create · match · verify</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartPurchaseOrders}>
-          View POs <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Order Form Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <FileText className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Order forms</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Create professional wholesale order forms to send to your suppliers.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">PDF · CSV · email text</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartOrderForm}>
-          Start <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Reorder Suggestions Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
-            <RotateCcw className="w-5 h-5 text-secondary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Reorder suggestions</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              AI-powered reorder recommendations based on stock levels and order history.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Low stock · due for reorder · seasonal</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartReorder}>
-          View suggestions <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Supplier Performance Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Users className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Supplier performance</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Track invoices, match rates, and cost history per supplier.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Invoices · products · pricing trends</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartSuppliers}>
-          View suppliers <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Catalog Memory Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <BookOpen className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Catalog memory</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Upload supplier catalogs so future invoices match instantly — no web search needed.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">{getTotalCatalogProducts()} products learned</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartCatalogMemory}>
-          Manage catalogs <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Google Feed Health Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-success/15 flex items-center justify-center shrink-0">
-            <BarChart3 className="w-5 h-5 text-success" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Google Feed Health</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Fix gender, age_group, and color for all products. Push metafields directly to Shopify.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">gender · age_group · color · metafields</p>
-          </div>
-        </div>
-        <Button variant="success" className="w-full mt-4 h-12 text-base" onClick={onStartFeedHealth}>
-          Scan store <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Google Colours Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">🎨</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Google colours</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Auto-detect product colours for Google Shopping. Fix "Add missing colors" in Merchant Center.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">title parsing · variant · vision AI</p>
-          </div>
-        </div>
-        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartGoogleColour}>
-          Detect colours <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Google Ads Attributes Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-destructive/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">📢</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Google Ads attributes</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Auto-detect age group and gender for every product. Fix disapproved ads in one export.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">age_group · gender · Matrixify CSV</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base border-destructive/30 text-destructive hover:bg-destructive/10" onClick={onStartGoogleAds}>
-          Fix ads <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Style Grouping Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">🎨</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Style grouping</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Link same-style products so customers can switch between colours on the product page.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">related_products · colour_label · Matrixify CSV</p>
-          </div>
-        </div>
-        <Button variant="secondary" className="w-full mt-4 h-12 text-base" onClick={onStartStyleGrouping}>
-          Group styles <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Collection SEO Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-warning/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">🗂</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Collection SEO</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Turn every product name into rankable collection pages with internal links. Programmatic SEO from a single invoice.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">brand · print · type · internal links</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base border-warning/30 text-warning hover:bg-warning/10" onClick={onStartCollectionSEO}>
-          Generate <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* GEO & Agentic Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">🤖</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">GEO & Agentic</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Get cited by AI. Get bought by AI agents. Optimise for ChatGPT, Perplexity, Google AI Mode, and UCP agentic commerce.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">answer capsules · schema · UCP · visibility</p>
-          </div>
-        </div>
-        <Button className="w-full mt-4 h-12 text-base bg-gradient-to-r from-primary to-accent text-primary-foreground" onClick={onStartGeoAgentic}>
-          Optimise <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Organic SEO Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">📈</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Organic SEO</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Build topical authority. Generate blog posts that rank on Google and drive free traffic to your products.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">topic maps · blog posts · internal links · gap analysis</p>
-          </div>
-        </div>
-        <Button className="w-full mt-4 h-12 text-base bg-primary text-primary-foreground" onClick={onStartOrganicSEO}>
-          Build topic map <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Margin Protection Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-destructive/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">🛡️</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Margin Protection</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Prevent selling below cost. Protect minimum margins across all pricing actions.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">real-time validation · bulk checks · audit trail</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base border-destructive/30 text-destructive hover:bg-destructive/10" onClick={onStartMarginProtection}>
-          Review margins <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Markdown Ladder Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-warning/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">📉</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Markdown Ladders</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Automatically reduce prices over time for slow-moving stock. Staged discounts with margin protection.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">staged discounts · dead stock · auto-pricing</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base border-warning/30 text-warning hover:bg-warning/10" onClick={onStartMarkdownLadder}>
-          Manage ladders <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Stock Monitor Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <Bell className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Stock Monitor</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Track ongoing styles in real time. Get alerts when any size drops below your reorder threshold.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">ongoing styles · reorder alerts · size tracking</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base border-primary/30 text-primary hover:bg-primary/10" onClick={onStartStockMonitor}>
-          View alerts <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Social Media Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">📣</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Social Media</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Auto-detect new arrivals, generate AI captions, and schedule posts to Facebook and Instagram.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">AI captions · drag-drop schedule · auto-detect</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base border-primary/30 text-primary hover:bg-primary/10" onClick={onStartSocialMedia}>
-          Manage queue <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Inventory Planning Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">🏭</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Inventory Intelligence</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Your complete Stocky replacement — purchase orders, demand forecasting, dead stock detection, and AI-powered reorder intelligence.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">POs · health scores · dead stock · margin protection</p>
-          </div>
-        </div>
-        <div className="flex gap-2 mt-4">
-          <Button variant="default" className="flex-1 h-12 text-base" onClick={onStartStockyHub}>
-            Inventory Hub <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
-          <Button variant="outline" className="h-12 text-base border-primary/30 text-primary hover:bg-primary/10" onClick={onStartInventoryPlanning}>
-            Advanced
-          </Button>
-        </div>
-      </div>
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
-            <span className="text-lg">🔎</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Competitor Intel</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Spy on competitors and suppliers. Find collection gaps. Generate descriptions that outrank them.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">gap analysis · print stories · SEO descriptions</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartCompetitorIntel}>
-          Research <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">AI Feed Optimisation</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Generate Google Shopping attributes from product images — silhouette, neckline, pattern and more.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">product_detail · refinement filters · "About this product"</p>
-          </div>
-        </div>
-        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartFeedOptimise}>
-          Optimise feed <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Performance Dashboard Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <BarChart3 className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Performance</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Track ROAS, spend, conversions, and pipeline activity for published products.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">ROAS · spend · conversions · funnel</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartPerformance}>
-          View dashboard <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Google Ads Setup AI Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-success/15 flex items-center justify-center shrink-0">
-            <TrendingUp className="w-5 h-5 text-success" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Google Ads Setup AI</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Launch and scale profitable ads step-by-step. From zero to converting campaigns.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">search · shopping · performance max</p>
-          </div>
-        </div>
-        <Button variant="success" className="w-full mt-4 h-12 text-base" onClick={onStartGoogleAdsSetup}>
-          Start <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Meta Ads Setup AI Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <Target className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Meta Ads Setup AI</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Facebook + Instagram ads — from zero to profitable campaigns with Advantage+.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">UGC · reels · advantage+ shopping</p>
-          </div>
-        </div>
-        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartMetaAdsSetup}>
-          Start <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Lightspeed → Shopify Converter Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <FileText className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Lightspeed → Shopify</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Convert your Lightspeed product export to a Shopify-ready CSV. Barcodes mapped automatically where available.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">products · variants · barcodes · pricing</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartLightspeedConvert}>
-          Convert file → <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* JOOR Integration Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <Link className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">JOOR Orders</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Pull wholesale orders from JOOR and push products directly to Shopify. No manual entry — one click from order to Shopify.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">wholesale · orders · styles · push to Shopify</p>
-          </div>
-        </div>
-        <Button variant="outline" className="w-full mt-4 h-12 text-base" onClick={onStartJoor}>
-          Open JOOR → <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Lookbook Import Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold font-display">Lookbook Import</h2>
-              <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded-full font-medium">New</span>
-            </div>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Paste any Dropbox, Google Drive, WeTransfer, or OneDrive link from your supplier. AI reads the images and creates products automatically.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Dropbox · Google Drive · WeTransfer · OneDrive</p>
-          </div>
-        </div>
-        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartLookbookImport}>
-          Import lookbook → <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Wholesale Import Card */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-3">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <Package className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Wholesale Import</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Import orders from JOOR, NuOrder, Brandscope, Brandboom, Faire, or any CSV export. Push products directly to Shopify in one click.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">JOOR · NuOrder · Brandscope · Brandboom · Faire · CSV</p>
-          </div>
-        </div>
-        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartWholesaleImport}>
-          Import orders → <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Accounting Integration */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <DollarSign className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold font-display">Accounting push</h2>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/15 text-primary px-1.5 py-0.5 rounded">New</span>
-            </div>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Push supplier invoices directly to Xero or MYOB — GST, total, category and supplier all pre-filled. Zero double entry.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Xero · MYOB · GST auto-mapped · draft bills</p>
-          </div>
-        </div>
-        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartAccounting}>
-          Connect accounting → <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      {/* Profit & Loss */}
-      <div className="bg-card rounded-lg border border-border p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-success/15 flex items-center justify-center shrink-0">
-            <TrendingUp className="w-5 h-5 text-success" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold font-display">Profit & Loss</h2>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-success/15 text-success px-1.5 py-0.5 rounded">New</span>
-            </div>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              True P&L beyond Shopify's basic margin — track all expenses including ads, apps, staff, rent, shipping, and custom categories.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">Custom date range · Import CSV · Export report</p>
-          </div>
-        </div>
-        <Button variant="success" className="w-full mt-4 h-12 text-base" onClick={onStartProfitLoss}>
-          View Profit & Loss → <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
-      </div>
-
-      <div className="bg-card rounded-lg border border-border p-5 mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-            <Link className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold font-display">Local collab SEO</h2>
-            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-              Write one blog post with local partners. Every store gets a backlink. Runs in 10 minutes.
-            </p>
-            <p className="text-xs text-muted-foreground mt-2 font-mono-data">blog post · outreach emails · backlink tracker</p>
-          </div>
-        </div>
-        <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={onStartCollabSEO}>
-          Start campaign <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
       </div>
 
       {/* Stock by Location */}
@@ -903,28 +246,65 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         );
       })()}
 
-      {/* Stat tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <div className="bg-card rounded-lg border border-border p-4 text-center">
-          <p className="text-2xl font-bold font-display">3</p>
-          <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Lightspeed imports' : 'CSV exports'}</p>
-        </div>
-        <div className="bg-card rounded-lg border border-border p-4 text-center">
-          <p className="text-2xl font-bold font-display">84</p>
-          <p className="text-xs text-muted-foreground mt-1">{mode.isLightspeed ? 'Products ready' : 'Products imported'}</p>
-        </div>
-        <div className="bg-card rounded-lg border border-border p-4 text-center">
-          <p className="text-2xl font-bold font-display">{getStockUpdatesCount()}</p>
-          <p className="text-xs text-muted-foreground mt-1">📦 Stock updates</p>
-        </div>
-        <div className="bg-card rounded-lg border border-border p-4 text-center cursor-pointer hover:border-primary/30 transition-colors" onClick={onStartCatalogMemory}>
-          <p className="text-2xl font-bold font-display">{getTotalCatalogProducts()}</p>
-          <p className="text-xs text-muted-foreground mt-1">📚 Catalog products</p>
-          <p className="text-[9px] text-muted-foreground/60 mt-0.5">More catalogs = faster matching</p>
-        </div>
-      </div>
+      {/* ── QUICK ACCESS GRID ── */}
+      <CollapsibleSection title="Invoices & Stock" icon="📦" defaultOpen>
+        <FeatureTile icon="📄" label="Import invoice" onClick={onStartInvoice} highlight />
+        <FeatureTile icon="📦" label="Packing slip" onClick={onStartPackingSlip} />
+        <FeatureTile icon="📷" label="Scan mode" onClick={onStartScanMode} />
+        <FeatureTile icon="🔍" label="Stock check" onClick={onStartStockCheck} highlight />
+        <FeatureTile icon="🔗" label="JOOR" onClick={onStartJoor} />
+        <FeatureTile icon="📥" label="Wholesale import" onClick={onStartWholesaleImport} />
+        <FeatureTile icon="📸" label="Lookbook import" onClick={onStartLookbookImport} />
+        <FeatureTile icon="📋" label="Purchase orders" onClick={onStartPurchaseOrders} />
+        <FeatureTile icon="📝" label="Order forms" onClick={onStartOrderForm} />
+        <FeatureTile icon="💼" label="Accounting push" onClick={onStartAccounting} />
+      </CollapsibleSection>
 
-      {/* Performance metrics card */}
+      <CollapsibleSection title="Inventory & Pricing" icon="💰">
+        <FeatureTile icon="🏭" label="Inventory hub" onClick={onStartStockyHub} />
+        <FeatureTile icon="🔔" label="Stock monitor" onClick={onStartStockMonitor} />
+        <FeatureTile icon="📊" label="Restock analytics" onClick={onStartRestock} />
+        <FeatureTile icon="🔄" label="Reorder suggestions" onClick={onStartReorder} />
+        <FeatureTile icon="💲" label="Price adjustment" onClick={onStartPriceAdjust} />
+        <FeatureTile icon="🏷️" label="Bulk sale" onClick={onStartSale} />
+        <FeatureTile icon="🛡️" label="Margin protection" onClick={onStartMarginProtection} />
+        <FeatureTile icon="📉" label="Markdown ladders" onClick={onStartMarkdownLadder} />
+        <FeatureTile icon="📈" label="P&L" onClick={onStartProfitLoss} />
+        <FeatureTile icon="👥" label="Supplier performance" onClick={onStartSuppliers} />
+        <FeatureTile icon="🗓️" label="Seasons" onClick={() => {}} />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Marketing & SEO" icon="📢">
+        <FeatureTile icon="💚" label="Feed health" onClick={onStartFeedHealth} />
+        <FeatureTile icon="✨" label="AI feed optimisation" onClick={onStartFeedOptimise} />
+        <FeatureTile icon="🎨" label="Google colours" onClick={onStartGoogleColour} />
+        <FeatureTile icon="📢" label="Google Ads attributes" onClick={onStartGoogleAds} />
+        <FeatureTile icon="🚀" label="Google Ads setup" onClick={onStartGoogleAdsSetup} />
+        <FeatureTile icon="📱" label="Meta Ads setup" onClick={onStartMetaAdsSetup} />
+        <FeatureTile icon="📊" label="Performance" onClick={onStartPerformance} />
+        <FeatureTile icon="📈" label="Organic SEO" onClick={onStartOrganicSEO} />
+        <FeatureTile icon="🗂️" label="Collection SEO" onClick={onStartCollectionSEO} />
+        <FeatureTile icon="🤖" label="GEO & Agentic" onClick={onStartGeoAgentic} />
+        <FeatureTile icon="🤝" label="Collab SEO" onClick={onStartCollabSEO} />
+        <FeatureTile icon="🔎" label="Competitor intel" onClick={onStartCompetitorIntel} />
+        <FeatureTile icon="📣" label="Social media" onClick={onStartSocialMedia} />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Tools" icon="🔧">
+        <FeatureTile icon="🏷️" label="Tag builder" onClick={() => {}} />
+        <FeatureTile icon="✍️" label="SEO writer" onClick={() => {}} />
+        <FeatureTile icon="🔍" label="Price lookup" onClick={() => {}} />
+        <FeatureTile icon="📖" label="Brand reference" onClick={() => {}} />
+        <FeatureTile icon="📤" label="Export collections" onClick={() => {}} />
+        <FeatureTile icon="📥" label="Import collections" onClick={() => {}} />
+        <FeatureTile icon="🤖" label="Auto collections AI" onClick={() => {}} />
+        <FeatureTile icon="🖼️" label="Image optimisation" onClick={onStartImageOptimise} />
+        <FeatureTile icon="📚" label="Catalog memory" onClick={onStartCatalogMemory} />
+        <FeatureTile icon="⚙️" label="AI instructions" onClick={() => {}} />
+        <FeatureTile icon="📋" label="Audit log" onClick={onOpenAuditLog || (() => {})} />
+      </CollapsibleSection>
+
+      {/* ── PERFORMANCE METRICS ── */}
       {(() => {
         const history: { lines: number; processingTime: number; matchRate: number }[] = (() => {
           try { return JSON.parse(localStorage.getItem("processing_history") || "[]"); } catch { return []; }
@@ -939,7 +319,7 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
         const savedHours = (savedMinutes / 60).toFixed(1);
 
         return (
-          <div className="bg-card rounded-lg border border-border p-4 mb-4">
+          <div className="bg-card rounded-lg border border-border p-4 mb-4 mt-4">
             <div className="flex items-center gap-2 mb-3">
               <Zap className="w-4 h-4 text-primary" />
               <span className="text-sm font-semibold">Performance</span>
@@ -947,42 +327,34 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
             <div className="grid grid-cols-3 gap-3 text-center">
               <div>
                 <p className="text-lg font-bold font-display">{avgTime < 60 ? `${avgTime}s` : `${Math.floor(avgTime / 60)}m ${avgTime % 60}s`}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Avg processing<br/>per invoice</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Avg processing</p>
               </div>
               <div>
                 <p className="text-lg font-bold font-display text-success">{avgMatch}%</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Avg match rate<br/>this month</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Match rate</p>
               </div>
               <div>
                 <p className="text-lg font-bold font-display text-primary">{savedHours}h</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Total saved<br/>vs manual</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Time saved</p>
               </div>
-            </div>
-
-            {/* Time saved detail */}
-            <div className="bg-muted/50 rounded-lg p-3 mt-3 text-xs">
-              <p className="font-semibold mb-1.5 flex items-center gap-1"><Clock className="w-3 h-3" /> How much time has Sonic Invoice saved you?</p>
-              <div className="grid grid-cols-2 gap-y-1 text-muted-foreground">
-                <span>Invoices processed:</span><span className="font-mono-data text-foreground">{totalInvoices}</span>
-                <span>Total product lines:</span><span className="font-mono-data text-foreground">{totalLines}</span>
-                <span>Manual time estimate:</span><span className="font-mono-data text-foreground">~{Math.round(manualMinutes / 60)}h</span>
-                <span>Sonic Invoice time:</span><span className="font-mono-data text-foreground">~{(totalProcTime / 60).toFixed(0)}m</span>
-                <span>Time saved:</span><span className="font-mono-data text-success font-semibold">~{savedHours} hours ✅</span>
-              </div>
-              <p className="text-[10px] text-muted-foreground/70 mt-2">Based on 8 min/product for manual entry (industry average for fashion boutiques)</p>
             </div>
           </div>
         );
       })()}
 
-      {/* Recent Activity — from audit log */}
+      {/* ── RECENT ACTIVITY ── */}
       <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recent activity</h3>
       {(() => {
-        const auditEntries = getRecentAuditEntries(5);
+        const auditEntries = getRecentAuditEntries(3);
+        const fallbackActivity = [
+          { type: "invoice" as const, label: mode.isLightspeed ? "Lightspeed CSV downloaded — 18 products" : "CSV exported — Jantzen Mar26 — 18 products", time: "2 days ago" },
+          { type: "sale" as const, label: mode.isLightspeed ? "Ready to import to Lightspeed POS" : "Baku 30% off — 48 products", time: "5 days ago" },
+        ];
+
         if (auditEntries.length === 0) {
           return (
             <div className="space-y-2">
-              {recentActivity.map((item, i) => (
+              {fallbackActivity.map((item, i) => (
                 <div key={i} className="flex items-center gap-3 bg-card rounded-lg border border-border px-4 py-3">
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${item.type === "invoice" ? "bg-primary/15 text-primary" : "bg-secondary/15 text-secondary"}`}>
                     {item.type === "invoice" ? "Invoice" : "Sale"}
@@ -1007,7 +379,7 @@ const HomeScreen = ({ onStartInvoice, onStartSale, onStartRestock, onStartPriceA
             ))}
             {onOpenAuditLog && (
               <button onClick={onOpenAuditLog} className="flex items-center gap-1 text-xs text-primary mt-2 hover:underline">
-                <ClipboardList className="w-3 h-3" /> View full log →
+                <ClipboardList className="w-3 h-3" /> View all →
               </button>
             )}
           </div>

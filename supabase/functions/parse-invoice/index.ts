@@ -313,6 +313,13 @@ Return ONLY valid JSON (no markdown, no explanation):
     "grouping_reason": "why grouping is or isn't needed",
     "total_products_expected": number,
     "total_variants_expected": number,
+    "page_zones": {
+      "header": { "y_start": 0.00, "y_end": 0.08 },
+      "invoice_info": { "y_start": 0.08, "y_end": 0.18 },
+      "line_items": { "y_start": 0.20, "y_end": 0.78 },
+      "totals": { "y_start": 0.78, "y_end": 0.88 },
+      "footer": { "y_start": 0.88, "y_end": 1.00 }
+    },
     "row_anchors_detected": ["CF08381", "CF08446", "CF08448"],
     "row_count": number,
     "expected_review_level": "low" | "medium" | "high",
@@ -451,31 +458,106 @@ function crossValidateProducts(products: Record<string, unknown>[]): Record<stri
   });
 }
 
-// ── Server-side noise filter ──────────────────────────────
+// ── Server-side noise filter (enhanced with zone-aware rejection) ──
+const NOISE_EXACT = new Set([
+  "total", "subtotal", "sub total", "sub-total",
+  "freight", "shipping", "delivery", "handling",
+  "gst", "tax", "vat",
+  "discount", "less discount", "credit",
+  "amount due", "balance", "balance due", "payment", "deposit",
+  "grand total", "net total",
+  "total units", "total qty", "total pieces",
+  "total excl. gst", "total ex gst", "total excl gst",
+  "total incl. gst", "total inc gst", "total incl gst",
+  "gst amount", "tax amount",
+]);
+
+const NOISE_PATTERNS = [
+  /^carton\s/i,
+  /^ctn\s/i,
+  /^asn\s/i,
+  /^consignment/i,
+  /^invoice\s*(number|no|#|:)/i,
+  /^tax\s*invoice/i,
+  /^customer\s/i,
+  /^account\s*(number|no|#|:)/i,
+  /^sold\s*to/i,
+  /^ship\s*to/i,
+  /^deliver\s*to/i,
+  /^delivery\s*address/i,
+  /^billing\s*address/i,
+  /^charge\s*date/i,
+  /^despatch\s*date/i,
+  /^order\s*(number|no|#|date|:)/i,
+  /^purchase\s*order/i,
+  /^reference\s/i,
+  /^po\s*#/i,
+  /^sales\s*rep/i,
+  /^agent\s/i,
+  /^territory\s/i,
+  /^abn\s/i,
+  /^acn\s/i,
+  /^payment\s*terms?/i,
+  /^terms?\s*:/i,
+  /^net\s*\d+/i,
+  /^eom$/i,
+  /^cod$/i,
+  /^bank\s*details?/i,
+  /^bsb\s/i,
+  /^remittance/i,
+  /^thank\s*you/i,
+  /^please\s*pay/i,
+  /^continued\s/i,
+  /^page\s*\d/i,
+  /^\d+[.,]\d{2}$/,  // bare price value
+];
+
 function filterNoise(products: Record<string, unknown>[]): { kept: Record<string, unknown>[]; rejected: Record<string, unknown>[] } {
   const kept: Record<string, unknown>[] = [];
   const rejected: Record<string, unknown>[] = [];
 
   for (const p of products) {
-    const title = String(p.product_title || p.style_description || p.name || "").trim().toLowerCase();
+    const title = String(p.product_title || p.style_description || p.name || "").trim();
+    const titleLower = title.toLowerCase();
     const code = String(p.style_code || p.sku || "").trim();
 
+    // Rule 1: Empty
     if (!title && !code) {
       rejected.push({ raw_text: JSON.stringify(p), rejection_reason: "Empty title and code" });
       continue;
     }
-    if (/^(total|subtotal|sub total|freight|shipping|gst|tax|delivery|discount|amount due|balance|payment|deposit)$/i.test(title)) {
-      rejected.push({ raw_text: title, rejection_reason: `Noise term: "${title}"` });
+
+    // Rule 2: Exact noise term match
+    if (NOISE_EXACT.has(titleLower)) {
+      rejected.push({ raw_text: title, rejection_reason: `Non-product term: "${title}"` });
       continue;
     }
-    if (/^carton\s/i.test(title) || /^carton\s/i.test(code)) {
-      rejected.push({ raw_text: title || code, rejection_reason: "Carton reference" });
-      continue;
+
+    // Rule 3: Pattern-based noise match
+    let matched = false;
+    for (const pat of NOISE_PATTERNS) {
+      if (pat.test(title) || pat.test(code)) {
+        rejected.push({ raw_text: title || code, rejection_reason: `Non-product pattern: ${pat.source}` });
+        matched = true;
+        break;
+      }
     }
-    if (/^\d+[.,]\d{2}$/.test(title)) {
-      rejected.push({ raw_text: title, rejection_reason: "Title is a price value" });
-      continue;
+    if (matched) continue;
+
+    // Rule 4: Row outside line-item zone (if y-position data available)
+    const yStart = Number(p.row_y_start) || 0;
+    if (yStart > 0) {
+      // If row is in the top 5% or bottom 8% of the page, it's likely metadata/totals
+      if (yStart < 0.05) {
+        rejected.push({ raw_text: title || code, rejection_reason: `Header zone (y=${yStart.toFixed(2)})` });
+        continue;
+      }
+      if (yStart > 0.92) {
+        rejected.push({ raw_text: title || code, rejection_reason: `Footer zone (y=${yStart.toFixed(2)})` });
+        continue;
+      }
     }
+
     kept.push(p);
   }
 

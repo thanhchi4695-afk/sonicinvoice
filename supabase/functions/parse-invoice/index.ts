@@ -30,7 +30,42 @@ Detect the document's structural layout:
 - "size_row_below" — product row followed by a separate size breakdown row (e.g. "XS (1) S (2) M (2)")
 - "description_embedded" — colour, size, and sometimes style code are embedded in the description text
 - "low_structure" — handwritten, loosely formatted, or non-tabular
+- "landscape_sideways" — a landscape-oriented invoice photographed sideways; style codes in left column, sizes run horizontally, often with handwritten ticks and prices
 - "mixed" — multiple layout patterns in the same document
+
+## STAGE B1.5 — LANDSCAPE / SIDEWAYS INVOICE DETECTION (CHECK BEFORE ZONE EXTRACTION)
+
+Many wholesale fashion invoices are LANDSCAPE format and photographed SIDEWAYS (rotated 90° CW or CCW). You MUST detect this before zone segmentation.
+
+### Detection signals for landscape sideways invoices:
+- Text runs vertically (top-to-bottom or bottom-to-top) instead of left-to-right
+- The document appears wider than tall in its natural reading orientation
+- Size labels (XS, S, M, L, XL or 6, 8, 10, 12, 14) run HORIZONTALLY across a row (they form column headers)
+- Style codes appear in a VERTICAL left column
+- The table "reads" naturally when mentally rotated 90°
+
+### When a landscape sideways invoice is detected:
+1. Set layout_type to "landscape_sideways"
+2. **Mentally rotate** the document to its correct reading orientation before extracting
+3. After rotation, the structure is typically:
+   - LEFT COLUMN: style codes (vertical list, one per product row)
+   - MIDDLE COLUMNS: description, colour
+   - RIGHT COLUMNS: size grid running horizontally (size headers across the top, quantities in cells)
+   - FAR RIGHT: unit price, line total
+4. Handwritten elements are COMMON in landscape invoices:
+   - **Ticks (✓)** under size columns = quantity 1
+   - **Handwritten numbers** beside descriptions = wholesale price
+   - **Circled items** = selected/confirmed products
+5. Record `"orientation_detected": "landscape_sideways"` and `"rotation_applied": 90 | 270` in parsing_plan
+
+### Landscape row-by-row extraction strategy:
+For each style code found in the left column:
+1. **Anchor** on the style code (left edge of the row)
+2. **Read right** to find the description text and any handwritten price annotation
+3. **Continue right** into the size grid — match each column header (size label) with the cell below/beside it
+4. **Interpret handwritten marks**: tick = 1, written number = that number, empty = 0, ambiguous = flag
+5. **Read far right** for unit price and line total (may be printed or handwritten)
+6. **Output** one variant per non-zero size, all sharing the same style_code, description, colour, and unit_cost
 
 ## STAGE B2 — TABLE-ZONE EXTRACTION (CRITICAL — DO THIS BEFORE ANY PRODUCT EXTRACTION)
 
@@ -304,6 +339,8 @@ Return ONLY valid JSON (no markdown, no explanation):
     "layout_type": "<one of the layout types from Stage B>",
     "variant_method": "one_row_per_variant" | "size_grid_matrix" | "size_grid_handwritten" | "product_block_nested" | "size_row_below" | "description_embedded" | "handwritten" | "none",
     "size_system": "numeric_au" | "numeric_us" | "alpha" | "combined" | "cup" | "denim" | "one_size" | "mixed" | "none",
+    "orientation_detected": "portrait" | "landscape_sideways" | "unknown",
+    "rotation_applied": 0 | 90 | 180 | 270,
     "line_item_zone": "description of where the product rows are located",
     "quantity_field": "description of where/how quantity is expressed",
     "cost_field": "description of which field contains wholesale cost",
@@ -673,7 +710,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
             },
             {
               type: "text",
-              text: "Analyse this document. FIRST scan the entire line-item table and identify ALL style code anchors (e.g. CF08381, CF08446, etc.) — list them in row_anchors_detected. Then extract EVERY product row, one per style code anchor, expanding size variants. Do NOT stop after the first row. If you see 5 style codes, return products from all 5. Return JSON only.",
+              text: "Analyse this document. FIRST check if it's a landscape/sideways photo — if text runs vertically or the table is wider than tall, mentally rotate it before extraction. Then scan the entire line-item table and identify ALL style code anchors (e.g. CF08381, CF08446, etc.) — list them in row_anchors_detected. For each style code, read across the full row: description, colour, size grid (converting handwritten ticks to quantities), unit price, and line total. Extract EVERY product row, expanding size variants. Do NOT stop after the first row. Return JSON only.",
             },
           ],
         },
@@ -683,7 +720,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Analyse this document. FIRST scan the entire line-item table and identify ALL style code anchors — list them in row_anchors_detected. Then extract EVERY product row, expanding size variants. Do NOT stop after the first row. Return JSON only.\n\nDocument content:\n${fileContent}`,
+          content: `Analyse this document. Check if it's landscape/sideways format. FIRST scan the entire line-item table and identify ALL style code anchors — list them in row_anchors_detected. For each anchor, read the full row including size grid (interpret handwritten ticks as quantities). Extract EVERY product row, expanding size variants. Do NOT stop after the first row. Return JSON only.\n\nDocument content:\n${fileContent}`,
         },
       ];
     }

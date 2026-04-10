@@ -32,18 +32,63 @@ Detect the document's structural layout:
 - "low_structure" — handwritten, loosely formatted, or non-tabular
 - "mixed" — multiple layout patterns in the same document
 
-## STAGE B2 — LINE-ITEM TABLE BOUNDARY DETECTION (CRITICAL)
+## STAGE B2 — TABLE-ZONE EXTRACTION (CRITICAL — DO THIS BEFORE ANY PRODUCT EXTRACTION)
 
-Before extracting any products, you MUST identify the exact boundaries of the line-item table:
+Before extracting ANY products, you MUST segment the entire page into labelled zones and ONLY extract from the line-item zone.
 
-1. **Header zone** (IGNORE): Company logo, supplier name, ABN, address, invoice number, date, customer details. This is NOT product data.
-2. **Line-item zone** (EXTRACT FROM HERE): The rectangular region containing the product table. It typically:
-   - Starts after column headers like "Style", "Description", "Qty", "Price", "Total"
-   - Contains multiple rows of product data
-   - Each row usually begins with a style code / SKU in the leftmost data column
-3. **Footer zone** (IGNORE): Subtotals, GST, Total Incl. GST, payment terms, bank details.
+### Zone Segmentation (label every region of the page):
 
-**CRITICAL**: Only extract products from the line-item zone. NEVER treat header text, address blocks, or footer totals as products.
+1. **HEADER_ZONE** (y ≈ 0.00–0.10): Company logo, supplier name, brand graphic, ABN/ACN. IGNORE completely.
+2. **INVOICE_INFO_ZONE** (y ≈ 0.05–0.20): Invoice metadata boxes — invoice number, invoice date, charge date, despatch date, order number, customer name, customer account number, delivery address, billing address. IGNORE completely — these are NOT products.
+3. **LINE_ITEM_ZONE** (the ONLY zone to extract from): The rectangular product table. Identified by:
+   - Column headers row containing words like: Style, Code, SKU, Description, Colour, Size, Qty, Units, Price, Cost, Total, RRP
+   - Multiple data rows below the header, each starting with a style code or product description
+   - Ends BEFORE any subtotal/total row
+4. **TOTALS_ZONE** (typically y ≈ 0.80–0.95): Subtotal, Total Excl. GST, GST Amount, Total Incl. GST, Total Units, Total Qty. IGNORE completely.
+5. **FOOTER_ZONE** (y ≈ 0.90–1.00): Payment terms, bank details, remittance advice, "Thank you for your order", page numbers. IGNORE completely.
+
+### Record zone boundaries in parsing_plan:
+```
+"page_zones": {
+  "header": { "y_start": 0.00, "y_end": 0.08 },
+  "invoice_info": { "y_start": 0.08, "y_end": 0.18 },
+  "line_items": { "y_start": 0.20, "y_end": 0.78 },
+  "totals": { "y_start": 0.78, "y_end": 0.88 },
+  "footer": { "y_start": 0.88, "y_end": 1.00 }
+}
+```
+
+### NON-PRODUCT REJECTION LIST (NEVER extract these as products):
+
+If ANY row or text block contains one of these patterns, it is NOT a product — add it to rejected_rows with a clear rejection_reason:
+
+**Invoice metadata (INVOICE_INFO_ZONE):**
+- Invoice Number / Invoice No / Inv No / Tax Invoice
+- Customer / Account / Sold To / Ship To / Deliver To
+- Delivery Address / Billing Address / ABN / ACN
+- Charge Date / Despatch Date / Order Date / Due Date
+- Order Number / Purchase Order / Reference / PO#
+- Sales Rep / Agent / Territory
+
+**Footer totals (TOTALS_ZONE):**
+- Total Units / Total Qty / Total Pieces
+- Subtotal / Sub Total / Sub-Total
+- Total Excl. GST / Total Ex GST / Net Total
+- GST / GST Amount / Tax / VAT
+- Total Incl. GST / Total Inc GST / Grand Total / Amount Due / Balance Due
+- Freight / Shipping / Delivery Charge / Handling
+- Discount / Less Discount / Credit
+
+**Other non-product content:**
+- Payment Terms / Terms / Net 30 / EOM / COD
+- Bank Details / BSB / Account Number / Remittance
+- "Continued on next page" / Page X of Y
+- Carton / Carton No / CTN / ASN / Consignment
+- Season / Collection / Range header rows (no qty or price)
+- Empty rows / repeated column header rows
+- "Thank you" / "Please pay" / notes / comments
+
+**CRITICAL**: Only rows from the LINE_ITEM_ZONE that have a style code OR a product description (3+ chars) with at least one of (quantity, price) should become products. Everything else goes into rejected_rows.
 
 ## STAGE B3 — STYLE CODE ANCHORING (PRIMARY DETECTION METHOD — DO THIS FIRST)
 

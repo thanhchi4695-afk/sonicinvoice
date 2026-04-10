@@ -46,7 +46,7 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
   const [selectedLocation, setSelectedLocation] = useState("");
   const [applyStatuses, setApplyStatuses] = useState<ApplyStatus[]>([]);
   const [applySummary, setApplySummary] = useState<{ refills: number; newColours: number; newProducts: number; skipped: number; totalUnits: number }>({ refills: 0, newColours: 0, newProducts: 0, skipped: 0, totalUnits: 0 });
-  const [searchProduct, setSearchProduct] = useState<{ groupKey: string; query: string; results: ShopifyVariant[] } | null>(null);
+  const [searchProduct, setSearchProduct] = useState<{ groupKey: string; query: string; results: ShopifyVariant[]; loading: boolean } | null>(null);
 
   // ── Run batch lookup on mount ──
   useEffect(() => {

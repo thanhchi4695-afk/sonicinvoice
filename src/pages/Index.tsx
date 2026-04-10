@@ -346,7 +346,9 @@ const Index = () => {
            onStartStockCheck={() => setActiveFlow("stock_check")}
            onStartPriceLookup={() => setActiveFlow("price_lookup")}
            onStartSeasons={() => setActiveFlow("seasons")}
-           onNavigateToTab={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
+            onNavigateToTab={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
+            onStartPipeline={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }}
+            onStartPipelineChooser={() => setActiveFlow("pipeline_chooser")}
         />
       )}
       <Suspense fallback={suspenseFallback}>

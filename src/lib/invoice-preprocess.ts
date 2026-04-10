@@ -145,6 +145,11 @@ export async function preprocessInvoiceImage(
 
 // ── Canvas Utilities ──
 
+/** Maximum pixel dimension for images sent to the AI model.
+ *  Phone photos are 3000-4000px — downsizing saves bandwidth and
+ *  keeps the AI context window manageable without losing OCR quality. */
+const MAX_IMAGE_DIMENSION = 2048;
+
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -171,6 +176,27 @@ function loadImage(base64: string): Promise<HTMLImageElement> {
 function canvasToBase64(canvas: HTMLCanvasElement, quality = 0.92): string {
   const dataUrl = canvas.toDataURL("image/jpeg", quality);
   return dataUrl.split(",")[1];
+}
+
+/** Downscale a canvas if either dimension exceeds MAX_IMAGE_DIMENSION.
+ *  Preserves aspect ratio. Returns the same canvas if no resize needed. */
+function resizeIfNeeded(source: HTMLCanvasElement): HTMLCanvasElement {
+  const { width, height } = source;
+  if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION) return source;
+
+  const scale = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height);
+  const newW = Math.round(width * scale);
+  const newH = Math.round(height * scale);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = newW;
+  canvas.height = newH;
+  const ctx = canvas.getContext("2d")!;
+  // Use high-quality downscaling
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, 0, 0, newW, newH);
+  return canvas;
 }
 
 // ── EXIF Orientation ──

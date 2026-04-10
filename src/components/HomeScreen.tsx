@@ -129,6 +129,20 @@ const HomeScreen = ({
         </div>
       )}
 
+      {/* Switching from Stocky banner */}
+      {localStorage.getItem("stocky_onboarding_done") !== "true" && (
+        <div className="bg-card border border-border rounded-lg p-3 mb-4 flex items-center gap-3">
+          <span className="text-lg shrink-0">📦</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Switching from Stocky?</p>
+            <p className="text-xs text-muted-foreground">Import your data and see what Sonic adds on top.</p>
+          </div>
+          <Button variant="outline" size="sm" className="text-xs shrink-0" onClick={onStartStockyOnboarding}>
+            Start →
+          </Button>
+        </div>
+      )}
+
       {/* Lightspeed workflow card */}
       {mode.isLightspeed && (
         <div className="bg-card rounded-lg border border-purple-500/20 p-4 mb-4">

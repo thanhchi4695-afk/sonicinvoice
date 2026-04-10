@@ -273,8 +273,8 @@ const HomeScreen = ({
         <FeatureTile icon="🛡️" label="Margin protection" onClick={onStartMarginProtection} />
         <FeatureTile icon="📉" label="Markdown ladders" onClick={onStartMarkdownLadder} />
         <FeatureTile icon="📈" label="P&L" onClick={onStartProfitLoss} />
-        <FeatureTile icon="👥" label="Supplier performance" onClick={onStartSuppliers} />
-        <FeatureTile icon="🗓️" label="Seasons" onClick={() => {}} />
+        <FeatureTile icon="👥" label="Supplier performance" onClick={onStartSuppliers || (() => {})} />
+        <FeatureTile icon="🗓️" label="Seasons" onClick={onStartSeasons || (() => {})} />
       </CollapsibleSection>
 
       <CollapsibleSection title="Marketing & SEO" icon="📢">
@@ -294,16 +294,16 @@ const HomeScreen = ({
       </CollapsibleSection>
 
       <CollapsibleSection title="Tools" icon="🔧">
-        <FeatureTile icon="🏷️" label="Tag builder" onClick={() => {}} />
-        <FeatureTile icon="✍️" label="SEO writer" onClick={() => {}} />
-        <FeatureTile icon="🔍" label="Price lookup" onClick={() => {}} />
-        <FeatureTile icon="📖" label="Brand reference" onClick={() => {}} />
-        <FeatureTile icon="📤" label="Export collections" onClick={() => {}} />
-        <FeatureTile icon="📥" label="Import collections" onClick={() => {}} />
-        <FeatureTile icon="🤖" label="Auto collections AI" onClick={() => {}} />
-        <FeatureTile icon="🖼️" label="Image optimisation" onClick={onStartImageOptimise} />
-        <FeatureTile icon="📚" label="Catalog memory" onClick={onStartCatalogMemory} />
-        <FeatureTile icon="⚙️" label="AI instructions" onClick={() => {}} />
+        <FeatureTile icon="🏷️" label="Tag builder" onClick={() => onNavigateToTab?.("tools")} />
+        <FeatureTile icon="✍️" label="SEO writer" onClick={() => onNavigateToTab?.("tools")} />
+        <FeatureTile icon="🔍" label="Price lookup" onClick={onStartPriceLookup || (() => onNavigateToTab?.("tools"))} />
+        <FeatureTile icon="📖" label="Brand reference" onClick={() => onNavigateToTab?.("tools")} />
+        <FeatureTile icon="📤" label="Export collections" onClick={() => onNavigateToTab?.("tools")} />
+        <FeatureTile icon="📥" label="Import collections" onClick={() => onNavigateToTab?.("tools")} />
+        <FeatureTile icon="🤖" label="Auto collections AI" onClick={() => onNavigateToTab?.("tools")} />
+        <FeatureTile icon="🖼️" label="Image optimisation" onClick={onStartImageOptimise || (() => {})} />
+        <FeatureTile icon="📚" label="Catalog memory" onClick={onStartCatalogMemory || (() => {})} />
+        <FeatureTile icon="⚙️" label="AI instructions" onClick={() => onNavigateToTab?.("tools")} />
         <FeatureTile icon="📋" label="Audit log" onClick={onOpenAuditLog || (() => {})} />
       </CollapsibleSection>
 

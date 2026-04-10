@@ -46,6 +46,14 @@ interface ShopifyRequestBody {
   image_updates?: Array<{ shopify_product_id: string; alt_text: string; seo_filename?: string; keywords?: string[] }>;
   // For replace_product_image (batch)
   image_replacements?: Array<{ shopify_product_id: string; image_base64: string; alt_text?: string; filename?: string }>;
+  // For batch_lookup (stock check)
+  lookup_items?: Array<{ sku?: string; barcode?: string; stylePrefix?: string; titleQuery?: string }>;
+  // For graphql_adjust_inventory
+  inventory_changes?: Array<{ inventoryItemId: string; locationId: string; delta: number }>;
+  reference_document_uri?: string;
+  // For graphql_create_variant
+  product_id_gid?: string;
+  new_variants?: Array<{ price: string; sku?: string; barcode?: string; options: string[]; qty?: number; locationId?: string; cost?: string; imageSrc?: string }>;
 }
 
 Deno.serve(async (req) => {

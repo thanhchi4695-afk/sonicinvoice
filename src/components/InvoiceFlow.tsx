@@ -532,14 +532,41 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
   const parseWithAI = async (file: File): Promise<Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }>> => {
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = "";
-      for (let i = 0; i < bytes.length; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64 = btoa(binary);
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      let base64: string;
+
+      // ── Photo preprocessing pipeline ──
+      if (isLikelyPhotoInvoice(file)) {
+        setEnrichLines([{ name: "Preprocessing photo…", status: "searching", action: "Correcting orientation & enhancing…", confidence: 0 }]);
+
+        const aiRegionDetect = async (imgBase64: string): Promise<DetectedRegions | null> => {
+          try {
+            const { data, error } = await supabase.functions.invoke("preprocess-invoice-image", {
+              body: { imageBase64: imgBase64, fileType: ext },
+            });
+            if (error || !data?.regions) return null;
+            return data.regions as DetectedRegions;
+          } catch { return null; }
+        };
+
+        const ppResult = await preprocessInvoiceImage(file, aiRegionDetect);
+        setPreprocessResult(ppResult);
+        base64 = ppResult.bestForOCR;
+
+        const rotMsg = ppResult.rotationApplied ? ` (rotated ${ppResult.rotationApplied}°)` : "";
+        const cropMsg = ppResult.lineItemCrop ? " • line-item crop" : "";
+        console.log(`[Preprocess] ${ppResult.processingTimeMs}ms${rotMsg}${cropMsg}`);
+
+        setEnrichLines([{ name: "Reading invoice…", status: "searching", action: "AI extracting products…", confidence: 0 }]);
+      } else {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        base64 = btoa(binary);
+      }
 
       // Build learning memory hint (structure-based, not brand-specific)
       const memoryHint = buildMemoryHint(supplierName || undefined);

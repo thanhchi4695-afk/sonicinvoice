@@ -760,10 +760,10 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   };
 
   // ── Reprocess in detailed mode ──
-  const handleReprocessDetailed = async () => {
+  const handleReprocessDetailed = async (expectedRowCount?: number) => {
     if (!uploadedFile || isReprocessing) return;
     setIsReprocessing(true);
-    toast("Reprocessing in detailed mode…", { description: "Using stronger row segmentation and style code anchoring" });
+    toast("Reprocessing in detailed mode…", { description: expectedRowCount ? `Looking for ${expectedRowCount} products` : "Using stronger row segmentation and style code anchoring" });
 
     try {
       const file = uploadedFile;

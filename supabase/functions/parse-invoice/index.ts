@@ -47,16 +47,15 @@ Before extracting ANY products, you MUST segment the entire page into labelled z
 4. **TOTALS_ZONE** (typically y ≈ 0.80–0.95): Subtotal, Total Excl. GST, GST Amount, Total Incl. GST, Total Units, Total Qty. IGNORE completely.
 5. **FOOTER_ZONE** (y ≈ 0.90–1.00): Payment terms, bank details, remittance advice, "Thank you for your order", page numbers. IGNORE completely.
 
-### Record zone boundaries in parsing_plan:
-```
-"page_zones": {
-  "header": { "y_start": 0.00, "y_end": 0.08 },
-  "invoice_info": { "y_start": 0.08, "y_end": 0.18 },
-  "line_items": { "y_start": 0.20, "y_end": 0.78 },
-  "totals": { "y_start": 0.78, "y_end": 0.88 },
-  "footer": { "y_start": 0.88, "y_end": 1.00 }
-}
-```
+### Record zone boundaries in parsing_plan as "page_zones":
+Example:
+  "page_zones": {
+    "header": { "y_start": 0.00, "y_end": 0.08 },
+    "invoice_info": { "y_start": 0.08, "y_end": 0.18 },
+    "line_items": { "y_start": 0.20, "y_end": 0.78 },
+    "totals": { "y_start": 0.78, "y_end": 0.88 },
+    "footer": { "y_start": 0.88, "y_end": 1.00 }
+  }
 
 ### NON-PRODUCT REJECTION LIST (NEVER extract these as products):
 

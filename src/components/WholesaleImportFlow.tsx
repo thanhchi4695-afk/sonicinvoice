@@ -374,6 +374,17 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
 
   const uniqueSeasons = [...new Set(orders.map((o) => o.season).filter(Boolean))];
 
+  // ═══ Stock Check Flow ═══
+  if (stockCheckItems) {
+    return (
+      <StockCheckFlow
+        lineItems={stockCheckItems}
+        onBack={() => setStockCheckItems(null)}
+        onComplete={() => setStockCheckItems(null)}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">

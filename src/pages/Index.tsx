@@ -67,6 +67,8 @@ const ProductHealthPanel = lazy(() => import("@/components/ProductHealthPanel"))
 const ShopifyOrderSync = lazy(() => import("@/components/ShopifyOrderSync"));
 const ImageOptimisePanel = lazy(() => import("@/components/ImageOptimisePanel"));
 const StockCheckFlow = lazy(() => import("@/components/StockCheckFlow"));
+const PipelineRunner = lazy(() => import("@/components/PipelineRunner"));
+const PipelineChooser = lazy(() => import("@/components/PipelineChooser"));
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -79,7 +81,8 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "inventory_dashboard" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "inventory_dashboard" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | "pipeline" | "pipeline_chooser" | null>(null);
+  const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const mode = useStoreMode();
@@ -258,6 +261,35 @@ const Index = () => {
       case "order_sync": flowEl = <ShopifyOrderSync onBack={() => setActiveFlow("stocky_hub")} />; break;
       case "image_optimise": flowEl = <ImageOptimisePanel onBack={() => setActiveFlow(null)} />; break;
       case "stock_check": flowEl = <StockCheckFlow lineItems={[]} onBack={() => setActiveFlow(null)} />; break;
+      case "pipeline": flowEl = activePipelineId ? <PipelineRunner pipelineId={activePipelineId} onRenderFlow={(flowKey, onComplete) => {
+        const flowMap: Record<string, React.ReactNode> = {
+          invoice: <InvoiceFlow onBack={onComplete} />,
+          stock_check: <StockCheckFlow lineItems={[]} onBack={onComplete} />,
+          image_optimise: <ImageOptimisePanel onBack={onComplete} />,
+          feed_health: <FeedHealthPanel onBack={onComplete} />,
+          collection_seo: <CollectionSEOFlow onBack={onComplete} />,
+          style_grouping: <StyleGroupingFlow onBack={onComplete} />,
+          social_media: <SocialMediaPanel onBack={onComplete} />,
+          accounting: <AccountingIntegration onBack={onComplete} />,
+          feed_optimise: <AIFeedOptimisation onBack={onComplete} />,
+          organic_seo: <OrganicSEOFlow onBack={onComplete} />,
+          geo_agentic: <GeoAgenticFlow onBack={onComplete} />,
+          collab_seo: <CollabSEOFlow onBack={onComplete} />,
+          google_colour: <GoogleColourFlow onBack={onComplete} />,
+          google_ads: <GoogleAdsFlow onBack={onComplete} />,
+          google_ads_setup: <GoogleAdsSetupWizard onBack={onComplete} />,
+          meta_ads_setup: <MetaAdsSetupWizard onBack={onComplete} />,
+          performance: <PerformanceDashboard onBack={onComplete} />,
+          restock: <RestockAnalytics onBack={onComplete} />,
+          markdown_ladder: <MarkdownLadderPanel onBack={onComplete} />,
+          margin_protection: <MarginProtectionPanel onBack={onComplete} />,
+          reorder: <ReorderPanel onBack={onComplete} onViewOrders={() => {}} />,
+          purchase_orders: <PurchaseOrderPanel onBack={onComplete} />,
+          profit_loss: <ProfitLossPanel onBack={onComplete} />,
+        };
+        return flowMap[flowKey] || <div className="p-6 text-center text-sm text-muted-foreground">Flow "{flowKey}" — <button className="text-primary underline" onClick={onComplete}>Mark complete →</button></div>;
+      }} onExit={() => { setActiveFlow(null); setActivePipelineId(null); }} /> : null; break;
+      case "pipeline_chooser": flowEl = <PipelineChooser onSelect={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }} onBack={() => setActiveFlow(null)} />; break;
       default: return null;
     }
     return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;
@@ -314,7 +346,9 @@ const Index = () => {
            onStartStockCheck={() => setActiveFlow("stock_check")}
            onStartPriceLookup={() => setActiveFlow("price_lookup")}
            onStartSeasons={() => setActiveFlow("seasons")}
-           onNavigateToTab={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
+            onNavigateToTab={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
+            onStartPipeline={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }}
+            onStartPipelineChooser={() => setActiveFlow("pipeline_chooser")}
         />
       )}
       <Suspense fallback={suspenseFallback}>

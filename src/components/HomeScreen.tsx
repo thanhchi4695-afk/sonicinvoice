@@ -9,6 +9,8 @@ import { useStoreMode } from "@/hooks/use-store-mode";
 import { getStoreLocations } from "@/components/AccountScreen";
 import FeatureTile from "@/components/FeatureTile";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import { getPipelineContext, clearPipelineContext } from "@/lib/pipeline-context";
+import { getPipelineById } from "@/lib/pipeline-definitions";
 
 interface HomeScreenProps {
   onStartInvoice: () => void;
@@ -54,6 +56,8 @@ interface HomeScreenProps {
   onStartPriceLookup?: () => void;
   onStartSeasons?: () => void;
   onNavigateToTab?: (tab: string) => void;
+  onStartPipeline?: (id: string) => void;
+  onStartPipelineChooser?: () => void;
 }
 
 const HomeScreen = ({
@@ -67,6 +71,7 @@ const HomeScreen = ({
   onStartInventoryPlanning, onStartStockyHub, onStartPackingSlip, onStartJoor,
   onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss,
   onStartImageOptimise, onStartStockCheck, onStartPriceLookup, onStartSeasons, onNavigateToTab,
+  onStartPipeline, onStartPipelineChooser,
 }: HomeScreenProps) => {
   const mode = useStoreMode();
   const unreadCount = getUnprocessedInboxCount();
@@ -153,6 +158,47 @@ const HomeScreen = ({
           </div>
         </div>
       )}
+
+      {/* Pipeline resume banner */}
+      {(() => {
+        const pCtx = getPipelineContext();
+        if (!pCtx || pCtx.currentStep >= (getPipelineById(pCtx.pipelineId)?.steps.length ?? 0)) return null;
+        const pl = getPipelineById(pCtx.pipelineId);
+        if (!pl) return null;
+        const stepLabel = pl.steps[pCtx.currentStep]?.label ?? "";
+        return (
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm">{pl.emoji}</span>
+              <div className="min-w-0">
+                <span className="text-xs font-medium block truncate">{pl.name} — step {pCtx.currentStep + 1} of {pl.steps.length}</span>
+                <span className="text-[10px] text-muted-foreground">You were on: {stepLabel}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="link" size="sm" className="text-xs h-auto p-0" onClick={() => onStartPipeline?.(pCtx.pipelineId)}>Resume →</Button>
+              <button onClick={() => { clearPipelineContext(); window.location.reload(); }} className="text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Automation pipelines card */}
+      <div className="bg-card border border-border rounded-xl p-4 mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Zap className="w-4 h-4 text-primary" />
+          <span className="text-sm font-semibold">Automation pipelines</span>
+        </div>
+        <p className="text-[11px] text-muted-foreground mb-3">
+          Go from invoice to live products, SEO, and social posts in one guided sequence
+        </p>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          <Button variant="outline" size="sm" className="text-[11px] h-7" onClick={() => onStartPipeline?.("new_arrivals_full")}>📦 New arrivals</Button>
+          <Button variant="outline" size="sm" className="text-[11px] h-7" onClick={() => onStartPipeline?.("restock_only")}>🔄 Restock</Button>
+          <Button variant="outline" size="sm" className="text-[11px] h-7" onClick={() => onStartPipeline?.("seo_visibility")}>📈 SEO boost</Button>
+        </div>
+        <button onClick={onStartPipelineChooser} className="text-[11px] text-primary hover:underline">View all pipelines →</button>
+      </div>
 
       {/* ── HERO ACTIONS ── */}
       <div className="space-y-2 mb-4">

@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import type { WholesaleOrder } from "@/lib/unified-types";
+import type { WholesaleOrder, WholesaleLineItem } from "@/lib/unified-types";
+import type { InvoiceLineItem } from "@/lib/stock-matcher";
+import StockCheckFlow from "@/components/StockCheckFlow";
 import {
   buildWholesaleShopifyCSV,
   buildWholesaleLightspeedCSV,
@@ -22,7 +24,7 @@ import * as XLSX from "xlsx";
 import {
   ArrowLeft, Check, Loader2, RefreshCw, Download,
   Upload, Search, ChevronRight, Link2, Unplug,
-  Package, FileUp, Globe, FileSpreadsheet,
+  Package, FileUp, Globe, FileSpreadsheet, PackageCheck,
 } from "lucide-react";
 
 interface Props {
@@ -70,6 +72,7 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
   const [activeOrder, setActiveOrder] = useState<WholesaleOrder | null>(null);
   const [pushing, setPushing] = useState(false);
   const [pushProgress, setPushProgress] = useState({ current: 0, total: 0 });
+  const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -259,6 +262,30 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
     toast.success(`${type === "shopify" ? "Shopify" : "Lightspeed"} CSV downloaded (${count} items)`);
   };
 
+  // ── Stock check before push ──
+  const startStockCheck = (targetOrders: WholesaleOrder[]) => {
+    const allItems = targetOrders.flatMap((o) => o.lineItems);
+    const converted: InvoiceLineItem[] = allItems.map((it) => ({
+      styleNumber: it.styleNumber,
+      styleName: it.styleName,
+      colour: it.colour,
+      colourCode: it.colourCode,
+      size: it.size,
+      barcode: it.barcode,
+      sku: `${it.styleNumber}-${it.colourCode || it.colour}-${it.size}`.toUpperCase().replace(/\s+/g, "-"),
+      brand: it.brand,
+      quantityOrdered: it.quantityOrdered,
+      rrp: it.rrp,
+      wholesale: it.wholesale,
+      imageUrl: it.imageUrl || undefined,
+      description: it.description || undefined,
+      productType: it.productType || undefined,
+      season: it.season || undefined,
+      collection: it.collection || undefined,
+    }));
+    setStockCheckItems(converted);
+  };
+
   // ── Push to Shopify ──
   const pushToShopify = async (targetOrders: WholesaleOrder[]) => {
     const allItems = targetOrders.flatMap((o) => o.lineItems);
@@ -346,6 +373,17 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
   });
 
   const uniqueSeasons = [...new Set(orders.map((o) => o.season).filter(Boolean))];
+
+  // ═══ Stock Check Flow ═══
+  if (stockCheckItems) {
+    return (
+      <StockCheckFlow
+        lineItems={stockCheckItems}
+        onBack={() => setStockCheckItems(null)}
+        onComplete={() => setStockCheckItems(null)}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -641,6 +679,13 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
             <Download className="w-4 h-4 mr-2" /> Lightspeed CSV
           </Button>
           <Button
+            onClick={() => startStockCheck([activeOrder])}
+            disabled={pushing}
+          >
+            <PackageCheck className="w-4 h-4 mr-2" /> Check stock & push
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => {
               if (confirm(`Push ${activeOrder.lineItems.length} items from this order to Shopify?`)) {
                 pushToShopify([activeOrder]);
@@ -648,7 +693,7 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
             }}
             disabled={pushing}
           >
-            <Upload className="w-4 h-4 mr-2" /> Push to Shopify
+            <Upload className="w-4 h-4 mr-2" /> Push as new
           </Button>
           <Button variant="secondary" onClick={() => { setScreen("orders"); setActiveOrder(null); }} disabled={pushing}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to list
@@ -787,11 +832,17 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
               </Button>
               <Button size="sm" onClick={() => {
                 const sel = orders.filter((o) => selectedOrders.has(o.orderId));
-                if (confirm(`Push ${sel.reduce((s, o) => s + o.lineItems.length, 0)} items to Shopify?`)) {
+                startStockCheck(sel);
+              }} disabled={pushing}>
+                <PackageCheck className="w-3 h-3 mr-1.5" /> Check stock & push
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => {
+                const sel = orders.filter((o) => selectedOrders.has(o.orderId));
+                if (confirm(`Push ${sel.reduce((s, o) => s + o.lineItems.length, 0)} items as new to Shopify?`)) {
                   pushToShopify(sel);
                 }
               }} disabled={pushing}>
-                <Upload className="w-3 h-3 mr-1.5" /> Push to Shopify
+                <Upload className="w-3 h-3 mr-1.5" /> Push as new
               </Button>
             </div>
           )}

@@ -312,6 +312,9 @@ const Index = () => {
            onStartProfitLoss={() => setActiveFlow("profit_loss")}
            onStartImageOptimise={() => setActiveFlow("image_optimise")}
            onStartStockCheck={() => setActiveFlow("stock_check")}
+           onStartPriceLookup={() => setActiveFlow("price_lookup")}
+           onStartSeasons={() => setActiveFlow("seasons")}
+           onNavigateToTab={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
         />
       )}
       <Suspense fallback={suspenseFallback}>

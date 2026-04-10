@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
 import { ChevronLeft, Activity, Check, AlertTriangle, Loader2, Eye, ShoppingCart, Pencil, Store, Download, Upload, ExternalLink, Copy, ChevronDown, ChevronUp, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,7 @@ interface ScanStats {
   colorFound: number; colorMissing: number;
 }
 
-export default function FeedHealthPanel({ onBack }: { onBack: () => void }) {
+export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () => void; onStartFlow?: (flow: string) => void }) {
   const [step, setStep] = useState<Step>("idle");
   const [rows, setRows] = useState<FeedHealthRow[]>([]);
   const [scanProgress, setScanProgress] = useState({ done: 0, total: 0 });
@@ -800,6 +801,14 @@ export default function FeedHealthPanel({ onBack }: { onBack: () => void }) {
           )}
         </DialogContent>
       </Dialog>
+
+      {onStartFlow && rows.length > 0 && (
+        <WhatsNextSuggestions
+          completedFlow="feed_health"
+          onStartFlow={onStartFlow}
+          onGoHome={onBack}
+        />
+      )}
     </div>
   );
 }

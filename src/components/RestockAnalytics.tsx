@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from "react";
+import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
 import {
   ChevronLeft, Upload, ChevronDown, ChevronUp, Check, Search, X,
   Download, Copy, Mail, List, Grid, BarChart3, Filter,
@@ -15,11 +16,11 @@ import {
   RestockSettings, DEFAULT_SETTINGS,
 } from "@/lib/restock-analytics";
 
-interface Props { onBack: () => void }
+interface Props { onBack: () => void; onStartFlow?: (flow: string) => void }
 
 type ViewMode = "list" | "grid" | "brand";
 
-const RestockAnalytics = ({ onBack }: Props) => {
+const RestockAnalytics = ({ onBack, onStartFlow }: Props) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [parsed, setParsed] = useState<ParsedInventory | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsResult | null>(null);
@@ -519,6 +520,14 @@ const RestockAnalytics = ({ onBack }: Props) => {
           </section>
         )}
       </div>
+
+      {onStartFlow && analytics && (
+        <WhatsNextSuggestions
+          completedFlow="restock"
+          onStartFlow={onStartFlow}
+          onGoHome={onBack}
+        />
+      )}
     </div>
   );
 };

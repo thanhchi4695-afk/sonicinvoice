@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, GripVertical, RefreshCw, Send, Calendar, Plus, Trash2, Eye, ExternalLink, Megaphone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
 
 // ── Types ──
 interface SocialSettings {
@@ -95,7 +96,7 @@ function savePosts(p: SocialPost[]) {
 }
 
 // ── Component ──
-export default function SocialMediaPanel({ onBack }: { onBack: () => void }) {
+export default function SocialMediaPanel({ onBack, onStartFlow }: { onBack: () => void; onStartFlow?: (flow: string) => void }) {
   const [tab, setTab] = useState("queue");
   const [settings, setSettings] = useState<SocialSettings>(loadSettings);
   const [posts, setPosts] = useState<SocialPost[]>(loadPosts);
@@ -667,6 +668,14 @@ export default function SocialMediaPanel({ onBack }: { onBack: () => void }) {
           <p><strong>🔗 Direct publishing</strong> — Connect Facebook & Instagram accounts to publish automatically</p>
         </div>
       </div>
+
+      {onStartFlow && (
+        <WhatsNextSuggestions
+          completedFlow="social_media"
+          onStartFlow={onStartFlow}
+          onGoHome={onBack}
+        />
+      )}
     </div>
   );
 }

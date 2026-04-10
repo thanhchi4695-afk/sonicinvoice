@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Loader2, Check, Copy, RefreshCw, Download, Eye, Code, Search } from "lucide-react";
+import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +9,7 @@ import { toast } from "sonner";
 
 interface CollectionSEOFlowProps {
   onBack: () => void;
+  onStartFlow?: (flow: string) => void;
 }
 
 interface ParsedCollection {
@@ -340,7 +342,7 @@ function generateSmartCollectionsCSV(collections: ParsedCollection[]): string {
 
 const STEPS = ["Parse", "Descriptions", "Links", "Export"];
 
-export default function CollectionSEOFlow({ onBack }: CollectionSEOFlowProps) {
+export default function CollectionSEOFlow({ onBack, onStartFlow }: CollectionSEOFlowProps) {
   const [step, setStep] = useState(0);
   const [collections, setCollections] = useState<ParsedCollection[]>([]);
   const [source, setSource] = useState<"invoice" | "paste">("invoice");
@@ -816,6 +818,14 @@ export default function CollectionSEOFlow({ onBack }: CollectionSEOFlowProps) {
             </details>
 
             <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
+
+            {onStartFlow && (
+              <WhatsNextSuggestions
+                completedFlow="collection_seo"
+                onStartFlow={onStartFlow}
+                onGoHome={onBack}
+              />
+            )}
           </div>
         )}
       </div>

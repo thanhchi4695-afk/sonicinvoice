@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +29,7 @@ interface StockCheckFlowProps {
   lineItems: InvoiceLineItem[];
   onBack: () => void;
   onComplete?: () => void;
+  onStartFlow?: (flow: string) => void;
 }
 
 type Screen = "checking" | "review" | "applying" | "done";
@@ -39,7 +41,7 @@ interface ApplyStatus {
   error?: string;
 }
 
-const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) => {
+const StockCheckFlow = ({ lineItems, onBack, onComplete, onStartFlow }: StockCheckFlowProps) => {
   const [screen, setScreen] = useState<Screen>("checking");
   const [checkProgress, setCheckProgress] = useState<{ done: number; total: number }>({ done: 0, total: lineItems.length });
   const [checkStatuses, setCheckStatuses] = useState<Map<number, { status: string; label: string }>>(new Map());
@@ -697,6 +699,15 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
           Done
         </Button>
       </div>
+
+      {onStartFlow && (
+        <WhatsNextSuggestions
+          completedFlow="stock_check"
+          context={{ hasNewProducts: applySummary.newProducts > 0, hasNewVariants: applySummary.newColours > 0, hasRefills: applySummary.refills > 0 }}
+          onStartFlow={onStartFlow}
+          onGoHome={onBack}
+        />
+      )}
     </div>
   );
 };

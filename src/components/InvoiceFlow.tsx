@@ -1660,6 +1660,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 onExportAccepted={() => setStep(4)}
                 onPushToShopify={() => setStep(4)}
                 onBack={() => setStep(2)}
+                onReprocessDetailed={handleReprocessDetailed}
+                isReprocessing={isReprocessing}
+                underExtractionWarning={underExtractionWarning}
               />
             </div>
           )}

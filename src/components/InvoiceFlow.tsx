@@ -1024,6 +1024,43 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [showCostSummary, setShowCostSummary] = useState(true);
   const [showPriceAlertModal, setShowPriceAlertModal] = useState(!!largePriceAlert);
 
+  // ── Convert product groups to InvoiceLineItems for stock check ──
+  const convertToStockCheckItems = (): InvoiceLineItem[] => {
+    const items: InvoiceLineItem[] = [];
+    for (const g of productGroups) {
+      for (const v of g.variants) {
+        items.push({
+          styleNumber: g.vendorCode || g.styleGroup || "",
+          styleName: g.name,
+          colour: v.option1Value || g.colour || "",
+          colourCode: "",
+          size: v.option2Value || g.size || "",
+          barcode: g.barcode || "",
+          sku: v.sku || "",
+          brand: g.brand,
+          quantityOrdered: v.qty,
+          rrp: v.rrp || g.rrp,
+          wholesale: v.price || g.price,
+          imageUrl: g.imageSrc || undefined,
+          description: g.desc || undefined,
+          productType: g.type || undefined,
+        });
+      }
+    }
+    return items;
+  };
+
+  // ── If stock check is active, render it instead ──
+  if (stockCheckItems) {
+    return (
+      <StockCheckFlow
+        lineItems={stockCheckItems}
+        onBack={() => setStockCheckItems(null)}
+        onComplete={() => { setStockCheckItems(null); }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
       {/* Header */}

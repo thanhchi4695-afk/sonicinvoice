@@ -315,6 +315,25 @@ const Index = () => {
         />
       )}
       <Suspense fallback={suspenseFallback}>
+        {activeTab === "invoices" && (
+          <InvoicesTab
+            onStartInvoice={() => setActiveFlow("invoice")}
+            onStartStockCheck={() => setActiveFlow("stock_check")}
+            onStartPackingSlip={() => setActiveFlow("packing_slip")}
+            onStartScanMode={() => setActiveFlow("scan_mode")}
+            onStartEmailInbox={() => setActiveFlow("email_inbox")}
+            onStartJoor={() => setActiveFlow("joor")}
+            onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
+            onStartLookbookImport={() => setActiveFlow("lookbook_import")}
+            onStartPurchaseOrders={() => setActiveFlow("purchase_orders")}
+            onStartOrderForm={() => setActiveFlow("order_form")}
+            onStartAccounting={() => setActiveFlow("accounting")}
+            onStartRestock={() => setActiveFlow("restock")}
+            onStartReorder={() => setActiveFlow("reorder")}
+            onStartSuppliers={() => setActiveFlow("suppliers")}
+            onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
+          />
+        )}
         {activeTab === "analytics" && <AnalyticsPanel />}
         {activeTab === "history" && <HistoryScreen />}
         {activeTab === "tools" && <ToolsScreen />}

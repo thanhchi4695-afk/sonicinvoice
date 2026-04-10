@@ -3,7 +3,7 @@ import {
   Check, X, AlertTriangle, ChevronDown, ChevronRight, RotateCcw,
   ShieldCheck, Bug, Search, Filter, CheckCheck, ArrowRight,
   Edit3, Download, Zap, ArrowUpRight, Layers, Merge, Scissors,
-  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash, MapPin
+  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash, MapPin, ScanLine
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, record
 import { toast } from "sonner";
 import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
 import SizeGridEditor from "@/components/SizeGridEditor";
+import InvoiceDebugOverlay from "@/components/InvoiceDebugOverlay";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;
@@ -78,6 +79,7 @@ export default function PostParseReviewScreen({
   const [bulkVendor, setBulkVendor] = useState("");
   const [sourceTraceProduct, setSourceTraceProduct] = useState<ValidatedProduct | null>(null);
   const [showDebugZones, setShowDebugZones] = useState(false);
+  const [showDebugOverlay, setShowDebugOverlay] = useState(false);
 
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
@@ -568,7 +570,21 @@ export default function PostParseReviewScreen({
       </div>
 
       {/* Debug panel */}
-      <div className="mt-3 border border-border rounded-lg bg-card overflow-hidden">
+      {invoicePages.length > 0 && (
+        <div className="mt-3 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-[10px] h-8"
+            onClick={() => setShowDebugOverlay(true)}
+          >
+            <ScanLine className="w-3.5 h-3.5" />
+            Extraction Debug View
+            <Badge variant="outline" className="text-[8px] h-4 px-1 ml-1">{products.filter(p => !p._rejected).length} rows</Badge>
+          </Button>
+        </div>
+      )}
+      <div className={`${invoicePages.length > 0 ? "mt-2" : "mt-3"} border border-border rounded-lg bg-card overflow-hidden`}>
         <button onClick={() => setShowDebug(!showDebug)} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors">
           <Bug className="w-3.5 h-3.5" />
           <span className="font-medium">AI Parsing Details</span>
@@ -663,6 +679,21 @@ export default function PostParseReviewScreen({
               onClose={() => setSourceTraceProduct(null)}
               allProducts={products}
               showDebugZones={showDebugZones}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Extraction Debug Overlay Modal */}
+      {showDebugOverlay && invoicePages.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-center justify-center">
+          <div className="w-full max-w-6xl h-[85vh]">
+            <InvoiceDebugOverlay
+              invoicePages={invoicePages}
+              products={products}
+              rejectedRows={debug.rejectedByAI}
+              parsingPlan={debug.parsingPlan}
+              onClose={() => setShowDebugOverlay(false)}
             />
           </div>
         </div>

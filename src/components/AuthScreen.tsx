@@ -312,6 +312,62 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
           {isSignUp ? "Already have an account? Sign in" : "New to Sonic Invoice? Create account"}
         </button>
       </div>
+
+      {/* SEO content — visible to search engines, styled as landing info below auth */}
+      <div className="w-full max-w-2xl mt-16 px-4 pb-16 text-left space-y-10">
+        <section>
+          <h2 className="text-xl font-semibold mb-3">Invoice to Shopify in Minutes</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Upload any supplier invoice — PDF, Excel, CSV, or Word — and Sonic Invoices uses AI to extract every product, map it to Shopify fields (title, SKU, barcode, price, cost, quantity, colour, size), and produce a Shopify-ready product file. Australian GST is calculated automatically. No reformatting or copy-pasting required.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mb-3">Link Orders from JOOR, Faire &amp; NuOrder to Shopify</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Connect to the wholesale platforms your suppliers use: JOOR (live API), Faire, NuOrder, Brandscope, and Brandboom. Pull orders directly from any platform and push products to Shopify in one click with intelligent column mapping. No more switching between tabs to copy product data.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mb-3">Bulk Discounts &amp; Markdown Ladders</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Apply bulk discounts, markups, or exact pricing to any product selection. Put entire Shopify collections on sale or restore original prices with a full audit trail. Automated markdown ladders reduce prices for slow-moving stock on a staged schedule — with margin protection that prevents any markdown from breaking your cost floor.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mb-3">Shopify Stocky Replacement</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Purchase orders, demand forecasting, dead stock detection, stocktake management, and AI-powered reorder intelligence in one place. Built to replace Shopify's discontinued Stocky app with everything Stocky had and more — designed for fashion retailers managing size runs across multiple brands.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mb-3">Google Shopping Feed &amp; SEO Automation</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Fix Google Merchant Center disapprovals in bulk — missing gender, age_group, and colour attributes pushed directly to Shopify via metafields. Generate AI-optimised collection SEO pages, organic blog posts for topical authority, and product descriptions that rank. Optimise for AI assistants like ChatGPT, Perplexity, and Google AI Mode.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mb-3">57 Tools for Independent Fashion Retailers</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Sonic Invoices is the complete retail back-office for independent fashion and lifestyle retailers running Shopify with 10 to 500+ brands. Invoicing, inventory, marketing, SEO, social media automation, accounting integration with Xero and MYOB, competitor intelligence, and more — organised into four tabs so nothing is hard to find.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold mb-3">How It Works</h2>
+          <ol className="text-sm text-muted-foreground leading-relaxed list-decimal pl-5 space-y-1">
+            <li>Install the Chrome extension or sign up at sonicinvoice.lovable.app</li>
+            <li>Connect your Shopify store from the Account screen</li>
+            <li>Upload a supplier invoice or connect a wholesale platform</li>
+            <li>Review AI-extracted products, confirm, and push to Shopify</li>
+          </ol>
+          <p className="text-sm text-muted-foreground mt-2">Free trial available — no credit card required. Works on Chrome, Edge, and Brave.</p>
+        </section>
+      </div>
     </div>
   );
 };

@@ -232,7 +232,7 @@ NEVER include these as products:
 - Story/collection/season headers that contain no product data
 - "Total Units", "Total Excl. GST", "GST Amount", "Total Incl. GST" — these are FOOTER TOTALS, not products
 
-Identify product rows by: having a descriptive title (3+ chars, not just a number), and at least one of: quantity, price, or style code.
+Identify product rows by: having a style code / SKU (primary), OR a descriptive title (3+ chars) with at least one of: quantity, price. Rows with a style code are always product candidates even if other fields are sparse.
 
 ## CONFIDENCE SCORING
 

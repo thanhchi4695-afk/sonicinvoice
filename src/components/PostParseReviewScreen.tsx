@@ -26,7 +26,7 @@ interface PostParseReviewScreenProps {
   onExportAccepted: () => void;
   onPushToShopify: () => void;
   onBack: () => void;
-  onReprocessDetailed?: () => void;
+  onReprocessDetailed?: (expectedRowCount?: number) => void;
   isReprocessing?: boolean;
   underExtractionWarning?: { extractedCount: number; estimatedRows: number } | null;
 }
@@ -55,6 +55,67 @@ interface ProductGroup {
   unitCost: number;
   totalUnits: number;
   variants: ReviewProduct[];
+}
+
+// Under-extraction warning banner with manual row count input
+function UnderExtractionBanner({ warning, onReprocessDetailed, isReprocessing }: {
+  warning: { extractedCount: number; estimatedRows: number };
+  onReprocessDetailed?: (expectedRowCount?: number) => void;
+  isReprocessing?: boolean;
+}) {
+  const [manualCount, setManualCount] = useState<string>("");
+  const expectedCount = manualCount ? parseInt(manualCount, 10) : undefined;
+
+  return (
+    <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-3 mb-4">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="w-4 h-4 text-secondary mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-secondary">
+            Possible under-extraction detected
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            We found only {warning.extractedCount} product{warning.extractedCount !== 1 ? 's' : ''}, but this invoice appears to contain ~{warning.estimatedRows} rows.
+          </p>
+
+          <div className="flex items-center gap-2 mt-2">
+            <label className="text-xs text-muted-foreground whitespace-nowrap">Expected products:</label>
+            <Input
+              type="number"
+              min={1}
+              max={200}
+              placeholder={String(warning.estimatedRows)}
+              value={manualCount}
+              onChange={(e) => setManualCount(e.target.value)}
+              className="w-20 h-7 text-xs"
+            />
+          </div>
+
+          {onReprocessDetailed && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-2"
+              onClick={() => onReprocessDetailed(expectedCount)}
+              disabled={isReprocessing}
+            >
+              {isReprocessing ? (
+                <>
+                  <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                  Reprocessing…
+                </>
+              ) : (
+                <>
+                  <Zap className="w-3.5 h-3.5" />
+                  Reprocess in detailed mode{expectedCount ? ` (expect ${expectedCount})` : ''}
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function PostParseReviewScreen({
@@ -400,42 +461,12 @@ export default function PostParseReviewScreen({
         <StatCard label="Missing Cost" value={missingCostCount} icon={<AlertTriangle className="w-3.5 h-3.5" />} colorClass={missingCostCount > 0 ? "text-secondary bg-secondary/10 border-secondary/20" : "text-success bg-success/10 border-success/20"} />
       </div>
 
-      {/* Under-extraction warning */}
       {underExtractionWarning && (
-        <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-3 mb-4">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-secondary mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-secondary">
-                Possible under-extraction detected
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                We found only {underExtractionWarning.extractedCount} product{underExtractionWarning.extractedCount !== 1 ? 's' : ''}, but this invoice appears to contain ~{underExtractionWarning.estimatedRows} rows. Some products may have been missed.
-              </p>
-              {onReprocessDetailed && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="mt-2"
-                  onClick={onReprocessDetailed}
-                  disabled={isReprocessing}
-                >
-                  {isReprocessing ? (
-                    <>
-                      <RotateCcw className="w-3.5 h-3.5 animate-spin" />
-                      Reprocessing…
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-3.5 h-3.5" />
-                      Reprocess in detailed mode
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+        <UnderExtractionBanner
+          warning={underExtractionWarning}
+          onReprocessDetailed={onReprocessDetailed}
+          isReprocessing={isReprocessing}
+        />
       )}
 
       <div className="flex items-center gap-3 mb-3 text-xs text-muted-foreground">

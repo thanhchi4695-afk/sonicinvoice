@@ -606,7 +606,7 @@ serve(async (req) => {
   }
 
   try {
-    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode } = await req.json();
+    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode, expectedProductCount } = await req.json();
 
     if (!fileContent) {
       return new Response(JSON.stringify({ error: "No file content provided" }), {
@@ -638,6 +638,10 @@ CRITICAL INSTRUCTIONS FOR DETAILED MODE:
 9. Report total_visible_rows (your count of all potential product rows in the document) in parsing_plan.
 
 The goal is MAXIMUM RECALL — extract everything that could possibly be a product. The merchant will review and reject false positives.`;
+
+      if (expectedProductCount && expectedProductCount > 0) {
+        systemPrompt += `\n\nIMPORTANT: The merchant has confirmed this invoice contains approximately ${expectedProductCount} product rows. You MUST find at least ${expectedProductCount} products. If you find fewer, re-examine the document — you are likely missing rows. Check for highlighted, faded, or partially obscured style codes.`;
+      }
     }
 
     // Force mode overrides

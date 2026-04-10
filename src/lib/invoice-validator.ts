@@ -103,6 +103,8 @@ export interface ParsingPlan {
   grouping_reason?: string;
   total_products_expected?: number;
   total_variants_expected?: number;
+  row_anchors_detected?: string[];
+  row_count?: number;
   expected_review_level?: string;
   review_reason?: string;
   strategy_explanation?: string;

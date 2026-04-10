@@ -32,6 +32,51 @@ Detect the document's structural layout:
 - "low_structure" — handwritten, loosely formatted, or non-tabular
 - "mixed" — multiple layout patterns in the same document
 
+## STAGE B2 — LINE-ITEM TABLE BOUNDARY DETECTION (CRITICAL)
+
+Before extracting any products, you MUST identify the exact boundaries of the line-item table:
+
+1. **Header zone** (IGNORE): Company logo, supplier name, ABN, address, invoice number, date, customer details. This is NOT product data.
+2. **Line-item zone** (EXTRACT FROM HERE): The rectangular region containing the product table. It typically:
+   - Starts after column headers like "Style", "Description", "Qty", "Price", "Total"
+   - Contains multiple rows of product data
+   - Each row usually begins with a style code / SKU in the leftmost data column
+3. **Footer zone** (IGNORE): Subtotals, GST, Total Incl. GST, payment terms, bank details.
+
+**CRITICAL**: Only extract products from the line-item zone. NEVER treat header text, address blocks, or footer totals as products.
+
+## STAGE B3 — ROW SEGMENTATION BY STYLE CODE ANCHORS (CRITICAL FOR MULTI-PRODUCT INVOICES)
+
+This is the MOST IMPORTANT stage for invoices with many products. You MUST segment the line-item table into individual product rows BEFORE extracting data.
+
+**Step 1: Scan for style code anchors**
+Look for a vertical sequence of style codes / SKU codes in the left column of the line-item table. Common patterns:
+- Alphanumeric codes like CF08381, CF08446, CF08448, AB1234, ST-2045
+- Codes that repeat a consistent format (same prefix, similar length)
+- Each style code marks the START of a new product row
+
+**Step 2: Count all anchors**
+If you see style codes CF08381, CF08446, CF08448, CF08449, CF08450 in the left column, that means there are AT LEAST 5 product rows. You MUST extract ALL of them.
+
+**Step 3: Segment one row per style code**
+Each product row spans from one style code anchor to the next. A single row may include:
+- The style code itself
+- A product description / title (same row or adjacent)
+- A colour / range name
+- A size grid or size list with quantities
+- A unit price and/or line total
+
+**Step 4: Extract EVERY row independently**
+Do NOT stop after the first row. Do NOT collapse multiple rows into one product. Each style code = one product family. Then within each product family, expand size variants.
+
+**Step 5: Row-level debug output**
+For each detected row, record in the output:
+- row_index: sequential number (0, 1, 2, ...)
+- anchor_code: the style code that started this row
+- row_confidence: 0-100 confidence for this specific row
+- row_y_start: normalized 0-1 vertical position where this row starts on the page
+- row_y_end: normalized 0-1 vertical position where this row ends
+
 ## STAGE C — SEMANTIC FIELD DETECTION
 
 Identify which areas of the document contain:
@@ -70,7 +115,7 @@ A product entry contains a main row (code, name, colour, price) plus a sub-secti
 - Create one output row per size
 
 **Method 4: Size breakdown row below product**
-Product data on one row, then a following row with patterns like "XS (1) S (2) M (2) L (1)" or "10, 12, 14 / 1, 2, 1"
+Product data on one row, then a following row with patterns like "XS (1) S (2) M (2)" or "10, 12, 14 / 1, 2, 1"
 - Parse the size labels and quantities from the breakdown row
 - Create one output row per size
 
@@ -138,6 +183,7 @@ NEVER include these as products:
 - "Continued on next page" / page markers
 - Empty rows / repeated column headers
 - Story/collection/season headers that contain no product data
+- "Total Units", "Total Excl. GST", "GST Amount", "Total Incl. GST" — these are FOOTER TOTALS, not products
 
 Identify product rows by: having a descriptive title (3+ chars, not just a number), and at least one of: quantity, price, or style code.
 
@@ -171,6 +217,8 @@ Return ONLY valid JSON (no markdown, no explanation):
     "grouping_reason": "why grouping is or isn't needed",
     "total_products_expected": number,
     "total_variants_expected": number,
+    "row_anchors_detected": ["CF08381", "CF08446", "CF08448"],
+    "row_count": number,
     "expected_review_level": "low" | "medium" | "high",
     "review_reason": "why this review level",
     "strategy_explanation": "1-2 sentence explanation of the overall extraction approach chosen"
@@ -187,6 +235,11 @@ Return ONLY valid JSON (no markdown, no explanation):
   "detected_fields": ["list", "of", "field", "names", "found"],
   "products": [
     {
+      "row_index": 0,
+      "anchor_code": "CF08381",
+      "row_y_start": 0.25,
+      "row_y_end": 0.32,
+      "row_confidence": 92,
       "style_code": "raw style/article/product code",
       "product_title": "clean base product name WITHOUT colour or size",
       "colour": "expanded colour name",
@@ -223,6 +276,8 @@ Return ONLY valid JSON (no markdown, no explanation):
 For source_regions: y_position is a normalized 0-1 value indicating the vertical position on the page where this field's data was found (0 = top, 1 = bottom). page is 1-indexed. Only include fields that were actually detected.
 
 CRITICAL RULES:
+- SCAN THE ENTIRE LINE-ITEM TABLE. If you see 10 style codes, you MUST return products from ALL 10 rows.
+- Do NOT stop after the first product row. Do NOT return only one item when the table has many.
 - Create ONE output row per size+colour variant where quantity > 0
 - product_title must be the CLEAN base name without colour or size appended
 - Do NOT hallucinate data that is not visible in the document
@@ -417,7 +472,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
             },
             {
               type: "text",
-              text: "Analyse this document's structure and layout. Classify the document type, detect the layout pattern, identify the variant expression method, then extract ALL products with full variant breakdown. Create one row per size/colour variant. Return JSON only.",
+              text: "Analyse this document. FIRST scan the entire line-item table and identify ALL style code anchors (e.g. CF08381, CF08446, etc.) — list them in row_anchors_detected. Then extract EVERY product row, one per style code anchor, expanding size variants. Do NOT stop after the first row. If you see 5 style codes, return products from all 5. Return JSON only.",
             },
           ],
         },
@@ -427,7 +482,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Analyse this document's structure and layout. Classify the document type, detect the layout pattern, identify the variant expression method, then extract ALL products with full variant breakdown. Create one row per size/colour variant. Return JSON only.\n\nDocument content:\n${fileContent}`,
+          content: `Analyse this document. FIRST scan the entire line-item table and identify ALL style code anchors — list them in row_anchors_detected. Then extract EVERY product row, expanding size variants. Do NOT stop after the first row. Return JSON only.\n\nDocument content:\n${fileContent}`,
         },
       ];
     }
@@ -496,7 +551,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
     }
 
     // Invoice response
-    const normalizedProducts = validated.map((p: Record<string, unknown>) => ({
+    const normalizedProducts = validated.map((p: Record<string, unknown>, idx: number) => ({
       name: p.product_title || p.name || "",
       brand: parsed.supplier || supplierName || String(p.brand || ""),
       sku: p.style_code || p.sku || "",
@@ -514,6 +569,11 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
       _lineTotal: Number(p.line_total) || 0,
       _extractionReason: p.extraction_reason || "",
       _sourceRegions: p.source_regions || null,
+      _rowIndex: Number(p.row_index ?? idx),
+      _anchorCode: p.anchor_code || p.style_code || "",
+      _rowYStart: Number(p.row_y_start) || 0,
+      _rowYEnd: Number(p.row_y_end) || 0,
+      _rowConfidence: Number(p.row_confidence || p.confidence) || 70,
     }));
 
     return new Response(JSON.stringify({

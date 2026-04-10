@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import POSConnectionPanel from "@/components/POSConnectionPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard, Store } from "lucide-react";
@@ -276,6 +277,11 @@ const AccountScreen = () => {
             </button>
           </div>
         )}
+      </Section>
+
+      {/* POS Connections (Stock Checking) */}
+      <Section title="🔌 POS integration">
+        <POSConnectionPanel />
       </Section>
 
       {/* Wholesale Platform Connections */}

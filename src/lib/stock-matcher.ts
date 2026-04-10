@@ -70,6 +70,7 @@ export interface GroupedMatch {
   reasons:     string[];
   suggestedAction: string;
   imageUrl?:   string;
+  platform?:   "shopify" | "lightspeed_x" | "lightspeed_r";
   sizes: { size: string; qty: number; matchedVariant: ShopifyVariant | null; lineItem: InvoiceLineItem }[];
   totalQty:    number;
 }

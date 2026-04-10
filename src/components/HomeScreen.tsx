@@ -51,6 +51,9 @@ interface HomeScreenProps {
   onStartProfitLoss?: () => void;
   onStartImageOptimise?: () => void;
   onStartStockCheck?: () => void;
+  onStartPriceLookup?: () => void;
+  onStartSeasons?: () => void;
+  onNavigateToTab?: (tab: string) => void;
 }
 
 const HomeScreen = ({

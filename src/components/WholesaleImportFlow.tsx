@@ -22,7 +22,7 @@ import * as XLSX from "xlsx";
 import {
   ArrowLeft, Check, Loader2, RefreshCw, Download,
   Upload, Search, ChevronRight, Link2, Unplug,
-  Package, FileUp, Globe, FileSpreadsheet,
+  Package, FileUp, Globe, FileSpreadsheet, PackageCheck,
 } from "lucide-react";
 
 interface Props {

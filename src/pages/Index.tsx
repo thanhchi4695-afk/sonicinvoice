@@ -310,6 +310,7 @@ const Index = () => {
            onStartAccounting={() => setActiveFlow("accounting")}
            onStartProfitLoss={() => setActiveFlow("profit_loss")}
            onStartImageOptimise={() => setActiveFlow("image_optimise")}
+           onStartStockCheck={() => setActiveFlow("stock_check")}
         />
       )}
       <Suspense fallback={suspenseFallback}>

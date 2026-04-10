@@ -695,10 +695,6 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete, onStartFlow }: StockChe
         <Button variant="outline" onClick={downloadReport}>
           <Download className="w-4 h-4 mr-1" /> Download report
         </Button>
-      <div className="flex gap-3">
-        <Button variant="outline" onClick={downloadReport}>
-          <Download className="w-4 h-4 mr-1" /> Download report
-        </Button>
         <Button onClick={() => { onComplete?.(); onBack(); }}>
           Done
         </Button>

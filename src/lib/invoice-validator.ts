@@ -645,6 +645,17 @@ export function validateAndCleanProducts(
         signals.push({ label: "Cost derived from line total", delta: -5 });
         confidence -= 5;
       }
+
+      // Handwritten quantity uncertainty detection
+      const parseNotes = ((p as any)._parseNotes || "").toLowerCase();
+      if (parseNotes.includes("handwritten_uncertain")) {
+        signals.push({ label: "Handwritten quantity uncertain — needs review", delta: -20 });
+        confidence -= 20;
+      } else if (parseNotes.includes("handwritten_qty") || parseNotes.includes("handwritten")) {
+        signals.push({ label: "Handwritten quantity detected", delta: -10 });
+        confidence -= 10;
+      }
+
       confidence = Math.max(0, Math.min(100, confidence));
     }
 

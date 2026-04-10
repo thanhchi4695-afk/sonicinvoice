@@ -66,6 +66,9 @@ export default function PostParseReviewScreen({
   onExportAccepted,
   onPushToShopify,
   onBack,
+  onReprocessDetailed,
+  isReprocessing = false,
+  underExtractionWarning = null,
 }: PostParseReviewScreenProps) {
   const [activeTab, setActiveTab] = useState<ReviewTab>("accepted");
   const [searchQuery, setSearchQuery] = useState("");

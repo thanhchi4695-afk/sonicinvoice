@@ -26,6 +26,9 @@ interface PostParseReviewScreenProps {
   onExportAccepted: () => void;
   onPushToShopify: () => void;
   onBack: () => void;
+  onReprocessDetailed?: () => void;
+  isReprocessing?: boolean;
+  underExtractionWarning?: { extractedCount: number; estimatedRows: number } | null;
 }
 
 type ReviewTab = "accepted" | "review" | "rejected";

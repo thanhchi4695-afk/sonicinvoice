@@ -832,11 +832,17 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
               </Button>
               <Button size="sm" onClick={() => {
                 const sel = orders.filter((o) => selectedOrders.has(o.orderId));
-                if (confirm(`Push ${sel.reduce((s, o) => s + o.lineItems.length, 0)} items to Shopify?`)) {
+                startStockCheck(sel);
+              }} disabled={pushing}>
+                <PackageCheck className="w-3 h-3 mr-1.5" /> Check stock & push
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => {
+                const sel = orders.filter((o) => selectedOrders.has(o.orderId));
+                if (confirm(`Push ${sel.reduce((s, o) => s + o.lineItems.length, 0)} items as new to Shopify?`)) {
                   pushToShopify(sel);
                 }
               }} disabled={pushing}>
-                <Upload className="w-3 h-3 mr-1.5" /> Push to Shopify
+                <Upload className="w-3 h-3 mr-1.5" /> Push as new
               </Button>
             </div>
           )}

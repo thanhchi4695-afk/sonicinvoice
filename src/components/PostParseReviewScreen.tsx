@@ -587,8 +587,23 @@ export default function PostParseReviewScreen({
                   <DetailRow label="Quantity field" value={debug.parsingPlan.quantity_field || "—"} />
                   <DetailRow label="Cost field" value={debug.parsingPlan.cost_field || "—"} />
                   <DetailRow label="Grouping required" value={debug.parsingPlan.grouping_required ? `Yes — ${debug.parsingPlan.grouping_reason || ""}` : "No"} />
+                  <DetailRow label="Row count" value={debug.parsingPlan.row_count != null ? String(debug.parsingPlan.row_count) : "—"} highlight />
                   <DetailRow label="Expected review" value={debug.parsingPlan.expected_review_level || "—"} highlight />
                 </div>
+                {debug.parsingPlan.row_anchors_detected && debug.parsingPlan.row_anchors_detected.length > 0 && (
+                  <div className="mt-2 border-t border-border/30 pt-2">
+                    <p className="text-[10px] font-semibold text-foreground mb-1.5 flex items-center gap-1">
+                      <Layers className="w-3 h-3" /> Row Anchors Detected ({debug.parsingPlan.row_anchors_detected.length})
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {debug.parsingPlan.row_anchors_detected.map((code, i) => (
+                        <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-mono font-medium">
+                          {code}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {debug.parsingPlan.strategy_explanation && (
                   <p className="mt-2 text-[10px] text-muted-foreground italic border-t border-border/30 pt-1.5">💡 {debug.parsingPlan.strategy_explanation}</p>
                 )}

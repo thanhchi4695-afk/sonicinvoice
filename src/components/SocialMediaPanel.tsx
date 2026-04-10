@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, GripVertical, RefreshCw, Send, Calendar, Plus, Trash2, Eye, ExternalLink, Megaphone } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
 
 // ── Types ──
 interface SocialSettings {

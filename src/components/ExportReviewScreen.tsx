@@ -1,4 +1,5 @@
 import { useState } from "react";
+import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
 import { Download, Check, AlertTriangle, FileSpreadsheet, FileText, Tag, Package, DollarSign, ChevronLeft, ShoppingCart, ShoppingBag, ShieldCheck, XCircle, ToggleLeft, ToggleRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,6 +36,7 @@ interface ExportReviewScreenProps {
   products: ExportProduct[];
   supplierName: string;
   onBack: () => void;
+  onStartFlow?: (flow: string) => void;
 }
 
 type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "tags_only" | "xlsx" | "summary_pdf" | "google_xml" | "google_tsv";
@@ -69,7 +71,7 @@ function generateFilename(supplier: string, format: ExportFormat): string {
   return `${tag}_${month}_${typeMap[format]}_${date}.${ext}`;
 }
 
-const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScreenProps) => {
+const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: ExportReviewScreenProps) => {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>("shopify_full");
   const [filterHigh, setFilterHigh] = useState(true);
   const [filterMedium, setFilterMedium] = useState(true);
@@ -441,6 +443,15 @@ const ExportReviewScreen = ({ products, supplierName, onBack }: ExportReviewScre
               onFallbackCSV={handleExport}
             />
           </div>
+
+          {onStartFlow && (
+            <WhatsNextSuggestions
+              completedFlow="invoice"
+              onStartFlow={onStartFlow}
+              onStartPipeline={(id) => onStartFlow(`pipeline:${id}`)}
+              onGoHome={onBack}
+            />
+          )}
         </div>
       </div>
     </div>

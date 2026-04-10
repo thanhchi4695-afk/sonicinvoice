@@ -261,6 +261,35 @@ const Index = () => {
       case "order_sync": flowEl = <ShopifyOrderSync onBack={() => setActiveFlow("stocky_hub")} />; break;
       case "image_optimise": flowEl = <ImageOptimisePanel onBack={() => setActiveFlow(null)} />; break;
       case "stock_check": flowEl = <StockCheckFlow lineItems={[]} onBack={() => setActiveFlow(null)} />; break;
+      case "pipeline": flowEl = activePipelineId ? <PipelineRunner pipelineId={activePipelineId} onRenderFlow={(flowKey, onComplete) => {
+        const flowMap: Record<string, React.ReactNode> = {
+          invoice: <InvoiceFlow onBack={onComplete} />,
+          stock_check: <StockCheckFlow lineItems={[]} onBack={onComplete} />,
+          image_optimise: <ImageOptimisePanel onBack={onComplete} />,
+          feed_health: <FeedHealthPanel onBack={onComplete} />,
+          collection_seo: <CollectionSEOFlow onBack={onComplete} />,
+          style_grouping: <StyleGroupingFlow onBack={onComplete} />,
+          social_media: <SocialMediaPanel onBack={onComplete} />,
+          accounting: <AccountingIntegration onBack={onComplete} />,
+          feed_optimise: <AIFeedOptimisation onBack={onComplete} />,
+          organic_seo: <OrganicSEOFlow onBack={onComplete} />,
+          geo_agentic: <GeoAgenticFlow onBack={onComplete} />,
+          collab_seo: <CollabSEOFlow onBack={onComplete} />,
+          google_colour: <GoogleColourFlow onBack={onComplete} />,
+          google_ads: <GoogleAdsFlow onBack={onComplete} />,
+          google_ads_setup: <GoogleAdsSetupWizard onBack={onComplete} />,
+          meta_ads_setup: <MetaAdsSetupWizard onBack={onComplete} />,
+          performance: <PerformanceDashboard onBack={onComplete} />,
+          restock: <RestockAnalytics onBack={onComplete} />,
+          markdown_ladder: <MarkdownLadderPanel onBack={onComplete} />,
+          margin_protection: <MarginProtectionPanel onBack={onComplete} />,
+          reorder: <ReorderPanel onBack={onComplete} onViewOrders={() => {}} />,
+          purchase_orders: <PurchaseOrderPanel onBack={onComplete} />,
+          profit_loss: <ProfitLossPanel onBack={onComplete} />,
+        };
+        return flowMap[flowKey] || <div className="p-6 text-center text-sm text-muted-foreground">Flow "{flowKey}" — <button className="text-primary underline" onClick={onComplete}>Mark complete →</button></div>;
+      }} onExit={() => { setActiveFlow(null); setActivePipelineId(null); }} /> : null; break;
+      case "pipeline_chooser": flowEl = <PipelineChooser onSelect={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }} onBack={() => setActiveFlow(null)} />; break;
       default: return null;
     }
     return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;

@@ -28,6 +28,8 @@ const App = () => (
             <Route path="/auth/myob/callback" element={<AuthCallbackPage />} />
             <Route path="/auth/lightspeed-x/callback" element={<AuthCallbackPage />} />
             <Route path="/auth/lightspeed-r/callback" element={<AuthCallbackPage />} />
+            <Route path="/support" element={<Support />} />
+            <Route path="/privacy" element={<Privacy />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

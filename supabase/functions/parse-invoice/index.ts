@@ -32,18 +32,62 @@ Detect the document's structural layout:
 - "low_structure" — handwritten, loosely formatted, or non-tabular
 - "mixed" — multiple layout patterns in the same document
 
-## STAGE B2 — LINE-ITEM TABLE BOUNDARY DETECTION (CRITICAL)
+## STAGE B2 — TABLE-ZONE EXTRACTION (CRITICAL — DO THIS BEFORE ANY PRODUCT EXTRACTION)
 
-Before extracting any products, you MUST identify the exact boundaries of the line-item table:
+Before extracting ANY products, you MUST segment the entire page into labelled zones and ONLY extract from the line-item zone.
 
-1. **Header zone** (IGNORE): Company logo, supplier name, ABN, address, invoice number, date, customer details. This is NOT product data.
-2. **Line-item zone** (EXTRACT FROM HERE): The rectangular region containing the product table. It typically:
-   - Starts after column headers like "Style", "Description", "Qty", "Price", "Total"
-   - Contains multiple rows of product data
-   - Each row usually begins with a style code / SKU in the leftmost data column
-3. **Footer zone** (IGNORE): Subtotals, GST, Total Incl. GST, payment terms, bank details.
+### Zone Segmentation (label every region of the page):
 
-**CRITICAL**: Only extract products from the line-item zone. NEVER treat header text, address blocks, or footer totals as products.
+1. **HEADER_ZONE** (y ≈ 0.00–0.10): Company logo, supplier name, brand graphic, ABN/ACN. IGNORE completely.
+2. **INVOICE_INFO_ZONE** (y ≈ 0.05–0.20): Invoice metadata boxes — invoice number, invoice date, charge date, despatch date, order number, customer name, customer account number, delivery address, billing address. IGNORE completely — these are NOT products.
+3. **LINE_ITEM_ZONE** (the ONLY zone to extract from): The rectangular product table. Identified by:
+   - Column headers row containing words like: Style, Code, SKU, Description, Colour, Size, Qty, Units, Price, Cost, Total, RRP
+   - Multiple data rows below the header, each starting with a style code or product description
+   - Ends BEFORE any subtotal/total row
+4. **TOTALS_ZONE** (typically y ≈ 0.80–0.95): Subtotal, Total Excl. GST, GST Amount, Total Incl. GST, Total Units, Total Qty. IGNORE completely.
+5. **FOOTER_ZONE** (y ≈ 0.90–1.00): Payment terms, bank details, remittance advice, "Thank you for your order", page numbers. IGNORE completely.
+
+### Record zone boundaries in parsing_plan as "page_zones":
+Example:
+  "page_zones": {
+    "header": { "y_start": 0.00, "y_end": 0.08 },
+    "invoice_info": { "y_start": 0.08, "y_end": 0.18 },
+    "line_items": { "y_start": 0.20, "y_end": 0.78 },
+    "totals": { "y_start": 0.78, "y_end": 0.88 },
+    "footer": { "y_start": 0.88, "y_end": 1.00 }
+  }
+
+### NON-PRODUCT REJECTION LIST (NEVER extract these as products):
+
+If ANY row or text block contains one of these patterns, it is NOT a product — add it to rejected_rows with a clear rejection_reason:
+
+**Invoice metadata (INVOICE_INFO_ZONE):**
+- Invoice Number / Invoice No / Inv No / Tax Invoice
+- Customer / Account / Sold To / Ship To / Deliver To
+- Delivery Address / Billing Address / ABN / ACN
+- Charge Date / Despatch Date / Order Date / Due Date
+- Order Number / Purchase Order / Reference / PO#
+- Sales Rep / Agent / Territory
+
+**Footer totals (TOTALS_ZONE):**
+- Total Units / Total Qty / Total Pieces
+- Subtotal / Sub Total / Sub-Total
+- Total Excl. GST / Total Ex GST / Net Total
+- GST / GST Amount / Tax / VAT
+- Total Incl. GST / Total Inc GST / Grand Total / Amount Due / Balance Due
+- Freight / Shipping / Delivery Charge / Handling
+- Discount / Less Discount / Credit
+
+**Other non-product content:**
+- Payment Terms / Terms / Net 30 / EOM / COD
+- Bank Details / BSB / Account Number / Remittance
+- "Continued on next page" / Page X of Y
+- Carton / Carton No / CTN / ASN / Consignment
+- Season / Collection / Range header rows (no qty or price)
+- Empty rows / repeated column header rows
+- "Thank you" / "Please pay" / notes / comments
+
+**CRITICAL**: Only rows from the LINE_ITEM_ZONE that have a style code OR a product description (3+ chars) with at least one of (quantity, price) should become products. Everything else goes into rejected_rows.
 
 ## STAGE B3 — STYLE CODE ANCHORING (PRIMARY DETECTION METHOD — DO THIS FIRST)
 
@@ -268,6 +312,13 @@ Return ONLY valid JSON (no markdown, no explanation):
     "grouping_reason": "why grouping is or isn't needed",
     "total_products_expected": number,
     "total_variants_expected": number,
+    "page_zones": {
+      "header": { "y_start": 0.00, "y_end": 0.08 },
+      "invoice_info": { "y_start": 0.08, "y_end": 0.18 },
+      "line_items": { "y_start": 0.20, "y_end": 0.78 },
+      "totals": { "y_start": 0.78, "y_end": 0.88 },
+      "footer": { "y_start": 0.88, "y_end": 1.00 }
+    },
     "row_anchors_detected": ["CF08381", "CF08446", "CF08448"],
     "row_count": number,
     "expected_review_level": "low" | "medium" | "high",
@@ -406,31 +457,106 @@ function crossValidateProducts(products: Record<string, unknown>[]): Record<stri
   });
 }
 
-// ── Server-side noise filter ──────────────────────────────
+// ── Server-side noise filter (enhanced with zone-aware rejection) ──
+const NOISE_EXACT = new Set([
+  "total", "subtotal", "sub total", "sub-total",
+  "freight", "shipping", "delivery", "handling",
+  "gst", "tax", "vat",
+  "discount", "less discount", "credit",
+  "amount due", "balance", "balance due", "payment", "deposit",
+  "grand total", "net total",
+  "total units", "total qty", "total pieces",
+  "total excl. gst", "total ex gst", "total excl gst",
+  "total incl. gst", "total inc gst", "total incl gst",
+  "gst amount", "tax amount",
+]);
+
+const NOISE_PATTERNS = [
+  /^carton\s/i,
+  /^ctn\s/i,
+  /^asn\s/i,
+  /^consignment/i,
+  /^invoice\s*(number|no|#|:)/i,
+  /^tax\s*invoice/i,
+  /^customer\s/i,
+  /^account\s*(number|no|#|:)/i,
+  /^sold\s*to/i,
+  /^ship\s*to/i,
+  /^deliver\s*to/i,
+  /^delivery\s*address/i,
+  /^billing\s*address/i,
+  /^charge\s*date/i,
+  /^despatch\s*date/i,
+  /^order\s*(number|no|#|date|:)/i,
+  /^purchase\s*order/i,
+  /^reference\s/i,
+  /^po\s*#/i,
+  /^sales\s*rep/i,
+  /^agent\s/i,
+  /^territory\s/i,
+  /^abn\s/i,
+  /^acn\s/i,
+  /^payment\s*terms?/i,
+  /^terms?\s*:/i,
+  /^net\s*\d+/i,
+  /^eom$/i,
+  /^cod$/i,
+  /^bank\s*details?/i,
+  /^bsb\s/i,
+  /^remittance/i,
+  /^thank\s*you/i,
+  /^please\s*pay/i,
+  /^continued\s/i,
+  /^page\s*\d/i,
+  /^\d+[.,]\d{2}$/,  // bare price value
+];
+
 function filterNoise(products: Record<string, unknown>[]): { kept: Record<string, unknown>[]; rejected: Record<string, unknown>[] } {
   const kept: Record<string, unknown>[] = [];
   const rejected: Record<string, unknown>[] = [];
 
   for (const p of products) {
-    const title = String(p.product_title || p.style_description || p.name || "").trim().toLowerCase();
+    const title = String(p.product_title || p.style_description || p.name || "").trim();
+    const titleLower = title.toLowerCase();
     const code = String(p.style_code || p.sku || "").trim();
 
+    // Rule 1: Empty
     if (!title && !code) {
       rejected.push({ raw_text: JSON.stringify(p), rejection_reason: "Empty title and code" });
       continue;
     }
-    if (/^(total|subtotal|sub total|freight|shipping|gst|tax|delivery|discount|amount due|balance|payment|deposit)$/i.test(title)) {
-      rejected.push({ raw_text: title, rejection_reason: `Noise term: "${title}"` });
+
+    // Rule 2: Exact noise term match
+    if (NOISE_EXACT.has(titleLower)) {
+      rejected.push({ raw_text: title, rejection_reason: `Non-product term: "${title}"` });
       continue;
     }
-    if (/^carton\s/i.test(title) || /^carton\s/i.test(code)) {
-      rejected.push({ raw_text: title || code, rejection_reason: "Carton reference" });
-      continue;
+
+    // Rule 3: Pattern-based noise match
+    let matched = false;
+    for (const pat of NOISE_PATTERNS) {
+      if (pat.test(title) || pat.test(code)) {
+        rejected.push({ raw_text: title || code, rejection_reason: `Non-product pattern: ${pat.source}` });
+        matched = true;
+        break;
+      }
     }
-    if (/^\d+[.,]\d{2}$/.test(title)) {
-      rejected.push({ raw_text: title, rejection_reason: "Title is a price value" });
-      continue;
+    if (matched) continue;
+
+    // Rule 4: Row outside line-item zone (if y-position data available)
+    const yStart = Number(p.row_y_start) || 0;
+    if (yStart > 0) {
+      // If row is in the top 5% or bottom 8% of the page, it's likely metadata/totals
+      if (yStart < 0.05) {
+        rejected.push({ raw_text: title || code, rejection_reason: `Header zone (y=${yStart.toFixed(2)})` });
+        continue;
+      }
+      if (yStart > 0.92) {
+        rejected.push({ raw_text: title || code, rejection_reason: `Footer zone (y=${yStart.toFixed(2)})` });
+        continue;
+      }
     }
+
     kept.push(p);
   }
 

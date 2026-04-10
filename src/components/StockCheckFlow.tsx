@@ -72,35 +72,78 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete }: StockCheckFlowProps) 
 
   const runBatchLookup = async () => {
     setScreen("checking");
+    const enabledPlatforms = getEnabledPOSPlatforms();
+    const hasShopify = enabledPlatforms.includes("shopify") || enabledPlatforms.length === 0;
+    const hasLSX = enabledPlatforms.includes("lightspeed_x");
+    const hasLSR = enabledPlatforms.includes("lightspeed_r");
+
     const lookupItems = lineItems.map(item => ({
       sku: item.sku || undefined,
       barcode: item.barcode || undefined,
       stylePrefix: extractStylePrefix(item.styleNumber || item.sku) || undefined,
       titleQuery: item.styleName ? `title:${item.styleName.split(" ").slice(0, 3).join(" ")}${item.brand ? ` vendor:${item.brand}` : ""}` : undefined,
+      styleName: item.styleName || undefined,
+      styleNumber: item.styleNumber || undefined,
     }));
 
-    // Show progress per item
     const BATCH = 10;
     let allShopifyVariants: ShopifyVariant[] = [];
 
     for (let i = 0; i < lookupItems.length; i += BATCH) {
       const batch = lookupItems.slice(i, i + BATCH);
-      try {
-        const { data, error } = await supabase.functions.invoke("shopify-proxy", {
-          body: { action: "batch_lookup", lookup_items: batch },
-        });
-        if (!error && data?.variants) {
-          const mapped = mapVariants(data.variants);
-          allShopifyVariants = deduplicateVariants([...allShopifyVariants, ...mapped]);
-        }
-      } catch {
-        // Continue with what we have
+      const lookupPromises: Promise<void>[] = [];
+
+      // ── Shopify lookup (existing path) ──
+      if (hasShopify) {
+        lookupPromises.push(
+          supabase.functions.invoke("shopify-proxy", {
+            body: { action: "batch_lookup", lookup_items: batch },
+          }).then(({ data, error }) => {
+            if (!error && data?.variants) {
+              const mapped = mapVariants(data.variants);
+              allShopifyVariants = deduplicateVariants([...allShopifyVariants, ...mapped]);
+            }
+          }).catch(() => {})
+        );
       }
+
+      // ── Lightspeed X-Series lookup ──
+      if (hasLSX) {
+        lookupPromises.push(
+          supabase.functions.invoke("pos-proxy", {
+            body: { action: "batch_lookup", platform: "lightspeed_x", items: batch },
+          }).then(({ data, error }) => {
+            if (!error && data?.results) {
+              const normalised = (data.results as { found: Record<string, unknown>[] }[])
+                .flatMap(r => (r.found || []).map(normaliseXProduct));
+              const asVariants = toShopifyVariantFormat(normalised) as unknown as ShopifyVariant[];
+              allShopifyVariants = deduplicateVariants([...allShopifyVariants, ...asVariants]);
+            }
+          }).catch(() => {})
+        );
+      }
+
+      // ── Lightspeed R-Series lookup ──
+      if (hasLSR) {
+        lookupPromises.push(
+          supabase.functions.invoke("pos-proxy", {
+            body: { action: "batch_lookup", platform: "lightspeed_r", items: batch },
+          }).then(({ data, error }) => {
+            if (!error && data?.results) {
+              const normalised = (data.results as { found: Record<string, unknown>[] }[])
+                .flatMap(r => (r.found || []).map(normaliseRItem));
+              const asVariants = toShopifyVariantFormat(normalised) as unknown as ShopifyVariant[];
+              allShopifyVariants = deduplicateVariants([...allShopifyVariants, ...asVariants]);
+            }
+          }).catch(() => {})
+        );
+      }
+
+      await Promise.all(lookupPromises);
 
       const done = Math.min(i + BATCH, lookupItems.length);
       setCheckProgress({ done, total: lookupItems.length });
 
-      // Update per-item statuses
       const newStatuses = new Map(checkStatuses);
       for (let j = i; j < done; j++) {
         newStatuses.set(j, { status: "done", label: lineItems[j].styleName || lineItems[j].sku });

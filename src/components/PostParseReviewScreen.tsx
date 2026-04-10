@@ -684,6 +684,21 @@ export default function PostParseReviewScreen({
         </div>
       )}
 
+      {/* Extraction Debug Overlay Modal */}
+      {showDebugOverlay && invoicePages.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-center justify-center">
+          <div className="w-full max-w-6xl h-[85vh]">
+            <InvoiceDebugOverlay
+              invoicePages={invoicePages}
+              products={products}
+              rejectedRows={debug.rejectedByAI}
+              parsingPlan={debug.parsingPlan}
+              onClose={() => setShowDebugOverlay(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Sticky bottom action bar */}
       <div className="sticky bottom-0 mt-4 -mx-4 px-4 py-3 bg-background border-t border-border flex items-center gap-2">
         <Button variant="outline" size="sm" onClick={onBack} className="gap-1">

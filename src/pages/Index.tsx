@@ -267,6 +267,7 @@ const Index = () => {
         setActiveFlow(map[t] || t);
       }} />; break;
       case "stocky_migration": flowEl = <StockyMigration onBack={() => setActiveFlow("stocky_hub")} onComplete={() => setActiveFlow("stocky_hub")} />; break;
+      case "stocky_onboarding": flowEl = <StockyOnboarding onBack={() => setActiveFlow(null)} onComplete={() => { setActiveFlow(null); localStorage.setItem("stocky_onboarding_done", "true"); }} onStartPipeline={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); localStorage.setItem("stocky_onboarding_done", "true"); }} onStartFlow={(f) => { setActiveFlow(f as any); localStorage.setItem("stocky_onboarding_done", "true"); }} />; break;
       case "inventory_dashboard": flowEl = <InventoryDashboard onBack={() => setActiveFlow("stocky_hub")} />; break;
       case "product_health": flowEl = <ProductHealthPanel onBack={() => setActiveFlow("stocky_hub")} />; break;
       case "order_sync": flowEl = <ShopifyOrderSync onBack={() => setActiveFlow("stocky_hub")} />; break;

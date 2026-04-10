@@ -825,6 +825,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
+  const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
+  const [isReprocessing, setIsReprocessing] = useState(false);
 
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {

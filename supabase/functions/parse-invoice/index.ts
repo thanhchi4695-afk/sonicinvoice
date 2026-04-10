@@ -233,6 +233,9 @@ Score each extracted row 0-100:
 - Has quantity > 0: +15
 - Math cross-check passes (unit_cost × qty ≈ line_total): +5
 - Deductions: missing price -20, ambiguous text -10, handwritten uncertainty -15, uncertain quantity -10, cost derived from line_total -5
+- Handwritten tick marks clearly readable: no deduction
+- Handwritten marks ambiguous (can't distinguish 1 vs 2, or tick vs stray): -15 and flag "handwritten_uncertain"
+- Size grid with mixed printed/handwritten: -5
 
 ## OUTPUT FORMAT
 

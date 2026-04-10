@@ -22,6 +22,8 @@ import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import AccountingBillReview from "@/components/AccountingBillReview";
 import StockCheckFlow from "@/components/StockCheckFlow";
 import type { InvoiceLineItem } from "@/lib/stock-matcher";
+import { preprocessInvoiceImage, isLikelyPhotoInvoice, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
+import { supabase } from "@/integrations/supabase/client";
 
 interface InvoiceFlowProps {
   onBack: () => void;

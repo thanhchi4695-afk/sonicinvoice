@@ -177,6 +177,15 @@ const Index = () => {
     addAuditEntry("Login", `User logged in`);
   };
 
+  const handleStartFlow = useCallback((flow: string) => {
+    if (flow.startsWith("pipeline:")) {
+      setActivePipelineId(flow.replace("pipeline:", ""));
+      setActiveFlow("pipeline");
+    } else {
+      setActiveFlow(flow as any);
+    }
+  }, []);
+
   // ── Loading state ──
   if (authLoading) {
     return (
@@ -209,14 +218,6 @@ const Index = () => {
     return <Suspense fallback={suspenseFallback}><OnboardingFlow onComplete={() => setOnboarded(true)} /></Suspense>;
   }
 
-  const handleStartFlow = useCallback((flow: string) => {
-    if (flow.startsWith("pipeline:")) {
-      setActivePipelineId(flow.replace("pipeline:", ""));
-      setActiveFlow("pipeline");
-    } else {
-      setActiveFlow(flow as any);
-    }
-  }, []);
 
   const renderFlow = () => {
     let flowEl: React.ReactNode = null;

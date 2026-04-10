@@ -472,7 +472,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
             },
             {
               type: "text",
-              text: "Analyse this document's structure and layout. Classify the document type, detect the layout pattern, identify the variant expression method, then extract ALL products with full variant breakdown. Create one row per size/colour variant. Return JSON only.",
+              text: "Analyse this document. FIRST scan the entire line-item table and identify ALL style code anchors (e.g. CF08381, CF08446, etc.) — list them in row_anchors_detected. Then extract EVERY product row, one per style code anchor, expanding size variants. Do NOT stop after the first row. If you see 5 style codes, return products from all 5. Return JSON only.",
             },
           ],
         },
@@ -482,7 +482,7 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: `Analyse this document's structure and layout. Classify the document type, detect the layout pattern, identify the variant expression method, then extract ALL products with full variant breakdown. Create one row per size/colour variant. Return JSON only.\n\nDocument content:\n${fileContent}`,
+          content: `Analyse this document. FIRST scan the entire line-item table and identify ALL style code anchors — list them in row_anchors_detected. Then extract EVERY product row, expanding size variants. Do NOT stop after the first row. Return JSON only.\n\nDocument content:\n${fileContent}`,
         },
       ];
     }

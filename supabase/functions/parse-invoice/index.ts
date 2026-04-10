@@ -195,9 +195,12 @@ Each line represents a single size+colour combination. Extract directly.
 **Method 2: Size grid matrix (printed quantities)**
 Size labels appear as column headers across the row. Quantities are printed in cells below each size.
 - Column headers are size labels: 2XS, XS, S, M, L, XL, 2XL, 3XL — or numeric: 6, 8, 10, 12, 14, 16
-- IMPORTANT: The size labels are COLUMN HEADERS, not quantities. Do NOT treat "XS", "S", "M" etc. as product data.
+- SHOE SIZE GRIDS: Some invoices use numeric shoe sizes as column headers: 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47. These are NOT quantities — they are size labels.
+- IMPORTANT: The size labels are COLUMN HEADERS, not quantities. Do NOT treat "XS", "S", "M" or "35", "36", "37" etc. as product data.
 - The cells BELOW each size header contain the ordered quantity for that size
-- Circled, underlined, or highlighted numbers ARE quantities — extract them
+- **Circled numbers**: Numbers that are circled (drawn with a ring around them) ARE valid quantities — extract the number inside the circle
+- **Numbers with ticks/checkmarks beside them**: The number is the quantity, the tick confirms it
+- Underlined or highlighted numbers ARE quantities — extract them
 - Empty or zero cells mean that size was NOT ordered — skip it (create NO variant for that size)
 - A "Total Qty" column should confirm the sum of all size quantities
 - Create one output row per size with quantity > 0
@@ -222,6 +225,24 @@ EXTRACTION RULES for handwritten marks:
   - Lower row_confidence by 15-20 points
   - Add "handwritten_uncertain" to parse_notes
   - The client will route this to "Needs Review"
+
+**Method 2c: Product block with embedded size grid (COMMON in fashion linesheet-style invoices)**
+Each product appears as a visual BLOCK on the page with:
+- Product name/title at the top of the block
+- Style code (e.g. "Style #SD298PARO")
+- A product image (photo or swatch)
+- Wholesale price and RRP displayed prominently
+- A size grid row with column headers (XS/6, S/8, M/10, L/12, XL/14, XXL/16) and quantities below
+- Colour name in a row within the grid
+- Line total at the right edge
+
+CRITICAL: Each block is a SEPARATE product. Do NOT merge blocks. Read each block independently:
+1. Find the style code (usually starts with # or follows "Style")
+2. Read the product name (usually bold, above the style code line)
+3. Read wholesale price and RRP
+4. Read the colour from the colour row in the grid
+5. Read each size column header and its quantity (may be handwritten ticks or printed numbers)
+6. Output one variant per size with qty > 0
 
 CRITICAL: Do NOT confuse:
 - Printed size labels (XS, S, M, L) with handwritten quantities
@@ -714,7 +735,20 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
             },
             {
               type: "text",
-              text: "Analyse this document. FIRST check if it's a landscape/sideways photo — if text runs vertically or the table is wider than tall, mentally rotate it before extraction. Then scan the entire line-item table and identify ALL style code anchors (e.g. CF08381, CF08446, etc.) — list them in row_anchors_detected. For each style code, read across the full row: description, colour, size grid (converting handwritten ticks to quantities), unit price, and line total. Extract EVERY product row, expanding size variants. Do NOT stop after the first row. Return JSON only.",
+              text: `Analyse this document photo carefully. 
+
+STEP 1 — ORIENTATION: Check if the photo is rotated sideways (text running vertically). If so, mentally rotate it first.
+STEP 2 — LAYOUT: Determine the layout. Common types:
+  - Product blocks (each product is a visual block with image, style code, size grid)
+  - Landscape table with style codes down the left
+  - Standard row table
+  - Shoe/footwear invoices with numeric size grids (35-47)
+STEP 3 — STYLE CODES: Scan the ENTIRE line-item zone for ALL style codes / SKUs. List them in row_anchors_detected.
+STEP 4 — FOR EACH STYLE CODE: Read across the row to extract description, colour, size grid quantities (convert ticks/circles to numbers), unit price, and line total.
+STEP 5 — SIZE GRIDS: If sizes appear as column headers (XS, S, M, L or 6, 8, 10, 12 or 35, 36, 37...), read the quantity in each column cell. Handwritten ticks = 1, circled numbers = that number, empty = 0.
+STEP 6 — OUTPUT: One variant row per size with qty > 0. Do NOT stop after the first product.
+
+Return JSON only.`,
             },
           ],
         },
@@ -732,17 +766,44 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
     // Use Pro model for complex documents (PDFs, images), Flash for text
     const model = (isPdf || isImage) ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
 
-    const data = await callAI({
+    let data = await callAI({
       model,
       messages,
       temperature: 0.1,
     });
-    const content = getContent(data);
+    let content = getContent(data);
 
     // Extract JSON from response
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-    const jsonStr = (jsonMatch[1] || content).trim();
-    const parsed = JSON.parse(jsonStr);
+    let jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+    let jsonStr = (jsonMatch[1] || content).trim();
+    let parsed = JSON.parse(jsonStr);
+
+    // ── Zero-product retry: if AI returned 0 products, retry with enhanced prompt ──
+    const rawProductCount = (parsed.products || []).length;
+    if (rawProductCount === 0 && (isImage || isPdf) && !detailedMode) {
+      console.log("[parse-invoice] Zero products detected on first pass — retrying with enhanced prompt");
+      const retryMessages = [
+        { role: "system", content: systemPrompt + `\n\n## RETRY — ZERO PRODUCTS FOUND ON FIRST PASS
+The previous extraction attempt found ZERO products. This is almost certainly wrong — the document clearly contains product data.
+
+INSTRUCTIONS FOR RETRY:
+1. Look MORE CAREFULLY at the document. It may be a photo taken at an angle, sideways, or with poor lighting.
+2. Try BOTH orientations — if reading left-to-right yields nothing, try reading top-to-bottom (the photo may be rotated).
+3. Look for ANY text that could be product descriptions, style codes, or SKUs.
+4. If you see a table structure, identify the column headers first, then read the data rows.
+5. For product block layouts: each product may appear as a separate visual section with its own image, title, and size grid.
+6. Extract EVERYTHING you can see — even partial data with low confidence is better than nothing.
+7. If the document appears to be a statement or non-product document, still set document_type correctly and explain why no products were found.` },
+        ...messages.slice(1),
+      ];
+      
+      data = await callAI({ model, messages: retryMessages, temperature: 0.2 });
+      content = getContent(data);
+      jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+      jsonStr = (jsonMatch[1] || content).trim();
+      parsed = JSON.parse(jsonStr);
+      console.log(`[parse-invoice] Retry found ${(parsed.products || []).length} products`);
+    }
 
     const parsingPlan = parsed.parsing_plan || {};
     const docType = parsingPlan.document_type || parsed.document_type || (forceMode || "tax_invoice");

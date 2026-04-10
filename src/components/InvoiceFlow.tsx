@@ -728,8 +728,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     // Flag if extracted count is less than 50% of estimated, or if only 1 product from multi-row invoice
     if (estimatedRows > 0 && nonRejectedCount < estimatedRows * 0.5) {
       setUnderExtractionWarning({ extractedCount: nonRejectedCount, estimatedRows });
-    } else if (nonRejectedCount <= 1 && (debug.total + debug.rejected) > 3) {
-      setUnderExtractionWarning({ extractedCount: nonRejectedCount, estimatedRows: debug.total + debug.rejected });
+    } else if (nonRejectedCount <= 1 && (debug.totalRaw + debug.rejected) > 3) {
+      setUnderExtractionWarning({ extractedCount: nonRejectedCount, estimatedRows: debug.totalRaw + debug.rejected });
     } else {
       setUnderExtractionWarning(null);
     }

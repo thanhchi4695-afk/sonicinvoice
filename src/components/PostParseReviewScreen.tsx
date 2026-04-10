@@ -14,6 +14,7 @@ import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates"
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
 import { toast } from "sonner";
 import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
+import SizeGridEditor from "@/components/SizeGridEditor";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;
@@ -748,28 +749,32 @@ function GroupedProductCard({
 
       {expanded && (
         <>
-          <div className="ml-10 mt-2 bg-muted/20 rounded-lg border border-border/50 divide-y divide-border/30">
-            <div className="grid grid-cols-[1fr_60px_50px_40px] gap-2 px-3 py-1.5 text-[9px] text-muted-foreground font-semibold uppercase tracking-wide">
-              <span>Size</span>
-              <span>Colour</span>
-              <span>Qty</span>
-              <span></span>
-            </div>
-            {group.variants.map(v => (
-              <div key={v._rowIndex} className="grid grid-cols-[1fr_60px_50px_40px] gap-2 px-3 py-2 items-center text-xs">
-                <span className="font-medium">{v.size || "—"}</span>
-                <span className="text-muted-foreground">{v.colour || group.colour || "—"}</span>
-                <span className="font-mono font-semibold">{v.qty || 0}</span>
-                <div className="flex gap-0.5">
-                  <button onClick={() => onSplitVariant(v._rowIndex)} className="p-1 rounded hover:bg-muted" title="Split out">
-                    <Scissors className="w-3 h-3 text-muted-foreground" />
-                  </button>
-                  <button onClick={() => onRejectVariant(v._rowIndex)} className="p-1 rounded hover:bg-destructive/10" title="Remove variant">
-                    <X className="w-3 h-3 text-destructive" />
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="ml-10 mt-2">
+            <SizeGridEditor
+              label={group.styleCode || undefined}
+              unitCost={group.unitCost}
+              sizes={group.variants.map(v => ({
+                size: v.size || "—",
+                qty: v.qty || 0,
+                confidence: v._confidenceLevel,
+                handwritten: (v._parseNotes || "").toLowerCase().includes("handwritten"),
+              }))}
+              onChange={(updated) => {
+                updated.forEach((s, i) => {
+                  if (i < group.variants.length) {
+                    const v = group.variants[i];
+                    if (s.qty !== v.qty) onUpdateField(v._rowIndex, "qty", s.qty);
+                    if (s.size !== (v.size || "—")) onUpdateField(v._rowIndex, "size", s.size);
+                  }
+                });
+                // Handle removals
+                if (updated.length < group.variants.length) {
+                  for (let i = updated.length; i < group.variants.length; i++) {
+                    onRejectVariant(group.variants[i]._rowIndex);
+                  }
+                }
+              }}
+            />
           </div>
           <div className="ml-10 mt-2 border border-primary/15 rounded-md overflow-hidden">
             <button
@@ -985,6 +990,25 @@ function ReviewRow({
                   <Input defaultValue={p.colour} onBlur={e => onUpdateField("colour", e.target.value)} className="h-8 text-xs" />
                 </div>
               </div>
+              {/* Size grid editor for multi-size rows */}
+              {p.size && p.size.includes(",") && (
+                <SizeGridEditor
+                  label={p.sku || undefined}
+                  unitCost={p.cost}
+                  sizes={p.size.split(",").map(s => s.trim()).filter(Boolean).map(s => ({
+                    size: s,
+                    qty: Math.round(p.qty / p.size.split(",").filter(Boolean).length),
+                    confidence: p._confidenceLevel,
+                    handwritten: (p._parseNotes || "").toLowerCase().includes("handwritten"),
+                  }))}
+                  onChange={(updated) => {
+                    const newSizes = updated.map(u => u.size).join(", ");
+                    const newQty = updated.reduce((sum, u) => sum + u.qty, 0);
+                    onUpdateField("size", newSizes);
+                    onUpdateField("qty", newQty);
+                  }}
+                />
+              )}
               <div className="flex justify-between items-center">
                 <div className="flex gap-1">
                   <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 text-muted-foreground" onClick={onSplit}>

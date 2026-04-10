@@ -766,17 +766,44 @@ Return JSON only.`,
     // Use Pro model for complex documents (PDFs, images), Flash for text
     const model = (isPdf || isImage) ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
 
-    const data = await callAI({
+    let data = await callAI({
       model,
       messages,
       temperature: 0.1,
     });
-    const content = getContent(data);
+    let content = getContent(data);
 
     // Extract JSON from response
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-    const jsonStr = (jsonMatch[1] || content).trim();
-    const parsed = JSON.parse(jsonStr);
+    let jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+    let jsonStr = (jsonMatch[1] || content).trim();
+    let parsed = JSON.parse(jsonStr);
+
+    // ── Zero-product retry: if AI returned 0 products, retry with enhanced prompt ──
+    const rawProductCount = (parsed.products || []).length;
+    if (rawProductCount === 0 && (isImage || isPdf) && !detailedMode) {
+      console.log("[parse-invoice] Zero products detected on first pass — retrying with enhanced prompt");
+      const retryMessages = [
+        { role: "system", content: systemPrompt + `\n\n## RETRY — ZERO PRODUCTS FOUND ON FIRST PASS
+The previous extraction attempt found ZERO products. This is almost certainly wrong — the document clearly contains product data.
+
+INSTRUCTIONS FOR RETRY:
+1. Look MORE CAREFULLY at the document. It may be a photo taken at an angle, sideways, or with poor lighting.
+2. Try BOTH orientations — if reading left-to-right yields nothing, try reading top-to-bottom (the photo may be rotated).
+3. Look for ANY text that could be product descriptions, style codes, or SKUs.
+4. If you see a table structure, identify the column headers first, then read the data rows.
+5. For product block layouts: each product may appear as a separate visual section with its own image, title, and size grid.
+6. Extract EVERYTHING you can see — even partial data with low confidence is better than nothing.
+7. If the document appears to be a statement or non-product document, still set document_type correctly and explain why no products were found.` },
+        ...messages.slice(1),
+      ];
+      
+      data = await callAI({ model, messages: retryMessages, temperature: 0.2 });
+      content = getContent(data);
+      jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+      jsonStr = (jsonMatch[1] || content).trim();
+      parsed = JSON.parse(jsonStr);
+      console.log(`[parse-invoice] Retry found ${(parsed.products || []).length} products`);
+    }
 
     const parsingPlan = parsed.parsing_plan || {};
     const docType = parsingPlan.document_type || parsed.document_type || (forceMode || "tax_invoice");

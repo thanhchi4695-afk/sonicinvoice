@@ -1261,9 +1261,17 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
   // ── If price lookup is active, render it instead ──
   if (priceLookupActive) {
+    const firstProduct = productGroups[0];
     return (
       <PriceLookup
         onBack={() => setPriceLookupActive(false)}
+        initialProduct={firstProduct ? {
+          product_name: firstProduct.title || "",
+          supplier: firstProduct.brand || "",
+          style_number: firstProduct.vendorCode || "",
+          colour: firstProduct.variants?.[0]?.colour || "",
+          supplier_cost: firstProduct.variants?.[0]?.costPrice ? parseFloat(String(firstProduct.variants[0].costPrice)) : undefined,
+        } : undefined}
       />
     );
   }

@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useBarcode } from "@/components/BarcodeProvider";
+import DataGrid from "@/components/ui/data-grid";
+import { type ColumnDef } from "@tanstack/react-table";
 import {
   ChevronLeft, Package, DollarSign, AlertTriangle, TrendingUp,
   TrendingDown, MapPin, BarChart3, Loader2, RefreshCw,
@@ -291,12 +293,12 @@ export default function InventoryDashboard({ onBack }: Props) {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="w-full mb-4">
             <TabsTrigger value="overview" className="flex-1 text-xs">Overview</TabsTrigger>
+            <TabsTrigger value="products" className="flex-1 text-xs">Products</TabsTrigger>
             <TabsTrigger value="alerts" className="flex-1 text-xs">
               Alerts {(stats.lowStockCount + stats.outOfStockCount) > 0 && (
                 <Badge variant="destructive" className="ml-1 text-[9px] px-1">{stats.lowStockCount + stats.outOfStockCount}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="sellers" className="flex-1 text-xs">Best / Slow</TabsTrigger>
             <TabsTrigger value="locations" className="flex-1 text-xs">Locations</TabsTrigger>
           </TabsList>
 
@@ -387,6 +389,30 @@ export default function InventoryDashboard({ onBack }: Props) {
             )}
           </TabsContent>
 
+          {/* ─── Products DataGrid ─── */}
+          <TabsContent value="products">
+            <DataGrid
+              data={data.variants}
+              storageKey="inv_products"
+              enableSelection
+              pageSize={50}
+              exportFilename="inventory-products.csv"
+              columns={[
+                { accessorKey: "sku", header: "SKU", size: 100, cell: ({ getValue, row }) => (
+                  <span className={cn("font-mono", highlightedSku && (getValue() as string)?.toLowerCase() === highlightedSku && "text-primary font-bold")}>{(getValue() as string) || "—"}</span>
+                )},
+                { accessorKey: "productTitle", header: "Product", size: 200, cell: ({ getValue }) => <span className="font-medium truncate block max-w-[200px]">{getValue() as string}</span> },
+                { accessorKey: "color", header: "Color", size: 70 },
+                { accessorKey: "size", header: "Size", size: 60 },
+                { accessorKey: "quantity", header: "On Hand", size: 70, cell: ({ getValue }) => <span className={cn("font-mono font-medium", (getValue() as number) === 0 && "text-destructive")}>{getValue() as number}</span> },
+                { accessorKey: "cost", header: "Cost", size: 70, cell: ({ getValue }) => `$${(getValue() as number).toFixed(2)}` },
+                { accessorKey: "retailPrice", header: "Retail", size: 70, cell: ({ getValue }) => `$${(getValue() as number).toFixed(2)}` },
+                { id: "margin", header: "Margin", size: 70, accessorFn: (r) => r.cost > 0 && r.retailPrice > 0 ? ((r.retailPrice - r.cost) / r.retailPrice) * 100 : -1, cell: ({ getValue }) => { const m = getValue() as number; return m >= 0 ? <Badge variant={m >= 50 ? "default" : m >= 30 ? "secondary" : "destructive"} className="text-[10px]">{m.toFixed(0)}%</Badge> : "—"; }},
+                { accessorKey: "vendor", header: "Vendor", size: 100, cell: ({ getValue }) => <span className="text-muted-foreground">{(getValue() as string) || "—"}</span> },
+              ] as ColumnDef<ProductVariant, any>[]}
+            />
+          </TabsContent>
+
           {/* ─── Alerts ─── */}
           <TabsContent value="alerts" className="space-y-4">
             {stats.outOfStockCount > 0 && (
@@ -426,37 +452,6 @@ export default function InventoryDashboard({ onBack }: Props) {
                 <p className="text-xs text-muted-foreground">No items are low or out of stock.</p>
               </Card>
             )}
-          </TabsContent>
-
-          {/* ─── Best / Slow Sellers ─── */}
-          <TabsContent value="sellers" className="space-y-4">
-            <Card className="p-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                <TrendingUp className="w-4 h-4 text-green-600" /> Highest Stock (Best Sellers)
-              </h3>
-              <p className="text-[10px] text-muted-foreground mb-2">
-                Products with the most units — likely your best sellers being restocked frequently.
-              </p>
-              <div className="max-h-72 overflow-y-auto">
-                {bestSellers.map(v => (
-                  <VariantRow key={v.variantId} v={v} />
-                ))}
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                <TrendingDown className="w-4 h-4 text-red-600" /> Slow Movers
-              </h3>
-              <p className="text-[10px] text-muted-foreground mb-2">
-                Products with the fewest units — may need markdown or promotion.
-              </p>
-              <div className="max-h-72 overflow-y-auto">
-                {slowMovers.map(v => (
-                  <VariantRow key={v.variantId} v={v} />
-                ))}
-              </div>
-            </Card>
           </TabsContent>
 
           {/* ─── Locations ─── */}

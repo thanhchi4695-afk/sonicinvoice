@@ -7,16 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from "@/components/ui/table";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { addAuditEntry } from "@/lib/audit-log";
+import DataGrid from "@/components/ui/data-grid";
+import { type ColumnDef } from "@tanstack/react-table";
 import Papa from "papaparse";
 
 /* ─── Types ─── */
@@ -204,9 +202,20 @@ const ReorderPanel = ({ onBack, onViewOrders }: ReorderPanelProps) => {
     } finally { setLoading(false); }
   };
 
-  const selectedRows = useMemo(() => rows.filter(r => r.selected), [rows]);
+  const [selectedRows, setSelectedRows] = useState<ReorderRow[]>([]);
   const toggleAll = (checked: boolean) => setRows(prev => prev.map(r => ({ ...r, selected: checked })));
-  const toggleRow = (variantId: string) => setRows(prev => prev.map(r => r.variantId === variantId ? { ...r, selected: !r.selected } : r));
+
+  const reorderColumns = useMemo<ColumnDef<ReorderRow, any>[]>(() => [
+    { accessorKey: "productTitle", header: "Product", size: 180, cell: ({ getValue }) => <span className="font-medium text-sm truncate block max-w-[180px]">{getValue()}</span> },
+    { accessorKey: "sku", header: "SKU", size: 100, cell: ({ getValue }) => <span className="font-mono">{getValue() || "—"}</span> },
+    { accessorKey: "supplierName", header: "Supplier", size: 100, cell: ({ getValue }) => <span className="text-muted-foreground">{getValue() || "—"}</span> },
+    { accessorKey: "onHand", header: "On Hand", size: 70, cell: ({ getValue }) => <span className={`font-medium ${getValue() === 0 ? "text-destructive" : ""}`}>{getValue()}</span> },
+    { accessorKey: "avgDailySales", header: "Avg/Day", size: 65, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
+    { accessorKey: "leadTimeDays", header: "Lead Time", size: 70, cell: ({ getValue }) => `${getValue()}d` },
+    { accessorKey: "incomingStock", header: "Incoming", size: 70, cell: ({ getValue }) => (getValue() as number) > 0 ? getValue() : "—" },
+    { accessorKey: "recommendedQty", header: "Reorder Qty", size: 85, cell: ({ getValue }) => <span className="font-semibold">{getValue()}</span> },
+    { id: "urgency", header: "Urgency", size: 80, accessorFn: (r) => r, cell: ({ getValue }) => { const u = getUrgency(getValue() as ReorderRow); return <Badge className={`text-[10px] ${u.color}`}>{u.label}</Badge>; }, enableSorting: false },
+  ], []);
 
   /* ─── Create PO from selected ─── */
 
@@ -420,10 +429,6 @@ const ReorderPanel = ({ onBack, onViewOrders }: ReorderPanelProps) => {
               <TrendingUp className="w-3 h-3 mr-1" />
               {rows.length} need reorder
             </Badge>
-            <div className="flex-1" />
-            <Button variant="outline" size="sm" onClick={exportCSV}>
-              <Download className="w-3.5 h-3.5 mr-1" /> Export
-            </Button>
           </div>
 
           {/* Action bar */}
@@ -436,60 +441,18 @@ const ReorderPanel = ({ onBack, onViewOrders }: ReorderPanelProps) => {
               {creatingPO ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <ShoppingCart className="w-4 h-4 mr-1" />}
               Create PO from {selectedRows.length || "selected"} items
             </Button>
-            {rows.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => toggleAll(!rows.every(r => r.selected))}>
-                {rows.every(r => r.selected) ? "Deselect all" : "Select all"}
-              </Button>
-            )}
           </div>
 
-          {/* Table */}
-          <div className="border rounded-lg overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={rows.length > 0 && rows.every(r => r.selected)}
-                      onCheckedChange={(c) => toggleAll(!!c)}
-                    />
-                  </TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead className="text-right">On Hand</TableHead>
-                  <TableHead className="text-right">Avg/Day</TableHead>
-                  <TableHead className="text-right">Lead Time</TableHead>
-                  <TableHead className="text-right">Incoming</TableHead>
-                  <TableHead className="text-right">Reorder Qty</TableHead>
-                  <TableHead>Urgency</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map(r => {
-                  const urgency = getUrgency(r);
-                  return (
-                    <TableRow key={r.variantId}>
-                      <TableCell>
-                        <Checkbox checked={r.selected} onCheckedChange={() => toggleRow(r.variantId)} />
-                      </TableCell>
-                      <TableCell className="text-sm font-medium truncate max-w-[180px]">{r.productTitle}</TableCell>
-                      <TableCell className="font-mono text-xs">{r.sku || "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.supplierName || "—"}</TableCell>
-                      <TableCell className={`text-right font-medium ${r.onHand === 0 ? "text-destructive" : ""}`}>{r.onHand}</TableCell>
-                      <TableCell className="text-right text-xs">{r.avgDailySales.toFixed(1)}</TableCell>
-                      <TableCell className="text-right text-xs">{r.leadTimeDays}d</TableCell>
-                      <TableCell className="text-right text-xs">{r.incomingStock > 0 ? r.incomingStock : "—"}</TableCell>
-                      <TableCell className="text-right font-semibold">{r.recommendedQty}</TableCell>
-                      <TableCell>
-                        <Badge className={`text-[10px] ${urgency.color}`}>{urgency.label}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          {/* DataGrid */}
+          <DataGrid
+            data={rows}
+            columns={reorderColumns}
+            storageKey="reorder"
+            enableSelection
+            onSelectionChange={setSelectedRows}
+            pageSize={50}
+            exportFilename={`reorder-suggestions-${new Date().toISOString().slice(0, 10)}.csv`}
+          />
 
           <p className="text-[10px] text-muted-foreground mt-3 text-center">
             Formula: ((Lead Time + Safety Stock) × Avg Daily Sales) − On Hand − Incoming · Velocity: last {velocityDays} days

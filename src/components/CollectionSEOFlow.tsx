@@ -598,91 +598,101 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
               </Button>
             </div>
 
-            {/* Collection cards grouped by type */}
+            {/* Collection cards - grouped by brand group (bulk) or type (other) */}
             <div className="space-y-4 max-h-[55vh] overflow-y-auto">
-              {Object.entries(typeGroups).map(([type, colls]) => (
-                <div key={type}>
-                  <div className="flex items-center gap-2 mb-2">
-                    {typeBadge(type)}
-                    <span className="text-xs text-muted-foreground">{colls.length} collection{colls.length !== 1 ? "s" : ""}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {colls.map(c => (
-                      <div
-                        key={c.id}
-                        className={`bg-card rounded-lg border transition-all ${c.selected ? "border-primary/40" : "border-border opacity-60"}`}
+              {groups.length > 0 ? (
+                <>
+                  {/* Bulk mode: show by group */}
+                  {groups.map((g) => (
+                    <div key={g.group_name} className="border border-border rounded-xl overflow-hidden">
+                      <button
+                        onClick={() => setExpandedGroup(expandedGroup === g.group_name ? null : g.group_name)}
+                        className="w-full flex items-center gap-3 p-3 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
                       >
-                        <div className="p-3">
-                          <div className="flex items-start gap-2">
-                            <Checkbox
-                              checked={c.selected}
-                              onCheckedChange={() => toggleSelect(c.id)}
-                              className="mt-0.5"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-semibold">{c.title}</p>
-                                {typeBadge(c.type)}
-                              </div>
-                              <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">/{c.handle}</p>
+                        <Layers className="w-4 h-4 text-primary shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">{g.group_name}</p>
+                          <p className="text-[10px] text-muted-foreground">{g.products_in_group} products · {g.collections.length} collections · {g.cross_links.length} cross-links</p>
+                        </div>
+                        <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedGroup === g.group_name ? "rotate-90" : ""}`} />
+                      </button>
 
-                              {/* SEO preview snippet */}
-                              <div className="mt-2 bg-muted/30 rounded p-2 border border-border/50">
-                                <p className="text-xs font-medium text-primary truncate">{c.seoTitle}</p>
-                                <p className="text-[10px] text-muted-foreground line-clamp-2">{c.metaDescription}</p>
-                              </div>
-
-                              {/* Rules + links row */}
-                              <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
-                                <span>{c.rules.length} rule{c.rules.length !== 1 ? "s" : ""}</span>
-                                {c.internalLinksTo.length > 0 && (
-                                  <span className="flex items-center gap-0.5"><Link className="w-2.5 h-2.5" /> {c.internalLinksTo.length} links</span>
-                                )}
-                                <button
-                                  onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
-                                  className="ml-auto text-primary flex items-center gap-0.5"
-                                >
-                                  <Eye className="w-3 h-3" /> {expandedId === c.id ? "Hide" : "Details"}
-                                </button>
-                              </div>
-
-                              {/* Expanded details */}
-                              {expandedId === c.id && (
-                                <div className="mt-2 pt-2 border-t border-border space-y-2 animate-fade-in">
-                                  <div>
-                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Rules</p>
-                                    {c.rules.map((r, i) => (
-                                      <p key={i} className="text-xs font-mono bg-muted/50 rounded px-2 py-0.5 mb-0.5">
-                                        {r.column} {r.relation} "{r.condition}"
-                                      </p>
-                                    ))}
-                                  </div>
-                                  {c.bodyContent && (
-                                    <div>
-                                      <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">SEO Body Content</p>
-                                      <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-32 overflow-y-auto prose prose-xs" dangerouslySetInnerHTML={{ __html: c.bodyContent.slice(0, 600) + (c.bodyContent.length > 600 ? "…" : "") }} />
-                                    </div>
-                                  )}
-                                  {c.internalLinksTo.length > 0 && (
-                                    <div>
-                                      <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5 flex items-center gap-1"><Link className="w-3 h-3" /> Internal Links</p>
-                                      <div className="flex flex-wrap gap-1">
-                                        {c.internalLinksTo.map((h, i) => (
-                                          <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono">/{h}</span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                      {expandedGroup === g.group_name && (
+                        <div className="p-3 space-y-3 animate-fade-in">
+                          {/* Product titles */}
+                          {g.product_titles.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {g.product_titles.slice(0, 8).map((t, i) => (
+                                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{t}</span>
+                              ))}
+                              {g.product_titles.length > 8 && <span className="text-[10px] text-muted-foreground">+{g.product_titles.length - 8} more</span>}
                             </div>
+                          )}
+
+                          {/* Cross-links for this group */}
+                          {g.cross_links.length > 0 && (
+                            <div className="bg-primary/5 rounded-lg p-2 border border-primary/10">
+                              <p className="text-[10px] font-semibold text-primary uppercase mb-1">Cross-links</p>
+                              {g.cross_links.map((cl, i) => (
+                                <div key={i} className="flex items-center gap-1 text-[10px] text-muted-foreground py-0.5">
+                                  <span className="font-mono text-primary">/{cl.from}</span>
+                                  <ArrowRight className="w-2.5 h-2.5" />
+                                  <span className="font-mono text-primary">/{cl.to}</span>
+                                  <span className="ml-1 text-muted-foreground">— {cl.reason}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Collections in this group */}
+                          <div className="space-y-2">
+                            {g.collections.map(c => {
+                              const mainC = collections.find(mc => mc.handle === c.handle);
+                              if (!mainC) return null;
+                              return <CollectionCard key={mainC.id} c={mainC} expandedId={expandedId} setExpandedId={setExpandedId} toggleSelect={toggleSelect} />;
+                            })}
                           </div>
                         </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Global collections (not in any group) */}
+                  {(() => {
+                    const groupHandles = new Set(groups.flatMap(g => g.collections.map(c => c.handle)));
+                    const global = collections.filter(c => !groupHandles.has(c.handle));
+                    if (global.length === 0) return null;
+                    return (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-secondary text-secondary-foreground">Global</span>
+                          <span className="text-xs text-muted-foreground">{global.length} cross-brand collections</span>
+                        </div>
+                        <div className="space-y-2">
+                          {global.map(c => (
+                            <CollectionCard key={c.id} c={c} expandedId={expandedId} setExpandedId={setExpandedId} toggleSelect={toggleSelect} />
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    );
+                  })()}
+                </>
+              ) : (
+                /* Non-bulk mode: group by type */
+                Object.entries(typeGroups).map(([type, colls]) => (
+                  <div key={type}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {typeBadge(type)}
+                      <span className="text-xs text-muted-foreground">{colls.length} collection{colls.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {colls.map(c => (
+                        <CollectionCard key={c.id} c={c} expandedId={expandedId} setExpandedId={setExpandedId} toggleSelect={toggleSelect} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="flex gap-2">

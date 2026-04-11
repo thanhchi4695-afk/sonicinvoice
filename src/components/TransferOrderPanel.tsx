@@ -91,26 +91,15 @@ const TransferOrderPanel = ({ onBack }: TransferOrderPanelProps) => {
 
   // Global barcode scanner integration
   const { registerHandler } = useBarcode();
-  const pendingBarcodeRef = useRef<string | null>(null);
+  const addSkuRef = useRef<() => void>(() => {});
   useEffect(() => {
     if (screen !== "create") return;
     return registerHandler("transfer", (barcode) => {
-      pendingBarcodeRef.current = barcode;
       setSkuInput(barcode);
+      // Use a timeout to let state update, then trigger add
+      setTimeout(() => addSkuRef.current(), 100);
     });
   }, [screen, registerHandler]);
-
-  // Process pending barcode after skuInput updates
-  useEffect(() => {
-    if (pendingBarcodeRef.current && skuInput === pendingBarcodeRef.current) {
-      pendingBarcodeRef.current = null;
-      // Trigger add via a microtask so handleAddSku sees latest skuInput
-      const timer = setTimeout(() => {
-        handleAddSkuFromBarcode();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [skuInput]);
 
   useEffect(() => { loadTransfers(); loadLocations(); }, []);
 

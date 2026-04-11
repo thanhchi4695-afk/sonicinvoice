@@ -434,12 +434,14 @@ export default function PostParseReviewScreen({
   const clearSelection = () => setSelectedRows(new Set());
 
   const triggerProfileUpdate = useCallback(() => {
-    if (supplierName) {
-      updateSupplierProfileWithCorrections(supplierName, products).then(() => {
-        toast.success("Supplier profile updated with your corrections", { duration: 3000 });
-      }).catch(() => {});
-    }
-  }, [supplierName, products]);
+    if (!autoRefineProfile || !supplierName) return;
+    const toastId = toast.loading("Learning from your corrections…");
+    updateSupplierProfileWithCorrections(supplierName, products).then(() => {
+      toast.success("Profile refined — future extractions will be more accurate", { id: toastId, duration: 3000 });
+    }).catch(() => {
+      toast.dismiss(toastId);
+    });
+  }, [supplierName, products, autoRefineProfile]);
 
   const handleExportClick = () => {
     if (needsReview.length > 0) setShowExportWarning(true);

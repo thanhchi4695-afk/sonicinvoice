@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag, FileCheck, Layers } from "lucide-react";
+import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag, FileCheck, Layers, Crop } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoreConfig } from "@/lib/prompt-builder";
@@ -10,6 +10,8 @@ import { matchProduct, lookupBarcode, saveBarcodeToCatalog, validateGTIN, extrac
 import { generateShopifyCSV, type ScannedProductForExport } from "@/lib/shopify-csv-schema";
 import ScanExportReview from "@/components/ScanExportReview";
 import BatchReviewScreen from "@/components/BatchReviewScreen";
+import ImageCropTool from "@/components/ImageCropTool";
+import { checkImageDimensions, loadImage, deskewImage, detectBarcodeFromImage } from "@/lib/scan-preprocess";
 
 interface ScannedProduct {
   id: string;
@@ -110,6 +112,11 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [showExportReview, setShowExportReview] = useState(false);
   const [showBatchReview, setShowBatchReview] = useState(false);
+  const [showCropTool, setShowCropTool] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [dimensionWarning, setDimensionWarning] = useState<string | null>(null);
+  const [preprocessingStatus, setPreprocessingStatus] = useState<string | null>(null);
+  const [detectedInvoiceBarcode, setDetectedInvoiceBarcode] = useState<string | null>(null);
 
   const resetInput = useCallback(() => {
     setTextInput("");
@@ -329,9 +336,76 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPreview(URL.createObjectURL(file));
+    const objectUrl = URL.createObjectURL(file);
+    setDimensionWarning(null);
+    setDetectedInvoiceBarcode(null);
+
+    // Step 1: Dimension check
+    try {
+      const img = await loadImage(objectUrl);
+      const dimCheck = checkImageDimensions(img);
+      if (!dimCheck.ok) {
+        setDimensionWarning(dimCheck.message || "Image too small");
+        setPreview(objectUrl);
+        // Still allow continuing
+      }
+    } catch {}
+
+    // Step 2: Convert to data URL
+    setPreprocessingStatus("Preprocessing image…");
     const base64 = await fileToBase64(file);
-    callAI(base64, "image");
+
+    // Step 3: Deskew (perspective correction)
+    let processedBase64 = base64;
+    try {
+      const deskewed = await deskewImage(base64);
+      if (deskewed.angle !== 0) {
+        processedBase64 = deskewed.result;
+        toast.info(`Auto-straightened ${deskewed.angle}°`, { duration: 2000 });
+      }
+    } catch (err) {
+      console.warn("Deskew failed:", err);
+    }
+
+    setPreview(processedBase64);
+
+    // Step 4: Barcode detection (background, non-blocking)
+    detectBarcodeFromImage(processedBase64, (body) =>
+      supabase.functions.invoke("scan-mode-ai", { body: { ...body, storeName: config.name, storeCity: config.city } })
+    ).then(barcode => {
+      if (barcode) {
+        setDetectedInvoiceBarcode(barcode);
+        toast.info(`Detected barcode/invoice: ${barcode}`, { duration: 3000 });
+      }
+    });
+
+    // Step 5: Offer crop tool for invoice photos
+    const isInvoicePhoto = file.type.startsWith("image/") && file.size > 500_000;
+    if (isInvoicePhoto) {
+      setCropImageSrc(processedBase64);
+      setShowCropTool(true);
+      setPreprocessingStatus(null);
+      return; // Wait for crop decision
+    }
+
+    setPreprocessingStatus(null);
+    callAI(processedBase64, "image");
+  };
+
+  /** Called when user finishes crop or skips */
+  const handleCropComplete = (croppedDataUrl: string) => {
+    setShowCropTool(false);
+    setCropImageSrc(null);
+    setPreview(croppedDataUrl);
+    callAI(croppedDataUrl, "image");
+  };
+
+  const handleCropSkip = () => {
+    setShowCropTool(false);
+    setCropImageSrc(null);
+    if (preview) {
+      callAI(preview, "image");
+    }
   };
 
   const handleSkuLabelCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -651,22 +725,61 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
         )}
 
         {/* Camera input (product photo) */}
-        {inputMode === "camera" && !draft && !generating && (
-          <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center min-h-[240px] cursor-pointer"
-            onClick={() => fileRef.current?.click()}>
-            {preview ? (
-              <img src={preview} alt="Product" className="w-full h-full object-contain max-h-[280px] rounded-xl" />
-            ) : (
-              <>
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                  <Camera className="w-8 h-8 text-primary" />
+        {inputMode === "camera" && !draft && !generating && !showCropTool && (
+          <div className="space-y-3">
+            {/* Dimension warning */}
+            {dimensionWarning && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-destructive">{dimensionWarning}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Move closer to the document or use a PDF for better results.</p>
                 </div>
-                <p className="text-sm font-semibold text-foreground">Take a product photo</p>
-                <p className="text-xs text-muted-foreground mt-1">AI will identify it instantly</p>
-              </>
+              </div>
             )}
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
+
+            {/* Detected barcode */}
+            {detectedInvoiceBarcode && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 flex items-center gap-2">
+                <ScanBarcode className="w-3.5 h-3.5 text-primary" />
+                <span className="text-xs text-primary font-mono">{detectedInvoiceBarcode}</span>
+                <span className="text-[10px] text-muted-foreground ml-auto">Auto-detected</span>
+              </div>
+            )}
+
+            {/* Preprocessing status */}
+            {preprocessingStatus && (
+              <div className="bg-muted rounded-lg p-3 flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-muted-foreground">{preprocessingStatus}</span>
+              </div>
+            )}
+
+            <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center min-h-[240px] cursor-pointer"
+              onClick={() => fileRef.current?.click()}>
+              {preview ? (
+                <img src={preview} alt="Product" className="w-full h-full object-contain max-h-[280px] rounded-xl" />
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                    <Camera className="w-8 h-8 text-primary" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">Take a product photo</p>
+                  <p className="text-xs text-muted-foreground mt-1">AI will identify it instantly</p>
+                </>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
+            </div>
           </div>
+        )}
+
+        {/* Crop tool overlay */}
+        {showCropTool && cropImageSrc && (
+          <ImageCropTool
+            imageSrc={cropImageSrc}
+            onCrop={handleCropComplete}
+            onCancel={handleCropSkip}
+          />
         )}
 
         {/* Text input */}

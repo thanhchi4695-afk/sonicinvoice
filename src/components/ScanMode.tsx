@@ -336,9 +336,76 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPreview(URL.createObjectURL(file));
+    const objectUrl = URL.createObjectURL(file);
+    setDimensionWarning(null);
+    setDetectedInvoiceBarcode(null);
+
+    // Step 1: Dimension check
+    try {
+      const img = await loadImage(objectUrl);
+      const dimCheck = checkImageDimensions(img);
+      if (!dimCheck.ok) {
+        setDimensionWarning(dimCheck.message || "Image too small");
+        setPreview(objectUrl);
+        // Still allow continuing
+      }
+    } catch {}
+
+    // Step 2: Convert to data URL
+    setPreprocessingStatus("Preprocessing image…");
     const base64 = await fileToBase64(file);
-    callAI(base64, "image");
+
+    // Step 3: Deskew (perspective correction)
+    let processedBase64 = base64;
+    try {
+      const deskewed = await deskewImage(base64);
+      if (deskewed.angle !== 0) {
+        processedBase64 = deskewed.result;
+        toast.info(`Auto-straightened ${deskewed.angle}°`, { duration: 2000 });
+      }
+    } catch (err) {
+      console.warn("Deskew failed:", err);
+    }
+
+    setPreview(processedBase64);
+
+    // Step 4: Barcode detection (background, non-blocking)
+    detectBarcodeFromImage(processedBase64, (body) =>
+      supabase.functions.invoke("scan-mode-ai", { body: { ...body, storeName: config.name, storeCity: config.city } })
+    ).then(barcode => {
+      if (barcode) {
+        setDetectedInvoiceBarcode(barcode);
+        toast.info(`Detected barcode/invoice: ${barcode}`, { duration: 3000 });
+      }
+    });
+
+    // Step 5: Offer crop tool for invoice photos
+    const isInvoicePhoto = file.type.startsWith("image/") && file.size > 500_000;
+    if (isInvoicePhoto) {
+      setCropImageSrc(processedBase64);
+      setShowCropTool(true);
+      setPreprocessingStatus(null);
+      return; // Wait for crop decision
+    }
+
+    setPreprocessingStatus(null);
+    callAI(processedBase64, "image");
+  };
+
+  /** Called when user finishes crop or skips */
+  const handleCropComplete = (croppedDataUrl: string) => {
+    setShowCropTool(false);
+    setCropImageSrc(null);
+    setPreview(croppedDataUrl);
+    callAI(croppedDataUrl, "image");
+  };
+
+  const handleCropSkip = () => {
+    setShowCropTool(false);
+    setCropImageSrc(null);
+    if (preview) {
+      callAI(preview, "image");
+    }
   };
 
   const handleSkuLabelCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {

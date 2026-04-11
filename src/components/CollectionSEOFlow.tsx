@@ -562,18 +562,28 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
         {step === 1 && (
           <div className="space-y-4">
             {/* Summary cards */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className={`grid ${groups.length > 0 ? "grid-cols-4" : "grid-cols-3"} gap-2`}>
               <div className="bg-card rounded-lg border border-border p-2 text-center">
                 <p className="text-lg font-bold">{collections.length}</p>
-                <p className="text-[10px] text-muted-foreground">Total</p>
+                <p className="text-[10px] text-muted-foreground">Collections</p>
               </div>
               <div className="bg-card rounded-lg border border-border p-2 text-center">
                 <p className="text-lg font-bold text-primary">{selectedCount}</p>
                 <p className="text-[10px] text-muted-foreground">Selected</p>
               </div>
+              {groups.length > 0 && (
+                <div className="bg-card rounded-lg border border-border p-2 text-center">
+                  <p className="text-lg font-bold text-accent-foreground">{groups.length}</p>
+                  <p className="text-[10px] text-muted-foreground">Groups</p>
+                </div>
+              )}
               <div className="bg-card rounded-lg border border-border p-2 text-center">
-                <p className="text-lg font-bold text-success">{Object.keys(typeGroups).length}</p>
-                <p className="text-[10px] text-muted-foreground">Types</p>
+                <p className="text-lg font-bold text-success">
+                  {groups.length > 0
+                    ? groups.reduce((s, g) => s + g.cross_links.length, 0) + globalCrossLinks.length
+                    : Object.keys(typeGroups).length}
+                </p>
+                <p className="text-[10px] text-muted-foreground">{groups.length > 0 ? "Cross-links" : "Types"}</p>
               </div>
             </div>
 

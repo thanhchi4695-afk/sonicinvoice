@@ -267,17 +267,63 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
         // Offline or no connection — continue without duplicate check
       }
 
-      const result = generateSuggestions(products, existingTitles);
-      setSuggestions(result);
-      // Pre-select non-duplicates with high confidence
-      const preSelected = new Set<string>();
-      result.forEach((s) => {
-        if (!s.duplicate && s.confidence >= 70) preSelected.add(s.id);
-      });
-      setSelected(preSelected);
+      if (mode === "architect") {
+        // AI-powered hierarchical collection generation
+        const storeConfig = JSON.parse(localStorage.getItem("store_config") || "{}");
+        const { data, error } = await supabase.functions.invoke("collection-architect", {
+          body: {
+            products: products.slice(0, 20),
+            storeName: storeConfig.storeName || storeConfig.store_name,
+            storeCity: storeConfig.storeCity || storeConfig.city,
+            industry: storeConfig.industry || "swimwear",
+            locale: storeConfig.locale || "AU",
+          },
+        });
+        if (error) throw error;
+
+        const aiCollections: CollectionSuggestion[] = (data.collections || []).map((c: any) => {
+          const dup = existingTitles.has((c.title || "").toLowerCase());
+          return {
+            id: crypto.randomUUID(),
+            title: c.title || "",
+            handle: c.handle || "",
+            type: c.type || "feature",
+            rules: Array.isArray(c.smart_collection_rules)
+              ? c.smart_collection_rules
+              : [{ column: "tag", relation: "contains", condition: c.handle || "" }],
+            disjunctive: c.disjunctive ?? true,
+            matchingProducts: 0,
+            sampleProducts: [],
+            confidence: 85,
+            reason: `AI-generated ${c.type || "collection"} for SEO hierarchy`,
+            seoTitle: c.seo_title || c.title || "",
+            seoDescription: c.meta_description || "",
+            bodyContent: c.body_content || "",
+            internalLinksTo: c.internal_links_to || [],
+            duplicate: dup,
+            duplicateOf: dup ? c.title : undefined,
+          };
+        });
+
+        setSuggestions(aiCollections);
+        const preSelected = new Set<string>();
+        aiCollections.forEach((s) => {
+          if (!s.duplicate) preSelected.add(s.id);
+        });
+        setSelected(preSelected);
+      } else {
+        // Quick local generation
+        const result = generateSuggestions(products, existingTitles);
+        setSuggestions(result);
+        const preSelected = new Set<string>();
+        result.forEach((s) => {
+          if (!s.duplicate && s.confidence >= 70) preSelected.add(s.id);
+        });
+        setSelected(preSelected);
+      }
       setStep("review");
-    } catch (err) {
-      toast.error("Failed to generate suggestions");
+    } catch (err: any) {
+      toast.error("Failed to generate: " + (err?.message || "Unknown error"));
     } finally {
       setLoading(false);
     }

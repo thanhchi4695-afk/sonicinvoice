@@ -49,6 +49,7 @@ const GoogleAdsFlow = lazy(() => import("@/components/GoogleAdsFlow"));
 const StyleGroupingFlow = lazy(() => import("@/components/StyleGroupingFlow"));
 const CompetitorIntelFlow = lazy(() => import("@/components/CompetitorIntelFlow"));
 const CollectionSEOFlow = lazy(() => import("@/components/CollectionSEOFlow"));
+const CollectionSEOExport = lazy(() => import("@/components/CollectionSEOExport"));
 const GeoAgenticFlow = lazy(() => import("@/components/GeoAgenticFlow"));
 const OrganicSEOFlow = lazy(() => import("@/components/OrganicSEOFlow"));
 const MarginProtectionPanel = lazy(() => import("@/components/MarginProtectionPanel"));
@@ -90,7 +91,7 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "stocky_onboarding" | "inventory_dashboard" | "inventory_view" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | "stocktake_module" | "transfer_orders" | "reports_hub" | "pipeline" | "pipeline_chooser" | "supplier_profile_builder" | "stock_adjustment" | "quick_receive" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "collection_seo_export" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "stocky_onboarding" | "inventory_dashboard" | "inventory_view" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | "stocktake_module" | "transfer_orders" | "reports_hub" | "pipeline" | "pipeline_chooser" | "supplier_profile_builder" | "stock_adjustment" | "quick_receive" | null>(null);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -258,6 +259,7 @@ const Index = () => {
       case "style_grouping": flowEl = <StyleGroupingFlow onBack={() => setActiveFlow(null)} />; break;
       case "competitor_intel": flowEl = <CompetitorIntelFlow onBack={() => setActiveFlow(null)} />; break;
       case "collection_seo": flowEl = <CollectionSEOFlow onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
+      case "collection_seo_export": flowEl = <CollectionSEOExport onBack={() => setActiveFlow(null)} />; break;
       case "geo_agentic": flowEl = <GeoAgenticFlow onBack={() => setActiveFlow(null)} />; break;
       case "organic_seo": flowEl = <OrganicSEOFlow onBack={() => setActiveFlow(null)} />; break;
       case "margin_protection": flowEl = <MarginProtectionPanel onBack={() => setActiveFlow(null)} />; break;

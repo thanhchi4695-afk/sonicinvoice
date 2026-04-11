@@ -5,29 +5,43 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PROFILE_PROMPT = `You are an expert Australian fashion retail invoice analyst with 15+ years experience.
+const PROFILE_PROMPT = `You are the Sonic Invoices Supplier Invoice Trainer — an expert Australian fashion retail invoice analyst with 15+ years experience.
 
-You have been given MULTIPLE invoices from the SAME supplier. Your job is to analyse ALL of them together and create a detailed "Supplier Invoice Profile" that will dramatically improve extraction accuracy for future invoices from this supplier.
+You have been given MULTIPLE invoices from the SAME supplier. Deeply analyse ALL documents together and build a rich, reusable "Supplier Invoice Profile".
 
-STEPS (follow exactly):
+Follow this exact step-by-step reasoning:
 
-1. Detect supplier name from headers/logos/footers (consistent across all files).
+1. **Supplier Detection**
+   - Extract consistent supplier name, logo clues, address, ABN, email domain, etc.
+   - Confirm all files belong to the same supplier.
 
-2. Identify the COMMON layout and table structure across 80%+ of the invoices.
+2. **Layout Analysis**
+   - Identify the most common table structure across all invoices (80%+ consistency).
+   - Note variations (merged cells, size runs in separate rows, multi-page tables, etc.).
 
-3. Map columns: list every unique column header and what it means (e.g. "Style No.", "Colour/Print", "Size Run", "Unit Cost ex GST", "Pack Qty").
+3. **Column & Field Mapping**
+   - Build a reliable mapping for every important field: style number, product name, colour, size, unit cost, quantity, line total, barcode, RRP.
 
-4. Document naming patterns for product_name, colour, size (especially how size runs are written — one row or multiple rows?).
+4. **Product Name, Colour & Size Rules**
+   - How product base names are written.
+   - How colours and sizes are attached (one row vs multiple rows).
+   - Common abbreviations and how to expand them.
 
-5. Note any supplier-specific quirks (abbreviations, merged cells, GST handling, currency, etc.).
+5. **Pricing & GST Rules**
+   - Which column is unit cost (ex GST or inc GST).
+   - How totals are calculated.
+   - Any GST-specific patterns (separate line, percentage, included).
 
-6. Create a clean JSON profile with examples from the real invoices.
+6. **Examples Extraction**
+   - Pull 4–6 real examples from different invoices showing raw text → extracted fields.
 
 OUTPUT ONLY VALID JSON — no markdown fences, no explanation:
 
 {
   "supplier": "Exact Supplier Name",
-  "invoice_layout": "row_table | size_grid | product_block | separate_variant_rows | mixed",
+  "profile_version": "YYYY-MM-DD",
+  "total_invoices_analysed": number,
+  "invoice_layout": "single_main_table | single_main_table_with_size_runs | size_grid_matrix | separate_variant_rows | product_block | multi_page | mixed",
   "layout_description": "1-2 sentence description of the typical layout",
   "column_mappings": {
     "style_number": { "header": "Style No.", "position": "Column A or 1", "notes": "" },
@@ -40,32 +54,42 @@ OUTPUT ONLY VALID JSON — no markdown fences, no explanation:
     "line_total": { "header": "Total or null", "position": "if exists", "notes": "" },
     "barcode": { "header": "Barcode/EAN or null", "position": "if exists", "notes": "" }
   },
+  "product_name_cleaning_rules": [
+    "Remove anything after last comma if it looks like colour/size",
+    "Capitalise first letter of each word"
+  ],
   "product_name_rules": "How to extract clean product name — which column, what to strip",
-  "colour_rules": "How colour appears — separate column, suffix after dash, embedded in description, abbreviation patterns",
-  "colour_abbreviations": { "BLK": "Black", "NVY": "Navy" },
-  "size_rules": "How sizes appear — column headers, comma-separated, one per row, size grid",
-  "variant_detection_rule": "size_grid_matrix | one_row_per_variant | size_in_description | size_row_below",
+  "colour_rules": "How colour appears — separate column, suffix after dash, embedded in description",
+  "variant_rules": "Size runs are usually comma-separated in the Size column. Colours appear before size.",
+  "variant_detection_rule": "size_grid_matrix | one_row_per_variant | size_in_description | size_row_below | comma_separated_in_cell",
   "size_system": "numeric_au | alpha | combined | cup | denim | mixed",
+  "size_rules": "How sizes appear — column headers, comma-separated, one per row, size grid",
+  "abbreviations": {
+    "Blk": "Black",
+    "Nvy": "Navy",
+    "Wht": "White"
+  },
   "gst_handling": "inclusive | exclusive | separate_line | not_shown",
   "currency": "AUD",
   "pricing_notes": "Which column is wholesale cost vs RRP, any gotchas",
-  "noise_patterns": ["list of common non-product rows seen across invoices"],
+  "noise_patterns": ["list of common non-product rows seen across invoices e.g. freight, subtotal, page headers"],
   "quirks": ["list of supplier-specific oddities"],
   "examples": [
     {
-      "raw_line": "exact text from one invoice row",
+      "raw_text": "exact text from one invoice row",
       "extracted": {
-        "style_code": "ABC123",
         "product_name": "Clean Product Name",
         "colour": "Black",
-        "sizes": ["6", "8", "10", "12"],
+        "size": ["6", "8", "10", "12"],
         "unit_cost": 45.50,
-        "quantity": 4
+        "quantity": 24
       }
     }
   ],
+  "confidence": number_0_to_100,
   "confidence_notes": "Any patterns seen in only some invoices, inconsistencies between invoices",
-  "extraction_tips": "Specific instructions for the AI parser to follow for this supplier"
+  "notes_for_future": "Specific instructions for the AI parser to follow for this supplier",
+  "extraction_tips": "Step-by-step tips for maximum accuracy on this supplier's invoices"
 }`;
 
 Deno.serve(async (req) => {

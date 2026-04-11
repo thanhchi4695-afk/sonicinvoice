@@ -359,6 +359,48 @@ export type Database = {
           },
         ]
       }
+      inventory_adjustments: {
+        Row: {
+          adjusted_at: string
+          adjustment_qty: number
+          barcode: string | null
+          created_at: string
+          id: string
+          location: string
+          product_title: string | null
+          reason: string | null
+          shopify_variant_id: string | null
+          sku: string | null
+          user_id: string
+        }
+        Insert: {
+          adjusted_at?: string
+          adjustment_qty?: number
+          barcode?: string | null
+          created_at?: string
+          id?: string
+          location?: string
+          product_title?: string | null
+          reason?: string | null
+          shopify_variant_id?: string | null
+          sku?: string | null
+          user_id: string
+        }
+        Update: {
+          adjusted_at?: string
+          adjustment_qty?: number
+          barcode?: string | null
+          created_at?: string
+          id?: string
+          location?: string
+          product_title?: string | null
+          reason?: string | null
+          shopify_variant_id?: string | null
+          sku?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       joor_connections: {
         Row: {
           connected_at: string
@@ -1001,6 +1043,89 @@ export type Database = {
           shopify_subscription_id?: string | null
           status?: string
           trial_ends_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stocktake_lines: {
+        Row: {
+          barcode: string | null
+          counted_qty: number
+          created_at: string
+          expected_qty: number
+          id: string
+          product_title: string | null
+          shopify_variant_id: string | null
+          sku: string | null
+          stocktake_id: string
+          user_id: string
+          variance: number | null
+        }
+        Insert: {
+          barcode?: string | null
+          counted_qty?: number
+          created_at?: string
+          expected_qty?: number
+          id?: string
+          product_title?: string | null
+          shopify_variant_id?: string | null
+          sku?: string | null
+          stocktake_id: string
+          user_id: string
+          variance?: number | null
+        }
+        Update: {
+          barcode?: string | null
+          counted_qty?: number
+          created_at?: string
+          expected_qty?: number
+          id?: string
+          product_title?: string | null
+          shopify_variant_id?: string | null
+          sku?: string | null
+          stocktake_id?: string
+          user_id?: string
+          variance?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stocktake_lines_stocktake_id_fkey"
+            columns: ["stocktake_id"]
+            isOneToOne: false
+            referencedRelation: "stocktakes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stocktakes: {
+        Row: {
+          counted_at: string
+          created_at: string
+          id: string
+          location: string
+          notes: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          counted_at?: string
+          created_at?: string
+          id?: string
+          location?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          counted_at?: string
+          created_at?: string
+          id?: string
+          location?: string
+          notes?: string | null
+          status?: string
           updated_at?: string
           user_id?: string
         }

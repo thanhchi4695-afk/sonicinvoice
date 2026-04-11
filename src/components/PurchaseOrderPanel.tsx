@@ -28,7 +28,7 @@ interface POLine {
   notes: string;
 }
 
-export type POStatus = "draft" | "sent" | "awaiting" | "partial" | "received" | "discrepancy";
+export type POStatus = "draft" | "sent" | "awaiting" | "partial" | "received" | "discrepancy" | "closed";
 
 export interface PurchaseOrder {
   id: string;
@@ -75,6 +75,7 @@ const STATUS_BADGES: Record<POStatus, { emoji: string; label: string; cls: strin
   partial: { emoji: "🔶", label: "Partial", cls: "bg-secondary/15 text-secondary" },
   received: { emoji: "✅", label: "Received", cls: "bg-success/15 text-success" },
   discrepancy: { emoji: "⚠", label: "Discrepancy", cls: "bg-destructive/15 text-destructive" },
+  closed: { emoji: "🔒", label: "Closed", cls: "bg-muted text-muted-foreground" },
 };
 
 function uid() { return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10); }

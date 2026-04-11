@@ -105,6 +105,7 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
   const [poNotes, setPoNotes] = useState("");
   const [lines, setLines] = useState<POLine[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showCatalog, setShowCatalog] = useState(false);
 
   // Receive state
   const [receivePO, setReceivePO] = useState<PurchaseOrder | null>(null);

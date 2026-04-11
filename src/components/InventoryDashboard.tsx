@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useBarcode } from "@/components/BarcodeProvider";
+import DataGrid from "@/components/ui/data-grid";
+import { type ColumnDef } from "@tanstack/react-table";
 import {
   ChevronLeft, Package, DollarSign, AlertTriangle, TrendingUp,
   TrendingDown, MapPin, BarChart3, Loader2, RefreshCw,

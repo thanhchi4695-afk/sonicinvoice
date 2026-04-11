@@ -115,10 +115,11 @@ export default function StockAdjustmentPanel({ onBack }: Props) {
       const shopifyResult = await findVariantBySKU(skuSearch.trim());
       if (shopifyResult) {
         setMatchedVariant({
-          title: shopifyResult.title || "Shopify product",
+          title: shopifyResult.product_title || "Shopify product",
           sku: shopifyResult.sku || skuSearch.trim(),
-          shopifyVariantId: shopifyResult.id,
-          currentQty: shopifyResult.inventoryQuantity ?? 0,
+          shopifyVariantId: shopifyResult.variant_id,
+          inventoryItemId: shopifyResult.inventory_item_id,
+          currentQty: 0,
         });
       } else {
         toast.error("No variant found for that SKU/barcode");

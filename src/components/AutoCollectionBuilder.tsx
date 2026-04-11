@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { ChevronLeft, Sparkles, Plus, Check, X, Eye, Loader2, AlertTriangle, ShoppingBag } from "lucide-react";
+import { ChevronLeft, Sparkles, Plus, Check, X, Eye, Loader2, AlertTriangle, ShoppingBag, Brain, Zap, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
   getSmartCollections,
   getCustomCollections,
@@ -18,7 +19,7 @@ interface CollectionSuggestion {
   id: string;
   title: string;
   handle: string;
-  type: "by_type" | "by_attribute" | "by_vendor" | "by_price";
+  type: "by_type" | "by_attribute" | "by_vendor" | "by_price" | "brand" | "style" | "category" | "style_category" | "feature" | "broad_category" | "colour" | "print_story" | "seasonal";
   rules: { column: string; relation: string; condition: string }[];
   disjunctive: boolean;
   matchingProducts: number;
@@ -27,6 +28,8 @@ interface CollectionSuggestion {
   reason: string;
   seoTitle: string;
   seoDescription: string;
+  bodyContent?: string;
+  internalLinksTo?: string[];
   duplicate: boolean;
   duplicateOf?: string;
 }
@@ -62,6 +65,15 @@ function getTypeLabel(t: string) {
     case "by_attribute": return "Attribute";
     case "by_vendor": return "Vendor";
     case "by_price": return "Price Range";
+    case "brand": return "Brand";
+    case "style": return "Style";
+    case "category": return "Category";
+    case "style_category": return "Style+Category";
+    case "feature": return "Feature";
+    case "broad_category": return "Broad Category";
+    case "colour": return "Colour";
+    case "print_story": return "Print/Story";
+    case "seasonal": return "Seasonal";
     default: return t;
   }
 }
@@ -207,6 +219,7 @@ function generateSuggestions(
 
 /* ─── Main Component ─── */
 export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }) {
+  const [mode, setMode] = useState<"quick" | "architect">("architect");
   const [step, setStep] = useState<"input" | "review" | "creating" | "done">("input");
   const [products, setProducts] = useState<ProductData[]>([]);
   const [suggestions, setSuggestions] = useState<CollectionSuggestion[]>([]);
@@ -254,17 +267,63 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
         // Offline or no connection — continue without duplicate check
       }
 
-      const result = generateSuggestions(products, existingTitles);
-      setSuggestions(result);
-      // Pre-select non-duplicates with high confidence
-      const preSelected = new Set<string>();
-      result.forEach((s) => {
-        if (!s.duplicate && s.confidence >= 70) preSelected.add(s.id);
-      });
-      setSelected(preSelected);
+      if (mode === "architect") {
+        // AI-powered hierarchical collection generation
+        const storeConfig = JSON.parse(localStorage.getItem("store_config") || "{}");
+        const { data, error } = await supabase.functions.invoke("collection-architect", {
+          body: {
+            products: products.slice(0, 20),
+            storeName: storeConfig.storeName || storeConfig.store_name,
+            storeCity: storeConfig.storeCity || storeConfig.city,
+            industry: storeConfig.industry || "swimwear",
+            locale: storeConfig.locale || "AU",
+          },
+        });
+        if (error) throw error;
+
+        const aiCollections: CollectionSuggestion[] = (data.collections || []).map((c: any) => {
+          const dup = existingTitles.has((c.title || "").toLowerCase());
+          return {
+            id: crypto.randomUUID(),
+            title: c.title || "",
+            handle: c.handle || "",
+            type: c.type || "feature",
+            rules: Array.isArray(c.smart_collection_rules)
+              ? c.smart_collection_rules
+              : [{ column: "tag", relation: "contains", condition: c.handle || "" }],
+            disjunctive: c.disjunctive ?? true,
+            matchingProducts: 0,
+            sampleProducts: [],
+            confidence: 85,
+            reason: `AI-generated ${c.type || "collection"} for SEO hierarchy`,
+            seoTitle: c.seo_title || c.title || "",
+            seoDescription: c.meta_description || "",
+            bodyContent: c.body_content || "",
+            internalLinksTo: c.internal_links_to || [],
+            duplicate: dup,
+            duplicateOf: dup ? c.title : undefined,
+          };
+        });
+
+        setSuggestions(aiCollections);
+        const preSelected = new Set<string>();
+        aiCollections.forEach((s) => {
+          if (!s.duplicate) preSelected.add(s.id);
+        });
+        setSelected(preSelected);
+      } else {
+        // Quick local generation
+        const result = generateSuggestions(products, existingTitles);
+        setSuggestions(result);
+        const preSelected = new Set<string>();
+        result.forEach((s) => {
+          if (!s.duplicate && s.confidence >= 70) preSelected.add(s.id);
+        });
+        setSelected(preSelected);
+      }
       setStep("review");
-    } catch (err) {
-      toast.error("Failed to generate suggestions");
+    } catch (err: any) {
+      toast.error("Failed to generate: " + (err?.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
@@ -285,7 +344,7 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
           title: s.title,
           rules: s.rules,
           disjunctive: s.disjunctive,
-          body_html: `<p>${s.seoDescription}</p>`,
+          body_html: s.bodyContent || `<p>${s.seoDescription}</p>`,
           metafields_global_title_tag: s.seoTitle,
           metafields_global_description_tag: s.seoDescription,
         });
@@ -340,20 +399,41 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
           <h2 className="text-lg font-semibold font-display">🗂️ Auto Collection Builder</h2>
         </div>
 
+        {/* Mode toggle */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <button
+            onClick={() => setMode("architect")}
+            className={`p-3 rounded-xl border text-left transition-all ${mode === "architect" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}
+          >
+            <Brain className={`w-5 h-5 mb-1 ${mode === "architect" ? "text-primary" : "text-muted-foreground"}`} />
+            <p className="text-xs font-semibold">SEO Architect</p>
+            <p className="text-[10px] text-muted-foreground">AI hierarchy with internal linking, 8-15 collections per product</p>
+          </button>
+          <button
+            onClick={() => setMode("quick")}
+            className={`p-3 rounded-xl border text-left transition-all ${mode === "quick" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}
+          >
+            <Zap className={`w-5 h-5 mb-1 ${mode === "quick" ? "text-primary" : "text-muted-foreground"}`} />
+            <p className="text-xs font-semibold">Quick Build</p>
+            <p className="text-[10px] text-muted-foreground">Local rules-based: type, vendor, tag, price</p>
+          </button>
+        </div>
+
         <Card className="mb-4">
           <CardContent className="p-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-primary" />
+                {mode === "architect" ? <Brain className="w-5 h-5 text-primary" /> : <Sparkles className="w-5 h-5 text-primary" />}
               </div>
               <div>
-                <p className="text-sm font-semibold">AI Collection Generator</p>
-                <p className="text-xs text-muted-foreground">Automatically organize products into smart collections</p>
+                <p className="text-sm font-semibold">{mode === "architect" ? "Collection Architect" : "Quick Collection Builder"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {mode === "architect"
+                    ? "Generates SEO hierarchy: brand → style → category → feature → colour collections with internal linking"
+                    : "Analyses types, vendors, tags & prices for smart collection rules"}
+                </p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">
-              Analyses your product data (types, vendors, tags, prices) and suggests Shopify smart collections with proper rules, SEO titles, and descriptions.
-            </p>
             <div className="bg-muted/50 rounded-lg p-3 mb-4 border border-border">
               <p className="text-xs font-medium mb-1">Products loaded: {products.length}</p>
               {products.length === 0 && (
@@ -374,9 +454,9 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
               variant="teal"
             >
               {loading ? (
-                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Analyzing products...</>
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />{mode === "architect" ? "AI building hierarchy..." : "Analyzing products..."}</>
               ) : (
-                <><Sparkles className="w-4 h-4 mr-2" />Generate Collections</>
+                <>{mode === "architect" ? <Brain className="w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}{mode === "architect" ? "Build SEO Collection Hierarchy" : "Generate Collections"}</>
               )}
             </Button>
           </CardContent>
@@ -534,6 +614,22 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
                           {s.sampleProducts.map((p, i) => (
                             <p key={i} className="text-xs text-muted-foreground">• {p}</p>
                           ))}
+                        </div>
+                      )}
+                      {s.bodyContent && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">SEO Body Content</p>
+                          <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-32 overflow-y-auto prose prose-xs" dangerouslySetInnerHTML={{ __html: s.bodyContent.slice(0, 500) + (s.bodyContent.length > 500 ? "…" : "") }} />
+                        </div>
+                      )}
+                      {s.internalLinksTo && s.internalLinksTo.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5 flex items-center gap-1"><Link className="w-3 h-3" /> Internal Links</p>
+                          <div className="flex flex-wrap gap-1">
+                            {s.internalLinksTo.map((h, i) => (
+                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono">/{h}</span>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>

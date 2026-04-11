@@ -138,7 +138,7 @@ const SupplierProfileBuilder = ({ onBack }: SupplierProfileBuilderProps) => {
       if (!user) { toast.error("Please sign in first"); return; }
 
       const { error: upsertErr } = await supabase
-        .from("supplier_profiles")
+        .from("supplier_profiles" as any)
         .upsert({
           user_id: user.id,
           supplier_name: profile.supplier,

@@ -208,8 +208,44 @@ const SupplierProfileBuilder = ({ onBack }: SupplierProfileBuilderProps) => {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                Upload 2–10 invoices from the same supplier. The AI will analyse them together to learn the layout, column mappings, naming patterns, and quirks.
+                Upload 2–10 invoices from the same supplier, or paste a public Google Drive link below.
               </p>
+
+              {/* Google Drive link input */}
+              <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  Google Drive Link
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    type="url"
+                    placeholder="https://drive.google.com/drive/folders/..."
+                    value={driveUrl}
+                    onChange={e => setDriveUrl(e.target.value)}
+                    className="text-xs h-9"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9 shrink-0 gap-1.5"
+                    onClick={fetchFromDrive}
+                    disabled={!driveUrl.trim() || fetchingDrive}
+                  >
+                    {fetchingDrive ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+                    {fetchingDrive ? "Fetching…" : "Fetch"}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Folder or file link • Must be shared as "Anyone with the link"
+                </p>
+              </div>
+
+              <div className="relative flex items-center justify-center my-1">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
+                <span className="relative bg-card px-3 text-[10px] text-muted-foreground">or upload directly</span>
+              </div>
+
               <label className="block cursor-pointer border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
                 <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleFileUpload} />
                 <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />

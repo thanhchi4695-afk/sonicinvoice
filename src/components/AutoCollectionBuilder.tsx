@@ -344,7 +344,7 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
           title: s.title,
           rules: s.rules,
           disjunctive: s.disjunctive,
-          body_html: `<p>${s.seoDescription}</p>`,
+          body_html: s.bodyContent || `<p>${s.seoDescription}</p>`,
           metafields_global_title_tag: s.seoTitle,
           metafields_global_description_tag: s.seoDescription,
         });

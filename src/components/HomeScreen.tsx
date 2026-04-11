@@ -63,6 +63,7 @@ interface HomeScreenProps {
   onStartStockyOnboarding?: () => void;
   onStartSupplierProfileBuilder?: () => void;
   onStartCollectionSEOExport?: () => void;
+  onSwitchToStockyDashboard?: () => void;
 }
 
 const HomeScreen = ({
@@ -79,6 +80,7 @@ const HomeScreen = ({
   onStartPipeline, onStartPipelineChooser, onStartStockyOnboarding,
   onStartSupplierProfileBuilder,
   onStartCollectionSEOExport,
+  onSwitchToStockyDashboard,
 }: HomeScreenProps) => {
   const mode = useStoreMode();
   const unreadCount = getUnprocessedInboxCount();

@@ -354,7 +354,7 @@ export default function ShopifyCSVSEO({ onBack }: { onBack: () => void }) {
     // Header integrity
     if (headers.length === 0) errors.push("No headers found");
     const dupeH = headers.filter((h, i) => headers.indexOf(h) !== i);
-    if (dupeH.length) errors.push(`Duplicate headers: ${[...new Set(dupeH)].join(", ")}`);
+    if (dupeH.length) errors.push(`Duplicate headers: ${Array.from(new Set(dupeH)).join(", ")}`);
     PRESERVE_COLS.forEach(c => { if (!headers.includes(c) && c !== "Image Src") errors.push(`Missing column: ${c}`); });
     // SEO length validation
     seoResults.forEach(r => {

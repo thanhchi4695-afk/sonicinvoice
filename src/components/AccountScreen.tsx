@@ -1,4 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
+import { useTranslation } from "react-i18next";
+import { SUPPORTED_LANGUAGES } from "@/i18n/config";
 const ConnectorsMarketplace = lazy(() => import("@/components/ConnectorsMarketplace"));
 import POSConnectionPanel from "@/components/POSConnectionPanel";
 import { Button } from "@/components/ui/button";
@@ -149,6 +151,7 @@ const AccountScreen = () => {
             options={LOCALES.map(l => ({ v: l.id, l: `${l.flag} ${l.country}` }))}
           />
         </div>
+        <LanguageSelector />
         <SelectField label="Store type / POS" value={storeType} onChange={(v) => { setStoreType(v as StoreType); saveStoreConfig({ storeType: v as StoreType }); }}
           options={[
             { v: "shopify", l: "🛍️ Shopify only" },
@@ -815,6 +818,27 @@ const SelectField = ({ label, value, onChange, options }: {
     </select>
   </div>
 );
+
+const LanguageSelector = () => {
+  const { i18n, t } = useTranslation();
+  return (
+    <div>
+      <label className="text-xs text-muted-foreground mb-1 block">{t("account.language")}</label>
+      <select
+        value={i18n.language}
+        onChange={(e) => i18n.changeLanguage(e.target.value)}
+        className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm text-foreground"
+      >
+        {SUPPORTED_LANGUAGES.map((lang) => (
+          <option key={lang.code} value={lang.code}>
+            {lang.flag} {lang.label}
+          </option>
+        ))}
+      </select>
+      <p className="text-[11px] text-muted-foreground mt-1">{t("account.languageDesc")}</p>
+    </div>
+  );
+};
 
 export default AccountScreen;
 

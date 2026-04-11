@@ -687,7 +687,7 @@ export function getIndustryProfileChoices(): { id: string; name: string; icon: s
     { id: 'clothing', name: 'Fashion', icon: '👗' },
     { id: 'beauty', name: 'Beauty', icon: '💄' },
     { id: 'home', name: 'Home Goods', icon: '🏠' },
-    { id: 'general', name: 'Pet Supplies', icon: '🐾' },
+    { id: 'pet', name: 'Pet Supplies', icon: '🐾' },
     { id: 'electronics', name: 'Electronics', icon: '📱' },
     { id: 'sports', name: 'Sports', icon: '⚽' },
   ];

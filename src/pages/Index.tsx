@@ -294,6 +294,7 @@ const Index = () => {
       case "stock_adjustment": flowEl = <StockAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
       case "inventory_view": flowEl = <InventoryView onBack={() => setActiveFlow(null)} />; break;
       case "csv_seo": flowEl = <ShopifyCSVSEO onBack={() => setActiveFlow(null)} />; break;
+      case "stocky_dashboard": flowEl = <StockyHomeDashboard onNavigate={(f) => setActiveFlow(f as any)} onSwitchToClassic={() => { setUseStockyDashboard(false); localStorage.setItem("stocky_dashboard_mode", "false"); setActiveFlow(null); }} />; break;
       case "pipeline": flowEl = activePipelineId ? <PipelineRunner pipelineId={activePipelineId} onRenderFlow={(flowKey, onComplete) => {
         const flowMap: Record<string, React.ReactNode> = {
           invoice: <InvoiceFlow onBack={onComplete} />,

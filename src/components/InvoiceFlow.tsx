@@ -24,7 +24,7 @@ import StockCheckFlow from "@/components/StockCheckFlow";
 import PriceLookup from "@/components/PriceLookup";
 import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import type { InvoiceLineItem } from "@/lib/stock-matcher";
-import { preprocessInvoiceImage, isLikelyPhotoInvoice, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
+import { preprocessInvoiceImage, isLikelyPhotoInvoice, preprocessForUpload, isPdfFile, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
 import { supabase } from "@/integrations/supabase/client";
 
 interface InvoiceFlowProps {

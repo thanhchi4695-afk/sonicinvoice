@@ -550,9 +550,9 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
 
             <Button className="w-full h-12 text-base" onClick={handleGenerate} disabled={loading}>
               {loading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{mode === "architect" ? "AI building hierarchy…" : "Parsing products…"}</>
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{mode === "bulk" ? "AI grouping & building hierarchy…" : mode === "architect" ? "AI building hierarchy…" : "Parsing products…"}</>
               ) : (
-                <>{mode === "architect" ? <Brain className="w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}{mode === "architect" ? "Build SEO Collection Hierarchy" : "Generate Collections"}</>
+                <>{mode === "bulk" ? <Layers className="w-4 h-4 mr-2" /> : mode === "architect" ? <Brain className="w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}{mode === "bulk" ? "Build Full Invoice Hierarchy" : mode === "architect" ? "Build SEO Collection Hierarchy" : "Generate Collections"}</>
               )}
             </Button>
           </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Check, Copy, RefreshCw, Download, Eye, Code, Search, Brain, Zap, Link, ExternalLink, Sparkles, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Check, Copy, RefreshCw, Download, Eye, Code, Search, Brain, Zap, Link, ExternalLink, Sparkles, X, Layers, ArrowRight } from "lucide-react";
 import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

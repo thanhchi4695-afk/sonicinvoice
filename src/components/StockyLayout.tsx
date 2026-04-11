@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  ArrowRightLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,7 @@ const defaultNavItems: StockyNavItem[] = [
   { id: "home", label: "Dashboard", icon: LayoutDashboard, type: "tab" },
   { id: "purchase_orders", label: "Purchase Orders", icon: ClipboardList, type: "flow" },
   { id: "inventory_dashboard", label: "Inventory", icon: Package, type: "flow" },
+  { id: "transfer_orders", label: "Transfers", icon: ArrowRightLeft, type: "flow" },
   { id: "suppliers", label: "Suppliers", icon: Users, type: "flow" },
   { id: "stocktake_module", label: "Stocktakes", icon: ClipboardCheck, type: "flow" },
   { id: "analytics", label: "Reports", icon: BarChart3, type: "tab" },

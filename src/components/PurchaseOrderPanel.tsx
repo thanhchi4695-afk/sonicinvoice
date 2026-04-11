@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { addAuditEntry } from "@/lib/audit-log";
 import { adjustInventory, findVariantBySKU, getConnection, getLocations } from "@/lib/shopify-api";
+import { CatalogPicker, type CatalogItem } from "@/components/SupplierCatalog";
 
 // ── Types ──────────────────────────────────────────────────
 interface POLine {

@@ -725,22 +725,61 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
         )}
 
         {/* Camera input (product photo) */}
-        {inputMode === "camera" && !draft && !generating && (
-          <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center min-h-[240px] cursor-pointer"
-            onClick={() => fileRef.current?.click()}>
-            {preview ? (
-              <img src={preview} alt="Product" className="w-full h-full object-contain max-h-[280px] rounded-xl" />
-            ) : (
-              <>
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                  <Camera className="w-8 h-8 text-primary" />
+        {inputMode === "camera" && !draft && !generating && !showCropTool && (
+          <div className="space-y-3">
+            {/* Dimension warning */}
+            {dimensionWarning && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-destructive">{dimensionWarning}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Move closer to the document or use a PDF for better results.</p>
                 </div>
-                <p className="text-sm font-semibold text-foreground">Take a product photo</p>
-                <p className="text-xs text-muted-foreground mt-1">AI will identify it instantly</p>
-              </>
+              </div>
             )}
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
+
+            {/* Detected barcode */}
+            {detectedInvoiceBarcode && (
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 flex items-center gap-2">
+                <ScanBarcode className="w-3.5 h-3.5 text-primary" />
+                <span className="text-xs text-primary font-mono">{detectedInvoiceBarcode}</span>
+                <span className="text-[10px] text-muted-foreground ml-auto">Auto-detected</span>
+              </div>
+            )}
+
+            {/* Preprocessing status */}
+            {preprocessingStatus && (
+              <div className="bg-muted rounded-lg p-3 flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-muted-foreground">{preprocessingStatus}</span>
+              </div>
+            )}
+
+            <div className="rounded-2xl border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center min-h-[240px] cursor-pointer"
+              onClick={() => fileRef.current?.click()}>
+              {preview ? (
+                <img src={preview} alt="Product" className="w-full h-full object-contain max-h-[280px] rounded-xl" />
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                    <Camera className="w-8 h-8 text-primary" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">Take a product photo</p>
+                  <p className="text-xs text-muted-foreground mt-1">AI will identify it instantly</p>
+                </>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleCapture} className="hidden" />
+            </div>
           </div>
+        )}
+
+        {/* Crop tool overlay */}
+        {showCropTool && cropImageSrc && (
+          <ImageCropTool
+            imageSrc={cropImageSrc}
+            onCrop={handleCropComplete}
+            onCancel={handleCropSkip}
+          />
         )}
 
         {/* Text input */}

@@ -219,7 +219,7 @@ const STEPS = ["Source", "Review", "Links", "Push"];
 
 export default function CollectionSEOFlow({ onBack, onStartFlow, products: propProducts }: CollectionSEOFlowProps) {
   const [step, setStep] = useState(0);
-  const [mode, setMode] = useState<"architect" | "quick">("architect");
+  const [mode, setMode] = useState<"bulk" | "architect" | "quick">("bulk");
   const [source, setSource] = useState<"invoice" | "paste" | "props">(propProducts?.length ? "props" : "invoice");
   const [pasteText, setPasteText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -227,6 +227,13 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
   const [crossLinks, setCrossLinks] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [viewTab, setViewTab] = useState<"preview" | "html" | "seo">("preview");
+
+  // Bulk mode state
+  const [groups, setGroups] = useState<CollectionGroup[]>([]);
+  const [globalCrossLinks, setGlobalCrossLinks] = useState<CrossLink[]>([]);
+  const [homepageSections, setHomepageSections] = useState<HomepageSection[]>([]);
+  const [footerMenu, setFooterMenu] = useState<FooterMenuItem[]>([]);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   // Push state
   const [pushing, setPushing] = useState(false);

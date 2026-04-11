@@ -1234,6 +1234,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     return items;
   };
 
+  // ── Convert products for Collection SEO ──
+  const convertToCollectionProducts = () => {
+    return productGroups.map(g => ({
+      title: `${g.brand} ${g.name}`.trim(),
+      vendor: g.brand,
+      product_type: g.type || "",
+      colour: g.colour || "",
+      tags: g.type ? `${g.brand}, ${g.type}` : g.brand,
+      price: g.rrp || g.price,
+      style_number: g.vendorCode || g.styleGroup || "",
+      description: g.desc || "",
+    }));
+  };
+
   // ── If stock check is active, render it instead ──
   if (stockCheckItems) {
     return (
@@ -1241,6 +1255,25 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         lineItems={stockCheckItems}
         onBack={() => setStockCheckItems(null)}
         onComplete={() => { setStockCheckItems(null); }}
+      />
+    );
+  }
+
+  // ── If price lookup is active, render it instead ──
+  if (priceLookupActive) {
+    return (
+      <PriceLookup
+        onBack={() => setPriceLookupActive(false)}
+      />
+    );
+  }
+
+  // ── If collection SEO is active, render it instead ──
+  if (collectionSeoActive) {
+    return (
+      <CollectionSEOFlow
+        onBack={() => setCollectionSeoActive(false)}
+        products={convertToCollectionProducts()}
       />
     );
   }

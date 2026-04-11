@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { CreditCard, Loader2, Check, Zap, Shield } from "lucide-react";
+import { CreditCard, Loader2, Check, Zap, Shield, FileText, Package, Users, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
 
 const PLANS = [
   {
@@ -9,6 +10,8 @@ const PLANS = [
     name: "Starter",
     price: 29,
     highlight: false,
+    invoiceLimit: 50,
+    teamLimit: 1,
     features: ["Up to 50 invoices/mo", "Basic SEO tools", "1 team member", "Email support"],
   },
   {
@@ -16,6 +19,8 @@ const PLANS = [
     name: "Pro",
     price: 59,
     highlight: true,
+    invoiceLimit: null as number | null,
+    teamLimit: 5,
     features: ["Unlimited invoices", "AI feed optimisation", "5 team members", "Priority support", "Margin protection"],
   },
   {
@@ -23,9 +28,18 @@ const PLANS = [
     name: "Growth",
     price: 99,
     highlight: false,
+    invoiceLimit: null as number | null,
+    teamLimit: null as number | null,
     features: ["Everything in Pro", "Unlimited team", "API access", "Dedicated support", "Custom integrations"],
   },
 ];
+
+interface UsageMetrics {
+  invoicesThisMonth: number;
+  totalProducts: number;
+  totalSuppliers: number;
+  totalDocuments: number;
+}
 
 const BillingScreen = () => {
   const [billingStatus, setBillingStatus] = useState<{
@@ -36,9 +50,11 @@ const BillingScreen = () => {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState<string | null>(null);
+  const [usage, setUsage] = useState<UsageMetrics>({ invoicesThisMonth: 0, totalProducts: 0, totalSuppliers: 0, totalDocuments: 0 });
 
   useEffect(() => {
     checkBillingStatus();
+    loadUsageMetrics();
   }, []);
 
   const checkBillingStatus = async () => {
@@ -54,6 +70,26 @@ const BillingScreen = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadUsageMetrics = async () => {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const [docsRes, productsRes, suppliersRes, allDocsRes] = await Promise.all([
+      supabase.from("documents").select("id", { count: "exact", head: true }).gte("created_at", startOfMonth.toISOString()),
+      supabase.from("products").select("id", { count: "exact", head: true }),
+      supabase.from("suppliers").select("id", { count: "exact", head: true }),
+      supabase.from("documents").select("id", { count: "exact", head: true }),
+    ]);
+
+    setUsage({
+      invoicesThisMonth: docsRes.count ?? 0,
+      totalProducts: productsRes.count ?? 0,
+      totalSuppliers: suppliersRes.count ?? 0,
+      totalDocuments: allDocsRes.count ?? 0,
+    });
   };
 
   const handleSubscribe = async (plan: string) => {
@@ -77,7 +113,57 @@ const BillingScreen = () => {
   return (
     <div className="px-4 pt-2 pb-24 animate-fade-in">
       <h1 className="text-2xl font-bold font-display mb-1">Plan & Billing</h1>
-      <p className="text-sm text-muted-foreground mb-6">Manage your subscription and billing details</p>
+      <p className="text-sm text-muted-foreground mb-4">Manage your subscription and billing details</p>
+
+      {/* Usage metrics */}
+      {!loading && (
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div className="bg-card border border-border rounded-xl p-3.5">
+            <div className="flex items-center gap-2 mb-1">
+              <FileText className="w-4 h-4 text-primary" />
+              <span className="text-xs font-semibold text-muted-foreground">Invoices this month</span>
+            </div>
+            <p className="text-2xl font-bold text-foreground">{usage.invoicesThisMonth}</p>
+            {(() => {
+              const currentPlan = PLANS.find(p => p.name === billingStatus?.plan_name) || PLANS[0];
+              if (currentPlan.invoiceLimit) {
+                const pct = Math.min((usage.invoicesThisMonth / currentPlan.invoiceLimit) * 100, 100);
+                return (
+                  <div className="mt-2">
+                    <Progress value={pct} className="h-1.5" />
+                    <p className="text-[10px] text-muted-foreground mt-1">{usage.invoicesThisMonth} / {currentPlan.invoiceLimit} limit</p>
+                  </div>
+                );
+              }
+              return <p className="text-[10px] text-muted-foreground mt-1">Unlimited</p>;
+            })()}
+          </div>
+          <div className="bg-card border border-border rounded-xl p-3.5">
+            <div className="flex items-center gap-2 mb-1">
+              <Package className="w-4 h-4 text-primary" />
+              <span className="text-xs font-semibold text-muted-foreground">Products</span>
+            </div>
+            <p className="text-2xl font-bold text-foreground">{usage.totalProducts}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Total in catalog</p>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-3.5">
+            <div className="flex items-center gap-2 mb-1">
+              <Users className="w-4 h-4 text-primary" />
+              <span className="text-xs font-semibold text-muted-foreground">Suppliers</span>
+            </div>
+            <p className="text-2xl font-bold text-foreground">{usage.totalSuppliers}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Active suppliers</p>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-3.5">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="w-4 h-4 text-primary" />
+              <span className="text-xs font-semibold text-muted-foreground">All documents</span>
+            </div>
+            <p className="text-2xl font-bold text-foreground">{usage.totalDocuments}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Total processed</p>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">

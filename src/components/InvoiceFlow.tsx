@@ -21,6 +21,8 @@ import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import AccountingBillReview from "@/components/AccountingBillReview";
 import StockCheckFlow from "@/components/StockCheckFlow";
+import PriceLookup from "@/components/PriceLookup";
+import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import type { InvoiceLineItem } from "@/lib/stock-matcher";
 import { preprocessInvoiceImage, isLikelyPhotoInvoice, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
 import { supabase } from "@/integrations/supabase/client";
@@ -972,6 +974,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
+  const [priceLookupActive, setPriceLookupActive] = useState(false);
+  const [collectionSeoActive, setCollectionSeoActive] = useState(false);
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
   const [isReprocessing, setIsReprocessing] = useState(false);
 

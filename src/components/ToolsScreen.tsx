@@ -1168,6 +1168,10 @@ const ToolsScreen = () => {
     const CollectionSEOExport = lazy(() => import("@/components/CollectionSEOExport"));
     return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><CollectionSEOExport onBack={() => setActiveTool(null)} /></Suspense>;
   }
+  if (activeTool === "csv_seo") {
+    const ShopifyCSVSEO = lazy(() => import("@/components/ShopifyCSVSEO"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><ShopifyCSVSEO onBack={() => setActiveTool(null)} /></Suspense>;
+  }
 
   if (activeTool === "ai") {
     return (

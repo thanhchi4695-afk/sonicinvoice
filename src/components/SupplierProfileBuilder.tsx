@@ -99,6 +99,33 @@ const SupplierProfileBuilder = ({ onBack }: SupplierProfileBuilderProps) => {
     setInvoices(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const fetchFromDrive = async () => {
+    if (!driveUrl.trim()) return;
+    setFetchingDrive(true);
+    setError(null);
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke("gdrive-fetch", {
+        body: { url: driveUrl.trim() },
+      });
+      if (fnErr) throw new Error(fnErr.message);
+      if (data?.error) throw new Error(data.error);
+      if (!data?.invoices?.length) throw new Error("No supported files found in that link");
+
+      setInvoices(prev => [...prev, ...data.invoices]);
+      toast.success(`Fetched ${data.invoices.length} file${data.invoices.length > 1 ? "s" : ""} from Google Drive`);
+      if (data.errors?.length) {
+        toast.warning(`${data.errors.length} file(s) skipped: ${data.errors[0]}`);
+      }
+      setDriveUrl("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to fetch from Google Drive";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setFetchingDrive(false);
+    }
+  };
+
   const startAnalysis = async () => {
     if (invoices.length < 2) {
       toast.error("Upload at least 2 invoices from the same supplier");

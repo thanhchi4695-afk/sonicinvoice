@@ -592,6 +592,46 @@ const GENERAL: IndustryDefinition = {
   hasSizeHoles: false,
 };
 
+const PET_SUPPLIES: IndustryDefinition = {
+  id: 'pet',
+  displayName: 'Pet Supplies',
+  icon: '🐾',
+  descriptionLength: '2-3',
+  descriptionStyle: 'Write in a friendly, pet-lover tone.',
+  descriptionFeatures: 'Mention: pet type, size suitability, ingredients/material, safety.',
+  productTypes: types(['Dog Food', 'Cat Food', 'Treats', 'Toys', 'Beds', 'Collars', 'Leads', 'Harnesses', 'Grooming', 'Health', 'Bowls', 'Carriers', 'Clothing', 'Accessories'], 'Pet'),
+  defaultType: 'Pet Supplies',
+  tagLayers: [
+    { name: 'Pet Type', description: 'Dog, Cat, etc.', type: 'single', values: ['dog', 'cat', 'bird', 'small animal', 'fish', 'reptile'], order: 1 },
+    { name: 'Category', description: 'Product category', type: 'single', values: ['food', 'treats', 'toys', 'beds', 'grooming', 'health', 'accessories'], order: 2 },
+    { name: 'Product Type', description: 'From product type list', type: 'auto', values: [], order: 3 },
+    { name: 'Brand', description: 'Vendor/brand name', type: 'auto', values: [], order: 4 },
+    { name: 'Arrival Month', description: 'Month product arrived', type: 'date', values: [], order: 5 },
+    { name: 'Price Status', description: 'Full price or on sale', type: 'single', values: ['full_price', 'sale'], order: 6 },
+  ],
+  specialRules: [
+    { keyword: 'grain free', tag: 'grain-free', caseSensitive: false, matchType: 'contains' },
+    { keyword: 'organic', tag: 'organic', caseSensitive: false, matchType: 'contains' },
+    { keyword: 'natural', tag: 'natural', caseSensitive: false, matchType: 'contains' },
+  ],
+  variantAttributes: [
+    { name: 'Pet Size', values: ['Small', 'Medium', 'Large', 'Extra Large'] },
+    { name: 'Flavour', values: [] },
+    { name: 'Weight', values: ['500g', '1kg', '2kg', '5kg', '10kg', '15kg'] },
+  ],
+  enrichmentSources: ['petbarn.com.au', 'petstock.com.au', 'mypetwarehouse.com.au'],
+  seoCtas: ['Shop {brand} at {store}', 'Free delivery over {threshold} at {store}'],
+  seoDescTemplate: '{product} by {brand}. {features}Shop at {store}.',
+  featureRules: [
+    { pattern: /grain[\s-]*free/i, phrase: 'Grain-free formula.' },
+    { pattern: /\bnatural\b/i, phrase: 'Made with natural ingredients.' },
+  ],
+  currencyDefault: 'AUD',
+  fieldLabels: { size: 'Pet Size', colour: 'Colour', material: 'Material' },
+  googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult' },
+  hasSizeHoles: false,
+};
+
 // ═══════════════════════════════════════════════════════════════
 // REGISTRY
 // ═══════════════════════════════════════════════════════════════
@@ -606,6 +646,7 @@ const INDUSTRY_REGISTRY: Record<string, IndustryDefinition> = {
   electronics: ELECTRONICS,
   home: HOME,
   sports: SPORTS,
+  pet: PET_SUPPLIES,
   general: GENERAL,
   // Legacy aliases
   jewellery: GENERAL,

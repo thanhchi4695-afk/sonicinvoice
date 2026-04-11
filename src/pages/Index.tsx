@@ -569,6 +569,10 @@ const Index = () => {
 
         {showCapture && <QuickCapture onClose={() => setShowCapture(false)} />}
       </div>
+
+      {/* Global modals */}
+      <KeyboardShortcutsModal open={showShortcuts} onOpenChange={setShowShortcuts} />
+      <QuickSearchModal open={showQuickSearch} onOpenChange={setShowQuickSearch} onNavigate={handleStartFlow} />
     </div>
   );
 };

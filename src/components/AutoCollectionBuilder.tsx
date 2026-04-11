@@ -616,6 +616,22 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
                           ))}
                         </div>
                       )}
+                      {s.bodyContent && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">SEO Body Content</p>
+                          <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-32 overflow-y-auto prose prose-xs" dangerouslySetInnerHTML={{ __html: s.bodyContent.slice(0, 500) + (s.bodyContent.length > 500 ? "…" : "") }} />
+                        </div>
+                      )}
+                      {s.internalLinksTo && s.internalLinksTo.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5 flex items-center gap-1"><Link className="w-3 h-3" /> Internal Links</p>
+                          <div className="flex flex-wrap gap-1">
+                            {s.internalLinksTo.map((h, i) => (
+                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono">/{h}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

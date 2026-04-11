@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag, FileCheck, Layers } from "lucide-react";
+import { Camera, Type, ChevronLeft, ChevronRight, Plus, Trash2, Copy, Edit2, Check, Download, Zap, Package, ScanBarcode, RotateCcw, Eye, AlertTriangle, Search, Tag, FileCheck, Layers, Crop } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoreConfig } from "@/lib/prompt-builder";
@@ -10,6 +10,8 @@ import { matchProduct, lookupBarcode, saveBarcodeToCatalog, validateGTIN, extrac
 import { generateShopifyCSV, type ScannedProductForExport } from "@/lib/shopify-csv-schema";
 import ScanExportReview from "@/components/ScanExportReview";
 import BatchReviewScreen from "@/components/BatchReviewScreen";
+import ImageCropTool from "@/components/ImageCropTool";
+import { checkImageDimensions, loadImage, deskewImage, detectBarcodeFromImage } from "@/lib/scan-preprocess";
 
 interface ScannedProduct {
   id: string;

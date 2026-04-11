@@ -498,7 +498,7 @@ function BillingSection() {
       const { data, error } = await supabase.functions.invoke("shopify-billing", {
         body: { action: "status" },
       });
-      if (!error && data && !data.error) {
+      if (!error && data) {
         setBillingStatus(data);
       }
     } catch (err) {

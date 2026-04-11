@@ -99,8 +99,13 @@ Deno.serve(async (req) => {
       .single();
 
     if (!conn) {
-      return new Response(JSON.stringify({ error: "No Shopify connection found" }), {
-        status: 404,
+      return new Response(JSON.stringify({
+        has_subscription: false,
+        plan_name: null,
+        status: "not_connected",
+        connected: false,
+      }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

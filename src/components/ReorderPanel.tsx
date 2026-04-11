@@ -429,10 +429,6 @@ const ReorderPanel = ({ onBack, onViewOrders }: ReorderPanelProps) => {
               <TrendingUp className="w-3 h-3 mr-1" />
               {rows.length} need reorder
             </Badge>
-            <div className="flex-1" />
-            <Button variant="outline" size="sm" onClick={exportCSV}>
-              <Download className="w-3.5 h-3.5 mr-1" /> Export
-            </Button>
           </div>
 
           {/* Action bar */}
@@ -445,60 +441,18 @@ const ReorderPanel = ({ onBack, onViewOrders }: ReorderPanelProps) => {
               {creatingPO ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <ShoppingCart className="w-4 h-4 mr-1" />}
               Create PO from {selectedRows.length || "selected"} items
             </Button>
-            {rows.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => toggleAll(!rows.every(r => r.selected))}>
-                {rows.every(r => r.selected) ? "Deselect all" : "Select all"}
-              </Button>
-            )}
           </div>
 
-          {/* Table */}
-          <div className="border rounded-lg overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={rows.length > 0 && rows.every(r => r.selected)}
-                      onCheckedChange={(c) => toggleAll(!!c)}
-                    />
-                  </TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead className="text-right">On Hand</TableHead>
-                  <TableHead className="text-right">Avg/Day</TableHead>
-                  <TableHead className="text-right">Lead Time</TableHead>
-                  <TableHead className="text-right">Incoming</TableHead>
-                  <TableHead className="text-right">Reorder Qty</TableHead>
-                  <TableHead>Urgency</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map(r => {
-                  const urgency = getUrgency(r);
-                  return (
-                    <TableRow key={r.variantId}>
-                      <TableCell>
-                        <Checkbox checked={r.selected} onCheckedChange={() => toggleRow(r.variantId)} />
-                      </TableCell>
-                      <TableCell className="text-sm font-medium truncate max-w-[180px]">{r.productTitle}</TableCell>
-                      <TableCell className="font-mono text-xs">{r.sku || "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.supplierName || "—"}</TableCell>
-                      <TableCell className={`text-right font-medium ${r.onHand === 0 ? "text-destructive" : ""}`}>{r.onHand}</TableCell>
-                      <TableCell className="text-right text-xs">{r.avgDailySales.toFixed(1)}</TableCell>
-                      <TableCell className="text-right text-xs">{r.leadTimeDays}d</TableCell>
-                      <TableCell className="text-right text-xs">{r.incomingStock > 0 ? r.incomingStock : "—"}</TableCell>
-                      <TableCell className="text-right font-semibold">{r.recommendedQty}</TableCell>
-                      <TableCell>
-                        <Badge className={`text-[10px] ${urgency.color}`}>{urgency.label}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          {/* DataGrid */}
+          <DataGrid
+            data={rows}
+            columns={reorderColumns}
+            storageKey="reorder"
+            enableSelection
+            onSelectionChange={setSelectedRows}
+            pageSize={50}
+            exportFilename={`reorder-suggestions-${new Date().toISOString().slice(0, 10)}.csv`}
+          />
 
           <p className="text-[10px] text-muted-foreground mt-3 text-center">
             Formula: ((Lead Time + Safety Stock) × Avg Daily Sales) − On Hand − Incoming · Velocity: last {velocityDays} days

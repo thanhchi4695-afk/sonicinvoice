@@ -102,6 +102,9 @@ const Index = () => {
   const [showCapture, setShowCapture] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [useStockyDashboard, setUseStockyDashboard] = useState(() => localStorage.getItem("stocky_dashboard_mode") === "true");
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showQuickSearch, setShowQuickSearch] = useState(false);
+  const [showMigrationChecklist] = useState(() => localStorage.getItem("migration_checklist_dismissed") !== "true");
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
   const { isEmbedded, shop, authState: embeddedAuthState } = useShopifyEmbedded();

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard, Store } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { TAX_REGIONS, getTaxConfig, saveTaxConfig, getEffectiveTaxRate, formatTaxRate, getTaxLabel } from "@/lib/tax-service";
 import {
   getDirectStores, saveDirectStore, removeDirectStore, setActiveStore,
   normalizeStoreUrl, type DirectStore,

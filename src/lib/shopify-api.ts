@@ -264,6 +264,58 @@ export async function updateCollectionSEO(
   return data.collection;
 }
 
+/* ─── GraphQL Catalog Search (for stock classification) ─── */
+
+export interface CatalogSearchVariant {
+  id: string;
+  sku: string;
+  title: string;
+  barcode: string;
+  inventoryQuantity: number;
+  inventoryItemId: string;
+  price: string;
+  product: {
+    id: string;
+    title: string;
+    handle: string;
+    vendor: string;
+    productType: string;
+    options: { name: string; values: string[] }[];
+  };
+}
+
+/**
+ * Search Shopify catalog via GraphQL for candidate matches.
+ * Builds a compound query from SKUs, barcodes, and title fragments.
+ * Returns up to 50 matching variants per call.
+ */
+export async function searchShopifyCatalog(
+  searchTerms: string[],
+): Promise<CatalogSearchVariant[]> {
+  const uniqueTerms = [...new Set(searchTerms.filter(Boolean).map(t => t.trim()))].slice(0, 20);
+  if (uniqueTerms.length === 0) return [];
+
+  const searchString = uniqueTerms
+    .map(term => `sku:${term} OR barcode:${term} OR title:*${term}*`)
+    .join(" OR ");
+
+  const data = await callProxy({
+    action: "graphql_search_catalog",
+    query_string: searchString,
+  });
+
+  return (data.variants || []).map((v: Record<string, unknown>) => ({
+    id: v.id || "",
+    sku: v.sku || "",
+    title: v.title || "",
+    barcode: v.barcode || "",
+    inventoryQuantity: v.inventoryQuantity || 0,
+    inventoryItemId: v.inventoryItemId || "",
+    price: v.price || "0.00",
+    product: v.product || { id: "", title: "", handle: "", vendor: "", productType: "", options: [] },
+  }));
+}
+
 /* ─── Inventory Sync ─── */
 
 export interface ShopifyVariantMatch {

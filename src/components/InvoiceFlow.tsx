@@ -23,6 +23,8 @@ import AccountingBillReview from "@/components/AccountingBillReview";
 import StockCheckFlow from "@/components/StockCheckFlow";
 import PriceLookup from "@/components/PriceLookup";
 import CollectionSEOFlow from "@/components/CollectionSEOFlow";
+import SupplierTemplateTeach from "@/components/SupplierTemplateTeach";
+import { extractWithTemplate, parseFileToRows, autoDetectMappings, type SupplierTemplate as DBSupplierTemplate } from "@/lib/rule-based-extractor";
 import type { InvoiceLineItem } from "@/lib/stock-matcher";
 import { preprocessInvoiceImage, isLikelyPhotoInvoice, preprocessForUpload, isPdfFile, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
 import { supabase } from "@/integrations/supabase/client";
@@ -247,6 +249,41 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [savedTemplate, setSavedTemplate] = useState(false);
   const [processAs, setProcessAs] = useState<ProcessAsMode>("auto");
   const [detectedLayout, setDetectedLayout] = useState<LayoutType | null>(null);
+
+  // Supplier dropdown & DB template state
+  const [supplierList, setSupplierList] = useState<string[]>([]);
+  const [dbTemplate, setDbTemplate] = useState<DBSupplierTemplate | null>(null);
+  const [showTeachModal, setShowTeachModal] = useState(false);
+  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
+
+  // Fetch user's suppliers for dropdown
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from("suppliers").select("name").order("name");
+        if (data) setSupplierList(data.map((s: any) => s.name));
+      } catch {}
+    })();
+  }, []);
+
+  // Check for DB template when supplier changes
+  useEffect(() => {
+    if (!supplierName.trim()) { setDbTemplate(null); return; }
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("supplier_templates" as any)
+          .select("*")
+          .eq("supplier_name", supplierName.trim())
+          .limit(1);
+        if (data && data.length > 0) {
+          setDbTemplate(data[0] as any);
+        } else {
+          setDbTemplate(null);
+        }
+      } catch { setDbTemplate(null); }
+    })();
+  }, [supplierName]);
 
   // Processing timer state
   const [processStartTime, setProcessStartTime] = useState<number | null>(null);
@@ -778,9 +815,36 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
     let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = [];
 
-    if (["csv", "xlsx", "xls"].includes(ext)) {
+    // ── Rule-based extraction if DB template exists for this supplier ──
+    if (dbTemplate && ["csv", "xlsx", "xls"].includes(ext)) {
+      setEnrichLines([{ name: "Using saved template…", status: "searching", action: `Rule-based extraction for ${supplierName}`, confidence: 0 }]);
+      try {
+        const rows = await parseFileToRows(file, dbTemplate.header_row);
+        if (rows.length > 0) {
+          // Save detected headers for teach modal
+          setDetectedHeaders(Object.keys(rows[0]));
+          const extracted = extractWithTemplate(rows, dbTemplate as any);
+          products = extracted;
+          // Increment success count in background
+          supabase.from("supplier_templates" as any)
+            .update({ success_count: (dbTemplate.success_count || 0) + 1 } as any)
+            .eq("id", dbTemplate.id)
+            .then(() => {});
+          toast.success(`⚡ Rule-based extraction: ${products.length} products`, { description: "No AI needed — using saved template" });
+        }
+      } catch (err) {
+        console.warn("Rule-based extraction failed, falling back to standard:", err);
+      }
+    }
+
+    if (products.length === 0 && ["csv", "xlsx", "xls"].includes(ext)) {
+      // Detect headers for potential teach later
+      try {
+        const rows = await parseFileToRows(file, 1);
+        if (rows.length > 0) setDetectedHeaders(Object.keys(rows[0]));
+      } catch {}
       products = await parseSpreadsheet(file);
-    } else {
+    } else if (products.length === 0) {
       products = await parseWithAI(file);
     }
 
@@ -1504,8 +1568,31 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           </button>
           {showDetails && (
             <div className="mt-3 space-y-3">
-              <input type="text" placeholder="Supplier name" value={supplierName} onChange={e => setSupplierName(e.target.value)}
-                className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm" />
+              {/* Supplier dropdown with free-text fallback */}
+              <div className="relative">
+                <input
+                  list="supplier-options"
+                  type="text"
+                  placeholder="Select or type supplier name"
+                  value={supplierName}
+                  onChange={e => setSupplierName(e.target.value)}
+                  className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm"
+                />
+                <datalist id="supplier-options">
+                  {supplierList.map(s => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+              </div>
+
+              {/* DB Template indicator */}
+              {dbTemplate && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 flex items-center gap-2">
+                  <Zap className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-xs text-primary font-medium">⚡ Rule-based template found — instant extraction, no AI needed</span>
+                </div>
+              )}
+
               <select className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm text-foreground">
                 <option value="">Arrival month</option>
                 <option>Mar 2026</option>
@@ -1614,13 +1701,24 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                         {enrichLines.filter(l => l.status === "review" || l.status === "not_found").length} product{enrichLines.filter(l => l.status === "review" || l.status === "not_found").length > 1 ? "s" : ""} tagged NEEDS-ENRICHMENT — search manually before importing.
                       </p>
                     )}
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button variant="teal" className="flex-1 h-11" onClick={handleProceedToReview}>
                         → Review & export
                       </Button>
                       {enrichLines.some(l => l.status === "review" || l.status === "not_found") && (
                         <Button variant="outline" className="flex-1 h-11 text-xs" onClick={() => { setFilterReviewOnly(true); handleProceedToReview(); }}>
                           Review issues first
+                        </Button>
+                      )}
+                      {/* Teach this supplier button — shown when no DB template exists */}
+                      {!dbTemplate && supplierName.trim() && detectedHeaders.length > 0 && (
+                        <Button
+                          variant="outline"
+                          className="w-full h-9 text-xs border-dashed border-primary/50 text-primary"
+                          onClick={() => setShowTeachModal(true)}
+                        >
+                          <Settings className="w-3.5 h-3.5 mr-1" />
+                          Teach this supplier for instant future extraction
                         </Button>
                       )}
                     </div>
@@ -2346,6 +2444,23 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           </div>
         </div>
       )}
+
+      {/* Supplier Template Teach Modal */}
+      <SupplierTemplateTeach
+        open={showTeachModal}
+        onClose={() => setShowTeachModal(false)}
+        supplierName={supplierName}
+        detectedHeaders={detectedHeaders}
+        sampleProducts={productGroups.slice(0, 5).map(g => ({
+          name: g.name,
+          sku: g.vendorCode || "",
+          colour: g.colour || "",
+          size: g.size || "",
+          qty: g.variants.reduce((s, v) => s + v.qty, 0),
+          cost: g.price,
+          rrp: g.rrp,
+        }))}
+      />
     </div>
   );
 };

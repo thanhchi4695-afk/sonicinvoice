@@ -1039,6 +1039,51 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_templates: {
+        Row: {
+          column_mappings: Json
+          created_at: string
+          error_count: number
+          file_type: string
+          header_row: number
+          id: string
+          notes: string | null
+          regex_patterns: Json
+          success_count: number
+          supplier_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          column_mappings?: Json
+          created_at?: string
+          error_count?: number
+          file_type?: string
+          header_row?: number
+          id?: string
+          notes?: string | null
+          regex_patterns?: Json
+          success_count?: number
+          supplier_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          column_mappings?: Json
+          created_at?: string
+          error_count?: number
+          file_type?: string
+          header_row?: number
+          id?: string
+          notes?: string | null
+          regex_patterns?: Json
+          success_count?: number
+          supplier_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           avg_margin: number | null

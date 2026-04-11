@@ -46,6 +46,7 @@
     "@shopify/polaris": "13",
     "@supabase/supabase-js": "^2.101.1",
     "@tanstack/react-query": "^5.83.0",
+    "@tanstack/react-table": "^8.21.3",
     "@types/papaparse": "^5.5.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

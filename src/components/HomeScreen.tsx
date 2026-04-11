@@ -366,6 +366,7 @@ const HomeScreen = ({
         <FeatureTile icon="🤖" label="Auto collections AI" onClick={() => onNavigateToTab?.("tools")} />
         <FeatureTile icon="🖼️" label="Image optimisation" onClick={onStartImageOptimise || (() => {})} />
         <FeatureTile icon="📚" label="Catalog memory" onClick={onStartCatalogMemory || (() => {})} />
+        <FeatureTile icon="🧬" label="Supplier profile builder" onClick={onStartSupplierProfileBuilder || (() => {})} />
         <FeatureTile icon="⚙️" label="AI instructions" onClick={() => onNavigateToTab?.("tools")} />
         <FeatureTile icon="📋" label="Audit log" onClick={onOpenAuditLog || (() => {})} />
       </CollapsibleSection>

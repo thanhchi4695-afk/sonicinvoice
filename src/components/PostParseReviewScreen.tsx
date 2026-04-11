@@ -148,6 +148,9 @@ export default function PostParseReviewScreen({
   const [sourceTraceProduct, setSourceTraceProduct] = useState<ValidatedProduct | null>(null);
   const [showDebugZones, setShowDebugZones] = useState(false);
   const [showDebugOverlay, setShowDebugOverlay] = useState(false);
+  const [autoRefineProfile, setAutoRefineProfile] = useState(() => {
+    try { return localStorage.getItem("sonic_auto_refine_profile") !== "false"; } catch { return true; }
+  });
 
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);

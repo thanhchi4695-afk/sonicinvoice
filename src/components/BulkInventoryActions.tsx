@@ -134,7 +134,7 @@ export default function BulkInventoryActions({ mode, onComplete }: BulkInventory
       complete: (result) => {
         const data = result.data as Record<string, string>[];
         if (!data.length) { toast.error("No data found in file"); return; }
-        const headers = Object.keys(data[0]).map(h => h.toLowerCase().trim());
+        const headers = Object.keys(data[0]);
 
         const errs: ValidationError[] = [];
         const parsed: PreviewRow[] = [];
@@ -548,9 +548,8 @@ export default function BulkInventoryActions({ mode, onComplete }: BulkInventory
 
 function findHeader(headers: string[], ...names: string[]): string | undefined {
   for (const n of names) {
-    const found = headers.find(h => h === n.toLowerCase());
+    const found = headers.find(h => h.toLowerCase().trim() === n.toLowerCase());
     if (found) return found;
   }
-  // Also check original case via index
   return undefined;
 }

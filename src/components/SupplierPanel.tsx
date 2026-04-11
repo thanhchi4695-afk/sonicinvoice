@@ -60,7 +60,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   const [linkedInvoices, setLinkedInvoices] = useState<LinkedInvoice[]>([]);
   const [productCosts, setProductCosts] = useState<ProductCostSummary[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailTab, setDetailTab] = useState<"overview" | "invoices" | "costs">("overview");
+  const [detailTab, setDetailTab] = useState<"overview" | "invoices" | "costs" | "catalog">("overview");
 
   // Form state
   const [form, setForm] = useState({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
@@ -414,13 +414,13 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
 
           {/* Tab bar */}
           <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
-            {(["overview", "invoices", "costs"] as const).map(tab => (
+            {(["overview", "invoices", "costs", "catalog"] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setDetailTab(tab)}
                 className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${detailTab === tab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
               >
-                {tab === "overview" ? "Overview" : tab === "invoices" ? `Invoices (${invoiceCount})` : `Costs (${totalProducts})`}
+                {tab === "overview" ? "Overview" : tab === "invoices" ? `Invoices (${invoiceCount})` : tab === "costs" ? `Costs (${totalProducts})` : "Catalog"}
               </button>
             ))}
           </div>

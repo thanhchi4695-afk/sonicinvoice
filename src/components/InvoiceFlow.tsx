@@ -815,9 +815,36 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
     let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = [];
 
-    if (["csv", "xlsx", "xls"].includes(ext)) {
+    // ── Rule-based extraction if DB template exists for this supplier ──
+    if (dbTemplate && ["csv", "xlsx", "xls"].includes(ext)) {
+      setEnrichLines([{ name: "Using saved template…", status: "searching", action: `Rule-based extraction for ${supplierName}`, confidence: 0 }]);
+      try {
+        const rows = await parseFileToRows(file, dbTemplate.header_row);
+        if (rows.length > 0) {
+          // Save detected headers for teach modal
+          setDetectedHeaders(Object.keys(rows[0]));
+          const extracted = extractWithTemplate(rows, dbTemplate as any);
+          products = extracted;
+          // Increment success count in background
+          supabase.from("supplier_templates" as any)
+            .update({ success_count: (dbTemplate.success_count || 0) + 1 } as any)
+            .eq("id", dbTemplate.id)
+            .then(() => {});
+          toast.success(`⚡ Rule-based extraction: ${products.length} products`, { description: "No AI needed — using saved template" });
+        }
+      } catch (err) {
+        console.warn("Rule-based extraction failed, falling back to standard:", err);
+      }
+    }
+
+    if (products.length === 0 && ["csv", "xlsx", "xls"].includes(ext)) {
+      // Detect headers for potential teach later
+      try {
+        const rows = await parseFileToRows(file, 1);
+        if (rows.length > 0) setDetectedHeaders(Object.keys(rows[0]));
+      } catch {}
       products = await parseSpreadsheet(file);
-    } else {
+    } else if (products.length === 0) {
       products = await parseWithAI(file);
     }
 

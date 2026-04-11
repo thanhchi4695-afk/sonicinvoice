@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
+const ConnectorsMarketplace = lazy(() => import("@/components/ConnectorsMarketplace"));
 import POSConnectionPanel from "@/components/POSConnectionPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -433,6 +434,13 @@ const AccountScreen = () => {
       </Section>
 
       <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); }}>Save settings</Button>
+
+      {/* Connectors Marketplace */}
+      <Section title="🔌 Connectors Marketplace">
+        <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
+          <ConnectorsMarketplace />
+        </Suspense>
+      </Section>
 
       {/* Team Management */}
       <Section title="👥 Team & Roles">

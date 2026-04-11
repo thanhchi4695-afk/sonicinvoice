@@ -76,6 +76,7 @@ const StocktakeModule = lazy(() => import("@/components/StocktakeModule"));
 const TransferOrderPanel = lazy(() => import("@/components/TransferOrderPanel"));
 const ReportsHub = lazy(() => import("@/components/ReportsHub"));
 const StockAdjustmentPanel = lazy(() => import("@/components/StockAdjustmentPanel"));
+const InventoryView = lazy(() => import("@/components/InventoryView"));
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";

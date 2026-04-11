@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { addAuditEntry } from "@/lib/audit-log";
 import { onImageSeoTrigger } from "@/lib/image-seo-trigger";
 import NotificationBell from "@/components/NotificationBell";
 import LoadingScreen from "@/components/ui/loading-screen";
+import { useKeyboardShortcuts, type ShortcutDef } from "@/hooks/use-keyboard-shortcuts";
 
 // ── Eagerly loaded (critical path) ──
 import HomeScreen from "@/components/HomeScreen";
@@ -10,6 +11,9 @@ import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
 import StockyLayout from "@/components/StockyLayout";
 import QuickActionsBar from "@/components/QuickActionsBar";
+import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
+import QuickSearchModal from "@/components/QuickSearchModal";
+import MigrationChecklist from "@/components/MigrationChecklist";
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
 const InvoicesTab = lazy(() => import("@/components/InvoicesTab"));
@@ -98,6 +102,9 @@ const Index = () => {
   const [showCapture, setShowCapture] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [useStockyDashboard, setUseStockyDashboard] = useState(() => localStorage.getItem("stocky_dashboard_mode") === "true");
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showQuickSearch, setShowQuickSearch] = useState(false);
+  const [showMigrationChecklist] = useState(() => localStorage.getItem("migration_checklist_dismissed") !== "true");
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
   const { isEmbedded, shop, authState: embeddedAuthState } = useShopifyEmbedded();
@@ -198,6 +205,17 @@ const Index = () => {
       setActiveFlow(flow as any);
     }
   }, []);
+
+  // ── Keyboard shortcuts ──
+  const shortcuts: ShortcutDef[] = useMemo(() => [
+    { key: "n", label: "N", description: "New Purchase Order", action: () => setActiveFlow("purchase_orders") },
+    { key: "r", label: "R", description: "Receive Stock", action: () => setActiveFlow("quick_receive") },
+    { key: "t", label: "T", description: "New Stocktake", action: () => setActiveFlow("stocktake_module") },
+    { key: "s", label: "S", description: "Focus Barcode Scanner", action: () => setActiveFlow("scan_mode") },
+    { key: "k", ctrl: true, label: "⌘K", description: "Quick Search", action: () => setShowQuickSearch(true) },
+    { key: "?", label: "?", description: "Keyboard Shortcuts", action: () => setShowShortcuts(true) },
+  ], []);
+  useKeyboardShortcuts(shortcuts);
 
   // ── Loading state ──
   if (authLoading) {
@@ -338,6 +356,11 @@ const Index = () => {
 
   const mainContent = (
     <>
+      {activeTab === "home" && showMigrationChecklist && !useStockyDashboard && (
+        <div className="px-4 pt-3">
+          <MigrationChecklist onNavigate={handleStartFlow} onDismiss={() => localStorage.setItem("migration_checklist_dismissed", "true")} />
+        </div>
+      )}
       {activeTab === "home" && useStockyDashboard && (
         <Suspense fallback={suspenseFallback}>
           <StockyHomeDashboard
@@ -551,6 +574,10 @@ const Index = () => {
 
         {showCapture && <QuickCapture onClose={() => setShowCapture(false)} />}
       </div>
+
+      {/* Global modals */}
+      <KeyboardShortcutsModal open={showShortcuts} onOpenChange={setShowShortcuts} />
+      <QuickSearchModal open={showQuickSearch} onOpenChange={setShowQuickSearch} onNavigate={handleStartFlow} />
     </div>
   );
 };

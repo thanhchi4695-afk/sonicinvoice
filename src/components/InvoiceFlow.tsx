@@ -1541,8 +1541,31 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           </button>
           {showDetails && (
             <div className="mt-3 space-y-3">
-              <input type="text" placeholder="Supplier name" value={supplierName} onChange={e => setSupplierName(e.target.value)}
-                className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm" />
+              {/* Supplier dropdown with free-text fallback */}
+              <div className="relative">
+                <input
+                  list="supplier-options"
+                  type="text"
+                  placeholder="Select or type supplier name"
+                  value={supplierName}
+                  onChange={e => setSupplierName(e.target.value)}
+                  className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm"
+                />
+                <datalist id="supplier-options">
+                  {supplierList.map(s => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+              </div>
+
+              {/* DB Template indicator */}
+              {dbTemplate && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-2 flex items-center gap-2">
+                  <Zap className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-xs text-primary font-medium">⚡ Rule-based template found — instant extraction, no AI needed</span>
+                </div>
+              )}
+
               <select className="w-full h-11 rounded-lg bg-input border border-border px-3 text-sm text-foreground">
                 <option value="">Arrival month</option>
                 <option>Mar 2026</option>

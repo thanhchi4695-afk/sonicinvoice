@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, lazy, Suspense } from "react";
 import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail, CalendarDays, ShoppingCart, Image, Sparkles, Brain, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PriceLookup from "@/components/PriceLookup";
@@ -45,6 +45,7 @@ const tools = [
   { id: "feed_health", icon: Globe, label: "Google Feed Health", desc: "Fix gender, age_group, color — push to Shopify", color: "text-success" },
   { id: "learning_memory", icon: Brain, label: "Learning memory", desc: "View learned invoice patterns by supplier", color: "text-secondary" },
   { id: "image_optimise", icon: Image, label: "Image optimisation AI", desc: "Alt text, filenames, quality analysis", color: "text-primary" },
+  { id: "collection_seo_export", icon: Globe, label: "Bulk Collection SEO", desc: "Export, optimize & import collection SEO", color: "text-success" },
 ];
 
 const quickInserts = [
@@ -1162,6 +1163,10 @@ const ToolsScreen = () => {
   if (activeTool === "feed_optimise") return <AIFeedOptimisation onBack={() => setActiveTool(null)} />;
   if (activeTool === "feed_health") return <FeedHealthPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "learning_memory") return <LearningMemoryPanel onBack={() => setActiveTool(null)} />;
+  if (activeTool === "collection_seo_export") {
+    const CollectionSEOExport = lazy(() => import("@/components/CollectionSEOExport"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><CollectionSEOExport onBack={() => setActiveTool(null)} /></Suspense>;
+  }
 
   if (activeTool === "ai") {
     return (

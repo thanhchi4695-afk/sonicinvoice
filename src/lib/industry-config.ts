@@ -164,6 +164,9 @@ const SWIMWEAR: IndustryDefinition = {
     { pattern: /upf|sun\s*protect/i, phrase: 'UPF 50+ sun protection.' },
   ],
   currencyDefault: 'AUD',
+  fieldLabels: { size: 'Size', colour: 'Colour', material: 'Fabric' },
+  googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult', size_system: 'AU' },
+  hasSizeHoles: true,
 };
 
 const BEAUTY: IndustryDefinition = {
@@ -225,6 +228,9 @@ const BEAUTY: IndustryDefinition = {
     { pattern: /hydrating/i, phrase: 'Deeply hydrating.' },
   ],
   currencyDefault: 'AUD',
+  fieldLabels: { size: 'Shade / Volume', colour: 'Colour', material: 'Formula' },
+  googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult' },
+  hasSizeHoles: false,
 };
 
 const CLOTHING: IndustryDefinition = {
@@ -277,6 +283,9 @@ const CLOTHING: IndustryDefinition = {
     { pattern: /linen/i, phrase: 'Premium linen fabric.' },
   ],
   currencyDefault: 'AUD',
+  fieldLabels: { size: 'Size', colour: 'Colour', material: 'Fabric' },
+  googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult', size_system: 'AU' },
+  hasSizeHoles: true,
 };
 
 const FOOTWEAR: IndustryDefinition = {
@@ -328,6 +337,9 @@ const FOOTWEAR: IndustryDefinition = {
     { pattern: /orthotic/i, phrase: 'Orthotic friendly.' },
   ],
   currencyDefault: 'AUD',
+  fieldLabels: { size: 'Size', colour: 'Colour', material: 'Upper Material' },
+  googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult', size_system: 'AU' },
+  hasSizeHoles: true,
 };
 
 const HEALTH: IndustryDefinition = {
@@ -381,6 +393,9 @@ const HEALTH: IndustryDefinition = {
     { pattern: /\borganic\b/i, phrase: 'Certified organic.' },
   ],
   currencyDefault: 'AUD',
+  fieldLabels: { size: 'Serving Size', colour: 'Flavour', material: 'Ingredients' },
+  googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult' },
+  hasSizeHoles: false,
 };
 
 const ELECTRONICS: IndustryDefinition = {
@@ -434,6 +449,9 @@ const ELECTRONICS: IndustryDefinition = {
     { pattern: /wifi[\s-]*6/i, phrase: 'WiFi 6 support.' },
   ],
   currencyDefault: 'AUD',
+  fieldLabels: { size: 'Specs', colour: 'Colour', material: 'Material' },
+  googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult' },
+  hasSizeHoles: false,
 };
 
 const HOME: IndustryDefinition = {
@@ -484,6 +502,9 @@ const HOME: IndustryDefinition = {
     { pattern: /australian\s*made/i, phrase: 'Australian made.' },
   ],
   currencyDefault: 'AUD',
+  fieldLabels: { size: 'Dimensions', colour: 'Colour', material: 'Material' },
+  googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult' },
+  hasSizeHoles: false,
 };
 
 const SPORTS: IndustryDefinition = {
@@ -532,6 +553,9 @@ const SPORTS: IndustryDefinition = {
     { pattern: /recycled/i, phrase: 'Made from recycled materials.' },
   ],
   currencyDefault: 'AUD',
+  fieldLabels: { size: 'Size', colour: 'Colour', material: 'Material' },
+  googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult', size_system: 'AU' },
+  hasSizeHoles: true,
 };
 
 const GENERAL: IndustryDefinition = {
@@ -565,7 +589,11 @@ const GENERAL: IndustryDefinition = {
   currencyDefault: 'AUD',
   fieldLabels: { size: 'Size', colour: 'Colour', material: 'Material' },
   googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult', size_system: 'AU' },
-  hasSizeHoles: true,
+  hasSizeHoles: false,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// REGISTRY
 // ═══════════════════════════════════════════════════════════════
 
 const INDUSTRY_REGISTRY: Record<string, IndustryDefinition> = {

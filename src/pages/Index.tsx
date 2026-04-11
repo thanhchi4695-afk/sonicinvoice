@@ -399,103 +399,125 @@ const Index = () => {
     </>
   );
 
-  // ─── Embedded layout (inside Shopify Admin) ───
+  // ─── Embedded layout (inside Shopify Admin) — always uses StockyLayout ───
   if (isEmbedded) {
     return (
-      <div className="flex h-screen overflow-hidden bg-background">
-        <EmbeddedNav
-          activeTab={activeFlow ? "" : activeTab}
-          onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); setMobileNavOpen(false); }}
-          onFlowChange={(flow) => { setActiveFlow(flow as any); setMobileNavOpen(false); }}
-          open={mobileNavOpen}
-          onClose={() => setMobileNavOpen(false)}
-        />
-        <main className="flex-1 overflow-y-auto min-w-0 pb-20 lg:pb-0">
-          <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-0 border-b border-border mb-0">
-            <div className="flex items-center gap-2">
-              {/* Mobile hamburger */}
+      <StockyLayout
+        activeTab={activeFlow ? "" : activeTab}
+        activeFlow={activeFlow}
+        onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
+        onFlowChange={(flow) => setActiveFlow(flow as any)}
+      >
+        <div className="pb-20 lg:pb-0">
+          <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-2 border-b border-border lg:border-0">
+            {activeFlow && (
               <button
-                onClick={() => setMobileNavOpen(true)}
-                className="lg:hidden p-1.5 rounded-md hover:bg-muted text-muted-foreground"
-                aria-label="Open menu"
+                onClick={() => setActiveFlow(null)}
+                className="mr-auto text-xs text-muted-foreground hover:text-foreground"
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                ← Back
               </button>
-              {activeFlow && (
-                <button
-                  onClick={() => setActiveFlow(null)}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  ← Back
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-2 pb-2">
-              <NotificationBell
-                notifications={notifications}
-                unreadCount={unreadCount}
-                onMarkRead={markRead}
-                onMarkAllRead={markAllRead}
-                onNavigate={(link) => {
-                  if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
-                    setActiveFlow(link as any);
-                  } else {
-                    setActiveTab(link);
-                  }
-                }}
-              />
-            </div>
+            )}
+            <NotificationBell
+              notifications={notifications}
+              unreadCount={unreadCount}
+              onMarkRead={markRead}
+              onMarkAllRead={markAllRead}
+              onNavigate={(link) => {
+                if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
+                  setActiveFlow(link as any);
+                } else {
+                  setActiveTab(link);
+                }
+              }}
+            />
           </div>
           {activeFlow ? renderFlow() : mainContent}
-        </main>
+        </div>
         {/* Mobile bottom tabs for embedded mode */}
         <div className="lg:hidden">
           <BottomTabBar activeTab={activeTab} onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }} />
         </div>
-      </div>
+      </StockyLayout>
     );
   }
 
-  // ─── Standalone layout (original mobile-first) ───
+  // ─── Standalone layout ───
+  // Desktop (≥1024px): use StockyLayout sidebar; Mobile: use BottomTabBar
   return (
     <div className="min-h-screen">
-      {/* Top bar */}
-      <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
-        <NotificationBell
-          notifications={notifications}
-          unreadCount={unreadCount}
-          onMarkRead={markRead}
-          onMarkAllRead={markAllRead}
-          onNavigate={(link) => {
-            if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
-              setActiveFlow(link as any);
-            } else {
-              setActiveTab(link);
-            }
-          }}
-        />
-        <button
-          onClick={() => setActiveTab("account")}
-          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${mode.modeBadge.color}`}
+      {/* Desktop sidebar wrapper — hidden on mobile */}
+      <div className="hidden lg:block h-screen">
+        <StockyLayout
+          activeTab={activeFlow ? "" : activeTab}
+          activeFlow={activeFlow}
+          onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
+          onFlowChange={(flow) => setActiveFlow(flow as any)}
         >
-          <span>{mode.modeBadge.emoji}</span>
-          {mode.modeBadge.label}
-        </button>
+          <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
+            <NotificationBell
+              notifications={notifications}
+              unreadCount={unreadCount}
+              onMarkRead={markRead}
+              onMarkAllRead={markAllRead}
+              onNavigate={(link) => {
+                if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
+                  setActiveFlow(link as any);
+                } else {
+                  setActiveTab(link);
+                }
+              }}
+            />
+            <button
+              onClick={() => setActiveTab("account")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${mode.modeBadge.color}`}
+            >
+              <span>{mode.modeBadge.emoji}</span>
+              {mode.modeBadge.label}
+            </button>
+          </div>
+          {activeFlow ? renderFlow() : mainContent}
+        </StockyLayout>
       </div>
 
-      {mainContent}
-      <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      {/* Mobile layout — hidden on desktop */}
+      <div className="lg:hidden">
+        <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
+          <NotificationBell
+            notifications={notifications}
+            unreadCount={unreadCount}
+            onMarkRead={markRead}
+            onMarkAllRead={markAllRead}
+            onNavigate={(link) => {
+              if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
+                setActiveFlow(link as any);
+              } else {
+                setActiveTab(link);
+              }
+            }}
+          />
+          <button
+            onClick={() => setActiveTab("account")}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${mode.modeBadge.color}`}
+          >
+            <span>{mode.modeBadge.emoji}</span>
+            {mode.modeBadge.label}
+          </button>
+        </div>
+        {activeFlow ? renderFlow() : mainContent}
+        <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Floating Quick Capture button — mobile only */}
-      <button
-        onClick={() => setShowCapture(true)}
-        className="md:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-        aria-label="Quick Capture"
-      >
-        <span className="text-2xl">📷</span>
-      </button>
+        {/* Floating Quick Capture button — mobile only */}
+        <button
+          onClick={() => setShowCapture(true)}
+          className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+          aria-label="Quick Capture"
+        >
+          <span className="text-2xl">📷</span>
+        </button>
 
-      {showCapture && <QuickCapture onClose={() => setShowCapture(false)} />}
+        {showCapture && <QuickCapture onClose={() => setShowCapture(false)} />}
+      </div>
     </div>
   );
 };

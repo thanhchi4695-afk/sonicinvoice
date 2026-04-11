@@ -11,7 +11,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog" | "graphql_create_collection";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant / find_by_barcode
@@ -56,6 +56,15 @@ interface ShopifyRequestBody {
   new_variants?: Array<{ price: string; sku?: string; barcode?: string; options: string[]; qty?: number; locationId?: string; cost?: string; imageSrc?: string }>;
   // For graphql_search_catalog
   query_string?: string;
+  // For graphql_create_collection
+  gql_collection?: {
+    title: string;
+    handle?: string;
+    descriptionHtml?: string;
+    seo?: { title?: string; description?: string };
+    ruleSet?: { appliedDisjunctively: boolean; rules: Array<{ column: string; relation: string; condition: string }> };
+    metafields?: Array<{ namespace: string; key: string; value: string; type: string }>;
+  };
 }
 
 Deno.serve(async (req) => {

@@ -11,7 +11,7 @@ interface QuickActionsBarProps {
 const actions = [
   { id: "purchase_orders", label: "New PO", icon: ClipboardList, key: "p", permission: "create_po" as const },
   { id: "quick_receive", label: "Quick Receive", icon: PackageCheck, key: "r", permission: "receive_po" as const },
-  { id: "stocktake_module", label: "New Stocktake", icon: ClipboardCheck, key: "t", permission: "stocktake" as const },
+  { id: "stocktake_module", label: "New Stocktake", icon: ClipboardCheck, key: "t", permission: "create_stocktake" as const },
   { id: "scan_mode", label: "Scan Barcode", icon: ScanBarcode, key: "s", permission: "view_inventory" as const },
   { id: "stock_adjustment", label: "Adjust Stock", icon: PlusCircle, key: "a", permission: "adjust_inventory" as const },
 ];

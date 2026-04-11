@@ -1,4 +1,4 @@
-import { Home, FileText, Megaphone, Wrench, User, Monitor } from "lucide-react";
+import { Home, FileText, Wrench, CreditCard, User, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useTranslation } from "react-i18next";
@@ -15,8 +15,8 @@ const BottomTabBar = ({ activeTab, onTabChange }: BottomTabBarProps) => {
   const baseTabs = [
     { id: "home", label: t("nav.home"), icon: Home },
     { id: "invoices", label: t("nav.invoices"), icon: FileText },
-    { id: "google_ads", label: t("nav.marketing"), icon: Megaphone },
     { id: "tools", label: t("nav.tools"), icon: Wrench },
+    { id: "billing", label: t("nav.billing", "Billing"), icon: CreditCard },
     { id: "account", label: t("nav.account"), icon: User },
   ];
 

@@ -16,6 +16,7 @@ import QuickSearchModal from "@/components/QuickSearchModal";
 
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
+const BillingScreen = lazy(() => import("@/components/BillingScreen"));
 const InvoicesTab = lazy(() => import("@/components/InvoicesTab"));
 const AuthScreen = lazy(() => import("@/components/AuthScreen"));
 const OnboardingFlow = lazy(() => import("@/components/OnboardingFlow"));
@@ -442,6 +443,7 @@ const Index = () => {
         {activeTab === "tools" && <ToolsScreen />}
         {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => { if (f === "invoice" || f === "lightspeed_convert") setActiveFlow(f); }} />}
         {activeTab === "google_ads" && <AdsGuideTabs />}
+        {activeTab === "billing" && <BillingScreen />}
         {activeTab === "help" && <HelpCentre />}
         {activeTab === "account" && <AccountScreen />}
       </Suspense>

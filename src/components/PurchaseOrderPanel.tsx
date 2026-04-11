@@ -28,7 +28,7 @@ interface POLine {
   notes: string;
 }
 
-export type POStatus = "draft" | "sent" | "awaiting" | "partial" | "received" | "discrepancy";
+export type POStatus = "draft" | "sent" | "awaiting" | "partial" | "received" | "discrepancy" | "closed";
 
 export interface PurchaseOrder {
   id: string;
@@ -75,6 +75,7 @@ const STATUS_BADGES: Record<POStatus, { emoji: string; label: string; cls: strin
   partial: { emoji: "🔶", label: "Partial", cls: "bg-secondary/15 text-secondary" },
   received: { emoji: "✅", label: "Received", cls: "bg-success/15 text-success" },
   discrepancy: { emoji: "⚠", label: "Discrepancy", cls: "bg-destructive/15 text-destructive" },
+  closed: { emoji: "🔒", label: "Closed", cls: "bg-muted text-muted-foreground" },
 };
 
 function uid() { return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2, 10); }
@@ -106,8 +107,10 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
   // Receive state
   const [receivePO, setReceivePO] = useState<PurchaseOrder | null>(null);
   const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({});
+  const [receiveCosts, setReceiveCosts] = useState<Record<string, number>>({});
   const [receiving, setReceiving] = useState(false);
   const [showReceiveConfirm, setShowReceiveConfirm] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState("");
 
   // Match state
   const [matchingPO, setMatchingPO] = useState<PurchaseOrder | null>(null);
@@ -347,9 +350,46 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
   const startReceive = (po: PurchaseOrder) => {
     setReceivePO(po);
     const qtys: Record<string, number> = {};
-    po.lines.forEach(l => { qtys[l.id] = l.expected_qty - l.received_qty; });
+    const costs: Record<string, number> = {};
+    po.lines.forEach(l => {
+      qtys[l.id] = l.expected_qty - l.received_qty;
+      costs[l.id] = l.actual_cost ?? l.expected_cost;
+    });
     setReceiveQtys(qtys);
+    setReceiveCosts(costs);
+    setBarcodeInput("");
     setView("receive");
+  };
+
+  // Barcode scan handler for receive view
+  const handleBarcodeScan = (barcode: string) => {
+    if (!receivePO || !barcode.trim()) return;
+    const line = receivePO.lines.find(l =>
+      l.sku.toLowerCase() === barcode.trim().toLowerCase()
+    );
+    if (line) {
+      const remaining = line.expected_qty - line.received_qty;
+      const current = receiveQtys[line.id] || 0;
+      if (current < remaining) {
+        setReceiveQtys(prev => ({ ...prev, [line.id]: current + 1 }));
+        toast.success(`+1 ${line.product_title || line.sku}`);
+      } else {
+        toast(`${line.sku} already fully counted`, { icon: "⚠️" });
+      }
+    } else {
+      toast.error(`SKU "${barcode}" not found on this PO`);
+    }
+    setBarcodeInput("");
+  };
+
+  // Close PO handler
+  const handleClosePO = async (po: PurchaseOrder) => {
+    await supabase.from("purchase_orders").update({ status: "closed" }).eq("id", po.id);
+    addAuditEntry("PO", `Closed PO ${po.po_number}`);
+    toast.success(`${po.po_number} closed`);
+    await loadOrders();
+    if (detailPO?.id === po.id) setDetailPO(null);
+    setView("list");
   };
 
   const handleReceive = async () => {
@@ -360,14 +400,30 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setReceiving(false); return; }
 
-    // Update received_qty on each line
+    // Update received_qty and actual_cost on each line
+    const receiveDetails: string[] = [];
     for (const line of receivePO.lines) {
       const qty = receiveQtys[line.id] || 0;
       if (qty > 0) {
         const newReceived = line.received_qty + qty;
+        const actualCost = receiveCosts[line.id] ?? line.expected_cost;
         await supabase.from("purchase_order_lines").update({
           received_qty: newReceived,
+          actual_cost: actualCost,
         }).eq("id", line.id);
+
+        receiveDetails.push(`${line.sku || line.product_title}: ${qty} @ $${actualCost.toFixed(2)}`);
+
+        // Update variant cost for COGS if we have a matching variant
+        if (line.sku) {
+          const { data: variant } = await supabase.from("variants")
+            .select("id")
+            .eq("sku", line.sku)
+            .maybeSingle();
+          if (variant) {
+            await supabase.from("variants").update({ cost: actualCost }).eq("id", variant.id);
+          }
+        }
 
         // Sync inventory to Shopify if connected
         if (hasShopify && shopifyLocationId && line.sku) {
@@ -392,10 +448,17 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
     const anyReceived = updatedLines.some(l => l.received_qty > 0);
     const newStatus: POStatus = allReceived ? "received" : anyReceived ? "partial" : receivePO.status;
 
+    // Calculate backorder info for partial receives
+    const backordered = updatedLines
+      .filter(l => l.received_qty < l.expected_qty)
+      .map(l => `${l.sku || l.product_title}: ${l.expected_qty - l.received_qty} backordered`);
+
     await supabase.from("purchase_orders").update({ status: newStatus }).eq("id", receivePO.id);
 
     const totalReceived = Object.values(receiveQtys).reduce((a, b) => a + b, 0);
-    addAuditEntry("PO", `Received ${totalReceived} units on ${receivePO.po_number} — status: ${newStatus}`);
+    const auditDetails = receiveDetails.join("; ");
+    const backorderNote = backordered.length > 0 ? ` | Backordered: ${backordered.join("; ")}` : "";
+    addAuditEntry("PO Receive", `Received ${totalReceived} units on ${receivePO.po_number} — status: ${newStatus} | ${auditDetails}${backorderNote}`);
     toast.success(`${totalReceived} units received`);
 
     setReceiving(false);
@@ -528,9 +591,9 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
   // ── Render ──────────────────────────────────────────────
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
-      <button onClick={view === "list" ? onBack : () => { resetForm(); setView("list"); }}
+      <button onClick={view === "list" || view === "detail" ? (view === "detail" ? () => { setDetailPO(null); setView("list"); } : onBack) : () => { resetForm(); setDetailPO(null); setView("list"); }}
         className="flex items-center gap-1 text-sm text-muted-foreground mb-4">
-        <ChevronLeft className="w-4 h-4" /> {view === "list" ? "Back" : "All purchase orders"}
+        <ChevronLeft className="w-4 h-4" /> {view === "list" ? "Back" : view === "detail" ? "All purchase orders" : "All purchase orders"}
       </button>
 
       {/* ── LIST VIEW ─────────────────────────────────────── */}
@@ -579,8 +642,10 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
                 const badge = STATUS_BADGES[po.status];
                 const receivedUnits = po.lines.reduce((a, l) => a + l.received_qty, 0);
                 const expectedUnits = po.lines.reduce((a, l) => a + l.expected_qty, 0);
+                const backordered = po.lines.reduce((a, l) => a + Math.max(0, l.expected_qty - l.received_qty), 0);
                 return (
-                  <div key={po.id} className="bg-card rounded-lg border border-border p-4">
+                  <div key={po.id} className="bg-card rounded-lg border border-border p-4 cursor-pointer hover:border-primary/30 transition-colors"
+                    onClick={() => { setDetailPO(po); setView("detail"); }}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold font-mono">{po.po_number}</span>
@@ -596,36 +661,39 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {po.lines.length} line{po.lines.length !== 1 ? "s" : ""} · ${po.total_cost.toFixed(2)}
                       {receivedUnits > 0 && ` · ${receivedUnits}/${expectedUnits} received`}
+                      {po.status === "partial" && backordered > 0 && ` · ${backordered} backordered`}
                     </p>
                     {po.linked_document_id && (
                       <p className="text-[10px] text-primary flex items-center gap-1 mt-1">
                         <Link2 className="w-3 h-3" /> Invoice linked
                       </p>
                     )}
-                    <div className="flex gap-2 mt-3 flex-wrap">
+                    <div className="flex gap-2 mt-3 flex-wrap" onClick={e => e.stopPropagation()}>
                       {["draft", "sent", "awaiting", "partial"].includes(po.status) && (
                         <Button variant="teal" size="sm" className="h-7 text-xs" onClick={() => startReceive(po)}>
-                          <ArrowDownToLine className="w-3 h-3 mr-1" /> Receive stock
+                          <ArrowDownToLine className="w-3 h-3 mr-1" /> Receive
+                        </Button>
+                      )}
+                      {["received", "discrepancy"].includes(po.status) && (
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleClosePO(po)}>
+                          🔒 Close PO
                         </Button>
                       )}
                       {["sent", "awaiting", "draft"].includes(po.status) && (
                         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => startMatch(po)}>
-                          <Search className="w-3 h-3 mr-1" /> Match invoice
+                          <Search className="w-3 h-3 mr-1" /> Match
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openLinkDialog(po)}>
-                        <Link2 className="w-3 h-3 mr-1" /> Link invoice
-                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleEdit(po)}>
                         <Edit2 className="w-3 h-3 mr-1" /> Edit
                       </Button>
                       {po.status === "draft" && (
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleStatusChange(po.id, "sent")}>
-                          📤 Mark sent
+                          📤 Send
                         </Button>
                       )}
                       <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => handleDelete(po.id)}>
-                        <Trash2 className="w-3 h-3 mr-1" /> Delete
+                        <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>
                   </div>
@@ -636,7 +704,112 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
         </>
       )}
 
-      {/* ── CREATE / EDIT VIEW ────────────────────────────── */}
+      {/* ── DETAIL VIEW ───────────────────────────────────── */}
+      {view === "detail" && detailPO && (() => {
+        const badge = STATUS_BADGES[detailPO.status];
+        const totalExpected = detailPO.lines.reduce((a, l) => a + l.expected_qty, 0);
+        const totalReceived = detailPO.lines.reduce((a, l) => a + l.received_qty, 0);
+        const totalBackordered = detailPO.lines.reduce((a, l) => a + Math.max(0, l.expected_qty - l.received_qty), 0);
+        return (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-xl font-bold font-display flex items-center gap-2">
+                  {detailPO.po_number}
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${badge.cls}`}>
+                    {badge.emoji} {badge.label}
+                  </span>
+                </h1>
+                <p className="text-sm text-muted-foreground">{detailPO.supplier_name}</p>
+              </div>
+            </div>
+
+            {/* Summary row */}
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className="text-lg font-bold">{totalExpected}</p>
+                <p className="text-[10px] text-muted-foreground">Ordered</p>
+              </div>
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className="text-lg font-bold text-success">{totalReceived}</p>
+                <p className="text-[10px] text-muted-foreground">Received</p>
+              </div>
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className={`text-lg font-bold ${totalBackordered > 0 ? "text-secondary" : "text-muted-foreground"}`}>{totalBackordered}</p>
+                <p className="text-[10px] text-muted-foreground">Backordered</p>
+              </div>
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className="text-lg font-bold">${detailPO.total_cost.toFixed(0)}</p>
+                <p className="text-[10px] text-muted-foreground">Total Cost</p>
+              </div>
+            </div>
+
+            {detailPO.expected_date && (
+              <p className="text-xs text-muted-foreground mb-2">Expected: {detailPO.expected_date}</p>
+            )}
+            {detailPO.notes && (
+              <p className="text-xs text-muted-foreground mb-4 italic">{detailPO.notes}</p>
+            )}
+
+            {/* Line items table */}
+            <div className="bg-card rounded-lg border border-border overflow-hidden mb-4">
+              <div className="grid grid-cols-[1fr_60px_60px_60px_70px] gap-1 px-3 py-2 bg-muted/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                <span>Product</span>
+                <span className="text-center">Ordered</span>
+                <span className="text-center">Received</span>
+                <span className="text-center">B/O</span>
+                <span className="text-right">Cost</span>
+              </div>
+              <div className="divide-y divide-border">
+                {detailPO.lines.map(line => {
+                  const backorder = Math.max(0, line.expected_qty - line.received_qty);
+                  return (
+                    <div key={line.id} className="grid grid-cols-[1fr_60px_60px_60px_70px] gap-1 px-3 py-2.5 text-xs items-center">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{line.product_title}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {line.sku && `SKU: ${line.sku}`}{line.color && ` · ${line.color}`}{line.size && ` · ${line.size}`}
+                        </p>
+                      </div>
+                      <span className="text-center font-mono">{line.expected_qty}</span>
+                      <span className={`text-center font-mono ${line.received_qty >= line.expected_qty ? "text-success" : ""}`}>
+                        {line.received_qty}
+                      </span>
+                      <span className={`text-center font-mono ${backorder > 0 ? "text-secondary font-semibold" : "text-muted-foreground"}`}>
+                        {backorder}
+                      </span>
+                      <span className="text-right font-mono">
+                        ${(line.actual_cost ?? line.expected_cost).toFixed(2)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 flex-wrap">
+              {["draft", "sent", "awaiting", "partial"].includes(detailPO.status) && (
+                <Button variant="teal" size="sm" onClick={() => startReceive(detailPO)}>
+                  <ArrowDownToLine className="w-4 h-4 mr-1" /> Receive Stock
+                </Button>
+              )}
+              {["received", "discrepancy"].includes(detailPO.status) && (
+                <Button variant="outline" size="sm" onClick={() => handleClosePO(detailPO)}>
+                  🔒 Close PO
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => handleEdit(detailPO)}>
+                <Edit2 className="w-4 h-4 mr-1" /> Edit
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => openLinkDialog(detailPO)}>
+                <Link2 className="w-4 h-4 mr-1" /> Link Invoice
+              </Button>
+            </div>
+          </>
+        );
+      })()}
+
       {(view === "create" || view === "edit") && (
         <>
           <h1 className="text-2xl font-bold font-display mb-4">
@@ -770,39 +943,78 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
       {view === "receive" && receivePO && (
         <>
           <h1 className="text-xl font-bold font-display mb-1">Receive Stock</h1>
-          <p className="text-sm text-muted-foreground mb-4">
+          <p className="text-sm text-muted-foreground mb-3">
             {receivePO.po_number} — {receivePO.supplier_name}
           </p>
 
-          <div className="space-y-2 mb-6">
+          {/* Barcode scanner input */}
+          <div className="bg-card rounded-lg border-2 border-dashed border-primary/30 p-3 mb-4">
+            <label className="text-xs font-semibold text-muted-foreground block mb-1">📷 Scan Barcode / SKU</label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Scan or type SKU…"
+                value={barcodeInput}
+                onChange={e => setBarcodeInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { handleBarcodeScan(barcodeInput); } }}
+                className="font-mono h-10 text-sm"
+                autoFocus
+              />
+              <Button variant="teal" size="sm" className="h-10 px-4" onClick={() => handleBarcodeScan(barcodeInput)}>
+                Scan
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">Each scan increments qty by 1 for the matching SKU</p>
+          </div>
+
+          <div className="space-y-2 mb-4">
             {receivePO.lines.map(line => {
               const remaining = line.expected_qty - line.received_qty;
               const qty = receiveQtys[line.id] || 0;
+              const cost = receiveCosts[line.id] ?? line.expected_cost;
               return (
-                <div key={line.id} className="bg-card rounded-lg border border-border p-3">
+                <div key={line.id} className={`bg-card rounded-lg border p-3 ${qty >= remaining && remaining > 0 ? "border-success/40" : "border-border"}`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{line.product_title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {line.sku && `SKU: ${line.sku} · `}Expected: {line.expected_qty} · Received: {line.received_qty} · Remaining: {remaining}
+                        {line.sku && <span className="font-mono">{line.sku}</span>}
+                        {line.sku && " · "}
+                        Expected: {line.expected_qty} · Already received: {line.received_qty} · Remaining: {remaining}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-muted-foreground shrink-0">Receiving:</label>
-                    <Input
-                      type="number"
-                      value={qty || ""}
-                      onChange={e => setReceiveQtys({ ...receiveQtys, [line.id]: Math.min(+e.target.value, remaining) })}
-                      className="w-20 h-8 text-xs font-mono"
-                      max={remaining}
-                    />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <label className="text-xs text-muted-foreground shrink-0">Qty:</label>
+                      <Input
+                        type="number"
+                        value={qty || ""}
+                        onChange={e => setReceiveQtys({ ...receiveQtys, [line.id]: Math.min(Math.max(0, +e.target.value), remaining) })}
+                        className="w-20 h-8 text-xs font-mono"
+                        max={remaining}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <label className="text-xs text-muted-foreground shrink-0">Cost $:</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={cost || ""}
+                        onChange={e => setReceiveCosts({ ...receiveCosts, [line.id]: +e.target.value })}
+                        className="w-20 h-8 text-xs font-mono"
+                      />
+                    </div>
                     <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setReceiveQtys({ ...receiveQtys, [line.id]: remaining })}>
                       All ({remaining})
                     </Button>
                   </div>
+                  {qty > 0 && qty < remaining && (
+                    <p className="text-[10px] text-secondary flex items-center gap-1 mt-1.5">
+                      🔶 {remaining - qty} will be backordered
+                    </p>
+                  )}
                   {qty >= 50 && (
-                    <p className="text-[10px] text-warning flex items-center gap-1 mt-1">
+                    <p className="text-[10px] flex items-center gap-1 mt-1 text-destructive">
                       <AlertTriangle className="w-3 h-3" /> High quantity — please confirm
                     </p>
                   )}

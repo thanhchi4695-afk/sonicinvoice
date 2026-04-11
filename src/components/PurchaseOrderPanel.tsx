@@ -704,7 +704,112 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
         </>
       )}
 
-      {/* ── CREATE / EDIT VIEW ────────────────────────────── */}
+      {/* ── DETAIL VIEW ───────────────────────────────────── */}
+      {view === "detail" && detailPO && (() => {
+        const badge = STATUS_BADGES[detailPO.status];
+        const totalExpected = detailPO.lines.reduce((a, l) => a + l.expected_qty, 0);
+        const totalReceived = detailPO.lines.reduce((a, l) => a + l.received_qty, 0);
+        const totalBackordered = detailPO.lines.reduce((a, l) => a + Math.max(0, l.expected_qty - l.received_qty), 0);
+        return (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-xl font-bold font-display flex items-center gap-2">
+                  {detailPO.po_number}
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${badge.cls}`}>
+                    {badge.emoji} {badge.label}
+                  </span>
+                </h1>
+                <p className="text-sm text-muted-foreground">{detailPO.supplier_name}</p>
+              </div>
+            </div>
+
+            {/* Summary row */}
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className="text-lg font-bold">{totalExpected}</p>
+                <p className="text-[10px] text-muted-foreground">Ordered</p>
+              </div>
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className="text-lg font-bold text-success">{totalReceived}</p>
+                <p className="text-[10px] text-muted-foreground">Received</p>
+              </div>
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className={`text-lg font-bold ${totalBackordered > 0 ? "text-secondary" : "text-muted-foreground"}`}>{totalBackordered}</p>
+                <p className="text-[10px] text-muted-foreground">Backordered</p>
+              </div>
+              <div className="bg-card rounded-lg border border-border p-3 text-center">
+                <p className="text-lg font-bold">${detailPO.total_cost.toFixed(0)}</p>
+                <p className="text-[10px] text-muted-foreground">Total Cost</p>
+              </div>
+            </div>
+
+            {detailPO.expected_date && (
+              <p className="text-xs text-muted-foreground mb-2">Expected: {detailPO.expected_date}</p>
+            )}
+            {detailPO.notes && (
+              <p className="text-xs text-muted-foreground mb-4 italic">{detailPO.notes}</p>
+            )}
+
+            {/* Line items table */}
+            <div className="bg-card rounded-lg border border-border overflow-hidden mb-4">
+              <div className="grid grid-cols-[1fr_60px_60px_60px_70px] gap-1 px-3 py-2 bg-muted/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                <span>Product</span>
+                <span className="text-center">Ordered</span>
+                <span className="text-center">Received</span>
+                <span className="text-center">B/O</span>
+                <span className="text-right">Cost</span>
+              </div>
+              <div className="divide-y divide-border">
+                {detailPO.lines.map(line => {
+                  const backorder = Math.max(0, line.expected_qty - line.received_qty);
+                  return (
+                    <div key={line.id} className="grid grid-cols-[1fr_60px_60px_60px_70px] gap-1 px-3 py-2.5 text-xs items-center">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{line.product_title}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {line.sku && `SKU: ${line.sku}`}{line.color && ` · ${line.color}`}{line.size && ` · ${line.size}`}
+                        </p>
+                      </div>
+                      <span className="text-center font-mono">{line.expected_qty}</span>
+                      <span className={`text-center font-mono ${line.received_qty >= line.expected_qty ? "text-success" : ""}`}>
+                        {line.received_qty}
+                      </span>
+                      <span className={`text-center font-mono ${backorder > 0 ? "text-secondary font-semibold" : "text-muted-foreground"}`}>
+                        {backorder}
+                      </span>
+                      <span className="text-right font-mono">
+                        ${(line.actual_cost ?? line.expected_cost).toFixed(2)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 flex-wrap">
+              {["draft", "sent", "awaiting", "partial"].includes(detailPO.status) && (
+                <Button variant="teal" size="sm" onClick={() => startReceive(detailPO)}>
+                  <ArrowDownToLine className="w-4 h-4 mr-1" /> Receive Stock
+                </Button>
+              )}
+              {["received", "discrepancy"].includes(detailPO.status) && (
+                <Button variant="outline" size="sm" onClick={() => handleClosePO(detailPO)}>
+                  🔒 Close PO
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => handleEdit(detailPO)}>
+                <Edit2 className="w-4 h-4 mr-1" /> Edit
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => openLinkDialog(detailPO)}>
+                <Link2 className="w-4 h-4 mr-1" /> Link Invoice
+              </Button>
+            </div>
+          </>
+        );
+      })()}
+
       {(view === "create" || view === "edit") && (
         <>
           <h1 className="text-2xl font-bold font-display mb-4">

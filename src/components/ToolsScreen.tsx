@@ -47,6 +47,15 @@ const tools = [
   { id: "image_optimise", icon: Image, label: "Image optimisation AI", desc: "Alt text, filenames, quality analysis", color: "text-primary" },
   { id: "collection_seo_export", icon: Globe, label: "Bulk Collection SEO", desc: "Export, optimize & import collection SEO", color: "text-success" },
   { id: "csv_seo", icon: Search, label: "CSV SEO Optimizer", desc: "Upload Shopify CSV, AI-optimize SEO fields, download ready-to-import file", color: "text-success" },
+  // Marketing
+  { id: "ads_guide", icon: Globe, label: "Ads & SEO guides", desc: "Google Ads, Meta Ads & SEO step-by-step guides", color: "text-primary" },
+  { id: "google_ads_wizard", icon: ShoppingCart, label: "Google Ads setup", desc: "Set up Google Shopping campaigns with margin checks", color: "text-success" },
+  { id: "meta_ads_wizard", icon: Globe, label: "Meta Ads setup", desc: "Set up Meta/Facebook ad campaigns", color: "text-primary" },
+  { id: "performance_dash", icon: Monitor, label: "Ad performance", desc: "Track ROI, spend & ROAS across channels", color: "text-success" },
+  { id: "organic_seo", icon: Search, label: "Organic SEO blog", desc: "Build topical authority with AI blog posts", color: "text-primary" },
+  { id: "social_media", icon: Mail, label: "Social media", desc: "Auto-generate social captions & announcements", color: "text-secondary" },
+  { id: "competitor_intel", icon: Bot, label: "Competitor intel", desc: "Analyse competitor pricing & positioning", color: "text-primary" },
+  { id: "geo_agentic", icon: Globe, label: "Local SEO", desc: "Geo-targeted SEO for local store visibility", color: "text-success" },
 ];
 
 const quickInserts = [
@@ -1171,6 +1180,38 @@ const ToolsScreen = () => {
   if (activeTool === "csv_seo") {
     const ShopifyCSVSEO = lazy(() => import("@/components/ShopifyCSVSEO"));
     return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><ShopifyCSVSEO onBack={() => setActiveTool(null)} /></Suspense>;
+  }
+  if (activeTool === "ads_guide") {
+    const AdsGuideTabs = lazy(() => import("@/components/AdsGuideTabs"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><div className="animate-fade-in"><div className="px-4 pt-6"><div className="flex items-center gap-3 mb-2"><button onClick={() => setActiveTool(null)} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button><h2 className="text-lg font-semibold font-display">Ads & SEO Guides</h2></div></div><AdsGuideTabs /></div></Suspense>;
+  }
+  if (activeTool === "google_ads_wizard") {
+    const GoogleAdsSetupWizard = lazy(() => import("@/components/GoogleAdsSetupWizard"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><GoogleAdsSetupWizard onBack={() => setActiveTool(null)} /></Suspense>;
+  }
+  if (activeTool === "meta_ads_wizard") {
+    const MetaAdsSetupWizard = lazy(() => import("@/components/MetaAdsSetupWizard"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><MetaAdsSetupWizard onBack={() => setActiveTool(null)} /></Suspense>;
+  }
+  if (activeTool === "performance_dash") {
+    const PerformanceDashboard = lazy(() => import("@/components/PerformanceDashboard"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><PerformanceDashboard onBack={() => setActiveTool(null)} /></Suspense>;
+  }
+  if (activeTool === "organic_seo") {
+    const OrganicSEOFlow = lazy(() => import("@/components/OrganicSEOFlow"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><OrganicSEOFlow onBack={() => setActiveTool(null)} /></Suspense>;
+  }
+  if (activeTool === "social_media") {
+    const SocialMediaPanel = lazy(() => import("@/components/SocialMediaPanel"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><SocialMediaPanel onBack={() => setActiveTool(null)} /></Suspense>;
+  }
+  if (activeTool === "competitor_intel") {
+    const CompetitorIntelFlow = lazy(() => import("@/components/CompetitorIntelFlow"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><CompetitorIntelFlow onBack={() => setActiveTool(null)} /></Suspense>;
+  }
+  if (activeTool === "geo_agentic") {
+    const GeoAgenticFlow = lazy(() => import("@/components/GeoAgenticFlow"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><GeoAgenticFlow onBack={() => setActiveTool(null)} /></Suspense>;
   }
 
   if (activeTool === "ai") {

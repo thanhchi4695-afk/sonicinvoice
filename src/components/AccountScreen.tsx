@@ -819,6 +819,27 @@ const SelectField = ({ label, value, onChange, options }: {
   </div>
 );
 
+const LanguageSelector = () => {
+  const { i18n, t } = useTranslation();
+  return (
+    <div>
+      <label className="text-xs text-muted-foreground mb-1 block">{t("account.language")}</label>
+      <select
+        value={i18n.language}
+        onChange={(e) => i18n.changeLanguage(e.target.value)}
+        className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm text-foreground"
+      >
+        {SUPPORTED_LANGUAGES.map((lang) => (
+          <option key={lang.code} value={lang.code}>
+            {lang.flag} {lang.label}
+          </option>
+        ))}
+      </select>
+      <p className="text-[11px] text-muted-foreground mt-1">{t("account.languageDesc")}</p>
+    </div>
+  );
+};
+
 export default AccountScreen;
 
 // ── API Keys Section ───────────────────────────────────────

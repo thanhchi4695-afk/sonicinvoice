@@ -1,4 +1,5 @@
 import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock } from "lucide-react";
+import MigrationChecklist from "@/components/MigrationChecklist";
 import { useState, useCallback } from "react";
 import ContextDetector from "@/components/ContextDetector";
 import { Button } from "@/components/ui/button";
@@ -144,17 +145,28 @@ const HomeScreen = ({
         </div>
       )}
 
-      {/* Switching from Stocky banner */}
-      {localStorage.getItem("stocky_onboarding_done") !== "true" && (
-        <div className="bg-card border border-border rounded-lg p-3 mb-4 flex items-center gap-3">
-          <span className="text-lg shrink-0">📦</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium">Switching from Stocky?</p>
-            <p className="text-xs text-muted-foreground">Import your data and see what Sonic adds on top.</p>
-          </div>
-          <Button variant="outline" size="sm" className="text-xs shrink-0" onClick={onStartStockyOnboarding}>
-            Start →
-          </Button>
+      {/* Switching from Stocky – Migration Checklist */}
+      {localStorage.getItem("migration_checklist_dismissed") !== "true" && (
+        <div className="mb-4">
+          <MigrationChecklist
+            onNavigate={(flow) => {
+              const navMap: Record<string, (() => void) | undefined> = {
+                stocky_migration: onStartStockyOnboarding,
+                suppliers: onStartSuppliers,
+                account: () => onNavigateToTab?.("account"),
+                purchase_orders: onStartPurchaseOrders,
+                stocktake_module: () => {
+                  const handler = (window as any).__startFlow;
+                  if (handler) handler("stocktake_module");
+                },
+              };
+              navMap[flow]?.();
+            }}
+            onDismiss={() => {
+              localStorage.setItem("migration_checklist_dismissed", "true");
+              window.location.reload();
+            }}
+          />
         </div>
       )}
 

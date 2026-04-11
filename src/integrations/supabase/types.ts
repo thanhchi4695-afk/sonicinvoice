@@ -952,6 +952,39 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_profiles: {
+        Row: {
+          created_at: string
+          id: string
+          invoices_analysed: number
+          is_active: boolean
+          profile_data: Json
+          supplier_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoices_analysed?: number
+          is_active?: boolean
+          profile_data?: Json
+          supplier_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoices_analysed?: number
+          is_active?: boolean
+          profile_data?: Json
+          supplier_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       suppliers: {
         Row: {
           avg_margin: number | null

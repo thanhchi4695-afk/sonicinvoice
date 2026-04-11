@@ -70,6 +70,7 @@ const StockCheckFlow = lazy(() => import("@/components/StockCheckFlow"));
 const PipelineRunner = lazy(() => import("@/components/PipelineRunner"));
 const PipelineChooser = lazy(() => import("@/components/PipelineChooser"));
 const StockyOnboarding = lazy(() => import("@/components/StockyOnboarding"));
+const SupplierProfileBuilder = lazy(() => import("@/components/SupplierProfileBuilder"));
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -82,7 +83,7 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "stocky_onboarding" | "inventory_dashboard" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | "pipeline" | "pipeline_chooser" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "stocky_onboarding" | "inventory_dashboard" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | "pipeline" | "pipeline_chooser" | "supplier_profile_builder" | null>(null);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -273,6 +274,7 @@ const Index = () => {
       case "order_sync": flowEl = <ShopifyOrderSync onBack={() => setActiveFlow("stocky_hub")} />; break;
       case "image_optimise": flowEl = <ImageOptimisePanel onBack={() => setActiveFlow(null)} />; break;
       case "stock_check": flowEl = <StockCheckFlow lineItems={[]} onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
+      case "supplier_profile_builder": flowEl = <SupplierProfileBuilder onBack={() => setActiveFlow(null)} />; break;
       case "pipeline": flowEl = activePipelineId ? <PipelineRunner pipelineId={activePipelineId} onRenderFlow={(flowKey, onComplete) => {
         const flowMap: Record<string, React.ReactNode> = {
           invoice: <InvoiceFlow onBack={onComplete} />,
@@ -361,7 +363,8 @@ const Index = () => {
             onNavigateToTab={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
             onStartPipeline={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }}
             onStartPipelineChooser={() => setActiveFlow("pipeline_chooser")}
-            onStartStockyOnboarding={() => setActiveFlow("stocky_onboarding")}
+             onStartStockyOnboarding={() => setActiveFlow("stocky_onboarding")}
+             onStartSupplierProfileBuilder={() => setActiveFlow("supplier_profile_builder")}
         />
       )}
       <Suspense fallback={suspenseFallback}>

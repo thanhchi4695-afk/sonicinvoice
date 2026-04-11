@@ -59,6 +59,7 @@ interface HomeScreenProps {
   onStartPipeline?: (id: string) => void;
   onStartPipelineChooser?: () => void;
   onStartStockyOnboarding?: () => void;
+  onStartSupplierProfileBuilder?: () => void;
 }
 
 const HomeScreen = ({
@@ -73,6 +74,7 @@ const HomeScreen = ({
   onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss,
   onStartImageOptimise, onStartStockCheck, onStartPriceLookup, onStartSeasons, onNavigateToTab,
   onStartPipeline, onStartPipelineChooser, onStartStockyOnboarding,
+  onStartSupplierProfileBuilder,
 }: HomeScreenProps) => {
   const mode = useStoreMode();
   const unreadCount = getUnprocessedInboxCount();
@@ -364,6 +366,7 @@ const HomeScreen = ({
         <FeatureTile icon="🤖" label="Auto collections AI" onClick={() => onNavigateToTab?.("tools")} />
         <FeatureTile icon="🖼️" label="Image optimisation" onClick={onStartImageOptimise || (() => {})} />
         <FeatureTile icon="📚" label="Catalog memory" onClick={onStartCatalogMemory || (() => {})} />
+        <FeatureTile icon="🧬" label="Supplier profile builder" onClick={onStartSupplierProfileBuilder || (() => {})} />
         <FeatureTile icon="⚙️" label="AI instructions" onClick={() => onNavigateToTab?.("tools")} />
         <FeatureTile icon="📋" label="Audit log" onClick={onOpenAuditLog || (() => {})} />
       </CollapsibleSection>

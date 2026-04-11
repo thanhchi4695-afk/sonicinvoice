@@ -550,3 +550,149 @@ export async function quickPreprocess(file: File): Promise<string> {
   const result = await preprocessInvoiceImage(file);
   return result.cleanedFull;
 }
+
+// ── Lightweight client-side preprocessing pipeline ──
+// Resize → Grayscale → Contrast boost → Sharpen (if screenshot) → JPEG 85%
+
+const PREPROCESS_MAX_DIM = 1200;
+const CONTRAST_FACTOR = 1.5;
+
+/**
+ * Check if an image is a PDF (skip preprocessing if so).
+ */
+export function isPdfFile(file: File): boolean {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  return ext === "pdf" || file.type === "application/pdf";
+}
+
+/**
+ * Detect if an image is likely a screenshot (low DPI or large canvas area
+ * relative to file size — screenshots are typically uncompressed PNGs).
+ */
+function isLikelyScreenshot(file: File, width: number, height: number): boolean {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  if (ext !== "png") return false;
+  // Screenshots: PNG + large pixel area but relatively small file
+  const pixelArea = width * height;
+  // Typical screenshot: 1920×1080 = ~2M pixels but only 1-3 MB
+  // Photo PNGs tend to be larger per-pixel
+  const bytesPerPixel = file.size / pixelArea;
+  return pixelArea > 800_000 && bytesPerPixel < 4;
+}
+
+/**
+ * Apply a 3×3 unsharp-mask sharpening kernel to an ImageData.
+ */
+function applySharpen(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const src = ctx.getImageData(0, 0, w, h);
+  const dst = ctx.createImageData(w, h);
+  const sd = src.data;
+  const dd = dst.data;
+
+  // Unsharp mask kernel: center=9, neighbours=-1 (sharpen strength ~1.0)
+  const k = [0, -1, 0, -1, 5, -1, 0, -1, 0]; // mild sharpen
+
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      for (let c = 0; c < 3; c++) {
+        let sum = 0;
+        for (let ky = -1; ky <= 1; ky++) {
+          for (let kx = -1; kx <= 1; kx++) {
+            const idx = ((y + ky) * w + (x + kx)) * 4 + c;
+            sum += sd[idx] * k[(ky + 1) * 3 + (kx + 1)];
+          }
+        }
+        dd[(y * w + x) * 4 + c] = Math.max(0, Math.min(255, Math.round(sum)));
+      }
+      dd[(y * w + x) * 4 + 3] = 255; // alpha
+    }
+  }
+
+  // Copy edges from source
+  for (let x = 0; x < w; x++) {
+    for (let c = 0; c < 4; c++) {
+      dd[x * 4 + c] = sd[x * 4 + c];
+      dd[((h - 1) * w + x) * 4 + c] = sd[((h - 1) * w + x) * 4 + c];
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    for (let c = 0; c < 4; c++) {
+      dd[(y * w) * 4 + c] = sd[(y * w) * 4 + c];
+      dd[(y * w + w - 1) * 4 + c] = sd[(y * w + w - 1) * 4 + c];
+    }
+  }
+
+  ctx.putImageData(dst, 0, 0);
+}
+
+/**
+ * Lightweight preprocessing pipeline for invoice images before API upload.
+ * 1. Resize to max 1200px (aspect ratio preserved)
+ * 2. Convert to grayscale
+ * 3. Increase contrast by 1.5×
+ * 4. Sharpen if screenshot detected
+ * 5. Output as JPEG Blob at 85% quality
+ *
+ * Returns null if the file is a PDF (skip preprocessing).
+ */
+export async function preprocessForUpload(file: File): Promise<Blob | null> {
+  if (isPdfFile(file)) return null;
+
+  // Load image
+  const url = URL.createObjectURL(file);
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new window.Image();
+    el.onload = () => resolve(el);
+    el.onerror = reject;
+    el.src = url;
+  });
+  URL.revokeObjectURL(url);
+
+  const origW = img.naturalWidth;
+  const origH = img.naturalHeight;
+
+  // 1. Resize so max dimension = 1200
+  let w = origW;
+  let h = origH;
+  if (w > PREPROCESS_MAX_DIM || h > PREPROCESS_MAX_DIM) {
+    const scale = Math.min(PREPROCESS_MAX_DIM / w, PREPROCESS_MAX_DIM / h);
+    w = Math.round(w * scale);
+    h = Math.round(h * scale);
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, w, h);
+
+  // 2 & 3. Grayscale + contrast boost (1.5×, clamped 0-255)
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const d = imageData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    // Grayscale using luminance weights
+    const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    // Contrast: multiply by factor, clamp
+    const val = Math.max(0, Math.min(255, Math.round(gray * CONTRAST_FACTOR)));
+    d[i] = val;
+    d[i + 1] = val;
+    d[i + 2] = val;
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  // 4. Sharpen if screenshot
+  if (isLikelyScreenshot(file, origW, origH)) {
+    applySharpen(ctx, w, h);
+  }
+
+  // 5. Convert to JPEG Blob at 85%
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Canvas toBlob failed"))),
+      "image/jpeg",
+      0.85
+    );
+  });
+}

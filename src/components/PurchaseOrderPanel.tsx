@@ -16,6 +16,7 @@ import { addAuditEntry } from "@/lib/audit-log";
 import { adjustInventory, findVariantBySKU, getConnection, getLocations } from "@/lib/shopify-api";
 import { CatalogPicker, type CatalogItem } from "@/components/SupplierCatalog";
 import BulkInventoryActions from "@/components/BulkInventoryActions";
+import RoleGate from "@/components/RoleGate";
 
 // ── Types ──────────────────────────────────────────────────
 interface POLine {

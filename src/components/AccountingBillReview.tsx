@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getTaxLabel, getEffectiveTaxRate } from "@/lib/tax-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -357,15 +358,15 @@ export default function AccountingBillReview({
         {/* Totals row */}
         <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border">
           <div>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Subtotal ex GST</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Subtotal ex {getTaxLabel()}</span>
             <p className="text-sm font-semibold">${bill.subtotalExGst.toFixed(2)}</p>
           </div>
           <div>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">GST</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{getTaxLabel()}</span>
             <p className="text-sm font-semibold">${bill.gstAmount.toFixed(2)}</p>
           </div>
           <div>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Total inc GST</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Total inc {getTaxLabel()}</span>
             <p className="text-sm font-bold text-primary">${bill.totalIncGst.toFixed(2)}</p>
           </div>
         </div>
@@ -609,7 +610,7 @@ function LineItemRow({
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground">Ex GST</label>
+              <label className="text-[10px] text-muted-foreground">Ex {getTaxLabel()}</label>
               <Input
                 type="number"
                 step="0.01"
@@ -617,13 +618,13 @@ function LineItemRow({
                 onChange={(e) => {
                   const val = parseFloat(e.target.value) || 0;
                   onUpdate("totalExGst", val);
-                  onUpdate("gstAmount", val * 0.1);
+                  onUpdate("gstAmount", val * getEffectiveTaxRate());
                 }}
                 className="h-7 text-xs"
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground">GST</label>
+              <label className="text-[10px] text-muted-foreground">{getTaxLabel()}</label>
               <Input
                 type="number"
                 step="0.01"

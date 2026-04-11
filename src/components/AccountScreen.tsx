@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard, Store } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { TAX_REGIONS, getTaxConfig, saveTaxConfig, getEffectiveTaxRate, formatTaxRate, getTaxLabel } from "@/lib/tax-service";
 import {
   getDirectStores, saveDirectStore, removeDirectStore, setActiveStore,
   normalizeStoreUrl, type DirectStore,
@@ -36,6 +37,8 @@ const AccountScreen = () => {
   const [storeCity, setStoreCity] = useState("");
   const [freeShippingThreshold, setFreeShippingThreshold] = useState("");
   const [industry, setIndustry] = useState(() => getStoreConfig().industry || "clothing");
+  const [taxRegion, setTaxRegion] = useState(() => getTaxConfig().regionCode || "AU");
+  const [taxSubRegion, setTaxSubRegion] = useState(() => getTaxConfig().subRegionCode || "");
 
   // Shopify connection
   const [shopifyUrl, setShopifyUrl] = useState("");
@@ -218,6 +221,42 @@ const AccountScreen = () => {
             </div>
           );
         })()}
+      </Section>
+
+      {/* Tax Region */}
+      <Section title="Tax region">
+        <p className="text-[11px] text-muted-foreground mb-2">Determines tax rates for invoices and pricing. US sales tax varies by state; EU VAT varies by country.</p>
+        <SelectField
+          label="Country / Region"
+          value={taxRegion}
+          onChange={(v) => {
+            setTaxRegion(v);
+            setTaxSubRegion("");
+            saveTaxConfig({ regionCode: v, subRegionCode: undefined });
+          }}
+          options={TAX_REGIONS.map(r => ({ v: r.countryCode, l: `${r.flag} ${r.country} — ${r.taxLabel}` }))}
+        />
+        {(() => {
+          const region = TAX_REGIONS.find(r => r.countryCode === taxRegion);
+          if (!region?.subRegions?.length) return null;
+          const subLabel = taxRegion === "US" ? "State" : taxRegion === "CA" ? "Province" : "Country";
+          return (
+            <SelectField
+              label={subLabel}
+              value={taxSubRegion}
+              onChange={(v) => { setTaxSubRegion(v); saveTaxConfig({ regionCode: taxRegion, subRegionCode: v }); }}
+              options={[
+                { v: "", l: `— Use default (${(region.defaultRate * 100).toFixed(1)}%)` },
+                ...region.subRegions.map(s => ({ v: s.code, l: `${s.name} (${(s.rate * 100).toFixed(2)}%)` })),
+              ]}
+            />
+          );
+        })()}
+        <div className="mt-2 p-3 rounded-md bg-muted/50 text-xs space-y-1">
+          <p><span className="font-semibold">Tax label:</span> {getTaxLabel({ regionCode: taxRegion, subRegionCode: taxSubRegion || undefined })}</p>
+          <p><span className="font-semibold">Rate:</span> {formatTaxRate({ regionCode: taxRegion, subRegionCode: taxSubRegion || undefined })}</p>
+          <p><span className="font-semibold">Pricing:</span> {TAX_REGIONS.find(r => r.countryCode === taxRegion)?.taxInclusive ? "Tax-inclusive (prices include tax)" : "Tax-exclusive (tax added at checkout)"}</p>
+        </div>
       </Section>
 
       {/* Pricing Rules */}

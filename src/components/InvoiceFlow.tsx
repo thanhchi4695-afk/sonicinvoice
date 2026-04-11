@@ -23,6 +23,8 @@ import AccountingBillReview from "@/components/AccountingBillReview";
 import StockCheckFlow from "@/components/StockCheckFlow";
 import PriceLookup from "@/components/PriceLookup";
 import CollectionSEOFlow from "@/components/CollectionSEOFlow";
+import SupplierTemplateTeach from "@/components/SupplierTemplateTeach";
+import { extractWithTemplate, parseFileToRows, autoDetectMappings, type SupplierTemplate as DBSupplierTemplate } from "@/lib/rule-based-extractor";
 import type { InvoiceLineItem } from "@/lib/stock-matcher";
 import { preprocessInvoiceImage, isLikelyPhotoInvoice, preprocessForUpload, isPdfFile, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
 import { supabase } from "@/integrations/supabase/client";

@@ -293,12 +293,12 @@ export default function InventoryDashboard({ onBack }: Props) {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="w-full mb-4">
             <TabsTrigger value="overview" className="flex-1 text-xs">Overview</TabsTrigger>
+            <TabsTrigger value="products" className="flex-1 text-xs">Products</TabsTrigger>
             <TabsTrigger value="alerts" className="flex-1 text-xs">
               Alerts {(stats.lowStockCount + stats.outOfStockCount) > 0 && (
                 <Badge variant="destructive" className="ml-1 text-[9px] px-1">{stats.lowStockCount + stats.outOfStockCount}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="sellers" className="flex-1 text-xs">Best / Slow</TabsTrigger>
             <TabsTrigger value="locations" className="flex-1 text-xs">Locations</TabsTrigger>
           </TabsList>
 

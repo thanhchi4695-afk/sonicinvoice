@@ -54,6 +54,8 @@ interface ShopifyRequestBody {
   // For graphql_create_variant
   product_id_gid?: string;
   new_variants?: Array<{ price: string; sku?: string; barcode?: string; options: string[]; qty?: number; locationId?: string; cost?: string; imageSrc?: string }>;
+  // For graphql_search_catalog
+  query_string?: string;
 }
 
 Deno.serve(async (req) => {

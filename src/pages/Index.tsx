@@ -242,6 +242,7 @@ const Index = () => {
       case "suppliers": flowEl = <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />; break;
       case "audit_log": flowEl = <AuditLogPanel onBack={() => setActiveFlow(null)} />; break;
       case "purchase_orders": flowEl = <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />; break;
+      case "quick_receive": flowEl = <PurchaseOrderPanel onBack={() => setActiveFlow(null)} initialTab="receive" />; break;
       case "catalog_memory": flowEl = <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />; break;
       case "email_inbox": flowEl = <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />; break;
       case "collab_seo": flowEl = <CollabSEOFlow onBack={() => setActiveFlow(null)} />; break;

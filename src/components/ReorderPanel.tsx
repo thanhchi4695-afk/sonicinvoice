@@ -202,9 +202,20 @@ const ReorderPanel = ({ onBack, onViewOrders }: ReorderPanelProps) => {
     } finally { setLoading(false); }
   };
 
-  const selectedRows = useMemo(() => rows.filter(r => r.selected), [rows]);
+  const [selectedRows, setSelectedRows] = useState<ReorderRow[]>([]);
   const toggleAll = (checked: boolean) => setRows(prev => prev.map(r => ({ ...r, selected: checked })));
-  const toggleRow = (variantId: string) => setRows(prev => prev.map(r => r.variantId === variantId ? { ...r, selected: !r.selected } : r));
+
+  const reorderColumns = useMemo<ColumnDef<ReorderRow, any>[]>(() => [
+    { accessorKey: "productTitle", header: "Product", size: 180, cell: ({ getValue }) => <span className="font-medium text-sm truncate block max-w-[180px]">{getValue()}</span> },
+    { accessorKey: "sku", header: "SKU", size: 100, cell: ({ getValue }) => <span className="font-mono">{getValue() || "—"}</span> },
+    { accessorKey: "supplierName", header: "Supplier", size: 100, cell: ({ getValue }) => <span className="text-muted-foreground">{getValue() || "—"}</span> },
+    { accessorKey: "onHand", header: "On Hand", size: 70, cell: ({ getValue }) => <span className={`font-medium ${getValue() === 0 ? "text-destructive" : ""}`}>{getValue()}</span> },
+    { accessorKey: "avgDailySales", header: "Avg/Day", size: 65, cell: ({ getValue }) => (getValue() as number).toFixed(1) },
+    { accessorKey: "leadTimeDays", header: "Lead Time", size: 70, cell: ({ getValue }) => `${getValue()}d` },
+    { accessorKey: "incomingStock", header: "Incoming", size: 70, cell: ({ getValue }) => (getValue() as number) > 0 ? getValue() : "—" },
+    { accessorKey: "recommendedQty", header: "Reorder Qty", size: 85, cell: ({ getValue }) => <span className="font-semibold">{getValue()}</span> },
+    { id: "urgency", header: "Urgency", size: 80, accessorFn: (r) => r, cell: ({ getValue }) => { const u = getUrgency(getValue() as ReorderRow); return <Badge className={`text-[10px] ${u.color}`}>{u.label}</Badge>; }, enableSorting: false },
+  ], []);
 
   /* ─── Create PO from selected ─── */
 

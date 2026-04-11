@@ -1248,6 +1248,101 @@ export type Database = {
         }
         Relationships: []
       }
+      transfer_order_lines: {
+        Row: {
+          barcode: string | null
+          created_at: string
+          id: string
+          product_title: string | null
+          quantity: number
+          received_qty: number
+          shipped_qty: number
+          shopify_inventory_item_id: string | null
+          shopify_variant_id: string | null
+          sku: string | null
+          transfer_order_id: string
+          user_id: string
+        }
+        Insert: {
+          barcode?: string | null
+          created_at?: string
+          id?: string
+          product_title?: string | null
+          quantity?: number
+          received_qty?: number
+          shipped_qty?: number
+          shopify_inventory_item_id?: string | null
+          shopify_variant_id?: string | null
+          sku?: string | null
+          transfer_order_id: string
+          user_id: string
+        }
+        Update: {
+          barcode?: string | null
+          created_at?: string
+          id?: string
+          product_title?: string | null
+          quantity?: number
+          received_qty?: number
+          shipped_qty?: number
+          shopify_inventory_item_id?: string | null
+          shopify_variant_id?: string | null
+          sku?: string | null
+          transfer_order_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_order_lines_transfer_order_id_fkey"
+            columns: ["transfer_order_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transfer_orders: {
+        Row: {
+          created_at: string
+          expected_ship_date: string | null
+          from_location: string
+          from_location_id: string | null
+          id: string
+          notes: string | null
+          status: string
+          to_location: string
+          to_location_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expected_ship_date?: string | null
+          from_location: string
+          from_location_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          to_location: string
+          to_location_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expected_ship_date?: string | null
+          from_location?: string
+          from_location_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          to_location?: string
+          to_location_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       variants: {
         Row: {
           barcode: string | null

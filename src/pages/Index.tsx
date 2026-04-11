@@ -73,6 +73,7 @@ const PipelineChooser = lazy(() => import("@/components/PipelineChooser"));
 const StockyOnboarding = lazy(() => import("@/components/StockyOnboarding"));
 const SupplierProfileBuilder = lazy(() => import("@/components/SupplierProfileBuilder"));
 const StocktakeModule = lazy(() => import("@/components/StocktakeModule"));
+const TransferOrderPanel = lazy(() => import("@/components/TransferOrderPanel"));
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -85,7 +86,7 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "stocky_onboarding" | "inventory_dashboard" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | "stocktake_module" | "pipeline" | "pipeline_chooser" | "supplier_profile_builder" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "stocky_onboarding" | "inventory_dashboard" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | "stocktake_module" | "transfer_orders" | "pipeline" | "pipeline_chooser" | "supplier_profile_builder" | null>(null);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -277,6 +278,7 @@ const Index = () => {
       case "image_optimise": flowEl = <ImageOptimisePanel onBack={() => setActiveFlow(null)} />; break;
       case "stock_check": flowEl = <StockCheckFlow lineItems={[]} onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
       case "stocktake_module": flowEl = <StocktakeModule onBack={() => setActiveFlow(null)} />; break;
+      case "transfer_orders": flowEl = <TransferOrderPanel onBack={() => setActiveFlow(null)} />; break;
       case "supplier_profile_builder": flowEl = <SupplierProfileBuilder onBack={() => setActiveFlow(null)} />; break;
       case "pipeline": flowEl = activePipelineId ? <PipelineRunner pipelineId={activePipelineId} onRenderFlow={(flowKey, onComplete) => {
         const flowMap: Record<string, React.ReactNode> = {

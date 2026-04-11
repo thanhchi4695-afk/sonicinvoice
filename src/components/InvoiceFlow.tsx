@@ -1266,11 +1266,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       <PriceLookup
         onBack={() => setPriceLookupActive(false)}
         initialProduct={firstProduct ? {
-          product_name: firstProduct.title || "",
+          product_name: firstProduct.name || "",
           supplier: firstProduct.brand || "",
           style_number: firstProduct.vendorCode || "",
-          colour: firstProduct.variants?.[0]?.colour || "",
-          supplier_cost: firstProduct.variants?.[0]?.costPrice ? parseFloat(String(firstProduct.variants[0].costPrice)) : undefined,
+          colour: firstProduct.colour || "",
+          supplier_cost: firstProduct.price || undefined,
         } : undefined}
       />
     );

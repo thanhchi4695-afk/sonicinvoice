@@ -46,6 +46,7 @@ const tools = [
   { id: "learning_memory", icon: Brain, label: "Learning memory", desc: "View learned invoice patterns by supplier", color: "text-secondary" },
   { id: "image_optimise", icon: Image, label: "Image optimisation AI", desc: "Alt text, filenames, quality analysis", color: "text-primary" },
   { id: "collection_seo_export", icon: Globe, label: "Bulk Collection SEO", desc: "Export, optimize & import collection SEO", color: "text-success" },
+  { id: "csv_seo", icon: Search, label: "CSV SEO Optimizer", desc: "Upload Shopify CSV, AI-optimize SEO fields, download ready-to-import file", color: "text-success" },
 ];
 
 const quickInserts = [
@@ -1166,6 +1167,10 @@ const ToolsScreen = () => {
   if (activeTool === "collection_seo_export") {
     const CollectionSEOExport = lazy(() => import("@/components/CollectionSEOExport"));
     return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><CollectionSEOExport onBack={() => setActiveTool(null)} /></Suspense>;
+  }
+  if (activeTool === "csv_seo") {
+    const ShopifyCSVSEO = lazy(() => import("@/components/ShopifyCSVSEO"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><ShopifyCSVSEO onBack={() => setActiveTool(null)} /></Suspense>;
   }
 
   if (activeTool === "ai") {

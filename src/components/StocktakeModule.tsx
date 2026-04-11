@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
+import DataGrid, { EditableCell } from "@/components/ui/data-grid";
+import { type ColumnDef } from "@tanstack/react-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";

@@ -79,6 +79,12 @@ const StocktakeModule = ({ onBack }: StocktakeModuleProps) => {
   // Apply progress
   const [applyProgress, setApplyProgress] = useState({ done: 0, total: 0 });
 
+  // Barcode scanner
+  const [scanInput, setScanInput] = useState("");
+  const [scanLog, setScanLog] = useState<{ sku: string; product: string; qty: number; time: string }[]>([]);
+  const scanInputRef = useRef<HTMLInputElement>(null);
+  const totalScanned = useMemo(() => activeLines.reduce((s, l) => s + l.counted_qty, 0), [activeLines]);
+
   useEffect(() => {
     loadStocktakes();
     loadLocations();

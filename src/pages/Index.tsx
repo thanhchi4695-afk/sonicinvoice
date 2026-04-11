@@ -356,11 +356,6 @@ const Index = () => {
 
   const mainContent = (
     <>
-      {activeTab === "home" && showMigrationChecklist && !useStockyDashboard && (
-        <div className="px-4 pt-3">
-          <MigrationChecklist onNavigate={handleStartFlow} onDismiss={() => localStorage.setItem("migration_checklist_dismissed", "true")} />
-        </div>
-      )}
       {activeTab === "home" && useStockyDashboard && (
         <Suspense fallback={suspenseFallback}>
           <StockyHomeDashboard

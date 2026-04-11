@@ -338,7 +338,15 @@ const Index = () => {
 
   const mainContent = (
     <>
-      {activeTab === "home" && (
+      {activeTab === "home" && useStockyDashboard && (
+        <Suspense fallback={suspenseFallback}>
+          <StockyHomeDashboard
+            onNavigate={(f) => setActiveFlow(f as any)}
+            onSwitchToClassic={() => { setUseStockyDashboard(false); localStorage.setItem("stocky_dashboard_mode", "false"); }}
+          />
+        </Suspense>
+      )}
+      {activeTab === "home" && !useStockyDashboard && (
         <HomeScreen
           onStartInvoice={() => setActiveFlow("invoice")}
           onStartSale={() => setActiveFlow("sale")}
@@ -388,6 +396,7 @@ const Index = () => {
               onStartStockyOnboarding={() => setActiveFlow("stocky_onboarding")}
               onStartSupplierProfileBuilder={() => setActiveFlow("supplier_profile_builder")}
               onStartCollectionSEOExport={() => setActiveFlow("collection_seo_export")}
+              onSwitchToStockyDashboard={() => { setUseStockyDashboard(true); localStorage.setItem("stocky_dashboard_mode", "true"); }}
         />
       )}
       <Suspense fallback={suspenseFallback}>

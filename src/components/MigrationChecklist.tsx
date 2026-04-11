@@ -65,7 +65,7 @@ const MigrationChecklist = ({ onNavigate, onDismiss }: Props) => {
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-sm">Migration Checklist</h3>
+        <h3 className="font-semibold text-sm">📦 Switching from Stocky?</h3>
         <span className="text-xs text-muted-foreground">{completedCount}/{ITEMS.length}</span>
       </div>
       <Progress value={progress} className="h-2" />

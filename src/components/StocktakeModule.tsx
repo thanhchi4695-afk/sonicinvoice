@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft, Plus, Download, Upload, ClipboardCheck, History,
-  Check, Loader2, AlertTriangle, FileText,
+  Check, Loader2, AlertTriangle, FileText, ScanBarcode, Volume2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";

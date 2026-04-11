@@ -151,6 +151,7 @@ const AccountScreen = () => {
             options={LOCALES.map(l => ({ v: l.id, l: `${l.flag} ${l.country}` }))}
           />
         </div>
+        <LanguageSelector />
         <SelectField label="Store type / POS" value={storeType} onChange={(v) => { setStoreType(v as StoreType); saveStoreConfig({ storeType: v as StoreType }); }}
           options={[
             { v: "shopify", l: "🛍️ Shopify only" },

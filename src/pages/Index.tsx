@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import { addAuditEntry } from "@/lib/audit-log";
 import { onImageSeoTrigger } from "@/lib/image-seo-trigger";
 import NotificationBell from "@/components/NotificationBell";
 import LoadingScreen from "@/components/ui/loading-screen";
+import { useKeyboardShortcuts, type ShortcutDef } from "@/hooks/use-keyboard-shortcuts";
 
 // ── Eagerly loaded (critical path) ──
 import HomeScreen from "@/components/HomeScreen";
@@ -10,6 +11,9 @@ import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
 import StockyLayout from "@/components/StockyLayout";
 import QuickActionsBar from "@/components/QuickActionsBar";
+import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
+import QuickSearchModal from "@/components/QuickSearchModal";
+import MigrationChecklist from "@/components/MigrationChecklist";
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
 const InvoicesTab = lazy(() => import("@/components/InvoicesTab"));

@@ -17,7 +17,7 @@ const actions = [
 ];
 
 const QuickActionsBar = ({ onAction }: QuickActionsBarProps) => {
-  const { can } = useUserRole();
+  const { hasPermission } = useUserRole();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

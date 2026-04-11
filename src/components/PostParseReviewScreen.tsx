@@ -148,6 +148,9 @@ export default function PostParseReviewScreen({
   const [sourceTraceProduct, setSourceTraceProduct] = useState<ValidatedProduct | null>(null);
   const [showDebugZones, setShowDebugZones] = useState(false);
   const [showDebugOverlay, setShowDebugOverlay] = useState(false);
+  const [autoRefineProfile, setAutoRefineProfile] = useState(() => {
+    try { return localStorage.getItem("sonic_auto_refine_profile") !== "false"; } catch { return true; }
+  });
 
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
@@ -431,12 +434,14 @@ export default function PostParseReviewScreen({
   const clearSelection = () => setSelectedRows(new Set());
 
   const triggerProfileUpdate = useCallback(() => {
-    if (supplierName) {
-      updateSupplierProfileWithCorrections(supplierName, products).then(() => {
-        toast.success("Supplier profile updated with your corrections", { duration: 3000 });
-      }).catch(() => {});
-    }
-  }, [supplierName, products]);
+    if (!autoRefineProfile || !supplierName) return;
+    const toastId = toast.loading("Learning from your corrections…");
+    updateSupplierProfileWithCorrections(supplierName, products).then(() => {
+      toast.success("Profile refined — future extractions will be more accurate", { id: toastId, duration: 3000 });
+    }).catch(() => {
+      toast.dismiss(toastId);
+    });
+  }, [supplierName, products, autoRefineProfile]);
 
   const handleExportClick = () => {
     if (needsReview.length > 0) setShowExportWarning(true);
@@ -783,17 +788,32 @@ export default function PostParseReviewScreen({
       )}
 
       {/* Sticky bottom action bar */}
-      <div className="sticky bottom-0 mt-4 -mx-4 px-4 py-3 bg-background border-t border-border flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={onBack} className="gap-1">
-          <ChevronDown className="w-3.5 h-3.5 rotate-90" /> Back
-        </Button>
-        <div className="flex-1" />
-        <Button variant="outline" size="sm" onClick={handleExportClick} className="gap-1">
-          <Download className="w-3.5 h-3.5" /> Export Accepted ({accepted.length})
-        </Button>
-        <Button variant="teal" size="sm" onClick={() => { triggerProfileUpdate(); if (needsReview.length > 0) setShowExportWarning(true); else onPushToShopify(); }} className="gap-1">
-          <ArrowUpRight className="w-3.5 h-3.5" /> Push to Shopify ({accepted.length})
-        </Button>
+      <div className="sticky bottom-0 mt-4 -mx-4 px-4 py-3 bg-background border-t border-border space-y-2">
+        <label className="flex items-center gap-2 text-[11px] text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={autoRefineProfile}
+            onChange={(e) => {
+              setAutoRefineProfile(e.target.checked);
+              localStorage.setItem("sonic_auto_refine_profile", String(e.target.checked));
+            }}
+            className="rounded border-border"
+          />
+          <Brain className="w-3 h-3" />
+          Use my corrections to improve future extractions (recommended)
+        </label>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onBack} className="gap-1">
+            <ChevronDown className="w-3.5 h-3.5 rotate-90" /> Back
+          </Button>
+          <div className="flex-1" />
+          <Button variant="outline" size="sm" onClick={handleExportClick} className="gap-1">
+            <Download className="w-3.5 h-3.5" /> Export Accepted ({accepted.length})
+          </Button>
+          <Button variant="teal" size="sm" onClick={() => { triggerProfileUpdate(); if (needsReview.length > 0) setShowExportWarning(true); else onPushToShopify(); }} className="gap-1">
+            <ArrowUpRight className="w-3.5 h-3.5" /> Push to Shopify ({accepted.length})
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -627,7 +627,7 @@ export default function CompetitorPriceMonitor({ onBack }: { onBack: () => void 
                                 ({diff > 0 ? "+" : ""}{pct.toFixed(0)}%)
                               </span>
                               {price.confidence_score < 80 && (
-                                <HelpCircle className="inline h-3 w-3 ml-0.5 text-amber-500" title={`${price.confidence_score}% confidence`} />
+                                <span title={`${price.confidence_score}% confidence`}><HelpCircle className="inline h-3 w-3 ml-0.5 text-amber-500" /></span>
                               )}
                             </td>
                           );

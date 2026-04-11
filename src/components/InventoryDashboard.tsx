@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useBarcode } from "@/components/BarcodeProvider";
 import {
   ChevronLeft, Package, DollarSign, AlertTriangle, TrendingUp,
   TrendingDown, MapPin, BarChart3, Loader2, RefreshCw,

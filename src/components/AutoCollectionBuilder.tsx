@@ -11,7 +11,9 @@ import {
   getSmartCollections,
   getCustomCollections,
   createSmartCollection,
+  createCollectionGraphQL,
   type ShopifyCollection,
+  type GraphQLCollectionInput,
 } from "@/lib/shopify-api";
 
 /* ─── Types ─── */

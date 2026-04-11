@@ -480,22 +480,30 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
         {step === 0 && (
           <div className="space-y-4">
             {/* Mode toggle */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => setMode("bulk")}
+                className={`p-3 rounded-xl border text-left transition-all ${mode === "bulk" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}
+              >
+                <Layers className={`w-5 h-5 mb-1 ${mode === "bulk" ? "text-primary" : "text-muted-foreground"}`} />
+                <p className="text-xs font-semibold">Bulk Invoice</p>
+                <p className="text-[10px] text-muted-foreground">Full invoice → grouped hierarchy with cross-links</p>
+              </button>
               <button
                 onClick={() => setMode("architect")}
                 className={`p-3 rounded-xl border text-left transition-all ${mode === "architect" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}
               >
                 <Brain className={`w-5 h-5 mb-1 ${mode === "architect" ? "text-primary" : "text-muted-foreground"}`} />
                 <p className="text-xs font-semibold">SEO Architect</p>
-                <p className="text-[10px] text-muted-foreground">AI generates 8-15 hierarchical collections per product with SEO content</p>
+                <p className="text-[10px] text-muted-foreground">AI hierarchy per product</p>
               </button>
               <button
                 onClick={() => setMode("quick")}
                 className={`p-3 rounded-xl border text-left transition-all ${mode === "quick" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}
               >
                 <Zap className={`w-5 h-5 mb-1 ${mode === "quick" ? "text-primary" : "text-muted-foreground"}`} />
-                <p className="text-xs font-semibold">Quick Parse</p>
-                <p className="text-[10px] text-muted-foreground">Local rules-based: brand, type, print, category</p>
+                <p className="text-xs font-semibold">Quick</p>
+                <p className="text-[10px] text-muted-foreground">Local rules-based</p>
               </button>
             </div>
 

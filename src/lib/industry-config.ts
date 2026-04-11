@@ -33,6 +33,22 @@ export interface IndustryFeatureRule {
   phrase: string;
 }
 
+/** Industry-specific field label overrides */
+export interface IndustryFieldLabels {
+  size: string;
+  colour: string;
+  material: string;
+}
+
+/** Google Shopping attribute mapping per industry */
+export interface GoogleShoppingMapping {
+  colour: string;        // what field maps to g:color
+  size: string;          // what field maps to g:size
+  material: string;      // what field maps to g:material
+  age_group: string;     // default g:age_group value
+  size_system?: string;  // e.g. AU, US
+}
+
 export interface IndustryDefinition {
   id: string;
   displayName: string;
@@ -50,6 +66,12 @@ export interface IndustryDefinition {
   seoDescTemplate: string;
   featureRules: IndustryFeatureRule[];
   currencyDefault: string;
+  /** UI field label overrides */
+  fieldLabels: IndustryFieldLabels;
+  /** Google Shopping attribute mapping */
+  googleShopping: GoogleShoppingMapping;
+  /** Whether this industry uses size-based inventory (size holes in restock) */
+  hasSizeHoles: boolean;
 }
 
 function toTag(name: string): string {

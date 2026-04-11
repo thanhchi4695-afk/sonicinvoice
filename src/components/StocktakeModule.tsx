@@ -723,32 +723,26 @@ const StocktakeModule = ({ onBack }: StocktakeModuleProps) => {
         {activeLines.length > 0 && (
           <div>
             <h3 className="text-sm font-medium mb-2">Items ({countedItems} counted / {activeLines.length} total)</h3>
-            <div className="border rounded-lg overflow-auto max-h-[35vh]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="text-right">System</TableHead>
-                    <TableHead className="text-right">Counted</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeLines
-                    .filter(l => l.counted_qty > 0)
-                    .sort((a, b) => b.counted_qty - a.counted_qty)
-                    .slice(0, 100)
-                    .map(l => (
-                    <TableRow key={l.id}>
-                      <TableCell className="font-mono text-xs">{l.sku || l.barcode || "—"}</TableCell>
-                      <TableCell className="text-sm truncate max-w-[200px]">{l.product_title || "—"}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{l.expected_qty}</TableCell>
-                      <TableCell className="text-right font-medium">{l.counted_qty}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <DataGrid
+              data={activeLines.filter(l => l.counted_qty > 0).sort((a, b) => b.counted_qty - a.counted_qty)}
+              storageKey="stocktake_count"
+              pageSize={100}
+              exportFilename="stocktake-count.csv"
+              columns={[
+                { accessorKey: "sku", header: "SKU", size: 120, cell: ({ row }) => <span className="font-mono">{row.original.sku || row.original.barcode || "—"}</span> },
+                { accessorKey: "product_title", header: "Product", size: 200, cell: ({ getValue }) => <span className="truncate block max-w-[200px]">{(getValue() as string) || "—"}</span> },
+                { accessorKey: "expected_qty", header: "System", size: 70, cell: ({ getValue }) => <span className="text-muted-foreground">{getValue() as number}</span> },
+                { accessorKey: "counted_qty", header: "Counted", size: 80, cell: ({ row }) => (
+                  <EditableCell
+                    value={row.original.counted_qty}
+                    onSave={(v) => {
+                      const newVal = Math.max(0, Number(v) || 0);
+                      setActiveLines(prev => prev.map(l => l.id === row.original.id ? { ...l, counted_qty: newVal, variance: newVal - l.expected_qty } : l));
+                    }}
+                  />
+                )},
+              ] as ColumnDef<StocktakeLine, any>[]}
+            />
           </div>
         )}
       </div>

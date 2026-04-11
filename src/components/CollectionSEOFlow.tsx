@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Check, Copy, RefreshCw, Download, Eye, Code, Search, Brain, Zap, Link, ExternalLink, Sparkles, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Check, Copy, RefreshCw, Download, Eye, Code, Search, Brain, Zap, Link, ExternalLink, Sparkles, X, Layers, ArrowRight } from "lucide-react";
 import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,6 +37,33 @@ interface PushResult {
   ok: boolean;
   shopifyId?: string;
   error?: string;
+}
+
+interface CrossLink {
+  from: string;
+  to: string;
+  anchor_text?: string;
+  reason: string;
+}
+
+interface CollectionGroup {
+  group_name: string;
+  brand: string;
+  products_in_group: number;
+  product_titles: string[];
+  collections: ArchitectCollection[];
+  cross_links: CrossLink[];
+}
+
+interface HomepageSection {
+  title: string;
+  collections: string[];
+  layout: string;
+}
+
+interface FooterMenuItem {
+  heading: string;
+  links: { title: string; handle: string }[];
 }
 
 // ── Local parse helpers (kept from original for "Quick" mode) ──
@@ -187,12 +214,76 @@ function typeBadge(t: string) {
   return <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${color}`}>{t.replace(/_/g, " ")}</span>;
 }
 
+// ── Reusable collection card ──
+function CollectionCard({ c, expandedId, setExpandedId, toggleSelect }: {
+  c: ArchitectCollection;
+  expandedId: string | null;
+  setExpandedId: (id: string | null) => void;
+  toggleSelect: (id: string) => void;
+}) {
+  return (
+    <div className={`bg-card rounded-lg border transition-all ${c.selected ? "border-primary/40" : "border-border opacity-60"}`}>
+      <div className="p-3">
+        <div className="flex items-start gap-2">
+          <Checkbox checked={c.selected} onCheckedChange={() => toggleSelect(c.id)} className="mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-semibold">{c.title}</p>
+              {typeBadge(c.type)}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">/{c.handle}</p>
+            <div className="mt-2 bg-muted/30 rounded p-2 border border-border/50">
+              <p className="text-xs font-medium text-primary truncate">{c.seoTitle}</p>
+              <p className="text-[10px] text-muted-foreground line-clamp-2">{c.metaDescription}</p>
+            </div>
+            <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
+              <span>{c.rules.length} rule{c.rules.length !== 1 ? "s" : ""}</span>
+              {c.internalLinksTo.length > 0 && (
+                <span className="flex items-center gap-0.5"><Link className="w-2.5 h-2.5" /> {c.internalLinksTo.length} links</span>
+              )}
+              <button onClick={() => setExpandedId(expandedId === c.id ? null : c.id)} className="ml-auto text-primary flex items-center gap-0.5">
+                <Eye className="w-3 h-3" /> {expandedId === c.id ? "Hide" : "Details"}
+              </button>
+            </div>
+            {expandedId === c.id && (
+              <div className="mt-2 pt-2 border-t border-border space-y-2 animate-fade-in">
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Rules</p>
+                  {c.rules.map((r, i) => (
+                    <p key={i} className="text-xs font-mono bg-muted/50 rounded px-2 py-0.5 mb-0.5">{r.column} {r.relation} "{r.condition}"</p>
+                  ))}
+                </div>
+                {c.bodyContent && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">SEO Body Content</p>
+                    <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-32 overflow-y-auto prose prose-xs" dangerouslySetInnerHTML={{ __html: c.bodyContent.slice(0, 600) + (c.bodyContent.length > 600 ? "…" : "") }} />
+                  </div>
+                )}
+                {c.internalLinksTo.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5 flex items-center gap-1"><Link className="w-3 h-3" /> Internal Links</p>
+                    <div className="flex flex-wrap gap-1">
+                      {c.internalLinksTo.map((h, i) => (
+                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono">/{h}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Steps ──
 const STEPS = ["Source", "Review", "Links", "Push"];
 
 export default function CollectionSEOFlow({ onBack, onStartFlow, products: propProducts }: CollectionSEOFlowProps) {
   const [step, setStep] = useState(0);
-  const [mode, setMode] = useState<"architect" | "quick">("architect");
+  const [mode, setMode] = useState<"bulk" | "architect" | "quick">("bulk");
   const [source, setSource] = useState<"invoice" | "paste" | "props">(propProducts?.length ? "props" : "invoice");
   const [pasteText, setPasteText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -200,6 +291,13 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
   const [crossLinks, setCrossLinks] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [viewTab, setViewTab] = useState<"preview" | "html" | "seo">("preview");
+
+  // Bulk mode state
+  const [groups, setGroups] = useState<CollectionGroup[]>([]);
+  const [globalCrossLinks, setGlobalCrossLinks] = useState<CrossLink[]>([]);
+  const [homepageSections, setHomepageSections] = useState<HomepageSection[]>([]);
+  const [footerMenu, setFooterMenu] = useState<FooterMenuItem[]>([]);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   // Push state
   const [pushing, setPushing] = useState(false);
@@ -232,6 +330,22 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
     return [];
   };
 
+  const mapCollection = (c: any): ArchitectCollection => ({
+    id: crypto.randomUUID(),
+    title: c.title || "",
+    handle: c.handle || toHandle(c.title || ""),
+    type: c.type || "feature",
+    rules: Array.isArray(c.smart_collection_rules)
+      ? c.smart_collection_rules
+      : [{ column: "tag", relation: "contains", condition: c.handle || "" }],
+    disjunctive: c.disjunctive ?? true,
+    seoTitle: c.seo_title || c.title || "",
+    metaDescription: c.meta_description || "",
+    bodyContent: c.body_content || "",
+    internalLinksTo: c.internal_links_to || [],
+    selected: true,
+  });
+
   const handleGenerate = async () => {
     const products = getProducts();
     if (products.length === 0) {
@@ -241,41 +355,70 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
 
     setLoading(true);
     try {
-      if (mode === "architect") {
-        const storeConfig = JSON.parse(localStorage.getItem("store_config") || "{}");
-        const { data, error } = await supabase.functions.invoke("collection-architect", {
-          body: {
-            products: products.slice(0, 20),
-            storeName: storeConfig.storeName || storeConfig.store_name || localStorage.getItem("store_name") || "",
-            storeCity: storeConfig.storeCity || storeConfig.city || localStorage.getItem("store_city") || "",
-            industry: storeConfig.industry || "swimwear",
-            locale: storeConfig.locale || "AU",
-          },
+      const storeConfig = JSON.parse(localStorage.getItem("store_config") || "{}");
+      const storeParams = {
+        storeName: storeConfig.storeName || storeConfig.store_name || localStorage.getItem("store_name") || "",
+        storeCity: storeConfig.storeCity || storeConfig.city || localStorage.getItem("store_city") || "",
+        industry: storeConfig.industry || "swimwear",
+        locale: storeConfig.locale || "AU",
+      };
+
+      if (mode === "bulk") {
+        // Bulk invoice-level hierarchy with groups & cross-links
+        const { data, error } = await supabase.functions.invoke("collection-bulk-architect", {
+          body: { products: products.slice(0, 40), ...storeParams },
         });
         if (error) throw error;
 
-        const mapped: ArchitectCollection[] = (data.collections || []).map((c: any) => ({
-          id: crypto.randomUUID(),
-          title: c.title || "",
-          handle: c.handle || toHandle(c.title || ""),
-          type: c.type || "feature",
-          rules: Array.isArray(c.smart_collection_rules)
-            ? c.smart_collection_rules
-            : [{ column: "tag", relation: "contains", condition: c.handle || "" }],
-          disjunctive: c.disjunctive ?? true,
-          seoTitle: c.seo_title || c.title || "",
-          metaDescription: c.meta_description || "",
-          bodyContent: c.body_content || "",
-          internalLinksTo: c.internal_links_to || [],
-          selected: true,
+        // Map groups
+        const mappedGroups: CollectionGroup[] = (data.groups || []).map((g: any) => ({
+          group_name: g.group_name || "",
+          brand: g.brand || "",
+          products_in_group: g.products_in_group || 0,
+          product_titles: g.product_titles || [],
+          collections: (g.collections || []).map(mapCollection),
+          cross_links: g.cross_links || [],
         }));
 
+        // Global collections
+        const globalColls = (data.global_collections || []).map(mapCollection);
+
+        // Flatten all collections for the review step
+        const allColls = [
+          ...mappedGroups.flatMap(g => g.collections),
+          ...globalColls,
+        ];
+        // De-duplicate by handle
+        const seen = new Set<string>();
+        const deduped = allColls.filter(c => {
+          if (seen.has(c.handle)) return false;
+          seen.add(c.handle);
+          return true;
+        });
+
+        setGroups(mappedGroups);
+        setGlobalCrossLinks(data.global_cross_links || []);
+        setCollections(deduped);
+        setLinkingStrategy(data.global_linking_strategy || "");
+        setHomepageSections(data.homepage_sections || []);
+        setFooterMenu(data.footer_menu || []);
+        toast.success(`AI generated ${deduped.length} collections across ${mappedGroups.length} groups`);
+
+      } else if (mode === "architect") {
+        const { data, error } = await supabase.functions.invoke("collection-architect", {
+          body: { products: products.slice(0, 20), ...storeParams },
+        });
+        if (error) throw error;
+
+        const mapped = (data.collections || []).map(mapCollection);
         setCollections(mapped);
+        setGroups([]);
         setLinkingStrategy(data.internal_linking_strategy || "");
         toast.success(`AI generated ${mapped.length} hierarchical collections`);
       } else {
         const parsed = quickParseToArchitect(products);
         setCollections(parsed);
+        setGroups([]);
         toast.success(`Parsed ${products.length} products → ${parsed.length} collections`);
       }
       setStep(1);
@@ -401,22 +544,30 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
         {step === 0 && (
           <div className="space-y-4">
             {/* Mode toggle */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => setMode("bulk")}
+                className={`p-3 rounded-xl border text-left transition-all ${mode === "bulk" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}
+              >
+                <Layers className={`w-5 h-5 mb-1 ${mode === "bulk" ? "text-primary" : "text-muted-foreground"}`} />
+                <p className="text-xs font-semibold">Bulk Invoice</p>
+                <p className="text-[10px] text-muted-foreground">Full invoice → grouped hierarchy with cross-links</p>
+              </button>
               <button
                 onClick={() => setMode("architect")}
                 className={`p-3 rounded-xl border text-left transition-all ${mode === "architect" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}
               >
                 <Brain className={`w-5 h-5 mb-1 ${mode === "architect" ? "text-primary" : "text-muted-foreground"}`} />
                 <p className="text-xs font-semibold">SEO Architect</p>
-                <p className="text-[10px] text-muted-foreground">AI generates 8-15 hierarchical collections per product with SEO content</p>
+                <p className="text-[10px] text-muted-foreground">AI hierarchy per product</p>
               </button>
               <button
                 onClick={() => setMode("quick")}
                 className={`p-3 rounded-xl border text-left transition-all ${mode === "quick" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}
               >
                 <Zap className={`w-5 h-5 mb-1 ${mode === "quick" ? "text-primary" : "text-muted-foreground"}`} />
-                <p className="text-xs font-semibold">Quick Parse</p>
-                <p className="text-[10px] text-muted-foreground">Local rules-based: brand, type, print, category</p>
+                <p className="text-xs font-semibold">Quick</p>
+                <p className="text-[10px] text-muted-foreground">Local rules-based</p>
               </button>
             </div>
 
@@ -463,9 +614,9 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
 
             <Button className="w-full h-12 text-base" onClick={handleGenerate} disabled={loading}>
               {loading ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{mode === "architect" ? "AI building hierarchy…" : "Parsing products…"}</>
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{mode === "bulk" ? "AI grouping & building hierarchy…" : mode === "architect" ? "AI building hierarchy…" : "Parsing products…"}</>
               ) : (
-                <>{mode === "architect" ? <Brain className="w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}{mode === "architect" ? "Build SEO Collection Hierarchy" : "Generate Collections"}</>
+                <>{mode === "bulk" ? <Layers className="w-4 h-4 mr-2" /> : mode === "architect" ? <Brain className="w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}{mode === "bulk" ? "Build Full Invoice Hierarchy" : mode === "architect" ? "Build SEO Collection Hierarchy" : "Generate Collections"}</>
               )}
             </Button>
           </div>
@@ -475,18 +626,28 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
         {step === 1 && (
           <div className="space-y-4">
             {/* Summary cards */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className={`grid ${groups.length > 0 ? "grid-cols-4" : "grid-cols-3"} gap-2`}>
               <div className="bg-card rounded-lg border border-border p-2 text-center">
                 <p className="text-lg font-bold">{collections.length}</p>
-                <p className="text-[10px] text-muted-foreground">Total</p>
+                <p className="text-[10px] text-muted-foreground">Collections</p>
               </div>
               <div className="bg-card rounded-lg border border-border p-2 text-center">
                 <p className="text-lg font-bold text-primary">{selectedCount}</p>
                 <p className="text-[10px] text-muted-foreground">Selected</p>
               </div>
+              {groups.length > 0 && (
+                <div className="bg-card rounded-lg border border-border p-2 text-center">
+                  <p className="text-lg font-bold text-accent-foreground">{groups.length}</p>
+                  <p className="text-[10px] text-muted-foreground">Groups</p>
+                </div>
+              )}
               <div className="bg-card rounded-lg border border-border p-2 text-center">
-                <p className="text-lg font-bold text-success">{Object.keys(typeGroups).length}</p>
-                <p className="text-[10px] text-muted-foreground">Types</p>
+                <p className="text-lg font-bold text-success">
+                  {groups.length > 0
+                    ? groups.reduce((s, g) => s + g.cross_links.length, 0) + globalCrossLinks.length
+                    : Object.keys(typeGroups).length}
+                </p>
+                <p className="text-[10px] text-muted-foreground">{groups.length > 0 ? "Cross-links" : "Types"}</p>
               </div>
             </div>
 
@@ -501,91 +662,101 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
               </Button>
             </div>
 
-            {/* Collection cards grouped by type */}
+            {/* Collection cards - grouped by brand group (bulk) or type (other) */}
             <div className="space-y-4 max-h-[55vh] overflow-y-auto">
-              {Object.entries(typeGroups).map(([type, colls]) => (
-                <div key={type}>
-                  <div className="flex items-center gap-2 mb-2">
-                    {typeBadge(type)}
-                    <span className="text-xs text-muted-foreground">{colls.length} collection{colls.length !== 1 ? "s" : ""}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {colls.map(c => (
-                      <div
-                        key={c.id}
-                        className={`bg-card rounded-lg border transition-all ${c.selected ? "border-primary/40" : "border-border opacity-60"}`}
+              {groups.length > 0 ? (
+                <>
+                  {/* Bulk mode: show by group */}
+                  {groups.map((g) => (
+                    <div key={g.group_name} className="border border-border rounded-xl overflow-hidden">
+                      <button
+                        onClick={() => setExpandedGroup(expandedGroup === g.group_name ? null : g.group_name)}
+                        className="w-full flex items-center gap-3 p-3 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
                       >
-                        <div className="p-3">
-                          <div className="flex items-start gap-2">
-                            <Checkbox
-                              checked={c.selected}
-                              onCheckedChange={() => toggleSelect(c.id)}
-                              className="mt-0.5"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-semibold">{c.title}</p>
-                                {typeBadge(c.type)}
-                              </div>
-                              <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">/{c.handle}</p>
+                        <Layers className="w-4 h-4 text-primary shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">{g.group_name}</p>
+                          <p className="text-[10px] text-muted-foreground">{g.products_in_group} products · {g.collections.length} collections · {g.cross_links.length} cross-links</p>
+                        </div>
+                        <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${expandedGroup === g.group_name ? "rotate-90" : ""}`} />
+                      </button>
 
-                              {/* SEO preview snippet */}
-                              <div className="mt-2 bg-muted/30 rounded p-2 border border-border/50">
-                                <p className="text-xs font-medium text-primary truncate">{c.seoTitle}</p>
-                                <p className="text-[10px] text-muted-foreground line-clamp-2">{c.metaDescription}</p>
-                              </div>
-
-                              {/* Rules + links row */}
-                              <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
-                                <span>{c.rules.length} rule{c.rules.length !== 1 ? "s" : ""}</span>
-                                {c.internalLinksTo.length > 0 && (
-                                  <span className="flex items-center gap-0.5"><Link className="w-2.5 h-2.5" /> {c.internalLinksTo.length} links</span>
-                                )}
-                                <button
-                                  onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
-                                  className="ml-auto text-primary flex items-center gap-0.5"
-                                >
-                                  <Eye className="w-3 h-3" /> {expandedId === c.id ? "Hide" : "Details"}
-                                </button>
-                              </div>
-
-                              {/* Expanded details */}
-                              {expandedId === c.id && (
-                                <div className="mt-2 pt-2 border-t border-border space-y-2 animate-fade-in">
-                                  <div>
-                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Rules</p>
-                                    {c.rules.map((r, i) => (
-                                      <p key={i} className="text-xs font-mono bg-muted/50 rounded px-2 py-0.5 mb-0.5">
-                                        {r.column} {r.relation} "{r.condition}"
-                                      </p>
-                                    ))}
-                                  </div>
-                                  {c.bodyContent && (
-                                    <div>
-                                      <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">SEO Body Content</p>
-                                      <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-32 overflow-y-auto prose prose-xs" dangerouslySetInnerHTML={{ __html: c.bodyContent.slice(0, 600) + (c.bodyContent.length > 600 ? "…" : "") }} />
-                                    </div>
-                                  )}
-                                  {c.internalLinksTo.length > 0 && (
-                                    <div>
-                                      <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5 flex items-center gap-1"><Link className="w-3 h-3" /> Internal Links</p>
-                                      <div className="flex flex-wrap gap-1">
-                                        {c.internalLinksTo.map((h, i) => (
-                                          <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono">/{h}</span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                      {expandedGroup === g.group_name && (
+                        <div className="p-3 space-y-3 animate-fade-in">
+                          {/* Product titles */}
+                          {g.product_titles.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {g.product_titles.slice(0, 8).map((t, i) => (
+                                <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{t}</span>
+                              ))}
+                              {g.product_titles.length > 8 && <span className="text-[10px] text-muted-foreground">+{g.product_titles.length - 8} more</span>}
                             </div>
+                          )}
+
+                          {/* Cross-links for this group */}
+                          {g.cross_links.length > 0 && (
+                            <div className="bg-primary/5 rounded-lg p-2 border border-primary/10">
+                              <p className="text-[10px] font-semibold text-primary uppercase mb-1">Cross-links</p>
+                              {g.cross_links.map((cl, i) => (
+                                <div key={i} className="flex items-center gap-1 text-[10px] text-muted-foreground py-0.5">
+                                  <span className="font-mono text-primary">/{cl.from}</span>
+                                  <ArrowRight className="w-2.5 h-2.5" />
+                                  <span className="font-mono text-primary">/{cl.to}</span>
+                                  <span className="ml-1 text-muted-foreground">— {cl.reason}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Collections in this group */}
+                          <div className="space-y-2">
+                            {g.collections.map(c => {
+                              const mainC = collections.find(mc => mc.handle === c.handle);
+                              if (!mainC) return null;
+                              return <CollectionCard key={mainC.id} c={mainC} expandedId={expandedId} setExpandedId={setExpandedId} toggleSelect={toggleSelect} />;
+                            })}
                           </div>
                         </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Global collections (not in any group) */}
+                  {(() => {
+                    const groupHandles = new Set(groups.flatMap(g => g.collections.map(c => c.handle)));
+                    const global = collections.filter(c => !groupHandles.has(c.handle));
+                    if (global.length === 0) return null;
+                    return (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-secondary text-secondary-foreground">Global</span>
+                          <span className="text-xs text-muted-foreground">{global.length} cross-brand collections</span>
+                        </div>
+                        <div className="space-y-2">
+                          {global.map(c => (
+                            <CollectionCard key={c.id} c={c} expandedId={expandedId} setExpandedId={setExpandedId} toggleSelect={toggleSelect} />
+                          ))}
+                        </div>
                       </div>
-                    ))}
+                    );
+                  })()}
+                </>
+              ) : (
+                /* Non-bulk mode: group by type */
+                Object.entries(typeGroups).map(([type, colls]) => (
+                  <div key={type}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {typeBadge(type)}
+                      <span className="text-xs text-muted-foreground">{colls.length} collection{colls.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {colls.map(c => (
+                        <CollectionCard key={c.id} c={c} expandedId={expandedId} setExpandedId={setExpandedId} toggleSelect={toggleSelect} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="flex gap-2">

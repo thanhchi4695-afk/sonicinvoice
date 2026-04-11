@@ -400,14 +400,30 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setReceiving(false); return; }
 
-    // Update received_qty on each line
+    // Update received_qty and actual_cost on each line
+    const receiveDetails: string[] = [];
     for (const line of receivePO.lines) {
       const qty = receiveQtys[line.id] || 0;
       if (qty > 0) {
         const newReceived = line.received_qty + qty;
+        const actualCost = receiveCosts[line.id] ?? line.expected_cost;
         await supabase.from("purchase_order_lines").update({
           received_qty: newReceived,
+          actual_cost: actualCost,
         }).eq("id", line.id);
+
+        receiveDetails.push(`${line.sku || line.product_title}: ${qty} @ $${actualCost.toFixed(2)}`);
+
+        // Update variant cost for COGS if we have a matching variant
+        if (line.sku) {
+          const { data: variant } = await supabase.from("variants")
+            .select("id")
+            .eq("sku", line.sku)
+            .maybeSingle();
+          if (variant) {
+            await supabase.from("variants").update({ cost: actualCost }).eq("id", variant.id);
+          }
+        }
 
         // Sync inventory to Shopify if connected
         if (hasShopify && shopifyLocationId && line.sku) {
@@ -432,10 +448,17 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
     const anyReceived = updatedLines.some(l => l.received_qty > 0);
     const newStatus: POStatus = allReceived ? "received" : anyReceived ? "partial" : receivePO.status;
 
+    // Calculate backorder info for partial receives
+    const backordered = updatedLines
+      .filter(l => l.received_qty < l.expected_qty)
+      .map(l => `${l.sku || l.product_title}: ${l.expected_qty - l.received_qty} backordered`);
+
     await supabase.from("purchase_orders").update({ status: newStatus }).eq("id", receivePO.id);
 
     const totalReceived = Object.values(receiveQtys).reduce((a, b) => a + b, 0);
-    addAuditEntry("PO", `Received ${totalReceived} units on ${receivePO.po_number} — status: ${newStatus}`);
+    const auditDetails = receiveDetails.join("; ");
+    const backorderNote = backordered.length > 0 ? ` | Backordered: ${backordered.join("; ")}` : "";
+    addAuditEntry("PO Receive", `Received ${totalReceived} units on ${receivePO.po_number} — status: ${newStatus} | ${auditDetails}${backorderNote}`);
     toast.success(`${totalReceived} units received`);
 
     setReceiving(false);

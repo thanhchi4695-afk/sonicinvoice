@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+
 import {
   Check, X, AlertTriangle, ChevronDown, ChevronRight, RotateCcw,
   ShieldCheck, Bug, Search, Filter, CheckCheck, ArrowRight,
@@ -13,6 +14,8 @@ import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
 import { updateSupplierProfileWithCorrections } from "@/lib/supplier-profile-updater";
+import { saveInvoiceLinesToCatalog } from "@/components/SupplierCatalog";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
 import SizeGridEditor from "@/components/SizeGridEditor";
@@ -448,6 +451,59 @@ export default function PostParseReviewScreen({
     else { triggerProfileUpdate(); onExportAccepted(); }
   };
 
+  const [savingToCatalog, setSavingToCatalog] = useState(false);
+
+  const handleSaveToCatalog = async () => {
+    if (!supplierName || accepted.length === 0) {
+      toast.error("No accepted products to save");
+      return;
+    }
+    setSavingToCatalog(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session) { toast.error("Please sign in first"); return; }
+      const userId = session.session.user.id;
+
+      // Find or create supplier
+      let { data: supplier } = await supabase
+        .from("suppliers")
+        .select("id")
+        .eq("name", supplierName)
+        .maybeSingle();
+
+      if (!supplier) {
+        const { data: newSup } = await supabase
+          .from("suppliers")
+          .insert({ user_id: userId, name: supplierName })
+          .select("id")
+          .single();
+        supplier = newSup;
+      }
+
+      if (!supplier) { toast.error("Could not resolve supplier"); return; }
+
+      const lines = accepted.map(p => ({
+        product_title: p.name,
+        sku: p.sku,
+        unit_cost: p.cost,
+        color: p.colour,
+        size: p.size,
+      }));
+
+      const saved = await saveInvoiceLinesToCatalog(supplier.id, userId, lines);
+      if (saved > 0) {
+        toast.success(`Saved ${saved} item${saved > 1 ? "s" : ""} to ${supplierName} catalog`);
+      } else {
+        toast.info("All items already exist in catalog");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save to catalog");
+    } finally {
+      setSavingToCatalog(false);
+    }
+  };
+
   const tabs: { key: ReviewTab; label: string; count: number; icon: React.ReactNode; colorClass: string }[] = [
     { key: "accepted", label: "Accepted", count: accepted.length, icon: <Check className="w-3.5 h-3.5" />, colorClass: "text-success" },
     { key: "review", label: "Needs Review", count: needsReview.length, icon: <AlertTriangle className="w-3.5 h-3.5" />, colorClass: "text-secondary" },
@@ -805,6 +861,9 @@ export default function PostParseReviewScreen({
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={onBack} className="gap-1">
             <ChevronDown className="w-3.5 h-3.5 rotate-90" /> Back
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleSaveToCatalog} className="gap-1" disabled={savingToCatalog}>
+            <Package className="w-3.5 h-3.5" /> {savingToCatalog ? "Saving…" : "Save to Catalog"}
           </Button>
           <div className="flex-1" />
           <Button variant="outline" size="sm" onClick={handleExportClick} className="gap-1">

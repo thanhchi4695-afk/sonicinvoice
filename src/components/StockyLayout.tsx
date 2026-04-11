@@ -57,6 +57,26 @@ const StockyLayout = ({
 }: StockyLayoutProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { hasPermission } = useUserRole();
+
+  // Filter nav items by permission
+  const NAV_PERMISSIONS: Record<string, Permission> = {
+    purchase_orders: "create_po",
+    stock_adjustment: "adjust_inventory",
+    stocktake_module: "create_stocktake",
+    reports_hub: "view_reports",
+    account: "manage_settings",
+    suppliers: "view_suppliers",
+    transfer_orders: "manage_transfers",
+  };
+
+  const filteredNavItems = useMemo(() => {
+    return navItems.filter(item => {
+      const perm = NAV_PERMISSIONS[item.id];
+      if (!perm) return true; // no restriction
+      return hasPermission(perm);
+    });
+  }, [navItems, hasPermission]);
 
   const getActiveId = () => activeFlow || activeTab;
 

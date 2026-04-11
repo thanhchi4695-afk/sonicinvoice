@@ -1,5 +1,6 @@
 import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import ContextDetector from "@/components/ContextDetector";
 import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
 import { getStockUpdatesCount } from "@/lib/inventory-sim";

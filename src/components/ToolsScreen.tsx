@@ -55,6 +55,7 @@ const tools = [
   { id: "organic_seo", icon: Search, label: "Organic SEO blog", desc: "Build topical authority with AI blog posts", color: "text-primary" },
   { id: "social_media", icon: Mail, label: "Social media", desc: "Auto-generate social captions & announcements", color: "text-secondary" },
   { id: "competitor_intel", icon: Bot, label: "Competitor intel", desc: "Analyse competitor pricing & positioning", color: "text-primary" },
+  { id: "price_monitor", icon: DollarSign, label: "Price monitor", desc: "Monitor & match competitor prices in real-time", color: "text-success" },
   { id: "geo_agentic", icon: Globe, label: "Local SEO", desc: "Geo-targeted SEO for local store visibility", color: "text-success" },
 ];
 
@@ -1208,6 +1209,10 @@ const ToolsScreen = () => {
   if (activeTool === "competitor_intel") {
     const CompetitorIntelFlow = lazy(() => import("@/components/CompetitorIntelFlow"));
     return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><CompetitorIntelFlow onBack={() => setActiveTool(null)} /></Suspense>;
+  }
+  if (activeTool === "price_monitor") {
+    const CompetitorPriceMonitor = lazy(() => import("@/components/CompetitorPriceMonitor"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><CompetitorPriceMonitor onBack={() => setActiveTool(null)} /></Suspense>;
   }
   if (activeTool === "geo_agentic") {
     const GeoAgenticFlow = lazy(() => import("@/components/GeoAgenticFlow"));

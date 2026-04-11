@@ -118,7 +118,7 @@ const StockyLayout = ({
 
       {/* Nav items */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = getActiveId() === item.id;
           return (

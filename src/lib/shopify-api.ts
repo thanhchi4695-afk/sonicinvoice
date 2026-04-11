@@ -262,6 +262,7 @@ export async function createCollectionGraphQL(gql_collection: GraphQLCollectionI
   return data.collection;
 }
 
+export async function updateSmartCollection(collectionId: number, collection: Record<string, unknown>): Promise<ShopifyCollection> {
   const data = await callProxy({ action: "update_smart_collection", collection_id: collectionId, collection });
   return data.collection;
 }

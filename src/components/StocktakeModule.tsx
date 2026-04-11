@@ -242,6 +242,55 @@ const StocktakeModule = ({ onBack }: StocktakeModuleProps) => {
     toast.success("System quantities exported");
   };
 
+  /* ─── Barcode Scan Handler ─── */
+
+  const handleBarcodeScan = useCallback((value: string) => {
+    const code = value.trim();
+    if (!code) return;
+
+    const match = activeLines.find(l =>
+      (l.sku && l.sku.toLowerCase() === code.toLowerCase()) ||
+      (l.barcode && l.barcode === code)
+    );
+
+    if (match) {
+      setActiveLines(prev => prev.map(l => {
+        if (l.id === match.id) {
+          const newCounted = l.counted_qty + 1;
+          return { ...l, counted_qty: newCounted, variance: newCounted - l.expected_qty };
+        }
+        return l;
+      }));
+      setScanLog(prev => [{
+        sku: match.sku || match.barcode || code,
+        product: match.product_title || "Unknown",
+        qty: match.counted_qty + 1,
+        time: new Date().toLocaleTimeString(),
+      }, ...prev].slice(0, 50));
+      // Play a short beep via AudioContext
+      try {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        osc.frequency.value = 880;
+        osc.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.08);
+      } catch { /* silent */ }
+    } else {
+      toast.error(`No match for "${code}"`);
+      try {
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        osc.frequency.value = 220;
+        osc.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.2);
+      } catch { /* silent */ }
+    }
+
+    setScanInput("");
+  }, [activeLines]);
+
   /* ─── Import Counted Quantities ─── */
 
   const handleImportCounted = (e: React.ChangeEvent<HTMLInputElement>) => {

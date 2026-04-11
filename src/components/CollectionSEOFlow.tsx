@@ -214,6 +214,70 @@ function typeBadge(t: string) {
   return <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${color}`}>{t.replace(/_/g, " ")}</span>;
 }
 
+// ── Reusable collection card ──
+function CollectionCard({ c, expandedId, setExpandedId, toggleSelect }: {
+  c: ArchitectCollection;
+  expandedId: string | null;
+  setExpandedId: (id: string | null) => void;
+  toggleSelect: (id: string) => void;
+}) {
+  return (
+    <div className={`bg-card rounded-lg border transition-all ${c.selected ? "border-primary/40" : "border-border opacity-60"}`}>
+      <div className="p-3">
+        <div className="flex items-start gap-2">
+          <Checkbox checked={c.selected} onCheckedChange={() => toggleSelect(c.id)} className="mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-semibold">{c.title}</p>
+              {typeBadge(c.type)}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">/{c.handle}</p>
+            <div className="mt-2 bg-muted/30 rounded p-2 border border-border/50">
+              <p className="text-xs font-medium text-primary truncate">{c.seoTitle}</p>
+              <p className="text-[10px] text-muted-foreground line-clamp-2">{c.metaDescription}</p>
+            </div>
+            <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
+              <span>{c.rules.length} rule{c.rules.length !== 1 ? "s" : ""}</span>
+              {c.internalLinksTo.length > 0 && (
+                <span className="flex items-center gap-0.5"><Link className="w-2.5 h-2.5" /> {c.internalLinksTo.length} links</span>
+              )}
+              <button onClick={() => setExpandedId(expandedId === c.id ? null : c.id)} className="ml-auto text-primary flex items-center gap-0.5">
+                <Eye className="w-3 h-3" /> {expandedId === c.id ? "Hide" : "Details"}
+              </button>
+            </div>
+            {expandedId === c.id && (
+              <div className="mt-2 pt-2 border-t border-border space-y-2 animate-fade-in">
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Rules</p>
+                  {c.rules.map((r, i) => (
+                    <p key={i} className="text-xs font-mono bg-muted/50 rounded px-2 py-0.5 mb-0.5">{r.column} {r.relation} "{r.condition}"</p>
+                  ))}
+                </div>
+                {c.bodyContent && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">SEO Body Content</p>
+                    <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-32 overflow-y-auto prose prose-xs" dangerouslySetInnerHTML={{ __html: c.bodyContent.slice(0, 600) + (c.bodyContent.length > 600 ? "…" : "") }} />
+                  </div>
+                )}
+                {c.internalLinksTo.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5 flex items-center gap-1"><Link className="w-3 h-3" /> Internal Links</p>
+                    <div className="flex flex-wrap gap-1">
+                      {c.internalLinksTo.map((h, i) => (
+                        <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono">/{h}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Steps ──
 const STEPS = ["Source", "Review", "Links", "Push"];
 

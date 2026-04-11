@@ -809,6 +809,9 @@ export default function PostParseReviewScreen({
           <Button variant="outline" size="sm" onClick={onBack} className="gap-1">
             <ChevronDown className="w-3.5 h-3.5 rotate-90" /> Back
           </Button>
+          <Button variant="outline" size="sm" onClick={handleSaveToCatalog} className="gap-1" disabled={savingToCatalog}>
+            <Package className="w-3.5 h-3.5" /> {savingToCatalog ? "Saving…" : "Save to Catalog"}
+          </Button>
           <div className="flex-1" />
           <Button variant="outline" size="sm" onClick={handleExportClick} className="gap-1">
             <Download className="w-3.5 h-3.5" /> Export Accepted ({accepted.length})

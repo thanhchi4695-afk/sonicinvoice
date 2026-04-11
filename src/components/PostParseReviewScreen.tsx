@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/lib/invoice-validator";
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
+import { updateSupplierProfileWithCorrections } from "@/lib/supplier-profile-updater";
 import { toast } from "sonner";
 import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
 import SizeGridEditor from "@/components/SizeGridEditor";
@@ -429,9 +430,17 @@ export default function PostParseReviewScreen({
 
   const clearSelection = () => setSelectedRows(new Set());
 
+  const triggerProfileUpdate = useCallback(() => {
+    if (supplierName) {
+      updateSupplierProfileWithCorrections(supplierName, products).then(() => {
+        toast.success("Supplier profile updated with your corrections", { duration: 3000 });
+      }).catch(() => {});
+    }
+  }, [supplierName, products]);
+
   const handleExportClick = () => {
     if (needsReview.length > 0) setShowExportWarning(true);
-    else onExportAccepted();
+    else { triggerProfileUpdate(); onExportAccepted(); }
   };
 
   const tabs: { key: ReviewTab; label: string; count: number; icon: React.ReactNode; colorClass: string }[] = [
@@ -732,7 +741,7 @@ export default function PostParseReviewScreen({
               {needsReview.length} row{needsReview.length > 1 ? "s" : ""} still need review. Export accepted rows only or review them first.
             </p>
             <div className="flex gap-2">
-              <Button variant="teal" size="sm" className="flex-1 h-9 text-xs" onClick={() => { setShowExportWarning(false); onExportAccepted(); }}>
+              <Button variant="teal" size="sm" className="flex-1 h-9 text-xs" onClick={() => { setShowExportWarning(false); triggerProfileUpdate(); onExportAccepted(); }}>
                 <Download className="w-3.5 h-3.5 mr-1" /> Export Accepted Only
               </Button>
               <Button variant="outline" size="sm" className="flex-1 h-9 text-xs" onClick={() => { setShowExportWarning(false); setActiveTab("review"); }}>
@@ -782,7 +791,7 @@ export default function PostParseReviewScreen({
         <Button variant="outline" size="sm" onClick={handleExportClick} className="gap-1">
           <Download className="w-3.5 h-3.5" /> Export Accepted ({accepted.length})
         </Button>
-        <Button variant="teal" size="sm" onClick={() => { if (needsReview.length > 0) setShowExportWarning(true); else onPushToShopify(); }} className="gap-1">
+        <Button variant="teal" size="sm" onClick={() => { triggerProfileUpdate(); if (needsReview.length > 0) setShowExportWarning(true); else onPushToShopify(); }} className="gap-1">
           <ArrowUpRight className="w-3.5 h-3.5" /> Push to Shopify ({accepted.length})
         </Button>
       </div>

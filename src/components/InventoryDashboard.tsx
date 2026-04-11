@@ -56,6 +56,17 @@ export default function InventoryDashboard({ onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData>({ variants: [], locations: [] });
   const [tab, setTab] = useState("overview");
+  const [highlightedSku, setHighlightedSku] = useState<string | null>(null);
+
+  // Global barcode scanner integration
+  const { registerHandler } = useBarcode();
+  useEffect(() => {
+    return registerHandler("inventory", (barcode) => {
+      setHighlightedSku(barcode.toLowerCase());
+      // Clear highlight after 5s
+      setTimeout(() => setHighlightedSku(null), 5000);
+    });
+  }, [registerHandler]);
 
   const fetchData = async () => {
     setLoading(true);

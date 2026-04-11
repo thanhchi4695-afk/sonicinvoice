@@ -89,6 +89,22 @@ const TransferOrderPanel = ({ onBack }: TransferOrderPanelProps) => {
   const [activeLines, setActiveLines] = useState<TransferLine[]>([]);
   const [processing, setProcessing] = useState(false);
 
+  // Global barcode scanner integration
+  const { registerHandler } = useBarcode();
+  useEffect(() => {
+    if (screen !== "create") return;
+    return registerHandler("transfer", (barcode) => {
+      setSkuInput(barcode);
+      // Auto-trigger add
+      setTimeout(() => {
+        const el = skuRef.current;
+        if (el) {
+          el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        }
+      }, 50);
+    });
+  }, [screen, registerHandler]);
+
   useEffect(() => { loadTransfers(); loadLocations(); }, []);
 
   const loadLocations = async () => {

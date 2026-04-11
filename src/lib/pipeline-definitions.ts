@@ -87,6 +87,20 @@ export const PIPELINES: Pipeline[] = [
     ],
   },
   {
+    id: "invoice_to_catalog",
+    name: "Invoice → Full Catalog Enrichment",
+    emoji: "🔎",
+    desc: "Extract products, check stock, look up prices & images, build SEO collections",
+    estimatedMinutes: 10,
+    trigger: "invoice_upload",
+    steps: [
+      { id: "upload_invoice", label: "Process invoice", description: "Upload and parse your supplier invoice", flow: "invoice", contextKey: "productList", icon: "📄" },
+      { id: "stock_check", label: "Stock check", description: "Check which items are refills, new colours, or new products", flow: "stock_check", contextKey: "stockResult", icon: "🔍" },
+      { id: "price_lookup", label: "Price lookup", description: "Search retail prices and images from Australian stores", flow: "price_lookup", icon: "💰" },
+      { id: "collection_seo", label: "Collection SEO", description: "Generate SEO collection hierarchy for the brands and product types", flow: "collection_seo", icon: "📚" },
+    ],
+  },
+  {
     id: "season_close",
     name: "Season close",
     emoji: "📉",

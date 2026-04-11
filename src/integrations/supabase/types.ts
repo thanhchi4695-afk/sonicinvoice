@@ -119,6 +119,206 @@ export type Database = {
         }
         Relationships: []
       }
+      competitor_monitored_products: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string | null
+          product_sku: string | null
+          product_title: string
+          product_type: string | null
+          product_vendor: string | null
+          retail_price: number
+          shopify_product_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          product_sku?: string | null
+          product_title: string
+          product_type?: string | null
+          product_vendor?: string | null
+          retail_price?: number
+          shopify_product_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          product_sku?: string | null
+          product_title?: string
+          product_type?: string | null
+          product_vendor?: string | null
+          retail_price?: number
+          shopify_product_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_monitored_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitor_price_changes: {
+        Row: {
+          change_detail: string | null
+          change_method: string
+          competitor_id: string
+          competitor_price: number
+          created_at: string
+          id: string
+          monitored_product_id: string
+          new_price: number
+          old_price: number
+          shopify_updated: boolean
+          user_id: string
+        }
+        Insert: {
+          change_detail?: string | null
+          change_method?: string
+          competitor_id: string
+          competitor_price: number
+          created_at?: string
+          id?: string
+          monitored_product_id: string
+          new_price: number
+          old_price: number
+          shopify_updated?: boolean
+          user_id: string
+        }
+        Update: {
+          change_detail?: string | null
+          change_method?: string
+          competitor_id?: string
+          competitor_price?: number
+          created_at?: string
+          id?: string
+          monitored_product_id?: string
+          new_price?: number
+          old_price?: number
+          shopify_updated?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_price_changes_competitor_id_fkey"
+            columns: ["competitor_id"]
+            isOneToOne: false
+            referencedRelation: "competitors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_price_changes_monitored_product_id_fkey"
+            columns: ["monitored_product_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_monitored_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitor_prices: {
+        Row: {
+          competitor_id: string
+          competitor_price: number | null
+          confidence_score: number | null
+          created_at: string
+          error_message: string | null
+          id: string
+          last_checked: string
+          match_status: string
+          matched_title: string | null
+          matched_url: string | null
+          monitored_product_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          competitor_id: string
+          competitor_price?: number | null
+          confidence_score?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_checked?: string
+          match_status?: string
+          matched_title?: string | null
+          matched_url?: string | null
+          monitored_product_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          competitor_id?: string
+          competitor_price?: number | null
+          confidence_score?: number | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_checked?: string
+          match_status?: string
+          matched_title?: string | null
+          matched_url?: string | null
+          monitored_product_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_prices_competitor_id_fkey"
+            columns: ["competitor_id"]
+            isOneToOne: false
+            referencedRelation: "competitors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_prices_monitored_product_id_fkey"
+            columns: ["monitored_product_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_monitored_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitors: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          is_shopify: boolean
+          name: string
+          updated_at: string
+          user_id: string
+          website_url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_shopify?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+          website_url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_shopify?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+          website_url?: string
+        }
+        Relationships: []
+      }
       document_lines: {
         Row: {
           accounting_category: string | null

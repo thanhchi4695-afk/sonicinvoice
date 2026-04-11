@@ -2,6 +2,7 @@ import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock } fro
 import { useState, useCallback } from "react";
 import ContextDetector from "@/components/ContextDetector";
 import { Button } from "@/components/ui/button";
+import InventoryAlerts from "@/components/InventoryAlerts";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
 import { getStockUpdatesCount } from "@/lib/inventory-sim";
 import { getTotalCatalogProducts } from "@/lib/catalog-memory";
@@ -145,6 +146,11 @@ const HomeScreen = ({
           </Button>
         </div>
       )}
+
+      {/* Inventory Alerts Widget */}
+      <div className="mb-4">
+        <InventoryAlerts onCreatePO={onStartPurchaseOrders} onAdjustStock={onStartStockyHub} />
+      </div>
 
       {/* Context-aware smart suggestions */}
       <div className="mb-4">

@@ -1091,6 +1091,11 @@ ${ocrText}`,
       total: parsed.total ?? null,
       rejected_rows: allRejected,
       products: normalizedProducts,
+      // OCR fallback metadata
+      ocr_fallback_used: parsed.ocr_fallback_used || false,
+      ocr_fallback_attempted: parsed.ocr_fallback_attempted || false,
+      needs_manual_review: parsed.needs_manual_review || false,
+      review_reason: parsed.review_reason || null,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

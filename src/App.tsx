@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ShopifyEmbeddedProvider from "@/components/ShopifyEmbeddedProvider";
 import InstallAppBanner from "@/components/InstallAppBanner";
+import BarcodeProvider from "@/components/BarcodeProvider";
 import Index from "./pages/Index.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import AuthCallbackPage from "./pages/AuthCallback.tsx";
@@ -18,23 +19,25 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <ShopifyEmbeddedProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/auth/xero/callback" element={<AuthCallbackPage />} />
-            <Route path="/auth/myob/callback" element={<AuthCallbackPage />} />
-            <Route path="/auth/lightspeed-x/callback" element={<AuthCallbackPage />} />
-            <Route path="/auth/lightspeed-r/callback" element={<AuthCallbackPage />} />
-            <Route path="/support" element={<Support />} />
-            <Route path="/privacy" element={<Privacy />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-        <InstallAppBanner />
+        <BarcodeProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/auth/xero/callback" element={<AuthCallbackPage />} />
+              <Route path="/auth/myob/callback" element={<AuthCallbackPage />} />
+              <Route path="/auth/lightspeed-x/callback" element={<AuthCallbackPage />} />
+              <Route path="/auth/lightspeed-r/callback" element={<AuthCallbackPage />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/privacy" element={<Privacy />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+          <InstallAppBanner />
+        </BarcodeProvider>
       </ShopifyEmbeddedProvider>
     </TooltipProvider>
   </QueryClientProvider>

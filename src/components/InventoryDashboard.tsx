@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useBarcode } from "@/components/BarcodeProvider";
 import {
   ChevronLeft, Package, DollarSign, AlertTriangle, TrendingUp,
   TrendingDown, MapPin, BarChart3, Loader2, RefreshCw,
@@ -55,6 +56,17 @@ export default function InventoryDashboard({ onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData>({ variants: [], locations: [] });
   const [tab, setTab] = useState("overview");
+  const [highlightedSku, setHighlightedSku] = useState<string | null>(null);
+
+  // Global barcode scanner integration
+  const { registerHandler } = useBarcode();
+  useEffect(() => {
+    return registerHandler("inventory", (barcode) => {
+      setHighlightedSku(barcode.toLowerCase());
+      // Clear highlight after 5s
+      setTimeout(() => setHighlightedSku(null), 5000);
+    });
+  }, [registerHandler]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -222,7 +234,7 @@ export default function InventoryDashboard({ onBack }: Props) {
     const margin = v.cost > 0 && v.retailPrice > 0
       ? ((v.retailPrice - v.cost) / v.retailPrice) * 100 : -1;
     return (
-      <div className="flex items-center gap-3 py-2 border-b border-border last:border-0">
+      <div className={cn("flex items-center gap-3 py-2 border-b border-border last:border-0 transition-all", highlightedSku && v.sku?.toLowerCase() === highlightedSku && "ring-2 ring-primary bg-primary/5 rounded-md px-2")}>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{v.productTitle}</p>
           <p className="text-[10px] text-muted-foreground">

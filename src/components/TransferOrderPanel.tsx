@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useBarcode } from "@/components/BarcodeProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,18 @@ const TransferOrderPanel = ({ onBack }: TransferOrderPanelProps) => {
   const [activeLines, setActiveLines] = useState<TransferLine[]>([]);
   const [processing, setProcessing] = useState(false);
 
+  // Global barcode scanner integration
+  const { registerHandler } = useBarcode();
+  const addSkuRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (screen !== "create") return;
+    return registerHandler("transfer", (barcode) => {
+      setSkuInput(barcode);
+      // Use a timeout to let state update, then trigger add
+      setTimeout(() => addSkuRef.current(), 100);
+    });
+  }, [screen, registerHandler]);
+
   useEffect(() => { loadTransfers(); loadLocations(); }, []);
 
   const loadLocations = async () => {
@@ -168,6 +181,7 @@ const TransferOrderPanel = ({ onBack }: TransferOrderPanelProps) => {
     setSkuInput("");
     skuRef.current?.focus();
   };
+  addSkuRef.current = handleAddSku;
 
   /* ─── Create Transfer ─── */
 

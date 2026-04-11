@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useBarcode } from "@/components/BarcodeProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -111,6 +112,24 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
   const [receiving, setReceiving] = useState(false);
   const [showReceiveConfirm, setShowReceiveConfirm] = useState(false);
   const [barcodeInput, setBarcodeInput] = useState("");
+
+  // Global barcode scanner integration
+  const { registerHandler } = useBarcode();
+  useEffect(() => {
+    if (view !== "receive" || !receivePO) return;
+    return registerHandler("purchase_order_receive", (barcode) => {
+      const line = receivePO.lines.find(l =>
+        l.sku.toLowerCase() === barcode.toLowerCase()
+      );
+      if (line) {
+        const remaining = line.expected_qty - line.received_qty;
+        const current = receiveQtys[line.id] || 0;
+        if (current < remaining) {
+          setReceiveQtys(prev => ({ ...prev, [line.id]: current + 1 }));
+        }
+      }
+    });
+  }, [view, receivePO, receiveQtys, registerHandler]);
 
   // Match state
   const [matchingPO, setMatchingPO] = useState<PurchaseOrder | null>(null);

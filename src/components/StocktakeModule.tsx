@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useBarcode } from "@/components/BarcodeProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,33 @@ const StocktakeModule = ({ onBack }: StocktakeModuleProps) => {
   const [scanLog, setScanLog] = useState<{ sku: string; product: string; qty: number; time: string }[]>([]);
   const scanInputRef = useRef<HTMLInputElement>(null);
   const totalScanned = useMemo(() => activeLines.reduce((s, l) => s + l.counted_qty, 0), [activeLines]);
+
+  // Global barcode scanner integration
+  const { registerHandler } = useBarcode();
+  useEffect(() => {
+    if (screen !== "import_count") return;
+    return registerHandler("stocktake", (barcode) => {
+      const match = activeLines.find(l =>
+        (l.sku && l.sku.toLowerCase() === barcode.toLowerCase()) ||
+        (l.barcode && l.barcode === barcode)
+      );
+      if (match) {
+        setActiveLines(prev => prev.map(l => {
+          if (l.id === match.id) {
+            const newCounted = l.counted_qty + 1;
+            return { ...l, counted_qty: newCounted, variance: newCounted - l.expected_qty };
+          }
+          return l;
+        }));
+        setScanLog(prev => [{
+          sku: match.sku || match.barcode || barcode,
+          product: match.product_title || "Unknown",
+          qty: match.counted_qty + 1,
+          time: new Date().toLocaleTimeString(),
+        }, ...prev].slice(0, 50));
+      }
+    });
+  }, [screen, activeLines, registerHandler]);
 
   useEffect(() => {
     loadStocktakes();

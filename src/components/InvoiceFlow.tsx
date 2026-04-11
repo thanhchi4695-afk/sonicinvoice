@@ -250,6 +250,41 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [processAs, setProcessAs] = useState<ProcessAsMode>("auto");
   const [detectedLayout, setDetectedLayout] = useState<LayoutType | null>(null);
 
+  // Supplier dropdown & DB template state
+  const [supplierList, setSupplierList] = useState<string[]>([]);
+  const [dbTemplate, setDbTemplate] = useState<DBSupplierTemplate | null>(null);
+  const [showTeachModal, setShowTeachModal] = useState(false);
+  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
+
+  // Fetch user's suppliers for dropdown
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from("suppliers").select("name").order("name");
+        if (data) setSupplierList(data.map((s: any) => s.name));
+      } catch {}
+    })();
+  }, []);
+
+  // Check for DB template when supplier changes
+  useEffect(() => {
+    if (!supplierName.trim()) { setDbTemplate(null); return; }
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("supplier_templates" as any)
+          .select("*")
+          .eq("supplier_name", supplierName.trim())
+          .limit(1);
+        if (data && data.length > 0) {
+          setDbTemplate(data[0] as any);
+        } else {
+          setDbTemplate(null);
+        }
+      } catch { setDbTemplate(null); }
+    })();
+  }, [supplierName]);
+
   // Processing timer state
   const [processStartTime, setProcessStartTime] = useState<number | null>(null);
   const [processingElapsed, setProcessingElapsed] = useState(0);

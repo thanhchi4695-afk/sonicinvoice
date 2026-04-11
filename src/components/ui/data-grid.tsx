@@ -267,7 +267,7 @@ export default function DataGrid<T>({
                 {headerGroup.headers.map(header => (
                   <th
                     key={header.id}
-                    className="relative px-2 py-1.5 text-left font-medium text-muted-foreground whitespace-nowrap select-none"
+                    className="relative px-2 py-1 text-left font-medium text-muted-foreground whitespace-nowrap select-none leading-[32px]"
                     style={{ width: header.getSize() }}
                   >
                     {header.isPlaceholder ? null : (
@@ -310,11 +310,12 @@ export default function DataGrid<T>({
                   key={row.id}
                   className={cn(
                     "border-t border-border hover:bg-muted/30 transition-colors",
-                    row.getIsSelected() && "bg-primary/5"
+                    row.getIsSelected() && "bg-primary/5",
+                    row.index % 2 === 1 && "bg-muted/15"
                   )}
                 >
                   {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className="px-2 py-1" style={{ width: cell.column.getSize() }}>
+                    <td key={cell.id} className="px-2 py-0.5 leading-[32px]" style={{ width: cell.column.getSize() }}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

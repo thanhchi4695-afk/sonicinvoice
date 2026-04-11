@@ -9,6 +9,7 @@ import HomeScreen from "@/components/HomeScreen";
 import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
 import StockyLayout from "@/components/StockyLayout";
+import QuickActionsBar from "@/components/QuickActionsBar";
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
 const InvoicesTab = lazy(() => import("@/components/InvoicesTab"));
@@ -488,6 +489,7 @@ const Index = () => {
               {mode.modeBadge.label}
             </button>
           </div>
+          <QuickActionsBar onAction={handleStartFlow} />
           {activeFlow ? renderFlow() : mainContent}
         </StockyLayout>
       </div>
@@ -516,6 +518,7 @@ const Index = () => {
             {mode.modeBadge.label}
           </button>
         </div>
+        <QuickActionsBar onAction={handleStartFlow} />
         {activeFlow ? renderFlow() : mainContent}
         <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 

@@ -234,7 +234,7 @@ export default function InventoryDashboard({ onBack }: Props) {
     const margin = v.cost > 0 && v.retailPrice > 0
       ? ((v.retailPrice - v.cost) / v.retailPrice) * 100 : -1;
     return (
-      <div className="flex items-center gap-3 py-2 border-b border-border last:border-0">
+      <div className={cn("flex items-center gap-3 py-2 border-b border-border last:border-0 transition-all", highlightedSku && v.sku?.toLowerCase() === highlightedSku && "ring-2 ring-primary bg-primary/5 rounded-md px-2")}>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{v.productTitle}</p>
           <p className="text-[10px] text-muted-foreground">

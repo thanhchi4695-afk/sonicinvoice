@@ -537,30 +537,70 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
       let base64: string;
 
-      // ── Photo preprocessing pipeline ──
-      if (isLikelyPhotoInvoice(file)) {
-        setEnrichLines([{ name: "Preprocessing photo…", status: "searching", action: "Correcting orientation & enhancing…", confidence: 0 }]);
+      // ── Client-side image preprocessing (resize, grayscale, contrast, sharpen) ──
+      if (!isPdfFile(file)) {
+        setEnrichLines([{ name: "Preprocessing image…", status: "searching", action: "Resize, grayscale, contrast & sharpen…", confidence: 0 }]);
 
-        const aiRegionDetect = async (imgBase64: string): Promise<DetectedRegions | null> => {
-          try {
-            const { data, error } = await supabase.functions.invoke("preprocess-invoice-image", {
-              body: { imageBase64: imgBase64, fileType: ext },
-            });
-            if (error || !data?.regions) return null;
-            return data.regions as DetectedRegions;
-          } catch { return null; }
-        };
+        try {
+          const preprocessedBlob = await preprocessForUpload(file);
+          if (preprocessedBlob) {
+            // Use the preprocessed blob for all downstream processing
+            const preprocessedFile = new File([preprocessedBlob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" });
+            console.log(`[Preprocess] Lightweight: ${(file.size / 1024).toFixed(0)}KB → ${(preprocessedBlob.size / 1024).toFixed(0)}KB`);
 
-        const ppResult = await preprocessInvoiceImage(file, aiRegionDetect);
-        setPreprocessResult(ppResult);
-        base64 = ppResult.bestForOCR;
+            // ── Photo preprocessing pipeline (orientation, region detection) ──
+            if (isLikelyPhotoInvoice(file)) {
+              setEnrichLines([{ name: "Preprocessing photo…", status: "searching", action: "Correcting orientation & enhancing…", confidence: 0 }]);
 
-        const rotMsg = ppResult.rotationApplied ? ` (rotated ${ppResult.rotationApplied}°)` : "";
-        const cropMsg = ppResult.lineItemCrop ? " • line-item crop" : "";
-        console.log(`[Preprocess] ${ppResult.processingTimeMs}ms${rotMsg}${cropMsg}`);
+              const aiRegionDetect = async (imgBase64: string): Promise<DetectedRegions | null> => {
+                try {
+                  const { data, error } = await supabase.functions.invoke("preprocess-invoice-image", {
+                    body: { imageBase64: imgBase64, fileType: "jpg" },
+                  });
+                  if (error || !data?.regions) return null;
+                  return data.regions as DetectedRegions;
+                } catch { return null; }
+              };
 
-        setEnrichLines([{ name: "Reading invoice…", status: "searching", action: "AI extracting products…", confidence: 0 }]);
+              const ppResult = await preprocessInvoiceImage(preprocessedFile, aiRegionDetect);
+              setPreprocessResult(ppResult);
+              base64 = ppResult.bestForOCR;
+
+              const rotMsg = ppResult.rotationApplied ? ` (rotated ${ppResult.rotationApplied}°)` : "";
+              const cropMsg = ppResult.lineItemCrop ? " • line-item crop" : "";
+              console.log(`[Preprocess] Full: ${ppResult.processingTimeMs}ms${rotMsg}${cropMsg}`);
+            } else {
+              // Non-photo image (screenshot etc) — use preprocessed blob directly
+              const arrayBuffer = await preprocessedBlob.arrayBuffer();
+              const bytes = new Uint8Array(arrayBuffer);
+              let binary = "";
+              for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+              }
+              base64 = btoa(binary);
+            }
+          } else {
+            // preprocessForUpload returned null (shouldn't happen since we checked isPdf)
+            const arrayBuffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = "";
+            for (let i = 0; i < bytes.length; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            base64 = btoa(binary);
+          }
+        } catch (ppErr) {
+          console.warn("[Preprocess] Lightweight preprocessing failed, using original:", ppErr);
+          const arrayBuffer = await file.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = "";
+          for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          base64 = btoa(binary);
+        }
       } else {
+        // PDF — skip all image preprocessing
         const arrayBuffer = await file.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
         let binary = "";
@@ -569,6 +609,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         }
         base64 = btoa(binary);
       }
+
+      setEnrichLines([{ name: "Reading invoice…", status: "searching", action: "AI extracting products…", confidence: 0 }]);
 
       // Build learning memory hint (structure-based, not brand-specific)
       const memoryHint = buildMemoryHint(supplierName || undefined);

@@ -6,6 +6,7 @@ import {
   ChevronLeft, Package, DollarSign, AlertTriangle, TrendingUp,
   TrendingDown, MapPin, BarChart3, Loader2, RefreshCw,
 } from "lucide-react";
+import BulkInventoryActions from "@/components/BulkInventoryActions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -276,6 +277,7 @@ export default function InventoryDashboard({ onBack }: Props) {
           </h2>
           <p className="text-xs text-muted-foreground">Real-time inventory health overview</p>
         </div>
+        <BulkInventoryActions mode="inventory" onComplete={fetchData} />
         <Button variant="ghost" size="sm" onClick={fetchData}>
           <RefreshCw className="w-4 h-4" />
         </Button>

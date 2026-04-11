@@ -112,6 +112,11 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [showExportReview, setShowExportReview] = useState(false);
   const [showBatchReview, setShowBatchReview] = useState(false);
+  const [showCropTool, setShowCropTool] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [dimensionWarning, setDimensionWarning] = useState<string | null>(null);
+  const [preprocessingStatus, setPreprocessingStatus] = useState<string | null>(null);
+  const [detectedInvoiceBarcode, setDetectedInvoiceBarcode] = useState<string | null>(null);
 
   const resetInput = useCallback(() => {
     setTextInput("");

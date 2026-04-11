@@ -26,7 +26,7 @@ const defaultNavItems: StockyNavItem[] = [
   { id: "purchase_orders", label: "Purchase Orders", icon: ClipboardList, type: "flow" },
   { id: "inventory_dashboard", label: "Inventory", icon: Package, type: "flow" },
   { id: "suppliers", label: "Suppliers", icon: Users, type: "flow" },
-  { id: "stock_check", label: "Stocktakes", icon: ClipboardCheck, type: "flow" },
+  { id: "stocktake_module", label: "Stocktakes", icon: ClipboardCheck, type: "flow" },
   { id: "analytics", label: "Reports", icon: BarChart3, type: "tab" },
   { id: "tools", label: "Settings", icon: Settings, type: "tab" },
 ];

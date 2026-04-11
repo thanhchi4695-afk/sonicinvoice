@@ -181,6 +181,7 @@ const TransferOrderPanel = ({ onBack }: TransferOrderPanelProps) => {
     setSkuInput("");
     skuRef.current?.focus();
   };
+  addSkuRef.current = handleAddSku;
 
   /* ─── Create Transfer ─── */
 

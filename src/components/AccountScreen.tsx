@@ -223,6 +223,42 @@ const AccountScreen = () => {
         })()}
       </Section>
 
+      {/* Tax Region */}
+      <Section title="Tax region">
+        <p className="text-[11px] text-muted-foreground mb-2">Determines tax rates for invoices and pricing. US sales tax varies by state; EU VAT varies by country.</p>
+        <SelectField
+          label="Country / Region"
+          value={taxRegion}
+          onChange={(v) => {
+            setTaxRegion(v);
+            setTaxSubRegion("");
+            saveTaxConfig({ regionCode: v, subRegionCode: undefined });
+          }}
+          options={TAX_REGIONS.map(r => ({ v: r.countryCode, l: `${r.flag} ${r.country} — ${r.taxLabel}` }))}
+        />
+        {(() => {
+          const region = TAX_REGIONS.find(r => r.countryCode === taxRegion);
+          if (!region?.subRegions?.length) return null;
+          const subLabel = taxRegion === "US" ? "State" : taxRegion === "CA" ? "Province" : "Country";
+          return (
+            <SelectField
+              label={subLabel}
+              value={taxSubRegion}
+              onChange={(v) => { setTaxSubRegion(v); saveTaxConfig({ regionCode: taxRegion, subRegionCode: v }); }}
+              options={[
+                { v: "", l: `— Use default (${(region.defaultRate * 100).toFixed(1)}%)` },
+                ...region.subRegions.map(s => ({ v: s.code, l: `${s.name} (${(s.rate * 100).toFixed(2)}%)` })),
+              ]}
+            />
+          );
+        })()}
+        <div className="mt-2 p-3 rounded-md bg-muted/50 text-xs space-y-1">
+          <p><span className="font-semibold">Tax label:</span> {getTaxLabel({ regionCode: taxRegion, subRegionCode: taxSubRegion || undefined })}</p>
+          <p><span className="font-semibold">Rate:</span> {formatTaxRate({ regionCode: taxRegion, subRegionCode: taxSubRegion || undefined })}</p>
+          <p><span className="font-semibold">Pricing:</span> {TAX_REGIONS.find(r => r.countryCode === taxRegion)?.taxInclusive ? "Tax-inclusive (prices include tax)" : "Tax-exclusive (tax added at checkout)"}</p>
+        </div>
+      </Section>
+
       {/* Pricing Rules */}
       <Section title="Pricing rules">
         <div className="grid grid-cols-2 gap-3">

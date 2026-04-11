@@ -1,9 +1,10 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Upload, FileText, CheckCircle2, AlertCircle, Loader2, Trash2, Eye, Save, Layers } from "lucide-react";
+import { ArrowLeft, Upload, FileText, CheckCircle2, AlertCircle, Loader2, Trash2, Eye, Save, Layers, Link2, FolderOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 

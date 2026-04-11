@@ -403,6 +403,7 @@ const HomeScreen = ({
         <FeatureTile icon="🤖" label="GEO & Agentic" onClick={onStartGeoAgentic} />
         <FeatureTile icon="🤝" label="Collab SEO" onClick={onStartCollabSEO} />
         <FeatureTile icon="🔎" label="Competitor intel" onClick={onStartCompetitorIntel} />
+        <FeatureTile icon="💰" label="Price monitor" onClick={() => onNavigateToTab?.("tools")} />
         <FeatureTile icon="📣" label="Social media" onClick={onStartSocialMedia} />
       </CollapsibleSection>
 

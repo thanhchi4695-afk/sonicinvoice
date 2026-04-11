@@ -1163,6 +1163,10 @@ const ToolsScreen = () => {
   if (activeTool === "feed_optimise") return <AIFeedOptimisation onBack={() => setActiveTool(null)} />;
   if (activeTool === "feed_health") return <FeedHealthPanel onBack={() => setActiveTool(null)} />;
   if (activeTool === "learning_memory") return <LearningMemoryPanel onBack={() => setActiveTool(null)} />;
+  if (activeTool === "collection_seo_export") {
+    const CollectionSEOExport = lazy(() => import("@/components/CollectionSEOExport"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><CollectionSEOExport onBack={() => setActiveTool(null)} /></Suspense>;
+  }
 
   if (activeTool === "ai") {
     return (

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useUserRole, type Permission } from "@/hooks/use-user-role";
 import {
   LayoutDashboard,
   ClipboardList,

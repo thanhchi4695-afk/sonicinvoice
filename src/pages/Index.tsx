@@ -363,7 +363,8 @@ const Index = () => {
             onNavigateToTab={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
             onStartPipeline={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }}
             onStartPipelineChooser={() => setActiveFlow("pipeline_chooser")}
-            onStartStockyOnboarding={() => setActiveFlow("stocky_onboarding")}
+             onStartStockyOnboarding={() => setActiveFlow("stocky_onboarding")}
+             onStartSupplierProfileBuilder={() => setActiveFlow("supplier_profile_builder")}
         />
       )}
       <Suspense fallback={suspenseFallback}>

@@ -21,6 +21,8 @@ import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import AccountingBillReview from "@/components/AccountingBillReview";
 import StockCheckFlow from "@/components/StockCheckFlow";
+import PriceLookup from "@/components/PriceLookup";
+import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import type { InvoiceLineItem } from "@/lib/stock-matcher";
 import { preprocessInvoiceImage, isLikelyPhotoInvoice, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
 import { supabase } from "@/integrations/supabase/client";
@@ -972,6 +974,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
+  const [priceLookupActive, setPriceLookupActive] = useState(false);
+  const [collectionSeoActive, setCollectionSeoActive] = useState(false);
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
   const [isReprocessing, setIsReprocessing] = useState(false);
 
@@ -1230,6 +1234,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     return items;
   };
 
+  // ── Convert products for Collection SEO ──
+  const convertToCollectionProducts = () => {
+    return productGroups.map(g => ({
+      title: `${g.brand} ${g.name}`.trim(),
+      vendor: g.brand,
+      product_type: g.type || "",
+      colour: g.colour || "",
+      tags: g.type ? `${g.brand}, ${g.type}` : g.brand,
+      price: g.rrp || g.price,
+      style_number: g.vendorCode || g.styleGroup || "",
+      description: g.desc || "",
+    }));
+  };
+
   // ── If stock check is active, render it instead ──
   if (stockCheckItems) {
     return (
@@ -1237,6 +1255,25 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         lineItems={stockCheckItems}
         onBack={() => setStockCheckItems(null)}
         onComplete={() => { setStockCheckItems(null); }}
+      />
+    );
+  }
+
+  // ── If price lookup is active, render it instead ──
+  if (priceLookupActive) {
+    return (
+      <PriceLookup
+        onBack={() => setPriceLookupActive(false)}
+      />
+    );
+  }
+
+  // ── If collection SEO is active, render it instead ──
+  if (collectionSeoActive) {
+    return (
+      <CollectionSEOFlow
+        onBack={() => setCollectionSeoActive(false)}
+        products={convertToCollectionProducts()}
       />
     );
   }
@@ -2156,6 +2193,38 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Price Lookup & Collection SEO tools */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-card border border-border rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                  <DollarSign className="w-4 h-4 text-secondary-foreground" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold">Price Lookup</p>
+                  <p className="text-[10px] text-muted-foreground">Find retail prices online</p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => setPriceLookupActive(true)}>
+                <Search className="w-3 h-3 mr-1" /> Look Up Prices
+              </Button>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                  <Link className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold">Build Collections</p>
+                  <p className="text-[10px] text-muted-foreground">SEO collection hierarchy</p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => setCollectionSeoActive(true)}>
+                <Link className="w-3 h-3 mr-1" /> Build SEO Collections
+              </Button>
             </div>
           </div>
 

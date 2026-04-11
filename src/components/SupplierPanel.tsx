@@ -601,6 +601,9 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                   )}
                 </div>
               )}
+              {detailTab === "catalog" && (
+                <SupplierCatalog supplierId={detail.id} supplierName={detail.name} />
+              )}
             </>
           )}
         </div>

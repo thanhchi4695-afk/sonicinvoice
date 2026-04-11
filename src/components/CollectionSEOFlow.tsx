@@ -39,6 +39,33 @@ interface PushResult {
   error?: string;
 }
 
+interface CrossLink {
+  from: string;
+  to: string;
+  anchor_text?: string;
+  reason: string;
+}
+
+interface CollectionGroup {
+  group_name: string;
+  brand: string;
+  products_in_group: number;
+  product_titles: string[];
+  collections: ArchitectCollection[];
+  cross_links: CrossLink[];
+}
+
+interface HomepageSection {
+  title: string;
+  collections: string[];
+  layout: string;
+}
+
+interface FooterMenuItem {
+  heading: string;
+  links: { title: string; handle: string }[];
+}
+
 // ── Local parse helpers (kept from original for "Quick" mode) ──
 
 const TYPE_OPTIONS = [

@@ -1208,6 +1208,79 @@ Deno.serve(async (req) => {
         break;
       }
 
+      // ═══ GraphQL Collection Create (Smart) ═══
+      case "graphql_create_collection": {
+        if (!body.gql_collection?.title) {
+          return new Response(JSON.stringify({ error: "Missing gql_collection.title" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const gc = body.gql_collection;
+        const colGqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+
+        // Map column names to Shopify GraphQL enum values
+        const colMap: Record<string, string> = {
+          tag: "TAG", title: "TITLE", type: "PRODUCT_TYPE", vendor: "VENDOR",
+          variant_price: "VARIANT_PRICE", variant_title: "VARIANT_TITLE",
+          product_type: "PRODUCT_TYPE",
+        };
+        const relMap: Record<string, string> = {
+          equals: "EQUALS", contains: "CONTAINS", starts_with: "STARTS_WITH",
+          ends_with: "ENDS_WITH", greater_than: "GREATER_THAN", less_than: "LESS_THAN",
+          is_set: "IS_SET", is_not_set: "IS_NOT_SET",
+        };
+
+        const ruleSetInput = gc.ruleSet ? {
+          appliedDisjunctively: gc.ruleSet.appliedDisjunctively,
+          rules: gc.ruleSet.rules.map(r => ({
+            column: colMap[r.column.toLowerCase()] || r.column,
+            relation: relMap[r.relation.toLowerCase()] || r.relation,
+            condition: r.condition,
+          })),
+        } : undefined;
+
+        const collectionInput: Record<string, unknown> = {
+          title: gc.title,
+          descriptionHtml: gc.descriptionHtml || "",
+        };
+        if (gc.handle) collectionInput.handle = gc.handle;
+        if (gc.seo) collectionInput.seo = gc.seo;
+        if (ruleSetInput) collectionInput.ruleSet = ruleSetInput;
+        if (gc.metafields && gc.metafields.length > 0) collectionInput.metafields = gc.metafields;
+
+        const colMutation = `
+          mutation CollectionCreate($input: CollectionInput!) {
+            collectionCreate(input: $input) {
+              collection {
+                id
+                handle
+                title
+                updatedAt
+              }
+              userErrors {
+                field
+                message
+              }
+            }
+          }
+        `;
+
+        const colResp = await fetch(colGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({ query: colMutation, variables: { input: collectionInput } }),
+        });
+        const colData = await colResp.json();
+        const userErrors = colData?.data?.collectionCreate?.userErrors || [];
+        if (userErrors.length > 0) {
+          return new Response(JSON.stringify({ error: "Collection creation failed", userErrors }), {
+            status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: colData?.data?.collectionCreate?.collection };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

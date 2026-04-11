@@ -75,6 +75,7 @@ const SupplierProfileBuilder = lazy(() => import("@/components/SupplierProfileBu
 const StocktakeModule = lazy(() => import("@/components/StocktakeModule"));
 const TransferOrderPanel = lazy(() => import("@/components/TransferOrderPanel"));
 const ReportsHub = lazy(() => import("@/components/ReportsHub"));
+const StockAdjustmentPanel = lazy(() => import("@/components/StockAdjustmentPanel"));
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -282,6 +283,7 @@ const Index = () => {
       case "transfer_orders": flowEl = <TransferOrderPanel onBack={() => setActiveFlow(null)} />; break;
       case "reports_hub": flowEl = <ReportsHub onBack={() => setActiveFlow(null)} />; break;
       case "supplier_profile_builder": flowEl = <SupplierProfileBuilder onBack={() => setActiveFlow(null)} />; break;
+      case "stock_adjustment": flowEl = <StockAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
       case "pipeline": flowEl = activePipelineId ? <PipelineRunner pipelineId={activePipelineId} onRenderFlow={(flowKey, onComplete) => {
         const flowMap: Record<string, React.ReactNode> = {
           invoice: <InvoiceFlow onBack={onComplete} />,

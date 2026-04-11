@@ -105,7 +105,7 @@ export default function ShopifyCSVSEO({ onBack }: { onBack: () => void }) {
         // Check for duplicate headers
         const dupes = headers.filter((h, i) => headers.indexOf(h) !== i);
         if (dupes.length > 0) {
-          toast.error(`Duplicate headers detected: ${[...new Set(dupes)].join(", ")}`);
+          toast.error(`Duplicate headers detected: ${Array.from(new Set(dupes)).join(", ")}`);
           return;
         }
 

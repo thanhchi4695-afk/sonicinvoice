@@ -24,16 +24,16 @@ const QuickActionsBar = ({ onAction }: QuickActionsBarProps) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const action = actions.find((a) => a.key === e.key.toLowerCase());
-      if (action && can(action.permission)) {
+      if (action && hasPermission(action.permission)) {
         e.preventDefault();
         onAction(action.id);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onAction, can]);
+  }, [onAction, hasPermission]);
 
-  const visible = actions.filter((a) => can(a.permission));
+  const visible = actions.filter((a) => hasPermission(a.permission));
   if (visible.length === 0) return null;
 
   return (

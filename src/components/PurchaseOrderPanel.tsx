@@ -943,39 +943,78 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
       {view === "receive" && receivePO && (
         <>
           <h1 className="text-xl font-bold font-display mb-1">Receive Stock</h1>
-          <p className="text-sm text-muted-foreground mb-4">
+          <p className="text-sm text-muted-foreground mb-3">
             {receivePO.po_number} — {receivePO.supplier_name}
           </p>
 
-          <div className="space-y-2 mb-6">
+          {/* Barcode scanner input */}
+          <div className="bg-card rounded-lg border-2 border-dashed border-primary/30 p-3 mb-4">
+            <label className="text-xs font-semibold text-muted-foreground block mb-1">📷 Scan Barcode / SKU</label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Scan or type SKU…"
+                value={barcodeInput}
+                onChange={e => setBarcodeInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { handleBarcodeScan(barcodeInput); } }}
+                className="font-mono h-10 text-sm"
+                autoFocus
+              />
+              <Button variant="teal" size="sm" className="h-10 px-4" onClick={() => handleBarcodeScan(barcodeInput)}>
+                Scan
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">Each scan increments qty by 1 for the matching SKU</p>
+          </div>
+
+          <div className="space-y-2 mb-4">
             {receivePO.lines.map(line => {
               const remaining = line.expected_qty - line.received_qty;
               const qty = receiveQtys[line.id] || 0;
+              const cost = receiveCosts[line.id] ?? line.expected_cost;
               return (
-                <div key={line.id} className="bg-card rounded-lg border border-border p-3">
+                <div key={line.id} className={`bg-card rounded-lg border p-3 ${qty >= remaining && remaining > 0 ? "border-success/40" : "border-border"}`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{line.product_title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {line.sku && `SKU: ${line.sku} · `}Expected: {line.expected_qty} · Received: {line.received_qty} · Remaining: {remaining}
+                        {line.sku && <span className="font-mono">{line.sku}</span>}
+                        {line.sku && " · "}
+                        Expected: {line.expected_qty} · Already received: {line.received_qty} · Remaining: {remaining}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-muted-foreground shrink-0">Receiving:</label>
-                    <Input
-                      type="number"
-                      value={qty || ""}
-                      onChange={e => setReceiveQtys({ ...receiveQtys, [line.id]: Math.min(+e.target.value, remaining) })}
-                      className="w-20 h-8 text-xs font-mono"
-                      max={remaining}
-                    />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <label className="text-xs text-muted-foreground shrink-0">Qty:</label>
+                      <Input
+                        type="number"
+                        value={qty || ""}
+                        onChange={e => setReceiveQtys({ ...receiveQtys, [line.id]: Math.min(Math.max(0, +e.target.value), remaining) })}
+                        className="w-20 h-8 text-xs font-mono"
+                        max={remaining}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <label className="text-xs text-muted-foreground shrink-0">Cost $:</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={cost || ""}
+                        onChange={e => setReceiveCosts({ ...receiveCosts, [line.id]: +e.target.value })}
+                        className="w-20 h-8 text-xs font-mono"
+                      />
+                    </div>
                     <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setReceiveQtys({ ...receiveQtys, [line.id]: remaining })}>
                       All ({remaining})
                     </Button>
                   </div>
+                  {qty > 0 && qty < remaining && (
+                    <p className="text-[10px] text-secondary flex items-center gap-1 mt-1.5">
+                      🔶 {remaining - qty} will be backordered
+                    </p>
+                  )}
                   {qty >= 50 && (
-                    <p className="text-[10px] text-warning flex items-center gap-1 mt-1">
+                    <p className="text-[10px] flex items-center gap-1 mt-1 text-destructive">
                       <AlertTriangle className="w-3 h-3" /> High quantity — please confirm
                     </p>
                   )}

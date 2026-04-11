@@ -451,6 +451,59 @@ export default function PostParseReviewScreen({
     else { triggerProfileUpdate(); onExportAccepted(); }
   };
 
+  const [savingToCatalog, setSavingToCatalog] = useState(false);
+
+  const handleSaveToCatalog = async () => {
+    if (!supplierName || accepted.length === 0) {
+      toast.error("No accepted products to save");
+      return;
+    }
+    setSavingToCatalog(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session) { toast.error("Please sign in first"); return; }
+      const userId = session.session.user.id;
+
+      // Find or create supplier
+      let { data: supplier } = await supabase
+        .from("suppliers")
+        .select("id")
+        .eq("name", supplierName)
+        .maybeSingle();
+
+      if (!supplier) {
+        const { data: newSup } = await supabase
+          .from("suppliers")
+          .insert({ user_id: userId, name: supplierName })
+          .select("id")
+          .single();
+        supplier = newSup;
+      }
+
+      if (!supplier) { toast.error("Could not resolve supplier"); return; }
+
+      const lines = accepted.map(p => ({
+        product_title: p.name,
+        sku: p.sku,
+        unit_cost: p.cost,
+        color: p.colour,
+        size: p.size,
+      }));
+
+      const saved = await saveInvoiceLinesToCatalog(supplier.id, userId, lines);
+      if (saved > 0) {
+        toast.success(`Saved ${saved} item${saved > 1 ? "s" : ""} to ${supplierName} catalog`);
+      } else {
+        toast.info("All items already exist in catalog");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save to catalog");
+    } finally {
+      setSavingToCatalog(false);
+    }
+  };
+
   const tabs: { key: ReviewTab; label: string; count: number; icon: React.ReactNode; colorClass: string }[] = [
     { key: "accepted", label: "Accepted", count: accepted.length, icon: <Check className="w-3.5 h-3.5" />, colorClass: "text-success" },
     { key: "review", label: "Needs Review", count: needsReview.length, icon: <AlertTriangle className="w-3.5 h-3.5" />, colorClass: "text-secondary" },

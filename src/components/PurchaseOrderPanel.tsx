@@ -642,8 +642,10 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
                 const badge = STATUS_BADGES[po.status];
                 const receivedUnits = po.lines.reduce((a, l) => a + l.received_qty, 0);
                 const expectedUnits = po.lines.reduce((a, l) => a + l.expected_qty, 0);
+                const backordered = po.lines.reduce((a, l) => a + Math.max(0, l.expected_qty - l.received_qty), 0);
                 return (
-                  <div key={po.id} className="bg-card rounded-lg border border-border p-4">
+                  <div key={po.id} className="bg-card rounded-lg border border-border p-4 cursor-pointer hover:border-primary/30 transition-colors"
+                    onClick={() => { setDetailPO(po); setView("detail"); }}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold font-mono">{po.po_number}</span>
@@ -659,36 +661,39 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {po.lines.length} line{po.lines.length !== 1 ? "s" : ""} · ${po.total_cost.toFixed(2)}
                       {receivedUnits > 0 && ` · ${receivedUnits}/${expectedUnits} received`}
+                      {po.status === "partial" && backordered > 0 && ` · ${backordered} backordered`}
                     </p>
                     {po.linked_document_id && (
                       <p className="text-[10px] text-primary flex items-center gap-1 mt-1">
                         <Link2 className="w-3 h-3" /> Invoice linked
                       </p>
                     )}
-                    <div className="flex gap-2 mt-3 flex-wrap">
+                    <div className="flex gap-2 mt-3 flex-wrap" onClick={e => e.stopPropagation()}>
                       {["draft", "sent", "awaiting", "partial"].includes(po.status) && (
                         <Button variant="teal" size="sm" className="h-7 text-xs" onClick={() => startReceive(po)}>
-                          <ArrowDownToLine className="w-3 h-3 mr-1" /> Receive stock
+                          <ArrowDownToLine className="w-3 h-3 mr-1" /> Receive
+                        </Button>
+                      )}
+                      {["received", "discrepancy"].includes(po.status) && (
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleClosePO(po)}>
+                          🔒 Close PO
                         </Button>
                       )}
                       {["sent", "awaiting", "draft"].includes(po.status) && (
                         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => startMatch(po)}>
-                          <Search className="w-3 h-3 mr-1" /> Match invoice
+                          <Search className="w-3 h-3 mr-1" /> Match
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openLinkDialog(po)}>
-                        <Link2 className="w-3 h-3 mr-1" /> Link invoice
-                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleEdit(po)}>
                         <Edit2 className="w-3 h-3 mr-1" /> Edit
                       </Button>
                       {po.status === "draft" && (
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleStatusChange(po.id, "sent")}>
-                          📤 Mark sent
+                          📤 Send
                         </Button>
                       )}
                       <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={() => handleDelete(po.id)}>
-                        <Trash2 className="w-3 h-3 mr-1" /> Delete
+                        <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>
                   </div>

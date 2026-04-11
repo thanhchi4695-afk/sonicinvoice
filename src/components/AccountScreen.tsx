@@ -35,6 +35,7 @@ const AccountScreen = () => {
   const [rounding, setRounding] = useState("nearest_05");
   const [storeCity, setStoreCity] = useState("");
   const [freeShippingThreshold, setFreeShippingThreshold] = useState("");
+  const [industry, setIndustry] = useState(() => getStoreConfig().industry || "clothing");
 
   // Shopify connection
   const [shopifyUrl, setShopifyUrl] = useState("");

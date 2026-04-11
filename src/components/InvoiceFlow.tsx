@@ -2196,6 +2196,38 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           </div>
 
+          {/* Price Lookup & Collection SEO tools */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-card border border-border rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                  <DollarSign className="w-4 h-4 text-secondary-foreground" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold">Price Lookup</p>
+                  <p className="text-[10px] text-muted-foreground">Find retail prices online</p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => setPriceLookupActive(true)}>
+                <Search className="w-3 h-3 mr-1" /> Look Up Prices
+              </Button>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                  <Link className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold">Build Collections</p>
+                  <p className="text-[10px] text-muted-foreground">SEO collection hierarchy</p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => setCollectionSeoActive(true)}>
+                <Link className="w-3 h-3 mr-1" /> Build SEO Collections
+              </Button>
+            </div>
+          </div>
+
           <ExportReviewScreen
             products={mockProducts.map((p, i) => ({
               ...p,

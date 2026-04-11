@@ -245,7 +245,23 @@ export async function createSmartCollection(collection: Record<string, unknown>)
   return data.collection;
 }
 
-export async function updateSmartCollection(collectionId: number, collection: Record<string, unknown>): Promise<ShopifyCollection> {
+export interface GraphQLCollectionInput {
+  title: string;
+  handle?: string;
+  descriptionHtml?: string;
+  seo?: { title?: string; description?: string };
+  ruleSet?: {
+    appliedDisjunctively: boolean;
+    rules: Array<{ column: string; relation: string; condition: string }>;
+  };
+  metafields?: Array<{ namespace: string; key: string; value: string; type: string }>;
+}
+
+export async function createCollectionGraphQL(gql_collection: GraphQLCollectionInput) {
+  const data = await callProxy({ action: "graphql_create_collection" as any, gql_collection } as any);
+  return data.collection;
+}
+
   const data = await callProxy({ action: "update_smart_collection", collection_id: collectionId, collection });
   return data.collection;
 }

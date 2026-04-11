@@ -37,6 +37,8 @@ const AccountScreen = () => {
   const [storeCity, setStoreCity] = useState("");
   const [freeShippingThreshold, setFreeShippingThreshold] = useState("");
   const [industry, setIndustry] = useState(() => getStoreConfig().industry || "clothing");
+  const [taxRegion, setTaxRegion] = useState(() => getTaxConfig().regionCode || "AU");
+  const [taxSubRegion, setTaxSubRegion] = useState(() => getTaxConfig().subRegionCode || "");
 
   // Shopify connection
   const [shopifyUrl, setShopifyUrl] = useState("");

@@ -350,9 +350,46 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
   const startReceive = (po: PurchaseOrder) => {
     setReceivePO(po);
     const qtys: Record<string, number> = {};
-    po.lines.forEach(l => { qtys[l.id] = l.expected_qty - l.received_qty; });
+    const costs: Record<string, number> = {};
+    po.lines.forEach(l => {
+      qtys[l.id] = l.expected_qty - l.received_qty;
+      costs[l.id] = l.actual_cost ?? l.expected_cost;
+    });
     setReceiveQtys(qtys);
+    setReceiveCosts(costs);
+    setBarcodeInput("");
     setView("receive");
+  };
+
+  // Barcode scan handler for receive view
+  const handleBarcodeScan = (barcode: string) => {
+    if (!receivePO || !barcode.trim()) return;
+    const line = receivePO.lines.find(l =>
+      l.sku.toLowerCase() === barcode.trim().toLowerCase()
+    );
+    if (line) {
+      const remaining = line.expected_qty - line.received_qty;
+      const current = receiveQtys[line.id] || 0;
+      if (current < remaining) {
+        setReceiveQtys(prev => ({ ...prev, [line.id]: current + 1 }));
+        toast.success(`+1 ${line.product_title || line.sku}`);
+      } else {
+        toast(`${line.sku} already fully counted`, { icon: "⚠️" });
+      }
+    } else {
+      toast.error(`SKU "${barcode}" not found on this PO`);
+    }
+    setBarcodeInput("");
+  };
+
+  // Close PO handler
+  const handleClosePO = async (po: PurchaseOrder) => {
+    await supabase.from("purchase_orders").update({ status: "closed" }).eq("id", po.id);
+    addAuditEntry("PO", `Closed PO ${po.po_number}`);
+    toast.success(`${po.po_number} closed`);
+    await loadOrders();
+    if (detailPO?.id === po.id) setDetailPO(null);
+    setView("list");
   };
 
   const handleReceive = async () => {

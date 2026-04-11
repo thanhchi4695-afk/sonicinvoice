@@ -8,6 +8,7 @@ import LoadingScreen from "@/components/ui/loading-screen";
 import HomeScreen from "@/components/HomeScreen";
 import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
+import StockyLayout from "@/components/StockyLayout";
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
 const InvoicesTab = lazy(() => import("@/components/InvoicesTab"));

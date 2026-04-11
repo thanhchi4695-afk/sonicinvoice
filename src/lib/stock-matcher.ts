@@ -75,6 +75,101 @@ export interface GroupedMatch {
   totalQty:    number;
 }
 
+// ── Classified item (strict output format) ──
+export interface ClassifiedItem {
+  original_line: InvoiceLineItem;
+  classification: MatchOutcome;
+  shopify_match: {
+    product_id: string | null;
+    variant_id: string | null;
+  };
+  action: {
+    type: "inventory_adjust" | "add_variant" | "create_product";
+    details: Record<string, unknown>;
+  };
+  confidence: number;
+  reason: string;
+}
+
+export interface ClassificationSummary {
+  refills: number;
+  new_colours: number;
+  new_products: number;
+  total_quantity_to_add: number;
+}
+
+export interface ClassificationResult {
+  classified_items: ClassifiedItem[];
+  summary: ClassificationSummary;
+}
+
+// ── COLOUR ABBREVIATION MAP ──
+const COLOUR_ABBREVIATIONS: Record<string, string> = {
+  blk: "black", bk: "black", blck: "black",
+  wht: "white", wh: "white", wte: "white",
+  nvy: "navy", nv: "navy",
+  gry: "grey", gr: "grey", gray: "grey",
+  brn: "brown", br: "brown",
+  grn: "green", gn: "green",
+  blu: "blue", bl: "blue",
+  pnk: "pink", pk: "pink",
+  red: "red", rd: "red",
+  org: "orange", orn: "orange",
+  ylw: "yellow", yl: "yellow",
+  prp: "purple", pur: "purple",
+  crm: "cream", cr: "cream",
+  tan: "tan", tn: "tan",
+  olv: "olive", oliv: "olive",
+  brg: "burgundy", burg: "burgundy",
+  kha: "khaki", kh: "khaki",
+  cor: "coral", crl: "coral",
+  rst: "rust", rs: "rust",
+  sge: "sage", sg: "sage",
+  tl: "teal", tea: "teal",
+  lav: "lavender", lv: "lavender",
+  mnt: "mint", mn: "mint",
+  ivo: "ivory", iv: "ivory",
+  chc: "charcoal", char: "charcoal",
+  mve: "mauve", mv: "mauve",
+  nat: "natural", ntl: "natural",
+  snd: "sand", sd: "sand",
+  mul: "multi", mlt: "multi",
+  dnm: "denim", den: "denim",
+  cml: "camel", cam: "camel",
+  fch: "fuchsia", fuc: "fuchsia",
+  trq: "turquoise", tur: "turquoise",
+  mag: "magenta", mgn: "magenta",
+  ind: "indigo",
+  plt: "platinum",
+  slv: "silver", sv: "silver",
+  gld: "gold", gl: "gold",
+  rse: "rose", ros: "rose",
+  sky: "sky blue",
+  cob: "cobalt",
+  aqm: "aquamarine", aqu: "aqua",
+};
+
+// ── SIZE NORMALIZATION ──
+const SIZE_ALIASES: Record<string, string> = {
+  xxs: "XXS", "2xs": "XXS",
+  xs: "XS", "x-small": "XS", "x small": "XS", "extra small": "XS",
+  s: "S", sm: "S", sml: "S", small: "S",
+  m: "M", md: "M", med: "M", medium: "M",
+  l: "L", lg: "L", lrg: "L", large: "L",
+  xl: "XL", "x-large": "XL", "x large": "XL", "extra large": "XL",
+  xxl: "XXL", "2xl": "XXL", "xx-large": "XXL",
+  xxxl: "XXXL", "3xl": "XXXL",
+  "0": "0", "00": "00",
+  "4": "4", "6": "6", "8": "8", "10": "10", "12": "12",
+  "14": "14", "16": "16", "18": "18", "20": "20",
+  "one size": "OS", os: "OS", "o/s": "OS", onesize: "OS",
+};
+
+function normaliseSize(s: string): string {
+  const trimmed = (s || "").trim().toLowerCase().replace(/[.\-_]/g, "");
+  return SIZE_ALIASES[trimmed] || (s || "").trim().toUpperCase();
+}
+
 // ── MATCH A SINGLE LINE ITEM ──
 
 export function matchLineItem(
@@ -107,6 +202,45 @@ export function matchLineItem(
         matchedVariant: skuMatch, matchedProduct: skuMatch.product,
         reasons: [`SKU "${item.sku}" matched exactly`],
         suggestedAction: `Add ${item.quantityOrdered} units to existing stock`,
+      };
+    }
+  }
+
+  // STEP 2.5: Fuzzy SKU match (strip trailing colour/size suffixes)
+  if (item.sku) {
+    const fuzzySku = normalise(item.sku);
+    const fuzzyMatches = shopifyVariants.filter(v => {
+      const vs = normalise(v.sku);
+      if (!vs || !fuzzySku) return false;
+      // One contains the other (handles suffix differences)
+      return (vs.startsWith(fuzzySku) || fuzzySku.startsWith(vs)) && 
+             Math.abs(vs.length - fuzzySku.length) <= 4;
+    });
+    if (fuzzyMatches.length > 0) {
+      const best = fuzzyMatches[0];
+      const product = best.product;
+      const colourExists = product.variants.some(v => coloursMatch(v.option1, item.colour));
+      if (colourExists) {
+        const sizeMatch = product.variants.find(v =>
+          coloursMatch(v.option1, item.colour) && sizesMatch(v.option2, item.size)
+        );
+        if (sizeMatch) {
+          return {
+            lineItem: item, outcome: "refill", confidence: 90,
+            matchedVariant: sizeMatch, matchedProduct: product,
+            reasons: [`Fuzzy SKU match: "${item.sku}" ≈ "${best.sku}"`, `Colour + size confirmed`],
+            suggestedAction: `Add ${item.quantityOrdered} units to existing stock`,
+          };
+        }
+      }
+      return {
+        lineItem: item, outcome: colourExists ? "refill" : "new_colour",
+        confidence: 80,
+        matchedVariant: null, matchedProduct: product,
+        reasons: [`Fuzzy SKU match: "${item.sku}" ≈ "${best.sku}"`, colourExists ? `Colour exists but size "${item.size}" may be new` : `Colour "${item.colour}" is new`],
+        suggestedAction: colourExists
+          ? `Verify size variant for "${product.title}"`
+          : `Add "${item.colour}" as new colour to "${product.title}"`,
       };
     }
   }
@@ -167,10 +301,16 @@ export function matchLineItem(
     }
   }
 
-  // STEP 4: Title fuzzy match
+  // STEP 4: Title fuzzy match (enhanced with bigram similarity)
   const titleMatches = shopifyVariants
-    .map(v => ({ variant: v, score: titleSimilarity(item.styleName, v.product.title) }))
-    .filter(m => m.score >= 0.6)
+    .map(v => ({
+      variant: v,
+      score: Math.max(
+        titleSimilarity(item.styleName, v.product.title),
+        bigramSimilarity(item.styleName, v.product.title)
+      ),
+    }))
+    .filter(m => m.score >= 0.55)
     .sort((a, b) => b.score - a.score);
 
   if (titleMatches.length > 0) {
@@ -179,27 +319,29 @@ export function matchLineItem(
     const vendorScore = vendorMatch(item.brand, product.vendor);
     const colourExists = product.variants.some(v => coloursMatch(v.option1, item.colour));
 
-    if (colourExists && vendorScore > 0.7) {
+    if (colourExists && vendorScore > 0.6) {
+      const sizeMatch = product.variants.find(v =>
+        coloursMatch(v.option1, item.colour) && sizesMatch(v.option2, item.size)
+      );
       return {
         lineItem: item, outcome: "refill",
-        confidence: Math.round(best.score * 75),
-        matchedVariant: product.variants.find(v =>
-          coloursMatch(v.option1, item.colour) && sizesMatch(v.option2, item.size)
-        ) || null,
+        confidence: Math.round(best.score * 80),
+        matchedVariant: sizeMatch || null,
         matchedProduct: product,
         reasons: [
           `Title similarity ${Math.round(best.score * 100)}% with "${product.title}"`,
           `Brand "${item.brand}" matches vendor "${product.vendor}"`,
           `Colour "${item.colour}" already exists in this product`,
+          ...(sizeMatch ? [`Size "${item.size}" confirmed`] : [`Size "${item.size}" may need adding`]),
         ],
         suggestedAction: `Likely refill — please confirm this is "${product.title}"`,
       };
     }
 
-    if (vendorScore > 0.5) {
+    if (vendorScore > 0.4 || best.score > 0.75) {
       return {
         lineItem: item, outcome: "new_colour",
-        confidence: Math.round(best.score * 65),
+        confidence: Math.round(best.score * 70),
         matchedVariant: null, matchedProduct: product,
         reasons: [
           `Title similarity ${Math.round(best.score * 100)}% with "${product.title}"`,
@@ -230,6 +372,88 @@ export function matchAllLineItems(
   variants: ShopifyVariant[]
 ): MatchResult[] {
   return items.map(item => matchLineItem(item, variants));
+}
+
+// ── CLASSIFY ALL — strict JSON output format ──
+
+export function classifyAllItems(
+  items: InvoiceLineItem[],
+  variants: ShopifyVariant[]
+): ClassificationResult {
+  const results = matchAllLineItems(items, variants);
+  const classified: ClassifiedItem[] = results.map(r => ({
+    original_line: r.lineItem,
+    classification: r.outcome,
+    shopify_match: {
+      product_id: r.matchedProduct?.id || null,
+      variant_id: r.matchedVariant?.id || null,
+    },
+    action: buildAction(r),
+    confidence: r.confidence,
+    reason: r.reasons.join("; "),
+  }));
+
+  return {
+    classified_items: classified,
+    summary: {
+      refills: classified.filter(c => c.classification === "refill").length,
+      new_colours: classified.filter(c => c.classification === "new_colour").length,
+      new_products: classified.filter(c => c.classification === "new_product").length,
+      total_quantity_to_add: classified.reduce((sum, c) => sum + c.original_line.quantityOrdered, 0),
+    },
+  };
+}
+
+function buildAction(r: MatchResult): ClassifiedItem["action"] {
+  switch (r.outcome) {
+    case "refill":
+      return {
+        type: "inventory_adjust",
+        details: {
+          variant_id: r.matchedVariant?.id || null,
+          inventory_item_id: r.matchedVariant?.inventoryItemId || null,
+          quantity_to_add: r.lineItem.quantityOrdered,
+          current_qty: r.matchedVariant?.inventoryQty ?? null,
+          new_qty: r.matchedVariant ? r.matchedVariant.inventoryQty + r.lineItem.quantityOrdered : null,
+          unit_cost: r.lineItem.wholesale,
+        },
+      };
+    case "new_colour":
+      return {
+        type: "add_variant",
+        details: {
+          product_id: r.matchedProduct?.id || null,
+          product_title: r.matchedProduct?.title || r.lineItem.styleName,
+          colour: r.lineItem.colour,
+          size: r.lineItem.size,
+          sku: r.lineItem.sku,
+          barcode: r.lineItem.barcode,
+          price: r.lineItem.rrp,
+          cost: r.lineItem.wholesale,
+          quantity: r.lineItem.quantityOrdered,
+        },
+      };
+    case "new_product":
+      return {
+        type: "create_product",
+        details: {
+          title: r.lineItem.styleName,
+          vendor: r.lineItem.brand,
+          product_type: r.lineItem.productType || "",
+          tags: [r.lineItem.season, r.lineItem.collection].filter(Boolean),
+          image_url: r.lineItem.imageUrl || null,
+          variant: {
+            colour: r.lineItem.colour,
+            size: r.lineItem.size,
+            sku: r.lineItem.sku,
+            barcode: r.lineItem.barcode,
+            price: r.lineItem.rrp,
+            cost: r.lineItem.wholesale,
+            quantity: r.lineItem.quantityOrdered,
+          },
+        },
+      };
+  }
 }
 
 // ── GROUP BY STYLE + COLOUR ──
@@ -294,24 +518,37 @@ function extractStylePrefix(sku: string): string {
   return parts.length > 1 ? parts[0] : "";
 }
 
+/** Expand colour abbreviations and normalise for comparison */
+function normaliseColour(s: string): string {
+  let c = (s || "").toLowerCase().trim()
+    .replace(/\s+(floral|print|stripe|check|spot|dot|multi)$/i, "")
+    .replace(/\s+/g, " ");
+  // Check abbreviation map
+  const abbr = COLOUR_ABBREVIATIONS[c.replace(/\s/g, "")];
+  if (abbr) c = abbr;
+  return c;
+}
+
 function coloursMatch(a: string, b: string): boolean {
-  const norm = (s: string) =>
-    (s || "").toLowerCase()
-      .replace(/\s+(floral|print|stripe|check|spot|dot|multi)$/i, "")
-      .trim().replace(/\s+/g, " ");
-  if (norm(a) === norm(b)) return true;
-  const na = norm(a), nb = norm(b);
-  return na.includes(nb) || nb.includes(na);
+  const na = normaliseColour(a);
+  const nb = normaliseColour(b);
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  // Check if one is abbreviation of the other
+  const aExpanded = COLOUR_ABBREVIATIONS[na.replace(/\s/g, "")] || na;
+  const bExpanded = COLOUR_ABBREVIATIONS[nb.replace(/\s/g, "")] || nb;
+  return aExpanded === bExpanded;
 }
 
 function sizesMatch(a: string, b: string): boolean {
-  return (a || "").trim().toUpperCase() === (b || "").trim().toUpperCase();
+  return normaliseSize(a) === normaliseSize(b);
 }
 
 function getExistingColours(variants: ShopifyVariant[]): string[] {
   return [...new Set(variants.map(v => v.option1).filter(Boolean))];
 }
 
+/** Jaccard token similarity */
 function titleSimilarity(a: string, b: string): number {
   const tokenise = (s: string) =>
     new Set(s.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(Boolean));
@@ -321,6 +558,25 @@ function titleSimilarity(a: string, b: string): number {
   return union === 0 ? 0 : intersection / union;
 }
 
+/** Bigram (character-pair) similarity — better for partial/misspelled matches */
+function bigramSimilarity(a: string, b: string): number {
+  const bigrams = (s: string): string[] => {
+    const clean = s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const result: string[] = [];
+    for (let i = 0; i < clean.length - 1; i++) {
+      result.push(clean.slice(i, i + 2));
+    }
+    return result;
+  };
+  const ba = bigrams(a), bb = bigrams(b);
+  if (ba.length === 0 || bb.length === 0) return 0;
+  const setB = new Set(bb);
+  const intersection = ba.filter(bg => setB.has(bg)).length;
+  return (2 * intersection) / (ba.length + bb.length);
+}
+
 function vendorMatch(brand: string, vendor: string): number {
-  return titleSimilarity(brand, vendor);
+  const jac = titleSimilarity(brand, vendor);
+  const big = bigramSimilarity(brand, vendor);
+  return Math.max(jac, big);
 }

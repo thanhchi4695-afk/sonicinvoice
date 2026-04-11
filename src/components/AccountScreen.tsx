@@ -186,6 +186,40 @@ const AccountScreen = () => {
         )}
       </Section>
 
+      {/* Industry Profile */}
+      <Section title="Industry profile">
+        <p className="text-[11px] text-muted-foreground mb-2">Controls field labels, Google Shopping mapping, and restock analytics behaviour.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {getIndustryProfileChoices().map((opt) => {
+            const active = industry === opt.id;
+            const def = getIndustryDefinition(opt.id);
+            return (
+              <button
+                key={opt.id}
+                onClick={() => { setIndustry(opt.id); saveStoreConfig({ industry: opt.id }); }}
+                className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
+                  active ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-primary/50"
+                }`}
+              >
+                <span className="text-xl">{opt.icon}</span>
+                <span>{opt.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        {(() => {
+          const def = getIndustryDefinition(industry);
+          return (
+            <div className="mt-3 p-3 rounded-md bg-muted/50 text-xs space-y-1">
+              <p><span className="font-semibold">Size label:</span> {def.fieldLabels.size}</p>
+              <p><span className="font-semibold">Colour label:</span> {def.fieldLabels.colour}</p>
+              <p><span className="font-semibold">Material label:</span> {def.fieldLabels.material}</p>
+              <p><span className="font-semibold">Size holes in restock:</span> {def.hasSizeHoles ? "Yes" : "No (unit-based reorder)"}</p>
+            </div>
+          );
+        })()}
+      </Section>
+
       {/* Pricing Rules */}
       <Section title="Pricing rules">
         <div className="grid grid-cols-2 gap-3">

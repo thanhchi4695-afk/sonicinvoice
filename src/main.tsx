@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./i18n/config";
 
 // ═══ Set Shopify API key meta tag at runtime for App Bridge ═══
 const apiKeyMeta = document.getElementById("shopify-api-key-meta");

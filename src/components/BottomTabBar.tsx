@@ -1,25 +1,28 @@
 import { Home, FileText, Megaphone, Wrench, User, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoreMode } from "@/hooks/use-store-mode";
+import { useTranslation } from "react-i18next";
 
 interface BottomTabBarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
 
-const baseTabs = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "invoices", label: "Invoices", icon: FileText },
-  { id: "google_ads", label: "Marketing", icon: Megaphone },
-  { id: "tools", label: "Tools", icon: Wrench },
-  { id: "account", label: "Account", icon: User },
-];
-
-const guidTab = { id: "guide", label: "Guide", icon: Monitor };
-
 const BottomTabBar = ({ activeTab, onTabChange }: BottomTabBarProps) => {
+  const { t } = useTranslation();
   const mode = useStoreMode();
+
+  const baseTabs = [
+    { id: "home", label: t("nav.home"), icon: Home },
+    { id: "invoices", label: t("nav.invoices"), icon: FileText },
+    { id: "google_ads", label: t("nav.marketing"), icon: Megaphone },
+    { id: "tools", label: t("nav.tools"), icon: Wrench },
+    { id: "account", label: t("nav.account"), icon: User },
+  ];
+
+  const guidTab = { id: "guide", label: t("nav.guide"), icon: Monitor };
   const tabs = mode.isLightspeed ? [...baseTabs.slice(0, 3), guidTab, ...baseTabs.slice(3)] : baseTabs;
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card safe-bottom">
       <div className="flex items-center justify-around h-16">

@@ -219,6 +219,7 @@ function generateSuggestions(
 
 /* ─── Main Component ─── */
 export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }) {
+  const [mode, setMode] = useState<"quick" | "architect">("architect");
   const [step, setStep] = useState<"input" | "review" | "creating" | "done">("input");
   const [products, setProducts] = useState<ProductData[]>([]);
   const [suggestions, setSuggestions] = useState<CollectionSuggestion[]>([]);

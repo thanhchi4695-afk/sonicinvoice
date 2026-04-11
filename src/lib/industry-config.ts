@@ -624,3 +624,30 @@ export function getIndustryList(): { id: string; name: string; icon: string }[] 
 export function getAllIndustryIds(): string[] {
   return ['swimwear', 'beauty', 'clothing', 'footwear', 'health', 'electronics', 'home', 'sports', 'general'];
 }
+
+/** Convenience: get field labels for the current industry */
+export function getFieldLabels(industryId: string): IndustryFieldLabels {
+  return getIndustryDefinition(industryId).fieldLabels;
+}
+
+/** Convenience: get Google Shopping mapping for the current industry */
+export function getGoogleShoppingMapping(industryId: string): GoogleShoppingMapping {
+  return getIndustryDefinition(industryId).googleShopping;
+}
+
+/** Whether this industry tracks size holes in restock analytics */
+export function industryHasSizeHoles(industryId: string): boolean {
+  return getIndustryDefinition(industryId).hasSizeHoles;
+}
+
+/** User-facing industry list for the settings picker (subset requested by user) */
+export function getIndustryProfileChoices(): { id: string; name: string; icon: string }[] {
+  return [
+    { id: 'clothing', name: 'Fashion', icon: '👗' },
+    { id: 'beauty', name: 'Beauty', icon: '💄' },
+    { id: 'home', name: 'Home Goods', icon: '🏠' },
+    { id: 'general', name: 'Pet Supplies', icon: '🐾' },
+    { id: 'electronics', name: 'Electronics', icon: '📱' },
+    { id: 'sports', name: 'Sports', icon: '⚽' },
+  ];
+}

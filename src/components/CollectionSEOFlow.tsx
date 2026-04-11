@@ -266,6 +266,22 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
     return [];
   };
 
+  const mapCollection = (c: any): ArchitectCollection => ({
+    id: crypto.randomUUID(),
+    title: c.title || "",
+    handle: c.handle || toHandle(c.title || ""),
+    type: c.type || "feature",
+    rules: Array.isArray(c.smart_collection_rules)
+      ? c.smart_collection_rules
+      : [{ column: "tag", relation: "contains", condition: c.handle || "" }],
+    disjunctive: c.disjunctive ?? true,
+    seoTitle: c.seo_title || c.title || "",
+    metaDescription: c.meta_description || "",
+    bodyContent: c.body_content || "",
+    internalLinksTo: c.internal_links_to || [],
+    selected: true,
+  });
+
   const handleGenerate = async () => {
     const products = getProducts();
     if (products.length === 0) {
@@ -275,41 +291,70 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
 
     setLoading(true);
     try {
-      if (mode === "architect") {
-        const storeConfig = JSON.parse(localStorage.getItem("store_config") || "{}");
-        const { data, error } = await supabase.functions.invoke("collection-architect", {
-          body: {
-            products: products.slice(0, 20),
-            storeName: storeConfig.storeName || storeConfig.store_name || localStorage.getItem("store_name") || "",
-            storeCity: storeConfig.storeCity || storeConfig.city || localStorage.getItem("store_city") || "",
-            industry: storeConfig.industry || "swimwear",
-            locale: storeConfig.locale || "AU",
-          },
+      const storeConfig = JSON.parse(localStorage.getItem("store_config") || "{}");
+      const storeParams = {
+        storeName: storeConfig.storeName || storeConfig.store_name || localStorage.getItem("store_name") || "",
+        storeCity: storeConfig.storeCity || storeConfig.city || localStorage.getItem("store_city") || "",
+        industry: storeConfig.industry || "swimwear",
+        locale: storeConfig.locale || "AU",
+      };
+
+      if (mode === "bulk") {
+        // Bulk invoice-level hierarchy with groups & cross-links
+        const { data, error } = await supabase.functions.invoke("collection-bulk-architect", {
+          body: { products: products.slice(0, 40), ...storeParams },
         });
         if (error) throw error;
 
-        const mapped: ArchitectCollection[] = (data.collections || []).map((c: any) => ({
-          id: crypto.randomUUID(),
-          title: c.title || "",
-          handle: c.handle || toHandle(c.title || ""),
-          type: c.type || "feature",
-          rules: Array.isArray(c.smart_collection_rules)
-            ? c.smart_collection_rules
-            : [{ column: "tag", relation: "contains", condition: c.handle || "" }],
-          disjunctive: c.disjunctive ?? true,
-          seoTitle: c.seo_title || c.title || "",
-          metaDescription: c.meta_description || "",
-          bodyContent: c.body_content || "",
-          internalLinksTo: c.internal_links_to || [],
-          selected: true,
+        // Map groups
+        const mappedGroups: CollectionGroup[] = (data.groups || []).map((g: any) => ({
+          group_name: g.group_name || "",
+          brand: g.brand || "",
+          products_in_group: g.products_in_group || 0,
+          product_titles: g.product_titles || [],
+          collections: (g.collections || []).map(mapCollection),
+          cross_links: g.cross_links || [],
         }));
 
+        // Global collections
+        const globalColls = (data.global_collections || []).map(mapCollection);
+
+        // Flatten all collections for the review step
+        const allColls = [
+          ...mappedGroups.flatMap(g => g.collections),
+          ...globalColls,
+        ];
+        // De-duplicate by handle
+        const seen = new Set<string>();
+        const deduped = allColls.filter(c => {
+          if (seen.has(c.handle)) return false;
+          seen.add(c.handle);
+          return true;
+        });
+
+        setGroups(mappedGroups);
+        setGlobalCrossLinks(data.global_cross_links || []);
+        setCollections(deduped);
+        setLinkingStrategy(data.global_linking_strategy || "");
+        setHomepageSections(data.homepage_sections || []);
+        setFooterMenu(data.footer_menu || []);
+        toast.success(`AI generated ${deduped.length} collections across ${mappedGroups.length} groups`);
+
+      } else if (mode === "architect") {
+        const { data, error } = await supabase.functions.invoke("collection-architect", {
+          body: { products: products.slice(0, 20), ...storeParams },
+        });
+        if (error) throw error;
+
+        const mapped = (data.collections || []).map(mapCollection);
         setCollections(mapped);
+        setGroups([]);
         setLinkingStrategy(data.internal_linking_strategy || "");
         toast.success(`AI generated ${mapped.length} hierarchical collections`);
       } else {
         const parsed = quickParseToArchitect(products);
         setCollections(parsed);
+        setGroups([]);
         toast.success(`Parsed ${products.length} products → ${parsed.length} collections`);
       }
       setStep(1);

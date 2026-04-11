@@ -1,5 +1,6 @@
 import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import ContextDetector from "@/components/ContextDetector";
 import { Button } from "@/components/ui/button";
 import { getRecentAuditEntries, formatRelativeTime } from "@/lib/audit-log";
 import { getStockUpdatesCount } from "@/lib/inventory-sim";
@@ -144,6 +145,26 @@ const HomeScreen = ({
           </Button>
         </div>
       )}
+
+      {/* Context-aware smart suggestions */}
+      <div className="mb-4">
+        <ContextDetector onStartFlow={(flow) => {
+          const flowMap: Record<string, (() => void) | undefined> = {
+            invoice: onStartInvoice,
+            stock_check: onStartStockCheck,
+            joor: onStartJoor,
+            wholesale_import: onStartWholesaleImport,
+            lookbook_import: onStartLookbookImport,
+            supplier_profile: onStartSupplierProfileBuilder,
+            accounting: onStartAccounting,
+            gdrive_import: onStartSupplierProfileBuilder,
+            collection_builder: onStartCollectionSEO,
+            quick_capture: onStartScanMode,
+            email_forward: onStartEmailInbox,
+          };
+          flowMap[flow]?.();
+        }} />
+      </div>
 
       {/* Lightspeed workflow card */}
       {mode.isLightspeed && (

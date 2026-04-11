@@ -591,9 +591,9 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
   // ── Render ──────────────────────────────────────────────
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
-      <button onClick={view === "list" ? onBack : () => { resetForm(); setView("list"); }}
+      <button onClick={view === "list" || view === "detail" ? (view === "detail" ? () => { setDetailPO(null); setView("list"); } : onBack) : () => { resetForm(); setDetailPO(null); setView("list"); }}
         className="flex items-center gap-1 text-sm text-muted-foreground mb-4">
-        <ChevronLeft className="w-4 h-4" /> {view === "list" ? "Back" : "All purchase orders"}
+        <ChevronLeft className="w-4 h-4" /> {view === "list" ? "Back" : view === "detail" ? "All purchase orders" : "All purchase orders"}
       </button>
 
       {/* ── LIST VIEW ─────────────────────────────────────── */}

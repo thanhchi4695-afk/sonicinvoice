@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/lib/invoice-validator";
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
+import { updateSupplierProfileWithCorrections } from "@/lib/supplier-profile-updater";
 import { toast } from "sonner";
 import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
 import SizeGridEditor from "@/components/SizeGridEditor";
@@ -429,9 +430,17 @@ export default function PostParseReviewScreen({
 
   const clearSelection = () => setSelectedRows(new Set());
 
+  const triggerProfileUpdate = useCallback(() => {
+    if (supplierName) {
+      updateSupplierProfileWithCorrections(supplierName, products).then(() => {
+        toast.success("Supplier profile updated with your corrections", { duration: 3000 });
+      }).catch(() => {});
+    }
+  }, [supplierName, products]);
+
   const handleExportClick = () => {
     if (needsReview.length > 0) setShowExportWarning(true);
-    else onExportAccepted();
+    else { triggerProfileUpdate(); onExportAccepted(); }
   };
 
   const tabs: { key: ReviewTab; label: string; count: number; icon: React.ReactNode; colorClass: string }[] = [

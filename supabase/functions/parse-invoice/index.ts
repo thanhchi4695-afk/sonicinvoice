@@ -885,6 +885,121 @@ INSTRUCTIONS FOR RETRY:
       console.log(`[parse-invoice] Retry found ${(parsed.products || []).length} products`);
     }
 
+    // ── Step B: OCR text fallback ──
+    // If any line item has confidence < 70 OR quality_warning is set, run a text-extraction
+    // pass using a vision model to get raw OCR text, then re-parse with a fast text-only model.
+    const products = parsed.products || [];
+    const hasLowConfidence = products.some((p: Record<string, unknown>) => (Number(p.confidence) || 0) < 70);
+    const hasQualityWarning = parsed.quality_warning === true || parsed.parsing_plan?.expected_review_level === "high";
+    const shouldFallbackOCR = (hasLowConfidence || hasQualityWarning) && (isImage || isPdf) && !detailedMode;
+
+    if (shouldFallbackOCR) {
+      console.log(`[parse-invoice] Step B: OCR text fallback triggered — lowConf=${hasLowConfidence}, qualityWarn=${hasQualityWarning}`);
+      try {
+        // Step B.1: Extract raw OCR text from the image using vision model
+        const ocrMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
+          {
+            role: "system",
+            content: `You are a precise OCR engine. Extract ALL visible text from this document image exactly as it appears, preserving the layout structure (rows, columns, spacing). Include every number, code, word, and symbol you can see. Output ONLY the raw text, no commentary or formatting. Preserve table structure using | as column separators and newlines for rows. Include headers, data rows, and totals — extract EVERYTHING visible.`,
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${isImage ? `image/${fileType === "jpg" ? "jpeg" : fileType}` : "application/pdf"};base64,${fileContent}`,
+                },
+              },
+              { type: "text", text: "Extract all text from this document image. Preserve table layout with | separators." },
+            ],
+          },
+        ];
+
+        const ocrData = await callAI({ model: "google/gemini-2.5-flash", messages: ocrMessages, temperature: 0.0 });
+        const ocrText = getContent(ocrData);
+
+        if (ocrText && ocrText.length > 50) {
+          console.log(`[parse-invoice] Step B: OCR extracted ${ocrText.length} chars of text`);
+
+          // Step B.2: Re-parse the OCR text with a fast text-only model
+          const ocrParseMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
+            {
+              role: "system",
+              content: systemPrompt,
+            },
+            {
+              role: "user",
+              content: `Below is raw OCR text extracted from a fashion supplier invoice image. The original vision extraction had low confidence. Please re-extract ALL product line items from this text.
+
+IMPORTANT:
+- Each product row must have: style_code, product_title, quantity, unit_cost, colour, size
+- If a value is missing, use null
+- Follow the full extraction rules from your system prompt
+- Return the same JSON output format as specified
+
+OCR TEXT:
+${ocrText}`,
+            },
+          ];
+
+          const ocrParsed = await callAI({ model: "google/gemini-2.5-flash", messages: ocrParseMessages, temperature: 0.1 });
+          const ocrContent = getContent(ocrParsed);
+          const ocrJsonMatch = ocrContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, ocrContent];
+          const ocrJsonStr = (ocrJsonMatch[1] || ocrContent).trim();
+
+          try {
+            const ocrResult = JSON.parse(ocrJsonStr);
+            const ocrProducts = ocrResult.products || [];
+            console.log(`[parse-invoice] Step B: OCR re-parse found ${ocrProducts.length} products`);
+
+            // Merge strategy: use OCR results if they found more products or higher confidence
+            const originalAvgConf = products.length > 0
+              ? products.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / products.length
+              : 0;
+            const ocrAvgConf = ocrProducts.length > 0
+              ? ocrProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / ocrProducts.length
+              : 0;
+
+            if (ocrProducts.length > products.length || (ocrProducts.length === products.length && ocrAvgConf > originalAvgConf)) {
+              console.log(`[parse-invoice] Step B: Using OCR results (${ocrProducts.length} products, avg conf ${ocrAvgConf.toFixed(0)}) over original (${products.length} products, avg conf ${originalAvgConf.toFixed(0)})`);
+              parsed.products = ocrProducts;
+              parsed.ocr_fallback_used = true;
+              parsed.ocr_text_length = ocrText.length;
+              // Preserve other metadata from OCR pass if available
+              if (ocrResult.parsing_plan) parsed.parsing_plan = { ...parsed.parsing_plan, ...ocrResult.parsing_plan, ocr_fallback: true };
+              if (ocrResult.rejected_rows) parsed.rejected_rows = [...(parsed.rejected_rows || []), ...ocrResult.rejected_rows];
+            } else {
+              console.log(`[parse-invoice] Step B: Keeping original results (higher quality)`);
+              parsed.ocr_fallback_attempted = true;
+              parsed.ocr_fallback_used = false;
+            }
+
+            // If BOTH passes returned low confidence, mark as needs_manual_review
+            const finalProducts = parsed.products || [];
+            const finalAvgConf = finalProducts.length > 0
+              ? finalProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / finalProducts.length
+              : 0;
+            if (finalAvgConf < 60 || finalProducts.length === 0) {
+              parsed.needs_manual_review = true;
+              parsed.review_reason = finalProducts.length === 0
+                ? "Both vision and OCR fallback failed to extract products"
+                : `Average confidence ${finalAvgConf.toFixed(0)}% is below threshold after OCR fallback`;
+              console.log(`[parse-invoice] Step B: Marked as needs_manual_review — ${parsed.review_reason}`);
+            }
+          } catch (ocrParseErr) {
+            console.warn("[parse-invoice] Step B: OCR re-parse JSON failed:", ocrParseErr);
+            parsed.ocr_fallback_attempted = true;
+            parsed.ocr_fallback_used = false;
+          }
+        }
+      } catch (ocrErr) {
+        console.warn("[parse-invoice] Step B: OCR fallback failed:", ocrErr);
+        parsed.ocr_fallback_attempted = true;
+        parsed.ocr_fallback_used = false;
+      }
+    }
+
     const parsingPlan = parsed.parsing_plan || {};
     const docType = parsingPlan.document_type || parsed.document_type || (forceMode || "tax_invoice");
     const layoutType = parsingPlan.layout_type || parsed.layout_type || "unknown";
@@ -976,6 +1091,11 @@ INSTRUCTIONS FOR RETRY:
       total: parsed.total ?? null,
       rejected_rows: allRejected,
       products: normalizedProducts,
+      // OCR fallback metadata
+      ocr_fallback_used: parsed.ocr_fallback_used || false,
+      ocr_fallback_attempted: parsed.ocr_fallback_attempted || false,
+      needs_manual_review: parsed.needs_manual_review || false,
+      review_reason: parsed.review_reason || null,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

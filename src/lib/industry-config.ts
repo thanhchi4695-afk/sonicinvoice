@@ -563,10 +563,9 @@ const GENERAL: IndustryDefinition = {
   seoDescTemplate: '{product} by {brand}. {features}Shop at {store}.',
   featureRules: [],
   currencyDefault: 'AUD',
-};
-
-// ═══════════════════════════════════════════════════════════════
-// REGISTRY
+  fieldLabels: { size: 'Size', colour: 'Colour', material: 'Material' },
+  googleShopping: { colour: 'colour', size: 'size', material: 'material', age_group: 'adult', size_system: 'AU' },
+  hasSizeHoles: true,
 // ═══════════════════════════════════════════════════════════════
 
 const INDUSTRY_REGISTRY: Record<string, IndustryDefinition> = {

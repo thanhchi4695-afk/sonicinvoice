@@ -581,33 +581,104 @@ const StocktakeModule = ({ onBack }: StocktakeModuleProps) => {
     );
   }
 
-  // ── IMPORT COUNTED QUANTITIES ──
+  // ── COUNT SCREEN (Barcode Scanner + CSV Import) ──
   if (screen === "import_count") {
+    const countedItems = activeLines.filter(l => l.counted_qty > 0).length;
     return (
       <div className="px-4 pt-4 pb-24 max-w-4xl mx-auto animate-fade-in">
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-4">
           <Button variant="ghost" size="icon" onClick={() => setScreen("list")}><ArrowLeft className="w-5 h-5" /></Button>
-          <h1 className="text-xl font-semibold">Import Counted Quantities</h1>
+          <h1 className="text-xl font-semibold flex-1">Count Items</h1>
+          <Button
+            size="sm"
+            disabled={countedItems === 0}
+            onClick={() => {
+              // Compute variances for all counted lines
+              setActiveLines(prev => prev.map(l => l.counted_qty > 0
+                ? { ...l, variance: l.counted_qty - l.expected_qty }
+                : l
+              ));
+              setScreen("variance");
+            }}
+          >
+            Review Variances ({countedItems})
+          </Button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 mb-6">
+        {/* Barcode Scanner */}
+        <Card className="mb-4 border-primary/30">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-2 mb-2">
+              <ScanBarcode className="w-5 h-5 text-primary" />
+              <p className="font-medium text-sm">Barcode / SKU Scanner</p>
+              <Badge variant="outline" className="ml-auto">{totalScanned} scanned</Badge>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                ref={scanInputRef}
+                value={scanInput}
+                onChange={e => setScanInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleBarcodeScan(scanInput);
+                    scanInputRef.current?.focus();
+                  }
+                }}
+                placeholder="Scan barcode or type SKU, then press Enter…"
+                className="font-mono"
+                autoFocus
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { handleBarcodeScan(scanInput); scanInputRef.current?.focus(); }}
+                disabled={!scanInput.trim()}
+              >
+                Add
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Each scan increments the counted quantity by 1. Focus stays on the input for rapid scanning.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Recent scan log */}
+        {scanLog.length > 0 && (
+          <Card className="mb-4">
+            <CardContent className="py-3">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Recent Scans</p>
+              <div className="space-y-1 max-h-[150px] overflow-y-auto">
+                {scanLog.slice(0, 15).map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs py-0.5">
+                    <Check className="w-3 h-3 text-primary shrink-0" />
+                    <span className="font-mono">{s.sku}</span>
+                    <span className="text-muted-foreground truncate flex-1">{s.product}</span>
+                    <Badge variant="outline" className="text-[10px]">×{s.qty}</Badge>
+                    <span className="text-muted-foreground">{s.time}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* CSV Import/Export */}
+        <div className="grid gap-4 sm:grid-cols-2 mb-4">
           <Card className="cursor-pointer hover:border-primary/30 transition-colors" onClick={exportSystemCSV}>
-            <CardContent className="py-6 text-center">
-              <Download className="w-8 h-8 text-primary mx-auto mb-2" />
-              <p className="font-medium text-sm">Export System Quantities</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Download CSV with current stock levels ({activeLines.length} items)
-              </p>
+            <CardContent className="py-4 text-center">
+              <Download className="w-6 h-6 text-primary mx-auto mb-1" />
+              <p className="font-medium text-xs">Export System Quantities</p>
+              <p className="text-[10px] text-muted-foreground">{activeLines.length} items</p>
             </CardContent>
           </Card>
 
           <Card className="cursor-pointer hover:border-primary/30 transition-colors relative">
-            <CardContent className="py-6 text-center">
-              <Upload className="w-8 h-8 text-primary mx-auto mb-2" />
-              <p className="font-medium text-sm">Import Counted Quantities</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Upload CSV with SKU + counted_qty columns
-              </p>
+            <CardContent className="py-4 text-center">
+              <Upload className="w-6 h-6 text-primary mx-auto mb-1" />
+              <p className="font-medium text-xs">Import Counted CSV</p>
+              <p className="text-[10px] text-muted-foreground">SKU + counted_qty</p>
               <input
                 type="file"
                 accept=".csv"
@@ -618,39 +689,33 @@ const StocktakeModule = ({ onBack }: StocktakeModuleProps) => {
           </Card>
         </div>
 
-        <p className="text-sm text-muted-foreground">
-          <strong>Step 1:</strong> Export system quantities to get your count sheet.{" "}
-          <strong>Step 2:</strong> Fill in the <code>counted_qty</code> column and upload.
-        </p>
-
-        {/* Show current lines preview */}
+        {/* Items with counts */}
         {activeLines.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-sm font-medium mb-2">System Quantities Preview ({activeLines.length} items)</h3>
-            <div className="border rounded-lg overflow-auto max-h-[40vh]">
+          <div>
+            <h3 className="text-sm font-medium mb-2">Items ({countedItems} counted / {activeLines.length} total)</h3>
+            <div className="border rounded-lg overflow-auto max-h-[35vh]">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>SKU</TableHead>
                     <TableHead>Product</TableHead>
-                    <TableHead className="text-right">System Qty</TableHead>
+                    <TableHead className="text-right">System</TableHead>
+                    <TableHead className="text-right">Counted</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {activeLines.slice(0, 50).map(l => (
+                  {activeLines
+                    .filter(l => l.counted_qty > 0)
+                    .sort((a, b) => b.counted_qty - a.counted_qty)
+                    .slice(0, 100)
+                    .map(l => (
                     <TableRow key={l.id}>
-                      <TableCell className="font-mono text-xs">{l.sku || "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">{l.sku || l.barcode || "—"}</TableCell>
                       <TableCell className="text-sm truncate max-w-[200px]">{l.product_title || "—"}</TableCell>
-                      <TableCell className="text-right">{l.expected_qty}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{l.expected_qty}</TableCell>
+                      <TableCell className="text-right font-medium">{l.counted_qty}</TableCell>
                     </TableRow>
                   ))}
-                  {activeLines.length > 50 && (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-xs text-muted-foreground">
-                        + {activeLines.length - 50} more items
-                      </TableCell>
-                    </TableRow>
-                  )}
                 </TableBody>
               </Table>
             </div>

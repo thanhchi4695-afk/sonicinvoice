@@ -1,272 +1,501 @@
-import { useState, useMemo } from "react";
-import { ChevronLeft, ShoppingCart, AlertTriangle, Clock, Snowflake, X, Check, ChevronDown, Download, Settings } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import {
+  ArrowLeft, Settings, ShoppingCart, Check, Loader2,
+  TrendingUp, Package, Clock, AlertTriangle, Download,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
+} from "@/components/ui/table";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { addAuditEntry } from "@/lib/audit-log";
+import Papa from "papaparse";
+
+/* ─── Types ─── */
 
 interface ReorderPanelProps {
   onBack: () => void;
   onViewOrders?: () => void;
 }
 
-interface ReorderSuggestion {
-  id: string;
-  product: string;
-  supplier: string;
-  currentStock: number;
-  lastOrderDate: string;
-  lastOrderQty: number;
-  suggestedQty: number;
-  reason: "low_stock" | "due_reorder" | "new_season";
-  dismissed: boolean;
+interface ReorderRow {
+  variantId: string;
+  productTitle: string;
+  sku: string | null;
+  vendor: string | null;
+  onHand: number;
+  avgDailySales: number;
+  leadTimeDays: number;
+  safetyStockDays: number;
+  desiredCoverDays: number;
+  minOrderQty: number;
+  incomingStock: number;
+  recommendedQty: number;
+  supplierId: string | null;
+  supplierName: string | null;
+  selected: boolean;
 }
 
-const DISMISSED_KEY = "reorder_dismissed";
-const SETTINGS_KEY = "reorder_settings";
-
-interface ReorderSettings {
-  lowStockThreshold: number;
-  reorderFrequency: "auto" | number;
-  seasonalCycle: number;
+interface GlobalDefaults {
+  lead_time_days: number;
+  safety_stock_days: number;
+  desired_cover_days: number;
+  min_order_qty: number;
 }
 
-const DEFAULT_SETTINGS: ReorderSettings = { lowStockThreshold: 3, reorderFrequency: "auto", seasonalCycle: 12 };
+const DEFAULTS_KEY = "reorder_global_defaults";
 
-function getSettings(): ReorderSettings {
-  try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") }; } catch { return DEFAULT_SETTINGS; }
-}
-function saveSettings(s: ReorderSettings) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
-function getDismissed(): string[] {
-  try { return JSON.parse(localStorage.getItem(DISMISSED_KEY) || "[]"); } catch { return []; }
-}
-function addDismissed(id: string) {
-  const d = getDismissed();
-  if (!d.includes(id)) { d.push(id); localStorage.setItem(DISMISSED_KEY, JSON.stringify(d)); }
+function getGlobalDefaults(): GlobalDefaults {
+  try {
+    return { lead_time_days: 14, safety_stock_days: 7, desired_cover_days: 30, min_order_qty: 1, ...JSON.parse(localStorage.getItem(DEFAULTS_KEY) || "{}") };
+  } catch {
+    return { lead_time_days: 14, safety_stock_days: 7, desired_cover_days: 30, min_order_qty: 1 };
+  }
 }
 
-const REASON_CONFIG = {
-  low_stock: { icon: "🔴", label: "Low stock", badgeClass: "bg-destructive/15 text-destructive" },
-  due_reorder: { icon: "🟡", label: "Due for reorder", badgeClass: "bg-warning/15 text-warning" },
-  new_season: { icon: "🔵", label: "New season", badgeClass: "bg-primary/15 text-primary" },
-};
-
-// Generate mock suggestions from simulated data
-function generateSuggestions(settings: ReorderSettings): ReorderSuggestion[] {
-  const dismissed = getDismissed();
-  const now = new Date();
-  const suggestions: ReorderSuggestion[] = [
-    { id: "r1", product: "Mara One Piece - Black", supplier: "Bond Eye", currentStock: 1, lastOrderDate: "2026-01-15", lastOrderQty: 12, suggestedQty: 12, reason: "low_stock", dismissed: false },
-    { id: "r2", product: "Sahara Kaftan", supplier: "Jantzen", currentStock: 2, lastOrderDate: "2026-02-10", lastOrderQty: 8, suggestedQty: 8, reason: "low_stock", dismissed: false },
-    { id: "r3", product: "Collective Bikini Top", supplier: "Seafolly", currentStock: 8, lastOrderDate: "2025-12-01", lastOrderQty: 24, suggestedQty: 24, reason: "due_reorder", dismissed: false },
-    { id: "r4", product: "Riviera High Waist Pant", supplier: "Baku", currentStock: 6, lastOrderDate: "2025-11-15", lastOrderQty: 18, suggestedQty: 18, reason: "due_reorder", dismissed: false },
-    { id: "r5", product: "Classic One Piece", supplier: "Seafolly", currentStock: 14, lastOrderDate: "2025-04-20", lastOrderQty: 20, suggestedQty: 20, reason: "new_season", dismissed: false },
-    { id: "r6", product: "Retro Racerback", supplier: "Jantzen", currentStock: 0, lastOrderDate: "2026-01-05", lastOrderQty: 10, suggestedQty: 10, reason: "low_stock", dismissed: false },
-  ];
-  return suggestions.map(s => ({ ...s, dismissed: dismissed.includes(s.id) }));
-}
+/* ─── Component ─── */
 
 const ReorderPanel = ({ onBack, onViewOrders }: ReorderPanelProps) => {
-  const [settings, setSettings] = useState<ReorderSettings>(getSettings);
+  const [rows, setRows] = useState<ReorderRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  const [localSettings, setLocalSettings] = useState<ReorderSettings>(settings);
-  const [suggestions, setSuggestions] = useState<ReorderSuggestion[]>(() => generateSuggestions(settings));
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [createdPOs, setCreatedPOs] = useState<{ supplier: string; count: number; poNum: string }[]>([]);
-  const [addedToPO, setAddedToPO] = useState<Set<string>>(new Set());
+  const [velocityDays, setVelocityDays] = useState<30 | 60 | 90>(30);
+  const [defaults, setDefaults] = useState<GlobalDefaults>(getGlobalDefaults);
+  const [editDefaults, setEditDefaults] = useState<GlobalDefaults>(getGlobalDefaults);
+  const [creatingPO, setCreatingPO] = useState(false);
+  const [createdPOs, setCreatedPOs] = useState<{ supplier: string; poNumber: string; lineCount: number }[]>([]);
 
-  const visible = useMemo(() => suggestions.filter(s => !s.dismissed), [suggestions]);
-  const lowStockCount = visible.filter(s => s.reason === "low_stock").length;
-  const dueCount = visible.filter(s => s.reason === "due_reorder").length;
-  const seasonCount = visible.filter(s => s.reason === "new_season").length;
+  useEffect(() => { loadData(); }, [velocityDays]);
 
-  const handleDismiss = (id: string) => {
-    addDismissed(id);
-    setSuggestions(prev => prev.map(s => s.id === id ? { ...s, dismissed: true } : s));
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) return;
+      const userId = user.user.id;
+
+      // Fetch variants, products, suppliers, reorder settings, sales data, and incoming PO lines in parallel
+      const [varRes, prodRes, supRes, settRes, poLineRes] = await Promise.all([
+        supabase.from("variants").select("*").eq("user_id", userId),
+        supabase.from("products").select("id, title, vendor").eq("user_id", userId),
+        supabase.from("suppliers").select("id, name").eq("user_id", userId),
+        supabase.from("product_reorder_settings").select("*").eq("user_id", userId),
+        supabase.from("purchase_order_lines").select("sku, expected_qty, received_qty, purchase_order_id").eq("user_id", userId),
+      ]);
+
+      const variants = varRes.data || [];
+      const products = prodRes.data || [];
+      const suppliers = supRes.data || [];
+      const settings = settRes.data || [];
+      const poLines = poLineRes.data || [];
+
+      // Get open PO IDs (draft/sent/partial)
+      const { data: openPOs } = await supabase
+        .from("purchase_orders")
+        .select("id")
+        .eq("user_id", userId)
+        .in("status", ["draft", "sent", "partial"]);
+      const openPOIds = new Set((openPOs || []).map(p => p.id));
+
+      // Calculate incoming stock per SKU from open POs
+      const incomingBySku: Record<string, number> = {};
+      for (const pl of poLines) {
+        if (pl.sku && openPOIds.has(pl.purchase_order_id)) {
+          const remaining = (pl.expected_qty || 0) - (pl.received_qty || 0);
+          if (remaining > 0) {
+            incomingBySku[pl.sku.toLowerCase()] = (incomingBySku[pl.sku.toLowerCase()] || 0) + remaining;
+          }
+        }
+      }
+
+      // Fetch sales data for velocity
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - velocityDays);
+      const { data: salesData } = await supabase
+        .from("sales_data")
+        .select("variant_id, quantity_sold, sold_at")
+        .eq("user_id", userId)
+        .gte("sold_at", cutoff.toISOString());
+
+      // Aggregate daily sales per variant
+      const salesByVariant: Record<string, number> = {};
+      for (const s of salesData || []) {
+        if (s.variant_id) {
+          salesByVariant[s.variant_id] = (salesByVariant[s.variant_id] || 0) + (s.quantity_sold || 0);
+        }
+      }
+
+      const productMap = new Map(products.map(p => [p.id, p]));
+      const settingsMap = new Map(settings.map(s => [s.variant_id, s]));
+      const defs = getGlobalDefaults();
+
+      // Try to match vendor to supplier
+      const supplierByName = new Map(suppliers.map(s => [s.name.toLowerCase(), s]));
+
+      const reorderRows: ReorderRow[] = variants.map(v => {
+        const product = productMap.get(v.product_id);
+        const setting = settingsMap.get(v.id);
+        const totalSold = salesByVariant[v.id] || 0;
+        const avgDaily = totalSold / velocityDays;
+        const leadTime = setting?.lead_time_days ?? defs.lead_time_days;
+        const safetyDays = setting?.safety_stock_days ?? defs.safety_stock_days;
+        const coverDays = setting?.desired_cover_days ?? defs.desired_cover_days;
+        const minQty = setting?.min_order_qty ?? defs.min_order_qty;
+        const incoming = v.sku ? (incomingBySku[v.sku.toLowerCase()] || 0) : 0;
+
+        // Formula: ((lead_time + safety_stock) * avg_daily_sales) - current_stock - incoming
+        const raw = ((leadTime + safetyDays) * avgDaily) - v.quantity - incoming;
+        const recommended = Math.max(0, Math.ceil(raw));
+        const finalQty = recommended > 0 ? Math.max(recommended, minQty) : 0;
+
+        // Find supplier
+        let supplierId = setting?.supplier_id || null;
+        let supplierName: string | null = null;
+        if (!supplierId && product?.vendor) {
+          const match = supplierByName.get(product.vendor.toLowerCase());
+          if (match) { supplierId = match.id; supplierName = match.name; }
+          else supplierName = product.vendor;
+        }
+        if (supplierId) {
+          const sup = suppliers.find(s => s.id === supplierId);
+          if (sup) supplierName = sup.name;
+        }
+
+        return {
+          variantId: v.id,
+          productTitle: product?.title || "Unknown",
+          sku: v.sku,
+          vendor: product?.vendor || null,
+          onHand: v.quantity,
+          avgDailySales: avgDaily,
+          leadTimeDays: leadTime,
+          safetyStockDays: safetyDays,
+          desiredCoverDays: coverDays,
+          minOrderQty: minQty,
+          incomingStock: incoming,
+          recommendedQty: finalQty,
+          supplierId,
+          supplierName,
+          selected: false,
+        };
+      });
+
+      // Only show rows with recommended > 0, sorted by urgency
+      setRows(
+        reorderRows
+          .filter(r => r.recommendedQty > 0)
+          .sort((a, b) => {
+            // Sort by days of stock remaining (ascending = most urgent first)
+            const daysA = a.avgDailySales > 0 ? a.onHand / a.avgDailySales : 999;
+            const daysB = b.avgDailySales > 0 ? b.onHand / b.avgDailySales : 999;
+            return daysA - daysB;
+          })
+      );
+    } catch (err) {
+      toast.error("Failed to load reorder data");
+    } finally { setLoading(false); }
   };
 
-  const handleAddToPO = (id: string) => {
-    setAddedToPO(prev => new Set(prev).add(id));
+  const selectedRows = useMemo(() => rows.filter(r => r.selected), [rows]);
+  const toggleAll = (checked: boolean) => setRows(prev => prev.map(r => ({ ...r, selected: checked })));
+  const toggleRow = (variantId: string) => setRows(prev => prev.map(r => r.variantId === variantId ? { ...r, selected: !r.selected } : r));
+
+  /* ─── Create PO from selected ─── */
+
+  const handleCreatePOs = async () => {
+    if (selectedRows.length === 0) { toast.error("Select items first"); return; }
+    setCreatingPO(true);
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error("Not authenticated");
+
+      // Group by supplier
+      const bySupplier: Record<string, ReorderRow[]> = {};
+      for (const r of selectedRows) {
+        const key = r.supplierName || "Unknown Supplier";
+        if (!bySupplier[key]) bySupplier[key] = [];
+        bySupplier[key].push(r);
+      }
+
+      const created: { supplier: string; poNumber: string; lineCount: number }[] = [];
+
+      for (const [supplierName, items] of Object.entries(bySupplier)) {
+        const poNumber = `PO-${new Date().toISOString().slice(2, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+        const totalCost = items.reduce((s, r) => s + r.recommendedQty * 0, 0); // cost unknown here
+
+        const { data: po, error } = await supabase
+          .from("purchase_orders")
+          .insert({
+            user_id: user.user.id,
+            po_number: poNumber,
+            supplier_name: supplierName,
+            supplier_id: items[0].supplierId,
+            status: "draft",
+            total_cost: totalCost,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+
+        const lines = items.map(r => ({
+          user_id: user.user!.id,
+          purchase_order_id: po.id,
+          product_title: r.productTitle,
+          sku: r.sku,
+          expected_qty: r.recommendedQty,
+          expected_cost: 0,
+          received_qty: 0,
+        }));
+
+        await supabase.from("purchase_order_lines").insert(lines);
+        created.push({ supplier: supplierName, poNumber, lineCount: items.length });
+      }
+
+      addAuditEntry("reorder_po_created", `Created ${created.length} POs from reorder suggestions (${selectedRows.length} items)`);
+      setCreatedPOs(created);
+      toast.success(`Created ${created.length} draft PO(s)`);
+      setRows(prev => prev.map(r => ({ ...r, selected: false })));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create POs");
+    } finally { setCreatingPO(false); }
   };
 
-  const handleGeneratePOs = () => {
-    const toOrder = visible.filter(s => !addedToPO.has(s.id) || addedToPO.has(s.id));
-    const bySupplier: Record<string, ReorderSuggestion[]> = {};
-    for (const s of toOrder) {
-      if (!bySupplier[s.supplier]) bySupplier[s.supplier] = [];
-      bySupplier[s.supplier].push(s);
-    }
-    const pos = Object.entries(bySupplier).map(([supplier, items], i) => ({
-      supplier,
-      count: items.length,
-      poNum: `PO-2026-${String(14 + i).padStart(3, "0")}`,
-    }));
-    // Save draft POs to localStorage for OrderFormFlow
-    const existing = JSON.parse(localStorage.getItem("purchase_orders") || "[]");
-    const newPOs = pos.map(po => ({
-      poNumber: po.poNum,
-      supplier: po.supplier,
-      date: new Date().toISOString(),
-      status: "draft",
-      lines: bySupplier[po.supplier].map(s => ({
-        product: s.product,
-        qty: s.suggestedQty,
-        cost: 0,
-      })),
-    }));
-    localStorage.setItem("purchase_orders", JSON.stringify([...newPOs, ...existing]));
-    setCreatedPOs(pos);
-    setShowConfirmation(true);
-  };
+  /* ─── Save global defaults ─── */
 
-  const handleSaveSettings = () => {
-    saveSettings(localSettings);
-    setSettings(localSettings);
-    setSuggestions(generateSuggestions(localSettings));
+  const handleSaveDefaults = () => {
+    localStorage.setItem(DEFAULTS_KEY, JSON.stringify(editDefaults));
+    setDefaults(editDefaults);
     setShowSettings(false);
+    toast.success("Default settings saved");
+    loadData();
+  };
+
+  /* ─── Export CSV ─── */
+
+  const exportCSV = () => {
+    const csv = Papa.unparse(rows.map(r => ({
+      Product: r.productTitle,
+      SKU: r.sku || "",
+      Supplier: r.supplierName || "",
+      On_Hand: r.onHand,
+      Avg_Daily_Sales: r.avgDailySales.toFixed(2),
+      Lead_Time: r.leadTimeDays,
+      Safety_Days: r.safetyStockDays,
+      Incoming: r.incomingStock,
+      Recommended_Qty: r.recommendedQty,
+    })));
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `reorder-suggestions-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  /* ─── Urgency helper ─── */
+
+  const getUrgency = (r: ReorderRow) => {
+    if (r.onHand === 0) return { label: "Out of stock", color: "bg-destructive/15 text-destructive" };
+    const days = r.avgDailySales > 0 ? Math.floor(r.onHand / r.avgDailySales) : 999;
+    if (days <= r.leadTimeDays) return { label: `${days}d left`, color: "bg-destructive/15 text-destructive" };
+    if (days <= r.leadTimeDays + r.safetyStockDays) return { label: `${days}d left`, color: "bg-secondary text-secondary-foreground" };
+    return { label: `${days}d left`, color: "bg-muted text-muted-foreground" };
   };
 
   return (
-    <div className="min-h-screen pb-24 animate-fade-in">
+    <div className="px-4 pt-4 pb-24 max-w-5xl mx-auto animate-fade-in">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="text-muted-foreground">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <h2 className="text-lg font-semibold font-display">🔁 Reorder Suggestions</h2>
-          </div>
-          <button onClick={() => setShowSettings(!showSettings)} className="text-muted-foreground">
-            <Settings className="w-5 h-5" />
-          </button>
-        </div>
+      <div className="flex items-center gap-3 mb-4">
+        <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="w-5 h-5" /></Button>
+        <h1 className="text-xl font-semibold flex-1">Reorder Suggestions</h1>
+        <Select value={String(velocityDays)} onValueChange={v => setVelocityDays(Number(v) as 30 | 60 | 90)}>
+          <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="30">Last 30 days</SelectItem>
+            <SelectItem value="60">Last 60 days</SelectItem>
+            <SelectItem value="90">Last 90 days</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="ghost" size="icon" onClick={() => setShowSettings(!showSettings)}>
+          <Settings className="w-5 h-5" />
+        </Button>
       </div>
 
-      <div className="px-4 pt-4">
-        {/* Settings panel */}
-        {showSettings && (
-          <div className="bg-card border border-border rounded-lg p-4 mb-4">
-            <h3 className="text-sm font-semibold mb-3">Reorder thresholds</h3>
-            <div className="space-y-3">
+      {/* Settings panel */}
+      {showSettings && (
+        <Card className="mb-4">
+          <CardContent className="py-4 space-y-3">
+            <h3 className="text-sm font-semibold">Global Reorder Defaults</h3>
+            <p className="text-xs text-muted-foreground">These apply to all products without per-product overrides.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Low stock threshold</label>
-                <select value={localSettings.lowStockThreshold} onChange={e => setLocalSettings({ ...localSettings, lowStockThreshold: Number(e.target.value) })}
-                  className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm">
-                  {[1, 2, 3, 5, 10].map(n => <option key={n} value={n}>{n} units</option>)}
-                </select>
+                <label className="text-xs text-muted-foreground mb-1 block">Lead Time (days)</label>
+                <Input
+                  type="number" min={1}
+                  value={editDefaults.lead_time_days}
+                  onChange={e => setEditDefaults({ ...editDefaults, lead_time_days: parseInt(e.target.value) || 14 })}
+                  className="h-8 text-sm"
+                />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Reorder frequency</label>
-                <select value={String(localSettings.reorderFrequency)} onChange={e => setLocalSettings({ ...localSettings, reorderFrequency: e.target.value === "auto" ? "auto" : Number(e.target.value) })}
-                  className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm">
-                  <option value="auto">Auto-detect from order history</option>
-                  {[2, 4, 6, 8, 12].map(n => <option key={n} value={n}>{n} weeks</option>)}
-                </select>
+                <label className="text-xs text-muted-foreground mb-1 block">Safety Stock (days)</label>
+                <Input
+                  type="number" min={0}
+                  value={editDefaults.safety_stock_days}
+                  onChange={e => setEditDefaults({ ...editDefaults, safety_stock_days: parseInt(e.target.value) || 7 })}
+                  className="h-8 text-sm"
+                />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Seasonal cycle</label>
-                <select value={localSettings.seasonalCycle} onChange={e => setLocalSettings({ ...localSettings, seasonalCycle: Number(e.target.value) })}
-                  className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm">
-                  {[6, 12, 18].map(n => <option key={n} value={n}>{n} months</option>)}
-                </select>
+                <label className="text-xs text-muted-foreground mb-1 block">Cover Days</label>
+                <Input
+                  type="number" min={1}
+                  value={editDefaults.desired_cover_days}
+                  onChange={e => setEditDefaults({ ...editDefaults, desired_cover_days: parseInt(e.target.value) || 30 })}
+                  className="h-8 text-sm"
+                />
               </div>
-              <Button size="sm" onClick={handleSaveSettings}>Save settings</Button>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Min Order Qty</label>
+                <Input
+                  type="number" min={1}
+                  value={editDefaults.min_order_qty}
+                  onChange={e => setEditDefaults({ ...editDefaults, min_order_qty: parseInt(e.target.value) || 1 })}
+                  className="h-8 text-sm"
+                />
+              </div>
             </div>
-          </div>
-        )}
+            <Button size="sm" onClick={handleSaveDefaults}>Save Defaults</Button>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Confirmation modal */}
-        {showConfirmation && createdPOs.length > 0 && (
-          <div className="bg-success/10 border border-success/20 rounded-lg p-4 mb-4">
+      {/* Created POs confirmation */}
+      {createdPOs.length > 0 && (
+        <Card className="mb-4 border-primary/30">
+          <CardContent className="py-3">
             <div className="flex items-center gap-2 mb-2">
-              <Check className="w-4 h-4 text-success" />
-              <span className="text-sm font-semibold text-success">Created {createdPOs.length} draft POs</span>
+              <Check className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Created {createdPOs.length} draft PO(s)</span>
             </div>
-            <div className="space-y-1 mb-3">
-              {createdPOs.map(po => (
-                <p key={po.poNum} className="text-xs text-muted-foreground">
-                  • <span className="font-mono-data">{po.poNum}</span> — {po.supplier} — {po.count} line{po.count > 1 ? "s" : ""}
-                </p>
-              ))}
+            {createdPOs.map(po => (
+              <p key={po.poNumber} className="text-xs text-muted-foreground">
+                • <span className="font-mono">{po.poNumber}</span> — {po.supplier} — {po.lineCount} items
+              </p>
+            ))}
+            <div className="flex gap-2 mt-2">
+              {onViewOrders && <Button size="sm" variant="outline" onClick={onViewOrders}>View POs →</Button>}
+              <Button size="sm" variant="ghost" onClick={() => setCreatedPOs([])}>Dismiss</Button>
             </div>
-            {onViewOrders ? (
-              <Button size="sm" variant="outline" onClick={onViewOrders}>View Purchase Orders →</Button>
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => setShowConfirmation(false)}>Dismiss</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>
+      ) : rows.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Package className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground">No reorder suggestions right now.</p>
+            <p className="text-xs text-muted-foreground mt-1">Sync sales data and add inventory to generate suggestions.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Summary */}
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
+            <Badge variant="outline" className="text-xs">
+              <AlertTriangle className="w-3 h-3 mr-1" />
+              {rows.filter(r => r.onHand === 0).length} out of stock
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              <TrendingUp className="w-3 h-3 mr-1" />
+              {rows.length} need reorder
+            </Badge>
+            <div className="flex-1" />
+            <Button variant="outline" size="sm" onClick={exportCSV}>
+              <Download className="w-3.5 h-3.5 mr-1" /> Export
+            </Button>
+          </div>
+
+          {/* Action bar */}
+          <div className="flex items-center gap-3 mb-3">
+            <Button
+              size="sm"
+              disabled={selectedRows.length === 0 || creatingPO}
+              onClick={handleCreatePOs}
+            >
+              {creatingPO ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <ShoppingCart className="w-4 h-4 mr-1" />}
+              Create PO from {selectedRows.length || "selected"} items
+            </Button>
+            {rows.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => toggleAll(!rows.every(r => r.selected))}>
+                {rows.every(r => r.selected) ? "Deselect all" : "Select all"}
+              </Button>
             )}
           </div>
-        )}
 
-        {/* Summary */}
-        {visible.length > 0 ? (
-          <div className="bg-card border border-border rounded-lg p-3 mb-4">
-            <p className="text-sm font-medium">
-              💡 {lowStockCount > 0 && <span className="text-destructive">{lowStockCount} running low</span>}
-              {lowStockCount > 0 && dueCount > 0 && " · "}
-              {dueCount > 0 && <span className="text-warning">{dueCount} due for reorder</span>}
-              {(lowStockCount > 0 || dueCount > 0) && seasonCount > 0 && " · "}
-              {seasonCount > 0 && <span className="text-primary">{seasonCount} new season</span>}
-            </p>
+          {/* Table */}
+          <div className="border rounded-lg overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={rows.length > 0 && rows.every(r => r.selected)}
+                      onCheckedChange={(c) => toggleAll(!!c)}
+                    />
+                  </TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead className="text-right">On Hand</TableHead>
+                  <TableHead className="text-right">Avg/Day</TableHead>
+                  <TableHead className="text-right">Lead Time</TableHead>
+                  <TableHead className="text-right">Incoming</TableHead>
+                  <TableHead className="text-right">Reorder Qty</TableHead>
+                  <TableHead>Urgency</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map(r => {
+                  const urgency = getUrgency(r);
+                  return (
+                    <TableRow key={r.variantId}>
+                      <TableCell>
+                        <Checkbox checked={r.selected} onCheckedChange={() => toggleRow(r.variantId)} />
+                      </TableCell>
+                      <TableCell className="text-sm font-medium truncate max-w-[180px]">{r.productTitle}</TableCell>
+                      <TableCell className="font-mono text-xs">{r.sku || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{r.supplierName || "—"}</TableCell>
+                      <TableCell className={`text-right font-medium ${r.onHand === 0 ? "text-destructive" : ""}`}>{r.onHand}</TableCell>
+                      <TableCell className="text-right text-xs">{r.avgDailySales.toFixed(1)}</TableCell>
+                      <TableCell className="text-right text-xs">{r.leadTimeDays}d</TableCell>
+                      <TableCell className="text-right text-xs">{r.incomingStock > 0 ? r.incomingStock : "—"}</TableCell>
+                      <TableCell className="text-right font-semibold">{r.recommendedQty}</TableCell>
+                      <TableCell>
+                        <Badge className={`text-[10px] ${urgency.color}`}>{urgency.label}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
           </div>
-        ) : (
-          <div className="bg-card border border-border rounded-lg p-6 mb-4 text-center">
-            <p className="text-sm text-muted-foreground">✅ No reorder suggestions right now</p>
-            <p className="text-xs text-muted-foreground mt-1">Process more invoices to build reorder intelligence</p>
-          </div>
-        )}
 
-        {/* Generate PO button */}
-        {visible.length > 0 && !showConfirmation && (
-          <Button className="w-full h-12 mb-4" onClick={handleGeneratePOs}>
-            <ShoppingCart className="w-4 h-4 mr-2" /> Generate PO from suggestions ({visible.length} items)
-          </Button>
-        )}
-
-        {/* Suggestions list */}
-        <div className="space-y-2">
-          {visible.map(s => {
-            const rc = REASON_CONFIG[s.reason];
-            const isAdded = addedToPO.has(s.id);
-            return (
-              <div key={s.id} className="bg-card rounded-lg border border-border p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{s.product}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{s.supplier}</p>
-                    <div className="flex flex-wrap gap-2 mt-1.5 text-[11px]">
-                      <span className="text-muted-foreground">Stock: <span className={`font-medium ${s.currentStock <= 3 ? "text-destructive" : "text-foreground"}`}>{s.currentStock}</span></span>
-                      <span className="text-muted-foreground">Last order: {new Date(s.lastOrderDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "2-digit" })} ({s.lastOrderQty} units)</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${rc.badgeClass}`}>
-                        {rc.icon} {rc.label}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">Suggested: <span className="font-medium text-foreground">{s.suggestedQty} units</span></span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1 shrink-0">
-                    {isAdded ? (
-                      <span className="text-[10px] text-success font-medium px-2 py-1">✓ Added</span>
-                    ) : (
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleAddToPO(s.id)}>
-                        Add to PO
-                      </Button>
-                    )}
-                    <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => handleDismiss(s.id)}>
-                      Dismiss
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Dismissed count */}
-        {suggestions.filter(s => s.dismissed).length > 0 && (
-          <p className="text-[10px] text-muted-foreground text-center mt-4">
-            {suggestions.filter(s => s.dismissed).length} suggestion{suggestions.filter(s => s.dismissed).length > 1 ? "s" : ""} dismissed
+          <p className="text-[10px] text-muted-foreground mt-3 text-center">
+            Formula: ((Lead Time + Safety Stock) × Avg Daily Sales) − On Hand − Incoming · Velocity: last {velocityDays} days
           </p>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 };

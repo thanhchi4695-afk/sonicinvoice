@@ -671,6 +671,60 @@ export type Database = {
         }
         Relationships: []
       }
+      product_reorder_settings: {
+        Row: {
+          created_at: string
+          desired_cover_days: number
+          id: string
+          lead_time_days: number
+          min_order_qty: number
+          safety_stock_days: number
+          supplier_id: string | null
+          updated_at: string
+          user_id: string
+          variant_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          desired_cover_days?: number
+          id?: string
+          lead_time_days?: number
+          min_order_qty?: number
+          safety_stock_days?: number
+          supplier_id?: string | null
+          updated_at?: string
+          user_id: string
+          variant_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          desired_cover_days?: number
+          id?: string
+          lead_time_days?: number
+          min_order_qty?: number
+          safety_stock_days?: number
+          supplier_id?: string | null
+          updated_at?: string
+          user_id?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_reorder_settings_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_reorder_settings_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           created_at: string

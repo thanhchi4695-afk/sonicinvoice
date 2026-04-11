@@ -139,7 +139,7 @@ const COLOUR_ABBREVIATIONS: Record<string, string> = {
   fch: "fuchsia", fuc: "fuchsia",
   trq: "turquoise", tur: "turquoise",
   mag: "magenta", mgn: "magenta",
-  ind: "indigo", ind: "indigo",
+  ind: "indigo",
   plt: "platinum",
   slv: "silver", sv: "silver",
   gld: "gold", gl: "gold",

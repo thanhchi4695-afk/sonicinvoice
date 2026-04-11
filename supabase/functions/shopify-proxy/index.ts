@@ -11,7 +11,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant / find_by_barcode
@@ -54,6 +54,8 @@ interface ShopifyRequestBody {
   // For graphql_create_variant
   product_id_gid?: string;
   new_variants?: Array<{ price: string; sku?: string; barcode?: string; options: string[]; qty?: number; locationId?: string; cost?: string; imageSrc?: string }>;
+  // For graphql_search_catalog
+  query_string?: string;
 }
 
 Deno.serve(async (req) => {
@@ -1121,6 +1123,79 @@ Deno.serve(async (req) => {
         }
 
         result = { variants: createdVariants, success: true };
+        break;
+      }
+
+      // ═══ GraphQL Catalog Search ═══
+      case "graphql_search_catalog": {
+        if (!body.query_string) {
+          return new Response(JSON.stringify({ error: "Missing query_string" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const searchGqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+        const searchQuery = `
+          query SearchCatalog($query: String!) {
+            productVariants(first: 50, query: $query) {
+              nodes {
+                id sku barcode title price
+                inventoryQuantity
+                selectedOptions { name value }
+                inventoryItem { id }
+                image { url }
+                product {
+                  id title handle vendor productType tags
+                  options { name values }
+                  variants(first: 100) {
+                    nodes {
+                      id sku barcode title
+                      inventoryQuantity
+                      selectedOptions { name value }
+                      inventoryItem { id }
+                      image { url }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `;
+        const searchResp = await fetch(searchGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({ query: searchQuery, variables: { query: body.query_string } }),
+        });
+        const searchData = await searchResp.json();
+        const searchNodes = searchData?.data?.productVariants?.nodes || [];
+        
+        const mappedSearch = searchNodes.map((v: Record<string, unknown>) => {
+          const opts = (v.selectedOptions || []) as { name: string; value: string }[];
+          const prod = v.product as Record<string, unknown> | undefined;
+          const prodVars = ((prod?.variants as Record<string, unknown>)?.nodes || []) as Record<string, unknown>[];
+          
+          const mapV = (vv: Record<string, unknown>) => {
+            const vOpts = (vv.selectedOptions || []) as { name: string; value: string }[];
+            return {
+              id: vv.id, sku: vv.sku || "", barcode: vv.barcode || "",
+              title: vv.title || "", inventoryQuantity: vv.inventoryQuantity || 0,
+              price: vv.price || "0", option1: vOpts[0]?.value || "", option2: vOpts[1]?.value || "",
+              image: (vv.image as Record<string, unknown>)?.url || undefined,
+              inventoryItemId: (vv.inventoryItem as Record<string, unknown>)?.id || "",
+            };
+          };
+          
+          return {
+            ...mapV(v),
+            product: prod ? {
+              id: prod.id, title: prod.title, handle: prod.handle,
+              vendor: prod.vendor || "", productType: prod.productType || "",
+              tags: prod.tags || [], options: prod.options || [],
+              variants: prodVars.map(pv => ({ ...mapV(pv), product: undefined as unknown })),
+            } : null,
+          };
+        });
+        
+        result = { variants: mappedSearch };
         break;
       }
 

@@ -65,6 +65,8 @@ const SupplierProfileBuilder = ({ onBack }: SupplierProfileBuilderProps) => {
   const [profile, setProfile] = useState<SupplierProfile | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [driveUrl, setDriveUrl] = useState("");
+  const [fetchingDrive, setFetchingDrive] = useState(false);
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);

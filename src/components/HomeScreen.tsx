@@ -147,6 +147,11 @@ const HomeScreen = ({
         </div>
       )}
 
+      {/* Inventory Alerts Widget */}
+      <div className="mb-4">
+        <InventoryAlerts onCreatePO={onStartPurchaseOrders} onAdjustStock={onStartStockyHub} />
+      </div>
+
       {/* Context-aware smart suggestions */}
       <div className="mb-4">
         <ContextDetector onStartFlow={(flow) => {

@@ -712,8 +712,14 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
     if (supplierProfile) {
       const sp = supplierProfile;
       systemPrompt += `\n\n## SUPPLIER INVOICE PROFILE (HIGHEST PRIORITY — follow these rules EXACTLY)
-This profile was built from analysing ${sp.invoices_analysed || "multiple"} real invoices from this supplier.
-Profile version: ${sp.last_updated || "current"}
+This profile was built from analysing ${sp.total_invoices_analysed || sp.invoices_analysed || "multiple"} real invoices from this supplier.
+Profile version: ${sp.profile_version || sp.last_updated || "current"}
+Profile confidence: ${sp.confidence || "N/A"}
+
+### PRIORITY: USE THIS PROFILE FIRST
+1. STRICTLY follow column_mappings, product_name_cleaning_rules, variant_rules, abbreviations, and examples below.
+2. This profile is your SINGLE SOURCE OF TRUTH for layout and patterns.
+3. If anything in the document contradicts the profile, extract using profile rules but flag the discrepancy.
 
 ### Supplier: ${sp.supplier || supplierName || "unknown"}
 ### Layout: ${sp.invoice_layout || "unknown"} — ${sp.layout_description || ""}
@@ -721,18 +727,38 @@ Profile version: ${sp.last_updated || "current"}
 ### Column Mappings (use these to find data):`;
       if (sp.column_mappings) {
         for (const [field, mapping] of Object.entries(sp.column_mappings)) {
-          const m = mapping as Record<string, string>;
-          systemPrompt += `\n- **${field}**: header="${m.header || ""}", position="${m.position || ""}" ${m.notes ? `(${m.notes})` : ""}`;
+          if (typeof mapping === "object" && mapping) {
+            const m = mapping as Record<string, string>;
+            systemPrompt += `\n- **${field}**: header="${m.header || ""}", position="${m.position || ""}" ${m.notes ? `(${m.notes})` : ""}`;
+          } else {
+            systemPrompt += `\n- **${field}**: ${mapping}`;
+          }
         }
       }
-      systemPrompt += `\n\n### Product Name Rules: ${sp.product_name_rules || "standard"}`;
-      systemPrompt += `\n### Colour Rules: ${sp.colour_rules || "standard"}`;
-      if (sp.colour_abbreviations && Object.keys(sp.colour_abbreviations).length > 0) {
-        systemPrompt += `\n### Colour Abbreviations (APPLY these): ${Object.entries(sp.colour_abbreviations).map(([k, v]) => `${k}→${v}`).join(", ")}`;
+
+      // Product name cleaning rules
+      if (sp.product_name_cleaning_rules?.length) {
+        systemPrompt += `\n\n### Product Name Cleaning Rules (APPLY in order):`;
+        for (const rule of sp.product_name_cleaning_rules) {
+          systemPrompt += `\n- ${rule}`;
+        }
       }
-      systemPrompt += `\n### Size Rules: ${sp.size_rules || "standard"}`;
+      systemPrompt += `\n### Product Name Rules: ${sp.product_name_rules || "standard"}`;
+      systemPrompt += `\n### Colour Rules: ${sp.colour_rules || "standard"}`;
+
+      // Abbreviations (combined format)
+      const abbrevs = sp.abbreviations || sp.colour_abbreviations || {};
+      if (Object.keys(abbrevs).length > 0) {
+        systemPrompt += `\n### Abbreviations (EXPAND these automatically): ${Object.entries(abbrevs).map(([k, v]) => `${k}→${Array.isArray(v) ? v.join(",") : v}`).join(", ")}`;
+      }
+
+      // Variant rules
+      if (sp.variant_rules) {
+        systemPrompt += `\n### Variant Rules: ${sp.variant_rules}`;
+      }
       systemPrompt += `\n### Variant Detection: ${sp.variant_detection_rule || "auto"}`;
       systemPrompt += `\n### Size System: ${sp.size_system || "auto"}`;
+      systemPrompt += `\n### Size Rules: ${sp.size_rules || "standard"}`;
       systemPrompt += `\n### GST Handling: ${sp.gst_handling || "exclusive"}`;
       systemPrompt += `\n### Pricing Notes: ${sp.pricing_notes || "standard"}`;
 
@@ -745,14 +771,21 @@ Profile version: ${sp.last_updated || "current"}
       if (sp.extraction_tips) {
         systemPrompt += `\n\n### Extraction Tips: ${sp.extraction_tips}`;
       }
+      if (sp.notes_for_future) {
+        systemPrompt += `\n### Notes for Future: ${sp.notes_for_future}`;
+      }
       if (sp.examples?.length) {
-        systemPrompt += `\n\n### Few-Shot Examples (use as guidance):`;
-        for (const ex of sp.examples.slice(0, 3)) {
-          systemPrompt += `\nRaw: "${ex.raw_line}" → ${JSON.stringify(ex.extracted)}`;
+        systemPrompt += `\n\n### Few-Shot Examples (use as guidance for how to parse this supplier's invoices):`;
+        for (const ex of sp.examples.slice(0, 6)) {
+          const rawField = ex.raw_text || ex.raw_line || "";
+          systemPrompt += `\nRaw: "${rawField}" → ${JSON.stringify(ex.extracted)}`;
         }
       }
 
-      systemPrompt += `\n\nADD to your output: "used_profile_version": "${sp.last_updated || "current"}", "profile_confidence_boost": <0-100 based on how well this invoice matches the profile>`;
+      systemPrompt += `\n\nADD to your output:
+"supplier_profile_used": "Yes",
+"used_profile_version": "${sp.profile_version || sp.last_updated || "current"}",
+"profile_confidence_boost": <0-100 based on how well this invoice matches the profile patterns>`;
     }
 
     if (customInstructions) {

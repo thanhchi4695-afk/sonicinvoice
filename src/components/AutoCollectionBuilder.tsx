@@ -19,7 +19,7 @@ interface CollectionSuggestion {
   id: string;
   title: string;
   handle: string;
-  type: "by_type" | "by_attribute" | "by_vendor" | "by_price";
+  type: "by_type" | "by_attribute" | "by_vendor" | "by_price" | "brand" | "style" | "category" | "style_category" | "feature" | "broad_category" | "colour" | "print_story" | "seasonal";
   rules: { column: string; relation: string; condition: string }[];
   disjunctive: boolean;
   matchingProducts: number;
@@ -28,6 +28,8 @@ interface CollectionSuggestion {
   reason: string;
   seoTitle: string;
   seoDescription: string;
+  bodyContent?: string;
+  internalLinksTo?: string[];
   duplicate: boolean;
   duplicateOf?: string;
 }

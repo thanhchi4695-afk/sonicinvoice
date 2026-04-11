@@ -297,16 +297,16 @@ export default function ShopifyCSVSEO({ onBack }: { onBack: () => void }) {
     // ── Duplicate detection ──────────────────────────────
     setProgress(92);
     setProgressMsg("Detecting duplicates & mismatches…");
-    const titleCounts = new Map<string, string[]>();
-    const descCounts = new Map<string, string[]>();
+    const titleCounts: Record<string, string[]> = {};
+    const descCounts: Record<string, string[]> = {};
     allResults.forEach(r => {
       const t = r.seoTitle.toLowerCase();
       const d = r.seoDescription.toLowerCase();
-      titleCounts.set(t, [...(titleCounts.get(t) || []), r.handle]);
-      descCounts.set(d, [...(descCounts.get(d) || []), r.handle]);
+      titleCounts[t] = [...(titleCounts[t] || []), r.handle];
+      descCounts[d] = [...(descCounts[d] || []), r.handle];
     });
 
-    for (const [title, handles] of titleCounts) {
+    Object.entries(titleCounts).forEach(([title, handles]) => {
       if (handles.length > 1 && title.length > 15) {
         handles.forEach(h => {
           const r = allResults.find(x => x.handle === h);
@@ -317,8 +317,8 @@ export default function ShopifyCSVSEO({ onBack }: { onBack: () => void }) {
           }
         });
       }
-    }
-    for (const [desc, handles] of descCounts) {
+    });
+    Object.entries(descCounts).forEach(([desc, handles]) => {
       if (handles.length > 1 && desc.length > 30) {
         handles.forEach(h => {
           const r = allResults.find(x => x.handle === h);
@@ -329,7 +329,7 @@ export default function ShopifyCSVSEO({ onBack }: { onBack: () => void }) {
           }
         });
       }
-    }
+    });
 
     // ── Validation layer ─────────────────────────────────
     setProgress(95);

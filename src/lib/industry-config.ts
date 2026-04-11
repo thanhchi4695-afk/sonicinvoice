@@ -658,12 +658,12 @@ export function getIndustryDefinition(id: string): IndustryDefinition {
 
 export function getIndustryList(): { id: string; name: string; icon: string }[] {
   // Return deduplicated list (no aliases)
-  const unique = [SWIMWEAR, BEAUTY, CLOTHING, FOOTWEAR, HEALTH, ELECTRONICS, HOME, SPORTS, GENERAL];
+  const unique = [SWIMWEAR, BEAUTY, CLOTHING, FOOTWEAR, HEALTH, ELECTRONICS, HOME, SPORTS, PET_SUPPLIES, GENERAL];
   return unique.map(i => ({ id: i.id, name: i.displayName, icon: i.icon }));
 }
 
 export function getAllIndustryIds(): string[] {
-  return ['swimwear', 'beauty', 'clothing', 'footwear', 'health', 'electronics', 'home', 'sports', 'general'];
+  return ['swimwear', 'beauty', 'clothing', 'footwear', 'health', 'electronics', 'home', 'sports', 'pet', 'general'];
 }
 
 /** Convenience: get field labels for the current industry */

@@ -9,6 +9,7 @@ import HomeScreen from "@/components/HomeScreen";
 import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
 import StockyLayout from "@/components/StockyLayout";
+import QuickActionsBar from "@/components/QuickActionsBar";
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
 const InvoicesTab = lazy(() => import("@/components/InvoicesTab"));
@@ -89,7 +90,7 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "stocky_onboarding" | "inventory_dashboard" | "inventory_view" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | "stocktake_module" | "transfer_orders" | "reports_hub" | "pipeline" | "pipeline_chooser" | "supplier_profile_builder" | "stock_adjustment" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "stocky_onboarding" | "inventory_dashboard" | "inventory_view" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | "stocktake_module" | "transfer_orders" | "reports_hub" | "pipeline" | "pipeline_chooser" | "supplier_profile_builder" | "stock_adjustment" | "quick_receive" | null>(null);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -241,6 +242,7 @@ const Index = () => {
       case "suppliers": flowEl = <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />; break;
       case "audit_log": flowEl = <AuditLogPanel onBack={() => setActiveFlow(null)} />; break;
       case "purchase_orders": flowEl = <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />; break;
+      case "quick_receive": flowEl = <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />; break;
       case "catalog_memory": flowEl = <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />; break;
       case "email_inbox": flowEl = <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />; break;
       case "collab_seo": flowEl = <CollabSEOFlow onBack={() => setActiveFlow(null)} />; break;
@@ -488,6 +490,7 @@ const Index = () => {
               {mode.modeBadge.label}
             </button>
           </div>
+          <QuickActionsBar onAction={handleStartFlow} />
           {activeFlow ? renderFlow() : mainContent}
         </StockyLayout>
       </div>
@@ -516,6 +519,7 @@ const Index = () => {
             {mode.modeBadge.label}
           </button>
         </div>
+        <QuickActionsBar onAction={handleStartFlow} />
         {activeFlow ? renderFlow() : mainContent}
         <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 

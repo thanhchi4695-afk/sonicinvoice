@@ -11,7 +11,9 @@ import {
   getSmartCollections,
   getCustomCollections,
   createSmartCollection,
+  createCollectionGraphQL,
   type ShopifyCollection,
+  type GraphQLCollectionInput,
 } from "@/lib/shopify-api";
 
 /* ─── Types ─── */
@@ -340,14 +342,32 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
     for (let i = 0; i < toCreate.length; i++) {
       const s = toCreate[i];
       try {
-        await createSmartCollection({
-          title: s.title,
-          rules: s.rules,
-          disjunctive: s.disjunctive,
-          body_html: s.bodyContent || `<p>${s.seoDescription}</p>`,
-          metafields_global_title_tag: s.seoTitle,
-          metafields_global_description_tag: s.seoDescription,
-        });
+        const isArchitectType = ["brand","style","category","style_category","feature","broad_category","colour","print_story","seasonal"].includes(s.type);
+        
+        if (isArchitectType && s.rules.length > 0) {
+          // Use GraphQL for architect collections — supports ruleSet, SEO, metafields
+          const gqlInput: GraphQLCollectionInput = {
+            title: s.title,
+            handle: s.handle,
+            descriptionHtml: s.bodyContent || `<p>${s.seoDescription}</p>`,
+            seo: { title: s.seoTitle, description: s.seoDescription },
+            ruleSet: {
+              appliedDisjunctively: s.disjunctive,
+              rules: s.rules,
+            },
+          };
+          await createCollectionGraphQL(gqlInput);
+        } else {
+          // REST API for quick-mode collections
+          await createSmartCollection({
+            title: s.title,
+            rules: s.rules,
+            disjunctive: s.disjunctive,
+            body_html: s.bodyContent || `<p>${s.seoDescription}</p>`,
+            metafields_global_title_tag: s.seoTitle,
+            metafields_global_description_tag: s.seoDescription,
+          });
+        }
         res.push({ title: s.title, ok: true });
       } catch (err: any) {
         res.push({ title: s.title, ok: false, error: err?.message || "Unknown error" });

@@ -11,7 +11,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog" | "graphql_create_collection";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant / find_by_barcode
@@ -56,6 +56,15 @@ interface ShopifyRequestBody {
   new_variants?: Array<{ price: string; sku?: string; barcode?: string; options: string[]; qty?: number; locationId?: string; cost?: string; imageSrc?: string }>;
   // For graphql_search_catalog
   query_string?: string;
+  // For graphql_create_collection
+  gql_collection?: {
+    title: string;
+    handle?: string;
+    descriptionHtml?: string;
+    seo?: { title?: string; description?: string };
+    ruleSet?: { appliedDisjunctively: boolean; rules: Array<{ column: string; relation: string; condition: string }> };
+    metafields?: Array<{ namespace: string; key: string; value: string; type: string }>;
+  };
 }
 
 Deno.serve(async (req) => {
@@ -1196,6 +1205,79 @@ Deno.serve(async (req) => {
         });
         
         result = { variants: mappedSearch };
+        break;
+      }
+
+      // ═══ GraphQL Collection Create (Smart) ═══
+      case "graphql_create_collection": {
+        if (!body.gql_collection?.title) {
+          return new Response(JSON.stringify({ error: "Missing gql_collection.title" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const gc = body.gql_collection;
+        const colGqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+
+        // Map column names to Shopify GraphQL enum values
+        const colMap: Record<string, string> = {
+          tag: "TAG", title: "TITLE", type: "PRODUCT_TYPE", vendor: "VENDOR",
+          variant_price: "VARIANT_PRICE", variant_title: "VARIANT_TITLE",
+          product_type: "PRODUCT_TYPE",
+        };
+        const relMap: Record<string, string> = {
+          equals: "EQUALS", contains: "CONTAINS", starts_with: "STARTS_WITH",
+          ends_with: "ENDS_WITH", greater_than: "GREATER_THAN", less_than: "LESS_THAN",
+          is_set: "IS_SET", is_not_set: "IS_NOT_SET",
+        };
+
+        const ruleSetInput = gc.ruleSet ? {
+          appliedDisjunctively: gc.ruleSet.appliedDisjunctively,
+          rules: gc.ruleSet.rules.map(r => ({
+            column: colMap[r.column.toLowerCase()] || r.column,
+            relation: relMap[r.relation.toLowerCase()] || r.relation,
+            condition: r.condition,
+          })),
+        } : undefined;
+
+        const collectionInput: Record<string, unknown> = {
+          title: gc.title,
+          descriptionHtml: gc.descriptionHtml || "",
+        };
+        if (gc.handle) collectionInput.handle = gc.handle;
+        if (gc.seo) collectionInput.seo = gc.seo;
+        if (ruleSetInput) collectionInput.ruleSet = ruleSetInput;
+        if (gc.metafields && gc.metafields.length > 0) collectionInput.metafields = gc.metafields;
+
+        const colMutation = `
+          mutation CollectionCreate($input: CollectionInput!) {
+            collectionCreate(input: $input) {
+              collection {
+                id
+                handle
+                title
+                updatedAt
+              }
+              userErrors {
+                field
+                message
+              }
+            }
+          }
+        `;
+
+        const colResp = await fetch(colGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({ query: colMutation, variables: { input: collectionInput } }),
+        });
+        const colData = await colResp.json();
+        const userErrors = colData?.data?.collectionCreate?.userErrors || [];
+        if (userErrors.length > 0) {
+          return new Response(JSON.stringify({ error: "Collection creation failed", userErrors }), {
+            status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { collection: colData?.data?.collectionCreate?.collection };
         break;
       }
 

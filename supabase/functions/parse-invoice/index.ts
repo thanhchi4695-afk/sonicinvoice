@@ -627,7 +627,7 @@ serve(async (req) => {
   }
 
   try {
-    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode, expectedProductCount } = await req.json();
+    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode, expectedProductCount, supplierProfile } = await req.json();
 
     if (!fileContent) {
       return new Response(JSON.stringify({ error: "No file content provided" }), {
@@ -706,6 +706,53 @@ ${templateHint.groupingRules.map((g: string) => `• ${g}`).join("\n")}`;
       }
 
       systemPrompt += `\n\nUse this learned memory as primary guidance. Verify against the actual document structure — if the layout has changed significantly, override the hints and note the difference.`;
+    }
+
+    // Supplier Profile (highest priority — from profile builder)
+    if (supplierProfile) {
+      const sp = supplierProfile;
+      systemPrompt += `\n\n## SUPPLIER INVOICE PROFILE (HIGHEST PRIORITY — follow these rules EXACTLY)
+This profile was built from analysing ${sp.invoices_analysed || "multiple"} real invoices from this supplier.
+Profile version: ${sp.last_updated || "current"}
+
+### Supplier: ${sp.supplier || supplierName || "unknown"}
+### Layout: ${sp.invoice_layout || "unknown"} — ${sp.layout_description || ""}
+
+### Column Mappings (use these to find data):`;
+      if (sp.column_mappings) {
+        for (const [field, mapping] of Object.entries(sp.column_mappings)) {
+          const m = mapping as Record<string, string>;
+          systemPrompt += `\n- **${field}**: header="${m.header || ""}", position="${m.position || ""}" ${m.notes ? `(${m.notes})` : ""}`;
+        }
+      }
+      systemPrompt += `\n\n### Product Name Rules: ${sp.product_name_rules || "standard"}`;
+      systemPrompt += `\n### Colour Rules: ${sp.colour_rules || "standard"}`;
+      if (sp.colour_abbreviations && Object.keys(sp.colour_abbreviations).length > 0) {
+        systemPrompt += `\n### Colour Abbreviations (APPLY these): ${Object.entries(sp.colour_abbreviations).map(([k, v]) => `${k}→${v}`).join(", ")}`;
+      }
+      systemPrompt += `\n### Size Rules: ${sp.size_rules || "standard"}`;
+      systemPrompt += `\n### Variant Detection: ${sp.variant_detection_rule || "auto"}`;
+      systemPrompt += `\n### Size System: ${sp.size_system || "auto"}`;
+      systemPrompt += `\n### GST Handling: ${sp.gst_handling || "exclusive"}`;
+      systemPrompt += `\n### Pricing Notes: ${sp.pricing_notes || "standard"}`;
+
+      if (sp.noise_patterns?.length) {
+        systemPrompt += `\n\n### Known Noise Patterns (REJECT these): ${sp.noise_patterns.join("; ")}`;
+      }
+      if (sp.quirks?.length) {
+        systemPrompt += `\n\n### Supplier Quirks: ${sp.quirks.join("; ")}`;
+      }
+      if (sp.extraction_tips) {
+        systemPrompt += `\n\n### Extraction Tips: ${sp.extraction_tips}`;
+      }
+      if (sp.examples?.length) {
+        systemPrompt += `\n\n### Few-Shot Examples (use as guidance):`;
+        for (const ex of sp.examples.slice(0, 3)) {
+          systemPrompt += `\nRaw: "${ex.raw_line}" → ${JSON.stringify(ex.extracted)}`;
+        }
+      }
+
+      systemPrompt += `\n\nADD to your output: "used_profile_version": "${sp.last_updated || "current"}", "profile_confidence_boost": <0-100 based on how well this invoice matches the profile>`;
     }
 
     if (customInstructions) {

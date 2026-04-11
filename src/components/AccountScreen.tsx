@@ -1,4 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
+import { useTranslation } from "react-i18next";
+import { SUPPORTED_LANGUAGES } from "@/i18n/config";
 const ConnectorsMarketplace = lazy(() => import("@/components/ConnectorsMarketplace"));
 import POSConnectionPanel from "@/components/POSConnectionPanel";
 import { Button } from "@/components/ui/button";

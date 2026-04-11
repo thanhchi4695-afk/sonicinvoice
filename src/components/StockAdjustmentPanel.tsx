@@ -108,6 +108,7 @@ export default function StockAdjustmentPanel({ onBack }: Props) {
         title: prod?.title || "Unknown",
         sku: v.sku || v.barcode || "",
         shopifyVariantId: v.shopify_variant_id,
+        inventoryItemId: null,
         currentQty: v.quantity,
       });
     } else if (hasShopify) {
@@ -140,9 +141,9 @@ export default function StockAdjustmentPanel({ onBack }: Props) {
     if (!user) { setSubmitting(false); return; }
 
     // Adjust in Shopify if connected
-    if (hasShopify && matchedVariant.shopifyVariantId && shopifyLocationId) {
+    if (hasShopify && matchedVariant.inventoryItemId && shopifyLocationId) {
       try {
-        await adjustInventory(matchedVariant.shopifyVariantId, qty, shopifyLocationId);
+        await adjustInventory(shopifyLocationId, matchedVariant.inventoryItemId, qty);
       } catch (e) {
         console.error("Shopify adjust error:", e);
         toast.error("Shopify inventory update failed — recording locally");

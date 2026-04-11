@@ -582,6 +582,30 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         }
       }
 
+      // Load supplier profile from database if available
+      let supplierProfileData: Record<string, unknown> | undefined;
+      if (supplierName) {
+        try {
+          const { data: profileRows } = await supabase
+            .from("supplier_profiles" as any)
+            .select("profile_data, invoices_analysed, updated_at")
+            .eq("supplier_name", supplierName)
+            .eq("is_active", true)
+            .limit(1);
+          if (profileRows && profileRows.length > 0) {
+            const row = profileRows[0] as any;
+            supplierProfileData = {
+              ...(row.profile_data as Record<string, unknown>),
+              invoices_analysed: row.invoices_analysed,
+              last_updated: row.updated_at?.split("T")[0],
+            };
+            console.log(`[Sonic Invoice] Supplier profile loaded for "${supplierName}" (${row.invoices_analysed} invoices analysed)`);
+          }
+        } catch (e) {
+          console.warn("[Sonic Invoice] Could not load supplier profile:", e);
+        }
+      }
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
@@ -596,6 +620,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             : processAs === "handwritten" ? "handwritten"
             : undefined,
           templateHint: combinedHint || undefined,
+          supplierProfile: supplierProfileData || undefined,
         }),
       });
 

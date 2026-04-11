@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { addAuditEntry } from "@/lib/audit-log";
 import { adjustInventory, findVariantBySKU, getConnection, getLocations } from "@/lib/shopify-api";
+import { CatalogPicker, type CatalogItem } from "@/components/SupplierCatalog";
 
 // ── Types ──────────────────────────────────────────────────
 interface POLine {
@@ -104,6 +105,7 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
   const [poNotes, setPoNotes] = useState("");
   const [lines, setLines] = useState<POLine[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showCatalog, setShowCatalog] = useState(false);
 
   // Receive state
   const [receivePO, setReceivePO] = useState<PurchaseOrder | null>(null);
@@ -936,9 +938,40 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
                   </div>
                 ))}
               </div>
-              <Button variant="ghost" size="sm" className="mt-2 text-xs" onClick={() => setLines([...lines, newLine()])}>
-                <Plus className="w-3 h-3 mr-1" /> Add line
-              </Button>
+              <div className="flex gap-2 mt-2">
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => setLines([...lines, newLine()])}>
+                  <Plus className="w-3 h-3 mr-1" /> Add line
+                </Button>
+                {supplierId && (
+                  <Button variant="outline" size="sm" className="text-xs" onClick={() => setShowCatalog(!showCatalog)}>
+                    <Package className="w-3 h-3 mr-1" /> {showCatalog ? "Hide catalog" : "From catalog"}
+                  </Button>
+                )}
+              </div>
+              {showCatalog && supplierId && (
+                <div className="mt-2 bg-muted/30 rounded-lg border border-border p-3">
+                  <CatalogPicker
+                    supplierId={supplierId}
+                    onSelect={(catalogItems: CatalogItem[]) => {
+                      const newLines = catalogItems.map(ci => ({
+                        id: uid(),
+                        product_title: ci.product_name,
+                        sku: ci.sku || "",
+                        color: ci.color || "",
+                        size: ci.size || "",
+                        expected_qty: ci.min_order_qty || 1,
+                        received_qty: 0,
+                        expected_cost: ci.cost,
+                        actual_cost: null,
+                        notes: "",
+                      }));
+                      setLines(prev => [...prev.filter(l => l.product_title.trim()), ...newLines]);
+                      setShowCatalog(false);
+                      toast.success(`${newLines.length} items added from catalog`);
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="bg-card rounded-lg border border-border p-3 flex items-center justify-between">

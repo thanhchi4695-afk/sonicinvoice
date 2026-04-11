@@ -1185,6 +1185,71 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_catalog_items: {
+        Row: {
+          barcode: string | null
+          color: string | null
+          cost: number
+          created_at: string
+          id: string
+          is_archived: boolean
+          lead_time_days: number
+          min_order_qty: number
+          notes: string | null
+          product_name: string
+          shopify_variant_id: string | null
+          size: string | null
+          sku: string | null
+          supplier_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          barcode?: string | null
+          color?: string | null
+          cost?: number
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          lead_time_days?: number
+          min_order_qty?: number
+          notes?: string | null
+          product_name?: string
+          shopify_variant_id?: string | null
+          size?: string | null
+          sku?: string | null
+          supplier_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          barcode?: string | null
+          color?: string | null
+          cost?: number
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          lead_time_days?: number
+          min_order_qty?: number
+          notes?: string | null
+          product_name?: string
+          shopify_variant_id?: string | null
+          size?: string | null
+          sku?: string | null
+          supplier_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_catalog_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_profiles: {
         Row: {
           created_at: string

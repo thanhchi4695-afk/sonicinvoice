@@ -146,6 +146,26 @@ const HomeScreen = ({
         </div>
       )}
 
+      {/* Context-aware smart suggestions */}
+      <div className="mb-4">
+        <ContextDetector onStartFlow={(flow) => {
+          const flowMap: Record<string, (() => void) | undefined> = {
+            invoice: onStartInvoice,
+            stock_check: onStartStockCheck,
+            joor: onStartJoor,
+            wholesale_import: onStartWholesaleImport,
+            lookbook_import: onStartLookbookImport,
+            supplier_profile: onStartSupplierProfileBuilder,
+            accounting: onStartAccounting,
+            gdrive_import: onStartSupplierProfileBuilder,
+            collection_builder: onStartCollectionSEO,
+            quick_capture: onStartScanMode,
+            email_forward: onStartEmailInbox,
+          };
+          flowMap[flow]?.();
+        }} />
+      </div>
+
       {/* Lightspeed workflow card */}
       {mode.isLightspeed && (
         <div className="bg-card rounded-lg border border-purple-500/20 p-4 mb-4">

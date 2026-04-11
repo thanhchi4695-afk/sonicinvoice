@@ -39,7 +39,7 @@ interface Props {
 export default function StockAdjustmentPanel({ onBack }: Props) {
   // Form
   const [skuSearch, setSkuSearch] = useState("");
-  const [matchedVariant, setMatchedVariant] = useState<{ title: string; sku: string; shopifyVariantId: string | null; currentQty: number } | null>(null);
+  const [matchedVariant, setMatchedVariant] = useState<{ title: string; sku: string; shopifyVariantId: string | null; inventoryItemId: string | null; currentQty: number } | null>(null);
   const [qty, setQty] = useState<number>(0);
   const [reason, setReason] = useState<Reason>("Correction");
   const [note, setNote] = useState("");

@@ -107,8 +107,10 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
   // Receive state
   const [receivePO, setReceivePO] = useState<PurchaseOrder | null>(null);
   const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({});
+  const [receiveCosts, setReceiveCosts] = useState<Record<string, number>>({});
   const [receiving, setReceiving] = useState(false);
   const [showReceiveConfirm, setShowReceiveConfirm] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState("");
 
   // Match state
   const [matchingPO, setMatchingPO] = useState<PurchaseOrder | null>(null);

@@ -114,7 +114,14 @@ const HomeScreen = ({
         </div>
       )}
 
-      <h1 className="text-2xl font-bold font-display mb-1">Sonic Invoice</h1>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-2xl font-bold font-display">Sonic Invoice</h1>
+        {onSwitchToStockyDashboard && (
+          <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={onSwitchToStockyDashboard}>
+            <Monitor className="w-3.5 h-3.5" /> Stocky View
+          </Button>
+        )}
+      </div>
       <p className="text-muted-foreground text-sm mb-4">
         {mode.isLightspeed
           ? `Invoice → ${mode.targetPlatform} in minutes`

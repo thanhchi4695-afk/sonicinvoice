@@ -13,7 +13,7 @@ import StockyLayout from "@/components/StockyLayout";
 import QuickActionsBar from "@/components/QuickActionsBar";
 import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
 import QuickSearchModal from "@/components/QuickSearchModal";
-import MigrationChecklist from "@/components/MigrationChecklist";
+
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
 const InvoicesTab = lazy(() => import("@/components/InvoicesTab"));
@@ -104,7 +104,7 @@ const Index = () => {
   const [useStockyDashboard, setUseStockyDashboard] = useState(() => localStorage.getItem("stocky_dashboard_mode") === "true");
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showQuickSearch, setShowQuickSearch] = useState(false);
-  const [showMigrationChecklist] = useState(() => localStorage.getItem("migration_checklist_dismissed") !== "true");
+  
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
   const { isEmbedded, shop, authState: embeddedAuthState } = useShopifyEmbedded();

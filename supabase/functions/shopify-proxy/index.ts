@@ -1126,6 +1126,79 @@ Deno.serve(async (req) => {
         break;
       }
 
+      // ═══ GraphQL Catalog Search ═══
+      case "graphql_search_catalog": {
+        if (!body.query_string) {
+          return new Response(JSON.stringify({ error: "Missing query_string" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const searchGqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+        const searchQuery = `
+          query SearchCatalog($query: String!) {
+            productVariants(first: 50, query: $query) {
+              nodes {
+                id sku barcode title price
+                inventoryQuantity
+                selectedOptions { name value }
+                inventoryItem { id }
+                image { url }
+                product {
+                  id title handle vendor productType tags
+                  options { name values }
+                  variants(first: 100) {
+                    nodes {
+                      id sku barcode title
+                      inventoryQuantity
+                      selectedOptions { name value }
+                      inventoryItem { id }
+                      image { url }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `;
+        const searchResp = await fetch(searchGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({ query: searchQuery, variables: { query: body.query_string } }),
+        });
+        const searchData = await searchResp.json();
+        const searchNodes = searchData?.data?.productVariants?.nodes || [];
+        
+        const mappedSearch = searchNodes.map((v: Record<string, unknown>) => {
+          const opts = (v.selectedOptions || []) as { name: string; value: string }[];
+          const prod = v.product as Record<string, unknown> | undefined;
+          const prodVars = ((prod?.variants as Record<string, unknown>)?.nodes || []) as Record<string, unknown>[];
+          
+          const mapV = (vv: Record<string, unknown>) => {
+            const vOpts = (vv.selectedOptions || []) as { name: string; value: string }[];
+            return {
+              id: vv.id, sku: vv.sku || "", barcode: vv.barcode || "",
+              title: vv.title || "", inventoryQuantity: vv.inventoryQuantity || 0,
+              price: vv.price || "0", option1: vOpts[0]?.value || "", option2: vOpts[1]?.value || "",
+              image: (vv.image as Record<string, unknown>)?.url || undefined,
+              inventoryItemId: (vv.inventoryItem as Record<string, unknown>)?.id || "",
+            };
+          };
+          
+          return {
+            ...mapV(v),
+            product: prod ? {
+              id: prod.id, title: prod.title, handle: prod.handle,
+              vendor: prod.vendor || "", productType: prod.productType || "",
+              tags: prod.tags || [], options: prod.options || [],
+              variants: prodVars.map(pv => ({ ...mapV(pv), product: undefined as unknown })),
+            } : null,
+          };
+        });
+        
+        result = { variants: mappedSearch };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

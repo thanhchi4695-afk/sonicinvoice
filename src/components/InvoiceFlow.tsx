@@ -2444,6 +2444,23 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           </div>
         </div>
       )}
+
+      {/* Supplier Template Teach Modal */}
+      <SupplierTemplateTeach
+        open={showTeachModal}
+        onClose={() => setShowTeachModal(false)}
+        supplierName={supplierName}
+        detectedHeaders={detectedHeaders}
+        sampleProducts={productGroups.slice(0, 5).map(g => ({
+          name: g.name,
+          sku: g.vendorCode || "",
+          colour: g.colour || "",
+          size: g.size || "",
+          qty: g.variants.reduce((s, v) => s + v.qty, 0),
+          cost: g.price,
+          rrp: g.rrp,
+        }))}
+      />
     </div>
   );
 };

@@ -59,6 +59,7 @@ interface HomeScreenProps {
   onStartPipeline?: (id: string) => void;
   onStartPipelineChooser?: () => void;
   onStartStockyOnboarding?: () => void;
+  onStartSupplierProfileBuilder?: () => void;
 }
 
 const HomeScreen = ({
@@ -73,6 +74,7 @@ const HomeScreen = ({
   onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss,
   onStartImageOptimise, onStartStockCheck, onStartPriceLookup, onStartSeasons, onNavigateToTab,
   onStartPipeline, onStartPipelineChooser, onStartStockyOnboarding,
+  onStartSupplierProfileBuilder,
 }: HomeScreenProps) => {
   const mode = useStoreMode();
   const unreadCount = getUnprocessedInboxCount();

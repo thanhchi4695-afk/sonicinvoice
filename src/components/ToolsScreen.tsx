@@ -45,6 +45,7 @@ const tools = [
   { id: "feed_health", icon: Globe, label: "Google Feed Health", desc: "Fix gender, age_group, color — push to Shopify", color: "text-success" },
   { id: "learning_memory", icon: Brain, label: "Learning memory", desc: "View learned invoice patterns by supplier", color: "text-secondary" },
   { id: "image_optimise", icon: Image, label: "Image optimisation AI", desc: "Alt text, filenames, quality analysis", color: "text-primary" },
+  { id: "collection_seo_export", icon: Globe, label: "Bulk Collection SEO", desc: "Export, optimize & import collection SEO", color: "text-success" },
 ];
 
 const quickInserts = [

@@ -399,20 +399,41 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
           <h2 className="text-lg font-semibold font-display">🗂️ Auto Collection Builder</h2>
         </div>
 
+        {/* Mode toggle */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <button
+            onClick={() => setMode("architect")}
+            className={`p-3 rounded-xl border text-left transition-all ${mode === "architect" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}
+          >
+            <Brain className={`w-5 h-5 mb-1 ${mode === "architect" ? "text-primary" : "text-muted-foreground"}`} />
+            <p className="text-xs font-semibold">SEO Architect</p>
+            <p className="text-[10px] text-muted-foreground">AI hierarchy with internal linking, 8-15 collections per product</p>
+          </button>
+          <button
+            onClick={() => setMode("quick")}
+            className={`p-3 rounded-xl border text-left transition-all ${mode === "quick" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}
+          >
+            <Zap className={`w-5 h-5 mb-1 ${mode === "quick" ? "text-primary" : "text-muted-foreground"}`} />
+            <p className="text-xs font-semibold">Quick Build</p>
+            <p className="text-[10px] text-muted-foreground">Local rules-based: type, vendor, tag, price</p>
+          </button>
+        </div>
+
         <Card className="mb-4">
           <CardContent className="p-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-primary" />
+                {mode === "architect" ? <Brain className="w-5 h-5 text-primary" /> : <Sparkles className="w-5 h-5 text-primary" />}
               </div>
               <div>
-                <p className="text-sm font-semibold">AI Collection Generator</p>
-                <p className="text-xs text-muted-foreground">Automatically organize products into smart collections</p>
+                <p className="text-sm font-semibold">{mode === "architect" ? "Collection Architect" : "Quick Collection Builder"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {mode === "architect"
+                    ? "Generates SEO hierarchy: brand → style → category → feature → colour collections with internal linking"
+                    : "Analyses types, vendors, tags & prices for smart collection rules"}
+                </p>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">
-              Analyses your product data (types, vendors, tags, prices) and suggests Shopify smart collections with proper rules, SEO titles, and descriptions.
-            </p>
             <div className="bg-muted/50 rounded-lg p-3 mb-4 border border-border">
               <p className="text-xs font-medium mb-1">Products loaded: {products.length}</p>
               {products.length === 0 && (
@@ -433,9 +454,9 @@ export default function AutoCollectionBuilder({ onBack }: { onBack: () => void }
               variant="teal"
             >
               {loading ? (
-                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Analyzing products...</>
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />{mode === "architect" ? "AI building hierarchy..." : "Analyzing products..."}</>
               ) : (
-                <><Sparkles className="w-4 h-4 mr-2" />Generate Collections</>
+                <>{mode === "architect" ? <Brain className="w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}{mode === "architect" ? "Build SEO Collection Hierarchy" : "Generate Collections"}</>
               )}
             </Button>
           </CardContent>

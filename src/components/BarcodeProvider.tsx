@@ -96,7 +96,7 @@ export default function BarcodeProvider({ children }: { children: ReactNode }) {
       if (target.closest("[data-barcode-ignore]")) return;
 
       const now = Date.now();
-      const gap = now - lastKeyTimeRef.ref;
+      const gap = now - lastKeyTimeRef.current;
 
       if (e.key === "Enter") {
         e.stopPropagation();

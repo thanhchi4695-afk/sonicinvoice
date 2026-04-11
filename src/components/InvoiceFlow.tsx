@@ -1701,13 +1701,24 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                         {enrichLines.filter(l => l.status === "review" || l.status === "not_found").length} product{enrichLines.filter(l => l.status === "review" || l.status === "not_found").length > 1 ? "s" : ""} tagged NEEDS-ENRICHMENT — search manually before importing.
                       </p>
                     )}
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button variant="teal" className="flex-1 h-11" onClick={handleProceedToReview}>
                         → Review & export
                       </Button>
                       {enrichLines.some(l => l.status === "review" || l.status === "not_found") && (
                         <Button variant="outline" className="flex-1 h-11 text-xs" onClick={() => { setFilterReviewOnly(true); handleProceedToReview(); }}>
                           Review issues first
+                        </Button>
+                      )}
+                      {/* Teach this supplier button — shown when no DB template exists */}
+                      {!dbTemplate && supplierName.trim() && detectedHeaders.length > 0 && (
+                        <Button
+                          variant="outline"
+                          className="w-full h-9 text-xs border-dashed border-primary/50 text-primary"
+                          onClick={() => setShowTeachModal(true)}
+                        >
+                          <Settings className="w-3.5 h-3.5 mr-1" />
+                          Teach this supplier for instant future extraction
                         </Button>
                       )}
                     </div>

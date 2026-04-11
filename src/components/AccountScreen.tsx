@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import POSConnectionPanel from "@/components/POSConnectionPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { getFormatTemplates, deleteFormatTemplate, getTemplateQuality, getTemplateList, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
 import { getMetafieldConfig, saveMetafieldConfig, type MetafieldDefinition } from "@/lib/metafields";
 import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
+const TeamManagement = lazy(() => import("@/components/TeamManagement"));
 
 const AccountScreen = () => {
   const [storeName, setStoreName] = useState("");
@@ -357,6 +358,13 @@ const AccountScreen = () => {
       </Section>
 
       <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); }}>Save settings</Button>
+
+      {/* Team Management */}
+      <Section title="👥 Team & Roles">
+        <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
+          <TeamManagement />
+        </Suspense>
+      </Section>
 
       {/* Billing / Plan */}
       <BillingSection />

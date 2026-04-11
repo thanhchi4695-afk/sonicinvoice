@@ -16,6 +16,7 @@ import { addAuditEntry } from "@/lib/audit-log";
 import { adjustInventory, findVariantBySKU, getConnection, getLocations } from "@/lib/shopify-api";
 import { CatalogPicker, type CatalogItem } from "@/components/SupplierCatalog";
 import BulkInventoryActions from "@/components/BulkInventoryActions";
+import RoleGate from "@/components/RoleGate";
 
 // ── Types ──────────────────────────────────────────────────
 interface POLine {
@@ -628,9 +629,11 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
             </div>
             <div className="flex items-center gap-2">
               <BulkInventoryActions mode="po" onComplete={loadOrders} />
-              <Button variant="teal" size="sm" onClick={() => { resetForm(); setView("create"); }}>
-                <Plus className="w-4 h-4 mr-1" /> New PO
-              </Button>
+              <RoleGate permission="create_po" fallback={null}>
+                <Button variant="teal" size="sm" onClick={() => { resetForm(); setView("create"); }}>
+                  <Plus className="w-4 h-4 mr-1" /> New PO
+                </Button>
+              </RoleGate>
             </div>
           </div>
 

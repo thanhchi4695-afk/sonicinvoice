@@ -65,6 +65,15 @@ function getTypeLabel(t: string) {
     case "by_attribute": return "Attribute";
     case "by_vendor": return "Vendor";
     case "by_price": return "Price Range";
+    case "brand": return "Brand";
+    case "style": return "Style";
+    case "category": return "Category";
+    case "style_category": return "Style+Category";
+    case "feature": return "Feature";
+    case "broad_category": return "Broad Category";
+    case "colour": return "Colour";
+    case "print_story": return "Print/Story";
+    case "seasonal": return "Seasonal";
     default: return t;
   }
 }

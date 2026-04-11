@@ -575,6 +575,60 @@ export type Database = {
         }
         Relationships: []
       }
+      price_lookups: {
+        Row: {
+          colour: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_urls: Json | null
+          notes: string | null
+          price_confidence: number | null
+          product_name: string
+          retail_price_aud: number | null
+          source_url: string | null
+          style_number: string | null
+          supplier: string
+          supplier_cost: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          colour?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_urls?: Json | null
+          notes?: string | null
+          price_confidence?: number | null
+          product_name: string
+          retail_price_aud?: number | null
+          source_url?: string | null
+          style_number?: string | null
+          supplier: string
+          supplier_cost?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          colour?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_urls?: Json | null
+          notes?: string | null
+          price_confidence?: number | null
+          product_name?: string
+          retail_price_aud?: number | null
+          source_url?: string | null
+          style_number?: string | null
+          supplier?: string
+          supplier_cost?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           created_at: string

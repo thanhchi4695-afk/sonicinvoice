@@ -712,6 +712,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       if (data.rejected_rows) {
         setAiRejectedRows(data.rejected_rows);
       }
+
+      // OCR fallback notifications
+      if (data.ocr_fallback_used) {
+        toast.info("OCR fallback was used for better extraction accuracy", {
+          description: "The initial vision pass had low confidence — a text-extraction fallback improved results.",
+        });
+      }
+      if (data.needs_manual_review) {
+        toast.warning("This invoice needs manual review", {
+          description: data.review_reason || "Both extraction passes returned low confidence. Please verify the extracted data carefully.",
+          duration: 8000,
+        });
+      }
+
       return data.products || [];
     } catch (err) {
       console.error("AI parse error:", err);

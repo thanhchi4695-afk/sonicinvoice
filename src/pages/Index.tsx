@@ -73,6 +73,7 @@ const PipelineChooser = lazy(() => import("@/components/PipelineChooser"));
 const StockyOnboarding = lazy(() => import("@/components/StockyOnboarding"));
 const SupplierProfileBuilder = lazy(() => import("@/components/SupplierProfileBuilder"));
 const StocktakeModule = lazy(() => import("@/components/StocktakeModule"));
+const TransferOrderPanel = lazy(() => import("@/components/TransferOrderPanel"));
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";

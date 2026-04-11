@@ -1,14 +1,20 @@
 import { useState } from "react";
-import { ChevronLeft, Search, Loader2, ExternalLink, Check, X, Globe, ShoppingBag, Store, Building, Image, Copy, AlertTriangle, ChevronRight } from "lucide-react";
+import { ChevronLeft, Search, Loader2, ExternalLink, Check, AlertTriangle, ChevronRight, Globe, ShoppingBag, Store, Building, Image, Copy, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getStoreConfig } from "@/lib/prompt-builder";
 
 interface PriceLookupProps {
   onBack: () => void;
+  initialProduct?: {
+    product_name?: string;
+    supplier?: string;
+    style_number?: string;
+    colour?: string;
+    supplier_cost?: number;
+  };
 }
 
 interface SearchResult {
@@ -53,18 +59,18 @@ const RETAILER_ICONS: Record<string, typeof Store> = {
   marketplace: Globe,
 };
 
-export default function PriceLookup({ onBack }: PriceLookupProps) {
+export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps) {
   const store = getStoreConfig();
 
   // Input state
-  const [productName, setProductName] = useState("");
-  const [supplier, setSupplier] = useState("");
-  const [styleNumber, setStyleNumber] = useState("");
-  const [colour, setColour] = useState("");
-  const [supplierCost, setSupplierCost] = useState("");
+  const [productName, setProductName] = useState(initialProduct?.product_name || "");
+  const [supplier, setSupplier] = useState(initialProduct?.supplier || "");
+  const [styleNumber, setStyleNumber] = useState(initialProduct?.style_number || "");
+  const [colour, setColour] = useState(initialProduct?.colour || "");
+  const [supplierCost, setSupplierCost] = useState(initialProduct?.supplier_cost?.toString() || "");
 
   // Flow state
-  const [step, setStep] = useState<Step>("input");
+  const [step, setStep] = useState<Step>(initialProduct?.product_name ? "input" : "input");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [selectedUrl, setSelectedUrl] = useState("");
@@ -72,6 +78,7 @@ export default function PriceLookup({ onBack }: PriceLookupProps) {
   const [extracted, setExtracted] = useState<ExtractedProduct | null>(null);
   const [editDescription, setEditDescription] = useState("");
   const [finalJson, setFinalJson] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const currentStepIndex = ["input", "searching", "results", "extracting", "review", "approved"].indexOf(step);
 
@@ -128,8 +135,8 @@ export default function PriceLookup({ onBack }: PriceLookupProps) {
     }
   };
 
-  // ── Step 3: Approve ──
-  const handleApprove = () => {
+  // ── Step 3: Approve & Save ──
+  const handleApprove = async () => {
     if (!extracted) return;
 
     const output = {
@@ -145,8 +152,35 @@ export default function PriceLookup({ onBack }: PriceLookupProps) {
     };
 
     setFinalJson(output);
+
+    // Save to database
+    setIsSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("price_lookups").insert({
+          user_id: user.id,
+          supplier: output.supplier,
+          product_name: output.product_name,
+          style_number: styleNumber || null,
+          colour: colour || null,
+          supplier_cost: supplierCost ? parseFloat(supplierCost) : null,
+          retail_price_aud: output.retail_price_aud,
+          price_confidence: output.price_confidence,
+          image_urls: output.image_urls,
+          description: output.description,
+          source_url: output.source_url,
+          notes: output.notes,
+        });
+      }
+    } catch {
+      // Non-critical — still show success
+    } finally {
+      setIsSaving(false);
+    }
+
     setStep("approved");
-    toast.success("Product data approved!");
+    toast.success("Product data approved & saved!");
   };
 
   const copyJson = () => {
@@ -266,9 +300,7 @@ export default function PriceLookup({ onBack }: PriceLookupProps) {
                         <IconComp className="w-4 h-4 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                          <p className="text-sm font-semibold line-clamp-1">{r.title}</p>
-                        </div>
+                        <p className="text-sm font-semibold line-clamp-1">{r.title}</p>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-[10px] text-primary font-mono truncate">{r.domain}</span>
                           {r.is_australian && (
@@ -324,7 +356,6 @@ export default function PriceLookup({ onBack }: PriceLookupProps) {
           <div className="space-y-4">
             <h2 className="text-base font-semibold">Review Extracted Data</h2>
 
-            {/* Warnings */}
             {extracted.fetch_error && (
               <div className="flex items-start gap-2 bg-destructive/10 border border-destructive/20 rounded-lg p-3">
                 <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
@@ -345,7 +376,6 @@ export default function PriceLookup({ onBack }: PriceLookupProps) {
             {/* Product header */}
             <div className="bg-card rounded-xl border border-border p-4">
               <div className="flex gap-4">
-                {/* Image */}
                 {extracted.image_urls?.length > 0 && (
                   <div className="w-24 h-24 rounded-lg overflow-hidden border border-border bg-muted shrink-0">
                     <img
@@ -456,7 +486,6 @@ export default function PriceLookup({ onBack }: PriceLookupProps) {
               </div>
             )}
 
-            {/* Extraction notes */}
             {extracted.extraction_notes && (
               <div className="bg-muted/30 rounded-lg p-3 border border-border">
                 <p className="text-xs text-muted-foreground">{extracted.extraction_notes}</p>
@@ -468,8 +497,9 @@ export default function PriceLookup({ onBack }: PriceLookupProps) {
               <Button variant="outline" onClick={() => setStep("results")} className="flex-1">
                 ← Try different URL
               </Button>
-              <Button onClick={handleApprove} className="flex-1">
-                <Check className="w-4 h-4 mr-2" /> Approve Data
+              <Button onClick={handleApprove} className="flex-1" disabled={isSaving}>
+                {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                Approve & Save
               </Button>
             </div>
           </div>
@@ -482,7 +512,7 @@ export default function PriceLookup({ onBack }: PriceLookupProps) {
               <div className="w-12 h-12 rounded-full bg-success/15 flex items-center justify-center mx-auto mb-3">
                 <Check className="w-6 h-6 text-success" />
               </div>
-              <h2 className="text-lg font-bold">Product Data Approved</h2>
+              <h2 className="text-lg font-bold">Product Data Approved & Saved</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {finalJson.product_name} — ${finalJson.retail_price_aud?.toFixed(2) || "N/A"} AUD
               </p>

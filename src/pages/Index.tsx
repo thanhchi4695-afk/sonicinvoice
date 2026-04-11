@@ -285,6 +285,7 @@ const Index = () => {
       case "reports_hub": flowEl = <ReportsHub onBack={() => setActiveFlow(null)} />; break;
       case "supplier_profile_builder": flowEl = <SupplierProfileBuilder onBack={() => setActiveFlow(null)} />; break;
       case "stock_adjustment": flowEl = <StockAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
+      case "inventory_view": flowEl = <InventoryView onBack={() => setActiveFlow(null)} />; break;
       case "pipeline": flowEl = activePipelineId ? <PipelineRunner pipelineId={activePipelineId} onRenderFlow={(flowKey, onComplete) => {
         const flowMap: Record<string, React.ReactNode> = {
           invoice: <InvoiceFlow onBack={onComplete} />,
@@ -319,8 +320,10 @@ const Index = () => {
     return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;
   };
 
-  // In standalone mode, flows replace the entire screen
-  if (!isEmbedded && activeFlow) {
+  // In standalone mobile mode, flows replace the entire screen (no sidebar)
+  // On desktop, flows render inside StockyLayout (sidebar stays visible)
+  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
+  if (!isEmbedded && activeFlow && !isDesktop) {
     return renderFlow();
   }
 

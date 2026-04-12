@@ -353,7 +353,12 @@ const Index = () => {
   // On desktop, flows render inside StockyLayout (sidebar stays visible)
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   if (!isEmbedded && activeFlow && !isDesktop) {
-    return renderFlow();
+    return (
+      <div className="min-h-screen pb-24">
+        {renderFlow()}
+        <BottomTabBar activeTab={activeTab} onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }} />
+      </div>
+    );
   }
 
   const mainContent = (

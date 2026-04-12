@@ -159,7 +159,7 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
                           {feature.tips && feature.tips.length > 0 && (
                             <>
                               <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1">
-                                <Lightbulb className="w-3 h-3 text-yellow-500" /> Pro Tips
+                                <Lightbulb className="w-3 h-3 text-primary" /> Pro Tips
                               </h4>
                               <ul className="text-xs text-muted-foreground space-y-1 pl-4 list-disc mb-3">
                                 {feature.tips.map((tip, i) => (

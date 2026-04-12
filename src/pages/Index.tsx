@@ -353,7 +353,12 @@ const Index = () => {
   // On desktop, flows render inside StockyLayout (sidebar stays visible)
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   if (!isEmbedded && activeFlow && !isDesktop) {
-    return renderFlow();
+    return (
+      <div className="min-h-screen pb-24">
+        {renderFlow()}
+        <BottomTabBar activeTab={activeTab} onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }} />
+      </div>
+    );
   }
 
   const mainContent = (
@@ -535,7 +540,7 @@ const Index = () => {
       </div>
 
       {/* Mobile layout — hidden on desktop */}
-      <div className="lg:hidden">
+      <div className="lg:hidden pb-24">
         <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
           <NotificationBell
             notifications={notifications}

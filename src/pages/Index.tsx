@@ -535,7 +535,7 @@ const Index = () => {
       </div>
 
       {/* Mobile layout — hidden on desktop */}
-      <div className="lg:hidden">
+      <div className="lg:hidden pb-24">
         <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
           <NotificationBell
             notifications={notifications}

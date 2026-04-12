@@ -38,6 +38,7 @@ const SeasonManager = lazy(() => import("@/components/SeasonManager"));
 const ReorderPanel = lazy(() => import("@/components/ReorderPanel"));
 const SupplierPanel = lazy(() => import("@/components/SupplierPanel"));
 const HelpCentre = lazy(() => import("@/components/HelpCentre"));
+const HowToCatalog = lazy(() => import("@/components/HowToCatalog"));
 const AuditLogPanel = lazy(() => import("@/components/AuditLogPanel"));
 const CatalogMemoryPanel = lazy(() => import("@/components/CatalogMemoryPanel"));
 const EmailInboxPanel = lazy(() => import("@/components/EmailInboxPanel"));
@@ -445,6 +446,7 @@ const Index = () => {
         {activeTab === "google_ads" && <AdsGuideTabs />}
         {activeTab === "billing" && <BillingScreen />}
         {activeTab === "help" && <HelpCentre />}
+        {activeTab === "howto" && <HowToCatalog onNavigateToFeature={(f) => setActiveFlow(f as any)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
         {activeTab === "account" && <AccountScreen />}
       </Suspense>
     </>

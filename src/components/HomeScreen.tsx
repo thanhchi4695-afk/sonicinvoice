@@ -307,6 +307,17 @@ const HomeScreen = ({
           )}
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </button>
+        <button
+          onClick={onStartSupplierProfileBuilder}
+          className="w-full h-14 bg-card border border-border rounded-xl flex items-center gap-3 px-4 hover:bg-primary/10 transition-colors"
+        >
+          <span className="text-xl">🧬</span>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-semibold text-foreground">Supplier profile builder</p>
+            <p className="text-[11px] text-muted-foreground">Train AI to recognise invoice templates</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </button>
       </div>
 
       {/* ── STATS ROW ── */}

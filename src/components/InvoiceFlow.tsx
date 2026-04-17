@@ -33,6 +33,7 @@ import { preprocessInvoiceImage, isLikelyPhotoInvoice, preprocessForUpload, isPd
 import { supabase } from "@/integrations/supabase/client";
 import { inferSupplierRules, computeHeaderFingerprint, type InferredRules, type SupplierProfile as InferProfile, type SharedPatternLite } from "@/lib/supplier-inference";
 import { generateLayoutFingerprint, matchFingerprint } from "@/lib/layout-fingerprint";
+import { recordProcessingQuality } from "@/lib/processing-quality";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 

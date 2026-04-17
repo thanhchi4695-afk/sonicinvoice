@@ -97,7 +97,12 @@ export async function logCorrection(input: LogCorrectionInput): Promise<void> {
       field_corrected: field,
       original_value: originalValue.slice(0, 500),
       corrected_value: correctedValue.slice(0, 500),
-    });
+      correction_reason: input.correctionReason ?? null,
+      correction_reason_detail: input.correctionReasonDetail?.slice(0, 500) ?? null,
+      field_category: input.fieldCategory ?? deriveFieldCategory(field),
+      auto_detected: input.autoDetected ?? false,
+      session_invoice_index: input.sessionInvoiceIndex ?? null,
+    } as never);
 
     // Tally for the prompt — only meaningful when we have a known supplier.
     if (!profile?.id) return;

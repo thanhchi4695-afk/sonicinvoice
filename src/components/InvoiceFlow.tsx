@@ -1167,6 +1167,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         sample_rows: sampleRows,
         format_type: detectedLayout || null,
         extracted_products: extractedProducts,
+        field_confidence: aiFieldConfidence || undefined,
       };
 
       supabase.functions

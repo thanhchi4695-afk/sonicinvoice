@@ -479,6 +479,41 @@ const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntell
                           {p.confidence_score || 0}% · {colour.label}
                         </span>
                       </div>
+
+                      {/* Quality metrics row */}
+                      {quality && quality.invoiceCount > 0 && (
+                        <div className="mt-3 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+                          {quality.avgDurationMin != null && (
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {quality.avgDurationMin.toFixed(1)} min avg
+                            </span>
+                          )}
+                          {quality.avgEdits != null && (
+                            <span className="inline-flex items-center gap-1">
+                              <Edit3 className="w-3 h-3" />
+                              {quality.avgEdits.toFixed(1)} edits avg
+                            </span>
+                          )}
+                          {quality.recentScores.length > 0 && (
+                            <span className="inline-flex items-center gap-1.5">
+                              <TrendingUp className="w-3 h-3" />
+                              <QualitySparkline scores={quality.recentScores} />
+                            </span>
+                          )}
+                          {quality.bestQuality != null && (
+                            <span className="inline-flex items-center gap-1 text-emerald-400">
+                              <Award className="w-3 h-3" />
+                              Best: {quality.bestQuality}/100
+                            </span>
+                          )}
+                          {quality.avgQuality != null && quality.avgQuality < 60 && (
+                            <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/15 text-xs">
+                              Needs attention
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1.5">

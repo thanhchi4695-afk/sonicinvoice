@@ -72,12 +72,90 @@ Deno.serve(async (req) => {
       sample_rows = [],
       format_type = null,
       extracted_products = [],
+      corrections_override = null,
     } = body || {};
 
     if (!supplier_name || typeof supplier_name !== "string") {
       return new Response(JSON.stringify({ error: "supplier_name required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // === FAST PATH: corrections_override ===
+    // Called when the user has corrected the same field 3+ times and clicks
+    // "Update rule". We patch the existing invoice_pattern for that field
+    // without re-running the AI analysis.
+    if (corrections_override && typeof corrections_override === "object") {
+      const { field, corrected_value, supplier_profile_id } = corrections_override as {
+        field?: string; corrected_value?: string; supplier_profile_id?: string;
+      };
+      if (!field || !supplier_profile_id) {
+        return new Response(JSON.stringify({ error: "corrections_override requires field and supplier_profile_id" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Verify ownership
+      const { data: ownProfile } = await supabase
+        .from("supplier_profiles")
+        .select("id")
+        .eq("id", supplier_profile_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (!ownProfile) {
+        return new Response(JSON.stringify({ error: "supplier_profile not found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: existingPattern } = await supabase
+        .from("invoice_patterns")
+        .select("id, column_map")
+        .eq("supplier_profile_id", supplier_profile_id)
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingPattern) {
+        const colMap = (existingPattern.column_map as Record<string, string>) || {};
+        // Record that THIS column header should map to the corrected field role
+        colMap[`__user_override_${field}`] = corrected_value || "";
+        await supabase
+          .from("invoice_patterns")
+          .update({ column_map: colMap, updated_at: new Date().toISOString() })
+          .eq("id", existingPattern.id);
+      }
+
+      // Recalculate confidence (correction count already includes the new ones).
+      const { count: correctionCount } = await supabase
+        .from("correction_log")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("supplier_profile_id", supplier_profile_id);
+
+      const { data: profileRow } = await supabase
+        .from("supplier_profiles")
+        .select("invoice_count")
+        .eq("id", supplier_profile_id)
+        .single();
+
+      const confidenceScore = calcConfidence(profileRow?.invoice_count || 1, correctionCount || 0);
+
+      await supabase
+        .from("supplier_profiles")
+        .update({ confidence_score: confidenceScore })
+        .eq("id", supplier_profile_id);
+
+      return new Response(
+        JSON.stringify({
+          supplier_profile_id,
+          confidence_score: confidenceScore,
+          rule_updated: !!existingPattern,
+          field,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     // 1. Call AI to analyse pattern

@@ -263,6 +263,8 @@ Return ONLY the JSON pattern object.`;
             sample_headers: raw_headers,
             invoice_count: (existingPattern.invoice_count || 0) + 1,
             field_confidence_history: nextHistory,
+            layout_fingerprint: layout_fingerprint || (existingPattern as any).layout_fingerprint || null,
+            match_method: match_method || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", existingPattern.id);
@@ -283,6 +285,8 @@ Return ONLY the JSON pattern object.`;
           sample_headers: raw_headers,
           invoice_count: 1,
           field_confidence_history: fcEntry ? [fcEntry] : [],
+          layout_fingerprint: layout_fingerprint || null,
+          match_method: match_method || null,
         });
       }
     } else {
@@ -326,7 +330,59 @@ Return ONLY the JSON pattern object.`;
         sample_headers: raw_headers,
         invoice_count: 1,
         field_confidence_history: fcEntryNew,
+        layout_fingerprint: layout_fingerprint || null,
+        match_method: match_method || null,
       });
+    }
+
+    // Cross-client shared fingerprint index — opt-in only.
+    // Increments match_count if the fingerprint already exists; otherwise inserts.
+    if (layout_fingerprint && pattern.column_map) {
+      try {
+        const { data: optedIn } = await supabase
+          .from("user_preferences")
+          .select("contribute_to_shared_learning")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (optedIn?.contribute_to_shared_learning) {
+          const { data: existingFp } = await supabase
+            .from("shared_fingerprint_index")
+            .select("id, match_count")
+            .eq("layout_fingerprint", layout_fingerprint)
+            .maybeSingle();
+
+          const priceLogic = {
+            price_column_cost: pattern.price_column_cost,
+            price_column_rrp: pattern.price_column_rrp,
+            gst_included_in_cost: pattern.gst_included_in_cost,
+            gst_included_in_rrp: pattern.gst_included_in_rrp,
+            default_markup_multiplier: pattern.default_markup_multiplier,
+          };
+
+          if (existingFp) {
+            await supabase
+              .from("shared_fingerprint_index")
+              .update({
+                match_count: (existingFp.match_count || 0) + 1,
+                last_seen: new Date().toISOString(),
+              })
+              .eq("id", existingFp.id);
+          } else {
+            await supabase.from("shared_fingerprint_index").insert({
+              layout_fingerprint,
+              format_type,
+              column_map: pattern.column_map || {},
+              size_system: pattern.size_system,
+              price_logic: priceLogic,
+              match_count: 1,
+              last_seen: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("shared_fingerprint_index upsert failed (non-fatal):", e);
+      }
     }
 
     // Brand pattern (sku prefix / colour column / etc) — upsert per supplier

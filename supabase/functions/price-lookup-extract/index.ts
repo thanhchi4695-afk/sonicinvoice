@@ -41,7 +41,11 @@ serve(async (req) => {
       url,
       formats: ["markdown"],
       onlyMainContent: true,
-      waitFor: brandHint?.waitFor ?? 1500,
+      // JS-rendered sites (Iconic, Myer, David Jones, Zimmermann) need longer waits
+      // Firecrawl runs a real headless browser, so this gives JS time to hydrate
+      waitFor: brandHint?.waitFor ?? 2500,
+      mobile: false,
+      blockAds: true,
       location: { country: "AU", languages: ["en-AU", "en"] },
     };
     if (brandHint?.includeTags?.length) scrapeBody.includeTags = brandHint.includeTags;

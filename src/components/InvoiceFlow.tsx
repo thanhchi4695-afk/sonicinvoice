@@ -1098,6 +1098,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
   const [priceLookupActive, setPriceLookupActive] = useState(false);
+  const [bulkPriceLookupActive, setBulkPriceLookupActive] = useState(false);
   const [priceMatchActive, setPriceMatchActive] = useState(false);
   const [descriptionsActive, setDescriptionsActive] = useState(false);
   const [collectionSeoActive, setCollectionSeoActive] = useState(false);
@@ -1401,6 +1402,22 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     );
   }
 
+  // ── Bulk price lookup across every product in this invoice ──
+  if (bulkPriceLookupActive) {
+    return (
+      <PriceLookup
+        onBack={() => setBulkPriceLookupActive(false)}
+        bulkItems={productGroups.map(p => ({
+          product_name: p.name || "",
+          supplier: p.brand || "",
+          style_number: p.vendorCode || "",
+          colour: p.colour || "",
+          supplier_cost: p.price || undefined,
+        }))}
+      />
+    );
+  }
+
   // ── If collection SEO is active, render it instead ──
   if (collectionSeoActive) {
     return (
@@ -1668,7 +1685,10 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             supplierName={supplierName}
           />
 
-          <button className="mt-6 text-sm text-primary font-medium">
+          <button
+            className="mt-6 text-sm text-primary font-medium hover:underline"
+            onClick={() => setPriceLookupActive(true)}
+          >
             Or enter products manually →
           </button>
         </div>
@@ -2390,6 +2410,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => setPriceLookupActive(true)}>
                 <Search className="w-3 h-3 mr-1" /> Look Up Prices
               </Button>
+              {productGroups.length > 1 && (
+                <Button size="sm" variant="outline" className="w-full text-xs mt-2" onClick={() => setBulkPriceLookupActive(true)}>
+                  <Search className="w-3 h-3 mr-1" /> Bulk Look Up All {productGroups.length} Products
+                </Button>
+              )}
             </div>
             <div className="bg-card border border-border rounded-lg p-3">
               <div className="flex items-center gap-2 mb-2">

@@ -8,6 +8,12 @@ export interface CatalogProduct {
   size: string;
   type: string;
   rrp: number;
+  /** Marketing description extracted from supplier catalog/PDF (optional). */
+  description?: string;
+  /** Fabric / composition (optional). */
+  fabric?: string;
+  /** Care instructions (optional). */
+  care?: string;
 }
 
 export interface SupplierCatalog {

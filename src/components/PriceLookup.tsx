@@ -1,10 +1,19 @@
-import { useState } from "react";
-import { ChevronLeft, Search, Loader2, ExternalLink, Check, AlertTriangle, ChevronRight, Globe, ShoppingBag, Store, Building, Image, Copy, Save, Sparkles, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronLeft, Search, Loader2, ExternalLink, Check, AlertTriangle, ChevronRight, Globe, ShoppingBag, Store, Building, Image, Copy, Save, Sparkles, RefreshCw, Layers, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getStoreConfig } from "@/lib/prompt-builder";
+import { getApiKeys } from "@/lib/price-intelligence";
+
+export interface BulkLookupItem {
+  product_name: string;
+  supplier?: string;
+  style_number?: string;
+  colour?: string;
+  supplier_cost?: number;
+}
 
 interface PriceLookupProps {
   onBack: () => void;
@@ -15,6 +24,8 @@ interface PriceLookupProps {
     colour?: string;
     supplier_cost?: number;
   };
+  /** When provided, opens in bulk mode and runs price lookup across every item. */
+  bulkItems?: BulkLookupItem[];
 }
 
 interface SearchResult {
@@ -65,7 +76,7 @@ const RETAILER_ICONS: Record<string, typeof Store> = {
   marketplace: Globe,
 };
 
-export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps) {
+export default function PriceLookup({ onBack, initialProduct, bulkItems }: PriceLookupProps) {
   const store = getStoreConfig();
 
   // Input state
@@ -88,6 +99,19 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
   const [finalJson, setFinalJson] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Bulk-mode state
+  type BulkRow = BulkLookupItem & {
+    status: "pending" | "searching" | "extracting" | "done" | "failed" | "no_results";
+    result?: { url: string; price: number | null; description: string | null; image: string | null; retailer: string | null };
+    error?: string;
+  };
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>(
+    (bulkItems || []).map(it => ({ ...it, status: "pending" as const }))
+  );
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkDone, setBulkDone] = useState(false);
+  const isBulk = !!bulkItems && bulkItems.length > 0;
+
   const currentStepIndex = ["input", "searching", "results", "extracting", "review", "approved"].indexOf(step);
 
   // ── Step 1: Search ──
@@ -96,12 +120,15 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
     setStep("searching");
 
     try {
+      const apiKeys = getApiKeys();
       const { data, error } = await supabase.functions.invoke("price-lookup-search", {
         body: {
           product_name: productName,
           supplier,
           style_number: styleNumber,
           colour,
+          // SerpApi key (if configured in Settings) — preferred over Firecrawl scrape
+          serpapi_key: apiKeys.serpApi || undefined,
         },
       });
       if (error) throw error;
@@ -109,14 +136,83 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
       setSearchQuery(data.search_query || "");
       setSearchResults(data.results || []);
       setStep("results");
-      toast.success(`Found ${data.results?.length || 0} results`);
+      toast.success(`Found ${data.results?.length || 0} results${data.source === "serpapi" ? " (Google Shopping)" : ""}`);
     } catch (err: any) {
       toast.error("Search failed: " + (err?.message || "Unknown error"));
       setStep("input");
     }
   };
 
-  // ── Step 2: Extract from URL ──
+  // ── Bulk lookup runner: process all bulkRows sequentially with progress ──
+  const runBulk = async () => {
+    if (bulkRunning) return;
+    setBulkRunning(true);
+    setBulkDone(false);
+    const apiKeys = getApiKeys();
+
+    for (let i = 0; i < bulkRows.length; i++) {
+      const row = bulkRows[i];
+      // 1. Search
+      setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "searching" } : r));
+      try {
+        const { data: searchData, error: searchErr } = await supabase.functions.invoke("price-lookup-search", {
+          body: {
+            product_name: row.product_name,
+            supplier: row.supplier,
+            style_number: row.style_number,
+            colour: row.colour,
+            serpapi_key: apiKeys.serpApi || undefined,
+          },
+        });
+        if (searchErr) throw searchErr;
+        const results = searchData?.results || [];
+        if (results.length === 0) {
+          setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "no_results" } : r));
+          continue;
+        }
+
+        // 2. Extract from the top-ranked result
+        setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "extracting" } : r));
+        const topUrl = results[0].url;
+        const { data: extractData, error: extractErr } = await supabase.functions.invoke("price-lookup-extract", {
+          body: {
+            url: topUrl,
+            product_name: row.product_name,
+            supplier: row.supplier,
+            style_number: row.style_number,
+            colour: row.colour,
+            supplier_cost: row.supplier_cost,
+          },
+        });
+        if (extractErr) throw extractErr;
+
+        setBulkRows(prev => prev.map((r, idx) => idx === i ? {
+          ...r,
+          status: "done",
+          result: {
+            url: topUrl,
+            price: extractData?.retail_price_aud ?? results[0].price_aud ?? null,
+            description: extractData?.description ?? null,
+            image: extractData?.image_urls?.[0] ?? results[0].thumbnail ?? null,
+            retailer: results[0].retailer ?? results[0].domain ?? null,
+          },
+        } : r));
+      } catch (err: any) {
+        setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "failed", error: err?.message || "Unknown error" } : r));
+      }
+    }
+    setBulkRunning(false);
+    setBulkDone(true);
+    toast.success("Bulk lookup complete");
+  };
+
+  // Auto-start bulk run when entering bulk mode
+  useEffect(() => {
+    if (isBulk && bulkRows.length > 0 && !bulkRunning && !bulkDone) {
+      void runBulk();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const handleExtract = async (url: string) => {
     setSelectedUrl(url);
     setStep("extracting");
@@ -258,8 +354,67 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
       </div>
 
       <div className="px-4 pb-24">
+        {/* ───── BULK MODE ───── */}
+        {isBulk && (
+          <div className="space-y-3">
+            <div className="bg-card rounded-xl border border-border p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Layers className="w-4 h-4 text-primary" />
+                <h2 className="text-base font-semibold">Bulk Price Lookup</h2>
+                <span className="ml-auto text-xs text-muted-foreground font-mono">
+                  {bulkRows.filter(r => r.status === "done").length}/{bulkRows.length} done
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Running price lookup across {bulkRows.length} products. Top result auto-selected for each.
+              </p>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border divide-y divide-border overflow-hidden">
+              {bulkRows.map((row, i) => (
+                <div key={i} className="p-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center shrink-0">
+                    {row.status === "pending" && <span className="text-xs text-muted-foreground">{i + 1}</span>}
+                    {(row.status === "searching" || row.status === "extracting") && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                    {row.status === "done" && <Check className="w-4 h-4 text-success" />}
+                    {row.status === "failed" && <X className="w-4 h-4 text-destructive" />}
+                    {row.status === "no_results" && <AlertTriangle className="w-4 h-4 text-warning" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{row.product_name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {row.supplier ? `${row.supplier} · ` : ""}{row.style_number || ""} {row.colour || ""}
+                    </p>
+                    {row.status === "searching" && <p className="text-[10px] text-primary">Searching Google Shopping…</p>}
+                    {row.status === "extracting" && <p className="text-[10px] text-primary">Extracting from {row.result?.retailer || "page"}…</p>}
+                    {row.status === "no_results" && <p className="text-[10px] text-warning">No results found</p>}
+                    {row.status === "failed" && <p className="text-[10px] text-destructive truncate">{row.error}</p>}
+                  </div>
+                  {row.status === "done" && row.result && (
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-mono font-semibold">
+                        {row.result.price ? `$${row.result.price.toFixed(2)}` : "—"}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground truncate max-w-[100px]">{row.result.retailer}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {bulkDone && (
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={onBack}>Done</Button>
+                <Button className="flex-1" onClick={() => { setBulkDone(false); void runBulk(); }}>
+                  <RefreshCw className="w-4 h-4 mr-2" /> Re-run all
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ───── STEP: INPUT ───── */}
-        {step === "input" && (
+        {!isBulk && step === "input" && (
           <div className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-4 space-y-3">
               <h2 className="text-base font-semibold">Product Details</h2>
@@ -307,7 +462,7 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
         )}
 
         {/* ───── STEP: SEARCHING ───── */}
-        {step === "searching" && (
+        {!isBulk && step === "searching" && (
           <div className="text-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
             <p className="text-sm font-medium">Searching Google for your product…</p>
@@ -318,7 +473,7 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
         )}
 
         {/* ───── STEP: RESULTS ───── */}
-        {step === "results" && (
+        {!isBulk && step === "results" && (
           <div className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-3">
               <p className="text-xs text-muted-foreground mb-1">Search query:</p>
@@ -385,7 +540,7 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
         )}
 
         {/* ───── STEP: EXTRACTING ───── */}
-        {step === "extracting" && (
+        {!isBulk && step === "extracting" && (
           <div className="text-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
             <p className="text-sm font-medium">Visiting approved page…</p>
@@ -395,7 +550,7 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
         )}
 
         {/* ───── STEP: REVIEW ───── */}
-        {step === "review" && extracted && (
+        {!isBulk && step === "review" && extracted && (
           <div className="space-y-4">
             <h2 className="text-base font-semibold">Review Extracted Data</h2>
 
@@ -627,7 +782,7 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
         )}
 
         {/* ───── STEP: APPROVED ───── */}
-        {step === "approved" && finalJson && (
+        {!isBulk && step === "approved" && finalJson && (
           <div className="space-y-4">
             <div className="text-center py-4">
               <div className="w-12 h-12 rounded-full bg-success/15 flex items-center justify-center mx-auto mb-3">

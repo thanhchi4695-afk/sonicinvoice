@@ -32,6 +32,95 @@ import type { InvoiceLineItem } from "@/lib/stock-matcher";
 import { preprocessInvoiceImage, isLikelyPhotoInvoice, preprocessForUpload, isPdfFile, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
 import { supabase } from "@/integrations/supabase/client";
 import { inferSupplierRules, computeHeaderFingerprint, type InferredRules, type SupplierProfile as InferProfile, type SharedPatternLite } from "@/lib/supplier-inference";
+import { generateLayoutFingerprint, matchFingerprint } from "@/lib/layout-fingerprint";
+
+export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
+
+export interface FingerprintHit {
+  source: "user" | "shared";
+  layout_fingerprint: string;
+  column_map: Record<string, string>;
+  size_system?: string | null;
+  price_logic?: Record<string, unknown> | null;
+  format_type?: string | null;
+  confidence_score?: number | null;
+  invoice_count?: number | null;
+  match_count?: number | null;
+}
+
+/**
+ * STEP 1 — Look for an exact layout-fingerprint match.
+ * Checks the user's own learned invoice_patterns first (with confidence
+ * gate of >=80), then falls back to the cross-client shared_fingerprint_index.
+ */
+async function lookupFingerprintMatch(
+  fingerprint: string,
+): Promise<FingerprintHit | null> {
+  if (!fingerprint) return null;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+    if (!userId) return null;
+
+    // a) User's own patterns — must clear confidence gate
+    const { data: ownRows } = await supabase
+      .from("invoice_patterns" as any)
+      .select("id, layout_fingerprint, column_map, size_system, format_type, price_column_cost, price_column_rrp, gst_included_in_cost, gst_included_in_rrp, default_markup_multiplier, invoice_count, supplier_profiles!inner(confidence_score)")
+      .eq("user_id", userId)
+      .eq("layout_fingerprint", fingerprint)
+      .limit(5);
+
+    const eligible = (ownRows || []).find((r: any) => {
+      const conf = r.supplier_profiles?.confidence_score ?? 0;
+      return conf >= 80;
+    }) as any;
+
+    if (eligible) {
+      const hit = matchFingerprint(fingerprint, [eligible]);
+      if (hit) {
+        return {
+          source: "user",
+          layout_fingerprint: fingerprint,
+          column_map: (eligible.column_map || {}) as Record<string, string>,
+          size_system: eligible.size_system,
+          format_type: eligible.format_type,
+          confidence_score: eligible.supplier_profiles?.confidence_score ?? null,
+          invoice_count: eligible.invoice_count ?? null,
+          price_logic: {
+            price_column_cost: eligible.price_column_cost,
+            price_column_rrp: eligible.price_column_rrp,
+            gst_included_in_cost: eligible.gst_included_in_cost,
+            gst_included_in_rrp: eligible.gst_included_in_rrp,
+            default_markup_multiplier: eligible.default_markup_multiplier,
+          },
+        };
+      }
+    }
+
+    // b) Cross-client shared index
+    const { data: sharedRows } = await supabase
+      .from("shared_fingerprint_index" as any)
+      .select("layout_fingerprint, format_type, column_map, size_system, price_logic, match_count")
+      .eq("layout_fingerprint", fingerprint)
+      .limit(1);
+
+    const shared = (sharedRows || [])[0] as any;
+    if (shared) {
+      return {
+        source: "shared",
+        layout_fingerprint: shared.layout_fingerprint,
+        column_map: (shared.column_map || {}) as Record<string, string>,
+        size_system: shared.size_system,
+        format_type: shared.format_type,
+        price_logic: shared.price_logic || null,
+        match_count: shared.match_count ?? null,
+      };
+    }
+  } catch (err) {
+    console.warn("[Sonic Invoice] fingerprint lookup failed:", err);
+  }
+  return null;
+}
 
 // Load all of this user's supplier profiles + their invoice patterns,
 // then run the waterfall inference. Used to pre-seed the AI extractor
@@ -305,6 +394,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
   const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
   const [aiExtractionNotes, setAiExtractionNotes] = useState<string | null>(null);
+  const [layoutFingerprint, setLayoutFingerprint] = useState<string | null>(null);
+  const [fingerprintHit, setFingerprintHit] = useState<FingerprintHit | null>(null);
+  const [matchMethod, setMatchMethod] = useState<InvoiceMatchMethod>("full_extraction");
 
   // Fetch user's suppliers for dropdown
   useEffect(() => {
@@ -737,18 +829,42 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         }
       }
 
-      // Run waterfall inference (exact match → fuzzy → header fingerprint → heuristics → defaults)
+      // STEP 0 — Generate fingerprint from detected headers
+      const headersForFingerprint = detectedHeaders.length
+        ? detectedHeaders
+        : ((["csv", "xlsx", "xls"].includes(ext)
+            ? await parseFileToRows(file, 1).then(r => r[0] ? Object.keys(r[0]) : []).catch(() => [])
+            : []) as string[]);
+      const fp = headersForFingerprint.length ? generateLayoutFingerprint(headersForFingerprint) : "";
+      setLayoutFingerprint(fp || null);
+
+      // STEP 1 — Exact fingerprint match (free, instant). Skips column mapping work.
+      let fpHit: FingerprintHit | null = null;
+      if (fp) {
+        fpHit = await lookupFingerprintMatch(fp);
+        if (fpHit) {
+          setFingerprintHit(fpHit);
+          setMatchMethod("fingerprint_match");
+          const label = fpHit.source === "user"
+            ? `${fpHit.invoice_count ?? 0} invoices processed with this format`
+            : `learned from ${fpHit.match_count ?? 0} similar layouts`;
+          toast.success("Recognised invoice layout — using saved rules", { description: label });
+          console.log(`[Sonic Invoice] Fingerprint hit (${fpHit.source}): ${fp}`);
+        }
+      }
+
+      // STEP 2 — Supplier-profile waterfall (only if no fingerprint hit)
       let inferredRules: InferredRules | null = null;
       try {
-        // For PDF/image we usually have no headers yet; supplier-name match still works.
         const sampleSheetRows = ["csv", "xlsx", "xls"].includes(ext)
           ? await parseFileToRows(file, 1).then(r => r.slice(0, 3)).catch(() => [])
           : [];
-        const headersForInfer = detectedHeaders.length
-          ? detectedHeaders
-          : (sampleSheetRows[0] ? Object.keys(sampleSheetRows[0]) : []);
+        const headersForInfer = headersForFingerprint;
         inferredRules = await buildInferredRules(supplierName || "", headersForInfer, sampleSheetRows);
         if (inferredRules) {
+          if (!fpHit && inferredRules.rules_source !== "defaults" && inferredRules.rules_source !== "header_inference") {
+            setMatchMethod("supplier_match");
+          }
           console.log(`[Sonic Invoice] Inferred rules: ${inferredRules.rules_source} @ ${inferredRules.confidence}% confidence`);
         }
       } catch (e) {
@@ -771,6 +887,16 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           templateHint: combinedHint || undefined,
           supplierProfile: supplierProfileData || undefined,
           inferredRules: inferredRules || undefined,
+          // Fingerprint pre-check — when present, parse-invoice can skip column detection
+          // and go straight to value extraction using the saved column_map.
+          fingerprintMatch: fpHit ? {
+            layout_fingerprint: fpHit.layout_fingerprint,
+            source: fpHit.source,
+            column_map: fpHit.column_map,
+            size_system: fpHit.size_system,
+            format_type: fpHit.format_type,
+            price_logic: fpHit.price_logic,
+          } : undefined,
         }),
       });
 
@@ -1021,16 +1147,24 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         } catch (e) { /* ignore */ }
       }
 
-      // Re-run inference for the detailed pass (uses any newly-saved learning).
+      // Re-run fingerprint pre-check + inference for the detailed pass (uses any newly-saved learning).
+      const headersForFingerprintRe = detectedHeaders.length
+        ? detectedHeaders
+        : ((["csv", "xlsx", "xls"].includes(ext)
+            ? await parseFileToRows(file, 1).then(r => r[0] ? Object.keys(r[0]) : []).catch(() => [])
+            : []) as string[]);
+      const fpRe = headersForFingerprintRe.length ? generateLayoutFingerprint(headersForFingerprintRe) : "";
+      let fpHitRe: FingerprintHit | null = null;
+      if (fpRe) {
+        fpHitRe = await lookupFingerprintMatch(fpRe);
+        if (fpHitRe) setFingerprintHit(fpHitRe);
+      }
       let inferredRules: InferredRules | null = null;
       try {
         const sampleSheetRows = ["csv", "xlsx", "xls"].includes(ext)
           ? await parseFileToRows(file, 1).then(r => r.slice(0, 3)).catch(() => [])
           : [];
-        const headersForInfer = detectedHeaders.length
-          ? detectedHeaders
-          : (sampleSheetRows[0] ? Object.keys(sampleSheetRows[0]) : []);
-        inferredRules = await buildInferredRules(supplierName || "", headersForInfer, sampleSheetRows);
+        inferredRules = await buildInferredRules(supplierName || "", headersForFingerprintRe, sampleSheetRows);
       } catch { /* ignore */ }
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
@@ -1049,6 +1183,14 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           templateHint: combinedHint || undefined,
           supplierProfile: supplierProfileData || undefined,
           inferredRules: inferredRules || undefined,
+          fingerprintMatch: fpHitRe ? {
+            layout_fingerprint: fpHitRe.layout_fingerprint,
+            source: fpHitRe.source,
+            column_map: fpHitRe.column_map,
+            size_system: fpHitRe.size_system,
+            format_type: fpHitRe.format_type,
+            price_logic: fpHitRe.price_logic,
+          } : undefined,
           detailedMode: true,
           expectedProductCount: expectedRowCount || undefined,
         }),
@@ -1175,6 +1317,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         format_type: detectedLayout || null,
         extracted_products: extractedProducts,
         field_confidence: aiFieldConfidence || undefined,
+        layout_fingerprint: layoutFingerprint || (detectedHeaders.length ? generateLayoutFingerprint(detectedHeaders) : null),
+        match_method: matchMethod,
       };
 
       supabase.functions

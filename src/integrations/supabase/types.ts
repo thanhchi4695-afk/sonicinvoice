@@ -759,6 +759,7 @@ export type Database = {
           id: string
           invoice_count: number
           layout_fingerprint: string | null
+          match_method: string | null
           pack_notation_detected: boolean | null
           price_column_cost: string | null
           price_column_rrp: string | null
@@ -780,6 +781,7 @@ export type Database = {
           id?: string
           invoice_count?: number
           layout_fingerprint?: string | null
+          match_method?: string | null
           pack_notation_detected?: boolean | null
           price_column_cost?: string | null
           price_column_rrp?: string | null
@@ -801,6 +803,7 @@ export type Database = {
           id?: string
           invoice_count?: number
           layout_fingerprint?: string | null
+          match_method?: string | null
           pack_notation_detected?: boolean | null
           price_column_cost?: string | null
           price_column_rrp?: string | null

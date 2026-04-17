@@ -1,6 +1,7 @@
-import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock } from "lucide-react";
+import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock, Brain } from "lucide-react";
 import MigrationChecklist from "@/components/MigrationChecklist";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import ContextDetector from "@/components/ContextDetector";
 import { Button } from "@/components/ui/button";
 import InventoryAlerts from "@/components/InventoryAlerts";
@@ -65,6 +66,7 @@ interface HomeScreenProps {
   onStartPipelineChooser?: () => void;
   onStartStockyOnboarding?: () => void;
   onStartSupplierProfileBuilder?: () => void;
+  onStartSupplierIntelligence?: () => void;
   onStartCollectionSEOExport?: () => void;
   onSwitchToStockyDashboard?: () => void;
 }
@@ -82,12 +84,34 @@ const HomeScreen = ({
   onStartImageOptimise, onStartStockCheck, onStartPriceLookup, onStartPriceMatch, onStartProductDescriptions, onStartSeasons, onNavigateToTab,
   onStartPipeline, onStartPipelineChooser, onStartStockyOnboarding,
   onStartSupplierProfileBuilder,
+  onStartSupplierIntelligence,
   onStartCollectionSEOExport,
   onSwitchToStockyDashboard,
 }: HomeScreenProps) => {
   const mode = useStoreMode();
   const unreadCount = getUnprocessedInboxCount();
+  const [learnedSupplierCount, setLearnedSupplierCount] = useState<number | null>(null);
 
+  // Fetch the count of learned supplier profiles for the "Supplier Brain" badge
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData?.session?.user?.id;
+        if (!userId) return;
+        const { count } = await supabase
+          .from("supplier_profiles")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("is_active", true);
+        if (!cancelled) setLearnedSupplierCount(count ?? 0);
+      } catch (err) {
+        console.warn("Failed to load learned supplier count:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   // Check for incomplete onboarding
   const onboardingStep = localStorage.getItem("onboarding_step");
   const onboardingComplete = localStorage.getItem("onboarding_complete") === "true";

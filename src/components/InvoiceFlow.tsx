@@ -22,6 +22,7 @@ import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import AccountingBillReview from "@/components/AccountingBillReview";
 import StockCheckFlow from "@/components/StockCheckFlow";
 import PriceLookup from "@/components/PriceLookup";
+import PriceMatchPanel from "@/components/PriceMatchPanel";
 import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import SupplierTemplateTeach from "@/components/SupplierTemplateTeach";
 import { extractWithTemplate, parseFileToRows, autoDetectMappings, type SupplierTemplate as DBSupplierTemplate } from "@/lib/rule-based-extractor";

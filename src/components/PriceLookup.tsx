@@ -550,20 +550,46 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
             <p className="text-sm font-medium">Visiting approved page…</p>
             <p className="text-xs text-muted-foreground mt-1 font-mono truncate max-w-md mx-auto">{selectedUrl}</p>
             <p className="text-xs text-muted-foreground mt-2">Extracting price, images & description</p>
+            <div className="mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted/50 border border-border">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] text-muted-foreground">Live page fetch · Powered by Firecrawl</span>
+            </div>
           </div>
         )}
 
         {/* ───── STEP: REVIEW ───── */}
         {!isBulk && step === "review" && extracted && (
           <div className="space-y-4">
-            <h2 className="text-base font-semibold">Review Extracted Data</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">Review Extracted Data</h2>
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted/50 border border-border">
+                <span className={`w-1.5 h-1.5 rounded-full ${extracted.fetch_success ? "bg-emerald-500" : "bg-destructive"}`} />
+                <span className="text-[10px] text-muted-foreground">
+                  {extracted.cached ? `Cached ${extracted.cache_age_minutes ?? 0}m ago` : "Powered by Firecrawl"}
+                  {extracted.status_code ? ` · ${extracted.status_code}` : ""}
+                </span>
+              </div>
+            </div>
 
             {extracted.fetch_error && (
               <div className="flex items-start gap-2 bg-destructive/10 border border-destructive/20 rounded-lg p-3">
                 <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-medium text-destructive">Page fetch issue</p>
-                  <p className="text-xs text-muted-foreground">{extracted.fetch_error}. Data may be estimated from AI knowledge.</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-destructive">
+                    Page fetch failed{extracted.status_code ? ` (HTTP ${extracted.status_code})` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{extracted.fetch_error}</p>
+                  {extracted.source_url && (
+                    <a
+                      href={extracted.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-primary hover:underline font-mono break-all mt-1 inline-block"
+                    >
+                      {extracted.source_url} ↗
+                    </a>
+                  )}
+                  <p className="text-[11px] text-muted-foreground mt-1">Open the URL above to verify, or pick another search result.</p>
                 </div>
               </div>
             )}

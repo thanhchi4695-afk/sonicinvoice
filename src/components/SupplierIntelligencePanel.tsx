@@ -105,6 +105,7 @@ function confidenceColour(score: number) {
 const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntelligencePanelProps) => {
   const [profiles, setProfiles] = useState<SupplierProfileRow[]>([]);
   const [patterns, setPatterns] = useState<Record<string, InvoicePatternRow>>({});
+  const [allPatterns, setAllPatterns] = useState<InvoicePatternRow[]>([]);
   const [corrections, setCorrections] = useState<CorrectionRow[]>([]);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -125,10 +126,12 @@ const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntell
 
     setProfiles((profs as SupplierProfileRow[]) || []);
     const patternMap: Record<string, InvoicePatternRow> = {};
-    for (const p of (pats as InvoicePatternRow[]) || []) {
+    const all = (pats as InvoicePatternRow[]) || [];
+    for (const p of all) {
       if (p.supplier_profile_id && !patternMap[p.supplier_profile_id]) patternMap[p.supplier_profile_id] = p;
     }
     setPatterns(patternMap);
+    setAllPatterns(all);
     setCorrections((corrs as CorrectionRow[]) || []);
     setLoading(false);
   };
@@ -143,6 +146,92 @@ const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntell
       (p.supplier_name_variants || []).some((v) => v.toLowerCase().includes(q))
     );
   }, [profiles, search]);
+
+  // Per-supplier quality aggregates
+  const qualityBySupplier = useMemo(() => {
+    const map: Record<string, SupplierQualityStats> = {};
+    const grouped: Record<string, InvoicePatternRow[]> = {};
+    for (const p of allPatterns) {
+      if (!p.supplier_profile_id) continue;
+      (grouped[p.supplier_profile_id] ||= []).push(p);
+    }
+    for (const [sid, rows] of Object.entries(grouped)) {
+      // chronological oldest → newest
+      const sorted = [...rows].sort(
+        (a, b) => +new Date(a.exported_at || a.updated_at) - +new Date(b.exported_at || b.updated_at),
+      );
+      const durations = sorted.map((r) => r.review_duration_seconds).filter((v): v is number => typeof v === "number");
+      const edits = sorted.map((r) => r.edit_count).filter((v): v is number => typeof v === "number");
+      const scores = sorted.map((r) => r.processing_quality_score).filter((v): v is number => typeof v === "number");
+      const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+      map[sid] = {
+        invoiceCount: sorted.length,
+        avgDurationMin: durations.length ? avg(durations)! / 60 : null,
+        avgEdits: avg(edits),
+        avgQuality: avg(scores),
+        bestQuality: scores.length ? Math.max(...scores) : null,
+        recentScores: scores.slice(-5),
+        firstScore: scores[0] ?? null,
+        lastScore: scores[scores.length - 1] ?? null,
+      };
+    }
+    return map;
+  }, [allPatterns]);
+
+  // Aggregate report
+  const qualityReport = useMemo(() => {
+    const allScores: number[] = [];
+    let totalInvoices = 0;
+    let savedMins = 0;
+    for (const stats of Object.values(qualityBySupplier)) {
+      totalInvoices += stats.invoiceCount;
+      // recompute time savings from raw rows
+    }
+    for (const r of allPatterns) {
+      const s = r.processing_quality_score;
+      if (typeof s === "number") {
+        allScores.push(s);
+        if (s > 80) savedMins += 15;
+        else if (s >= 50) savedMins += 7;
+      }
+    }
+    const avgQuality = allScores.length
+      ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
+      : null;
+
+    let mostReliable: { name: string; score: number } | null = null;
+    let mostImproved: { name: string; delta: number } | null = null;
+    let weakest: { name: string; score: number } | null = null;
+
+    for (const prof of profiles) {
+      const s = qualityBySupplier[prof.id];
+      if (!s) continue;
+      if (s.avgQuality != null) {
+        if (!mostReliable || s.avgQuality > mostReliable.score) {
+          mostReliable = { name: prof.supplier_name, score: s.avgQuality };
+        }
+        if (s.invoiceCount > 3 && (!weakest || s.avgQuality < weakest.score)) {
+          weakest = { name: prof.supplier_name, score: s.avgQuality };
+        }
+      }
+      if (s.firstScore != null && s.lastScore != null && s.invoiceCount >= 2) {
+        const delta = s.lastScore - s.firstScore;
+        if (!mostImproved || delta > mostImproved.delta) {
+          mostImproved = { name: prof.supplier_name, delta };
+        }
+      }
+    }
+
+    return {
+      totalInvoices: allPatterns.length,
+      scoredInvoices: allScores.length,
+      avgQuality,
+      hoursSaved: Math.round((savedMins / 60) * 10) / 10,
+      mostReliable,
+      mostImproved,
+      weakest,
+    };
+  }, [allPatterns, qualityBySupplier, profiles]);
 
   const correctionsByProfile = useMemo(() => {
     const map: Record<string, number> = {};

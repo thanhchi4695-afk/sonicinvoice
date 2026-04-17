@@ -204,7 +204,7 @@ EXTRACT (separately, each can be null):
 - care_instructions: Wash/care guidance (e.g. "Hand wash cold, do not tumble dry").
 - fit_notes: Anything about fit/sizing (e.g. "True to size", "Model wears size 8", "Adjustable for a custom fit").
 
-IMPORTANT: If you successfully extract key_features OR fabric_content, the page clearly has product copy — re-scan the markdown for prose near the product title and populate `description`. Do not leave it null when prose is present.
+IMPORTANT: If you successfully extract key_features OR fabric_content, the page clearly has product copy — re-scan the markdown for prose near the product title and populate the description field. Do not leave it null when prose is present.
 
 Return STRICT JSON ONLY (no markdown fences, no preamble):
 {

@@ -344,6 +344,26 @@ const HomeScreen = ({
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </button>
+        {onStartSupplierIntelligence && (
+          <button
+            onClick={onStartSupplierIntelligence}
+            className="w-full h-14 bg-card border border-border rounded-xl flex items-center gap-3 px-4 hover:bg-primary/10 transition-colors"
+          >
+            <Brain className="w-5 h-5 text-primary shrink-0" />
+            <div className="flex-1 text-left min-w-0">
+              <p className="text-sm font-semibold text-foreground">Supplier Brain</p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                See what the app has learned from your invoices. Gets smarter with every upload.
+              </p>
+            </div>
+            {learnedSupplierCount !== null && learnedSupplierCount > 0 && (
+              <span className="bg-primary/15 text-primary text-[10px] rounded-full px-2 py-0.5 font-semibold shrink-0">
+                {learnedSupplierCount} learned
+              </span>
+            )}
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
+        )}
       </div>
 
       {/* ── STATS ROW ── */}

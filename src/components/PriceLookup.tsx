@@ -496,15 +496,55 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
               </div>
             )}
 
-            {/* Description (editable) */}
+            {/* Description (editable) — Path 1 + Path 3 */}
             <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Description (editable)</h3>
-              <textarea
-                value={editDescription}
-                onChange={e => setEditDescription(e.target.value)}
-                placeholder={extracted.fetch_success ? "" : "Couldn't extract description automatically — write your own here."}
-                className="w-full min-h-[120px] rounded-md bg-input border border-border p-3 text-sm"
-              />
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase">Description (editable)</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => generateDescription()}
+                  disabled={isGeneratingDesc}
+                  className="h-7 text-xs"
+                >
+                  {isGeneratingDesc ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : descriptionSource === "ai_generated" ? (
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                  ) : (
+                    <Sparkles className="w-3 h-3 mr-1" />
+                  )}
+                  {descriptionSource === "ai_generated" ? "Regenerate" : "Generate with AI"}
+                </Button>
+              </div>
+
+              {descriptionSource === "ai_generated" && (
+                <div className="flex items-start gap-2 bg-warning/10 border border-warning/30 rounded-md p-2 mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-warning-foreground">
+                    <span className="font-semibold">AI-generated</span> — review and edit before publishing. This description was written by AI because no description was found on the source page.
+                  </p>
+                </div>
+              )}
+              {descriptionSource === "scraped" && extracted.brand_hint_applied && (
+                <p className="text-[10px] text-muted-foreground mb-2">
+                  ✓ Scraped from {extracted.brand_hint_applied} using brand-specific selectors
+                </p>
+              )}
+
+              {isGeneratingDesc && !editDescription ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating description…
+                </div>
+              ) : (
+                <textarea
+                  value={editDescription}
+                  onChange={e => { setEditDescription(e.target.value); }}
+                  placeholder={extracted.fetch_success ? "" : "Couldn't extract description automatically — write your own here or click 'Generate with AI'."}
+                  className="w-full min-h-[120px] rounded-md bg-input border border-border p-3 text-sm"
+                />
+              )}
             </div>
 
             {/* Product details — key features, fabric, care, fit (Bug 3 fix) */}

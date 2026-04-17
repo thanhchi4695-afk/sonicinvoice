@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, Search, Loader2, ExternalLink, Check, AlertTriangle, ChevronRight, Globe, ShoppingBag, Store, Building, Image, Copy, Save } from "lucide-react";
+import { ChevronLeft, Search, Loader2, ExternalLink, Check, AlertTriangle, ChevronRight, Globe, ShoppingBag, Store, Building, Image, Copy, Save, Sparkles, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,6 +50,8 @@ interface ExtractedProduct {
   source_url: string;
   fetch_success: boolean;
   fetch_error: string | null;
+  brand_hint_applied?: string | null;
+  description_source?: "scraped" | "ai_generated" | null;
 }
 
 type Step = "input" | "searching" | "results" | "extracting" | "review" | "approved";
@@ -81,6 +83,8 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
   const [manualUrl, setManualUrl] = useState("");
   const [extracted, setExtracted] = useState<ExtractedProduct | null>(null);
   const [editDescription, setEditDescription] = useState("");
+  const [descriptionSource, setDescriptionSource] = useState<"scraped" | "ai_generated" | null>(null);
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
   const [finalJson, setFinalJson] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 

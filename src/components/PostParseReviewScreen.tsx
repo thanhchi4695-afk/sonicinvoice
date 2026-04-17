@@ -35,6 +35,8 @@ interface PostParseReviewScreenProps {
   /** Detected invoice layout (A/B/C/D/E/F) — passed through to retraining. */
   detectedLayout?: string | null;
   onUpdateProducts: (products: ValidatedProduct[]) => void;
+  /** Called every time the user edits a cell — used for processing-quality tracking. */
+  onCellEdited?: (field: string) => void;
   onExportAccepted: () => void;
   onPushToShopify: () => void;
   onBack: () => void;
@@ -142,6 +144,7 @@ export default function PostParseReviewScreen({
   detectedHeaders = [],
   detectedLayout = null,
   onUpdateProducts,
+  onCellEdited,
   onExportAccepted,
   onPushToShopify,
   onBack,
@@ -429,16 +432,19 @@ export default function PostParseReviewScreen({
       if (p._rowIndex !== rowIndex) return p;
       const originalValue = String((p as any)[field] || "");
       const newValue = String(value);
-      if (supplierName && originalValue !== newValue && originalValue) {
+      if (originalValue !== newValue) {
         const fieldLabel = FIELD_LABELS[field] || field;
-        const key = `${rowIndex}::${field}`;
-        // Defer logging — picker will pick a reason. If user moves away without
-        // picking, flushOtherPending() persists with reason=null.
-        flushOtherPending(key);
-        setPendingCorrections(prev => ({
-          ...prev,
-          [key]: { rowIndex, field, fieldLabel, originalValue, correctedValue: newValue },
-        }));
+        onCellEdited?.(fieldLabel);
+        if (supplierName && originalValue) {
+          const key = `${rowIndex}::${field}`;
+          // Defer logging — picker will pick a reason. If user moves away without
+          // picking, flushOtherPending() persists with reason=null.
+          flushOtherPending(key);
+          setPendingCorrections(prev => ({
+            ...prev,
+            [key]: { rowIndex, field, fieldLabel, originalValue, correctedValue: newValue },
+          }));
+        }
       }
       const updated = { ...p, [field]: value, _manuallyEdited: true } as any;
       // Recalculate confidence

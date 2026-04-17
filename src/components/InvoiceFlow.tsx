@@ -33,6 +33,7 @@ import { preprocessInvoiceImage, isLikelyPhotoInvoice, preprocessForUpload, isPd
 import { supabase } from "@/integrations/supabase/client";
 import { inferSupplierRules, computeHeaderFingerprint, type InferredRules, type SupplierProfile as InferProfile, type SharedPatternLite } from "@/lib/supplier-inference";
 import { generateLayoutFingerprint, matchFingerprint } from "@/lib/layout-fingerprint";
+import { recordProcessingQuality } from "@/lib/processing-quality";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 
@@ -397,6 +398,41 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [layoutFingerprint, setLayoutFingerprint] = useState<string | null>(null);
   const [fingerprintHit, setFingerprintHit] = useState<FingerprintHit | null>(null);
   const [matchMethod, setMatchMethod] = useState<InvoiceMatchMethod>("full_extraction");
+
+  // ── Processing quality tracking ───────────────────────────
+  const [invoiceReviewStartedAt, setInvoiceReviewStartedAt] = useState<number | null>(null);
+  const editCountRef = useRef(0);
+  const fieldsCorrectedRef = useRef<Set<string>>(new Set());
+  const rowsDeletedRef = useRef(0);
+  const rowsAddedRef = useRef(0);
+  const lastRowCountRef = useRef<number | null>(null);
+  const qualityRecordedRef = useRef(false);
+
+  const beginReviewTimer = () => {
+    setInvoiceReviewStartedAt(Date.now());
+    editCountRef.current = 0;
+    fieldsCorrectedRef.current = new Set();
+    rowsDeletedRef.current = 0;
+    rowsAddedRef.current = 0;
+    lastRowCountRef.current = null;
+    qualityRecordedRef.current = false;
+  };
+
+  const finalizeQualityMetrics = () => {
+    if (qualityRecordedRef.current) return;
+    qualityRecordedRef.current = true;
+    recordProcessingQuality({
+      reviewStartedAt: invoiceReviewStartedAt,
+      exportedAt: Date.now(),
+      editCount: editCountRef.current,
+      fieldsCorrected: Array.from(fieldsCorrectedRef.current),
+      rowsDeleted: rowsDeletedRef.current,
+      rowsAdded: rowsAddedRef.current,
+      layoutFingerprint:
+        layoutFingerprint || (detectedHeaders.length ? generateLayoutFingerprint(detectedHeaders) : null),
+    });
+  };
+
 
   // Fetch user's suppliers for dropdown
   useEffect(() => {
@@ -1268,6 +1304,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const handleProceedToReview = () => {
     setShowCompletionSummary(false);
     setStep(3);
+    beginReviewTimer();
     if (!matchedTemplate && supplierName.trim()) {
       setShowSaveTemplate(true);
     }
@@ -2242,6 +2279,13 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 detectedHeaders={detectedHeaders}
                 detectedLayout={detectedLayout}
                 onUpdateProducts={(updated) => {
+                  // Track row additions / deletions for quality metrics
+                  const prev = lastRowCountRef.current ?? validatedProducts.length;
+                  const next = updated.length;
+                  if (next > prev) rowsAddedRef.current += next - prev;
+                  else if (next < prev) rowsDeletedRef.current += prev - next;
+                  lastRowCountRef.current = next;
+
                   setValidatedProducts(updated);
                   // Rebuild product groups from accepted products
                   const acceptedOnly = updated.filter(p => !p._rejected);
@@ -2249,8 +2293,12 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                   const groups = convertToProductGroups(clean);
                   setProductGroups(groups);
                 }}
-                onExportAccepted={() => setStep(4)}
-                onPushToShopify={() => setStep(4)}
+                onCellEdited={(field) => {
+                  editCountRef.current += 1;
+                  fieldsCorrectedRef.current.add(field);
+                }}
+                onExportAccepted={() => { finalizeQualityMetrics(); setStep(4); }}
+                onPushToShopify={() => { finalizeQualityMetrics(); setStep(4); }}
                 onBack={() => setStep(2)}
                 onReprocessDetailed={handleReprocessDetailed}
                 isReprocessing={isReprocessing}
@@ -2449,7 +2497,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               ) : null}
               <Button variant="outline" size="sm" onClick={() => setPreviewAll(true)} className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview all</Button>
               <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
-              <Button variant="teal" size="sm" onClick={() => setStep(4)}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
+              <Button variant="teal" size="sm" onClick={() => { finalizeQualityMetrics(); setStep(4); }}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>
           </div>
           {/* New products tab */}

@@ -662,6 +662,8 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
                 setSupplierCost("");
                 setSearchResults([]);
                 setExtracted(null);
+                setEditDescription("");
+                setDescriptionSource(null);
                 setFinalJson(null);
               }}>
                 Look Up Another Product

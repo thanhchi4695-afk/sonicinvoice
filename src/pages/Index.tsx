@@ -167,6 +167,7 @@ const Index = () => {
       exchangeShopifyToken(loginToken)
         .then(({ shop: shopName }) => {
           setAuthed(true);
+          setAuthLoading(false);
           setOnboarded(true);
           localStorage.setItem("onboarding_complete", "true");
           addAuditEntry("Login", `Shopify OAuth login from ${shopName}`);

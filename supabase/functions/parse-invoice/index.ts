@@ -430,8 +430,40 @@ Return ONLY valid JSON (no markdown, no explanation):
       "raw_text": "the original text of the rejected row",
       "rejection_reason": "why this was not a product"
     }
-  ]
+  ],
+  "field_confidence": {
+    "product_name": 0,
+    "sku": 0,
+    "colour": 0,
+    "size": 0,
+    "quantity": 0,
+    "cost_ex_gst": 0,
+    "rrp_incl_gst": 0,
+    "vendor": 0
+  },
+  "extraction_notes": "brief explanation of any uncertainty across the document",
+  "format_type": "A | B | C | D | E | F",
+  "overall_confidence": 0
 }
+
+## FIELD-LEVEL CONFIDENCE SCORING (REQUIRED)
+
+After extracting all products, assess your own confidence for each field type across the WHOLE invoice (not per row — one score per field type).
+
+Score 0–100 where:
+- 90–100: column was unambiguous, header matched exactly
+- 70–89: high confidence but header was non-standard
+- 50–69: inferred from context, could be wrong
+- 30–49: guessed based on data patterns, verify recommended
+- 0–29: very uncertain, manual review strongly recommended
+
+Return field_confidence as part of your JSON response with one score for each of:
+product_name, sku, colour, size, quantity, cost_ex_gst, rrp_incl_gst, vendor.
+
+Also return:
+- "extraction_notes": short string summarising any uncertainty (e.g. "RRP column header missing — inferred from second price column")
+- "format_type": one of "A" (single_main_table), "B" (size_grid_matrix), "C" (size_grid_handwritten), "D" (product_block_nested), "E" (size_row_below), "F" (description_embedded / low_structure)
+- "overall_confidence": single 0–100 score for the whole document
 
 For source_regions: y_position is a normalized 0-1 value indicating the vertical position on the page where this field's data was found (0 = top, 1 = bottom). page is 1-indexed. Only include fields that were actually detected.
 
@@ -1067,6 +1099,10 @@ ${ocrText}`,
         supplier_order_number: parsed.supplier_order_number || parsed.invoice_number || "",
         invoice_date: parsed.invoice_date || "",
         rejected_rows: allRejected,
+        field_confidence: parsed.field_confidence || null,
+        extraction_notes: parsed.extraction_notes || "",
+        format_type: parsed.format_type || "",
+        overall_confidence: Number(parsed.overall_confidence) || null,
         products: validated.map((p: Record<string, unknown>) => ({
           style_code: p.style_code || p.sku || "",
           colour_code: p.colour || "",
@@ -1128,6 +1164,11 @@ ${ocrText}`,
       total: parsed.total ?? null,
       rejected_rows: allRejected,
       products: normalizedProducts,
+      // Field-level confidence scoring
+      field_confidence: parsed.field_confidence || null,
+      extraction_notes: parsed.extraction_notes || "",
+      format_type: parsed.format_type || "",
+      overall_confidence: Number(parsed.overall_confidence) || null,
       // OCR fallback metadata
       ocr_fallback_used: parsed.ocr_fallback_used || false,
       ocr_fallback_attempted: parsed.ocr_fallback_attempted || false,

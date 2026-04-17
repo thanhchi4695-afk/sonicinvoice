@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
       format_type = null,
       extracted_products = [],
       corrections_override = null,
+      field_confidence = null,
     } = body || {};
 
     if (!supplier_name || typeof supplier_name !== "string") {
@@ -227,14 +228,23 @@ Return ONLY the JSON pattern object.`;
       // Update existing invoice_pattern (most recent) or insert new
       const { data: existingPattern } = await supabase
         .from("invoice_patterns")
-        .select("id, invoice_count")
+        .select("id, invoice_count, field_confidence_history")
         .eq("supplier_profile_id", supplierProfileId)
         .eq("user_id", userId)
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
+      const fcEntry = field_confidence
+        ? { recorded_at: new Date().toISOString(), scores: field_confidence }
+        : null;
+
       if (existingPattern) {
+        const prevHistory = Array.isArray((existingPattern as any).field_confidence_history)
+          ? (existingPattern as any).field_confidence_history
+          : [];
+        const nextHistory = fcEntry ? [...prevHistory, fcEntry].slice(-50) : prevHistory;
+
         await supabase
           .from("invoice_patterns")
           .update({
@@ -250,6 +260,7 @@ Return ONLY the JSON pattern object.`;
             size_matrix_detected: pattern.size_matrix_detected,
             sample_headers: raw_headers,
             invoice_count: (existingPattern.invoice_count || 0) + 1,
+            field_confidence_history: nextHistory,
             updated_at: new Date().toISOString(),
           })
           .eq("id", existingPattern.id);
@@ -269,6 +280,7 @@ Return ONLY the JSON pattern object.`;
           size_matrix_detected: pattern.size_matrix_detected,
           sample_headers: raw_headers,
           invoice_count: 1,
+          field_confidence_history: fcEntry ? [fcEntry] : [],
         });
       }
     } else {
@@ -292,6 +304,10 @@ Return ONLY the JSON pattern object.`;
       if (insertErr || !newProfile) throw new Error(insertErr?.message || "Failed to create profile");
       supplierProfileId = newProfile.id;
 
+      const fcEntryNew = field_confidence
+        ? [{ recorded_at: new Date().toISOString(), scores: field_confidence }]
+        : [];
+
       await supabase.from("invoice_patterns").insert({
         user_id: userId,
         supplier_profile_id: supplierProfileId,
@@ -307,6 +323,7 @@ Return ONLY the JSON pattern object.`;
         size_matrix_detected: pattern.size_matrix_detected,
         sample_headers: raw_headers,
         invoice_count: 1,
+        field_confidence_history: fcEntryNew,
       });
     }
 

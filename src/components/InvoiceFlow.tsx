@@ -303,6 +303,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [dbTemplate, setDbTemplate] = useState<DBSupplierTemplate | null>(null);
   const [showTeachModal, setShowTeachModal] = useState(false);
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
+  const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
 
   // Fetch user's suppliers for dropdown
   useEffect(() => {
@@ -781,6 +782,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       if (data.supplier && !supplierName) {
         setSupplierName(data.supplier);
       }
+      if (data.field_confidence && typeof data.field_confidence === "object") {
+        setAiFieldConfidence(data.field_confidence as Record<string, number>);
+      }
       if (data.layout_type) {
         setDetectedLayout(data.layout_type as LayoutType);
         const plan = data.parsing_plan || {};
@@ -1057,6 +1061,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
       if (data.parsing_plan) setAiParsingPlan(data.parsing_plan);
       if (data.rejected_rows) setAiRejectedRows(data.rejected_rows);
+      if (data.field_confidence && typeof data.field_confidence === "object") {
+        setAiFieldConfidence(data.field_confidence as Record<string, number>);
+      }
 
       if (products.length === 0) {
         toast.error("No products found in detailed mode");
@@ -1160,6 +1167,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         sample_rows: sampleRows,
         format_type: detectedLayout || null,
         extracted_products: extractedProducts,
+        field_confidence: aiFieldConfidence || undefined,
       };
 
       supabase.functions

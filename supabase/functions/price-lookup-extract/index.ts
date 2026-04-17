@@ -282,6 +282,8 @@ ${pageMarkdown}
     parsed.fetch_error = null;
     parsed.page_title = parsed.page_title || pageTitle || null;
     parsed.brand_hint_applied = brandHint?.name || null;
+    parsed.status_code = statusCode || 200;
+    parsed.scraper = "firecrawl";
     // Mark whether the description was successfully scraped from the page
     parsed.description_source = parsed.description && parsed.description.trim().length > 20 ? "scraped" : null;
 

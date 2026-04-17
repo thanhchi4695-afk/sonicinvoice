@@ -1,10 +1,19 @@
-import { useState } from "react";
-import { ChevronLeft, Search, Loader2, ExternalLink, Check, AlertTriangle, ChevronRight, Globe, ShoppingBag, Store, Building, Image, Copy, Save, Sparkles, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronLeft, Search, Loader2, ExternalLink, Check, AlertTriangle, ChevronRight, Globe, ShoppingBag, Store, Building, Image, Copy, Save, Sparkles, RefreshCw, Layers, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getStoreConfig } from "@/lib/prompt-builder";
+import { getApiKeys } from "@/lib/price-intelligence";
+
+export interface BulkLookupItem {
+  product_name: string;
+  supplier?: string;
+  style_number?: string;
+  colour?: string;
+  supplier_cost?: number;
+}
 
 interface PriceLookupProps {
   onBack: () => void;
@@ -15,6 +24,8 @@ interface PriceLookupProps {
     colour?: string;
     supplier_cost?: number;
   };
+  /** When provided, opens in bulk mode and runs price lookup across every item. */
+  bulkItems?: BulkLookupItem[];
 }
 
 interface SearchResult {

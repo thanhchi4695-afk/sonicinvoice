@@ -752,7 +752,10 @@ export type Database = {
           column_map: Json
           created_at: string
           default_markup_multiplier: number | null
+          edit_count: number | null
+          exported_at: string | null
           field_confidence_history: Json
+          fields_corrected: string[] | null
           format_type: string | null
           gst_included_in_cost: boolean | null
           gst_included_in_rrp: boolean | null
@@ -763,6 +766,10 @@ export type Database = {
           pack_notation_detected: boolean | null
           price_column_cost: string | null
           price_column_rrp: string | null
+          processing_quality_score: number | null
+          review_duration_seconds: number | null
+          rows_added: number | null
+          rows_deleted: number | null
           sample_headers: Json
           size_matrix_detected: boolean | null
           size_system: string | null
@@ -774,7 +781,10 @@ export type Database = {
           column_map?: Json
           created_at?: string
           default_markup_multiplier?: number | null
+          edit_count?: number | null
+          exported_at?: string | null
           field_confidence_history?: Json
+          fields_corrected?: string[] | null
           format_type?: string | null
           gst_included_in_cost?: boolean | null
           gst_included_in_rrp?: boolean | null
@@ -785,6 +795,10 @@ export type Database = {
           pack_notation_detected?: boolean | null
           price_column_cost?: string | null
           price_column_rrp?: string | null
+          processing_quality_score?: number | null
+          review_duration_seconds?: number | null
+          rows_added?: number | null
+          rows_deleted?: number | null
           sample_headers?: Json
           size_matrix_detected?: boolean | null
           size_system?: string | null
@@ -796,7 +810,10 @@ export type Database = {
           column_map?: Json
           created_at?: string
           default_markup_multiplier?: number | null
+          edit_count?: number | null
+          exported_at?: string | null
           field_confidence_history?: Json
+          fields_corrected?: string[] | null
           format_type?: string | null
           gst_included_in_cost?: boolean | null
           gst_included_in_rrp?: boolean | null
@@ -807,6 +824,10 @@ export type Database = {
           pack_notation_detected?: boolean | null
           price_column_cost?: string | null
           price_column_rrp?: string | null
+          processing_quality_score?: number | null
+          review_duration_seconds?: number | null
+          rows_added?: number | null
+          rows_deleted?: number | null
           sample_headers?: Json
           size_matrix_detected?: boolean | null
           size_system?: string | null

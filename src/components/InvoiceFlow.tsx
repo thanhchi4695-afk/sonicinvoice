@@ -782,6 +782,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       if (data.supplier && !supplierName) {
         setSupplierName(data.supplier);
       }
+      if (data.field_confidence && typeof data.field_confidence === "object") {
+        setAiFieldConfidence(data.field_confidence as Record<string, number>);
+      }
       if (data.layout_type) {
         setDetectedLayout(data.layout_type as LayoutType);
         const plan = data.parsing_plan || {};

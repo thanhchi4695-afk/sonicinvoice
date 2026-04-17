@@ -22,6 +22,7 @@ import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import AccountingBillReview from "@/components/AccountingBillReview";
 import StockCheckFlow from "@/components/StockCheckFlow";
 import PriceLookup from "@/components/PriceLookup";
+import PriceMatchPanel from "@/components/PriceMatchPanel";
 import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import SupplierTemplateTeach from "@/components/SupplierTemplateTeach";
 import { extractWithTemplate, parseFileToRows, autoDetectMappings, type SupplierTemplate as DBSupplierTemplate } from "@/lib/rule-based-extractor";
@@ -1095,6 +1096,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
   const [priceLookupActive, setPriceLookupActive] = useState(false);
+  const [priceMatchActive, setPriceMatchActive] = useState(false);
   const [collectionSeoActive, setCollectionSeoActive] = useState(false);
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
   const [isReprocessing, setIsReprocessing] = useState(false);
@@ -1404,6 +1406,19 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         products={convertToCollectionProducts()}
       />
     );
+  }
+
+  // ── If price match is active, render it instead ──
+  if (priceMatchActive) {
+    const items = productGroups.map(g => ({
+      style_name: g.name || "",
+      style_number: g.vendorCode || g.variants[0]?.sku || "",
+      brand: g.brand || "",
+      cost_ex_gst: g.price || 0,
+      rrp_incl_gst: g.rrp || 0,
+      barcode: g.barcode || undefined,
+    }));
+    return <PriceMatchPanel lineItems={items} onBack={() => setPriceMatchActive(false)} />;
   }
 
   return (
@@ -2358,8 +2373,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           </div>
 
-          {/* Price Lookup & Collection SEO tools */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          {/* Price Lookup, Price Match & Collection SEO tools */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             <div className="bg-card border border-border rounded-lg p-3">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
@@ -2372,6 +2387,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               </div>
               <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => setPriceLookupActive(true)}>
                 <Search className="w-3 h-3 mr-1" /> Look Up Prices
+              </Button>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-success/15 flex items-center justify-center shrink-0">
+                  <DollarSign className="w-4 h-4 text-success" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold">Price Match</p>
+                  <p className="text-[10px] text-muted-foreground">Compare RRP vs market (AUD)</p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => setPriceMatchActive(true)}>
+                <Search className="w-3 h-3 mr-1" /> Match Prices
               </Button>
             </div>
             <div className="bg-card border border-border rounded-lg p-3">

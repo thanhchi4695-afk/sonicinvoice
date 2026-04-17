@@ -1164,6 +1164,11 @@ ${ocrText}`,
       total: parsed.total ?? null,
       rejected_rows: allRejected,
       products: normalizedProducts,
+      // Field-level confidence scoring
+      field_confidence: parsed.field_confidence || null,
+      extraction_notes: parsed.extraction_notes || "",
+      format_type: parsed.format_type || "",
+      overall_confidence: Number(parsed.overall_confidence) || null,
       // OCR fallback metadata
       ocr_fallback_used: parsed.ocr_fallback_used || false,
       ocr_fallback_attempted: parsed.ocr_fallback_attempted || false,

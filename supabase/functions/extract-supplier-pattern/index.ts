@@ -76,6 +76,9 @@ Deno.serve(async (req) => {
       field_confidence = null,
       layout_fingerprint = null,
       match_method = null,
+      original_file_path = null,
+      original_file_mime = null,
+      original_filename = null,
     } = body || {};
 
     if (!supplier_name || typeof supplier_name !== "string") {

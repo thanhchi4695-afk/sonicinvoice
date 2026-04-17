@@ -1147,16 +1147,24 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         } catch (e) { /* ignore */ }
       }
 
-      // Re-run inference for the detailed pass (uses any newly-saved learning).
+      // Re-run fingerprint pre-check + inference for the detailed pass (uses any newly-saved learning).
+      const headersForFingerprintRe = detectedHeaders.length
+        ? detectedHeaders
+        : ((["csv", "xlsx", "xls"].includes(ext)
+            ? await parseFileToRows(file, 1).then(r => r[0] ? Object.keys(r[0]) : []).catch(() => [])
+            : []) as string[]);
+      const fpRe = headersForFingerprintRe.length ? generateLayoutFingerprint(headersForFingerprintRe) : "";
+      let fpHitRe: FingerprintHit | null = null;
+      if (fpRe) {
+        fpHitRe = await lookupFingerprintMatch(fpRe);
+        if (fpHitRe) setFingerprintHit(fpHitRe);
+      }
       let inferredRules: InferredRules | null = null;
       try {
         const sampleSheetRows = ["csv", "xlsx", "xls"].includes(ext)
           ? await parseFileToRows(file, 1).then(r => r.slice(0, 3)).catch(() => [])
           : [];
-        const headersForInfer = detectedHeaders.length
-          ? detectedHeaders
-          : (sampleSheetRows[0] ? Object.keys(sampleSheetRows[0]) : []);
-        inferredRules = await buildInferredRules(supplierName || "", headersForInfer, sampleSheetRows);
+        inferredRules = await buildInferredRules(supplierName || "", headersForFingerprintRe, sampleSheetRows);
       } catch { /* ignore */ }
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
@@ -1175,6 +1183,14 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           templateHint: combinedHint || undefined,
           supplierProfile: supplierProfileData || undefined,
           inferredRules: inferredRules || undefined,
+          fingerprintMatch: fpHitRe ? {
+            layout_fingerprint: fpHitRe.layout_fingerprint,
+            source: fpHitRe.source,
+            column_map: fpHitRe.column_map,
+            size_system: fpHitRe.size_system,
+            format_type: fpHitRe.format_type,
+            price_logic: fpHitRe.price_logic,
+          } : undefined,
           detailedMode: true,
           expectedProductCount: expectedRowCount || undefined,
         }),
@@ -1301,6 +1317,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         format_type: detectedLayout || null,
         extracted_products: extractedProducts,
         field_confidence: aiFieldConfidence || undefined,
+        layout_fingerprint: layoutFingerprint || (detectedHeaders.length ? generateLayoutFingerprint(detectedHeaders) : null),
+        match_method: matchMethod,
       };
 
       supabase.functions

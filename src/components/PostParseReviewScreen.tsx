@@ -830,6 +830,7 @@ export default function PostParseReviewScreen({
                   parsingPlan={debug.parsingPlan}
                   invoicePages={invoicePages}
                   onShowSourceTrace={(prod) => setSourceTraceProduct(prod)}
+                  lowConfFields={lowConfFields}
                 />
               ))}
             </div>

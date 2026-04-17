@@ -654,6 +654,11 @@ export default function PostParseReviewScreen({
         />
       )}
 
+      <FieldConfidenceHeader
+        fieldConfidence={fieldConfidence}
+        extractionNotes={extractionNotes}
+      />
+
       <div className="flex items-center gap-3 mb-3 text-xs text-muted-foreground">
         <span><Layers className="w-3 h-3 inline mr-1" />{groupedProducts.length} grouped products</span>
         <span>·</span>

@@ -754,6 +754,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           inferredRules: inferredRules || undefined,
         }),
       });
+
+      if (!response.ok) {
+        console.error("AI parse failed:", await response.text());
         return [];
       }
 

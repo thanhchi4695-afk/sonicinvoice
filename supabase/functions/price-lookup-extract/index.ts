@@ -177,6 +177,8 @@ serve(async (req) => {
         source_url: finalUrl,
         fetch_success: false,
         fetch_error: fetchError || "no_content",
+        status_code: statusCode || null,
+        scraper: "firecrawl",
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

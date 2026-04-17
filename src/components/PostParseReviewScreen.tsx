@@ -41,6 +41,10 @@ interface PostParseReviewScreenProps {
   onReprocessDetailed?: (expectedRowCount?: number) => void;
   isReprocessing?: boolean;
   underExtractionWarning?: { extractedCount: number; estimatedRows: number } | null;
+  /** Per-field AI confidence scores from the extraction response (0–100). */
+  fieldConfidence?: Record<string, number> | null;
+  /** Brief AI-authored note describing any uncertainty in the extraction. */
+  extractionNotes?: string | null;
 }
 
 type ReviewTab = "accepted" | "review" | "rejected";
@@ -144,6 +148,8 @@ export default function PostParseReviewScreen({
   onReprocessDetailed,
   isReprocessing = false,
   underExtractionWarning = null,
+  fieldConfidence = null,
+  extractionNotes = null,
 }: PostParseReviewScreenProps) {
   const [activeTab, setActiveTab] = useState<ReviewTab>("accepted");
   const [searchQuery, setSearchQuery] = useState("");

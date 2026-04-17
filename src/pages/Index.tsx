@@ -428,7 +428,6 @@ const Index = () => {
 
   // In standalone mobile mode, flows replace the entire screen (no sidebar)
   // On desktop, flows render inside StockyLayout (sidebar stays visible)
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   if (!isEmbedded && activeFlow && !isDesktop) {
     return (
       <div className="min-h-screen pb-24">

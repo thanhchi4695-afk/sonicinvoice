@@ -2373,8 +2373,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           </div>
 
-          {/* Price Lookup & Collection SEO tools */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          {/* Price Lookup, Price Match & Collection SEO tools */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             <div className="bg-card border border-border rounded-lg p-3">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
@@ -2387,6 +2387,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               </div>
               <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => setPriceLookupActive(true)}>
                 <Search className="w-3 h-3 mr-1" /> Look Up Prices
+              </Button>
+            </div>
+            <div className="bg-card border border-border rounded-lg p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-lg bg-success/15 flex items-center justify-center shrink-0">
+                  <DollarSign className="w-4 h-4 text-success" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold">Price Match</p>
+                  <p className="text-[10px] text-muted-foreground">Compare RRP vs market (AUD)</p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="w-full text-xs" onClick={() => setPriceMatchActive(true)}>
+                <Search className="w-3 h-3 mr-1" /> Match Prices
               </Button>
             </div>
             <div className="bg-card border border-border rounded-lg p-3">

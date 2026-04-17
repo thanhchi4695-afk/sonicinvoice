@@ -1408,6 +1408,19 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     );
   }
 
+  // ── If price match is active, render it instead ──
+  if (priceMatchActive) {
+    const items = productGroups.map(g => ({
+      style_name: g.name || "",
+      style_number: g.vendorCode || g.variants[0]?.sku || "",
+      brand: g.brand || "",
+      cost_ex_gst: g.price || 0,
+      rrp_incl_gst: g.rrp || 0,
+      barcode: g.barcode || undefined,
+    }));
+    return <PriceMatchPanel lineItems={items} onBack={() => setPriceMatchActive(false)} />;
+  }
+
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
       {/* Header */}

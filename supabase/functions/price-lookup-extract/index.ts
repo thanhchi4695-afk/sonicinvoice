@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { callAI, getContent } from "../_shared/ai-gateway.ts";
 import { findBrandHint } from "../_shared/brand-extraction-hints.ts";
 
@@ -8,17 +9,74 @@ const corsHeaders = {
 };
 
 const FIRECRAWL_API = "https://api.firecrawl.dev/v2";
+const CACHE_TTL_HOURS = 24;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { url, product_name, supplier, style_number, colour, supplier_cost } = await req.json();
+    const { url, product_name, supplier, style_number, colour, supplier_cost, force_refresh } = await req.json();
 
     if (!url) {
       return new Response(JSON.stringify({ error: "url is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // ── Cache check: if we successfully extracted this URL within the last 24h, return cached row ──
+    // Skips Firecrawl + AI cost entirely.
+    if (!force_refresh) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL");
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+        const authHeader = req.headers.get("Authorization");
+
+        if (supabaseUrl && serviceKey && authHeader) {
+          const userClient = createClient(supabaseUrl, serviceKey, {
+            global: { headers: { Authorization: authHeader } },
+          });
+          const { data: { user } } = await userClient.auth.getUser();
+
+          if (user) {
+            const cutoff = new Date(Date.now() - CACHE_TTL_HOURS * 60 * 60 * 1000).toISOString();
+            const admin = createClient(supabaseUrl, serviceKey);
+            const { data: cached } = await admin
+              .from("price_lookups")
+              .select("*")
+              .eq("user_id", user.id)
+              .eq("source_url", url)
+              .gte("updated_at", cutoff)
+              .not("retail_price_aud", "is", null)
+              .order("updated_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (cached) {
+              const ageMin = Math.round((Date.now() - new Date(cached.updated_at).getTime()) / 60000);
+              return new Response(JSON.stringify({
+                product_name: cached.product_name,
+                brand: cached.supplier,
+                retail_price_aud: cached.retail_price_aud,
+                sale_price_aud: null,
+                compare_at_price_aud: null,
+                currency_detected: "AUD",
+                currency_confidence: cached.price_confidence ?? 90,
+                image_urls: cached.image_urls ?? [],
+                description: cached.description,
+                page_title: null,
+                source_url: cached.source_url,
+                fetch_success: true,
+                fetch_error: null,
+                cached: true,
+                cache_age_minutes: ageMin,
+                description_source: cached.description ? "scraped" : null,
+              }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            }
+          }
+        }
+      } catch (cacheErr) {
+        console.warn("Cache check failed (continuing to scrape):", cacheErr);
+      }
     }
 
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");

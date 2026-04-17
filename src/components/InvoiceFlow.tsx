@@ -31,7 +31,7 @@ import { extractWithTemplate, parseFileToRows, autoDetectMappings, type Supplier
 import type { InvoiceLineItem } from "@/lib/stock-matcher";
 import { preprocessInvoiceImage, isLikelyPhotoInvoice, preprocessForUpload, isPdfFile, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
 import { supabase } from "@/integrations/supabase/client";
-import { inferSupplierRules, type InferredRules, type SupplierProfile as InferProfile } from "@/lib/supplier-inference";
+import { inferSupplierRules, computeHeaderFingerprint, type InferredRules, type SupplierProfile as InferProfile, type SharedPatternLite } from "@/lib/supplier-inference";
 
 // Load all of this user's supplier profiles + their invoice patterns,
 // then run the waterfall inference. Used to pre-seed the AI extractor
@@ -52,8 +52,25 @@ async function buildInferredRules(
       .eq("user_id", userId)
       .eq("is_active", true);
 
+    // Pull anonymised shared patterns matching this header fingerprint
+    // — fallback when this user has no learned rules yet.
+    let sharedPatterns: SharedPatternLite[] = [];
+    try {
+      const fp = computeHeaderFingerprint(detectedHeaders || []);
+      if (fp) {
+        const { data: shared } = await supabase
+          .from("shared_patterns" as any)
+          .select("format_type, header_fingerprint, column_roles, size_system, gst_included_in_cost, gst_included_in_rrp, markup_avg, pack_notation_detected, size_matrix_detected, contributor_count, avg_confidence")
+          .eq("header_fingerprint", fp)
+          .limit(1);
+        sharedPatterns = (shared || []) as unknown as SharedPatternLite[];
+      }
+    } catch {
+      // table may not exist yet in older deployments — fail silent
+    }
+
     const list = (profiles || []) as unknown as InferProfile[];
-    return inferSupplierRules(detectedHeaders || [], sampleRows || [], list, supplierName);
+    return inferSupplierRules(detectedHeaders || [], sampleRows || [], list, supplierName, "fashion", sharedPatterns);
   } catch (err) {
     console.warn("[Sonic Invoice] inferSupplierRules failed:", err);
     return null;

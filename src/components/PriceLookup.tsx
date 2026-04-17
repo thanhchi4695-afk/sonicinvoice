@@ -463,9 +463,43 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
               <textarea
                 value={editDescription}
                 onChange={e => setEditDescription(e.target.value)}
+                placeholder={extracted.fetch_success ? "" : "Couldn't extract description automatically — write your own here."}
                 className="w-full min-h-[120px] rounded-md bg-input border border-border p-3 text-sm"
               />
             </div>
+
+            {/* Product details — key features, fabric, care, fit (Bug 3 fix) */}
+            {(extracted.key_features?.length || extracted.fabric_content || extracted.care_instructions || extracted.fit_notes) && (
+              <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase">Product Details</h3>
+                {extracted.key_features && extracted.key_features.length > 0 && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Key Features</p>
+                    <ul className="text-sm space-y-1 list-disc pl-4">
+                      {extracted.key_features.map((f, i) => <li key={i}>{f}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {extracted.fabric_content && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Fabric</p>
+                    <p className="text-sm">{extracted.fabric_content}</p>
+                  </div>
+                )}
+                {extracted.care_instructions && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Care</p>
+                    <p className="text-sm">{extracted.care_instructions}</p>
+                  </div>
+                )}
+                {extracted.fit_notes && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Fit</p>
+                    <p className="text-sm">{extracted.fit_notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Availability */}
             {(extracted.sizes_available?.length || extracted.colours_available?.length) && (

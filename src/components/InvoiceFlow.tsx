@@ -1038,6 +1038,76 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     if (!matchedTemplate && supplierName.trim()) {
       setShowSaveTemplate(true);
     }
+    // Fire-and-forget: train the supplier intelligence engine in the background
+    void trainSupplierPattern();
+  };
+
+  const trainSupplierPattern = async () => {
+    try {
+      const name = supplierName.trim();
+      if (!name || productGroups.length === 0) return;
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
+      if (!userId) return;
+
+      // Build sample rows from the first 3 product groups (flatten one variant each)
+      const sampleRows = productGroups.slice(0, 3).map((g) => {
+        const v = g.variants?.[0];
+        return {
+          name: g.name,
+          brand: g.brand,
+          sku: v?.sku || "",
+          colour: g.colour,
+          size: v?.option2Value || g.size,
+          qty: v?.qty || 0,
+          cost: g.cogs ?? g.price,
+          rrp: g.rrp,
+        };
+      });
+
+      const extractedProducts = productGroups.map((g) => ({
+        name: g.name,
+        brand: g.brand,
+        type: g.type,
+        colour: g.colour,
+        cost: g.cogs ?? g.price,
+        rrp: g.rrp,
+        variant_count: g.variants?.length || 0,
+      }));
+
+      const payload = {
+        user_id: userId,
+        supplier_name: name,
+        raw_headers: detectedHeaders,
+        sample_rows: sampleRows,
+        format_type: detectedLayout || null,
+        extracted_products: extractedProducts,
+      };
+
+      supabase.functions
+        .invoke("extract-supplier-pattern", { body: payload })
+        .then(({ data, error }) => {
+          if (error) {
+            console.warn("Pattern learning failed silently:", error);
+            return;
+          }
+          if (!data) return;
+          const supplierLabel = name;
+          if (data.is_new_supplier) {
+            toast(`New supplier learned: ${supplierLabel}`, {
+              description: "The app will get smarter with each invoice.",
+            });
+          } else {
+            toast(`Supplier profile updated: ${supplierLabel}`, {
+              description: `Confidence now ${data.confidence_score ?? 0}%.`,
+            });
+          }
+        })
+        .catch((err) => console.warn("Pattern learning failed silently:", err));
+    } catch (err) {
+      console.warn("Pattern learning failed silently:", err);
+    }
   };
 
   // Simulated rules-applied feedback

@@ -4,6 +4,7 @@ import { onImageSeoTrigger } from "@/lib/image-seo-trigger";
 import NotificationBell from "@/components/NotificationBell";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { useKeyboardShortcuts, type ShortcutDef } from "@/hooks/use-keyboard-shortcuts";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 // ── Eagerly loaded (critical path) ──
 import HomeScreen from "@/components/HomeScreen";
@@ -290,6 +291,9 @@ const Index = () => {
   ], []);
   useKeyboardShortcuts(shortcuts);
 
+  // ── Responsive layout switch (reactive to window resize) ──
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+
   // ── Loading state ──
   if (authLoading) {
     return (
@@ -424,7 +428,6 @@ const Index = () => {
 
   // In standalone mobile mode, flows replace the entire screen (no sidebar)
   // On desktop, flows render inside StockyLayout (sidebar stays visible)
-  const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
   if (!isEmbedded && activeFlow && !isDesktop) {
     return (
       <div className="min-h-screen pb-24">

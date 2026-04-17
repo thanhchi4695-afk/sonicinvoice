@@ -161,6 +161,13 @@ const CatalogMemoryPanel = ({ onBack }: CatalogMemoryPanelProps) => {
           ) : (
             <>
               <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.webp"
+                className="hidden"
+                onChange={handleFileSelected}
+              />
+              <input
                 type="text"
                 value={supplierName}
                 onChange={e => setSupplierName(e.target.value)}
@@ -169,11 +176,12 @@ const CatalogMemoryPanel = ({ onBack }: CatalogMemoryPanelProps) => {
               />
               <button
                 onClick={handleUpload}
-                className="w-full h-36 rounded-lg border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-2 active:bg-muted transition-colors mb-3"
+                disabled={!supplierName.trim()}
+                className="w-full h-36 rounded-lg border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-2 active:bg-muted transition-colors mb-3 disabled:opacity-50"
               >
                 <Upload className="w-6 h-6 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">Drop or select catalog file</p>
-                <p className="text-[10px] text-muted-foreground/60">PDF · Excel · CSV</p>
+                <p className="text-[10px] text-muted-foreground/60">PDF · Image (descriptions auto-extracted)</p>
               </button>
               <Button
                 className="w-full h-11"

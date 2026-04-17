@@ -1388,6 +1388,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         field_confidence: aiFieldConfidence || undefined,
         layout_fingerprint: layoutFingerprint || (detectedHeaders.length ? generateLayoutFingerprint(detectedHeaders) : null),
         match_method: matchMethod,
+        original_file_path: originalFileMeta?.path || null,
+        original_file_mime: originalFileMeta?.mime || null,
+        original_filename: originalFileMeta?.name || null,
       };
 
       supabase.functions

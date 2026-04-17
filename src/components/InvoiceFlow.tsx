@@ -1668,7 +1668,10 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             supplierName={supplierName}
           />
 
-          <button className="mt-6 text-sm text-primary font-medium">
+          <button
+            className="mt-6 text-sm text-primary font-medium hover:underline"
+            onClick={() => setShowPriceLookup(true)}
+          >
             Or enter products manually →
           </button>
         </div>

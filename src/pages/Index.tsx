@@ -89,6 +89,74 @@ const ShopifyCSVSEO = lazy(() => import("@/components/ShopifyCSVSEO"));
 const StockyHomeDashboard = lazy(() => import("@/components/StockyHomeDashboard"));
 const PriceMatchPanel = lazy(() => import("@/components/PriceMatchPanel"));
 const ProductDescriptionPanel = lazy(() => import("@/components/ProductDescriptionPanel"));
+// ── Flow keys registry — single source of truth for all activeFlow values ──
+// Add a new flow by adding its key here; TypeScript will enforce usage everywhere.
+const FLOW_KEYS = {
+  invoice: true,
+  sale: true,
+  restock: true,
+  price_adjust: true,
+  price_lookup: true,
+  price_match: true,
+  product_descriptions: true,
+  order_form: true,
+  seasons: true,
+  reorder: true,
+  suppliers: true,
+  audit_log: true,
+  purchase_orders: true,
+  catalog_memory: true,
+  email_inbox: true,
+  collab_seo: true,
+  google_ads_setup: true,
+  meta_ads_setup: true,
+  lightspeed_convert: true,
+  scan_mode: true,
+  performance: true,
+  feed_optimise: true,
+  feed_health: true,
+  google_colour: true,
+  google_ads: true,
+  style_grouping: true,
+  competitor_intel: true,
+  collection_seo: true,
+  collection_seo_export: true,
+  geo_agentic: true,
+  organic_seo: true,
+  margin_protection: true,
+  markdown_ladder: true,
+  stock_monitor: true,
+  social_media: true,
+  inventory_planning: true,
+  packing_slip: true,
+  joor: true,
+  wholesale_import: true,
+  lookbook_import: true,
+  accounting: true,
+  profit_loss: true,
+  stocky_hub: true,
+  stocky_migration: true,
+  stocky_onboarding: true,
+  inventory_dashboard: true,
+  inventory_view: true,
+  product_health: true,
+  order_sync: true,
+  image_optimise: true,
+  stock_check: true,
+  stocktake_module: true,
+  transfer_orders: true,
+  reports_hub: true,
+  pipeline: true,
+  pipeline_chooser: true,
+  supplier_profile_builder: true,
+  stock_adjustment: true,
+  quick_receive: true,
+  csv_seo: true,
+  stocky_dashboard: true,
+} as const;
+
+export type ActiveFlow = keyof typeof FLOW_KEYS;
+
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -101,7 +169,7 @@ const Index = () => {
   const [authLoading, setAuthLoading] = useState(true);
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
   const [activeTab, setActiveTab] = useState("home");
-  const [activeFlow, setActiveFlow] = useState<"invoice" | "sale" | "restock" | "price_adjust" | "price_lookup" | "price_match" | "product_descriptions" | "order_form" | "seasons" | "reorder" | "suppliers" | "audit_log" | "purchase_orders" | "catalog_memory" | "email_inbox" | "collab_seo" | "google_ads_setup" | "meta_ads_setup" | "lightspeed_convert" | "scan_mode" | "performance" | "feed_optimise" | "feed_health" | "google_colour" | "google_ads" | "style_grouping" | "competitor_intel" | "collection_seo" | "collection_seo_export" | "geo_agentic" | "organic_seo" | "margin_protection" | "markdown_ladder" | "stock_monitor" | "social_media" | "inventory_planning" | "packing_slip" | "joor" | "wholesale_import" | "lookbook_import" | "accounting" | "profit_loss" | "stocky_hub" | "stocky_migration" | "stocky_onboarding" | "inventory_dashboard" | "inventory_view" | "product_health" | "order_sync" | "image_optimise" | "stock_check" | "stocktake_module" | "transfer_orders" | "reports_hub" | "pipeline" | "pipeline_chooser" | "supplier_profile_builder" | "stock_adjustment" | "quick_receive" | "csv_seo" | "stocky_dashboard" | null>(null);
+  const [activeFlow, setActiveFlow] = useState<ActiveFlow | null>(null);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);

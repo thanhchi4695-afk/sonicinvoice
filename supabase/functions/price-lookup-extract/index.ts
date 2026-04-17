@@ -70,6 +70,8 @@ serve(async (req) => {
                 cached: true,
                 cache_age_minutes: ageMin,
                 description_source: cached.description ? "scraped" : null,
+                status_code: 200,
+                scraper: "firecrawl",
               }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
           }

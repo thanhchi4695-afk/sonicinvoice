@@ -304,6 +304,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [showTeachModal, setShowTeachModal] = useState(false);
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
   const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
+  const [aiExtractionNotes, setAiExtractionNotes] = useState<string | null>(null);
 
   // Fetch user's suppliers for dropdown
   useEffect(() => {
@@ -785,6 +786,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       if (data.field_confidence && typeof data.field_confidence === "object") {
         setAiFieldConfidence(data.field_confidence as Record<string, number>);
       }
+      if (typeof data.extraction_notes === "string") {
+        setAiExtractionNotes(data.extraction_notes);
+      }
       if (data.layout_type) {
         setDetectedLayout(data.layout_type as LayoutType);
         const plan = data.parsing_plan || {};
@@ -1063,6 +1067,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       if (data.rejected_rows) setAiRejectedRows(data.rejected_rows);
       if (data.field_confidence && typeof data.field_confidence === "object") {
         setAiFieldConfidence(data.field_confidence as Record<string, number>);
+      }
+      if (typeof data.extraction_notes === "string") {
+        setAiExtractionNotes(data.extraction_notes);
       }
 
       if (products.length === 0) {
@@ -2104,6 +2111,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 onReprocessDetailed={handleReprocessDetailed}
                 isReprocessing={isReprocessing}
                 underExtractionWarning={underExtractionWarning}
+                fieldConfidence={aiFieldConfidence}
+                extractionNotes={aiExtractionNotes}
               />
             </div>
           )}

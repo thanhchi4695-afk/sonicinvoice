@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
 import SizeGridEditor from "@/components/SizeGridEditor";
 import InvoiceDebugOverlay from "@/components/InvoiceDebugOverlay";
+import FieldConfidenceHeader, { lowConfidenceFieldNames } from "@/components/FieldConfidenceHeader";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;
@@ -40,6 +41,10 @@ interface PostParseReviewScreenProps {
   onReprocessDetailed?: (expectedRowCount?: number) => void;
   isReprocessing?: boolean;
   underExtractionWarning?: { extractedCount: number; estimatedRows: number } | null;
+  /** Per-field AI confidence scores from the extraction response (0–100). */
+  fieldConfidence?: Record<string, number> | null;
+  /** Brief AI-authored note describing any uncertainty in the extraction. */
+  extractionNotes?: string | null;
 }
 
 type ReviewTab = "accepted" | "review" | "rejected";
@@ -143,6 +148,8 @@ export default function PostParseReviewScreen({
   onReprocessDetailed,
   isReprocessing = false,
   underExtractionWarning = null,
+  fieldConfidence = null,
+  extractionNotes = null,
 }: PostParseReviewScreenProps) {
   const [activeTab, setActiveTab] = useState<ReviewTab>("accepted");
   const [searchQuery, setSearchQuery] = useState("");
@@ -200,6 +207,11 @@ export default function PostParseReviewScreen({
   const missingCostCount = useMemo(() => {
     return products.filter(p => !p._rejected && (!p.cost || p.cost <= 0)).length;
   }, [products]);
+
+  /** Internal product field names whose AI confidence was < 70 — used both for
+   *  cell tinting and for marking corrections as system-suggested (the most
+   *  valuable training signal). */
+  const lowConfFields = useMemo(() => lowConfidenceFieldNames(fieldConfidence), [fieldConfidence]);
 
   // Grouped products for fashion view
   const groupedProducts = useMemo((): ProductGroup[] => {
@@ -365,9 +377,9 @@ export default function PostParseReviewScreen({
       correctionReason: reason ?? null,
       correctionReasonDetail: reasonDetail ?? null,
       fieldCategory: deriveFieldCategory(field),
-      autoDetected: false,
+      autoDetected: lowConfFields.has(field),
     });
-  }, [supplierName, products, detectedHeaders, detectedLayout]);
+  }, [supplierName, products, detectedHeaders, detectedLayout, lowConfFields]);
 
   /** Flush any pending correction for a different cell (user moved away without picking). */
   const flushOtherPending = useCallback((keepKey: string) => {
@@ -642,6 +654,11 @@ export default function PostParseReviewScreen({
         />
       )}
 
+      <FieldConfidenceHeader
+        fieldConfidence={fieldConfidence}
+        extractionNotes={extractionNotes}
+      />
+
       <div className="flex items-center gap-3 mb-3 text-xs text-muted-foreground">
         <span><Layers className="w-3 h-3 inline mr-1" />{groupedProducts.length} grouped products</span>
         <span>·</span>
@@ -813,6 +830,7 @@ export default function PostParseReviewScreen({
                   parsingPlan={debug.parsingPlan}
                   invoicePages={invoicePages}
                   onShowSourceTrace={(prod) => setSourceTraceProduct(prod)}
+                  lowConfFields={lowConfFields}
                 />
               ))}
             </div>
@@ -1104,6 +1122,7 @@ function ReviewRow({
   showTeachAI, onToggleTeachAI, supplierName, parsingPlan,
   invoicePages, onShowSourceTrace,
   pendingFields, savedReasonFields, onPickReason, onDismissReason,
+  lowConfFields,
 }: {
   product: ReviewProduct;
   tab: ReviewTab;
@@ -1129,9 +1148,15 @@ function ReviewRow({
   savedReasonFields?: Set<string>;
   onPickReason?: (field: string, reason: CorrectionReason, detail?: string) => void;
   onDismissReason?: (field: string) => void;
+  lowConfFields?: Set<string>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showWhyAI, setShowWhyAI] = useState(false);
+  // Tint label for low-confidence fields. < 50 was tinted destructive at the
+  // banner level; here we keep both <50 and 50–69 visually muted-amber to keep
+  // the row UI calm — the dot/banner above already escalates to red.
+  const labelCls = (field: string) =>
+    `text-[10px] mb-0.5 block ${lowConfFields?.has(field) ? "text-secondary font-medium" : "text-muted-foreground"}`;
 
   return (
     <div className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""}`}>
@@ -1264,7 +1289,7 @@ function ReviewRow({
           {isEditing ? (
             <div className="bg-muted/30 rounded-lg p-3 space-y-2">
               <div>
-                <label className="text-[10px] text-muted-foreground mb-0.5 block">Product Title</label>
+                <label className={labelCls("name")}>Product Title</label>
                 <Input defaultValue={p.name} onBlur={e => onUpdateField("name", e.target.value)} className="h-8 text-xs" />
                 {pendingFields?.has("name") && onPickReason && onDismissReason && (
                   <CorrectionReasonPicker onPick={(r, d) => onPickReason("name", r, d)} onDismiss={() => onDismissReason("name")} />
@@ -1273,7 +1298,7 @@ function ReviewRow({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Vendor</label>
+                  <label className={labelCls("brand")}>Vendor</label>
                   <Input defaultValue={p.brand} onBlur={e => onUpdateField("brand", e.target.value)} className="h-8 text-xs" />
                   {pendingFields?.has("brand") && onPickReason && onDismissReason && (
                     <CorrectionReasonPicker onPick={(r, d) => onPickReason("brand", r, d)} onDismiss={() => onDismissReason("brand")} />
@@ -1281,7 +1306,7 @@ function ReviewRow({
                   {savedReasonFields?.has("brand") && <CorrectionSavedCheck />}
                 </div>
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Style Code / SKU</label>
+                  <label className={labelCls("sku")}>Style Code / SKU</label>
                   <Input defaultValue={p.sku} onBlur={e => onUpdateField("sku", e.target.value)} className="h-8 text-xs" />
                   {pendingFields?.has("sku") && onPickReason && onDismissReason && (
                     <CorrectionReasonPicker onPick={(r, d) => onPickReason("sku", r, d)} onDismiss={() => onDismissReason("sku")} />
@@ -1291,7 +1316,7 @@ function ReviewRow({
               </div>
               <div className="grid grid-cols-4 gap-2">
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Unit Cost</label>
+                  <label className={labelCls("cost")}>Unit Cost</label>
                   <Input type="number" defaultValue={p.cost} onBlur={e => onUpdateField("cost", parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
                   {pendingFields?.has("cost") && onPickReason && onDismissReason && (
                     <CorrectionReasonPicker onPick={(r, d) => onPickReason("cost", r, d)} onDismiss={() => onDismissReason("cost")} />
@@ -1299,7 +1324,7 @@ function ReviewRow({
                   {savedReasonFields?.has("cost") && <CorrectionSavedCheck />}
                 </div>
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Qty</label>
+                  <label className={labelCls("qty")}>Qty</label>
                   <Input type="number" defaultValue={p.qty} onBlur={e => onUpdateField("qty", parseInt(e.target.value) || 0)} className="h-8 text-xs" />
                   {pendingFields?.has("qty") && onPickReason && onDismissReason && (
                     <CorrectionReasonPicker onPick={(r, d) => onPickReason("qty", r, d)} onDismiss={() => onDismissReason("qty")} />
@@ -1307,7 +1332,7 @@ function ReviewRow({
                   {savedReasonFields?.has("qty") && <CorrectionSavedCheck />}
                 </div>
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Size</label>
+                  <label className={labelCls("size")}>Size</label>
                   <Input defaultValue={p.size} onBlur={e => onUpdateField("size", e.target.value)} className="h-8 text-xs" />
                   {pendingFields?.has("size") && onPickReason && onDismissReason && (
                     <CorrectionReasonPicker onPick={(r, d) => onPickReason("size", r, d)} onDismiss={() => onDismissReason("size")} />
@@ -1315,7 +1340,7 @@ function ReviewRow({
                   {savedReasonFields?.has("size") && <CorrectionSavedCheck />}
                 </div>
                 <div>
-                  <label className="text-[10px] text-muted-foreground mb-0.5 block">Colour</label>
+                  <label className={labelCls("colour")}>Colour</label>
                   <Input defaultValue={p.colour} onBlur={e => onUpdateField("colour", e.target.value)} className="h-8 text-xs" />
                   {pendingFields?.has("colour") && onPickReason && onDismissReason && (
                     <CorrectionReasonPicker onPick={(r, d) => onPickReason("colour", r, d)} onDismiss={() => onDismissReason("colour")} />

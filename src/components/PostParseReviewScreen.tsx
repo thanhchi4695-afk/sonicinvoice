@@ -14,7 +14,8 @@ import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
 import { updateSupplierProfileWithCorrections } from "@/lib/supplier-profile-updater";
-import { logCorrection } from "@/lib/correction-tracker";
+import { logCorrection, deriveFieldCategory, type CorrectionReason } from "@/lib/correction-tracker";
+import CorrectionReasonPicker, { CorrectionSavedCheck } from "@/components/CorrectionReasonPicker";
 import { saveInvoiceLinesToCatalog } from "@/components/SupplierCatalog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";

@@ -371,32 +371,47 @@ export type Database = {
       }
       correction_log: {
         Row: {
+          auto_detected: boolean
           corrected_value: string | null
+          correction_reason: string | null
+          correction_reason_detail: string | null
           created_at: string
+          field_category: string | null
           field_corrected: string | null
           id: string
           invoice_pattern_id: string | null
           original_value: string | null
+          session_invoice_index: number | null
           supplier_profile_id: string | null
           user_id: string
         }
         Insert: {
+          auto_detected?: boolean
           corrected_value?: string | null
+          correction_reason?: string | null
+          correction_reason_detail?: string | null
           created_at?: string
+          field_category?: string | null
           field_corrected?: string | null
           id?: string
           invoice_pattern_id?: string | null
           original_value?: string | null
+          session_invoice_index?: number | null
           supplier_profile_id?: string | null
           user_id: string
         }
         Update: {
+          auto_detected?: boolean
           corrected_value?: string | null
+          correction_reason?: string | null
+          correction_reason_detail?: string | null
           created_at?: string
+          field_category?: string | null
           field_corrected?: string | null
           id?: string
           invoice_pattern_id?: string | null
           original_value?: string | null
+          session_invoice_index?: number | null
           supplier_profile_id?: string | null
           user_id?: string
         }

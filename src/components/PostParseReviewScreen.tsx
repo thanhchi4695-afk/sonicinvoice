@@ -1122,6 +1122,7 @@ function ReviewRow({
   showTeachAI, onToggleTeachAI, supplierName, parsingPlan,
   invoicePages, onShowSourceTrace,
   pendingFields, savedReasonFields, onPickReason, onDismissReason,
+  lowConfFields,
 }: {
   product: ReviewProduct;
   tab: ReviewTab;
@@ -1147,6 +1148,7 @@ function ReviewRow({
   savedReasonFields?: Set<string>;
   onPickReason?: (field: string, reason: CorrectionReason, detail?: string) => void;
   onDismissReason?: (field: string) => void;
+  lowConfFields?: Set<string>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showWhyAI, setShowWhyAI] = useState(false);

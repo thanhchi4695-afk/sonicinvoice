@@ -1670,7 +1670,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
           <button
             className="mt-6 text-sm text-primary font-medium hover:underline"
-            onClick={() => setShowPriceLookup(true)}
+            onClick={() => setPriceLookupActive(true)}
           >
             Or enter products manually →
           </button>

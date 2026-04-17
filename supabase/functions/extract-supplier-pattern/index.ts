@@ -341,6 +341,9 @@ Return ONLY the JSON pattern object.`;
         field_confidence_history: fcEntryNew,
         layout_fingerprint: layout_fingerprint || null,
         match_method: match_method || null,
+        original_file_path,
+        original_file_mime,
+        original_filename,
       });
     }
 

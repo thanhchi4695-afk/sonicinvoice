@@ -291,6 +291,9 @@ const Index = () => {
   ], []);
   useKeyboardShortcuts(shortcuts);
 
+  // ── Responsive layout switch (reactive to window resize) ──
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+
   // ── Loading state ──
   if (authLoading) {
     return (

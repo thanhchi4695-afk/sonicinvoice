@@ -394,6 +394,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
   const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
   const [aiExtractionNotes, setAiExtractionNotes] = useState<string | null>(null);
+  const [layoutFingerprint, setLayoutFingerprint] = useState<string | null>(null);
+  const [fingerprintHit, setFingerprintHit] = useState<FingerprintHit | null>(null);
+  const [matchMethod, setMatchMethod] = useState<InvoiceMatchMethod>("full_extraction");
 
   // Fetch user's suppliers for dropdown
   useEffect(() => {

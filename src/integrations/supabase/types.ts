@@ -752,6 +752,7 @@ export type Database = {
           column_map: Json
           created_at: string
           default_markup_multiplier: number | null
+          field_confidence_history: Json
           format_type: string | null
           gst_included_in_cost: boolean | null
           gst_included_in_rrp: boolean | null
@@ -771,6 +772,7 @@ export type Database = {
           column_map?: Json
           created_at?: string
           default_markup_multiplier?: number | null
+          field_confidence_history?: Json
           format_type?: string | null
           gst_included_in_cost?: boolean | null
           gst_included_in_rrp?: boolean | null
@@ -790,6 +792,7 @@ export type Database = {
           column_map?: Json
           created_at?: string
           default_markup_multiplier?: number | null
+          field_confidence_history?: Json
           format_type?: string | null
           gst_included_in_cost?: boolean | null
           gst_included_in_rrp?: boolean | null

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI, getContent } from "../_shared/ai-gateway.ts";
+import { findBrandHint } from "../_shared/brand-extraction-hints.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +35,18 @@ serve(async (req) => {
     let fetchError = "";
     let statusCode = 0;
 
+    // Per-brand hints: pass tighter includeTags/excludeTags + longer waitFor for known sites.
+    const brandHint = findBrandHint(url);
+    const scrapeBody: Record<string, unknown> = {
+      url,
+      formats: ["markdown"],
+      onlyMainContent: true,
+      waitFor: brandHint?.waitFor ?? 1500,
+      location: { country: "AU", languages: ["en-AU", "en"] },
+    };
+    if (brandHint?.includeTags?.length) scrapeBody.includeTags = brandHint.includeTags;
+    if (brandHint?.excludeTags?.length) scrapeBody.excludeTags = brandHint.excludeTags;
+
     try {
       const fcRes = await fetch(`${FIRECRAWL_API}/scrape`, {
         method: "POST",
@@ -41,13 +54,7 @@ serve(async (req) => {
           Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          url,
-          formats: ["markdown"],
-          onlyMainContent: true,
-          waitFor: 1500,
-          location: { country: "AU", languages: ["en-AU", "en"] },
-        }),
+        body: JSON.stringify(scrapeBody),
       });
 
       const fcData = await fcRes.json();
@@ -154,6 +161,10 @@ Return STRICT JSON ONLY (no markdown fences, no preamble):
   "price_vs_cost_note": "Retail is 2.5x supplier cost"
 }`;
 
+    const brandHintLine = brandHint?.promptHint
+      ? `\nBRAND HINT (${brandHint.name}): ${brandHint.promptHint}\n`
+      : "";
+
     const userContent = `Extract product data from this page.
 
 Looking for: ${product_name}
@@ -163,7 +174,7 @@ Colour: ${colour || "N/A"}
 Supplier cost (ex GST): ${supplier_cost ? `$${supplier_cost} AUD` : "unknown"}
 
 Source URL: ${finalUrl}
-Page title: ${pageTitle}
+Page title: ${pageTitle}${brandHintLine}
 
 PAGE CONTENT (markdown):
 ---
@@ -200,6 +211,9 @@ ${pageMarkdown}
     parsed.fetch_success = true;
     parsed.fetch_error = null;
     parsed.page_title = parsed.page_title || pageTitle || null;
+    parsed.brand_hint_applied = brandHint?.name || null;
+    // Mark whether the description was successfully scraped from the page
+    parsed.description_source = parsed.description && parsed.description.trim().length > 20 ? "scraped" : null;
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

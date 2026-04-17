@@ -387,7 +387,7 @@ const Index = () => {
       case "stocktake_module": flowEl = <StocktakeModule onBack={() => setActiveFlow(null)} />; break;
       case "transfer_orders": flowEl = <TransferOrderPanel onBack={() => setActiveFlow(null)} />; break;
       case "reports_hub": flowEl = <ReportsHub onBack={() => setActiveFlow(null)} />; break;
-      case "supplier_profile_builder": flowEl = <SupplierProfileBuilder onBack={() => setActiveFlow(null)} />; break;
+      case "supplier_profile_builder": flowEl = <SupplierProfileBuilder onBack={() => setActiveFlow(null)} onViewLearnedRules={() => setActiveFlow("supplier_intelligence")} />; break;
       case "stock_adjustment": flowEl = <StockAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
       case "inventory_view": flowEl = <InventoryView onBack={() => setActiveFlow(null)} />; break;
       case "csv_seo": flowEl = <ShopifyCSVSEO onBack={() => setActiveFlow(null)} />; break;

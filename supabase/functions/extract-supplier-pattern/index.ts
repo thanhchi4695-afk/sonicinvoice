@@ -74,6 +74,8 @@ Deno.serve(async (req) => {
       extracted_products = [],
       corrections_override = null,
       field_confidence = null,
+      layout_fingerprint = null,
+      match_method = null,
     } = body || {};
 
     if (!supplier_name || typeof supplier_name !== "string") {

@@ -63,6 +63,10 @@ interface ExtractedProduct {
   fetch_error: string | null;
   brand_hint_applied?: string | null;
   description_source?: "scraped" | "ai_generated" | null;
+  status_code?: number | null;
+  scraper?: string | null;
+  cached?: boolean;
+  cache_age_minutes?: number;
 }
 
 type Step = "input" | "searching" | "results" | "extracting" | "review" | "approved";

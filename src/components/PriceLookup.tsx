@@ -462,7 +462,7 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
         )}
 
         {/* ───── STEP: SEARCHING ───── */}
-        {step === "searching" && (
+        {!isBulk && step === "searching" && (
           <div className="text-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
             <p className="text-sm font-medium">Searching Google for your product…</p>
@@ -473,7 +473,7 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
         )}
 
         {/* ───── STEP: RESULTS ───── */}
-        {step === "results" && (
+        {!isBulk && step === "results" && (
           <div className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-3">
               <p className="text-xs text-muted-foreground mb-1">Search query:</p>
@@ -540,7 +540,7 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
         )}
 
         {/* ───── STEP: EXTRACTING ───── */}
-        {step === "extracting" && (
+        {!isBulk && step === "extracting" && (
           <div className="text-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
             <p className="text-sm font-medium">Visiting approved page…</p>
@@ -550,7 +550,7 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
         )}
 
         {/* ───── STEP: REVIEW ───── */}
-        {step === "review" && extracted && (
+        {!isBulk && step === "review" && extracted && (
           <div className="space-y-4">
             <h2 className="text-base font-semibold">Review Extracted Data</h2>
 
@@ -782,7 +782,7 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
         )}
 
         {/* ───── STEP: APPROVED ───── */}
-        {step === "approved" && finalJson && (
+        {!isBulk && step === "approved" && finalJson && (
           <div className="space-y-4">
             <div className="text-center py-4">
               <div className="w-12 h-12 rounded-full bg-success/15 flex items-center justify-center mx-auto mb-3">

@@ -208,6 +208,11 @@ export default function PostParseReviewScreen({
     return products.filter(p => !p._rejected && (!p.cost || p.cost <= 0)).length;
   }, [products]);
 
+  /** Internal product field names whose AI confidence was < 70 — used both for
+   *  cell tinting and for marking corrections as system-suggested (the most
+   *  valuable training signal). */
+  const lowConfFields = useMemo(() => lowConfidenceFieldNames(fieldConfidence), [fieldConfidence]);
+
   // Grouped products for fashion view
   const groupedProducts = useMemo((): ProductGroup[] => {
     const nonRejected = products.filter(p => !p._rejected) as ReviewProduct[];
@@ -372,9 +377,9 @@ export default function PostParseReviewScreen({
       correctionReason: reason ?? null,
       correctionReasonDetail: reasonDetail ?? null,
       fieldCategory: deriveFieldCategory(field),
-      autoDetected: false,
+      autoDetected: lowConfFields.has(field),
     });
-  }, [supplierName, products, detectedHeaders, detectedLayout]);
+  }, [supplierName, products, detectedHeaders, detectedLayout, lowConfFields]);
 
   /** Flush any pending correction for a different cell (user moved away without picking). */
   const flushOtherPending = useCallback((keepKey: string) => {

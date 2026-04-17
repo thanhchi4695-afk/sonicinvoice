@@ -31,6 +31,34 @@ import { extractWithTemplate, parseFileToRows, autoDetectMappings, type Supplier
 import type { InvoiceLineItem } from "@/lib/stock-matcher";
 import { preprocessInvoiceImage, isLikelyPhotoInvoice, preprocessForUpload, isPdfFile, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
 import { supabase } from "@/integrations/supabase/client";
+import { inferSupplierRules, type InferredRules, type SupplierProfile as InferProfile } from "@/lib/supplier-inference";
+
+// Load all of this user's supplier profiles + their invoice patterns,
+// then run the waterfall inference. Used to pre-seed the AI extractor
+// with learned rules before sending the prompt.
+async function buildInferredRules(
+  supplierName: string,
+  detectedHeaders: string[],
+  sampleRows: Record<string, unknown>[],
+): Promise<InferredRules | null> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+    if (!userId) return null;
+
+    const { data: profiles } = await supabase
+      .from("supplier_profiles" as any)
+      .select("id, supplier_name, supplier_name_variants, confidence_score, invoice_count, currency, country, profile_data, invoice_patterns(id, format_type, column_map, size_system, price_column_cost, price_column_rrp, gst_included_in_cost, gst_included_in_rrp, default_markup_multiplier, pack_notation_detected, size_matrix_detected, sample_headers)")
+      .eq("user_id", userId)
+      .eq("is_active", true);
+
+    const list = (profiles || []) as unknown as InferProfile[];
+    return inferSupplierRules(detectedHeaders || [], sampleRows || [], list, supplierName);
+  } catch (err) {
+    console.warn("[Sonic Invoice] inferSupplierRules failed:", err);
+    return null;
+  }
+}
 
 interface InvoiceFlowProps {
   onBack: () => void;
@@ -690,6 +718,24 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         }
       }
 
+      // Run waterfall inference (exact match → fuzzy → header fingerprint → heuristics → defaults)
+      let inferredRules: InferredRules | null = null;
+      try {
+        // For PDF/image we usually have no headers yet; supplier-name match still works.
+        const sampleSheetRows = ["csv", "xlsx", "xls"].includes(ext)
+          ? await parseFileToRows(file, 1).then(r => r.slice(0, 3)).catch(() => [])
+          : [];
+        const headersForInfer = detectedHeaders.length
+          ? detectedHeaders
+          : (sampleSheetRows[0] ? Object.keys(sampleSheetRows[0]) : []);
+        inferredRules = await buildInferredRules(supplierName || "", headersForInfer, sampleSheetRows);
+        if (inferredRules) {
+          console.log(`[Sonic Invoice] Inferred rules: ${inferredRules.rules_source} @ ${inferredRules.confidence}% confidence`);
+        }
+      } catch (e) {
+        console.warn("[Sonic Invoice] Pre-extraction inference failed:", e);
+      }
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
@@ -705,6 +751,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             : undefined,
           templateHint: combinedHint || undefined,
           supplierProfile: supplierProfileData || undefined,
+          inferredRules: inferredRules || undefined,
         }),
       });
 
@@ -949,6 +996,18 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         } catch (e) { /* ignore */ }
       }
 
+      // Re-run inference for the detailed pass (uses any newly-saved learning).
+      let inferredRules: InferredRules | null = null;
+      try {
+        const sampleSheetRows = ["csv", "xlsx", "xls"].includes(ext)
+          ? await parseFileToRows(file, 1).then(r => r.slice(0, 3)).catch(() => [])
+          : [];
+        const headersForInfer = detectedHeaders.length
+          ? detectedHeaders
+          : (sampleSheetRows[0] ? Object.keys(sampleSheetRows[0]) : []);
+        inferredRules = await buildInferredRules(supplierName || "", headersForInfer, sampleSheetRows);
+      } catch { /* ignore */ }
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
@@ -964,6 +1023,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             : undefined,
           templateHint: combinedHint || undefined,
           supplierProfile: supplierProfileData || undefined,
+          inferredRules: inferredRules || undefined,
           detailedMode: true,
           expectedProductCount: expectedRowCount || undefined,
         }),

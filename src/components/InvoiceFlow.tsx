@@ -31,6 +31,34 @@ import { extractWithTemplate, parseFileToRows, autoDetectMappings, type Supplier
 import type { InvoiceLineItem } from "@/lib/stock-matcher";
 import { preprocessInvoiceImage, isLikelyPhotoInvoice, preprocessForUpload, isPdfFile, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
 import { supabase } from "@/integrations/supabase/client";
+import { inferSupplierRules, type InferredRules, type SupplierProfile as InferProfile } from "@/lib/supplier-inference";
+
+// Load all of this user's supplier profiles + their invoice patterns,
+// then run the waterfall inference. Used to pre-seed the AI extractor
+// with learned rules before sending the prompt.
+async function buildInferredRules(
+  supplierName: string,
+  detectedHeaders: string[],
+  sampleRows: Record<string, unknown>[],
+): Promise<InferredRules | null> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+    if (!userId) return null;
+
+    const { data: profiles } = await supabase
+      .from("supplier_profiles" as any)
+      .select("id, supplier_name, supplier_name_variants, confidence_score, invoice_count, currency, country, profile_data, invoice_patterns(id, format_type, column_map, size_system, price_column_cost, price_column_rrp, gst_included_in_cost, gst_included_in_rrp, default_markup_multiplier, pack_notation_detected, size_matrix_detected, sample_headers)")
+      .eq("user_id", userId)
+      .eq("is_active", true);
+
+    const list = (profiles || []) as unknown as InferProfile[];
+    return inferSupplierRules(detectedHeaders || [], sampleRows || [], list, supplierName);
+  } catch (err) {
+    console.warn("[Sonic Invoice] inferSupplierRules failed:", err);
+    return null;
+  }
+}
 
 interface InvoiceFlowProps {
   onBack: () => void;

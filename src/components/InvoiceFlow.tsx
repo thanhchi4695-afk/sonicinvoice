@@ -32,6 +32,95 @@ import type { InvoiceLineItem } from "@/lib/stock-matcher";
 import { preprocessInvoiceImage, isLikelyPhotoInvoice, preprocessForUpload, isPdfFile, type PreprocessResult, type DetectedRegions } from "@/lib/invoice-preprocess";
 import { supabase } from "@/integrations/supabase/client";
 import { inferSupplierRules, computeHeaderFingerprint, type InferredRules, type SupplierProfile as InferProfile, type SharedPatternLite } from "@/lib/supplier-inference";
+import { generateLayoutFingerprint, matchFingerprint } from "@/lib/layout-fingerprint";
+
+export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
+
+export interface FingerprintHit {
+  source: "user" | "shared";
+  layout_fingerprint: string;
+  column_map: Record<string, string>;
+  size_system?: string | null;
+  price_logic?: Record<string, unknown> | null;
+  format_type?: string | null;
+  confidence_score?: number | null;
+  invoice_count?: number | null;
+  match_count?: number | null;
+}
+
+/**
+ * STEP 1 — Look for an exact layout-fingerprint match.
+ * Checks the user's own learned invoice_patterns first (with confidence
+ * gate of >=80), then falls back to the cross-client shared_fingerprint_index.
+ */
+async function lookupFingerprintMatch(
+  fingerprint: string,
+): Promise<FingerprintHit | null> {
+  if (!fingerprint) return null;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+    if (!userId) return null;
+
+    // a) User's own patterns — must clear confidence gate
+    const { data: ownRows } = await supabase
+      .from("invoice_patterns" as any)
+      .select("id, layout_fingerprint, column_map, size_system, format_type, price_column_cost, price_column_rrp, gst_included_in_cost, gst_included_in_rrp, default_markup_multiplier, invoice_count, supplier_profiles!inner(confidence_score)")
+      .eq("user_id", userId)
+      .eq("layout_fingerprint", fingerprint)
+      .limit(5);
+
+    const eligible = (ownRows || []).find((r: any) => {
+      const conf = r.supplier_profiles?.confidence_score ?? 0;
+      return conf >= 80;
+    }) as any;
+
+    if (eligible) {
+      const hit = matchFingerprint(fingerprint, [eligible]);
+      if (hit) {
+        return {
+          source: "user",
+          layout_fingerprint: fingerprint,
+          column_map: (eligible.column_map || {}) as Record<string, string>,
+          size_system: eligible.size_system,
+          format_type: eligible.format_type,
+          confidence_score: eligible.supplier_profiles?.confidence_score ?? null,
+          invoice_count: eligible.invoice_count ?? null,
+          price_logic: {
+            price_column_cost: eligible.price_column_cost,
+            price_column_rrp: eligible.price_column_rrp,
+            gst_included_in_cost: eligible.gst_included_in_cost,
+            gst_included_in_rrp: eligible.gst_included_in_rrp,
+            default_markup_multiplier: eligible.default_markup_multiplier,
+          },
+        };
+      }
+    }
+
+    // b) Cross-client shared index
+    const { data: sharedRows } = await supabase
+      .from("shared_fingerprint_index" as any)
+      .select("layout_fingerprint, format_type, column_map, size_system, price_logic, match_count")
+      .eq("layout_fingerprint", fingerprint)
+      .limit(1);
+
+    const shared = (sharedRows || [])[0] as any;
+    if (shared) {
+      return {
+        source: "shared",
+        layout_fingerprint: shared.layout_fingerprint,
+        column_map: (shared.column_map || {}) as Record<string, string>,
+        size_system: shared.size_system,
+        format_type: shared.format_type,
+        price_logic: shared.price_logic || null,
+        match_count: shared.match_count ?? null,
+      };
+    }
+  } catch (err) {
+    console.warn("[Sonic Invoice] fingerprint lookup failed:", err);
+  }
+  return null;
+}
 
 // Load all of this user's supplier profiles + their invoice patterns,
 // then run the waterfall inference. Used to pre-seed the AI extractor

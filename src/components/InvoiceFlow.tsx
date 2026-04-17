@@ -303,6 +303,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [dbTemplate, setDbTemplate] = useState<DBSupplierTemplate | null>(null);
   const [showTeachModal, setShowTeachModal] = useState(false);
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
+  const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
 
   // Fetch user's suppliers for dropdown
   useEffect(() => {

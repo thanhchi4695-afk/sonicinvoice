@@ -1061,6 +1061,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
       if (data.parsing_plan) setAiParsingPlan(data.parsing_plan);
       if (data.rejected_rows) setAiRejectedRows(data.rejected_rows);
+      if (data.field_confidence && typeof data.field_confidence === "object") {
+        setAiFieldConfidence(data.field_confidence as Record<string, number>);
+      }
 
       if (products.length === 0) {
         toast.error("No products found in detailed mode");

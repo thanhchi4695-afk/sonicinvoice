@@ -14,6 +14,7 @@ import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
 import { updateSupplierProfileWithCorrections } from "@/lib/supplier-profile-updater";
+import { logCorrection } from "@/lib/correction-tracker";
 import { saveInvoiceLinesToCatalog } from "@/components/SupplierCatalog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -26,6 +27,11 @@ interface PostParseReviewScreenProps {
   products: ValidatedProduct[];
   supplierName?: string;
   invoicePages?: string[]; // base64 or URL images per page
+  /** Original column headers detected in the source invoice — needed when the
+   *  user agrees to retrain a saved rule from the correction prompt. */
+  detectedHeaders?: string[];
+  /** Detected invoice layout (A/B/C/D/E/F) — passed through to retraining. */
+  detectedLayout?: string | null;
   onUpdateProducts: (products: ValidatedProduct[]) => void;
   onExportAccepted: () => void;
   onPushToShopify: () => void;

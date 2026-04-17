@@ -1269,6 +1269,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const handleProceedToReview = () => {
     setShowCompletionSummary(false);
     setStep(3);
+    beginReviewTimer();
     if (!matchedTemplate && supplierName.trim()) {
       setShowSaveTemplate(true);
     }
@@ -2243,6 +2244,13 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 detectedHeaders={detectedHeaders}
                 detectedLayout={detectedLayout}
                 onUpdateProducts={(updated) => {
+                  // Track row additions / deletions for quality metrics
+                  const prev = lastRowCountRef.current ?? validatedProducts.length;
+                  const next = updated.length;
+                  if (next > prev) rowsAddedRef.current += next - prev;
+                  else if (next < prev) rowsDeletedRef.current += prev - next;
+                  lastRowCountRef.current = next;
+
                   setValidatedProducts(updated);
                   // Rebuild product groups from accepted products
                   const acceptedOnly = updated.filter(p => !p._rejected);
@@ -2250,8 +2258,12 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                   const groups = convertToProductGroups(clean);
                   setProductGroups(groups);
                 }}
-                onExportAccepted={() => setStep(4)}
-                onPushToShopify={() => setStep(4)}
+                onCellEdited={(field) => {
+                  editCountRef.current += 1;
+                  fieldsCorrectedRef.current.add(field);
+                }}
+                onExportAccepted={() => { finalizeQualityMetrics(); setStep(4); }}
+                onPushToShopify={() => { finalizeQualityMetrics(); setStep(4); }}
                 onBack={() => setStep(2)}
                 onReprocessDetailed={handleReprocessDetailed}
                 isReprocessing={isReprocessing}
@@ -2450,7 +2462,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               ) : null}
               <Button variant="outline" size="sm" onClick={() => setPreviewAll(true)} className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview all</Button>
               <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
-              <Button variant="teal" size="sm" onClick={() => setStep(4)}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
+              <Button variant="teal" size="sm" onClick={() => { finalizeQualityMetrics(); setStep(4); }}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>
           </div>
           {/* New products tab */}

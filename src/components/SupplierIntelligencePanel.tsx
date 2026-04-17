@@ -377,6 +377,57 @@ const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntell
 
           {/* TAB 1 — Known suppliers */}
           <TabsContent value="known" className="space-y-3 mt-4">
+            {/* Quality report — aggregate across all suppliers */}
+            {!loading && qualityReport.scoredInvoices > 0 && (
+              <Card className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+                <div className="flex items-start gap-3 mb-4">
+                  <Trophy className="w-5 h-5 text-primary mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold">Quality report</p>
+                    <p className="text-xs text-muted-foreground">
+                      Aggregate extraction performance across every supplier you've processed.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Hero ROI number */}
+                <div className="bg-background/50 rounded-lg p-4 mb-4 text-center">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                    Estimated time saved vs manual entry
+                  </p>
+                  <p className="text-4xl font-bold text-emerald-400">
+                    {qualityReport.hoursSaved} <span className="text-2xl font-medium">hours</span>
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  <ReportStat label="Invoices processed" value={qualityReport.totalInvoices.toString()} />
+                  <ReportStat
+                    label="Avg quality score"
+                    value={qualityReport.avgQuality != null ? `${qualityReport.avgQuality}/100` : "—"}
+                  />
+                  <ReportStat
+                    label="Most reliable"
+                    value={qualityReport.mostReliable
+                      ? `${qualityReport.mostReliable.name} (${Math.round(qualityReport.mostReliable.score)})`
+                      : "—"}
+                  />
+                  <ReportStat
+                    label="Most improved"
+                    value={qualityReport.mostImproved && qualityReport.mostImproved.delta > 0
+                      ? `${qualityReport.mostImproved.name} (+${Math.round(qualityReport.mostImproved.delta)})`
+                      : "—"}
+                  />
+                  <ReportStat
+                    label="Weakest format"
+                    value={qualityReport.weakest
+                      ? `${qualityReport.weakest.name} (${Math.round(qualityReport.weakest.score)})`
+                      : "—"}
+                  />
+                </div>
+              </Card>
+            )}
+
             {loading && <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>}
             {!loading && filtered.length === 0 && (
               <Card className="p-8 text-center">

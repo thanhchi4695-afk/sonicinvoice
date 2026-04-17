@@ -1152,6 +1152,11 @@ function ReviewRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showWhyAI, setShowWhyAI] = useState(false);
+  // Tint label for low-confidence fields. < 50 was tinted destructive at the
+  // banner level; here we keep both <50 and 50–69 visually muted-amber to keep
+  // the row UI calm — the dot/banner above already escalates to red.
+  const labelCls = (field: string) =>
+    `text-[10px] mb-0.5 block ${lowConfFields?.has(field) ? "text-secondary font-medium" : "text-muted-foreground"}`;
 
   return (
     <div className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""}`}>

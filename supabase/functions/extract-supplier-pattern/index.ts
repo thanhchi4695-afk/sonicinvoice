@@ -268,6 +268,9 @@ Return ONLY the JSON pattern object.`;
             field_confidence_history: nextHistory,
             layout_fingerprint: layout_fingerprint || (existingPattern as any).layout_fingerprint || null,
             match_method: match_method || null,
+            original_file_path: original_file_path || (existingPattern as any).original_file_path || null,
+            original_file_mime: original_file_mime || (existingPattern as any).original_file_mime || null,
+            original_filename:  original_filename  || (existingPattern as any).original_filename  || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", existingPattern.id);
@@ -290,6 +293,9 @@ Return ONLY the JSON pattern object.`;
           field_confidence_history: fcEntry ? [fcEntry] : [],
           layout_fingerprint: layout_fingerprint || null,
           match_method: match_method || null,
+          original_file_path,
+          original_file_mime,
+          original_filename,
         });
       }
     } else {

@@ -2063,6 +2063,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 products={validatedProducts}
                 supplierName={supplierName}
                 invoicePages={invoicePageImages}
+                detectedHeaders={detectedHeaders}
+                detectedLayout={detectedLayout}
                 onUpdateProducts={(updated) => {
                   setValidatedProducts(updated);
                   // Rebuild product groups from accepted products

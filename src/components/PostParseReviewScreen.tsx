@@ -432,16 +432,19 @@ export default function PostParseReviewScreen({
       if (p._rowIndex !== rowIndex) return p;
       const originalValue = String((p as any)[field] || "");
       const newValue = String(value);
-      if (supplierName && originalValue !== newValue && originalValue) {
+      if (originalValue !== newValue) {
         const fieldLabel = FIELD_LABELS[field] || field;
-        const key = `${rowIndex}::${field}`;
-        // Defer logging — picker will pick a reason. If user moves away without
-        // picking, flushOtherPending() persists with reason=null.
-        flushOtherPending(key);
-        setPendingCorrections(prev => ({
-          ...prev,
-          [key]: { rowIndex, field, fieldLabel, originalValue, correctedValue: newValue },
-        }));
+        onCellEdited?.(fieldLabel);
+        if (supplierName && originalValue) {
+          const key = `${rowIndex}::${field}`;
+          // Defer logging — picker will pick a reason. If user moves away without
+          // picking, flushOtherPending() persists with reason=null.
+          flushOtherPending(key);
+          setPendingCorrections(prev => ({
+            ...prev,
+            [key]: { rowIndex, field, fieldLabel, originalValue, correctedValue: newValue },
+          }));
+        }
       }
       const updated = { ...p, [field]: value, _manuallyEdited: true } as any;
       // Recalculate confidence

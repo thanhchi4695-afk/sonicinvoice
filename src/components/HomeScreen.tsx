@@ -57,6 +57,7 @@ interface HomeScreenProps {
   onStartImageOptimise?: () => void;
   onStartStockCheck?: () => void;
   onStartPriceLookup?: () => void;
+  onStartPriceMatch?: () => void;
   onStartSeasons?: () => void;
   onNavigateToTab?: (tab: string) => void;
   onStartPipeline?: (id: string) => void;
@@ -77,7 +78,7 @@ const HomeScreen = ({
   onStartMarginProtection, onStartMarkdownLadder, onStartStockMonitor, onStartSocialMedia,
   onStartInventoryPlanning, onStartStockyHub, onStartPackingSlip, onStartJoor,
   onStartWholesaleImport, onStartLookbookImport, onStartAccounting, onStartProfitLoss,
-  onStartImageOptimise, onStartStockCheck, onStartPriceLookup, onStartSeasons, onNavigateToTab,
+  onStartImageOptimise, onStartStockCheck, onStartPriceLookup, onStartPriceMatch, onStartSeasons, onNavigateToTab,
   onStartPipeline, onStartPipelineChooser, onStartStockyOnboarding,
   onStartSupplierProfileBuilder,
   onStartCollectionSEOExport,
@@ -393,6 +394,7 @@ const HomeScreen = ({
         <FeatureTile icon="📊" label="Restock analytics" onClick={onStartRestock} />
         <FeatureTile icon="🔄" label="Reorder suggestions" onClick={onStartReorder} />
         <FeatureTile icon="💲" label="Price adjustment" onClick={onStartPriceAdjust} />
+        <FeatureTile icon="⚖️" label="Price match" onClick={onStartPriceMatch || (() => {})} />
         <FeatureTile icon="🏷️" label="Bulk sale" onClick={onStartSale} />
         <FeatureTile icon="🛡️" label="Margin protection" onClick={onStartMarginProtection} />
         <FeatureTile icon="📉" label="Markdown ladders" onClick={onStartMarkdownLadder} />

@@ -758,6 +758,7 @@ export type Database = {
           gst_included_in_rrp: boolean | null
           id: string
           invoice_count: number
+          layout_fingerprint: string | null
           pack_notation_detected: boolean | null
           price_column_cost: string | null
           price_column_rrp: string | null
@@ -778,6 +779,7 @@ export type Database = {
           gst_included_in_rrp?: boolean | null
           id?: string
           invoice_count?: number
+          layout_fingerprint?: string | null
           pack_notation_detected?: boolean | null
           price_column_cost?: string | null
           price_column_rrp?: string | null
@@ -798,6 +800,7 @@ export type Database = {
           gst_included_in_rrp?: boolean | null
           id?: string
           invoice_count?: number
+          layout_fingerprint?: string | null
           pack_notation_detected?: boolean | null
           price_column_cost?: string | null
           price_column_rrp?: string | null
@@ -1356,6 +1359,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      shared_fingerprint_index: {
+        Row: {
+          column_map: Json
+          created_at: string
+          format_type: string | null
+          id: string
+          last_seen: string
+          layout_fingerprint: string
+          match_count: number
+          price_logic: Json
+          size_system: string | null
+        }
+        Insert: {
+          column_map?: Json
+          created_at?: string
+          format_type?: string | null
+          id?: string
+          last_seen?: string
+          layout_fingerprint: string
+          match_count?: number
+          price_logic?: Json
+          size_system?: string | null
+        }
+        Update: {
+          column_map?: Json
+          created_at?: string
+          format_type?: string | null
+          id?: string
+          last_seen?: string
+          layout_fingerprint?: string
+          match_count?: number
+          price_logic?: Json
+          size_system?: string | null
+        }
+        Relationships: []
       }
       shared_patterns: {
         Row: {

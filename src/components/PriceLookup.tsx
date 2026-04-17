@@ -76,7 +76,7 @@ const RETAILER_ICONS: Record<string, typeof Store> = {
   marketplace: Globe,
 };
 
-export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps) {
+export default function PriceLookup({ onBack, initialProduct, bulkItems }: PriceLookupProps) {
   const store = getStoreConfig();
 
   // Input state
@@ -99,6 +99,19 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
   const [finalJson, setFinalJson] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Bulk-mode state
+  type BulkRow = BulkLookupItem & {
+    status: "pending" | "searching" | "extracting" | "done" | "failed" | "no_results";
+    result?: { url: string; price: number | null; description: string | null; image: string | null; retailer: string | null };
+    error?: string;
+  };
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>(
+    (bulkItems || []).map(it => ({ ...it, status: "pending" as const }))
+  );
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkDone, setBulkDone] = useState(false);
+  const isBulk = !!bulkItems && bulkItems.length > 0;
+
   const currentStepIndex = ["input", "searching", "results", "extracting", "review", "approved"].indexOf(step);
 
   // ── Step 1: Search ──
@@ -107,12 +120,15 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
     setStep("searching");
 
     try {
+      const apiKeys = getApiKeys();
       const { data, error } = await supabase.functions.invoke("price-lookup-search", {
         body: {
           product_name: productName,
           supplier,
           style_number: styleNumber,
           colour,
+          // SerpApi key (if configured in Settings) — preferred over Firecrawl scrape
+          serpapi_key: apiKeys.serpApi || undefined,
         },
       });
       if (error) throw error;
@@ -120,7 +136,7 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
       setSearchQuery(data.search_query || "");
       setSearchResults(data.results || []);
       setStep("results");
-      toast.success(`Found ${data.results?.length || 0} results`);
+      toast.success(`Found ${data.results?.length || 0} results${data.source === "serpapi" ? " (Google Shopping)" : ""}`);
     } catch (err: any) {
       toast.error("Search failed: " + (err?.message || "Unknown error"));
       setStep("input");

@@ -14,7 +14,8 @@ import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
 import { updateSupplierProfileWithCorrections } from "@/lib/supplier-profile-updater";
-import { logCorrection } from "@/lib/correction-tracker";
+import { logCorrection, deriveFieldCategory, type CorrectionReason } from "@/lib/correction-tracker";
+import CorrectionReasonPicker, { CorrectionSavedCheck } from "@/components/CorrectionReasonPicker";
 import { saveInvoiceLinesToCatalog } from "@/components/SupplierCatalog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -162,6 +163,17 @@ export default function PostParseReviewScreen({
   const [autoRefineProfile, setAutoRefineProfile] = useState(() => {
     try { return localStorage.getItem("sonic_auto_refine_profile") !== "false"; } catch { return true; }
   });
+
+  /** Pending corrections awaiting a reason. Key = `${rowIndex}::${field}`. */
+  const [pendingCorrections, setPendingCorrections] = useState<Record<string, {
+    rowIndex: number;
+    field: string;
+    fieldLabel: string;
+    originalValue: string;
+    correctedValue: string;
+  }>>({});
+  /** Cells where a reason was just recorded — show check for ~1.5s. */
+  const [savedReasonFlash, setSavedReasonFlash] = useState<Record<string, boolean>>({});
 
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
@@ -318,34 +330,103 @@ export default function PostParseReviewScreen({
     ));
   };
 
+  const FIELD_LABELS: Record<string, string> = { name: "title", colour: "colour", size: "size", cost: "cost", sku: "sku", qty: "quantity", brand: "vendor" };
+
+  /** Persist a correction (and trigger the rule-update prompt) with an optional reason. */
+  const persistCorrection = useCallback((args: {
+    rowIndex: number;
+    field: string;
+    fieldLabel: string;
+    originalValue: string;
+    correctedValue: string;
+    reason?: CorrectionReason | null;
+    reasonDetail?: string | null;
+  }) => {
+    if (!supplierName) return;
+    const { field, fieldLabel, originalValue, correctedValue, reason, reasonDetail } = args;
+    saveCorrection(supplierName, {
+      field: fieldLabel, original: originalValue, corrected: correctedValue,
+      rule: `In ${fieldLabel}: "${originalValue}" → "${correctedValue}"`,
+      timestamp: new Date().toISOString(),
+    });
+    recordFieldCorrection(supplierName, fieldLabel, originalValue, correctedValue);
+    const sampleRows = products.slice(0, 3).map(sp => ({
+      name: sp.name, sku: sp.sku, cost: sp.cost, colour: sp.colour, size: sp.size, qty: sp.qty,
+    }));
+    void logCorrection({
+      supplierName,
+      field: fieldLabel,
+      originalValue,
+      correctedValue,
+      rawHeaders: detectedHeaders,
+      sampleRows,
+      formatType: detectedLayout,
+      extractedProducts: products.filter(pp => !pp._rejected) as unknown as Record<string, unknown>[],
+      correctionReason: reason ?? null,
+      correctionReasonDetail: reasonDetail ?? null,
+      fieldCategory: deriveFieldCategory(field),
+      autoDetected: false,
+    });
+  }, [supplierName, products, detectedHeaders, detectedLayout]);
+
+  /** Flush any pending correction for a different cell (user moved away without picking). */
+  const flushOtherPending = useCallback((keepKey: string) => {
+    setPendingCorrections(prev => {
+      const next: typeof prev = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (k === keepKey) { next[k] = v; continue; }
+        persistCorrection({ ...v, reason: null, reasonDetail: null });
+      }
+      return next;
+    });
+  }, [persistCorrection]);
+
+  /** User picked a reason from the inline picker. */
+  const recordReasonForCell = useCallback((rowIndex: number, field: string, reason: CorrectionReason, detail?: string) => {
+    const key = `${rowIndex}::${field}`;
+    setPendingCorrections(prev => {
+      const entry = prev[key];
+      if (entry) {
+        persistCorrection({ ...entry, reason, reasonDetail: detail ?? null });
+      }
+      const { [key]: _drop, ...rest } = prev;
+      return rest;
+    });
+    setSavedReasonFlash(prev => ({ ...prev, [key]: true }));
+    setTimeout(() => {
+      setSavedReasonFlash(prev => {
+        const { [key]: _drop, ...rest } = prev;
+        return rest;
+      });
+    }, 1500);
+  }, [persistCorrection]);
+
+  /** User dismissed the picker — log without a reason. */
+  const dismissReasonForCell = useCallback((rowIndex: number, field: string) => {
+    const key = `${rowIndex}::${field}`;
+    setPendingCorrections(prev => {
+      const entry = prev[key];
+      if (entry) persistCorrection({ ...entry, reason: null, reasonDetail: null });
+      const { [key]: _drop, ...rest } = prev;
+      return rest;
+    });
+  }, [persistCorrection]);
+
   const updateField = (rowIndex: number, field: string, value: string | number) => {
     onUpdateProducts(products.map(p => {
       if (p._rowIndex !== rowIndex) return p;
       const originalValue = String((p as any)[field] || "");
       const newValue = String(value);
       if (supplierName && originalValue !== newValue && originalValue) {
-        const fieldLabels: Record<string, string> = { name: "title", colour: "colour", size: "size", cost: "cost", sku: "sku", qty: "quantity", brand: "vendor" };
-        const fieldLabel = fieldLabels[field] || field;
-        saveCorrection(supplierName, {
-          field: fieldLabel, original: originalValue, corrected: newValue,
-          rule: `In ${fieldLabel}: "${originalValue}" → "${newValue}"`,
-          timestamp: new Date().toISOString(),
-        });
-        recordFieldCorrection(supplierName, fieldLabel, originalValue, newValue);
-        // Persist to correction_log + trigger "update rule" prompt after 3 corrections
-        const sampleRows = products.slice(0, 3).map(sp => ({
-          name: sp.name, sku: sp.sku, cost: sp.cost, colour: sp.colour, size: sp.size, qty: sp.qty,
+        const fieldLabel = FIELD_LABELS[field] || field;
+        const key = `${rowIndex}::${field}`;
+        // Defer logging — picker will pick a reason. If user moves away without
+        // picking, flushOtherPending() persists with reason=null.
+        flushOtherPending(key);
+        setPendingCorrections(prev => ({
+          ...prev,
+          [key]: { rowIndex, field, fieldLabel, originalValue, correctedValue: newValue },
         }));
-        void logCorrection({
-          supplierName,
-          field: fieldLabel,
-          originalValue,
-          correctedValue: newValue,
-          rawHeaders: detectedHeaders,
-          sampleRows,
-          formatType: detectedLayout,
-          extractedProducts: products.filter(pp => !pp._rejected) as unknown as Record<string, unknown>[],
-        });
       }
       const updated = { ...p, [field]: value, _manuallyEdited: true } as any;
       // Recalculate confidence
@@ -720,6 +801,10 @@ export default function PostParseReviewScreen({
                   onMoveToReview={() => moveToReview(p._rowIndex)}
                   onRestore={() => restoreToReview(p._rowIndex)}
                   onUpdateField={(field, value) => updateField(p._rowIndex, field, value)}
+                  pendingFields={new Set(Object.values(pendingCorrections).filter(c => c.rowIndex === p._rowIndex).map(c => c.field))}
+                  savedReasonFields={new Set(Object.keys(savedReasonFlash).filter(k => k.startsWith(`${p._rowIndex}::`)).map(k => k.split("::")[1]))}
+                  onPickReason={(field, reason, detail) => recordReasonForCell(p._rowIndex, field, reason, detail)}
+                  onDismissReason={(field) => dismissReasonForCell(p._rowIndex, field)}
                   onMarkAs={(markAs) => markRowAs(p._rowIndex, markAs)}
                   onSplit={() => splitRow(p._rowIndex)}
                   showTeachAI={showTeachAI === p._rowIndex}
@@ -1018,6 +1103,7 @@ function ReviewRow({
   onUpdateField, onMarkAs, onSplit,
   showTeachAI, onToggleTeachAI, supplierName, parsingPlan,
   invoicePages, onShowSourceTrace,
+  pendingFields, savedReasonFields, onPickReason, onDismissReason,
 }: {
   product: ReviewProduct;
   tab: ReviewTab;
@@ -1039,6 +1125,10 @@ function ReviewRow({
   parsingPlan?: import("@/lib/invoice-validator").ParsingPlan;
   invoicePages?: string[];
   onShowSourceTrace?: (product: ReviewProduct) => void;
+  pendingFields?: Set<string>;
+  savedReasonFields?: Set<string>;
+  onPickReason?: (field: string, reason: CorrectionReason, detail?: string) => void;
+  onDismissReason?: (field: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showWhyAI, setShowWhyAI] = useState(false);
@@ -1176,33 +1266,61 @@ function ReviewRow({
               <div>
                 <label className="text-[10px] text-muted-foreground mb-0.5 block">Product Title</label>
                 <Input defaultValue={p.name} onBlur={e => onUpdateField("name", e.target.value)} className="h-8 text-xs" />
+                {pendingFields?.has("name") && onPickReason && onDismissReason && (
+                  <CorrectionReasonPicker onPick={(r, d) => onPickReason("name", r, d)} onDismiss={() => onDismissReason("name")} />
+                )}
+                {savedReasonFields?.has("name") && <CorrectionSavedCheck />}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Vendor</label>
                   <Input defaultValue={p.brand} onBlur={e => onUpdateField("brand", e.target.value)} className="h-8 text-xs" />
+                  {pendingFields?.has("brand") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("brand", r, d)} onDismiss={() => onDismissReason("brand")} />
+                  )}
+                  {savedReasonFields?.has("brand") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Style Code / SKU</label>
                   <Input defaultValue={p.sku} onBlur={e => onUpdateField("sku", e.target.value)} className="h-8 text-xs" />
+                  {pendingFields?.has("sku") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("sku", r, d)} onDismiss={() => onDismissReason("sku")} />
+                  )}
+                  {savedReasonFields?.has("sku") && <CorrectionSavedCheck />}
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-2">
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Unit Cost</label>
                   <Input type="number" defaultValue={p.cost} onBlur={e => onUpdateField("cost", parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+                  {pendingFields?.has("cost") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("cost", r, d)} onDismiss={() => onDismissReason("cost")} />
+                  )}
+                  {savedReasonFields?.has("cost") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Qty</label>
                   <Input type="number" defaultValue={p.qty} onBlur={e => onUpdateField("qty", parseInt(e.target.value) || 0)} className="h-8 text-xs" />
+                  {pendingFields?.has("qty") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("qty", r, d)} onDismiss={() => onDismissReason("qty")} />
+                  )}
+                  {savedReasonFields?.has("qty") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Size</label>
                   <Input defaultValue={p.size} onBlur={e => onUpdateField("size", e.target.value)} className="h-8 text-xs" />
+                  {pendingFields?.has("size") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("size", r, d)} onDismiss={() => onDismissReason("size")} />
+                  )}
+                  {savedReasonFields?.has("size") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Colour</label>
                   <Input defaultValue={p.colour} onBlur={e => onUpdateField("colour", e.target.value)} className="h-8 text-xs" />
+                  {pendingFields?.has("colour") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("colour", r, d)} onDismiss={() => onDismissReason("colour")} />
+                  )}
+                  {savedReasonFields?.has("colour") && <CorrectionSavedCheck />}
                 </div>
               </div>
               {/* Size grid editor for multi-size rows */}

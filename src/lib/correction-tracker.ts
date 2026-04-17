@@ -9,6 +9,26 @@ import { toast } from "sonner";
  * user to update the saved invoice_pattern rule for that field.
  */
 
+export type CorrectionReason =
+  | "wrong_column_detected"
+  | "wrong_format"
+  | "currency_error"
+  | "size_system_wrong"
+  | "missed_field"
+  | "wrong_value"
+  | "other";
+
+export type FieldCategory = "identification" | "pricing" | "variant" | "metadata";
+
+/** Derive the canonical category for any edited field name. */
+export function deriveFieldCategory(field: string): FieldCategory {
+  const f = field.toLowerCase();
+  if (["name", "title", "sku", "style", "style_number", "style_code"].some(k => f.includes(k))) return "identification";
+  if (["cost", "rrp", "price", "markup"].some(k => f.includes(k))) return "pricing";
+  if (["size", "colour", "color", "qty", "quantity"].some(k => f.includes(k))) return "variant";
+  return "metadata"; // supplier, brand, vendor, date, …
+}
+
 interface LogCorrectionInput {
   supplierName: string;
   field: string;          // canonical field name e.g. "cost", "name", "colour"
@@ -20,6 +40,11 @@ interface LogCorrectionInput {
   sampleRows?: Record<string, unknown>[];
   formatType?: string | null;
   extractedProducts?: Record<string, unknown>[];
+  correctionReason?: CorrectionReason | null;
+  correctionReasonDetail?: string | null;
+  fieldCategory?: FieldCategory;
+  autoDetected?: boolean;
+  sessionInvoiceIndex?: number | null;
 }
 
 // In-memory tally for this session: key = `${supplierName}::${field}`
@@ -72,7 +97,12 @@ export async function logCorrection(input: LogCorrectionInput): Promise<void> {
       field_corrected: field,
       original_value: originalValue.slice(0, 500),
       corrected_value: correctedValue.slice(0, 500),
-    });
+      correction_reason: input.correctionReason ?? null,
+      correction_reason_detail: input.correctionReasonDetail?.slice(0, 500) ?? null,
+      field_category: input.fieldCategory ?? deriveFieldCategory(field),
+      auto_detected: input.autoDetected ?? false,
+      session_invoice_index: input.sessionInvoiceIndex ?? null,
+    } as never);
 
     // Tally for the prompt — only meaningful when we have a known supplier.
     if (!profile?.id) return;

@@ -20,10 +20,12 @@ export interface BrandHint {
 export const BRAND_HINTS: Record<string, BrandHint> = {
   "seafolly.com.au": {
     name: "Seafolly",
-    includeTags: [".product-detail__description", ".product-detail__features", ".product__info", '[itemprop="description"]', "h1", ".price", "main"],
-    excludeTags: ["header", "footer", "nav", ".header", ".footer", ".reviews", ".you-may-also-like", ".recommendations"],
-    waitFor: 2000,
-    promptHint: "Seafolly product pages put the marketing description directly under the title and a 'Details' accordion with bullet features. Fabric content is usually under 'Fabric & Care'.",
+    // Keep "main" broad — Seafolly's description block uses dynamic class names that change between releases.
+    // Including the whole main region ensures the marketing prose is captured even if specific selectors miss.
+    includeTags: ["main", "article", '[itemprop="description"]', ".pdp", ".product", "h1"],
+    excludeTags: ["header", "footer", "nav", ".header", ".footer", ".reviews", ".you-may-also-like", ".recommendations", ".product-recommendations", ".cross-sell", ".upsell", "[class*='recommend']", "[class*='related']"],
+    waitFor: 3000,
+    promptHint: "Seafolly product pages: the marketing description is a short prose paragraph (1-3 sentences) directly under the product title — it may NOT be labelled 'Description'. Capture this prose even if it appears before any 'Details', 'Fabric', or 'Care' accordion. Features are bulleted under 'Details'; fabric under 'Fabric & Care'.",
   },
   "bakuswimwear.com": {
     name: "Baku",

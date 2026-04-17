@@ -354,8 +354,67 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
       </div>
 
       <div className="px-4 pb-24">
+        {/* ───── BULK MODE ───── */}
+        {isBulk && (
+          <div className="space-y-3">
+            <div className="bg-card rounded-xl border border-border p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Layers className="w-4 h-4 text-primary" />
+                <h2 className="text-base font-semibold">Bulk Price Lookup</h2>
+                <span className="ml-auto text-xs text-muted-foreground font-mono">
+                  {bulkRows.filter(r => r.status === "done").length}/{bulkRows.length} done
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Running price lookup across {bulkRows.length} products. Top result auto-selected for each.
+              </p>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border divide-y divide-border overflow-hidden">
+              {bulkRows.map((row, i) => (
+                <div key={i} className="p-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center shrink-0">
+                    {row.status === "pending" && <span className="text-xs text-muted-foreground">{i + 1}</span>}
+                    {(row.status === "searching" || row.status === "extracting") && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                    {row.status === "done" && <Check className="w-4 h-4 text-success" />}
+                    {row.status === "failed" && <X className="w-4 h-4 text-destructive" />}
+                    {row.status === "no_results" && <AlertTriangle className="w-4 h-4 text-warning" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{row.product_name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      {row.supplier ? `${row.supplier} · ` : ""}{row.style_number || ""} {row.colour || ""}
+                    </p>
+                    {row.status === "searching" && <p className="text-[10px] text-primary">Searching Google Shopping…</p>}
+                    {row.status === "extracting" && <p className="text-[10px] text-primary">Extracting from {row.result?.retailer || "page"}…</p>}
+                    {row.status === "no_results" && <p className="text-[10px] text-warning">No results found</p>}
+                    {row.status === "failed" && <p className="text-[10px] text-destructive truncate">{row.error}</p>}
+                  </div>
+                  {row.status === "done" && row.result && (
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-mono font-semibold">
+                        {row.result.price ? `$${row.result.price.toFixed(2)}` : "—"}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground truncate max-w-[100px]">{row.result.retailer}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {bulkDone && (
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={onBack}>Done</Button>
+                <Button className="flex-1" onClick={() => { setBulkDone(false); void runBulk(); }}>
+                  <RefreshCw className="w-4 h-4 mr-2" /> Re-run all
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ───── STEP: INPUT ───── */}
-        {step === "input" && (
+        {!isBulk && step === "input" && (
           <div className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-4 space-y-3">
               <h2 className="text-base font-semibold">Product Details</h2>

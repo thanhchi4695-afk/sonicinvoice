@@ -96,7 +96,7 @@ export function recordProcessingQuality(input: QualityMetricsInput): void {
         .order("updated_at", { ascending: false })
         .limit(1);
 
-      const patternId = ((rows || []) as Array<{ id: string }>)[0]?.id;
+      const patternId = ((rows || []) as unknown as Array<{ id: string }>)[0]?.id;
       if (!patternId) return; // training row may not exist yet — silent skip
 
       await supabase

@@ -675,4 +675,42 @@ const RuleField = ({ label, value }: { label: string; value: string | number | n
   </div>
 );
 
+const ReportStat = ({ label, value }: { label: string; value: string }) => (
+  <div className="bg-background/40 rounded-md p-2.5">
+    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+    <p className="text-sm font-medium mt-0.5 truncate">{value}</p>
+  </div>
+);
+
+const QualitySparkline = ({ scores }: { scores: number[] }) => {
+  const max = 100;
+  const barWidth = 4;
+  const gap = 2;
+  const height = 16;
+  const colourFor = (s: number) =>
+    s >= 80 ? "hsl(var(--primary))" : s >= 50 ? "hsl(45 93% 58%)" : "hsl(0 84% 60%)";
+  return (
+    <svg
+      width={scores.length * (barWidth + gap)}
+      height={height}
+      aria-label="Recent quality scores"
+    >
+      {scores.map((s, i) => {
+        const h = Math.max(2, (s / max) * height);
+        return (
+          <rect
+            key={i}
+            x={i * (barWidth + gap)}
+            y={height - h}
+            width={barWidth}
+            height={h}
+            rx={1}
+            fill={colourFor(s)}
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
 export default SupplierIntelligencePanel;

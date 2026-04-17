@@ -1,7 +1,9 @@
-import { useState, useMemo } from "react";
-import { Upload, ChevronLeft, Search, Trash2, Eye, X, Check, BookOpen, ChevronDown } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
+import { Upload, ChevronLeft, Search, Trash2, Eye, X, Check, BookOpen, ChevronDown, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { addAuditEntry } from "@/lib/audit-log";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   getCatalogs, addCatalog, deleteCatalog, searchCatalogs, getTotalCatalogProducts,
   type SupplierCatalog, type CatalogProduct,
@@ -33,24 +35,74 @@ const CatalogMemoryPanel = ({ onBack }: CatalogMemoryPanelProps) => {
   const searchResults = useMemo(() => searchCatalogs(searchQuery), [searchQuery, catalogs]);
   const totalProducts = catalogs.reduce((s, c) => s + c.products.length, 0);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleUpload = () => {
     if (!supplierName.trim()) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !supplierName.trim()) return;
     setProcessing(true);
     setProcessed(false);
-    setTimeout(() => {
+
+    try {
+      // Convert file to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1] || "");
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke("catalog-pdf-extract", {
+        body: { file_base64: base64, file_mime: file.type, supplier: supplierName.trim() },
+      });
+
+      if (error) throw error;
+      const extracted: CatalogProduct[] = (data?.products || []).map((p: any) => ({
+        title: String(p.title || "").trim(),
+        sku: String(p.sku || "").trim(),
+        barcode: String(p.barcode || "").trim(),
+        colour: String(p.colour || "").trim(),
+        size: String(p.size || "").trim(),
+        type: String(p.type || "").trim(),
+        rrp: typeof p.rrp === "number" ? p.rrp : parseFloat(p.rrp) || 0,
+        description: String(p.description || "").trim() || undefined,
+        fabric: String(p.fabric || "").trim() || undefined,
+        care: String(p.care || "").trim() || undefined,
+      })).filter((p: CatalogProduct) => p.title);
+
+      if (extracted.length === 0) {
+        toast.error("No products extracted — try a clearer file or different format");
+        setProcessing(false);
+        return;
+      }
+
       const newCatalog: SupplierCatalog = {
         supplier: supplierName.trim(),
-        products: DEMO_EXTRACT,
+        products: extracted,
         uploadedAt: new Date().toISOString(),
-        fileName: `${supplierName.toLowerCase().replace(/\s+/g, "_")}_catalog.pdf`,
+        fileName: file.name,
       };
       addCatalog(newCatalog);
       setCatalogs(getCatalogs());
-      setProcessedCount(DEMO_EXTRACT.length);
-      setProcessing(false);
+      const withDesc = extracted.filter(p => p.description).length;
+      setProcessedCount(extracted.length);
       setProcessed(true);
-      addAuditEntry("Catalog", `${supplierName} catalog uploaded — ${DEMO_EXTRACT.length} products learned`);
-    }, 2000);
+      addAuditEntry("Catalog", `${supplierName} catalog uploaded — ${extracted.length} products learned (${withDesc} with descriptions)`);
+      toast.success(`${extracted.length} products learned${withDesc > 0 ? ` · ${withDesc} with descriptions` : ""}`);
+    } catch (err: any) {
+      toast.error("Catalog extraction failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleDelete = (supplier: string) => {

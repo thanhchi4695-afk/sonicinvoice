@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
 import SizeGridEditor from "@/components/SizeGridEditor";
 import InvoiceDebugOverlay from "@/components/InvoiceDebugOverlay";
+import FieldConfidenceHeader, { lowConfidenceFieldNames } from "@/components/FieldConfidenceHeader";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;

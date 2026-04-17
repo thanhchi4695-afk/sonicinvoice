@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft, Search, Trash2, Eye, Edit3, Brain, Upload,
   History, BookOpen, Sparkles, AlertCircle, Check, X,
+  Clock, TrendingUp, Award, Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,22 @@ interface InvoicePatternRow {
   sample_headers: string[] | null;
   invoice_count: number;
   updated_at: string;
+  created_at?: string;
+  review_duration_seconds?: number | null;
+  edit_count?: number | null;
+  processing_quality_score?: number | null;
+  exported_at?: string | null;
+}
+
+interface SupplierQualityStats {
+  invoiceCount: number;
+  avgDurationMin: number | null;
+  avgEdits: number | null;
+  avgQuality: number | null;
+  bestQuality: number | null;
+  recentScores: number[]; // last 5 chronological (oldest→newest)
+  firstScore: number | null;
+  lastScore: number | null;
 }
 
 interface CorrectionRow {
@@ -88,6 +105,7 @@ function confidenceColour(score: number) {
 const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntelligencePanelProps) => {
   const [profiles, setProfiles] = useState<SupplierProfileRow[]>([]);
   const [patterns, setPatterns] = useState<Record<string, InvoicePatternRow>>({});
+  const [allPatterns, setAllPatterns] = useState<InvoicePatternRow[]>([]);
   const [corrections, setCorrections] = useState<CorrectionRow[]>([]);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -108,10 +126,12 @@ const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntell
 
     setProfiles((profs as SupplierProfileRow[]) || []);
     const patternMap: Record<string, InvoicePatternRow> = {};
-    for (const p of (pats as InvoicePatternRow[]) || []) {
+    const all = (pats as InvoicePatternRow[]) || [];
+    for (const p of all) {
       if (p.supplier_profile_id && !patternMap[p.supplier_profile_id]) patternMap[p.supplier_profile_id] = p;
     }
     setPatterns(patternMap);
+    setAllPatterns(all);
     setCorrections((corrs as CorrectionRow[]) || []);
     setLoading(false);
   };
@@ -126,6 +146,92 @@ const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntell
       (p.supplier_name_variants || []).some((v) => v.toLowerCase().includes(q))
     );
   }, [profiles, search]);
+
+  // Per-supplier quality aggregates
+  const qualityBySupplier = useMemo(() => {
+    const map: Record<string, SupplierQualityStats> = {};
+    const grouped: Record<string, InvoicePatternRow[]> = {};
+    for (const p of allPatterns) {
+      if (!p.supplier_profile_id) continue;
+      (grouped[p.supplier_profile_id] ||= []).push(p);
+    }
+    for (const [sid, rows] of Object.entries(grouped)) {
+      // chronological oldest → newest
+      const sorted = [...rows].sort(
+        (a, b) => +new Date(a.exported_at || a.updated_at) - +new Date(b.exported_at || b.updated_at),
+      );
+      const durations = sorted.map((r) => r.review_duration_seconds).filter((v): v is number => typeof v === "number");
+      const edits = sorted.map((r) => r.edit_count).filter((v): v is number => typeof v === "number");
+      const scores = sorted.map((r) => r.processing_quality_score).filter((v): v is number => typeof v === "number");
+      const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+      map[sid] = {
+        invoiceCount: sorted.length,
+        avgDurationMin: durations.length ? avg(durations)! / 60 : null,
+        avgEdits: avg(edits),
+        avgQuality: avg(scores),
+        bestQuality: scores.length ? Math.max(...scores) : null,
+        recentScores: scores.slice(-5),
+        firstScore: scores[0] ?? null,
+        lastScore: scores[scores.length - 1] ?? null,
+      };
+    }
+    return map;
+  }, [allPatterns]);
+
+  // Aggregate report
+  const qualityReport = useMemo(() => {
+    const allScores: number[] = [];
+    let totalInvoices = 0;
+    let savedMins = 0;
+    for (const stats of Object.values(qualityBySupplier)) {
+      totalInvoices += stats.invoiceCount;
+      // recompute time savings from raw rows
+    }
+    for (const r of allPatterns) {
+      const s = r.processing_quality_score;
+      if (typeof s === "number") {
+        allScores.push(s);
+        if (s > 80) savedMins += 15;
+        else if (s >= 50) savedMins += 7;
+      }
+    }
+    const avgQuality = allScores.length
+      ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
+      : null;
+
+    let mostReliable: { name: string; score: number } | null = null;
+    let mostImproved: { name: string; delta: number } | null = null;
+    let weakest: { name: string; score: number } | null = null;
+
+    for (const prof of profiles) {
+      const s = qualityBySupplier[prof.id];
+      if (!s) continue;
+      if (s.avgQuality != null) {
+        if (!mostReliable || s.avgQuality > mostReliable.score) {
+          mostReliable = { name: prof.supplier_name, score: s.avgQuality };
+        }
+        if (s.invoiceCount > 3 && (!weakest || s.avgQuality < weakest.score)) {
+          weakest = { name: prof.supplier_name, score: s.avgQuality };
+        }
+      }
+      if (s.firstScore != null && s.lastScore != null && s.invoiceCount >= 2) {
+        const delta = s.lastScore - s.firstScore;
+        if (!mostImproved || delta > mostImproved.delta) {
+          mostImproved = { name: prof.supplier_name, delta };
+        }
+      }
+    }
+
+    return {
+      totalInvoices: allPatterns.length,
+      scoredInvoices: allScores.length,
+      avgQuality,
+      hoursSaved: Math.round((savedMins / 60) * 10) / 10,
+      mostReliable,
+      mostImproved,
+      weakest,
+    };
+  }, [allPatterns, qualityBySupplier, profiles]);
 
   const correctionsByProfile = useMemo(() => {
     const map: Record<string, number> = {};
@@ -271,6 +377,57 @@ const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntell
 
           {/* TAB 1 — Known suppliers */}
           <TabsContent value="known" className="space-y-3 mt-4">
+            {/* Quality report — aggregate across all suppliers */}
+            {!loading && qualityReport.scoredInvoices > 0 && (
+              <Card className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+                <div className="flex items-start gap-3 mb-4">
+                  <Trophy className="w-5 h-5 text-primary mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold">Quality report</p>
+                    <p className="text-xs text-muted-foreground">
+                      Aggregate extraction performance across every supplier you've processed.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Hero ROI number */}
+                <div className="bg-background/50 rounded-lg p-4 mb-4 text-center">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                    Estimated time saved vs manual entry
+                  </p>
+                  <p className="text-4xl font-bold text-emerald-400">
+                    {qualityReport.hoursSaved} <span className="text-2xl font-medium">hours</span>
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                  <ReportStat label="Invoices processed" value={qualityReport.totalInvoices.toString()} />
+                  <ReportStat
+                    label="Avg quality score"
+                    value={qualityReport.avgQuality != null ? `${qualityReport.avgQuality}/100` : "—"}
+                  />
+                  <ReportStat
+                    label="Most reliable"
+                    value={qualityReport.mostReliable
+                      ? `${qualityReport.mostReliable.name} (${Math.round(qualityReport.mostReliable.score)})`
+                      : "—"}
+                  />
+                  <ReportStat
+                    label="Most improved"
+                    value={qualityReport.mostImproved && qualityReport.mostImproved.delta > 0
+                      ? `${qualityReport.mostImproved.name} (+${Math.round(qualityReport.mostImproved.delta)})`
+                      : "—"}
+                  />
+                  <ReportStat
+                    label="Weakest format"
+                    value={qualityReport.weakest
+                      ? `${qualityReport.weakest.name} (${Math.round(qualityReport.weakest.score)})`
+                      : "—"}
+                  />
+                </div>
+              </Card>
+            )}
+
             {loading && <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>}
             {!loading && filtered.length === 0 && (
               <Card className="p-8 text-center">
@@ -291,6 +448,7 @@ const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntell
               const correctionCount = correctionsByProfile[p.id] || 0;
               const expanded = expandedId === p.id;
               const editing = editingId === p.id;
+              const quality = qualityBySupplier[p.id];
 
               return (
                 <Card key={p.id} className="p-4">
@@ -321,6 +479,41 @@ const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntell
                           {p.confidence_score || 0}% · {colour.label}
                         </span>
                       </div>
+
+                      {/* Quality metrics row */}
+                      {quality && quality.invoiceCount > 0 && (
+                        <div className="mt-3 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+                          {quality.avgDurationMin != null && (
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {quality.avgDurationMin.toFixed(1)} min avg
+                            </span>
+                          )}
+                          {quality.avgEdits != null && (
+                            <span className="inline-flex items-center gap-1">
+                              <Edit3 className="w-3 h-3" />
+                              {quality.avgEdits.toFixed(1)} edits avg
+                            </span>
+                          )}
+                          {quality.recentScores.length > 0 && (
+                            <span className="inline-flex items-center gap-1.5">
+                              <TrendingUp className="w-3 h-3" />
+                              <QualitySparkline scores={quality.recentScores} />
+                            </span>
+                          )}
+                          {quality.bestQuality != null && (
+                            <span className="inline-flex items-center gap-1 text-emerald-400">
+                              <Award className="w-3 h-3" />
+                              Best: {quality.bestQuality}/100
+                            </span>
+                          )}
+                          {quality.avgQuality != null && quality.avgQuality < 60 && (
+                            <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/15 text-xs">
+                              Needs attention
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col gap-1.5">
@@ -481,5 +674,43 @@ const RuleField = ({ label, value }: { label: string; value: string | number | n
     <p className="text-sm font-medium mt-0.5">{value ?? <span className="text-muted-foreground italic">—</span>}</p>
   </div>
 );
+
+const ReportStat = ({ label, value }: { label: string; value: string }) => (
+  <div className="bg-background/40 rounded-md p-2.5">
+    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+    <p className="text-sm font-medium mt-0.5 truncate">{value}</p>
+  </div>
+);
+
+const QualitySparkline = ({ scores }: { scores: number[] }) => {
+  const max = 100;
+  const barWidth = 4;
+  const gap = 2;
+  const height = 16;
+  const colourFor = (s: number) =>
+    s >= 80 ? "hsl(var(--primary))" : s >= 50 ? "hsl(45 93% 58%)" : "hsl(0 84% 60%)";
+  return (
+    <svg
+      width={scores.length * (barWidth + gap)}
+      height={height}
+      aria-label="Recent quality scores"
+    >
+      {scores.map((s, i) => {
+        const h = Math.max(2, (s / max) * height);
+        return (
+          <rect
+            key={i}
+            x={i * (barWidth + gap)}
+            y={height - h}
+            width={barWidth}
+            height={h}
+            rx={1}
+            fill={colourFor(s)}
+          />
+        );
+      })}
+    </svg>
+  );
+};
 
 export default SupplierIntelligencePanel;

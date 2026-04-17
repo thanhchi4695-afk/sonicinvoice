@@ -627,7 +627,7 @@ serve(async (req) => {
   }
 
   try {
-    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode, expectedProductCount, supplierProfile } = await req.json();
+    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode, expectedProductCount, supplierProfile, inferredRules } = await req.json();
 
     if (!fileContent) {
       return new Response(JSON.stringify({ error: "No file content provided" }), {
@@ -786,6 +786,43 @@ Profile confidence: ${sp.confidence || "N/A"}
 "supplier_profile_used": "Yes",
 "used_profile_version": "${sp.profile_version || sp.last_updated || "current"}",
 "profile_confidence_boost": <0-100 based on how well this invoice matches the profile patterns>`;
+    }
+
+    // Inferred supplier rules (from supplier-inference waterfall — runs BEFORE every extraction)
+    if (inferredRules && typeof inferredRules === "object") {
+      const ir = inferredRules as Record<string, any>;
+      const conf = Number(ir.confidence ?? 0);
+      const src = String(ir.rules_source || "");
+      const matchedName = ir.matched_supplier_name || supplierName || "this supplier";
+      const profileMatch = src === "exact_match" || src === "fuzzy_match" || src === "header_match";
+
+      if (conf >= 70 && profileMatch) {
+        systemPrompt += `\n\n## KNOWN SUPPLIER CONTEXT (HIGH CONFIDENCE — apply these rules first)
+This invoice is from **${matchedName}**. Based on previous invoices (match: ${src}, confidence ${conf}%), apply these learned rules:
+- Cost column is: ${ir.price_column_cost || "(not specified)"}
+- RRP column is: ${ir.price_column_rrp || "(not specified)"}
+- GST included in cost: ${ir.gst_included_in_cost ? "yes" : "no"}
+- GST included in RRP: ${ir.gst_included_in_rrp ? "yes" : "no"}
+- Size system: ${ir.size_system || "AU"}
+- Currency: ${ir.currency || "AUD"}
+- Default markup multiplier: ${ir.default_markup_multiplier ?? 2.2}
+- Pack notation expected: ${ir.pack_notation_detected ? "yes" : "no"}
+- Size matrix expected: ${ir.size_matrix_detected ? "yes" : "no"}
+- Column mapping: ${JSON.stringify(ir.column_map || {})}
+${ir.notes?.length ? `- Notes: ${(ir.notes as string[]).join("; ")}` : ""}
+
+Apply these rules first. Only deviate if the current invoice clearly contradicts them — and flag the discrepancy if you do.`;
+      } else if (conf >= 40) {
+        systemPrompt += `\n\n## SUGGESTED RULES (medium confidence ${conf}% — verify against the document)
+Source: ${src}. These are best-guess hints — use them as a starting point, but trust the document over the hints if they conflict.
+- Cost column hint: ${ir.price_column_cost || "(unknown)"}
+- RRP column hint: ${ir.price_column_rrp || "(unknown)"}
+- Size system hint: ${ir.size_system || "AU"}
+- Currency hint: ${ir.currency || "AUD"}
+- Column mapping hint: ${JSON.stringify(ir.column_map || {})}
+${ir.notes?.length ? `- Notes: ${(ir.notes as string[]).join("; ")}` : ""}`;
+      }
+      // confidence < 40 → no injection; standard extraction runs and pattern learning fires post-extraction.
     }
 
     if (customInstructions) {

@@ -330,34 +330,103 @@ export default function PostParseReviewScreen({
     ));
   };
 
+  const FIELD_LABELS: Record<string, string> = { name: "title", colour: "colour", size: "size", cost: "cost", sku: "sku", qty: "quantity", brand: "vendor" };
+
+  /** Persist a correction (and trigger the rule-update prompt) with an optional reason. */
+  const persistCorrection = useCallback((args: {
+    rowIndex: number;
+    field: string;
+    fieldLabel: string;
+    originalValue: string;
+    correctedValue: string;
+    reason?: CorrectionReason | null;
+    reasonDetail?: string | null;
+  }) => {
+    if (!supplierName) return;
+    const { field, fieldLabel, originalValue, correctedValue, reason, reasonDetail } = args;
+    saveCorrection(supplierName, {
+      field: fieldLabel, original: originalValue, corrected: correctedValue,
+      rule: `In ${fieldLabel}: "${originalValue}" → "${correctedValue}"`,
+      timestamp: new Date().toISOString(),
+    });
+    recordFieldCorrection(supplierName, fieldLabel, originalValue, correctedValue);
+    const sampleRows = products.slice(0, 3).map(sp => ({
+      name: sp.name, sku: sp.sku, cost: sp.cost, colour: sp.colour, size: sp.size, qty: sp.qty,
+    }));
+    void logCorrection({
+      supplierName,
+      field: fieldLabel,
+      originalValue,
+      correctedValue,
+      rawHeaders: detectedHeaders,
+      sampleRows,
+      formatType: detectedLayout,
+      extractedProducts: products.filter(pp => !pp._rejected) as unknown as Record<string, unknown>[],
+      correctionReason: reason ?? null,
+      correctionReasonDetail: reasonDetail ?? null,
+      fieldCategory: deriveFieldCategory(field),
+      autoDetected: false,
+    });
+  }, [supplierName, products, detectedHeaders, detectedLayout]);
+
+  /** Flush any pending correction for a different cell (user moved away without picking). */
+  const flushOtherPending = useCallback((keepKey: string) => {
+    setPendingCorrections(prev => {
+      const next: typeof prev = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (k === keepKey) { next[k] = v; continue; }
+        persistCorrection({ ...v, reason: null, reasonDetail: null });
+      }
+      return next;
+    });
+  }, [persistCorrection]);
+
+  /** User picked a reason from the inline picker. */
+  const recordReasonForCell = useCallback((rowIndex: number, field: string, reason: CorrectionReason, detail?: string) => {
+    const key = `${rowIndex}::${field}`;
+    setPendingCorrections(prev => {
+      const entry = prev[key];
+      if (entry) {
+        persistCorrection({ ...entry, reason, reasonDetail: detail ?? null });
+      }
+      const { [key]: _drop, ...rest } = prev;
+      return rest;
+    });
+    setSavedReasonFlash(prev => ({ ...prev, [key]: true }));
+    setTimeout(() => {
+      setSavedReasonFlash(prev => {
+        const { [key]: _drop, ...rest } = prev;
+        return rest;
+      });
+    }, 1500);
+  }, [persistCorrection]);
+
+  /** User dismissed the picker — log without a reason. */
+  const dismissReasonForCell = useCallback((rowIndex: number, field: string) => {
+    const key = `${rowIndex}::${field}`;
+    setPendingCorrections(prev => {
+      const entry = prev[key];
+      if (entry) persistCorrection({ ...entry, reason: null, reasonDetail: null });
+      const { [key]: _drop, ...rest } = prev;
+      return rest;
+    });
+  }, [persistCorrection]);
+
   const updateField = (rowIndex: number, field: string, value: string | number) => {
     onUpdateProducts(products.map(p => {
       if (p._rowIndex !== rowIndex) return p;
       const originalValue = String((p as any)[field] || "");
       const newValue = String(value);
       if (supplierName && originalValue !== newValue && originalValue) {
-        const fieldLabels: Record<string, string> = { name: "title", colour: "colour", size: "size", cost: "cost", sku: "sku", qty: "quantity", brand: "vendor" };
-        const fieldLabel = fieldLabels[field] || field;
-        saveCorrection(supplierName, {
-          field: fieldLabel, original: originalValue, corrected: newValue,
-          rule: `In ${fieldLabel}: "${originalValue}" → "${newValue}"`,
-          timestamp: new Date().toISOString(),
-        });
-        recordFieldCorrection(supplierName, fieldLabel, originalValue, newValue);
-        // Persist to correction_log + trigger "update rule" prompt after 3 corrections
-        const sampleRows = products.slice(0, 3).map(sp => ({
-          name: sp.name, sku: sp.sku, cost: sp.cost, colour: sp.colour, size: sp.size, qty: sp.qty,
+        const fieldLabel = FIELD_LABELS[field] || field;
+        const key = `${rowIndex}::${field}`;
+        // Defer logging — picker will pick a reason. If user moves away without
+        // picking, flushOtherPending() persists with reason=null.
+        flushOtherPending(key);
+        setPendingCorrections(prev => ({
+          ...prev,
+          [key]: { rowIndex, field, fieldLabel, originalValue, correctedValue: newValue },
         }));
-        void logCorrection({
-          supplierName,
-          field: fieldLabel,
-          originalValue,
-          correctedValue: newValue,
-          rawHeaders: detectedHeaders,
-          sampleRows,
-          formatType: detectedLayout,
-          extractedProducts: products.filter(pp => !pp._rejected) as unknown as Record<string, unknown>[],
-        });
       }
       const updated = { ...p, [field]: value, _manuallyEdited: true } as any;
       // Recalculate confidence

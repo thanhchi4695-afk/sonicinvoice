@@ -119,6 +119,56 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_patterns: {
+        Row: {
+          brand_name: string | null
+          colour_column_name: string | null
+          created_at: string
+          id: string
+          product_type_keywords: Json
+          size_scale_examples: Json
+          sku_format_regex: string | null
+          sku_prefix_pattern: string | null
+          special_rules: Json
+          supplier_profile_id: string | null
+          user_id: string
+        }
+        Insert: {
+          brand_name?: string | null
+          colour_column_name?: string | null
+          created_at?: string
+          id?: string
+          product_type_keywords?: Json
+          size_scale_examples?: Json
+          sku_format_regex?: string | null
+          sku_prefix_pattern?: string | null
+          special_rules?: Json
+          supplier_profile_id?: string | null
+          user_id: string
+        }
+        Update: {
+          brand_name?: string | null
+          colour_column_name?: string | null
+          created_at?: string
+          id?: string
+          product_type_keywords?: Json
+          size_scale_examples?: Json
+          sku_format_regex?: string | null
+          sku_prefix_pattern?: string | null
+          special_rules?: Json
+          supplier_profile_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_patterns_supplier_profile_id_fkey"
+            columns: ["supplier_profile_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       competitor_monitored_products: {
         Row: {
           created_at: string
@@ -318,6 +368,54 @@ export type Database = {
           website_url?: string
         }
         Relationships: []
+      }
+      correction_log: {
+        Row: {
+          corrected_value: string | null
+          created_at: string
+          field_corrected: string | null
+          id: string
+          invoice_pattern_id: string | null
+          original_value: string | null
+          supplier_profile_id: string | null
+          user_id: string
+        }
+        Insert: {
+          corrected_value?: string | null
+          created_at?: string
+          field_corrected?: string | null
+          id?: string
+          invoice_pattern_id?: string | null
+          original_value?: string | null
+          supplier_profile_id?: string | null
+          user_id: string
+        }
+        Update: {
+          corrected_value?: string | null
+          created_at?: string
+          field_corrected?: string | null
+          id?: string
+          invoice_pattern_id?: string | null
+          original_value?: string | null
+          supplier_profile_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "correction_log_invoice_pattern_id_fkey"
+            columns: ["invoice_pattern_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_patterns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "correction_log_supplier_profile_id_fkey"
+            columns: ["supplier_profile_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       document_lines: {
         Row: {
@@ -633,6 +731,74 @@ export type Database = {
           token?: string
         }
         Relationships: []
+      }
+      invoice_patterns: {
+        Row: {
+          column_map: Json
+          created_at: string
+          default_markup_multiplier: number | null
+          format_type: string | null
+          gst_included_in_cost: boolean | null
+          gst_included_in_rrp: boolean | null
+          id: string
+          invoice_count: number
+          pack_notation_detected: boolean | null
+          price_column_cost: string | null
+          price_column_rrp: string | null
+          sample_headers: Json
+          size_matrix_detected: boolean | null
+          size_system: string | null
+          supplier_profile_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          column_map?: Json
+          created_at?: string
+          default_markup_multiplier?: number | null
+          format_type?: string | null
+          gst_included_in_cost?: boolean | null
+          gst_included_in_rrp?: boolean | null
+          id?: string
+          invoice_count?: number
+          pack_notation_detected?: boolean | null
+          price_column_cost?: string | null
+          price_column_rrp?: string | null
+          sample_headers?: Json
+          size_matrix_detected?: boolean | null
+          size_system?: string | null
+          supplier_profile_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          column_map?: Json
+          created_at?: string
+          default_markup_multiplier?: number | null
+          format_type?: string | null
+          gst_included_in_cost?: boolean | null
+          gst_included_in_rrp?: boolean | null
+          id?: string
+          invoice_count?: number
+          pack_notation_detected?: boolean | null
+          price_column_cost?: string | null
+          price_column_rrp?: string | null
+          sample_headers?: Json
+          size_matrix_detected?: boolean | null
+          size_system?: string | null
+          supplier_profile_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_patterns_supplier_profile_id_fkey"
+            columns: ["supplier_profile_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       joor_connections: {
         Row: {
@@ -1485,32 +1651,50 @@ export type Database = {
       }
       supplier_profiles: {
         Row: {
+          confidence_score: number | null
+          country: string | null
           created_at: string
+          currency: string | null
           id: string
+          invoice_count: number | null
           invoices_analysed: number
           is_active: boolean
+          is_known_brand: boolean | null
           profile_data: Json
           supplier_name: string
+          supplier_name_variants: string[] | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          confidence_score?: number | null
+          country?: string | null
           created_at?: string
+          currency?: string | null
           id?: string
+          invoice_count?: number | null
           invoices_analysed?: number
           is_active?: boolean
+          is_known_brand?: boolean | null
           profile_data?: Json
           supplier_name: string
+          supplier_name_variants?: string[] | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          confidence_score?: number | null
+          country?: string | null
           created_at?: string
+          currency?: string | null
           id?: string
+          invoice_count?: number | null
           invoices_analysed?: number
           is_active?: boolean
+          is_known_brand?: boolean | null
           profile_data?: Json
           supplier_name?: string
+          supplier_name_variants?: string[] | null
           updated_at?: string
           user_id?: string
         }

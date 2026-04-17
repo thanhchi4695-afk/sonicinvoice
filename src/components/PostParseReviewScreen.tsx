@@ -164,6 +164,17 @@ export default function PostParseReviewScreen({
     try { return localStorage.getItem("sonic_auto_refine_profile") !== "false"; } catch { return true; }
   });
 
+  /** Pending corrections awaiting a reason. Key = `${rowIndex}::${field}`. */
+  const [pendingCorrections, setPendingCorrections] = useState<Record<string, {
+    rowIndex: number;
+    field: string;
+    fieldLabel: string;
+    originalValue: string;
+    correctedValue: string;
+  }>>({});
+  /** Cells where a reason was just recorded — show check for ~1.5s. */
+  const [savedReasonFlash, setSavedReasonFlash] = useState<Record<string, boolean>>({});
+
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
   const needsReview = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel !== "high"), [products]);

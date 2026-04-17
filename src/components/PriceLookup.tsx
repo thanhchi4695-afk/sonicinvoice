@@ -33,10 +33,14 @@ interface ExtractedProduct {
   retail_price_aud: number | null;
   sale_price_aud: number | null;
   compare_at_price_aud: number | null;
-  currency_detected: string;
+  currency_detected: string | null;
   currency_confidence: number;
   image_urls: string[];
   description: string | null;
+  key_features: string[] | null;
+  fabric_content: string | null;
+  care_instructions: string | null;
+  fit_notes: string | null;
   sizes_available: string[] | null;
   colours_available: string[] | null;
   page_title: string | null;
@@ -366,7 +370,8 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
               </div>
             )}
 
-            {extracted.currency_detected !== "AUD" && (
+            {/* Bug 4 fix: only show currency warning when a price was actually found in a non-AUD currency */}
+            {extracted.retail_price_aud != null && extracted.currency_detected && extracted.currency_detected !== "AUD" && (
               <div className="flex items-start gap-2 bg-warning/10 border border-warning/20 rounded-lg p-3">
                 <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
                 <p className="text-xs text-warning">Currency detected: {extracted.currency_detected} — this may not be AUD!</p>
@@ -422,14 +427,17 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
               {extracted.price_vs_cost_note && (
                 <p className="text-xs text-muted-foreground mt-2 bg-muted/30 rounded p-2">{extracted.price_vs_cost_note}</p>
               )}
-              <div className="flex items-center gap-2 mt-2">
-                <p className="text-[10px] text-muted-foreground">Currency confidence:</p>
-                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full ${extracted.currency_confidence >= 80 ? "bg-success" : extracted.currency_confidence >= 50 ? "bg-warning" : "bg-destructive"}`}
-                    style={{ width: `${extracted.currency_confidence}%` }} />
+              {/* Only show currency confidence bar when a price was actually extracted */}
+              {extracted.retail_price_aud != null && (
+                <div className="flex items-center gap-2 mt-2">
+                  <p className="text-[10px] text-muted-foreground">Currency confidence:</p>
+                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${extracted.currency_confidence >= 80 ? "bg-success" : extracted.currency_confidence >= 50 ? "bg-warning" : "bg-destructive"}`}
+                      style={{ width: `${extracted.currency_confidence}%` }} />
+                  </div>
+                  <span className="text-[10px] font-medium">{extracted.currency_confidence}%</span>
                 </div>
-                <span className="text-[10px] font-medium">{extracted.currency_confidence}%</span>
-              </div>
+              )}
             </div>
 
             {/* Images */}
@@ -455,9 +463,43 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
               <textarea
                 value={editDescription}
                 onChange={e => setEditDescription(e.target.value)}
+                placeholder={extracted.fetch_success ? "" : "Couldn't extract description automatically — write your own here."}
                 className="w-full min-h-[120px] rounded-md bg-input border border-border p-3 text-sm"
               />
             </div>
+
+            {/* Product details — key features, fabric, care, fit (Bug 3 fix) */}
+            {(extracted.key_features?.length || extracted.fabric_content || extracted.care_instructions || extracted.fit_notes) && (
+              <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase">Product Details</h3>
+                {extracted.key_features && extracted.key_features.length > 0 && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Key Features</p>
+                    <ul className="text-sm space-y-1 list-disc pl-4">
+                      {extracted.key_features.map((f, i) => <li key={i}>{f}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {extracted.fabric_content && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Fabric</p>
+                    <p className="text-sm">{extracted.fabric_content}</p>
+                  </div>
+                )}
+                {extracted.care_instructions && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Care</p>
+                    <p className="text-sm">{extracted.care_instructions}</p>
+                  </div>
+                )}
+                {extracted.fit_notes && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Fit</p>
+                    <p className="text-sm">{extracted.fit_notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Availability */}
             {(extracted.sizes_available?.length || extracted.colours_available?.length) && (

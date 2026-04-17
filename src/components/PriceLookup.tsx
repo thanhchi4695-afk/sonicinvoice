@@ -33,10 +33,14 @@ interface ExtractedProduct {
   retail_price_aud: number | null;
   sale_price_aud: number | null;
   compare_at_price_aud: number | null;
-  currency_detected: string;
+  currency_detected: string | null;
   currency_confidence: number;
   image_urls: string[];
   description: string | null;
+  key_features: string[] | null;
+  fabric_content: string | null;
+  care_instructions: string | null;
+  fit_notes: string | null;
   sizes_available: string[] | null;
   colours_available: string[] | null;
   page_title: string | null;
@@ -366,7 +370,8 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
               </div>
             )}
 
-            {extracted.currency_detected !== "AUD" && (
+            {/* Bug 4 fix: only show currency warning when a price was actually found in a non-AUD currency */}
+            {extracted.retail_price_aud != null && extracted.currency_detected && extracted.currency_detected !== "AUD" && (
               <div className="flex items-start gap-2 bg-warning/10 border border-warning/20 rounded-lg p-3">
                 <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
                 <p className="text-xs text-warning">Currency detected: {extracted.currency_detected} — this may not be AUD!</p>

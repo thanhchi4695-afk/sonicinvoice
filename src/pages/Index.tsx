@@ -81,6 +81,7 @@ const PipelineRunner = lazy(() => import("@/components/PipelineRunner"));
 const PipelineChooser = lazy(() => import("@/components/PipelineChooser"));
 const StockyOnboarding = lazy(() => import("@/components/StockyOnboarding"));
 const SupplierProfileBuilder = lazy(() => import("@/components/SupplierProfileBuilder"));
+const SupplierIntelligencePanel = lazy(() => import("@/components/SupplierIntelligencePanel"));
 const StocktakeModule = lazy(() => import("@/components/StocktakeModule"));
 const TransferOrderPanel = lazy(() => import("@/components/TransferOrderPanel"));
 const ReportsHub = lazy(() => import("@/components/ReportsHub"));
@@ -150,6 +151,7 @@ const FLOW_KEYS = {
   pipeline: true,
   pipeline_chooser: true,
   supplier_profile_builder: true,
+  supplier_intelligence: true,
   stock_adjustment: true,
   quick_receive: true,
   csv_seo: true,
@@ -385,7 +387,7 @@ const Index = () => {
       case "stocktake_module": flowEl = <StocktakeModule onBack={() => setActiveFlow(null)} />; break;
       case "transfer_orders": flowEl = <TransferOrderPanel onBack={() => setActiveFlow(null)} />; break;
       case "reports_hub": flowEl = <ReportsHub onBack={() => setActiveFlow(null)} />; break;
-      case "supplier_profile_builder": flowEl = <SupplierProfileBuilder onBack={() => setActiveFlow(null)} />; break;
+      case "supplier_profile_builder": flowEl = <SupplierProfileBuilder onBack={() => setActiveFlow(null)} onViewLearnedRules={() => setActiveFlow("supplier_intelligence")} />; break;
       case "stock_adjustment": flowEl = <StockAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
       case "inventory_view": flowEl = <InventoryView onBack={() => setActiveFlow(null)} />; break;
       case "csv_seo": flowEl = <ShopifyCSVSEO onBack={() => setActiveFlow(null)} />; break;
@@ -421,6 +423,7 @@ const Index = () => {
         return flowMap[flowKey] || <div className="p-6 text-center text-sm text-muted-foreground">Flow "{flowKey}" — <button className="text-primary underline" onClick={onComplete}>Mark complete →</button></div>;
       }} onExit={() => { setActiveFlow(null); setActivePipelineId(null); }} /> : null; break;
       case "pipeline_chooser": flowEl = <PipelineChooser onSelect={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }} onBack={() => setActiveFlow(null)} />; break;
+      case "supplier_intelligence": flowEl = <SupplierIntelligencePanel onBack={() => setActiveFlow(null)} onOpenInvoiceFlow={() => setActiveFlow("invoice")} />; break;
       default: return null;
     }
     return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;
@@ -498,6 +501,7 @@ const Index = () => {
             onStartPipelineChooser={() => setActiveFlow("pipeline_chooser")}
               onStartStockyOnboarding={() => setActiveFlow("stocky_onboarding")}
               onStartSupplierProfileBuilder={() => setActiveFlow("supplier_profile_builder")}
+              onStartSupplierIntelligence={() => setActiveFlow("supplier_intelligence")}
               onStartCollectionSEOExport={() => setActiveFlow("collection_seo_export")}
               onSwitchToStockyDashboard={() => { setUseStockyDashboard(true); localStorage.setItem("stocky_dashboard_mode", "true"); }}
         />

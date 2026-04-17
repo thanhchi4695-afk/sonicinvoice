@@ -4,12 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Upload, FileText, CheckCircle2, AlertCircle, Loader2, Trash2, Eye, Save, Layers, Link2, FolderOpen } from "lucide-react";
+import { ArrowLeft, Upload, FileText, CheckCircle2, AlertCircle, Loader2, Trash2, Eye, Save, Layers, Link2, FolderOpen, Brain } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface SupplierProfileBuilderProps {
   onBack: () => void;
+  onViewLearnedRules?: () => void;
 }
 
 interface UploadedInvoice {
@@ -59,7 +60,7 @@ interface SupplierProfile {
 
 type Step = "upload" | "analysing" | "review" | "saved";
 
-const SupplierProfileBuilder = ({ onBack }: SupplierProfileBuilderProps) => {
+const SupplierProfileBuilder = ({ onBack, onViewLearnedRules }: SupplierProfileBuilderProps) => {
   const [step, setStep] = useState<Step>("upload");
   const [invoices, setInvoices] = useState<UploadedInvoice[]>([]);
   const [profile, setProfile] = useState<SupplierProfile | null>(null);
@@ -190,10 +191,16 @@ const SupplierProfileBuilder = ({ onBack }: SupplierProfileBuilderProps) => {
     <div className="space-y-4 pb-24">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>
-        <div>
+        <div className="flex-1 min-w-0">
           <h2 className="text-lg font-bold">Supplier Profile Builder</h2>
           <p className="text-xs text-muted-foreground">Upload multiple invoices to train AI for this supplier</p>
         </div>
+        {onViewLearnedRules && (
+          <Button variant="link" size="sm" className="text-xs gap-1.5 h-auto p-0 shrink-0" onClick={onViewLearnedRules}>
+            <Brain className="w-3.5 h-3.5" />
+            View learned rules →
+          </Button>
+        )}
       </div>
 
       {/* Step: Upload */}

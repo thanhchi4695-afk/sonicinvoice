@@ -1,6 +1,7 @@
-import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock } from "lucide-react";
+import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock, Brain } from "lucide-react";
 import MigrationChecklist from "@/components/MigrationChecklist";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import ContextDetector from "@/components/ContextDetector";
 import { Button } from "@/components/ui/button";
 import InventoryAlerts from "@/components/InventoryAlerts";
@@ -65,6 +66,7 @@ interface HomeScreenProps {
   onStartPipelineChooser?: () => void;
   onStartStockyOnboarding?: () => void;
   onStartSupplierProfileBuilder?: () => void;
+  onStartSupplierIntelligence?: () => void;
   onStartCollectionSEOExport?: () => void;
   onSwitchToStockyDashboard?: () => void;
 }
@@ -82,12 +84,34 @@ const HomeScreen = ({
   onStartImageOptimise, onStartStockCheck, onStartPriceLookup, onStartPriceMatch, onStartProductDescriptions, onStartSeasons, onNavigateToTab,
   onStartPipeline, onStartPipelineChooser, onStartStockyOnboarding,
   onStartSupplierProfileBuilder,
+  onStartSupplierIntelligence,
   onStartCollectionSEOExport,
   onSwitchToStockyDashboard,
 }: HomeScreenProps) => {
   const mode = useStoreMode();
   const unreadCount = getUnprocessedInboxCount();
+  const [learnedSupplierCount, setLearnedSupplierCount] = useState<number | null>(null);
 
+  // Fetch the count of learned supplier profiles for the "Supplier Brain" badge
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData?.session?.user?.id;
+        if (!userId) return;
+        const { count } = await supabase
+          .from("supplier_profiles")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("is_active", true);
+        if (!cancelled) setLearnedSupplierCount(count ?? 0);
+      } catch (err) {
+        console.warn("Failed to load learned supplier count:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   // Check for incomplete onboarding
   const onboardingStep = localStorage.getItem("onboarding_step");
   const onboardingComplete = localStorage.getItem("onboarding_complete") === "true";
@@ -320,6 +344,26 @@ const HomeScreen = ({
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
         </button>
+        {onStartSupplierIntelligence && (
+          <button
+            onClick={onStartSupplierIntelligence}
+            className="w-full h-14 bg-card border border-border rounded-xl flex items-center gap-3 px-4 hover:bg-primary/10 transition-colors"
+          >
+            <Brain className="w-5 h-5 text-primary shrink-0" />
+            <div className="flex-1 text-left min-w-0">
+              <p className="text-sm font-semibold text-foreground">Supplier Brain</p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                See what the app has learned from your invoices. Gets smarter with every upload.
+              </p>
+            </div>
+            {learnedSupplierCount !== null && learnedSupplierCount > 0 && (
+              <span className="bg-primary/15 text-primary text-[10px] rounded-full px-2 py-0.5 font-semibold shrink-0">
+                {learnedSupplierCount} learned
+              </span>
+            )}
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
+        )}
       </div>
 
       {/* ── STATS ROW ── */}

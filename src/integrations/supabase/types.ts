@@ -1339,6 +1339,66 @@ export type Database = {
           },
         ]
       }
+      shared_patterns: {
+        Row: {
+          avg_confidence: number | null
+          column_roles: Json
+          contributor_count: number
+          created_at: string
+          format_type: string | null
+          gst_included_in_cost: boolean | null
+          gst_included_in_rrp: boolean | null
+          header_fingerprint: string | null
+          id: string
+          last_aggregated_at: string
+          markup_avg: number | null
+          markup_max: number | null
+          markup_min: number | null
+          pack_notation_detected: boolean | null
+          size_matrix_detected: boolean | null
+          size_system: string | null
+          total_invoices: number
+        }
+        Insert: {
+          avg_confidence?: number | null
+          column_roles?: Json
+          contributor_count?: number
+          created_at?: string
+          format_type?: string | null
+          gst_included_in_cost?: boolean | null
+          gst_included_in_rrp?: boolean | null
+          header_fingerprint?: string | null
+          id?: string
+          last_aggregated_at?: string
+          markup_avg?: number | null
+          markup_max?: number | null
+          markup_min?: number | null
+          pack_notation_detected?: boolean | null
+          size_matrix_detected?: boolean | null
+          size_system?: string | null
+          total_invoices?: number
+        }
+        Update: {
+          avg_confidence?: number | null
+          column_roles?: Json
+          contributor_count?: number
+          created_at?: string
+          format_type?: string | null
+          gst_included_in_cost?: boolean | null
+          gst_included_in_rrp?: boolean | null
+          header_fingerprint?: string | null
+          id?: string
+          last_aggregated_at?: string
+          markup_avg?: number | null
+          markup_max?: number | null
+          markup_min?: number | null
+          pack_notation_detected?: boolean | null
+          size_matrix_detected?: boolean | null
+          size_system?: string | null
+          total_invoices?: number
+        }
+        Relationships: []
+      }
       shopify_connections: {
         Row: {
           access_token: string
@@ -1874,6 +1934,30 @@ export type Database = {
           status?: string
           to_location?: string
           to_location_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          contribute_to_shared_learning: boolean
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contribute_to_shared_learning?: boolean
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contribute_to_shared_learning?: boolean
+          created_at?: string
+          id?: string
           updated_at?: string
           user_id?: string
         }

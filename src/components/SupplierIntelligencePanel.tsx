@@ -49,6 +49,22 @@ interface InvoicePatternRow {
   sample_headers: string[] | null;
   invoice_count: number;
   updated_at: string;
+  created_at?: string;
+  review_duration_seconds?: number | null;
+  edit_count?: number | null;
+  processing_quality_score?: number | null;
+  exported_at?: string | null;
+}
+
+interface SupplierQualityStats {
+  invoiceCount: number;
+  avgDurationMin: number | null;
+  avgEdits: number | null;
+  avgQuality: number | null;
+  bestQuality: number | null;
+  recentScores: number[]; // last 5 chronological (oldest→newest)
+  firstScore: number | null;
+  lastScore: number | null;
 }
 
 interface CorrectionRow {

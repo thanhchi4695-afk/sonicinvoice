@@ -448,6 +448,7 @@ const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntell
               const correctionCount = correctionsByProfile[p.id] || 0;
               const expanded = expandedId === p.id;
               const editing = editingId === p.id;
+              const quality = qualityBySupplier[p.id];
 
               return (
                 <Card key={p.id} className="p-4">

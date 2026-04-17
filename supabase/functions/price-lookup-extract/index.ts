@@ -136,11 +136,17 @@ CRITICAL RULES:
 5. Prefer JSON-LD / Open Graph / schema.org data when present in the markdown.
 
 EXTRACT (separately, each can be null):
-- description: The main marketing/editorial copy describing the product (the "story"). Strip HTML, promo banners, "Free shipping" lines, size charts, reviews.
-- key_features: Bullet list of feature highlights (e.g. "Removable padding", "Adjustable straps", "Fully lined").
+- description: The main marketing/editorial copy describing the product (the "story" / hero prose). This is usually 1-4 sentences of flowing prose that sells the product — NOT a bullet list, NOT fabric, NOT care.
+  • IT MAY NOT BE LABELLED "Description" — on many brand sites it appears as plain prose directly below the product title and price, before any "Details", "Features", "Fabric", or "Care" sections.
+  • If you see ANY prose paragraph(s) about the product near the title (even unlabelled), capture them as the description.
+  • Only return null if the page truly contains zero prose about the product (e.g. only bullet lists and spec tables).
+  • Strip promo banners ("Free shipping", "Buy now pay later"), size charts, reviews, "You may also like", and navigation crumbs.
+- key_features: Bullet list of feature highlights (e.g. "Removable padding", "Adjustable straps", "Fully lined"). These are SHORT phrases, distinct from the prose description.
 - fabric_content: Material composition exactly as stated (e.g. "82% Recycled Nylon, 18% Elastane").
 - care_instructions: Wash/care guidance (e.g. "Hand wash cold, do not tumble dry").
 - fit_notes: Anything about fit/sizing (e.g. "True to size", "Model wears size 8", "Adjustable for a custom fit").
+
+IMPORTANT: If you successfully extract key_features OR fabric_content, the page clearly has product copy — re-scan the markdown for prose near the product title and populate `description`. Do not leave it null when prose is present.
 
 Return STRICT JSON ONLY (no markdown fences, no preamble):
 {

@@ -43,7 +43,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { product_name, supplier, style_number, colour } = await req.json();
+    const { product_name, supplier, style_number, colour, serpapi_key } = await req.json();
 
     if (!product_name) {
       return new Response(JSON.stringify({ error: "product_name is required" }), {
@@ -52,15 +52,82 @@ serve(async (req) => {
     }
 
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
+    const SERPAPI_KEY = serpapi_key || Deno.env.get("SERPAPI_KEY");
+
+    // ── Build a tight query — supplier + product + style number ──
+    // Bug fix: strip leading supplier from product_name to avoid duplicating it (e.g. "Seafolly Seafolly Active Bralette")
+    let cleanProductName = String(product_name).trim();
+    if (supplier) {
+      const supRe = new RegExp(`^${supplier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+`, "i");
+      cleanProductName = cleanProductName.replace(supRe, "").trim();
+    }
+    const queryParts = [supplier, cleanProductName, style_number, colour].filter(Boolean);
+    const searchQuery = `${queryParts.join(" ")} buy Australia`;
+
+    // ── Source 1 (PREFERRED): SerpApi Google Shopping — structured price + retailer ──
+    if (SERPAPI_KEY) {
+      try {
+        const params = new URLSearchParams({
+          engine: "google_shopping",
+          q: searchQuery,
+          gl: "au",
+          hl: "en",
+          location: "Australia",
+          api_key: SERPAPI_KEY,
+        });
+        const spRes = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
+        const spData = await spRes.json();
+        if (spRes.ok && Array.isArray(spData?.shopping_results) && spData.shopping_results.length > 0) {
+          const results = spData.shopping_results.slice(0, 10).map((r: any) => {
+            const url: string = r.product_link || r.link || "";
+            let domain = "";
+            try { domain = new URL(url).hostname.replace(/^www\./, ""); } catch {}
+            const meta = classifyDomain(domain, supplier);
+            // Parse price like "A$129.95" → 129.95
+            let price: number | null = null;
+            if (typeof r.extracted_price === "number") price = r.extracted_price;
+            else if (typeof r.price === "string") {
+              const m = r.price.replace(/,/g, "").match(/[\d.]+/);
+              if (m) price = parseFloat(m[0]);
+            }
+            return {
+              title: r.title || domain,
+              url,
+              domain,
+              snippet: r.snippet || (r.source ? `${r.source} — ${r.price || ""}` : ""),
+              is_australian: meta.au,
+              is_official_brand: meta.is_official_brand,
+              retailer_type: meta.type,
+              // SerpApi-only structured fields
+              price_aud: price,
+              retailer: r.source || domain,
+              thumbnail: r.thumbnail || null,
+            };
+          }).filter((r: any) => r.url);
+
+          results.sort((a: any, b: any) => {
+            const score = (x: any) => (x.is_official_brand ? 3 : 0) + (x.is_australian ? 1 : 0);
+            return score(b) - score(a);
+          });
+
+          return new Response(JSON.stringify({
+            search_query: searchQuery,
+            source: "serpapi",
+            results: results.slice(0, 8),
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        // SerpApi returned nothing usable — fall through to Firecrawl
+        console.log("SerpApi returned no shopping_results, falling back to Firecrawl");
+      } catch (e) {
+        console.warn("SerpApi failed, falling back to Firecrawl:", e);
+      }
+    }
+
     if (!FIRECRAWL_API_KEY) {
-      return new Response(JSON.stringify({ error: "FIRECRAWL_API_KEY is not configured" }), {
+      return new Response(JSON.stringify({ error: "Neither SERPAPI_KEY nor FIRECRAWL_API_KEY is configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    // Build a tight query — supplier + product + style number is the strongest signal
-    const queryParts = [supplier, product_name, style_number, colour].filter(Boolean);
-    const searchQuery = `${queryParts.join(" ")} buy Australia`;
 
     // ── Real Google search via Firecrawl ──
     const fcRes = await fetch(`${FIRECRAWL_API}/search`, {

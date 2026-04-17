@@ -1266,33 +1266,61 @@ function ReviewRow({
               <div>
                 <label className="text-[10px] text-muted-foreground mb-0.5 block">Product Title</label>
                 <Input defaultValue={p.name} onBlur={e => onUpdateField("name", e.target.value)} className="h-8 text-xs" />
+                {pendingFields?.has("name") && onPickReason && onDismissReason && (
+                  <CorrectionReasonPicker onPick={(r, d) => onPickReason("name", r, d)} onDismiss={() => onDismissReason("name")} />
+                )}
+                {savedReasonFields?.has("name") && <CorrectionSavedCheck />}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Vendor</label>
                   <Input defaultValue={p.brand} onBlur={e => onUpdateField("brand", e.target.value)} className="h-8 text-xs" />
+                  {pendingFields?.has("brand") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("brand", r, d)} onDismiss={() => onDismissReason("brand")} />
+                  )}
+                  {savedReasonFields?.has("brand") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Style Code / SKU</label>
                   <Input defaultValue={p.sku} onBlur={e => onUpdateField("sku", e.target.value)} className="h-8 text-xs" />
+                  {pendingFields?.has("sku") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("sku", r, d)} onDismiss={() => onDismissReason("sku")} />
+                  )}
+                  {savedReasonFields?.has("sku") && <CorrectionSavedCheck />}
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-2">
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Unit Cost</label>
                   <Input type="number" defaultValue={p.cost} onBlur={e => onUpdateField("cost", parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+                  {pendingFields?.has("cost") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("cost", r, d)} onDismiss={() => onDismissReason("cost")} />
+                  )}
+                  {savedReasonFields?.has("cost") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Qty</label>
                   <Input type="number" defaultValue={p.qty} onBlur={e => onUpdateField("qty", parseInt(e.target.value) || 0)} className="h-8 text-xs" />
+                  {pendingFields?.has("qty") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("qty", r, d)} onDismiss={() => onDismissReason("qty")} />
+                  )}
+                  {savedReasonFields?.has("qty") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Size</label>
                   <Input defaultValue={p.size} onBlur={e => onUpdateField("size", e.target.value)} className="h-8 text-xs" />
+                  {pendingFields?.has("size") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("size", r, d)} onDismiss={() => onDismissReason("size")} />
+                  )}
+                  {savedReasonFields?.has("size") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className="text-[10px] text-muted-foreground mb-0.5 block">Colour</label>
                   <Input defaultValue={p.colour} onBlur={e => onUpdateField("colour", e.target.value)} className="h-8 text-xs" />
+                  {pendingFields?.has("colour") && onPickReason && onDismissReason && (
+                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("colour", r, d)} onDismiss={() => onDismissReason("colour")} />
+                  )}
+                  {savedReasonFields?.has("colour") && <CorrectionSavedCheck />}
                 </div>
               </div>
               {/* Size grid editor for multi-size rows */}

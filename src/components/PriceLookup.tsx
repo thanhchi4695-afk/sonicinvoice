@@ -135,11 +135,46 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
       if (error) throw error;
 
       setExtracted(data);
-      setEditDescription(data.description || "");
+      const scrapedDesc = (data.description || "").trim();
+      setEditDescription(scrapedDesc);
+      setDescriptionSource(scrapedDesc.length > 20 ? "scraped" : null);
       setStep("review");
+
+      // Path 3: auto-generate when scraping returned nothing usable
+      if (scrapedDesc.length <= 20) {
+        void generateDescription(data);
+      }
     } catch (err: any) {
       toast.error("Extraction failed: " + (err?.message || "Unknown error"));
       setStep("results");
+    }
+  };
+
+  // ── Path 3: AI fallback / regenerate description ──
+  const generateDescription = async (extractedData?: ExtractedProduct | null) => {
+    const src = extractedData || extracted;
+    setIsGeneratingDesc(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-product-description", {
+        body: {
+          product_name: src?.product_name || productName,
+          supplier: src?.brand || supplier,
+          style_number: styleNumber,
+          colour,
+          key_features: src?.key_features || null,
+          fabric_content: src?.fabric_content || null,
+        },
+      });
+      if (error) throw error;
+      if (data?.description) {
+        setEditDescription(data.description);
+        setDescriptionSource("ai_generated");
+        toast.success("AI description generated — please review");
+      }
+    } catch (err: any) {
+      toast.error("Couldn't generate description: " + (err?.message || "Unknown error"));
+    } finally {
+      setIsGeneratingDesc(false);
     }
   };
 

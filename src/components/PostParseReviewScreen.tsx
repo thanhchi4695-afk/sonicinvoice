@@ -133,6 +133,8 @@ export default function PostParseReviewScreen({
   products,
   supplierName,
   invoicePages = [],
+  detectedHeaders = [],
+  detectedLayout = null,
   onUpdateProducts,
   onExportAccepted,
   onPushToShopify,
@@ -330,6 +332,20 @@ export default function PostParseReviewScreen({
           timestamp: new Date().toISOString(),
         });
         recordFieldCorrection(supplierName, fieldLabel, originalValue, newValue);
+        // Persist to correction_log + trigger "update rule" prompt after 3 corrections
+        const sampleRows = products.slice(0, 3).map(sp => ({
+          name: sp.name, sku: sp.sku, cost: sp.cost, colour: sp.colour, size: sp.size, qty: sp.qty,
+        }));
+        void logCorrection({
+          supplierName,
+          field: fieldLabel,
+          originalValue,
+          correctedValue: newValue,
+          rawHeaders: detectedHeaders,
+          sampleRows,
+          formatType: detectedLayout,
+          extractedProducts: products.filter(pp => !pp._rejected) as unknown as Record<string, unknown>[],
+        });
       }
       const updated = { ...p, [field]: value, _manuallyEdited: true } as any;
       // Recalculate confidence

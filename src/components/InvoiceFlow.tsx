@@ -1096,6 +1096,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
   const [priceLookupActive, setPriceLookupActive] = useState(false);
+  const [priceMatchActive, setPriceMatchActive] = useState(false);
   const [collectionSeoActive, setCollectionSeoActive] = useState(false);
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
   const [isReprocessing, setIsReprocessing] = useState(false);

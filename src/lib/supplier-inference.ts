@@ -36,8 +36,23 @@ export type RulesSource =
   | "exact_match"
   | "fuzzy_match"
   | "header_match"
+  | "shared_pattern_match"
   | "header_inference"
   | "defaults";
+
+export interface SharedPatternLite {
+  format_type?: string | null;
+  header_fingerprint?: string | null;
+  column_roles?: Record<string, number> | null;
+  size_system?: string | null;
+  gst_included_in_cost?: boolean | null;
+  gst_included_in_rrp?: boolean | null;
+  markup_avg?: number | null;
+  pack_notation_detected?: boolean | null;
+  size_matrix_detected?: boolean | null;
+  contributor_count?: number | null;
+  avg_confidence?: number | null;
+}
 
 export interface InferredRules {
   column_map: Record<string, string>;
@@ -324,12 +339,55 @@ function step5_defaults(category: "fashion" | "accessories" | "basics" = "fashio
 
 // ───────────────────────── public API ─────────────────────────
 
+// Shared-patterns fallback: matches on header fingerprint across the
+// anonymised pool. Lower confidence than per-user matches but still
+// far better than blind defaults.
+function stepShared_sharedPatternMatch(
+  headers: string[],
+  sharedPatterns: SharedPatternLite[],
+): InferredRules | null {
+  if (!sharedPatterns?.length) return null;
+  const fp = headerFingerprint(headers);
+  if (!fp) return null;
+
+  const match = sharedPatterns.find((sp) => sp.header_fingerprint === fp);
+  if (!match) return null;
+
+  // Build a synthetic column_map keyed by *header text* using role hints.
+  // We can only match the headers we recognise heuristically — the shared
+  // pattern only stores roles, not original header text.
+  const inferredHeader = step4_headerInference(headers, []);
+
+  const contributors = match.contributor_count ?? 2;
+  const baseConf = Math.min(70, 40 + contributors * 5);
+
+  return {
+    column_map: inferredHeader.column_map,
+    size_system: (match.size_system as InferredRules["size_system"]) || "AU",
+    price_column_cost: inferredHeader.price_column_cost,
+    price_column_rrp: inferredHeader.price_column_rrp,
+    gst_included_in_cost: match.gst_included_in_cost ?? false,
+    gst_included_in_rrp: match.gst_included_in_rrp ?? true,
+    default_markup_multiplier: match.markup_avg ?? 2.2,
+    pack_notation_detected: match.pack_notation_detected ?? false,
+    size_matrix_detected: match.size_matrix_detected ?? false,
+    currency: "AUD",
+    confidence: baseConf,
+    rules_source: "shared_pattern_match",
+    flags: ["shared_pattern", `contributors_${contributors}`],
+    notes: [
+      `Matched a format pattern learned from ${contributors} other retailers (anonymised).`,
+    ],
+  };
+}
+
 export function inferSupplierRules(
   headers: string[],
   sampleRows: Record<string, unknown>[],
   userSupplierProfiles: SupplierProfile[],
   supplierName?: string,
   category: "fashion" | "accessories" | "basics" = "fashion",
+  sharedPatterns: SharedPatternLite[] = [],
 ): InferredRules {
   const profiles = userSupplierProfiles || [];
 
@@ -337,6 +395,7 @@ export function inferSupplierRules(
     step1_exactMatch(supplierName, profiles) ||
     step2_fuzzyMatch(supplierName, profiles) ||
     step3_headerFingerprint(headers, profiles) ||
+    stepShared_sharedPatternMatch(headers, sharedPatterns) ||
     (() => {
       const inferred = step4_headerInference(headers, sampleRows);
       // Only fall through to defaults if we found basically nothing
@@ -346,4 +405,12 @@ export function inferSupplierRules(
       return inferred;
     })()
   );
+}
+
+/**
+ * Helper: header fingerprint exposed for callers that need to query
+ * shared_patterns by fingerprint before invoking inferSupplierRules.
+ */
+export function computeHeaderFingerprint(headers: string[]): string {
+  return headerFingerprint(headers);
 }

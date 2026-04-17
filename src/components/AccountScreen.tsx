@@ -385,6 +385,9 @@ const AccountScreen = () => {
       {/* Default AI Instructions */}
       <DefaultInstructionsSection />
 
+      {/* Shared Learning Opt-in */}
+      <SharedLearningSection />
+
       {/* Notification Preferences */}
       <NotificationPrefsSection />
 
@@ -1130,6 +1133,62 @@ function CollectionManagerSection() {
           <Plus className="w-3 h-3 mr-1" /> Add collection
         </Button>
         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleReset}>Reset to defaults</Button>
+      </div>
+    </Section>
+  );
+}
+
+// ── Shared Learning Opt-in ─────────────────────────────────
+function SharedLearningSection() {
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoading(false); return; }
+      const { data } = await supabase
+        .from("user_preferences")
+        .select("contribute_to_shared_learning")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      setEnabled(!!data?.contribute_to_shared_learning);
+      setLoading(false);
+    })();
+  }, []);
+
+  const toggle = async (v: boolean) => {
+    setSaving(true);
+    setEnabled(v);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("user_preferences").upsert(
+        { user_id: user.id, contribute_to_shared_learning: v },
+        { onConflict: "user_id" },
+      );
+    }
+    setSaving(false);
+  };
+
+  return (
+    <Section title="🧠 Shared Learning (Optional)">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <p className="text-xs text-foreground font-medium">
+            Contribute to shared learning
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Help improve invoice processing for all users. We share only
+            anonymised format patterns — never supplier names, product
+            names, prices, or any identifying data. Off by default.
+          </p>
+        </div>
+        <Switch
+          checked={enabled}
+          disabled={loading || saving}
+          onCheckedChange={toggle}
+        />
       </div>
     </Section>
   );

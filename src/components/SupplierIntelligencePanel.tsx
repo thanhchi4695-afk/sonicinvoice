@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft, Search, Trash2, Eye, Edit3, Brain, Upload,
   History, BookOpen, Sparkles, AlertCircle, Check, X,
+  Clock, TrendingUp, Award, Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

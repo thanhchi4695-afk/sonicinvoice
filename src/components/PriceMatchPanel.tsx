@@ -340,7 +340,7 @@ const PriceMatchPanel = ({ lineItems, onBack }: Props) => {
                             {r?.source && (
                               <span className="text-[10px] text-muted-foreground">{r.source}</span>
                             )}
-                            {r?.checkedAt && status !== "checking" && (
+                            {r?.checkedAt && (
                               <span className="text-[10px] text-muted-foreground">Checked {relativeTime(r.checkedAt)}</span>
                             )}
                           </div>

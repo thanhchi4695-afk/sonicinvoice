@@ -427,14 +427,17 @@ export default function PriceLookup({ onBack, initialProduct }: PriceLookupProps
               {extracted.price_vs_cost_note && (
                 <p className="text-xs text-muted-foreground mt-2 bg-muted/30 rounded p-2">{extracted.price_vs_cost_note}</p>
               )}
-              <div className="flex items-center gap-2 mt-2">
-                <p className="text-[10px] text-muted-foreground">Currency confidence:</p>
-                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className={`h-full rounded-full ${extracted.currency_confidence >= 80 ? "bg-success" : extracted.currency_confidence >= 50 ? "bg-warning" : "bg-destructive"}`}
-                    style={{ width: `${extracted.currency_confidence}%` }} />
+              {/* Only show currency confidence bar when a price was actually extracted */}
+              {extracted.retail_price_aud != null && (
+                <div className="flex items-center gap-2 mt-2">
+                  <p className="text-[10px] text-muted-foreground">Currency confidence:</p>
+                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${extracted.currency_confidence >= 80 ? "bg-success" : extracted.currency_confidence >= 50 ? "bg-warning" : "bg-destructive"}`}
+                      style={{ width: `${extracted.currency_confidence}%` }} />
+                  </div>
+                  <span className="text-[10px] font-medium">{extracted.currency_confidence}%</span>
                 </div>
-                <span className="text-[10px] font-medium">{extracted.currency_confidence}%</span>
-              </div>
+              )}
             </div>
 
             {/* Images */}

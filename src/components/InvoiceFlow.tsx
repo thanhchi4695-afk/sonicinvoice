@@ -399,6 +399,41 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [fingerprintHit, setFingerprintHit] = useState<FingerprintHit | null>(null);
   const [matchMethod, setMatchMethod] = useState<InvoiceMatchMethod>("full_extraction");
 
+  // ── Processing quality tracking ───────────────────────────
+  const [invoiceReviewStartedAt, setInvoiceReviewStartedAt] = useState<number | null>(null);
+  const editCountRef = useRef(0);
+  const fieldsCorrectedRef = useRef<Set<string>>(new Set());
+  const rowsDeletedRef = useRef(0);
+  const rowsAddedRef = useRef(0);
+  const lastRowCountRef = useRef<number | null>(null);
+  const qualityRecordedRef = useRef(false);
+
+  const beginReviewTimer = () => {
+    setInvoiceReviewStartedAt(Date.now());
+    editCountRef.current = 0;
+    fieldsCorrectedRef.current = new Set();
+    rowsDeletedRef.current = 0;
+    rowsAddedRef.current = 0;
+    lastRowCountRef.current = null;
+    qualityRecordedRef.current = false;
+  };
+
+  const finalizeQualityMetrics = () => {
+    if (qualityRecordedRef.current) return;
+    qualityRecordedRef.current = true;
+    recordProcessingQuality({
+      reviewStartedAt: invoiceReviewStartedAt,
+      exportedAt: Date.now(),
+      editCount: editCountRef.current,
+      fieldsCorrected: Array.from(fieldsCorrectedRef.current),
+      rowsDeleted: rowsDeletedRef.current,
+      rowsAdded: rowsAddedRef.current,
+      layoutFingerprint:
+        layoutFingerprint || (detectedHeaders.length ? generateLayoutFingerprint(detectedHeaders) : null),
+    });
+  };
+
+
   // Fetch user's suppliers for dropdown
   useEffect(() => {
     (async () => {

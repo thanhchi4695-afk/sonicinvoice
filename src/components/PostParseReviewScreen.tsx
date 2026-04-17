@@ -35,6 +35,8 @@ interface PostParseReviewScreenProps {
   /** Detected invoice layout (A/B/C/D/E/F) — passed through to retraining. */
   detectedLayout?: string | null;
   onUpdateProducts: (products: ValidatedProduct[]) => void;
+  /** Called every time the user edits a cell — used for processing-quality tracking. */
+  onCellEdited?: (field: string) => void;
   onExportAccepted: () => void;
   onPushToShopify: () => void;
   onBack: () => void;
@@ -142,6 +144,7 @@ export default function PostParseReviewScreen({
   detectedHeaders = [],
   detectedLayout = null,
   onUpdateProducts,
+  onCellEdited,
   onExportAccepted,
   onPushToShopify,
   onBack,

@@ -304,6 +304,10 @@ Return ONLY the JSON pattern object.`;
       if (insertErr || !newProfile) throw new Error(insertErr?.message || "Failed to create profile");
       supplierProfileId = newProfile.id;
 
+      const fcEntryNew = field_confidence
+        ? [{ recorded_at: new Date().toISOString(), scores: field_confidence }]
+        : [];
+
       await supabase.from("invoice_patterns").insert({
         user_id: userId,
         supplier_profile_id: supplierProfileId,
@@ -319,6 +323,7 @@ Return ONLY the JSON pattern object.`;
         size_matrix_detected: pattern.size_matrix_detected,
         sample_headers: raw_headers,
         invoice_count: 1,
+        field_confidence_history: fcEntryNew,
       });
     }
 

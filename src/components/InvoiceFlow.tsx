@@ -829,18 +829,42 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         }
       }
 
-      // Run waterfall inference (exact match → fuzzy → header fingerprint → heuristics → defaults)
+      // STEP 0 — Generate fingerprint from detected headers
+      const headersForFingerprint = detectedHeaders.length
+        ? detectedHeaders
+        : ((["csv", "xlsx", "xls"].includes(ext)
+            ? await parseFileToRows(file, 1).then(r => r[0] ? Object.keys(r[0]) : []).catch(() => [])
+            : []) as string[]);
+      const fp = headersForFingerprint.length ? generateLayoutFingerprint(headersForFingerprint) : "";
+      setLayoutFingerprint(fp || null);
+
+      // STEP 1 — Exact fingerprint match (free, instant). Skips column mapping work.
+      let fpHit: FingerprintHit | null = null;
+      if (fp) {
+        fpHit = await lookupFingerprintMatch(fp);
+        if (fpHit) {
+          setFingerprintHit(fpHit);
+          setMatchMethod("fingerprint_match");
+          const label = fpHit.source === "user"
+            ? `${fpHit.invoice_count ?? 0} invoices processed with this format`
+            : `learned from ${fpHit.match_count ?? 0} similar layouts`;
+          toast.success("Recognised invoice layout — using saved rules", { description: label });
+          console.log(`[Sonic Invoice] Fingerprint hit (${fpHit.source}): ${fp}`);
+        }
+      }
+
+      // STEP 2 — Supplier-profile waterfall (only if no fingerprint hit)
       let inferredRules: InferredRules | null = null;
       try {
-        // For PDF/image we usually have no headers yet; supplier-name match still works.
         const sampleSheetRows = ["csv", "xlsx", "xls"].includes(ext)
           ? await parseFileToRows(file, 1).then(r => r.slice(0, 3)).catch(() => [])
           : [];
-        const headersForInfer = detectedHeaders.length
-          ? detectedHeaders
-          : (sampleSheetRows[0] ? Object.keys(sampleSheetRows[0]) : []);
+        const headersForInfer = headersForFingerprint;
         inferredRules = await buildInferredRules(supplierName || "", headersForInfer, sampleSheetRows);
         if (inferredRules) {
+          if (!fpHit && inferredRules.rules_source !== "defaults" && inferredRules.rules_source !== "header_inference") {
+            setMatchMethod("supplier_match");
+          }
           console.log(`[Sonic Invoice] Inferred rules: ${inferredRules.rules_source} @ ${inferredRules.confidence}% confidence`);
         }
       } catch (e) {
@@ -863,6 +887,16 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           templateHint: combinedHint || undefined,
           supplierProfile: supplierProfileData || undefined,
           inferredRules: inferredRules || undefined,
+          // Fingerprint pre-check — when present, parse-invoice can skip column detection
+          // and go straight to value extraction using the saved column_map.
+          fingerprintMatch: fpHit ? {
+            layout_fingerprint: fpHit.layout_fingerprint,
+            source: fpHit.source,
+            column_map: fpHit.column_map,
+            size_system: fpHit.size_system,
+            format_type: fpHit.format_type,
+            price_logic: fpHit.price_logic,
+          } : undefined,
         }),
       });
 

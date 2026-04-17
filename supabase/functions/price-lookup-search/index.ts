@@ -185,6 +185,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       search_query: searchQuery,
+      source: "firecrawl",
       results: results.slice(0, 8),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -801,6 +801,10 @@ export default function PostParseReviewScreen({
                   onMoveToReview={() => moveToReview(p._rowIndex)}
                   onRestore={() => restoreToReview(p._rowIndex)}
                   onUpdateField={(field, value) => updateField(p._rowIndex, field, value)}
+                  pendingFields={new Set(Object.values(pendingCorrections).filter(c => c.rowIndex === p._rowIndex).map(c => c.field))}
+                  savedReasonFields={new Set(Object.keys(savedReasonFlash).filter(k => k.startsWith(`${p._rowIndex}::`)).map(k => k.split("::")[1]))}
+                  onPickReason={(field, reason, detail) => recordReasonForCell(p._rowIndex, field, reason, detail)}
+                  onDismissReason={(field) => dismissReasonForCell(p._rowIndex, field)}
                   onMarkAs={(markAs) => markRowAs(p._rowIndex, markAs)}
                   onSplit={() => splitRow(p._rowIndex)}
                   showTeachAI={showTeachAI === p._rowIndex}

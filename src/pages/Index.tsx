@@ -4,6 +4,7 @@ import { onImageSeoTrigger } from "@/lib/image-seo-trigger";
 import NotificationBell from "@/components/NotificationBell";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { useKeyboardShortcuts, type ShortcutDef } from "@/hooks/use-keyboard-shortcuts";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 // ── Eagerly loaded (critical path) ──
 import HomeScreen from "@/components/HomeScreen";

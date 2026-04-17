@@ -763,6 +763,9 @@ export type Database = {
           invoice_count: number
           layout_fingerprint: string | null
           match_method: string | null
+          original_file_mime: string | null
+          original_file_path: string | null
+          original_filename: string | null
           pack_notation_detected: boolean | null
           price_column_cost: string | null
           price_column_rrp: string | null
@@ -792,6 +795,9 @@ export type Database = {
           invoice_count?: number
           layout_fingerprint?: string | null
           match_method?: string | null
+          original_file_mime?: string | null
+          original_file_path?: string | null
+          original_filename?: string | null
           pack_notation_detected?: boolean | null
           price_column_cost?: string | null
           price_column_rrp?: string | null
@@ -821,6 +827,9 @@ export type Database = {
           invoice_count?: number
           layout_fingerprint?: string | null
           match_method?: string | null
+          original_file_mime?: string | null
+          original_file_path?: string | null
+          original_filename?: string | null
           pack_notation_detected?: boolean | null
           price_column_cost?: string | null
           price_column_rrp?: string | null

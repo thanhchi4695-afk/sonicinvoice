@@ -582,14 +582,46 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     cameraInputRef.current?.click();
   };
 
+  const [originalFileMeta, setOriginalFileMeta] = useState<{
+    path: string; mime: string; name: string;
+  } | null>(null);
+
   const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadedFile(file);
     toast("Invoice uploaded", { description: `Processing ${file.name}…` });
+    // Upload original to storage in the background so it can be re-processed later.
+    void uploadOriginalToStorage(file);
     startProcessing(file);
     e.target.value = "";
   };
+
+  /**
+   * Fire-and-forget upload of the original invoice file to the
+   * `invoice-originals` bucket so it can be re-processed later from
+   * the History screen using improved supplier rules.
+   */
+  const uploadOriginalToStorage = async (file: File) => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user?.id;
+      if (!userId) return;
+      const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, "_");
+      const path = `${userId}/${Date.now()}-${safeName}`;
+      const { error } = await supabase.storage
+        .from("invoice-originals")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (error) {
+        console.warn("[InvoiceFlow] Original upload failed (non-fatal):", error);
+        return;
+      }
+      setOriginalFileMeta({ path, mime: file.type || "application/octet-stream", name: file.name });
+    } catch (err) {
+      console.warn("[InvoiceFlow] Original upload threw (non-fatal):", err);
+    }
+  };
+
 
   const convertToProductGroups = (products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }>) => {
     // Group variant rows into Shopify-ready products by matching style code + product name
@@ -1356,6 +1388,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         field_confidence: aiFieldConfidence || undefined,
         layout_fingerprint: layoutFingerprint || (detectedHeaders.length ? generateLayoutFingerprint(detectedHeaders) : null),
         match_method: matchMethod,
+        original_file_path: originalFileMeta?.path || null,
+        original_file_mime: originalFileMeta?.mime || null,
+        original_filename: originalFileMeta?.name || null,
       };
 
       supabase.functions

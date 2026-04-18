@@ -276,7 +276,7 @@ async function triggerRuleUpdate(args: PromptArgs) {
       await supabase.from("supplier_learning_log").insert({
         user_id: userId,
         supplier_name: args.supplierName,
-        event_type: "manual_edit",
+        event_type: "rule_updated",
         match_method: "rule_prompt",
         confidence_before: null,
         confidence_after: null,

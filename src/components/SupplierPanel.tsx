@@ -78,7 +78,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   const [productCosts, setProductCosts] = useState<ProductCostSummary[]>([]);
   const [corrections, setCorrections] = useState<CorrectionRow[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailTab, setDetailTab] = useState<"overview" | "invoices" | "costs" | "catalog">("overview");
+  const [detailTab, setDetailTab] = useState<"overview" | "invoices" | "costs" | "catalog" | "corrections">("overview");
 
   // Form state
   const [form, setForm] = useState({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });

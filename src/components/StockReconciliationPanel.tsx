@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import type { ReconciliationLine, MatchType } from "@/lib/stock-matcher";
+import VariantDetailDrawer from "@/components/VariantDetailDrawer";
 import {
   exportNewProductsCsv,
   exportStockUpdateCsv,
@@ -150,6 +151,10 @@ export function StockReconciliationPanel({
   const [exportPlatform, setExportPlatform] = useState<"shopify" | "lightspeed">(
     platform === "lightspeed" ? "lightspeed" : "shopify",
   );
+  const [drawerIdx, setDrawerIdx] = useState<number | null>(null);
+  const [reclassified, setReclassified] = useState<Record<number, string>>({});
+
+  const drawerLine = drawerIdx != null ? lines[drawerIdx] ?? null : null;
 
   const grouped = useMemo(() => {
     const g: Record<GroupKey, { line: ReconciliationLine; idx: number }[]> = {
@@ -332,6 +337,7 @@ export function StockReconciliationPanel({
                         setConflictDecisions((prev) => ({ ...prev, [idx]: d }))
                       }
                       groupBadge={meta.badge}
+                      onOpen={() => setDrawerIdx(idx)}
                     />
                   ))}
                 </div>
@@ -530,6 +536,26 @@ export function StockReconciliationPanel({
         {summary.total} line{summary.total === 1 ? "" : "s"} ·{" "}
         {summary.conflicts} conflict{summary.conflicts === 1 ? "" : "s"}
       </div>
+
+      <VariantDetailDrawer
+        open={drawerIdx != null}
+        onOpenChange={(o) => !o && setDrawerIdx(null)}
+        line={drawerLine}
+        decision={drawerIdx != null ? conflictDecisions[drawerIdx] : undefined}
+        onDecision={(d) => {
+          if (drawerIdx == null) return;
+          setConflictDecisions((prev) => ({ ...prev, [drawerIdx]: d }));
+        }}
+        onReclassifyAsRefill={(matchedProductId) => {
+          if (drawerIdx == null) return;
+          setReclassified((prev) => ({ ...prev, [drawerIdx]: matchedProductId }));
+          toast({
+            title: "Reclassified as existing product",
+            description: "This line will be exported as a stock update instead of a new product.",
+          });
+          setDrawerIdx(null);
+        }}
+      />
     </div>
   );
 }
@@ -592,6 +618,7 @@ function LineRow({
   decision,
   onDecision,
   groupBadge,
+  onOpen,
 }: {
   line: ReconciliationLine;
   checked: boolean;
@@ -599,6 +626,7 @@ function LineRow({
   decision?: "new" | "old";
   onDecision: (d: "new" | "old") => void;
   groupBadge: string;
+  onOpen?: () => void;
 }) {
   const isConflict = line.match_type.endsWith("_conflict");
   const isRefill = line.match_type.startsWith("exact_refill");
@@ -614,13 +642,26 @@ function LineRow({
     line.matched_product_id ? `Product #${line.matched_product_id.slice(-6)}` : null;
 
   return (
-    <div className="px-4 py-3 hover:bg-muted/30">
+    <div
+      className="px-4 py-3 hover:bg-muted/30 cursor-pointer"
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen?.();
+        }
+      }}
+    >
       <div className="flex items-start gap-3">
-        <Checkbox
-          checked={checked}
-          onCheckedChange={(v) => onToggle(v === true)}
-          className="mt-1"
-        />
+        <div onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={checked}
+            onCheckedChange={(v) => onToggle(v === true)}
+            className="mt-1"
+          />
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="font-medium truncate">

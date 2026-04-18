@@ -2885,6 +2885,80 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             </div>
           )}
 
+          {/* Stock reconciliation status (auto-runs when entering export step) */}
+          {connectedPlatformLabel && (reconciling || reconcileResult || reconcileError) && (
+            <div className="bg-card border border-primary/20 rounded-lg p-4 mb-4">
+              {reconciling && (
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 text-primary animate-spin shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold">Checking stock…</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Matching {productGroups.length} products against your {connectedPlatformLabel} catalog
+                    </p>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
+                      <div className="h-full bg-primary transition-all" style={{ width: `${reconcileProgress}%` }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!reconciling && reconcileResult && (
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                    <PackageCheck className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">Stock check complete</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {reconcileResult.summary?.new_products ?? 0} new ·{" "}
+                      {reconcileResult.summary?.exact_refills ?? 0} refills ·{" "}
+                      {(reconcileResult.summary?.new_variants ?? 0) + (reconcileResult.summary?.new_colours ?? 0)} new variants ·{" "}
+                      {reconcileResult.summary?.conflicts ?? 0} need review
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="teal"
+                      className="mt-3"
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent("sonic:reconciliation-ready", { detail: reconcileResult }));
+                        window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "stock_reconciliation" }));
+                      }}
+                    >
+                      Review stock classification <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {!reconciling && reconcileError && (
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">Stock check unavailable</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {reconcileError}. You can still export your invoice using the buttons below.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* No-platform banner */}
+          {platformsChecked && !connectedPlatformLabel && (
+            <div className="bg-muted/40 border border-border rounded-lg p-3 mb-4 flex items-center gap-3">
+              <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+              <p className="text-xs text-muted-foreground flex-1">
+                Connect Shopify or Lightspeed to automatically identify new vs existing stock.
+              </p>
+              <button
+                className="text-xs text-primary font-medium hover:underline shrink-0"
+                onClick={() => window.dispatchEvent(new CustomEvent("sonic:navigate-tab", { detail: "account" }))}
+              >
+                Connect →
+              </button>
+            </div>
+          )}
+
           {/* Stock check prompt */}
           <div className="bg-card border border-primary/20 rounded-lg p-4 mb-4">
             <div className="flex items-start gap-3">

@@ -453,9 +453,8 @@ export default function PostParseReviewScreen({
         onCellEdited?.(fieldLabel);
         if (supplierName && originalValue) {
           const key = `${rowIndex}::${field}`;
-          // Defer logging — picker will pick a reason. If user moves away without
-          // picking, flushOtherPending() persists with reason=null.
-          flushOtherPending(key);
+          // Queue the change. Reason is captured later via the row-level
+          // picker shown after the user clicks "Done editing".
           setPendingCorrections(prev => ({
             ...prev,
             [key]: { rowIndex, field, fieldLabel, originalValue, correctedValue: newValue },
@@ -834,16 +833,25 @@ export default function PostParseReviewScreen({
                   isSelected={selectedRows.has(p._rowIndex)}
                   onToggleSelect={() => toggleSelectRow(p._rowIndex)}
                   onStartEdit={() => setEditingRow(p._rowIndex)}
-                  onStopEdit={() => setEditingRow(null)}
+                  onStopEdit={() => {
+                    const pendingForRow = pendingFieldsForRow(p._rowIndex);
+                    if (pendingForRow.length > 0) {
+                      // Surface the row-level reason picker; row stays in edit mode.
+                      setAwaitingReasonRows(prev => new Set(prev).add(p._rowIndex));
+                    } else {
+                      setEditingRow(null);
+                    }
+                  }}
                   onApprove={() => approveRow(p._rowIndex)}
                   onReject={() => rejectRow(p._rowIndex)}
                   onMoveToReview={() => moveToReview(p._rowIndex)}
                   onRestore={() => restoreToReview(p._rowIndex)}
                   onUpdateField={(field, value) => updateField(p._rowIndex, field, value)}
-                  pendingFields={new Set(Object.values(pendingCorrections).filter(c => c.rowIndex === p._rowIndex).map(c => c.field))}
+                  pendingRowCorrections={pendingFieldsForRow(p._rowIndex)}
                   savedReasonFields={new Set(Object.keys(savedReasonFlash).filter(k => k.startsWith(`${p._rowIndex}::`)).map(k => k.split("::")[1]))}
-                  onPickReason={(field, reason, detail) => recordReasonForCell(p._rowIndex, field, reason, detail)}
-                  onDismissReason={(field) => dismissReasonForCell(p._rowIndex, field)}
+                  awaitingRowReason={awaitingReasonRows.has(p._rowIndex)}
+                  onConfirmRowReason={(reason, detail) => confirmRowReason(p._rowIndex, reason, detail)}
+                  onSkipRowReason={() => skipRowReason(p._rowIndex)}
                   onMarkAs={(markAs) => markRowAs(p._rowIndex, markAs)}
                   onSplit={() => splitRow(p._rowIndex)}
                   showTeachAI={showTeachAI === p._rowIndex}

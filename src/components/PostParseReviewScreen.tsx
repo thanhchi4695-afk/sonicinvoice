@@ -1151,7 +1151,8 @@ function ReviewRow({
   onUpdateField, onMarkAs, onSplit,
   showTeachAI, onToggleTeachAI, supplierName, parsingPlan,
   invoicePages, onShowSourceTrace,
-  pendingFields, savedReasonFields, onPickReason, onDismissReason,
+  pendingRowCorrections, savedReasonFields,
+  awaitingRowReason, onConfirmRowReason, onSkipRowReason,
   lowConfFields,
 }: {
   product: ReviewProduct;
@@ -1174,10 +1175,15 @@ function ReviewRow({
   parsingPlan?: import("@/lib/invoice-validator").ParsingPlan;
   invoicePages?: string[];
   onShowSourceTrace?: (product: ReviewProduct) => void;
-  pendingFields?: Set<string>;
+  /** All currently-queued field changes for this row, awaiting a reason. */
+  pendingRowCorrections?: Array<{ field: string; fieldLabel: string; originalValue: string; correctedValue: string }>;
   savedReasonFields?: Set<string>;
-  onPickReason?: (field: string, reason: CorrectionReason, detail?: string) => void;
-  onDismissReason?: (field: string) => void;
+  /** True when the user has clicked "Done editing" with pending changes — show the bar. */
+  awaitingRowReason?: boolean;
+  /** Picked a reason for the entire row — applies it to every pending change. */
+  onConfirmRowReason?: (reason: CorrectionReason, detail?: string) => void;
+  /** Dismissed the bar without picking — record everything as "unspecified". */
+  onSkipRowReason?: () => void;
   lowConfFields?: Set<string>;
 }) {
   const [expanded, setExpanded] = useState(false);

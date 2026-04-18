@@ -788,7 +788,54 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                     </div>
                   )}
 
-                  {/* Supplier performance */}
+                  {/* Learning Intelligence */}
+                  <div className="bg-card rounded-lg border border-border p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Brain className="w-4 h-4 text-primary" />
+                      <h3 className="text-sm font-semibold">Learning Intelligence</h3>
+                    </div>
+                    {intel ? (
+                      <>
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-muted-foreground">Confidence score</span>
+                            <span className="font-mono font-semibold">{intel.confidence_score}%</span>
+                          </div>
+                          <ConfidenceBar value={intel.confidence_score} />
+                        </div>
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Invoices learned</span>
+                            <span className="font-medium">{intel.invoice_count}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Last match method</span>
+                            <span className="font-medium">{formatMatchMethod(intel.last_match_method)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Last invoice</span>
+                            <span className="font-medium">
+                              {intel.last_invoice_date
+                                ? new Date(intel.last_invoice_date).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
+                                : "—"}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => openIntelligenceForSupplier(detail.name)}
+                          className="mt-3 text-xs text-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          View full intelligence <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        No intelligence record yet — process an invoice from {detail.name} to start learning their layout.
+                      </p>
+                    )}
+                  </div>
+
+
                   <div className="bg-card rounded-lg border border-border p-4">
                     <h3 className="text-sm font-semibold mb-3">Performance</h3>
                     <div className="space-y-2 text-xs">

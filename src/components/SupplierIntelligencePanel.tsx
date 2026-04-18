@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ChevronLeft, Search, Trash2, Eye, Edit3, Brain, Upload,
-  History, BookOpen, Sparkles, AlertCircle, Check, X,
-  Clock, TrendingUp, Award, Trophy,
+  ChevronLeft, ChevronDown, ChevronRight, Search, Edit3, Brain,
+  History as HistoryIcon, BookOpen, Sparkles, Save, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,697 +18,528 @@ interface SupplierIntelligencePanelProps {
   onOpenInvoiceFlow?: () => void;
 }
 
-interface SupplierProfileRow {
+interface IntelligenceRow {
   id: string;
   supplier_name: string;
-  supplier_name_variants: string[] | null;
-  invoice_count: number;
-  confidence_score: number;
-  currency: string | null;
-  country: string | null;
-  is_known_brand: boolean;
-  updated_at: string;
-  created_at: string;
-  profile_data: Record<string, unknown> | null;
-}
-
-interface InvoicePatternRow {
-  id: string;
-  supplier_profile_id: string | null;
-  format_type: string | null;
+  name_variants: string[] | null;
   column_map: Record<string, string> | null;
-  size_system: string | null;
-  price_column_cost: string | null;
-  price_column_rrp: string | null;
-  gst_included_in_cost: boolean | null;
-  gst_included_in_rrp: boolean | null;
-  default_markup_multiplier: number | null;
-  pack_notation_detected: boolean | null;
-  size_matrix_detected: boolean | null;
-  sample_headers: string[] | null;
+  confidence_score: number;
   invoice_count: number;
+  size_system: string | null;
+  sku_prefix_pattern: string | null;
+  gst_on_cost: boolean | null;
+  gst_on_rrp: boolean | null;
+  markup_multiplier: number | null;
+  last_invoice_date: string | null;
+  last_match_method: string | null;
+  created_at: string;
   updated_at: string;
-  created_at?: string;
-  review_duration_seconds?: number | null;
-  edit_count?: number | null;
-  processing_quality_score?: number | null;
-  exported_at?: string | null;
 }
 
-interface SupplierQualityStats {
-  invoiceCount: number;
-  avgDurationMin: number | null;
-  avgEdits: number | null;
-  avgQuality: number | null;
-  bestQuality: number | null;
-  recentScores: number[]; // last 5 chronological (oldest→newest)
-  firstScore: number | null;
-  lastScore: number | null;
-}
-
-interface CorrectionRow {
+interface LogRow {
   id: string;
-  supplier_profile_id: string | null;
-  field_corrected: string | null;
-  original_value: string | null;
-  corrected_value: string | null;
+  supplier_name: string;
+  event_type: string;
+  match_method: string | null;
+  confidence_before: number | null;
+  confidence_after: number | null;
+  details: Record<string, unknown> | null;
   created_at: string;
 }
 
-const COMMON_SENSE_RULES = [
-  { field: "Cost column", logic: "Header contains \"wholesale\", \"WSP\", \"buy price\", \"cost\" or \"ex GST\"" },
-  { field: "RRP column", logic: "Header contains \"RRP\", \"retail\", \"sell price\" or \"recommended\"" },
-  { field: "SKU column", logic: "Header contains \"style no\", \"SKU\", \"item code\", \"ref\" or \"product code\"" },
-  { field: "Colour column", logic: "Header contains \"colour\", \"color\", \"col\" or \"colourway\"" },
-  { field: "Product name", logic: "Header contains \"description\", \"name\", \"product\" or \"style name\"" },
-  { field: "Size matrix", logic: "3+ numeric-only headers in a row (e.g. 8, 10, 12, 14, 16)" },
-  { field: "Pack notation", logic: "Header matches pattern like \"1x8\" or \"2x10\"" },
-  { field: "Currency check", logic: "If avg cost > 500 with no decimals → flag as likely JPY/USD, not AUD" },
-  { field: "Currency default", logic: "Australian retail → AUD unless evidence suggests otherwise" },
-  { field: "GST on cost", logic: "Default: cost is ex-GST (Australian wholesale standard)" },
-  { field: "GST on RRP", logic: "Default: RRP is incl-GST (consumer-facing price)" },
-  { field: "Markup — fashion", logic: "Default 2.2× cost when no RRP is provided" },
-  { field: "Markup — accessories", logic: "Default 2.5× cost (higher margin category)" },
-  { field: "Markup — basics", logic: "Default 2.0× cost (commodity items, tighter margin)" },
-  { field: "Size system", logic: "Default AU sizing unless US (XS-XXL with 0/2/4) or EU (34-44) markers found" },
-  { field: "Fuzzy supplier match", logic: "Levenshtein distance < 3 between names → treat as same supplier" },
-  { field: "Header fingerprint", logic: "Sorted+normalised headers match a saved invoice → reuse that pattern" },
+const COMMON_SENSE_RULES: Array<{ category: string; rules: Array<{ field: string; logic: string }> }> = [
+  {
+    category: "Column detection",
+    rules: [
+      { field: "Cost column", logic: "Header contains \"wholesale\", \"WSP\", \"buy price\", \"cost\" or \"ex GST\"  →  Unit Cost" },
+      { field: "RRP column", logic: "Header contains \"RRP\", \"retail\", \"sell price\" or \"recommended\"  →  Retail Price" },
+      { field: "SKU column", logic: "Header contains \"style no\", \"SKU\", \"item code\", \"ref\" or \"product code\"  →  SKU" },
+      { field: "Colour column", logic: "Header contains \"colour\", \"color\", \"col\" or \"colourway\"  →  Colour" },
+      { field: "Product name", logic: "Header contains \"description\", \"name\", \"product\" or \"style name\"  →  Title" },
+    ],
+  },
+  {
+    category: "Size matrix detection",
+    rules: [
+      { field: "Numeric size grid", logic: "3+ numeric-only headers in a row (e.g. 8, 10, 12, 14, 16) → treat row as size matrix" },
+      { field: "Letter size grid", logic: "Headers contain XS, S, M, L, XL, XXL → letter size matrix" },
+      { field: "Pack notation", logic: "Header matches pattern like \"1x8\" or \"2x10\" → expand into individual size lines" },
+    ],
+  },
+  {
+    category: "Australian GST defaults",
+    rules: [
+      { field: "GST on cost", logic: "Default: cost is ex-GST (Australian wholesale standard)" },
+      { field: "GST on RRP", logic: "Default: RRP is incl-GST (consumer-facing price)" },
+      { field: "GST rate", logic: "Default 10% — applied when adding GST to ex-GST cost or extracting GST from incl-GST RRP" },
+      { field: "Currency default", logic: "Australian retail → AUD unless evidence suggests otherwise" },
+    ],
+  },
+  {
+    category: "SKU pattern detection",
+    rules: [
+      { field: "Prefix detection", logic: "First alphanumeric segment before '-', '_' or whitespace becomes the SKU prefix (e.g. SF-2419 → SF)" },
+      { field: "Length normalisation", logic: "SKUs of consistent length (5–10 chars) treated as primary identifier; longer → variant code" },
+      { field: "Fuzzy supplier match", logic: "Levenshtein distance < 3 between names → treat as same supplier" },
+      { field: "Header fingerprint", logic: "Sorted+normalised headers match a saved invoice → reuse that pattern" },
+    ],
+  },
+  {
+    category: "Markup defaults (when no RRP given)",
+    rules: [
+      { field: "Fashion", logic: "Default 2.2× cost" },
+      { field: "Accessories", logic: "Default 2.5× cost (higher margin category)" },
+      { field: "Basics", logic: "Default 2.0× cost (commodity items, tighter margin)" },
+    ],
+  },
 ];
 
 function confidenceColour(score: number) {
-  if (score >= 70) return { bar: "bg-emerald-500", text: "text-emerald-400", label: "Strong" };
-  if (score >= 40) return { bar: "bg-amber-500", text: "text-amber-400", label: "Learning" };
-  return { bar: "bg-red-500", text: "text-red-400", label: "Weak" };
+  if (score >= 61) return { bar: "bg-success", text: "text-success", label: "Strong" };
+  if (score >= 31) return { bar: "bg-warning", text: "text-warning", label: "Building" };
+  return { bar: "bg-destructive", text: "text-destructive", label: "New" };
 }
 
-const SupplierIntelligencePanel = ({ onBack, onOpenInvoiceFlow }: SupplierIntelligencePanelProps) => {
-  const [profiles, setProfiles] = useState<SupplierProfileRow[]>([]);
-  const [patterns, setPatterns] = useState<Record<string, InvoicePatternRow>>({});
-  const [allPatterns, setAllPatterns] = useState<InvoicePatternRow[]>([]);
-  const [corrections, setCorrections] = useState<CorrectionRow[]>([]);
-  const [search, setSearch] = useState("");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editJson, setEditJson] = useState("");
+function formatRelative(iso: string | null): string {
+  if (!iso) return "Never";
+  try {
+    return format(new Date(iso), "d MMM yyyy");
+  } catch {
+    return "Unknown";
+  }
+}
+
+function eventTypeLabel(type: string): string {
+  switch (type) {
+    case "supplier_learned": return "🆕 New supplier learned";
+    case "supplier_updated": return "🔄 Profile updated";
+    case "manual_edit": return "✏️ Manual edit";
+    default: return type.replace(/_/g, " ");
+  }
+}
+
+function matchMethodLabel(method: string | null): string {
+  if (!method) return "—";
+  return method.replace(/_/g, " ");
+}
+
+const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) => {
   const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<IntelligenceRow[]>([]);
+  const [logs, setLogs] = useState<LogRow[]>([]);
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<"known" | "log" | "rules">("known");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<string>("");
+  const [expandedLog, setExpandedLog] = useState<Set<string>>(new Set());
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) { setLoading(false); return; }
+    const { data: si } = await supabase
+      .from("supplier_intelligence")
+      .select("*")
+      .order("invoice_count", { ascending: false });
 
-    const [{ data: profs }, { data: pats }, { data: corrs }] = await Promise.all([
-      supabase.from("supplier_profiles").select("*").eq("is_active", true).order("updated_at", { ascending: false }),
-      supabase.from("invoice_patterns").select("*").order("updated_at", { ascending: false }),
-      supabase.from("correction_log").select("*").order("created_at", { ascending: false }).limit(200),
-    ]);
+    const { data: lg } = await supabase
+      .from("supplier_learning_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
 
-    setProfiles((profs as SupplierProfileRow[]) || []);
-    const patternMap: Record<string, InvoicePatternRow> = {};
-    const all = (pats as InvoicePatternRow[]) || [];
-    for (const p of all) {
-      if (p.supplier_profile_id && !patternMap[p.supplier_profile_id]) patternMap[p.supplier_profile_id] = p;
-    }
-    setPatterns(patternMap);
-    setAllPatterns(all);
-    setCorrections((corrs as CorrectionRow[]) || []);
+    setRows((si || []) as IntelligenceRow[]);
+    setLogs((lg || []) as LogRow[]);
     setLoading(false);
-  };
+  }, []);
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return profiles;
-    return profiles.filter((p) =>
-      p.supplier_name.toLowerCase().includes(q) ||
-      (p.supplier_name_variants || []).some((v) => v.toLowerCase().includes(q))
+    if (!q) return rows;
+    return rows.filter(r =>
+      r.supplier_name.toLowerCase().includes(q) ||
+      (r.name_variants || []).some(v => v.toLowerCase().includes(q)),
     );
-  }, [profiles, search]);
+  }, [rows, search]);
 
-  // Per-supplier quality aggregates
-  const qualityBySupplier = useMemo(() => {
-    const map: Record<string, SupplierQualityStats> = {};
-    const grouped: Record<string, InvoicePatternRow[]> = {};
-    for (const p of allPatterns) {
-      if (!p.supplier_profile_id) continue;
-      (grouped[p.supplier_profile_id] ||= []).push(p);
-    }
-    for (const [sid, rows] of Object.entries(grouped)) {
-      // chronological oldest → newest
-      const sorted = [...rows].sort(
-        (a, b) => +new Date(a.exported_at || a.updated_at) - +new Date(b.exported_at || b.updated_at),
-      );
-      const durations = sorted.map((r) => r.review_duration_seconds).filter((v): v is number => typeof v === "number");
-      const edits = sorted.map((r) => r.edit_count).filter((v): v is number => typeof v === "number");
-      const scores = sorted.map((r) => r.processing_quality_score).filter((v): v is number => typeof v === "number");
-      const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
-      map[sid] = {
-        invoiceCount: sorted.length,
-        avgDurationMin: durations.length ? avg(durations)! / 60 : null,
-        avgEdits: avg(edits),
-        avgQuality: avg(scores),
-        bestQuality: scores.length ? Math.max(...scores) : null,
-        recentScores: scores.slice(-5),
-        firstScore: scores[0] ?? null,
-        lastScore: scores[scores.length - 1] ?? null,
-      };
-    }
-    return map;
-  }, [allPatterns]);
-
-  // Aggregate report
-  const qualityReport = useMemo(() => {
-    const allScores: number[] = [];
-    let totalInvoices = 0;
-    let savedMins = 0;
-    for (const stats of Object.values(qualityBySupplier)) {
-      totalInvoices += stats.invoiceCount;
-      // recompute time savings from raw rows
-    }
-    for (const r of allPatterns) {
-      const s = r.processing_quality_score;
-      if (typeof s === "number") {
-        allScores.push(s);
-        if (s > 80) savedMins += 15;
-        else if (s >= 50) savedMins += 7;
-      }
-    }
-    const avgQuality = allScores.length
-      ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
-      : null;
-
-    let mostReliable: { name: string; score: number } | null = null;
-    let mostImproved: { name: string; delta: number } | null = null;
-    let weakest: { name: string; score: number } | null = null;
-
-    for (const prof of profiles) {
-      const s = qualityBySupplier[prof.id];
-      if (!s) continue;
-      if (s.avgQuality != null) {
-        if (!mostReliable || s.avgQuality > mostReliable.score) {
-          mostReliable = { name: prof.supplier_name, score: s.avgQuality };
-        }
-        if (s.invoiceCount > 3 && (!weakest || s.avgQuality < weakest.score)) {
-          weakest = { name: prof.supplier_name, score: s.avgQuality };
-        }
-      }
-      if (s.firstScore != null && s.lastScore != null && s.invoiceCount >= 2) {
-        const delta = s.lastScore - s.firstScore;
-        if (!mostImproved || delta > mostImproved.delta) {
-          mostImproved = { name: prof.supplier_name, delta };
-        }
-      }
-    }
-
-    return {
-      totalInvoices: allPatterns.length,
-      scoredInvoices: allScores.length,
-      avgQuality,
-      hoursSaved: Math.round((savedMins / 60) * 10) / 10,
-      mostReliable,
-      mostImproved,
-      weakest,
-    };
-  }, [allPatterns, qualityBySupplier, profiles]);
-
-  const correctionsByProfile = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const c of corrections) {
-      if (c.supplier_profile_id) map[c.supplier_profile_id] = (map[c.supplier_profile_id] || 0) + 1;
-    }
-    return map;
-  }, [corrections]);
-
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete learned profile for "${name}"? This cannot be undone.`)) return;
-    const { error } = await supabase.from("supplier_profiles").update({ is_active: false }).eq("id", id);
-    if (error) { toast.error("Delete failed"); return; }
-    toast.success(`Removed "${name}" from learned suppliers`);
-    setProfiles((prev) => prev.filter((p) => p.id !== id));
+  const toggleRow = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
-  const startEdit = (id: string) => {
-    const pattern = patterns[id];
-    setEditingId(id);
-    setEditJson(JSON.stringify({
-      column_map: pattern?.column_map || {},
-      size_system: pattern?.size_system,
-      price_column_cost: pattern?.price_column_cost,
-      price_column_rrp: pattern?.price_column_rrp,
-      gst_included_in_cost: pattern?.gst_included_in_cost,
-      gst_included_in_rrp: pattern?.gst_included_in_rrp,
-      default_markup_multiplier: pattern?.default_markup_multiplier,
-    }, null, 2));
+  const toggleLogRow = (id: string) => {
+    setExpandedLog(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
-  const saveEdit = async () => {
-    if (!editingId) return;
-    let parsed: Record<string, unknown>;
-    try { parsed = JSON.parse(editJson); }
-    catch { toast.error("Invalid JSON"); return; }
+  const startEdit = (row: IntelligenceRow) => {
+    setEditing(row.id);
+    setEditDraft(JSON.stringify(row.column_map ?? {}, null, 2));
+  };
 
-    const pattern = patterns[editingId];
-    if (!pattern) return;
-
+  const saveEdit = async (row: IntelligenceRow) => {
+    let parsed: Record<string, string>;
+    try {
+      parsed = JSON.parse(editDraft);
+    } catch {
+      toast.error("Invalid JSON", { description: "Column map must be valid JSON." });
+      return;
+    }
     const { error } = await supabase
-      .from("invoice_patterns")
-      .update({
-        column_map: (parsed.column_map as Record<string, string>) || {},
-        size_system: (parsed.size_system as string) ?? pattern.size_system,
-        price_column_cost: (parsed.price_column_cost as string) ?? null,
-        price_column_rrp: (parsed.price_column_rrp as string) ?? null,
-        gst_included_in_cost: (parsed.gst_included_in_cost as boolean) ?? false,
-        gst_included_in_rrp: (parsed.gst_included_in_rrp as boolean) ?? true,
-        default_markup_multiplier: (parsed.default_markup_multiplier as number) ?? 2.2,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", pattern.id);
+      .from("supplier_intelligence")
+      .update({ column_map: parsed as never } as never)
+      .eq("id", row.id);
 
-    if (error) { toast.error("Save failed"); return; }
-    toast.success("Rules updated");
-    setEditingId(null);
-    loadAll();
+    if (error) {
+      toast.error("Save failed", { description: error.message });
+      return;
+    }
+
+    // Audit log entry — store the BEFORE confidence as both "before" and "after"
+    // so the chronological tab still gets a row without misrepresenting the
+    // confidence change.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await supabase.from("supplier_learning_log").insert({
+        user_id: session.user.id,
+        supplier_name: row.supplier_name,
+        event_type: "manual_edit",
+        match_method: row.last_match_method,
+        confidence_before: row.confidence_score,
+        confidence_after: row.confidence_score,
+        details: { fields_changed: ["column_map"] } as never,
+      } as never);
+    }
+
+    setEditing(null);
+    toast.success("Rules updated", { description: `${row.supplier_name} column map saved.` });
+    void loadAll();
   };
 
-  const learningTimeline = useMemo(() => {
-    // Build a unified timeline from corrections + pattern updates
-    const events: Array<{
-      date: string;
-      supplier: string;
-      supplierId: string | null;
-      kind: "processed" | "correction";
-      formatType?: string | null;
-      confidence?: number;
-      isKnown?: boolean;
-      correctionField?: string | null;
-    }> = [];
-
-    for (const p of profiles) {
-      const pattern = patterns[p.id];
-      events.push({
-        date: p.updated_at,
-        supplier: p.supplier_name,
-        supplierId: p.id,
-        kind: "processed",
-        formatType: pattern?.format_type,
-        confidence: p.confidence_score,
-        isKnown: (p.invoice_count || 0) > 1,
-      });
-    }
-    for (const c of corrections) {
-      const prof = profiles.find((p) => p.id === c.supplier_profile_id);
-      events.push({
-        date: c.created_at,
-        supplier: prof?.supplier_name || "Unknown supplier",
-        supplierId: c.supplier_profile_id,
-        kind: "correction",
-        correctionField: c.field_corrected,
-      });
-    }
-    return events.sort((a, b) => +new Date(b.date) - +new Date(a.date)).slice(0, 100);
-  }, [profiles, patterns, corrections]);
-
+  // ── Render ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background animate-fade-in pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="flex items-center gap-3 px-4 py-4 max-w-6xl mx-auto">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <Brain className="w-5 h-5 text-primary" />
-              <h1 className="text-lg font-semibold">Supplier Intelligence</h1>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              What the app has learned about your suppliers
-            </p>
-          </div>
-          {onOpenInvoiceFlow && (
-            <Button size="sm" onClick={onOpenInvoiceFlow}>
-              <Upload className="w-4 h-4 mr-1.5" />
-              Train with invoice
-            </Button>
-          )}
+      <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3 flex items-center gap-3">
+        <button onClick={onBack} className="text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1">
+          <h2 className="text-base font-semibold font-display flex items-center gap-2">
+            <Brain className="w-4 h-4 text-primary" /> Supplier Intelligence
+          </h2>
+          <p className="text-[11px] text-muted-foreground">
+            How the app learns your suppliers — and the rules it falls back on.
+          </p>
         </div>
+        <Badge variant="outline" className="text-[10px]">
+          {rows.length} known {rows.length === 1 ? "supplier" : "suppliers"}
+        </Badge>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search suppliers…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        <Tabs defaultValue="known">
-          <TabsList className="grid grid-cols-3 w-full">
-            <TabsTrigger value="known"><BookOpen className="w-4 h-4 mr-1.5" />Known suppliers</TabsTrigger>
-            <TabsTrigger value="log"><History className="w-4 h-4 mr-1.5" />Learning log</TabsTrigger>
-            <TabsTrigger value="rules"><Sparkles className="w-4 h-4 mr-1.5" />Common sense</TabsTrigger>
+      <div className="px-4 py-4">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+          <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsTrigger value="known" className="text-xs gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" /> Known Suppliers
+            </TabsTrigger>
+            <TabsTrigger value="log" className="text-xs gap-1.5">
+              <HistoryIcon className="w-3.5 h-3.5" /> Learning Log
+            </TabsTrigger>
+            <TabsTrigger value="rules" className="text-xs gap-1.5">
+              <BookOpen className="w-3.5 h-3.5" /> Common Sense
+            </TabsTrigger>
           </TabsList>
 
-          {/* TAB 1 — Known suppliers */}
-          <TabsContent value="known" className="space-y-3 mt-4">
-            {/* Quality report — aggregate across all suppliers */}
-            {!loading && qualityReport.scoredInvoices > 0 && (
-              <Card className="p-5 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-                <div className="flex items-start gap-3 mb-4">
-                  <Trophy className="w-5 h-5 text-primary mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold">Quality report</p>
-                    <p className="text-xs text-muted-foreground">
-                      Aggregate extraction performance across every supplier you've processed.
-                    </p>
-                  </div>
-                </div>
+          {/* ── Tab 1: Known Suppliers ────────────────────── */}
+          <TabsContent value="known" className="space-y-3 mt-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search suppliers or aliases…"
+                className="pl-9 h-9 text-sm"
+              />
+            </div>
 
-                {/* Hero ROI number */}
-                <div className="bg-background/50 rounded-lg p-4 mb-4 text-center">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                    Estimated time saved vs manual entry
-                  </p>
-                  <p className="text-4xl font-bold text-emerald-400">
-                    {qualityReport.hoursSaved} <span className="text-2xl font-medium">hours</span>
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                  <ReportStat label="Invoices processed" value={qualityReport.totalInvoices.toString()} />
-                  <ReportStat
-                    label="Avg quality score"
-                    value={qualityReport.avgQuality != null ? `${qualityReport.avgQuality}/100` : "—"}
-                  />
-                  <ReportStat
-                    label="Most reliable"
-                    value={qualityReport.mostReliable
-                      ? `${qualityReport.mostReliable.name} (${Math.round(qualityReport.mostReliable.score)})`
-                      : "—"}
-                  />
-                  <ReportStat
-                    label="Most improved"
-                    value={qualityReport.mostImproved && qualityReport.mostImproved.delta > 0
-                      ? `${qualityReport.mostImproved.name} (+${Math.round(qualityReport.mostImproved.delta)})`
-                      : "—"}
-                  />
-                  <ReportStat
-                    label="Weakest format"
-                    value={qualityReport.weakest
-                      ? `${qualityReport.weakest.name} (${Math.round(qualityReport.weakest.score)})`
-                      : "—"}
-                  />
-                </div>
+            {loading ? (
+              <Card className="p-8 text-center text-sm text-muted-foreground">
+                Loading…
               </Card>
-            )}
-
-            {loading && <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>}
-            {!loading && filtered.length === 0 && (
+            ) : filtered.length === 0 ? (
               <Card className="p-8 text-center">
-                <Brain className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-                <p className="font-medium mb-1">No suppliers learned yet</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Process an invoice and the app will start learning the supplier's format automatically.
+                <Brain className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm font-medium mb-1">No supplier intelligence yet</p>
+                <p className="text-xs text-muted-foreground">
+                  Process your first invoice to start building a profile.
                 </p>
-                {onOpenInvoiceFlow && (
-                  <Button onClick={onOpenInvoiceFlow}><Upload className="w-4 h-4 mr-1.5" />Upload an invoice</Button>
-                )}
               </Card>
-            )}
+            ) : (
+              <Card className="divide-y divide-border overflow-hidden">
+                {/* Header row */}
+                <div className="grid grid-cols-[2fr_70px_1.4fr_1fr_1.2fr_90px] gap-2 px-3 py-2 bg-muted/30 text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                  <span>Supplier</span>
+                  <span className="text-center">Invoices</span>
+                  <span>Confidence</span>
+                  <span>Last invoice</span>
+                  <span>Match method</span>
+                  <span className="text-right">Rules</span>
+                </div>
 
-            {filtered.map((p) => {
-              const pattern = patterns[p.id];
-              const colour = confidenceColour(p.confidence_score || 0);
-              const correctionCount = correctionsByProfile[p.id] || 0;
-              const expanded = expandedId === p.id;
-              const editing = editingId === p.id;
-              const quality = qualityBySupplier[p.id];
-
-              return (
-                <Card key={p.id} className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold truncate">{p.supplier_name}</h3>
-                        {p.is_known_brand && <Badge variant="secondary" className="text-xs">Known brand</Badge>}
-                        {p.currency && p.currency !== "AUD" && (
-                          <Badge variant="outline" className="text-xs">{p.currency}</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {p.invoice_count || 0} {p.invoice_count === 1 ? "invoice" : "invoices"} processed
-                        {" · "}Last seen {format(new Date(p.updated_at), "d MMM yyyy")}
-                        {correctionCount > 0 && ` · ${correctionCount} correction${correctionCount > 1 ? "s" : ""}`}
-                      </p>
-
-                      {/* Confidence bar */}
-                      <div className="mt-3 flex items-center gap-3">
-                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${colour.bar} transition-all`}
-                            style={{ width: `${Math.max(4, p.confidence_score || 0)}%` }}
-                          />
-                        </div>
-                        <span className={`text-xs font-medium ${colour.text} w-20 text-right`}>
-                          {p.confidence_score || 0}% · {colour.label}
-                        </span>
-                      </div>
-
-                      {/* Quality metrics row */}
-                      {quality && quality.invoiceCount > 0 && (
-                        <div className="mt-3 flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-                          {quality.avgDurationMin != null && (
-                            <span className="inline-flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {quality.avgDurationMin.toFixed(1)} min avg
-                            </span>
-                          )}
-                          {quality.avgEdits != null && (
-                            <span className="inline-flex items-center gap-1">
-                              <Edit3 className="w-3 h-3" />
-                              {quality.avgEdits.toFixed(1)} edits avg
-                            </span>
-                          )}
-                          {quality.recentScores.length > 0 && (
-                            <span className="inline-flex items-center gap-1.5">
-                              <TrendingUp className="w-3 h-3" />
-                              <QualitySparkline scores={quality.recentScores} />
-                            </span>
-                          )}
-                          {quality.bestQuality != null && (
-                            <span className="inline-flex items-center gap-1 text-emerald-400">
-                              <Award className="w-3 h-3" />
-                              Best: {quality.bestQuality}/100
-                            </span>
-                          )}
-                          {quality.avgQuality != null && quality.avgQuality < 60 && (
-                            <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/15 text-xs">
-                              Needs attention
-                            </Badge>
+                {filtered.map((row) => {
+                  const conf = confidenceColour(row.confidence_score);
+                  const isExpanded = expanded.has(row.id);
+                  const isEditing = editing === row.id;
+                  return (
+                    <div key={row.id}>
+                      <div className="grid grid-cols-[2fr_70px_1.4fr_1fr_1.2fr_90px] gap-2 px-3 py-2.5 items-center text-xs">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{row.supplier_name}</p>
+                          {(row.name_variants?.length ?? 0) > 0 && (
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              aka {row.name_variants!.slice(0, 2).join(", ")}
+                              {(row.name_variants!.length > 2) && ` +${row.name_variants!.length - 2}`}
+                            </p>
                           )}
                         </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <Button size="sm" variant="ghost" onClick={() => setExpandedId(expanded ? null : p.id)}>
-                        <Eye className="w-4 h-4 mr-1.5" />{expanded ? "Hide" : "View"}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => startEdit(p.id)}>
-                        <Edit3 className="w-4 h-4 mr-1.5" />Edit
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleDelete(p.id, p.supplier_name)}>
-                        <Trash2 className="w-4 h-4 mr-1.5 text-destructive" />Delete
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Expanded rules view */}
-                  {expanded && !editing && (
-                    <div className="mt-4 pt-4 border-t border-border space-y-3 text-sm">
-                      {!pattern && <p className="text-muted-foreground italic">No pattern saved yet for this supplier.</p>}
-                      {pattern && (
-                        <>
-                          <div className="grid grid-cols-2 gap-3">
-                            <RuleField label="Format type" value={pattern.format_type} />
-                            <RuleField label="Size system" value={pattern.size_system} />
-                            <RuleField label="Cost column" value={pattern.price_column_cost} />
-                            <RuleField label="RRP column" value={pattern.price_column_rrp} />
-                            <RuleField label="GST on cost" value={pattern.gst_included_in_cost ? "Inclusive" : "Exclusive"} />
-                            <RuleField label="GST on RRP" value={pattern.gst_included_in_rrp ? "Inclusive" : "Exclusive"} />
-                            <RuleField label="Default markup" value={pattern.default_markup_multiplier ? `${pattern.default_markup_multiplier}×` : null} />
-                            <RuleField label="Pack notation" value={pattern.pack_notation_detected ? "Yes" : "No"} />
+                        <div className="text-center font-mono font-bold">{row.invoice_count}</div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={`h-full ${conf.bar} transition-all`}
+                              style={{ width: `${row.confidence_score}%` }}
+                            />
                           </div>
+                          <span className={`text-[10px] font-mono font-bold ${conf.text} shrink-0`}>
+                            {row.confidence_score}%
+                          </span>
+                        </div>
+                        <div className="text-muted-foreground">
+                          {formatRelative(row.last_invoice_date)}
+                        </div>
+                        <div className="text-muted-foreground capitalize truncate">
+                          {matchMethodLabel(row.last_match_method)}
+                        </div>
+                        <div className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => toggleRow(row.id)}
+                            className="h-7 px-2 text-[10px] gap-1"
+                          >
+                            {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                            View
+                          </Button>
+                        </div>
+                      </div>
 
-                          {pattern.column_map && Object.keys(pattern.column_map).length > 0 && (
-                            <div>
-                              <p className="text-xs font-medium text-muted-foreground mb-1.5">Column map</p>
-                              <div className="bg-muted rounded-md p-2.5 space-y-1">
-                                {Object.entries(pattern.column_map).map(([header, role]) => (
-                                  <div key={header} className="flex items-center justify-between text-xs">
-                                    <span className="font-mono">{header}</span>
-                                    <span className="text-muted-foreground">→ {String(role)}</span>
+                      {isExpanded && (
+                        <div className="px-3 pb-4 pt-1 bg-muted/20 space-y-3 text-xs">
+                          {/* Column mappings */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground">
+                                Column mappings
+                              </p>
+                              {!isEditing ? (
+                                <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1" onClick={() => startEdit(row)}>
+                                  <Edit3 className="w-3 h-3" /> Edit rules
+                                </Button>
+                              ) : (
+                                <div className="flex gap-1">
+                                  <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] gap-1" onClick={() => setEditing(null)}>
+                                    <X className="w-3 h-3" /> Cancel
+                                  </Button>
+                                  <Button size="sm" variant="default" className="h-6 px-2 text-[10px] gap-1" onClick={() => saveEdit(row)}>
+                                    <Save className="w-3 h-3" /> Save
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                            {isEditing ? (
+                              <Textarea
+                                value={editDraft}
+                                onChange={(e) => setEditDraft(e.target.value)}
+                                className="font-mono text-[11px] min-h-[140px]"
+                              />
+                            ) : Object.keys(row.column_map ?? {}).length === 0 ? (
+                              <p className="text-[11px] text-muted-foreground italic">No column mappings learned yet.</p>
+                            ) : (
+                              <div className="rounded-md border border-border overflow-hidden">
+                                {Object.entries(row.column_map ?? {}).map(([header, field], i) => (
+                                  <div
+                                    key={header}
+                                    className={`grid grid-cols-2 gap-2 px-3 py-1.5 text-[11px] ${i % 2 === 0 ? "bg-card" : "bg-muted/20"}`}
+                                  >
+                                    <span className="font-mono text-muted-foreground truncate">{header}</span>
+                                    <span className="font-mono text-foreground truncate">→ {field}</span>
                                   </div>
                                 ))}
                               </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
 
-                          {p.supplier_name_variants && p.supplier_name_variants.length > 1 && (
-                            <div>
-                              <p className="text-xs font-medium text-muted-foreground mb-1.5">Also seen as</p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {p.supplier_name_variants.map((v) => (
-                                  <Badge key={v} variant="outline" className="text-xs">{v}</Badge>
-                                ))}
+                          {/* Brand patterns */}
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1.5">
+                              Brand patterns
+                            </p>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="rounded-md border border-border bg-card p-2">
+                                <p className="text-[9px] text-muted-foreground uppercase">SKU prefix</p>
+                                <p className="font-mono text-[11px] mt-0.5">{row.sku_prefix_pattern || "—"}</p>
+                              </div>
+                              <div className="rounded-md border border-border bg-card p-2">
+                                <p className="text-[9px] text-muted-foreground uppercase">Size system</p>
+                                <p className="font-mono text-[11px] mt-0.5">{row.size_system || "—"}</p>
+                              </div>
+                              <div className="rounded-md border border-border bg-card p-2">
+                                <p className="text-[9px] text-muted-foreground uppercase">Markup</p>
+                                <p className="font-mono text-[11px] mt-0.5">
+                                  {row.markup_multiplier ? `${row.markup_multiplier}×` : "—"}
+                                </p>
                               </div>
                             </div>
-                          )}
-                        </>
+                          </div>
+
+                          {/* GST */}
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground mb-1.5">
+                              GST settings
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="rounded-md border border-border bg-card p-2">
+                                <p className="text-[9px] text-muted-foreground uppercase">Cost</p>
+                                <p className="text-[11px] mt-0.5">
+                                  {row.gst_on_cost === null ? "Unknown" : row.gst_on_cost ? "Incl GST" : "Ex GST"}
+                                </p>
+                              </div>
+                              <div className="rounded-md border border-border bg-card p-2">
+                                <p className="text-[9px] text-muted-foreground uppercase">RRP</p>
+                                <p className="text-[11px] mt-0.5">
+                                  {row.gst_on_rrp === null ? "Unknown" : row.gst_on_rrp ? "Incl GST" : "Ex GST"}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-[10px] text-muted-foreground pt-1">
+                            Last updated {formatRelative(row.updated_at)}
+                          </p>
+                        </div>
                       )}
                     </div>
-                  )}
-
-                  {/* Edit mode */}
-                  {editing && (
-                    <div className="mt-4 pt-4 border-t border-border space-y-3">
-                      <p className="text-xs text-muted-foreground">
-                        Edit the saved rules as JSON. Be careful — mistakes here affect every future invoice from this supplier.
-                      </p>
-                      <Textarea
-                        value={editJson}
-                        onChange={(e) => setEditJson(e.target.value)}
-                        className="font-mono text-xs min-h-[200px]"
-                      />
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={saveEdit}><Check className="w-4 h-4 mr-1.5" />Save</Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                          <X className="w-4 h-4 mr-1.5" />Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
-          </TabsContent>
-
-          {/* TAB 2 — Learning log */}
-          <TabsContent value="log" className="space-y-2 mt-4">
-            {learningTimeline.length === 0 && (
-              <Card className="p-8 text-center text-sm text-muted-foreground">
-                No activity yet. Process an invoice to populate the learning log.
+                  );
+                })}
               </Card>
             )}
-            {learningTimeline
-              .filter((e) => !search.trim() || e.supplier.toLowerCase().includes(search.toLowerCase()))
-              .map((e, i) => (
-                <Card key={i} className="p-3 flex items-start gap-3">
-                  <div className="mt-0.5">
-                    {e.kind === "processed" ? (
-                      e.isKnown ? (
-                        <Badge className="bg-teal-500/15 text-teal-400 border-teal-500/30 hover:bg-teal-500/15">Known</Badge>
-                      ) : (
-                        <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/15">New</Badge>
-                      )
-                    ) : (
-                      <Badge variant="outline" className="border-red-500/30 text-red-400">
-                        <AlertCircle className="w-3 h-3 mr-1" />Correction
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{e.supplier}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(e.date), "d MMM yyyy · HH:mm")}
-                      {e.kind === "processed" && e.formatType && ` · format ${e.formatType}`}
-                      {e.kind === "processed" && typeof e.confidence === "number" && ` · ${e.confidence}% confidence`}
-                      {e.kind === "correction" && e.correctionField && ` · field "${e.correctionField}" corrected`}
-                    </p>
-                  </div>
-                </Card>
-              ))}
           </TabsContent>
 
-          {/* TAB 3 — Common sense rules */}
-          <TabsContent value="rules" className="mt-4">
-            <Card className="p-4 mb-3 bg-primary/5 border-primary/20">
-              <div className="flex gap-3">
-                <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">What the app knows by default</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    These are the universal rules applied to every new supplier <strong>before</strong> any learning happens.
-                    They're tuned for Australian retail. Once you process invoices, learned rules take priority.
-                  </p>
+          {/* ── Tab 2: Learning Log ───────────────────────── */}
+          <TabsContent value="log" className="space-y-2 mt-0">
+            {loading ? (
+              <Card className="p-8 text-center text-sm text-muted-foreground">Loading…</Card>
+            ) : logs.length === 0 ? (
+              <Card className="p-8 text-center">
+                <HistoryIcon className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm font-medium mb-1">No learning events yet</p>
+                <p className="text-xs text-muted-foreground">Process invoices to start building history.</p>
+              </Card>
+            ) : (
+              <Card className="divide-y divide-border overflow-hidden">
+                <div className="grid grid-cols-[140px_1.6fr_1.4fr_1.2fr_1.4fr_28px] gap-2 px-3 py-2 bg-muted/30 text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                  <span>Timestamp</span>
+                  <span>Supplier</span>
+                  <span>Event</span>
+                  <span>Match method</span>
+                  <span>Confidence</span>
+                  <span></span>
                 </div>
-              </div>
+                {logs.map((log) => {
+                  const isOpen = expandedLog.has(log.id);
+                  const before = log.confidence_before;
+                  const after = log.confidence_after;
+                  const delta = (typeof before === "number" && typeof after === "number") ? after - before : null;
+                  return (
+                    <div key={log.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleLogRow(log.id)}
+                        className="w-full grid grid-cols-[140px_1.6fr_1.4fr_1.2fr_1.4fr_28px] gap-2 px-3 py-2 items-center text-xs hover:bg-muted/30 text-left"
+                      >
+                        <span className="text-muted-foreground font-mono text-[10px]">
+                          {format(new Date(log.created_at), "d MMM HH:mm")}
+                        </span>
+                        <span className="truncate font-medium">{log.supplier_name}</span>
+                        <span className="truncate">{eventTypeLabel(log.event_type)}</span>
+                        <span className="truncate text-muted-foreground capitalize">
+                          {matchMethodLabel(log.match_method)}
+                        </span>
+                        <span className="font-mono text-[11px] flex items-center gap-1">
+                          {before ?? "—"}
+                          <span className="text-muted-foreground">→</span>
+                          {after ?? "—"}
+                          {delta !== null && delta !== 0 && (
+                            <span className={`text-[10px] ${delta > 0 ? "text-success" : "text-destructive"}`}>
+                              ({delta > 0 ? "+" : ""}{delta})
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        </span>
+                      </button>
+                      {isOpen && (
+                        <div className="px-3 pb-3 pt-1 bg-muted/20">
+                          <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre-wrap">
+                            {JSON.stringify(log.details ?? {}, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* ── Tab 3: Common Sense Rules (read-only) ─────── */}
+          <TabsContent value="rules" className="space-y-3 mt-0">
+            <Card className="p-3 bg-muted/20 border-dashed">
+              <p className="text-xs text-muted-foreground">
+                These are the universal rules the AI applies when it sees a supplier for the first time
+                (no learned profile yet). They're read-only — once a real invoice is processed, the
+                supplier's specific learned rules take over.
+              </p>
             </Card>
 
-            <div className="space-y-2">
-              {COMMON_SENSE_RULES.map((rule) => (
-                <Card key={rule.field} className="p-3 flex items-start gap-3">
-                  <div className="w-40 shrink-0">
-                    <p className="text-sm font-medium">{rule.field}</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground flex-1">{rule.logic}</p>
-                </Card>
-              ))}
-            </div>
+            {COMMON_SENSE_RULES.map((section) => (
+              <Card key={section.category} className="overflow-hidden">
+                <div className="px-3 py-2 bg-muted/30 border-b border-border">
+                  <p className="text-xs font-semibold">{section.category}</p>
+                </div>
+                <div className="divide-y divide-border">
+                  {section.rules.map((rule) => (
+                    <div key={rule.field} className="grid grid-cols-[160px_1fr] gap-3 px-3 py-2 text-xs">
+                      <span className="font-medium text-foreground">{rule.field}</span>
+                      <span className="text-muted-foreground">{rule.logic}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
           </TabsContent>
         </Tabs>
       </div>
     </div>
-  );
-};
-
-const RuleField = ({ label, value }: { label: string; value: string | number | null | undefined }) => (
-  <div>
-    <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="text-sm font-medium mt-0.5">{value ?? <span className="text-muted-foreground italic">—</span>}</p>
-  </div>
-);
-
-const ReportStat = ({ label, value }: { label: string; value: string }) => (
-  <div className="bg-background/40 rounded-md p-2.5">
-    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-    <p className="text-sm font-medium mt-0.5 truncate">{value}</p>
-  </div>
-);
-
-const QualitySparkline = ({ scores }: { scores: number[] }) => {
-  const max = 100;
-  const barWidth = 4;
-  const gap = 2;
-  const height = 16;
-  const colourFor = (s: number) =>
-    s >= 80 ? "hsl(var(--primary))" : s >= 50 ? "hsl(45 93% 58%)" : "hsl(0 84% 60%)";
-  return (
-    <svg
-      width={scores.length * (barWidth + gap)}
-      height={height}
-      aria-label="Recent quality scores"
-    >
-      {scores.map((s, i) => {
-        const h = Math.max(2, (s / max) * height);
-        return (
-          <rect
-            key={i}
-            x={i * (barWidth + gap)}
-            y={height - h}
-            width={barWidth}
-            height={h}
-            rx={1}
-            fill={colourFor(s)}
-          />
-        );
-      })}
-    </svg>
   );
 };
 

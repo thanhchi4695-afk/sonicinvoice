@@ -385,55 +385,63 @@ export default function PostParseReviewScreen({
       sampleRows,
       formatType: detectedLayout,
       extractedProducts: products.filter(pp => !pp._rejected) as unknown as Record<string, unknown>[],
-      correctionReason: reason ?? null,
+      correctionReason: reason ?? "unspecified",
       correctionReasonDetail: reasonDetail ?? null,
       fieldCategory: deriveFieldCategory(field),
       autoDetected: lowConfFields.has(field),
+      invoiceId: sessionInvoiceId,
     });
-  }, [supplierName, products, detectedHeaders, detectedLayout, lowConfFields]);
+    setSessionEditCount((c) => c + 1);
+  }, [supplierName, products, detectedHeaders, detectedLayout, lowConfFields, sessionInvoiceId]);
 
-  /** Flush any pending correction for a different cell (user moved away without picking). */
-  const flushOtherPending = useCallback((keepKey: string) => {
-    setPendingCorrections(prev => {
-      const next: typeof prev = {};
-      for (const [k, v] of Object.entries(prev)) {
-        if (k === keepKey) { next[k] = v; continue; }
-        persistCorrection({ ...v, reason: null, reasonDetail: null });
-      }
-      return next;
-    });
-  }, [persistCorrection]);
-
-  /** User picked a reason from the inline picker. */
-  const recordReasonForCell = useCallback((rowIndex: number, field: string, reason: CorrectionReason, detail?: string) => {
-    const key = `${rowIndex}::${field}`;
-    setPendingCorrections(prev => {
-      const entry = prev[key];
-      if (entry) {
-        persistCorrection({ ...entry, reason, reasonDetail: detail ?? null });
-      }
-      const { [key]: _drop, ...rest } = prev;
-      return rest;
-    });
-    setSavedReasonFlash(prev => ({ ...prev, [key]: true }));
+  /** Briefly flash the green check on a cell. */
+  const flashSavedFor = useCallback((key: string) => {
+    setSavedReasonFlash((prev) => ({ ...prev, [key]: true }));
     setTimeout(() => {
-      setSavedReasonFlash(prev => {
+      setSavedReasonFlash((prev) => {
         const { [key]: _drop, ...rest } = prev;
         return rest;
       });
     }, 1500);
-  }, [persistCorrection]);
+  }, []);
 
-  /** User dismissed the picker — log without a reason. */
-  const dismissReasonForCell = useCallback((rowIndex: number, field: string) => {
-    const key = `${rowIndex}::${field}`;
-    setPendingCorrections(prev => {
-      const entry = prev[key];
-      if (entry) persistCorrection({ ...entry, reason: null, reasonDetail: null });
-      const { [key]: _drop, ...rest } = prev;
-      return rest;
+  /** Persist every pending correction for the given row with the chosen reason,
+   *  flash the green check on each, then move the row to Accepted. */
+  const confirmRowReason = useCallback((
+    rowIndex: number,
+    reason: CorrectionReason,
+    detail?: string,
+  ) => {
+    setPendingCorrections((prev) => {
+      const next = { ...prev };
+      for (const [key, entry] of Object.entries(prev)) {
+        if (entry.rowIndex !== rowIndex) continue;
+        persistCorrection({ ...entry, reason, reasonDetail: detail ?? null });
+        flashSavedFor(key);
+        delete next[key];
+      }
+      return next;
     });
-  }, [persistCorrection]);
+    setAwaitingReasonRows((prev) => {
+      const next = new Set(prev);
+      next.delete(rowIndex);
+      return next;
+    });
+    setEditingRow((current) => (current === rowIndex ? null : current));
+    // Move to Accepted (also runs the existing learning hook).
+    approveRow(rowIndex);
+  }, [persistCorrection, flashSavedFor]);
+
+  /** User dismissed without picking — record everything for this row as
+   *  "unspecified" and still move to Accepted. */
+  const skipRowReason = useCallback((rowIndex: number) => {
+    confirmRowReason(rowIndex, "unspecified");
+  }, [confirmRowReason]);
+
+  /** Convenience: derive pending field labels for a row, used for the bar's summary. */
+  const pendingFieldsForRow = useCallback((rowIndex: number) => {
+    return Object.values(pendingCorrections).filter((c) => c.rowIndex === rowIndex);
+  }, [pendingCorrections]);
 
   const updateField = (rowIndex: number, field: string, value: string | number) => {
     onUpdateProducts(products.map(p => {

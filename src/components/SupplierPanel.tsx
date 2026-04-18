@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DbSupplier } from "@/lib/db-schema-types";
+import { isFuzzySupplierMatch } from "@/lib/invoice-persistence";
 import { getCostHistory } from "@/components/InvoiceFlow";
 import SupplierCatalog from "@/components/SupplierCatalog";
 
@@ -212,19 +213,26 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
       .select("supplier_name, total_inc_gst")
       .eq("user_id", session.user.id);
 
+    // Bucket each document into the best fuzzy-matching supplier
     const spendMap: Record<string, number> = {};
+
+    const bucketByFuzzy = (vendorName: string, amount: number) => {
+      const match = suppliers.find(s => isFuzzySupplierMatch(vendorName, s.name));
+      const key = match ? match.name : vendorName;
+      spendMap[key] = (spendMap[key] || 0) + amount;
+    };
 
     if (docs) {
       for (const row of docs) {
         const name = row.supplier_name || "";
-        if (name) spendMap[name] = (spendMap[name] || 0) + (Number(row.total) || 0);
+        if (name) bucketByFuzzy(name, Number(row.total) || 0);
       }
     }
 
     if (pushHistory) {
       for (const row of pushHistory) {
         const name = row.supplier_name || "";
-        if (name) spendMap[name] = Math.max(spendMap[name] || 0, (spendMap[name] || 0) + (Number(row.total_inc_gst) || 0));
+        if (name) bucketByFuzzy(name, Number(row.total_inc_gst) || 0);
       }
     }
 

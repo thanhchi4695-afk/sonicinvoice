@@ -191,12 +191,29 @@ const Index = () => {
   // Allow InvoiceFlow (and others) to stash the reconciliation payload
   // before navigating to the dedicated review panel.
   useEffect(() => {
-    const handler = (e: Event) => {
+    const onReady = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail) setReconciliationResult(detail);
     };
-    window.addEventListener("sonic:reconciliation-ready", handler as EventListener);
-    return () => window.removeEventListener("sonic:reconciliation-ready", handler as EventListener);
+    const onNavFlow = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (typeof detail === "string") setActiveFlow(detail as ActiveFlow);
+    };
+    const onNavTab = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (typeof detail === "string") {
+        setActiveFlow(null);
+        setActiveTab(detail);
+      }
+    };
+    window.addEventListener("sonic:reconciliation-ready", onReady as EventListener);
+    window.addEventListener("sonic:navigate-flow", onNavFlow as EventListener);
+    window.addEventListener("sonic:navigate-tab", onNavTab as EventListener);
+    return () => {
+      window.removeEventListener("sonic:reconciliation-ready", onReady as EventListener);
+      window.removeEventListener("sonic:navigate-flow", onNavFlow as EventListener);
+      window.removeEventListener("sonic:navigate-tab", onNavTab as EventListener);
+    };
   }, []);
   
   const mode = useStoreMode();

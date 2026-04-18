@@ -676,6 +676,73 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
               {detailTab === "catalog" && (
                 <SupplierCatalog supplierId={detail.id} supplierName={detail.name} />
               )}
+
+              {/* Corrections tab — surfaces all merchant edits logged for this supplier */}
+              {detailTab === "corrections" && (
+                <div className="space-y-2">
+                  {corrections.length === 0 ? (
+                    <div className="bg-card rounded-lg border border-border p-6 text-center">
+                      <Pencil className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No corrections logged yet for {detail.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Edits made on the Review page will appear here.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Reason summary chips */}
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {Object.entries(
+                          corrections.reduce<Record<string, number>>((acc, c) => {
+                            const k = c.correction_reason || "unspecified";
+                            acc[k] = (acc[k] || 0) + 1;
+                            return acc;
+                          }, {}),
+                        )
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([reason, count]) => (
+                            <span key={reason} className="text-[10px] px-2 py-0.5 rounded-full bg-muted/60 border border-border">
+                              {reason.replace(/_/g, " ")} · <span className="font-mono font-bold">{count}</span>
+                            </span>
+                          ))}
+                      </div>
+
+                      {corrections.map(c => (
+                        <div key={c.id} className="bg-card rounded-lg border border-border p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                {c.field_corrected || "field"}
+                                {c.field_category && (
+                                  <span className="ml-1.5 text-[10px] text-muted-foreground/70 normal-case">· {c.field_category}</span>
+                                )}
+                              </p>
+                              <div className="mt-1 flex items-center gap-2 text-xs font-mono">
+                                <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive line-through truncate max-w-[160px]">
+                                  {c.original_value || "∅"}
+                                </span>
+                                <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
+                                <span className="px-1.5 py-0.5 rounded bg-success/10 text-success truncate max-w-[160px]">
+                                  {c.corrected_value || "∅"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                {(c.correction_reason || "unspecified").replace(/_/g, " ")}
+                              </span>
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                {new Date(c.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                              </p>
+                            </div>
+                          </div>
+                          {c.correction_reason_detail && (
+                            <p className="text-[11px] text-muted-foreground mt-2 italic">"{c.correction_reason_detail}"</p>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

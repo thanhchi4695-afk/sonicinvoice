@@ -4,6 +4,7 @@ import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, Ch
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { matchCollectionsWithBrand, checkCoverage } from "@/lib/collection-engine";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
@@ -2536,6 +2537,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 onExportAccepted={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
                 onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
                 onBack={() => setStep(2)}
+                matchMethod={matchMethod}
                 onReprocessDetailed={handleReprocessDetailed}
                 isReprocessing={isReprocessing}
                 underExtractionWarning={underExtractionWarning}

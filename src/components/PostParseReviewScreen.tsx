@@ -47,6 +47,8 @@ interface PostParseReviewScreenProps {
   fieldConfidence?: Record<string, number> | null;
   /** Brief AI-authored note describing any uncertainty in the extraction. */
   extractionNotes?: string | null;
+  /** Which extraction path was taken: full_extraction | supplier_match | fingerprint_match. */
+  matchMethod?: "full_extraction" | "supplier_match" | "fingerprint_match";
 }
 
 type ReviewTab = "accepted" | "review" | "rejected";
@@ -143,6 +145,7 @@ export default function PostParseReviewScreen({
   invoicePages = [],
   detectedHeaders = [],
   detectedLayout = null,
+  matchMethod = "full_extraction",
   onUpdateProducts,
   onCellEdited,
   onExportAccepted,
@@ -912,7 +915,7 @@ export default function PostParseReviewScreen({
         <button onClick={() => setShowDebug(!showDebug)} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors">
           <Bug className="w-3.5 h-3.5" />
           <span className="font-medium">AI Parsing Details</span>
-          <span className="text-[10px] ml-auto mr-2">{debug.corrections.length + sessionEditCount} corrections{supplierName ? ` · ${supplierName}` : ""}</span>
+          <span className="text-[10px] ml-auto mr-2">Method: {matchMethod} · {debug.corrections.length + sessionEditCount} corrections{supplierName ? ` · ${supplierName}` : ""}</span>
           {showDebug ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
         {showDebug && (

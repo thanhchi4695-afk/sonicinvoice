@@ -495,6 +495,126 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
               className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm resize-none"
             />
           </div>
+
+          {/* ── Section 2: Name Variants ─────────────────── */}
+          <div className="border-t border-border pt-4">
+            <label className="text-sm font-semibold block">Name variants</label>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+              Alternative names this supplier may appear as on invoices
+            </p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {nameVariants.map((v, i) => (
+                <span key={`${v}-${i}`} className="inline-flex items-center gap-1 rounded-full bg-primary/15 text-primary border border-primary/30 px-2.5 py-1 text-xs">
+                  {v}
+                  <button
+                    type="button"
+                    onClick={() => setNameVariants(prev => prev.filter((_, idx) => idx !== i))}
+                    className="hover:text-destructive"
+                    aria-label={`Remove ${v}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <input
+              value={variantInput}
+              onChange={e => setVariantInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addVariant(); }
+                else if (e.key === "Backspace" && !variantInput && nameVariants.length > 0) {
+                  setNameVariants(prev => prev.slice(0, -1));
+                }
+              }}
+              onBlur={addVariant}
+              placeholder="e.g., Seafolly Pty Ltd, Seafolly Australia"
+              className="w-full rounded-md bg-input border border-border px-3 py-2.5 text-sm"
+            />
+          </div>
+
+          {/* ── Section 3: Invoice Column Mappings ───────── */}
+          <div className="border-t border-border pt-4">
+            <label className="text-sm font-semibold block">Invoice Column Mappings</label>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+              What column headers does this supplier use on their invoices?
+            </p>
+            <div className="space-y-2.5">
+              {COLUMN_FIELDS.map(f => (
+                <div key={f.key} className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-2 sm:items-center">
+                  <label className="text-xs font-medium text-muted-foreground">{f.label}</label>
+                  <input
+                    value={columnMap[f.key]}
+                    onChange={e => setColumnMap(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder}
+                    className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Section 4: Pricing & Tax ─────────────────── */}
+          <div className="border-t border-border pt-4">
+            <label className="text-sm font-semibold block mb-3">Pricing & Tax</label>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm">GST on cost</p>
+                  <p className="text-xs text-muted-foreground">Off = Ex-GST (default)</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={gstOnCost}
+                  onClick={() => setGstOnCost(v => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${gstOnCost ? "bg-primary" : "bg-muted"}`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform ${gstOnCost ? "translate-x-5" : "translate-x-0.5"}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm">GST on RRP</p>
+                  <p className="text-xs text-muted-foreground">On = Incl-GST (default)</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={gstOnRrp}
+                  onClick={() => setGstOnRrp(v => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${gstOnRrp ? "bg-primary" : "bg-muted"}`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform ${gstOnRrp ? "translate-x-5" : "translate-x-0.5"}`} />
+                </button>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Markup multiplier</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={markupMultiplier}
+                  onChange={e => setMarkupMultiplier(e.target.value)}
+                  placeholder="e.g., 2.3"
+                  className="w-full rounded-md bg-input border border-border px-3 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Size system</label>
+                <select
+                  value={sizeSystem}
+                  onChange={e => setSizeSystem(e.target.value as "AU" | "US" | "UK" | "EU")}
+                  className="w-full rounded-md bg-input border border-border px-3 py-2.5 text-sm"
+                >
+                  <option value="AU">AU</option>
+                  <option value="US">US</option>
+                  <option value="UK">UK</option>
+                  <option value="EU">EU</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <Button className="w-full" onClick={addMode ? handleAdd : handleUpdate}>
             <Save className="w-4 h-4 mr-2" />{addMode ? "Add Supplier" : "Save Changes"}
           </Button>

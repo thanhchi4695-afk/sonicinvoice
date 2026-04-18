@@ -494,9 +494,9 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
                           {matchMethodLabel(log.match_method)}
                         </span>
                         <span className="font-mono text-[11px] flex items-center gap-1">
-                          {before ?? "—"}
+                          {before !== null ? `${before}%` : "—"}
                           <span className="text-muted-foreground">→</span>
-                          {after ?? "—"}
+                          {after !== null ? `${after}%` : "—"}
                           {delta !== null && delta !== 0 && (
                             <span className={`text-[10px] ${delta > 0 ? "text-success" : "text-destructive"}`}>
                               ({delta > 0 ? "+" : ""}{delta})
@@ -508,10 +508,29 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
                         </span>
                       </button>
                       {isOpen && (
-                        <div className="px-3 pb-3 pt-1 bg-muted/20">
+                        <div className="px-3 pb-3 pt-1 bg-muted/20 space-y-2">
                           <pre className="text-[10px] font-mono text-muted-foreground whitespace-pre-wrap">
                             {JSON.stringify(log.details ?? {}, null, 2)}
                           </pre>
+                          {(() => {
+                            const invoiceId = (log.details as { invoice_id?: string } | null)?.invoice_id;
+                            if (!invoiceId) return null;
+                            return (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (typeof window !== "undefined") {
+                                    window.sessionStorage.setItem("processingHistory.filter", invoiceId);
+                                    window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "processing-history" }));
+                                  }
+                                }}
+                                className="text-[10px] text-primary hover:underline font-medium"
+                              >
+                                View invoice in Processing History →
+                              </button>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>

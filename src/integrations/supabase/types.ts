@@ -2017,6 +2017,99 @@ export type Database = {
           },
         ]
       }
+      supplier_intelligence: {
+        Row: {
+          column_map: Json
+          confidence_score: number
+          created_at: string
+          gst_on_cost: boolean | null
+          gst_on_rrp: boolean | null
+          id: string
+          invoice_count: number
+          last_invoice_date: string | null
+          last_match_method: string | null
+          markup_multiplier: number | null
+          name_variants: string[]
+          size_system: string | null
+          sku_prefix_pattern: string | null
+          supplier_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          column_map?: Json
+          confidence_score?: number
+          created_at?: string
+          gst_on_cost?: boolean | null
+          gst_on_rrp?: boolean | null
+          id?: string
+          invoice_count?: number
+          last_invoice_date?: string | null
+          last_match_method?: string | null
+          markup_multiplier?: number | null
+          name_variants?: string[]
+          size_system?: string | null
+          sku_prefix_pattern?: string | null
+          supplier_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          column_map?: Json
+          confidence_score?: number
+          created_at?: string
+          gst_on_cost?: boolean | null
+          gst_on_rrp?: boolean | null
+          id?: string
+          invoice_count?: number
+          last_invoice_date?: string | null
+          last_match_method?: string | null
+          markup_multiplier?: number | null
+          name_variants?: string[]
+          size_system?: string | null
+          sku_prefix_pattern?: string | null
+          supplier_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      supplier_learning_log: {
+        Row: {
+          confidence_after: number | null
+          confidence_before: number | null
+          created_at: string
+          details: Json
+          event_type: string
+          id: string
+          match_method: string | null
+          supplier_name: string
+          user_id: string
+        }
+        Insert: {
+          confidence_after?: number | null
+          confidence_before?: number | null
+          created_at?: string
+          details?: Json
+          event_type: string
+          id?: string
+          match_method?: string | null
+          supplier_name: string
+          user_id: string
+        }
+        Update: {
+          confidence_after?: number | null
+          confidence_before?: number | null
+          created_at?: string
+          details?: Json
+          event_type?: string
+          id?: string
+          match_method?: string | null
+          supplier_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       supplier_profiles: {
         Row: {
           confidence_score: number | null

@@ -1430,18 +1430,36 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
       supabase.functions
         .invoke("extract-supplier-pattern", { body: payload })
-        .then(({ data, error }) => {
+        .then(async ({ data, error }) => {
           if (error) {
             console.warn("Pattern learning failed silently:", error);
             return;
           }
           if (!data) return;
           const supplierLabel = name;
+          // Build a learning payload we can persist into supplier_intelligence.
+          const learningPayload = {
+            supplierName: supplierLabel,
+            confidence: data.confidence_score ?? null,
+            columnMap: (data.column_map ?? null) as Record<string, string> | null,
+            sizeSystem: data.size_system ?? null,
+            skuPrefixPattern: data.sku_prefix_pattern ?? null,
+            gstOnCost: data.gst_included_in_cost ?? null,
+            gstOnRrp: data.gst_included_in_rrp ?? null,
+            markupMultiplier: data.default_markup_multiplier ?? null,
+            matchMethod: matchMethod || "full_extraction",
+          };
+          // Lazy-load the helper so we don't pay the import cost on every render.
+          const { recordSupplierLearned, recordSupplierUpdated } = await import(
+            "@/lib/supplier-intelligence"
+          );
           if (data.is_new_supplier) {
+            void recordSupplierLearned(learningPayload);
             toast(`New supplier learned: ${supplierLabel}`, {
               description: "The app will get smarter with each invoice.",
             });
           } else {
+            void recordSupplierUpdated(learningPayload);
             toast(`Supplier profile updated: ${supplierLabel}`, {
               description: `Confidence now ${data.confidence_score ?? 0}%.`,
             });

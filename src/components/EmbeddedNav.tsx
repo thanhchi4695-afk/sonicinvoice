@@ -1,4 +1,4 @@
-import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight, X, Users, Brain } from "lucide-react";
+import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight, X, Users, Brain, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EmbeddedNavProps {
@@ -22,6 +22,7 @@ const navSections = [
     title: "Workflows",
     items: [
       { id: "invoice", label: "Process Invoice", icon: FileText, type: "flow" as const },
+      { id: "processing_history", label: "Processing History", icon: History, type: "flow" as const },
       { id: "sale", label: "Bulk Sale", icon: Layers, type: "flow" as const },
       { id: "purchase_orders", label: "Purchase Orders", icon: ClipboardList, type: "flow" as const },
       { id: "email_inbox", label: "Email Inbox", icon: Mail, type: "flow" as const },

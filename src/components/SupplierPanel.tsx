@@ -44,6 +44,18 @@ interface ProductCostSummary {
   costTrend: "up" | "down" | "stable";
 }
 
+interface CorrectionRow {
+  id: string;
+  field_corrected: string | null;
+  original_value: string | null;
+  corrected_value: string | null;
+  correction_reason: string | null;
+  correction_reason_detail: string | null;
+  field_category: string | null;
+  created_at: string;
+  invoice_id: string | null;
+}
+
 // ── Seed demo suppliers if table is empty ─────────────────
 const DEMO_SUPPLIERS: Omit<SupplierRow, "id" | "user_id" | "created_at" | "updated_at">[] = [
   { name: "Jantzen", contact_info: { email: "orders@jantzen.com.au", rep: "Sarah M" }, currency: "AUD", notes: "MOQ $2,000. Net 30.", total_spend: 48500, avg_margin: 62 },

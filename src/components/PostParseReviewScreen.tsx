@@ -412,12 +412,16 @@ export default function PostParseReviewScreen({
     reason: CorrectionReason,
     detail?: string,
   ) => {
+    let savedCount = 0;
+    const fieldsSaved: string[] = [];
     setPendingCorrections((prev) => {
       const next = { ...prev };
       for (const [key, entry] of Object.entries(prev)) {
         if (entry.rowIndex !== rowIndex) continue;
         persistCorrection({ ...entry, reason, reasonDetail: detail ?? null });
         flashSavedFor(key);
+        savedCount += 1;
+        fieldsSaved.push(entry.field);
         delete next[key];
       }
       return next;
@@ -430,7 +434,28 @@ export default function PostParseReviewScreen({
     setEditingRow((current) => (current === rowIndex ? null : current));
     // Move to Accepted (also runs the existing learning hook).
     approveRow(rowIndex);
-  }, [persistCorrection, flashSavedFor]);
+
+    // Session-summary toast — concise confirmation per row.
+    if (savedCount > 0) {
+      const reasonLabel =
+        reason === "unspecified" ? "unspecified" :
+        reason === "wrong_column_detected" ? "wrong column" :
+        reason === "wrong_format" ? "wrong format" :
+        reason === "currency_error" ? "currency" :
+        reason === "size_system_wrong" ? "wrong size system" :
+        reason === "missed_field" ? "field missing" :
+        reason === "wrong_value" ? "wrong value" :
+        "other";
+      const fieldList = fieldsSaved.slice(0, 3).join(", ") + (fieldsSaved.length > 3 ? "…" : "");
+      toast.success(
+        `${savedCount} correction${savedCount === 1 ? "" : "s"} saved`,
+        {
+          description: `${fieldList} · reason: ${reasonLabel}${supplierName ? ` · ${supplierName}` : ""}`,
+          duration: 2500,
+        },
+      );
+    }
+  }, [persistCorrection, flashSavedFor, supplierName]);
 
   /** User dismissed without picking — record everything for this row as
    *  "unspecified" and still move to Accepted. */

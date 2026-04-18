@@ -4,6 +4,7 @@ import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, Ch
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { matchCollectionsWithBrand, checkCoverage } from "@/lib/collection-engine";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
@@ -2331,9 +2332,37 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                   </div>
                 )}
 
+                {/* Fingerprint pre-message — shown above the progress bar when layout was recognised */}
+                {!showCompletionSummary && matchMethod === "fingerprint_match" && fingerprintHit && (
+                  <div className="bg-success/10 border border-success/30 rounded-lg px-3 py-2 mb-3 flex items-center gap-2">
+                    <Zap className="w-3.5 h-3.5 text-success shrink-0" />
+                    <p className="text-xs text-success">
+                      Recognised invoice layout{supplierName ? ` from ${supplierName}` : ""} — skipping full extraction
+                    </p>
+                  </div>
+                )}
+
                 {/* Status overview bar */}
                 {!showCompletionSummary && (
                   <div className="bg-card rounded-lg border border-border p-4 mb-4">
+                    {/* Extraction method badge */}
+                    <div className="flex items-center gap-2 mb-3">
+                      {matchMethod === "fingerprint_match" && (
+                        <Badge className="bg-success/15 text-success border-success/30 hover:bg-success/15 text-[10px] font-medium">
+                          ✓ Layout recognised — using saved fingerprint
+                        </Badge>
+                      )}
+                      {matchMethod === "supplier_match" && (
+                        <Badge className="bg-primary/15 text-primary border-primary/30 hover:bg-primary/15 text-[10px] font-medium">
+                          ◆ Supplier recognised — using saved rules
+                        </Badge>
+                      )}
+                      {matchMethod === "full_extraction" && (
+                        <Badge className="bg-secondary/15 text-secondary border-secondary/30 hover:bg-secondary/15 text-[10px] font-medium">
+                          ⚙ Full extraction — learning new layout
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex items-center justify-between text-xs mb-3">
                       <div className="flex gap-3">
                         <span className="text-muted-foreground">{total} lines</span>
@@ -2508,6 +2537,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 onExportAccepted={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
                 onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
                 onBack={() => setStep(2)}
+                matchMethod={matchMethod}
                 onReprocessDetailed={handleReprocessDetailed}
                 isReprocessing={isReprocessing}
                 underExtractionWarning={underExtractionWarning}

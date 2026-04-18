@@ -44,6 +44,18 @@ interface ProductCostSummary {
   costTrend: "up" | "down" | "stable";
 }
 
+interface CorrectionRow {
+  id: string;
+  field_corrected: string | null;
+  original_value: string | null;
+  corrected_value: string | null;
+  correction_reason: string | null;
+  correction_reason_detail: string | null;
+  field_category: string | null;
+  created_at: string;
+  invoice_id: string | null;
+}
+
 // ── Seed demo suppliers if table is empty ─────────────────
 const DEMO_SUPPLIERS: Omit<SupplierRow, "id" | "user_id" | "created_at" | "updated_at">[] = [
   { name: "Jantzen", contact_info: { email: "orders@jantzen.com.au", rep: "Sarah M" }, currency: "AUD", notes: "MOQ $2,000. Net 30.", total_spend: 48500, avg_margin: 62 },
@@ -64,8 +76,9 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   // Detail sub-data
   const [linkedInvoices, setLinkedInvoices] = useState<LinkedInvoice[]>([]);
   const [productCosts, setProductCosts] = useState<ProductCostSummary[]>([]);
+  const [corrections, setCorrections] = useState<CorrectionRow[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailTab, setDetailTab] = useState<"overview" | "invoices" | "costs" | "catalog">("overview");
+  const [detailTab, setDetailTab] = useState<"overview" | "invoices" | "costs" | "catalog" | "corrections">("overview");
 
   // Form state
   const [form, setForm] = useState({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
@@ -186,6 +199,16 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
       setLinkedInvoices([]);
       setProductCosts([]);
     }
+
+
+    // Load correction_log entries for this supplier — fuzzy by supplier_name.
+    const { data: corrRows } = await supabase
+      .from("correction_log")
+      .select("id, field_corrected, original_value, corrected_value, correction_reason, correction_reason_detail, field_category, created_at, invoice_id")
+      .ilike("supplier_name", `%${safeName}%`)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    setCorrections((corrRows || []) as CorrectionRow[]);
 
     setLoadingDetail(false);
   }, []);
@@ -446,14 +469,18 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
           )}
 
           {/* Tab bar */}
-          <div className="flex gap-1 bg-muted/50 rounded-lg p-1">
-            {(["overview", "invoices", "costs", "catalog"] as const).map(tab => (
+          <div className="flex gap-1 bg-muted/50 rounded-lg p-1 overflow-x-auto">
+            {(["overview", "invoices", "costs", "catalog", "corrections"] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setDetailTab(tab)}
-                className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${detailTab === tab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+                className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${detailTab === tab ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
               >
-                {tab === "overview" ? "Overview" : tab === "invoices" ? `Invoices (${invoiceCount})` : tab === "costs" ? `Costs (${totalProducts})` : "Catalog"}
+                {tab === "overview" ? "Overview"
+                  : tab === "invoices" ? `Invoices (${invoiceCount})`
+                  : tab === "costs" ? `Costs (${totalProducts})`
+                  : tab === "catalog" ? "Catalog"
+                  : `Corrections (${corrections.length})`}
               </button>
             ))}
           </div>
@@ -648,6 +675,73 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
               )}
               {detailTab === "catalog" && (
                 <SupplierCatalog supplierId={detail.id} supplierName={detail.name} />
+              )}
+
+              {/* Corrections tab — surfaces all merchant edits logged for this supplier */}
+              {detailTab === "corrections" && (
+                <div className="space-y-2">
+                  {corrections.length === 0 ? (
+                    <div className="bg-card rounded-lg border border-border p-6 text-center">
+                      <Pencil className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No corrections logged yet for {detail.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Edits made on the Review page will appear here.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Reason summary chips */}
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {Object.entries(
+                          corrections.reduce<Record<string, number>>((acc, c) => {
+                            const k = c.correction_reason || "unspecified";
+                            acc[k] = (acc[k] || 0) + 1;
+                            return acc;
+                          }, {}),
+                        )
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([reason, count]) => (
+                            <span key={reason} className="text-[10px] px-2 py-0.5 rounded-full bg-muted/60 border border-border">
+                              {reason.replace(/_/g, " ")} · <span className="font-mono font-bold">{count}</span>
+                            </span>
+                          ))}
+                      </div>
+
+                      {corrections.map(c => (
+                        <div key={c.id} className="bg-card rounded-lg border border-border p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                {c.field_corrected || "field"}
+                                {c.field_category && (
+                                  <span className="ml-1.5 text-[10px] text-muted-foreground/70 normal-case">· {c.field_category}</span>
+                                )}
+                              </p>
+                              <div className="mt-1 flex items-center gap-2 text-xs font-mono">
+                                <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive line-through truncate max-w-[160px]">
+                                  {c.original_value || "∅"}
+                                </span>
+                                <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
+                                <span className="px-1.5 py-0.5 rounded bg-success/10 text-success truncate max-w-[160px]">
+                                  {c.corrected_value || "∅"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                {(c.correction_reason || "unspecified").replace(/_/g, " ")}
+                              </span>
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                {new Date(c.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                              </p>
+                            </div>
+                          </div>
+                          {c.correction_reason_detail && (
+                            <p className="text-[11px] text-muted-foreground mt-2 italic">"{c.correction_reason_detail}"</p>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
               )}
             </>
           )}

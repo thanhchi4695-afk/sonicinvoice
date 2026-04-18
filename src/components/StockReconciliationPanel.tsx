@@ -598,6 +598,7 @@ function LineRow({
   decision,
   onDecision,
   groupBadge,
+  onOpen,
 }: {
   line: ReconciliationLine;
   checked: boolean;
@@ -605,6 +606,7 @@ function LineRow({
   decision?: "new" | "old";
   onDecision: (d: "new" | "old") => void;
   groupBadge: string;
+  onOpen?: () => void;
 }) {
   const isConflict = line.match_type.endsWith("_conflict");
   const isRefill = line.match_type.startsWith("exact_refill");
@@ -620,13 +622,26 @@ function LineRow({
     line.matched_product_id ? `Product #${line.matched_product_id.slice(-6)}` : null;
 
   return (
-    <div className="px-4 py-3 hover:bg-muted/30">
+    <div
+      className="px-4 py-3 hover:bg-muted/30 cursor-pointer"
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen?.();
+        }
+      }}
+    >
       <div className="flex items-start gap-3">
-        <Checkbox
-          checked={checked}
-          onCheckedChange={(v) => onToggle(v === true)}
-          className="mt-1"
-        />
+        <div onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={checked}
+            onCheckedChange={(v) => onToggle(v === true)}
+            className="mt-1"
+          />
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="font-medium truncate">

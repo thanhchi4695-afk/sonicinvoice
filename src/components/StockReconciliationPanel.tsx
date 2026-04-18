@@ -147,6 +147,9 @@ export function StockReconciliationPanel({
     review: true,
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [exportPlatform, setExportPlatform] = useState<"shopify" | "lightspeed">(
+    platform === "lightspeed" ? "lightspeed" : "shopify",
+  );
 
   const grouped = useMemo(() => {
     const g: Record<GroupKey, { line: ReconciliationLine; idx: number }[]> = {

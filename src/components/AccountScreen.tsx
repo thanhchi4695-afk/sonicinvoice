@@ -277,6 +277,11 @@ const AccountScreen = () => {
         </div>
       </Section>
 
+      {/* Platform connections (Shopify + Lightspeed unified card view) */}
+      <Section title="Platform connections">
+        <PlatformConnectionsSection />
+      </Section>
+
       {/* Shopify Connection */}
       <Section title="Shopify connection">
         {shopifyConnected && (

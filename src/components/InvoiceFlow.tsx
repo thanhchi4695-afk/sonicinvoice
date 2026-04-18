@@ -1483,6 +1483,126 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
   const [isReprocessing, setIsReprocessing] = useState(false);
 
+  // ── Stock reconciliation (auto-runs when reaching export step) ───────────
+  const [platformConnections, setPlatformConnections] = useState<Array<{ platform: string; shop_domain?: string | null }>>([]);
+  const [platformsChecked, setPlatformsChecked] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
+  const [reconcileProgress, setReconcileProgress] = useState(0);
+  const [reconcileResult, setReconcileResult] = useState<any>(null);
+  const [reconcileError, setReconcileError] = useState<string | null>(null);
+  const reconcileStartedRef = useRef(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: userRes } = await supabase.auth.getUser();
+        const uid = userRes?.user?.id;
+        if (!uid) { setPlatformsChecked(true); return; }
+        const { data } = await supabase
+          .from("platform_connections")
+          .select("platform, shop_domain")
+          .eq("user_id", uid)
+          .eq("is_active", true);
+        setPlatformConnections((data ?? []) as any);
+      } catch {
+        // non-fatal
+      } finally {
+        setPlatformsChecked(true);
+      }
+    })();
+  }, []);
+
+  const connectedPlatformLabel = (() => {
+    const set = new Set(platformConnections.map((c) => c.platform));
+    if (set.has("shopify") && set.has("lightspeed")) return "Shopify & Lightspeed";
+    if (set.has("shopify")) return "Shopify";
+    if (set.has("lightspeed")) return "Lightspeed";
+    return null;
+  })();
+
+  useEffect(() => {
+    if (step !== 4) return;
+    if (!platformsChecked) return;
+    if (reconcileStartedRef.current) return;
+    if (platformConnections.length === 0) return;
+    if (productGroups.length === 0) return;
+    reconcileStartedRef.current = true;
+
+    const platform =
+      platformConnections.some((c) => c.platform === "shopify") &&
+      platformConnections.some((c) => c.platform === "lightspeed")
+        ? "both"
+        : platformConnections[0].platform;
+
+    // Flatten productGroups into invoice_lines
+    const invoice_lines = productGroups.flatMap((g) =>
+      (g.variants && g.variants.length > 0)
+        ? g.variants.map((v) => ({
+            sku: v.sku,
+            product_name: g.name,
+            brand: g.brand,
+            colour: v.option1Value || g.colour,
+            size: v.option2Value || g.size,
+            qty: v.qty,
+            cost: v.price ?? g.cogs ?? g.price,
+            rrp: v.rrp ?? g.rrp,
+            barcode: g.barcode,
+          }))
+        : [{
+            sku: (g as any).sku ?? "",
+            product_name: g.name,
+            brand: g.brand,
+            colour: g.colour,
+            size: g.size,
+            qty: 1,
+            cost: g.cogs ?? g.price,
+            rrp: g.rrp,
+            barcode: g.barcode,
+          }]
+    );
+
+    setReconciling(true);
+    setReconcileProgress(0);
+    setReconcileError(null);
+
+    // Indeterminate progress ticker (capped at 92%)
+    const ticker = setInterval(() => {
+      setReconcileProgress((p) => (p < 92 ? p + Math.max(1, Math.round((92 - p) / 12)) : p));
+    }, 350);
+
+    (async () => {
+      try {
+        const { data: userRes } = await supabase.auth.getUser();
+        const uid = userRes?.user?.id;
+        const { data, error } = await supabase.functions.invoke("reconcile-invoice", {
+          body: {
+            user_id: uid,
+            invoice_id: null,
+            supplier_name: supplierName || null,
+            platform,
+            invoice_lines,
+          },
+        });
+        if (error) throw error;
+        setReconcileProgress(100);
+        const enriched = { ...(data as any), platform };
+        setReconcileResult(enriched);
+        // Broadcast so Index can stash before navigating to the review panel
+        window.dispatchEvent(new CustomEvent("sonic:reconciliation-ready", { detail: enriched }));
+      } catch (err: any) {
+        console.error("[reconcile-invoice]", err);
+        setReconcileError(err?.message || "Stock reconciliation failed");
+        toast.error("Stock check failed", { description: "You can still export your invoice as usual." });
+      } finally {
+        clearInterval(ticker);
+        setReconciling(false);
+      }
+    })();
+
+    return () => clearInterval(ticker);
+  }, [step, platformsChecked, platformConnections, productGroups, supplierName]);
+
+
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {
     try {
@@ -2762,6 +2882,80 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               <span className="text-xs text-success font-medium">
                 {confCounts.high} lines ready · {confCounts.medium} need review · All products exportable
               </span>
+            </div>
+          )}
+
+          {/* Stock reconciliation status (auto-runs when entering export step) */}
+          {connectedPlatformLabel && (reconciling || reconcileResult || reconcileError) && (
+            <div className="bg-card border border-primary/20 rounded-lg p-4 mb-4">
+              {reconciling && (
+                <div className="flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 text-primary animate-spin shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold">Checking stock…</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Matching {productGroups.length} products against your {connectedPlatformLabel} catalog
+                    </p>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
+                      <div className="h-full bg-primary transition-all" style={{ width: `${reconcileProgress}%` }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!reconciling && reconcileResult && (
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                    <PackageCheck className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">Stock check complete</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {reconcileResult.summary?.new_products ?? 0} new ·{" "}
+                      {reconcileResult.summary?.exact_refills ?? 0} refills ·{" "}
+                      {(reconcileResult.summary?.new_variants ?? 0) + (reconcileResult.summary?.new_colours ?? 0)} new variants ·{" "}
+                      {reconcileResult.summary?.conflicts ?? 0} need review
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="teal"
+                      className="mt-3"
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent("sonic:reconciliation-ready", { detail: reconcileResult }));
+                        window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "stock_reconciliation" }));
+                      }}
+                    >
+                      Review stock classification <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {!reconciling && reconcileError && (
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">Stock check unavailable</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {reconcileError}. You can still export your invoice using the buttons below.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* No-platform banner */}
+          {platformsChecked && !connectedPlatformLabel && (
+            <div className="bg-muted/40 border border-border rounded-lg p-3 mb-4 flex items-center gap-3">
+              <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+              <p className="text-xs text-muted-foreground flex-1">
+                Connect Shopify or Lightspeed to automatically identify new vs existing stock.
+              </p>
+              <button
+                className="text-xs text-primary font-medium hover:underline shrink-0"
+                onClick={() => window.dispatchEvent(new CustomEvent("sonic:navigate-tab", { detail: "account" }))}
+              >
+                Connect →
+              </button>
             </div>
           )}
 

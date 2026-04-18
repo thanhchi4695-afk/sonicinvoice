@@ -123,23 +123,25 @@ export async function logCorrection(input: LogCorrectionInput): Promise<void> {
       session_invoice_index: input.sessionInvoiceIndex ?? null,
     } as never);
 
-    // Tally for the prompt — only meaningful when we have a known supplier.
-    if (!profile?.id) return;
-    const key = `${profile.id}::${field}`;
-    const next = (correctionTally.get(key) || 0) + 1;
-    correctionTally.set(key, next);
+    // Tally on supplier name so we still prompt even without a supplier_profiles row.
+    const tallyKey = `${normalised}::${field}`;
+    if (ignoredKeys.has(tallyKey)) return;
+    const next = (correctionTally.get(tallyKey) || 0) + 1;
+    correctionTally.set(tallyKey, next);
 
-    if (next >= 3 && !promptedKeys.has(key)) {
-      promptedKeys.add(key);
+    if (next >= 3 && !promptedKeys.has(tallyKey)) {
+      promptedKeys.add(tallyKey);
       promptUpdateRule({
-        supplierProfileId: profile.id,
+        supplierProfileId: profile?.id ?? null,
         supplierName,
         field,
+        originalValue,
         latestCorrected: correctedValue,
         rawHeaders: input.rawHeaders || [],
         sampleRows: input.sampleRows || [],
         formatType: input.formatType ?? null,
         extractedProducts: input.extractedProducts || [],
+        tallyKey,
       });
     }
   } catch (err) {

@@ -83,6 +83,111 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   // Form state
   const [form, setForm] = useState({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
 
+  // ── Intelligence form state (variants, column map, pricing) ──
+  type ColMapKey = "product_name" | "sku" | "colour" | "size" | "cost" | "rrp" | "quantity";
+  const COLUMN_FIELDS: { key: ColMapKey; label: string; placeholder: string }[] = [
+    { key: "product_name", label: "Product name column", placeholder: "e.g., Style Description, Product Name" },
+    { key: "sku", label: "SKU column", placeholder: "e.g., Style Code, Item No" },
+    { key: "colour", label: "Colour column", placeholder: "e.g., Colourway, Color" },
+    { key: "size", label: "Size column", placeholder: "e.g., Size, Sizing" },
+    { key: "cost", label: "Cost column", placeholder: "e.g., Wholesale Price, WSP, Buy Price" },
+    { key: "rrp", label: "RRP column", placeholder: "e.g., RRP, Retail, Recommended Retail" },
+    { key: "quantity", label: "Quantity column", placeholder: "e.g., Qty, Quantity, Units" },
+  ];
+  const [nameVariants, setNameVariants] = useState<string[]>([]);
+  const [variantInput, setVariantInput] = useState("");
+  const [columnMap, setColumnMap] = useState<Record<ColMapKey, string>>({
+    product_name: "", sku: "", colour: "", size: "", cost: "", rrp: "", quantity: "",
+  });
+  const [gstOnCost, setGstOnCost] = useState(false); // Ex-GST default
+  const [gstOnRrp, setGstOnRrp] = useState(true); // Incl-GST default
+  const [markupMultiplier, setMarkupMultiplier] = useState<string>("");
+  const [sizeSystem, setSizeSystem] = useState<"AU" | "US" | "UK" | "EU">("AU");
+
+  const resetIntelligenceForm = () => {
+    setNameVariants([]);
+    setVariantInput("");
+    setColumnMap({ product_name: "", sku: "", colour: "", size: "", cost: "", rrp: "", quantity: "" });
+    setGstOnCost(false);
+    setGstOnRrp(true);
+    setMarkupMultiplier("");
+    setSizeSystem("AU");
+  };
+
+  const addVariant = () => {
+    const v = variantInput.trim();
+    if (!v) return;
+    if (nameVariants.some(n => n.toLowerCase() === v.toLowerCase())) { setVariantInput(""); return; }
+    setNameVariants(prev => [...prev, v]);
+    setVariantInput("");
+  };
+
+  const loadIntelligenceForSupplier = useCallback(async (supplierName: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data } = await supabase
+      .from("supplier_intelligence")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .eq("supplier_name", supplierName)
+      .maybeSingle();
+    if (!data) { resetIntelligenceForm(); return; }
+    setNameVariants(((data as any).name_variants as string[]) ?? []);
+    const cm = ((data as any).column_map as Record<string, string>) ?? {};
+    setColumnMap({
+      product_name: cm.product_name ?? "",
+      sku: cm.sku ?? "",
+      colour: cm.colour ?? "",
+      size: cm.size ?? "",
+      cost: cm.cost ?? "",
+      rrp: cm.rrp ?? "",
+      quantity: cm.quantity ?? "",
+    });
+    setGstOnCost(Boolean((data as any).gst_on_cost));
+    setGstOnRrp((data as any).gst_on_rrp ?? true);
+    setMarkupMultiplier((data as any).markup_multiplier != null ? String((data as any).markup_multiplier) : "");
+    const ss = ((data as any).size_system as string) ?? "AU";
+    setSizeSystem((["AU", "US", "UK", "EU"].includes(ss) ? ss : "AU") as "AU" | "US" | "UK" | "EU");
+  }, []);
+
+  const upsertSupplierIntelligence = async (supplierName: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const cleanedColMap = Object.fromEntries(
+      Object.entries(columnMap).filter(([, v]) => v && v.trim().length > 0).map(([k, v]) => [k, v.trim()]),
+    );
+    const markup = markupMultiplier ? parseFloat(markupMultiplier) : null;
+
+    const { data: existing } = await supabase
+      .from("supplier_intelligence")
+      .select("id, confidence_score")
+      .eq("user_id", session.user.id)
+      .eq("supplier_name", supplierName)
+      .maybeSingle();
+
+    const payload: Record<string, unknown> = {
+      user_id: session.user.id,
+      supplier_name: supplierName,
+      name_variants: nameVariants,
+      column_map: cleanedColMap,
+      gst_on_cost: gstOnCost,
+      gst_on_rrp: gstOnRrp,
+      markup_multiplier: markup,
+      size_system: sizeSystem,
+    };
+
+    if (existing?.id) {
+      await supabase.from("supplier_intelligence").update(payload as never).eq("id", existing.id);
+    } else {
+      await supabase.from("supplier_intelligence").insert({
+        ...payload,
+        confidence_score: 40,
+        invoice_count: 0,
+        last_match_method: "manual",
+      } as never);
+    }
+  };
+
   // ── Load suppliers ──────────────────────────────────────
   const loadSuppliers = useCallback(async () => {
     setLoading(true);

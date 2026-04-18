@@ -91,7 +91,7 @@ const ShopifyCSVSEO = lazy(() => import("@/components/ShopifyCSVSEO"));
 const StockyHomeDashboard = lazy(() => import("@/components/StockyHomeDashboard"));
 const PriceMatchPanel = lazy(() => import("@/components/PriceMatchPanel"));
 const ProductDescriptionPanel = lazy(() => import("@/components/ProductDescriptionPanel"));
-const StockReconciliationPanel = lazy(() => import("@/components/StockReconciliationPanel"));
+const StockReconciliationPanel = lazy(() => import("@/components/StockReconciliationPanel").then(m => ({ default: m.StockReconciliationPanel })));
 // ── Flow keys registry — single source of truth for all activeFlow values ──
 // Add a new flow by adding its key here; TypeScript will enforce usage everywhere.
 const FLOW_KEYS = {

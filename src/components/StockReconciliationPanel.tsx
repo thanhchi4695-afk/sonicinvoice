@@ -348,74 +348,170 @@ export function StockReconciliationPanel({
       </div>
 
       <Card className="p-4">
-        <div className="text-sm font-medium mb-3">Export to Shopify</div>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div className="text-sm font-medium">
+            Export to {exportPlatform === "lightspeed" ? "Lightspeed" : "Shopify"}
+          </div>
+          {platform === "both" && (
+            <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+              <button
+                type="button"
+                onClick={() => setExportPlatform("shopify")}
+                className={cn(
+                  "px-3 py-1.5 transition-colors",
+                  exportPlatform === "shopify"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background hover:bg-muted",
+                )}
+              >
+                Shopify
+              </button>
+              <button
+                type="button"
+                onClick={() => setExportPlatform("lightspeed")}
+                className={cn(
+                  "px-3 py-1.5 transition-colors border-l border-border",
+                  exportPlatform === "lightspeed"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background hover:bg-muted",
+                )}
+              >
+                Lightspeed
+              </button>
+            </div>
+          )}
+        </div>
         <TooltipProvider delayDuration={200}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {/* Format A — New products */}
-            <ExportButton
-              label={`Export ${exportSets.newProducts.length} new products`}
-              colorClass="bg-emerald-600 hover:bg-emerald-700 text-white"
-              disabled={exportSets.newProducts.length === 0}
-              onClick={() => {
-                const res = exportNewProductsCsv(exportSets.newProducts);
-                toast({ title: "New products exported", description: `${res.rowCount} rows · ${res.filename}` });
-                onExport(exportSets);
-              }}
-              tooltip={
-                <>
-                  <p className="font-medium mb-1">New products CSV</p>
-                  <p>Standard Shopify product import (with an extra <code>Import Type=NEW</code> column).</p>
-                  <p className="mt-2 text-muted-foreground">
-                    In Shopify admin: <em>Products → Import → Add new products only</em>.
-                  </p>
-                </>
-              }
-            />
-
-            {/* Format B — Inventory adjustment */}
-            <ExportButton
-              label={`Export ${exportSets.refills.length} stock updates`}
-              colorClass="bg-blue-600 hover:bg-blue-700 text-white"
-              disabled={exportSets.refills.length === 0}
-              onClick={() => {
-                const res = exportStockUpdateCsv(exportSets.refills);
-                toast({ title: "Stock update exported", description: `${res.rowCount} rows · ${res.filename}` });
-                onExport({ ...exportSets, newProducts: [], newVariants: [], all: exportSets.refills });
-              }}
-              tooltip={
-                <>
-                  <p className="font-medium mb-1">Stock update CSV (additive)</p>
-                  <p>Adds the received quantities to your current Shopify stock — it does <strong>not</strong> replace existing levels.</p>
-                  <p className="mt-2 text-muted-foreground">
-                    Import using the <em>Matrixify / Excelify</em> app in <em>additive inventory</em> mode.
-                  </p>
-                </>
-              }
-            />
-
-            {/* Format C — New variants */}
-            <ExportButton
-              label={`Export ${exportSets.newVariants.length} new variants`}
-              colorClass="bg-amber-600 hover:bg-amber-700 text-white"
-              disabled={exportSets.newVariants.length === 0}
-              onClick={async () => {
-                const res = await exportNewVariantsCsv(exportSets.newVariants);
-                toast({
-                  title: "New variants exported",
-                  description: `${res.rowCount} rows · ${res.filename}${res.missingHandles ? ` · ${res.missingHandles} missing handle(s)` : ""}`,
-                });
-                onExport({ ...exportSets, newProducts: [], refills: [], all: exportSets.newVariants });
-              }}
-              tooltip={
-                <>
-                  <p className="font-medium mb-1">New variants CSV</p>
-                  <p>Adds new sizes/colours to <em>existing</em> Shopify products. The <code>Handle</code> column is fetched from your live catalog cache.</p>
-                  <p className="mt-2 text-muted-foreground">
-                    Import using <em>Matrixify</em> or Shopify's bulk variant editor — the matching handle attaches the variant to the existing product.
-                  </p>
-                </>
-              }
-            />
+            {exportPlatform === "shopify" ? (
+              <>
+                <ExportButton
+                  label={`Export ${exportSets.newProducts.length} new products`}
+                  colorClass="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  disabled={exportSets.newProducts.length === 0}
+                  onClick={() => {
+                    const res = exportNewProductsCsv(exportSets.newProducts);
+                    toast({ title: "New products exported", description: `${res.rowCount} rows · ${res.filename}` });
+                    onExport(exportSets);
+                  }}
+                  tooltip={
+                    <>
+                      <p className="font-medium mb-1">New products CSV</p>
+                      <p>Standard Shopify product import (with an extra <code>Import Type=NEW</code> column).</p>
+                      <p className="mt-2 text-muted-foreground">
+                        In Shopify admin: <em>Products → Import → Add new products only</em>.
+                      </p>
+                    </>
+                  }
+                />
+                <ExportButton
+                  label={`Export ${exportSets.refills.length} stock updates`}
+                  colorClass="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={exportSets.refills.length === 0}
+                  onClick={() => {
+                    const res = exportStockUpdateCsv(exportSets.refills);
+                    toast({ title: "Stock update exported", description: `${res.rowCount} rows · ${res.filename}` });
+                    onExport({ ...exportSets, newProducts: [], newVariants: [], all: exportSets.refills });
+                  }}
+                  tooltip={
+                    <>
+                      <p className="font-medium mb-1">Stock update CSV (additive)</p>
+                      <p>Adds the received quantities to your current Shopify stock — it does <strong>not</strong> replace existing levels.</p>
+                      <p className="mt-2 text-muted-foreground">
+                        Import using the <em>Matrixify / Excelify</em> app in <em>additive inventory</em> mode.
+                      </p>
+                    </>
+                  }
+                />
+                <ExportButton
+                  label={`Export ${exportSets.newVariants.length} new variants`}
+                  colorClass="bg-amber-600 hover:bg-amber-700 text-white"
+                  disabled={exportSets.newVariants.length === 0}
+                  onClick={async () => {
+                    const res = await exportNewVariantsCsv(exportSets.newVariants);
+                    toast({
+                      title: "New variants exported",
+                      description: `${res.rowCount} rows · ${res.filename}${res.missingHandles ? ` · ${res.missingHandles} missing handle(s)` : ""}`,
+                    });
+                    onExport({ ...exportSets, newProducts: [], refills: [], all: exportSets.newVariants });
+                  }}
+                  tooltip={
+                    <>
+                      <p className="font-medium mb-1">New variants CSV</p>
+                      <p>Adds new sizes/colours to <em>existing</em> Shopify products. The <code>Handle</code> column is fetched from your live catalog cache.</p>
+                      <p className="mt-2 text-muted-foreground">
+                        Import using <em>Matrixify</em> or Shopify's bulk variant editor — the matching handle attaches the variant to the existing product.
+                      </p>
+                    </>
+                  }
+                />
+              </>
+            ) : (
+              <>
+                <ExportButton
+                  label={`Export ${exportSets.newProducts.length} new products`}
+                  colorClass="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  disabled={exportSets.newProducts.length === 0}
+                  onClick={() => {
+                    const res = exportLightspeedNewProductsCsv(exportSets.newProducts);
+                    toast({ title: "New products exported", description: `${res.rowCount} rows · ${res.filename}` });
+                    onExport(exportSets);
+                  }}
+                  tooltip={
+                    <>
+                      <p className="font-medium mb-1">Lightspeed new products CSV</p>
+                      <p>Creates new items in Lightspeed with <code>track_inventory=TRUE</code> and seeds <code>initial_stock_on_hand</code> from invoice quantity.</p>
+                      <p className="mt-2 text-muted-foreground">
+                        In Lightspeed: <em>Catalog → Import → Products</em>.
+                      </p>
+                    </>
+                  }
+                />
+                <ExportButton
+                  label={`Export ${exportSets.refills.length} stock updates`}
+                  colorClass="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={exportSets.refills.length === 0}
+                  onClick={() => {
+                    const res = exportLightspeedStockUpdateCsv(exportSets.refills, {
+                      locationId: catalog_meta?.last_synced_at ? "" : "",
+                    });
+                    toast({ title: "Stock update exported", description: `${res.rowCount} rows · ${res.filename}` });
+                    onExport({ ...exportSets, newProducts: [], newVariants: [], all: exportSets.refills });
+                  }}
+                  tooltip={
+                    <>
+                      <p className="font-medium mb-1">Lightspeed stock adjustment CSV</p>
+                      <p>Positive <code>adjustment_qty</code> values add received units to current stock with reason “Purchase order received”.</p>
+                      <p className="mt-2 text-muted-foreground">
+                        In Lightspeed: <em>Inventory → Stock control → Import adjustments</em>.
+                      </p>
+                    </>
+                  }
+                />
+                <ExportButton
+                  label={`Export ${exportSets.newVariants.length} new variants`}
+                  colorClass="bg-amber-600 hover:bg-amber-700 text-white"
+                  disabled={exportSets.newVariants.length === 0}
+                  onClick={async () => {
+                    const res = await exportLightspeedNewVariantsCsv(exportSets.newVariants);
+                    toast({
+                      title: "New variants exported",
+                      description: `${res.rowCount} rows · ${res.filename}${res.missingParents ? ` · ${res.missingParents} missing parent SKU(s)` : ""}`,
+                    });
+                    onExport({ ...exportSets, newProducts: [], refills: [], all: exportSets.newVariants });
+                  }}
+                  tooltip={
+                    <>
+                      <p className="font-medium mb-1">Lightspeed Matrix variants CSV</p>
+                      <p>Adds new sizes/colours to existing Matrix items. <code>parent_sku</code> is resolved from the matched record in your catalog cache.</p>
+                      <p className="mt-2 text-muted-foreground">
+                        In Lightspeed: <em>Catalog → Import → Matrix variants</em>.
+                      </p>
+                    </>
+                  }
+                />
+              </>
+            )}
           </div>
         </TooltipProvider>
 

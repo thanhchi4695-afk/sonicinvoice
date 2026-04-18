@@ -342,54 +342,84 @@ export function StockReconciliationPanel({
       </div>
 
       <Card className="p-4">
-        <div className="text-sm font-medium mb-3">Export</div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-          <Button
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            disabled={exportSets.newProducts.length === 0}
-            onClick={() => onExport(exportSets)}
-          >
-            Export {exportSets.newProducts.length} new products
-          </Button>
-          <Button
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-            disabled={exportSets.refills.length === 0}
-            onClick={() =>
-              onExport({
-                ...exportSets,
-                newProducts: [],
-                newVariants: [],
-                all: exportSets.refills,
-              })
-            }
-          >
-            Export {exportSets.refills.length} stock updates
-          </Button>
-          <Button
-            className="bg-amber-600 hover:bg-amber-700 text-white"
-            disabled={exportSets.newVariants.length === 0}
-            onClick={() =>
-              onExport({
-                ...exportSets,
-                newProducts: [],
-                refills: [],
-                all: exportSets.newVariants,
-              })
-            }
-          >
-            Export {exportSets.newVariants.length} new variants
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={exportSets.all.length === 0}
-            onClick={() => onExport(exportSets)}
-          >
-            Export all ({exportSets.all.length})
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-3">
-          Unticked rows are excluded from every export. Summary totals always reflect all
-          lines.
+        <div className="text-sm font-medium mb-3">Export to Shopify</div>
+        <TooltipProvider delayDuration={200}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Format A — New products */}
+            <ExportButton
+              label={`Export ${exportSets.newProducts.length} new products`}
+              colorClass="bg-emerald-600 hover:bg-emerald-700 text-white"
+              disabled={exportSets.newProducts.length === 0}
+              onClick={() => {
+                const res = exportNewProductsCsv(exportSets.newProducts);
+                toast({ title: "New products exported", description: `${res.rowCount} rows · ${res.filename}` });
+                onExport(exportSets);
+              }}
+              tooltip={
+                <>
+                  <p className="font-medium mb-1">New products CSV</p>
+                  <p>Standard Shopify product import (with an extra <code>Import Type=NEW</code> column).</p>
+                  <p className="mt-2 text-muted-foreground">
+                    In Shopify admin: <em>Products → Import → Add new products only</em>.
+                  </p>
+                </>
+              }
+            />
+
+            {/* Format B — Inventory adjustment */}
+            <ExportButton
+              label={`Export ${exportSets.refills.length} stock updates`}
+              colorClass="bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={exportSets.refills.length === 0}
+              onClick={() => {
+                const res = exportStockUpdateCsv(exportSets.refills);
+                toast({ title: "Stock update exported", description: `${res.rowCount} rows · ${res.filename}` });
+                onExport({ ...exportSets, newProducts: [], newVariants: [], all: exportSets.refills });
+              }}
+              tooltip={
+                <>
+                  <p className="font-medium mb-1">Stock update CSV (additive)</p>
+                  <p>Adds the received quantities to your current Shopify stock — it does <strong>not</strong> replace existing levels.</p>
+                  <p className="mt-2 text-muted-foreground">
+                    Import using the <em>Matrixify / Excelify</em> app in <em>additive inventory</em> mode.
+                  </p>
+                </>
+              }
+            />
+
+            {/* Format C — New variants */}
+            <ExportButton
+              label={`Export ${exportSets.newVariants.length} new variants`}
+              colorClass="bg-amber-600 hover:bg-amber-700 text-white"
+              disabled={exportSets.newVariants.length === 0}
+              onClick={async () => {
+                const res = await exportNewVariantsCsv(exportSets.newVariants);
+                toast({
+                  title: "New variants exported",
+                  description: `${res.rowCount} rows · ${res.filename}${res.missingHandles ? ` · ${res.missingHandles} missing handle(s)` : ""}`,
+                });
+                onExport({ ...exportSets, newProducts: [], refills: [], all: exportSets.newVariants });
+              }}
+              tooltip={
+                <>
+                  <p className="font-medium mb-1">New variants CSV</p>
+                  <p>Adds new sizes/colours to <em>existing</em> Shopify products. The <code>Handle</code> column is fetched from your live catalog cache.</p>
+                  <p className="mt-2 text-muted-foreground">
+                    Import using <em>Matrixify</em> or Shopify's bulk variant editor — the matching handle attaches the variant to the existing product.
+                  </p>
+                </>
+              }
+            />
+          </div>
+        </TooltipProvider>
+
+        {exportSets.refills.length > 0 && (
+          <p className="text-xs text-blue-600 mt-3">
+            ⓘ The stock update CSV adds received quantities to current stock. It does not replace existing stock levels.
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground mt-2">
+          Unticked rows are excluded from every export. Summary totals always reflect all lines.
         </p>
       </Card>
 
@@ -398,6 +428,38 @@ export function StockReconciliationPanel({
         {summary.total} line{summary.total === 1 ? "" : "s"} ·{" "}
         {summary.conflicts} conflict{summary.conflicts === 1 ? "" : "s"}
       </div>
+    </div>
+  );
+}
+
+function ExportButton({
+  label,
+  colorClass,
+  disabled,
+  onClick,
+  tooltip,
+}: {
+  label: string;
+  colorClass: string;
+  disabled: boolean;
+  onClick: () => void;
+  tooltip: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-stretch gap-1">
+      <Button className={cn("flex-1", colorClass)} disabled={disabled} onClick={onClick}>
+        {label}
+      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon" className="shrink-0" aria-label="Help">
+            <HelpCircle className="w-4 h-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }

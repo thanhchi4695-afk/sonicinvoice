@@ -123,6 +123,25 @@ export async function logCorrection(input: LogCorrectionInput): Promise<void> {
       session_invoice_index: input.sessionInvoiceIndex ?? null,
     } as never);
 
+    // Mirror to learning log so the chronological "Learning Log" tab on the
+    // Supplier Intelligence Panel sees every correction in real time.
+    await supabase.from("supplier_learning_log").insert({
+      user_id: userId,
+      supplier_name: supplierName,
+      event_type: "correction_recorded",
+      match_method: null,
+      confidence_before: null,
+      confidence_after: null,
+      details: {
+        field,
+        original_value: originalValue.slice(0, 200),
+        corrected_value: correctedValue.slice(0, 200),
+        reason: input.correctionReason ?? null,
+        reason_detail: input.correctionReasonDetail?.slice(0, 200) ?? null,
+        invoice_id: input.invoiceId ?? null,
+      } as never,
+    } as never);
+
     // Tally on supplier name so we still prompt even without a supplier_profiles row.
     const tallyKey = `${normalised}::${field}`;
     if (ignoredKeys.has(tallyKey)) return;

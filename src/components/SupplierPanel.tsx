@@ -400,9 +400,11 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     });
 
     if (error) { toast.error("Failed to add supplier"); return; }
+    await upsertSupplierIntelligence(form.name.trim());
     toast.success(`${form.name} added`);
     setAddMode(false);
     setForm({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
+    resetIntelligenceForm();
     loadSuppliers();
   };
 
@@ -421,6 +423,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     }).eq("id", selectedId);
 
     if (error) { toast.error("Failed to update"); return; }
+    await upsertSupplierIntelligence(form.name.trim());
     toast.success("Supplier updated");
     setEditMode(false);
     loadSuppliers();

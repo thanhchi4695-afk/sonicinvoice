@@ -15,6 +15,7 @@ import {
   ArrowRightLeft,
   FileText,
   Scissors,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

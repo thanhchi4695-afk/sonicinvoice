@@ -13,6 +13,31 @@ import { isFuzzySupplierMatch } from "@/lib/invoice-persistence";
 import { getCostHistory } from "@/components/InvoiceFlow";
 import SupplierCatalog from "@/components/SupplierCatalog";
 
+// ── Confidence helpers ─────────────────────────────────────
+const confidenceTone = (v: number) => {
+  if (v <= 30) return { bar: "bg-destructive", text: "text-destructive" };
+  if (v <= 60) return { bar: "bg-warning", text: "text-warning" };
+  return { bar: "bg-success", text: "text-success" };
+};
+
+const ConfidenceBar = ({ value }: { value: number }) => {
+  const pct = Math.max(0, Math.min(100, Math.round(value)));
+  const tone = confidenceTone(pct);
+  return (
+    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+      <div className={`h-full ${tone.bar} transition-all`} style={{ width: `${pct}%` }} />
+    </div>
+  );
+};
+
+const formatMatchMethod = (m: string | null | undefined) => {
+  if (!m) return "—";
+  return m
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, c => c.toUpperCase());
+};
+
+
 interface SupplierPanelProps {
   onBack: () => void;
   onStartInvoice: () => void;

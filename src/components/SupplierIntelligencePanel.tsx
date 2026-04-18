@@ -113,6 +113,8 @@ function eventTypeLabel(type: string): string {
   switch (type) {
     case "supplier_learned": return "🆕 New supplier learned";
     case "supplier_updated": return "🔄 Profile updated";
+    case "rule_updated": return "📐 Rule updated";
+    case "correction_recorded": return "✏️ Correction recorded";
     case "manual_edit": return "✏️ Manual edit";
     default: return type.replace(/_/g, " ");
   }

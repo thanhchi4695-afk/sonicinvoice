@@ -654,6 +654,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                     currency: detail.currency,
                     notes: detail.notes || "",
                   });
+                  loadIntelligenceForSupplier(detail.name);
                   setEditMode(true);
                 }}
                 className="p-2 rounded-lg text-muted-foreground hover:bg-muted"

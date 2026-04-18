@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import type { ReconciliationLine, MatchType } from "@/lib/stock-matcher";
+import VariantDetailDrawer from "@/components/VariantDetailDrawer";
 import {
   exportNewProductsCsv,
   exportStockUpdateCsv,
@@ -150,6 +151,10 @@ export function StockReconciliationPanel({
   const [exportPlatform, setExportPlatform] = useState<"shopify" | "lightspeed">(
     platform === "lightspeed" ? "lightspeed" : "shopify",
   );
+  const [drawerIdx, setDrawerIdx] = useState<number | null>(null);
+  const [reclassified, setReclassified] = useState<Record<number, string>>({});
+
+  const drawerLine = drawerIdx != null ? lines[drawerIdx] ?? null : null;
 
   const grouped = useMemo(() => {
     const g: Record<GroupKey, { line: ReconciliationLine; idx: number }[]> = {

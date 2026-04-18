@@ -3,7 +3,7 @@ import {
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   TrendingUp, TrendingDown, Minus, FileText, Package,
   BarChart3, Clock, DollarSign, Save, X, Search, RefreshCw,
-  Receipt, ShoppingBag, AlertTriangle,
+  Receipt, ShoppingBag, AlertTriangle, Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,31 @@ import type { DbSupplier } from "@/lib/db-schema-types";
 import { isFuzzySupplierMatch } from "@/lib/invoice-persistence";
 import { getCostHistory } from "@/components/InvoiceFlow";
 import SupplierCatalog from "@/components/SupplierCatalog";
+
+// ── Confidence helpers ─────────────────────────────────────
+const confidenceTone = (v: number) => {
+  if (v <= 30) return { bar: "bg-destructive", text: "text-destructive" };
+  if (v <= 60) return { bar: "bg-warning", text: "text-warning" };
+  return { bar: "bg-success", text: "text-success" };
+};
+
+const ConfidenceBar = ({ value }: { value: number }) => {
+  const pct = Math.max(0, Math.min(100, Math.round(value)));
+  const tone = confidenceTone(pct);
+  return (
+    <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+      <div className={`h-full ${tone.bar} transition-all`} style={{ width: `${pct}%` }} />
+    </div>
+  );
+};
+
+const formatMatchMethod = (m: string | null | undefined) => {
+  if (!m) return "—";
+  return m
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, c => c.toUpperCase());
+};
+
 
 interface SupplierPanelProps {
   onBack: () => void;
@@ -79,6 +104,15 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   const [corrections, setCorrections] = useState<CorrectionRow[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailTab, setDetailTab] = useState<"overview" | "invoices" | "costs" | "catalog" | "corrections">("overview");
+
+  // Supplier intelligence (confidence, invoice_count, last_match_method) keyed by lowercased supplier_name
+  interface IntelSummary {
+    confidence_score: number;
+    invoice_count: number;
+    last_match_method: string | null;
+    last_invoice_date: string | null;
+  }
+  const [intelByName, setIntelByName] = useState<Record<string, IntelSummary>>({});
 
   // Form state
   const [form, setForm] = useState({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
@@ -220,6 +254,51 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   }, []);
 
   useEffect(() => { loadSuppliers(); }, [loadSuppliers]);
+
+  // ── Load supplier_intelligence summaries ─────────────────
+  const loadIntelligenceSummaries = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data } = await supabase
+      .from("supplier_intelligence")
+      .select("supplier_name, name_variants, confidence_score, invoice_count, last_match_method, last_invoice_date")
+      .eq("user_id", session.user.id);
+    const map: Record<string, IntelSummary> = {};
+    for (const row of (data || []) as Array<{
+      supplier_name: string;
+      name_variants: string[] | null;
+      confidence_score: number;
+      invoice_count: number;
+      last_match_method: string | null;
+      last_invoice_date: string | null;
+    }>) {
+      const summary: IntelSummary = {
+        confidence_score: row.confidence_score ?? 0,
+        invoice_count: row.invoice_count ?? 0,
+        last_match_method: row.last_match_method,
+        last_invoice_date: row.last_invoice_date,
+      };
+      map[row.supplier_name.toLowerCase()] = summary;
+      for (const v of row.name_variants ?? []) {
+        if (v) map[v.toLowerCase()] = summary;
+      }
+    }
+    setIntelByName(map);
+  }, []);
+
+  useEffect(() => { loadIntelligenceSummaries(); }, [loadIntelligenceSummaries]);
+
+  const getIntelFor = useCallback(
+    (name: string): IntelSummary | null => intelByName[name.toLowerCase()] ?? null,
+    [intelByName],
+  );
+
+  const openIntelligenceForSupplier = (name: string) => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("supplierIntel.filter", name);
+    }
+    window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "supplier_intelligence" }));
+  };
 
   // ── Load detail data when supplier selected ────────────
   const loadSupplierDetail = useCallback(async (supplier: SupplierRow) => {
@@ -630,9 +709,10 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     const margin = detail.avg_margin;
 
     // Performance metrics
-    const invoiceCount = linkedInvoices.length;
+    const intel = getIntelFor(detail.name);
+    const invoiceCount = intel?.invoice_count ?? linkedInvoices.length;
     const totalProducts = productCosts.length;
-    const avgOrderValue = invoiceCount > 0 ? linkedInvoices.reduce((a, inv) => a + Number(inv.total), 0) / invoiceCount : 0;
+    const avgOrderValue = linkedInvoices.length > 0 ? linkedInvoices.reduce((a, inv) => a + Number(inv.total), 0) / linkedInvoices.length : 0;
     const costIncreases = productCosts.filter(p => p.costTrend === "up").length;
 
     return (
@@ -733,7 +813,54 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                     </div>
                   )}
 
-                  {/* Supplier performance */}
+                  {/* Learning Intelligence */}
+                  <div className="bg-card rounded-lg border border-border p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Brain className="w-4 h-4 text-primary" />
+                      <h3 className="text-sm font-semibold">Learning Intelligence</h3>
+                    </div>
+                    {intel ? (
+                      <>
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-muted-foreground">Confidence score</span>
+                            <span className="font-mono font-semibold">{intel.confidence_score}%</span>
+                          </div>
+                          <ConfidenceBar value={intel.confidence_score} />
+                        </div>
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Invoices learned</span>
+                            <span className="font-medium">{intel.invoice_count}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Last match method</span>
+                            <span className="font-medium">{formatMatchMethod(intel.last_match_method)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Last invoice</span>
+                            <span className="font-medium">
+                              {intel.last_invoice_date
+                                ? new Date(intel.last_invoice_date).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })
+                                : "—"}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => openIntelligenceForSupplier(detail.name)}
+                          className="mt-3 text-xs text-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          View full intelligence <ChevronRight className="w-3 h-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        No intelligence record yet — process an invoice from {detail.name} to start learning their layout.
+                      </p>
+                    )}
+                  </div>
+
+
                   <div className="bg-card rounded-lg border border-border p-4">
                     <h3 className="text-sm font-semibold mb-3">Performance</h3>
                     <div className="space-y-2 text-xs">
@@ -1047,13 +1174,15 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
 
             {filtered.map(s => {
               const spend = Number(s.total_spend);
+              const sIntel = getIntelFor(s.name);
+              const tone = sIntel ? confidenceTone(sIntel.confidence_score) : null;
               return (
                 <button
                   key={s.id}
                   onClick={() => setSelectedId(s.id)}
                   className="w-full bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors"
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-bold">{s.name}</p>
@@ -1068,6 +1197,23 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                       </div>
                       {s.notes && (
                         <p className="text-[10px] text-muted-foreground mt-1 truncate">{s.notes}</p>
+                      )}
+                    </div>
+                    <div className="w-32 shrink-0">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Confidence</p>
+                      {sIntel && tone ? (
+                        <>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className={`font-mono font-semibold ${tone.text}`}>{sIntel.confidence_score}%</span>
+                            <span className="text-[10px] text-muted-foreground">{sIntel.invoice_count} inv</span>
+                          </div>
+                          <ConfidenceBar value={sIntel.confidence_score} />
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-mono text-muted-foreground">—</p>
+                          <p className="text-[10px] text-muted-foreground">No invoices processed</p>
+                        </>
                       )}
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />

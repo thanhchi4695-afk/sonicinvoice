@@ -16,6 +16,7 @@ import {
   FileText,
   Scissors,
   Brain,
+  History as HistoryIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

@@ -230,6 +230,51 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
 
   useEffect(() => { loadSuppliers(); }, [loadSuppliers]);
 
+  // ── Load supplier_intelligence summaries ─────────────────
+  const loadIntelligenceSummaries = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data } = await supabase
+      .from("supplier_intelligence")
+      .select("supplier_name, name_variants, confidence_score, invoice_count, last_match_method, last_invoice_date")
+      .eq("user_id", session.user.id);
+    const map: Record<string, IntelSummary> = {};
+    for (const row of (data || []) as Array<{
+      supplier_name: string;
+      name_variants: string[] | null;
+      confidence_score: number;
+      invoice_count: number;
+      last_match_method: string | null;
+      last_invoice_date: string | null;
+    }>) {
+      const summary: IntelSummary = {
+        confidence_score: row.confidence_score ?? 0,
+        invoice_count: row.invoice_count ?? 0,
+        last_match_method: row.last_match_method,
+        last_invoice_date: row.last_invoice_date,
+      };
+      map[row.supplier_name.toLowerCase()] = summary;
+      for (const v of row.name_variants ?? []) {
+        if (v) map[v.toLowerCase()] = summary;
+      }
+    }
+    setIntelByName(map);
+  }, []);
+
+  useEffect(() => { loadIntelligenceSummaries(); }, [loadIntelligenceSummaries]);
+
+  const getIntelFor = useCallback(
+    (name: string): IntelSummary | null => intelByName[name.toLowerCase()] ?? null,
+    [intelByName],
+  );
+
+  const openIntelligenceForSupplier = (name: string) => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("supplierIntel.filter", name);
+    }
+    window.dispatchEvent(new CustomEvent("navigate-flow", { detail: { flow: "supplier_intelligence" } }));
+  };
+
   // ── Load detail data when supplier selected ────────────
   const loadSupplierDetail = useCallback(async (supplier: SupplierRow) => {
     setLoadingDetail(true);

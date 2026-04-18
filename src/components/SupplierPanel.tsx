@@ -684,9 +684,10 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     const margin = detail.avg_margin;
 
     // Performance metrics
-    const invoiceCount = linkedInvoices.length;
+    const intel = getIntelFor(detail.name);
+    const invoiceCount = intel?.invoice_count ?? linkedInvoices.length;
     const totalProducts = productCosts.length;
-    const avgOrderValue = invoiceCount > 0 ? linkedInvoices.reduce((a, inv) => a + Number(inv.total), 0) / invoiceCount : 0;
+    const avgOrderValue = linkedInvoices.length > 0 ? linkedInvoices.reduce((a, inv) => a + Number(inv.total), 0) / linkedInvoices.length : 0;
     const costIncreases = productCosts.filter(p => p.costTrend === "up").length;
 
     return (

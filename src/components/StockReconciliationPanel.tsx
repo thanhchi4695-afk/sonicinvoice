@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  HelpCircle,
   Package,
   RefreshCw,
 } from "lucide-react";
@@ -11,8 +12,20 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 import type { ReconciliationLine, MatchType } from "@/lib/stock-matcher";
+import {
+  exportNewProductsCsv,
+  exportStockUpdateCsv,
+  exportNewVariantsCsv,
+} from "@/lib/reconciliation-csv";
 
 export interface ExportSets {
   newProducts: ReconciliationLine[];

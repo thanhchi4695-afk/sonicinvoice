@@ -992,7 +992,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
             <button onClick={syncSpend} disabled={syncing} className="p-2 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-50">
               <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
             </button>
-            <Button size="sm" onClick={() => { setForm({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" }); setAddMode(true); }}>
+            <Button size="sm" onClick={() => { setForm({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" }); resetIntelligenceForm(); setAddMode(true); }}>
               <Plus className="w-4 h-4 mr-1" /> Add
             </Button>
           </div>

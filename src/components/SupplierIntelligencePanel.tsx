@@ -534,29 +534,49 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
 
           {/* ── Tab 3: Common Sense Rules (read-only) ─────── */}
           <TabsContent value="rules" className="space-y-3 mt-0">
+            <div>
+              <h3 className="text-sm font-semibold font-display">Universal Detection Rules</h3>
+              <p className="text-xs text-muted-foreground">Applied when no supplier profile exists</p>
+            </div>
             <Card className="p-3 bg-muted/20 border-dashed">
               <p className="text-xs text-muted-foreground">
-                These are the universal rules the AI applies when it sees a supplier for the first time
-                (no learned profile yet). They're read-only — once a real invoice is processed, the
-                supplier's specific learned rules take over.
+                These universal rules run on every brand-new supplier — once a real invoice is processed,
+                the supplier's learned profile takes over. Hover the <Info className="w-3 h-3 inline -mt-0.5" /> icon
+                on any rule to see when it's applied.
               </p>
             </Card>
 
-            {COMMON_SENSE_RULES.map((section) => (
-              <Card key={section.category} className="overflow-hidden">
-                <div className="px-3 py-2 bg-muted/30 border-b border-border">
-                  <p className="text-xs font-semibold">{section.category}</p>
-                </div>
-                <div className="divide-y divide-border">
-                  {section.rules.map((rule) => (
-                    <div key={rule.field} className="grid grid-cols-[160px_1fr] gap-3 px-3 py-2 text-xs">
-                      <span className="font-medium text-foreground">{rule.field}</span>
-                      <span className="text-muted-foreground">{rule.logic}</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            ))}
+            <TooltipProvider delayDuration={150}>
+              {COMMON_SENSE_RULES.map((section) => (
+                <Card key={section.category} className="overflow-hidden">
+                  <div className="px-3 py-2 bg-muted/30 border-b border-border">
+                    <p className="text-xs font-semibold">{section.category}</p>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {section.rules.map((rule) => (
+                      <div key={rule.field} className="grid grid-cols-[160px_1fr_28px] gap-3 px-3 py-2 text-xs items-start">
+                        <span className="font-medium text-foreground">{rule.field}</span>
+                        <span className="text-muted-foreground">{rule.logic}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`When this rule is applied: ${rule.tooltip}`}
+                              className="text-muted-foreground hover:text-foreground transition-colors justify-self-end"
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="max-w-xs text-xs">
+                            {rule.tooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ))}
+            </TooltipProvider>
           </TabsContent>
         </Tabs>
       </div>

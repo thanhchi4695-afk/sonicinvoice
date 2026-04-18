@@ -197,3 +197,102 @@ export async function exportNewVariantsCsv(
   downloadCsv(filename, csv);
   return { filename, rowCount: rows.length, missingHandles };
 }
+
+// ── Lightspeed: catalog SKU resolver ───────────────────────
+// Resolves the parent item SKU for matched products from product_catalog_cache
+// (platform='lightspeed'). Falls back to invoice SKU.
+
+async function resolveLightspeedParentSkus(
+  productIds: string[],
+): Promise<Record<string, string>> {
+  const ids = Array.from(new Set(productIds.filter(Boolean)));
+  if (ids.length === 0) return {};
+  const { data, error } = await supabase
+    .from("product_catalog_cache")
+    .select("platform_product_id, sku")
+    .eq("platform", "lightspeed")
+    .in("platform_product_id", ids);
+  if (error || !data) return {};
+  const map: Record<string, string> = {};
+  for (const row of data) {
+    const id = row.platform_product_id as string;
+    if (!map[id] && row.sku) map[id] = row.sku as string;
+  }
+  return map;
+}
+
+// ── Lightspeed Format A: New products ──────────────────────
+
+export function exportLightspeedNewProductsCsv(
+  lines: ReconciliationLine[],
+  opts: { brandFallback?: string } = {},
+): { filename: string; rowCount: number } {
+  const rows = lines.map((l) => ({
+    product_name: l.invoice_product_name || l.invoice_sku || "Product",
+    description: "",
+    brand: opts.brandFallback || "",
+    sku: l.invoice_sku || "",
+    price_including_tax: l.invoice_rrp != null ? Number(l.invoice_rrp).toFixed(2) : "",
+    supply_price: l.invoice_cost != null ? Number(l.invoice_cost).toFixed(2) : "",
+    product_type: "",
+    track_inventory: "TRUE",
+    initial_stock_on_hand: String(l.invoice_qty ?? 0),
+    colour: l.invoice_colour || "",
+    size: l.invoice_size || "",
+  }));
+  const csv = Papa.unparse(rows);
+  const filename = `lightspeed-new-products-${todayStamp()}.csv`;
+  downloadCsv(filename, csv);
+  return { filename, rowCount: rows.length };
+}
+
+// ── Lightspeed Format B: Stock adjustment ──────────────────
+
+export function exportLightspeedStockUpdateCsv(
+  lines: ReconciliationLine[],
+  opts: { locationId?: string } = {},
+): { filename: string; rowCount: number } {
+  const locationId = opts.locationId || "";
+  const rows = lines.map((l) => ({
+    sku: l.invoice_sku || "",
+    adjustment_qty: String(l.invoice_qty ?? 0),
+    adjustment_reason: "Purchase order received",
+    location_id: locationId,
+  }));
+  const csv = Papa.unparse(rows);
+  const filename = `lightspeed-stock-update-${todayStamp()}.csv`;
+  downloadCsv(filename, csv);
+  return { filename, rowCount: rows.length };
+}
+
+// ── Lightspeed Format C: New variants (Matrix) ─────────────
+
+export async function exportLightspeedNewVariantsCsv(
+  lines: ReconciliationLine[],
+): Promise<{ filename: string; rowCount: number; missingParents: number }> {
+  const productIds = lines
+    .map((l) => l.matched_product_id)
+    .filter((id): id is string => !!id);
+  const parentMap = await resolveLightspeedParentSkus(productIds);
+
+  let missingParents = 0;
+  const rows = lines.map((l) => {
+    const parentSku =
+      (l.matched_product_id && parentMap[l.matched_product_id]) || "";
+    if (!parentSku) missingParents++;
+    return {
+      parent_sku: parentSku,
+      variant_sku: l.invoice_sku || "",
+      colour: l.invoice_colour || "",
+      size: l.invoice_size || "",
+      price_including_tax:
+        l.invoice_rrp != null ? Number(l.invoice_rrp).toFixed(2) : "",
+      supply_price: l.invoice_cost != null ? Number(l.invoice_cost).toFixed(2) : "",
+      initial_stock_on_hand: String(l.invoice_qty ?? 0),
+    };
+  });
+  const csv = Papa.unparse(rows);
+  const filename = `lightspeed-new-variants-${todayStamp()}.csv`;
+  downloadCsv(filename, csv);
+  return { filename, rowCount: rows.length, missingParents };
+}

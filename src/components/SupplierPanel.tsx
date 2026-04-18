@@ -272,7 +272,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     if (typeof window !== "undefined") {
       window.sessionStorage.setItem("supplierIntel.filter", name);
     }
-    window.dispatchEvent(new CustomEvent("navigate-flow", { detail: { flow: "supplier_intelligence" } }));
+    window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "supplier_intelligence" }));
   };
 
   // ── Load detail data when supplier selected ────────────

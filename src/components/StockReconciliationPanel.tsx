@@ -536,6 +536,26 @@ export function StockReconciliationPanel({
         {summary.total} line{summary.total === 1 ? "" : "s"} ·{" "}
         {summary.conflicts} conflict{summary.conflicts === 1 ? "" : "s"}
       </div>
+
+      <VariantDetailDrawer
+        open={drawerIdx != null}
+        onOpenChange={(o) => !o && setDrawerIdx(null)}
+        line={drawerLine}
+        decision={drawerIdx != null ? conflictDecisions[drawerIdx] : undefined}
+        onDecision={(d) => {
+          if (drawerIdx == null) return;
+          setConflictDecisions((prev) => ({ ...prev, [drawerIdx]: d }));
+        }}
+        onReclassifyAsRefill={(matchedProductId) => {
+          if (drawerIdx == null) return;
+          setReclassified((prev) => ({ ...prev, [drawerIdx]: matchedProductId }));
+          toast({
+            title: "Reclassified as existing product",
+            description: "This line will be exported as a stock update instead of a new product.",
+          });
+          setDrawerIdx(null);
+        }}
+      />
     </div>
   );
 }

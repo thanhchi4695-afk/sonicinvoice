@@ -54,6 +54,20 @@ interface LogCorrectionInput {
 const correctionTally = new Map<string, number>();
 // Track which (supplier, field) pairs we've already prompted so we don't nag.
 const promptedKeys = new Set<string>();
+// Pairs the user explicitly chose to ignore for this session.
+const ignoredKeys = new Set<string>();
+
+/** Optional callback the Review screen can register so the "Apply to all"
+ *  follow-up prompt can bulk-update remaining rows in the current session. */
+export type ApplyToRemainingRowsFn = (args: {
+  field: string;
+  originalValue: string;
+  correctedValue: string;
+}) => number; // returns count of rows that would be updated
+let applyToRemainingRowsFn: ApplyToRemainingRowsFn | null = null;
+export function registerApplyToRemainingRowsHandler(fn: ApplyToRemainingRowsFn | null) {
+  applyToRemainingRowsFn = fn;
+}
 
 export async function logCorrection(input: LogCorrectionInput): Promise<void> {
   const { supplierName, field, originalValue, correctedValue } = input;

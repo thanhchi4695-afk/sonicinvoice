@@ -184,6 +184,14 @@ export default function PostParseReviewScreen({
   }>>({});
   /** Cells where a reason was just recorded — show check for ~1.5s. */
   const [savedReasonFlash, setSavedReasonFlash] = useState<Record<string, boolean>>({});
+  /** Counts every persisted correction in this session — drives the
+   *  "N corrections · SUPPLIER" badge in the AI Parsing Details header. */
+  const [sessionEditCount, setSessionEditCount] = useState(0);
+  /** Per-row state: when true, the row is in "awaiting reason" mode after the
+   *  user clicked Done editing with at least one changed field. */
+  const [awaitingReasonRows, setAwaitingReasonRows] = useState<Set<number>>(new Set());
+  /** Stable session id used as invoice_id when persisting corrections. */
+  const sessionInvoiceId = useMemo(() => `session_${Date.now().toString(36)}`, []);
 
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);

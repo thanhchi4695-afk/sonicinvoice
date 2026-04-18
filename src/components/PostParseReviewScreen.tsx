@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 
 import {
   Check, X, AlertTriangle, ChevronDown, ChevronRight, RotateCcw,
@@ -14,7 +14,7 @@ import type { ValidatedProduct, ValidationDebugInfo, CorrectionDetail } from "@/
 import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates";
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
 import { updateSupplierProfileWithCorrections } from "@/lib/supplier-profile-updater";
-import { logCorrection, deriveFieldCategory, type CorrectionReason } from "@/lib/correction-tracker";
+import { logCorrection, deriveFieldCategory, registerApplyToRemainingRowsHandler, type CorrectionReason } from "@/lib/correction-tracker";
 import CorrectionReasonPicker, { CorrectionSavedCheck } from "@/components/CorrectionReasonPicker";
 import { saveInvoiceLinesToCatalog } from "@/components/SupplierCatalog";
 import { supabase } from "@/integrations/supabase/client";
@@ -396,6 +396,35 @@ export default function PostParseReviewScreen({
     });
     setSessionEditCount((c) => c + 1);
   }, [supplierName, products, detectedHeaders, detectedLayout, lowConfFields, sessionInvoiceId]);
+
+  // Keep a ref to the latest products so the bulk-apply handler always sees them.
+  const productsRef = useRef(products);
+  useEffect(() => { productsRef.current = products; }, [products]);
+
+  // Register a session-scoped bulk-apply handler that the correction-tracker
+  // toast ("Apply to all") can call after a rule update. Returns the count.
+  useEffect(() => {
+    registerApplyToRemainingRowsHandler(({ field, originalValue, correctedValue }) => {
+      // Map UI label -> raw product key.
+      const keyByLabel: Record<string, string> = {
+        title: "name", colour: "colour", size: "size", cost: "cost",
+        sku: "sku", quantity: "qty", vendor: "brand",
+      };
+      const productKey = keyByLabel[field] ?? field;
+      const current = productsRef.current;
+      let count = 0;
+      const updated = current.map((p) => {
+        if (p._rejected) return p;
+        const v = String((p as any)[productKey] ?? "");
+        if (v.trim().toLowerCase() !== originalValue.trim().toLowerCase()) return p;
+        count += 1;
+        return { ...p, [productKey]: correctedValue, _manuallyEdited: true } as typeof p;
+      });
+      if (count > 0) onUpdateProducts(updated);
+      return count;
+    });
+    return () => registerApplyToRemainingRowsHandler(null);
+  }, [onUpdateProducts]);
 
   /** Briefly flash the green check on a cell. */
   const flashSavedFor = useCallback((key: string) => {

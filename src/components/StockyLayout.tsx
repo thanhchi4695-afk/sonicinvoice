@@ -16,6 +16,7 @@ import {
   FileText,
   Scissors,
   Brain,
+  History as HistoryIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ export interface StockyNavItem {
 const defaultNavItems: StockyNavItem[] = [
   { id: "home", label: "Dashboard", icon: LayoutDashboard, type: "tab" },
   { id: "invoices", label: "Invoices", icon: FileText, type: "tab" },
+  { id: "processing_history", label: "Processing History", icon: HistoryIcon, type: "flow" },
   { id: "purchase_orders", label: "Purchase Orders", icon: ClipboardList, type: "flow" },
   { id: "inventory_view", label: "Inventory", icon: Package, type: "flow" },
   { id: "transfer_orders", label: "Transfers", icon: ArrowRightLeft, type: "flow" },

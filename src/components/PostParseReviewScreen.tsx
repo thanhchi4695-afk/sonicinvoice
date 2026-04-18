@@ -887,7 +887,7 @@ export default function PostParseReviewScreen({
         <button onClick={() => setShowDebug(!showDebug)} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors">
           <Bug className="w-3.5 h-3.5" />
           <span className="font-medium">AI Parsing Details</span>
-          <span className="text-[10px] ml-auto mr-2">{debug.corrections.length} corrections · {debug.detectedVendor}</span>
+          <span className="text-[10px] ml-auto mr-2">{debug.corrections.length + sessionEditCount} corrections{supplierName ? ` · ${supplierName}` : ""}</span>
           {showDebug ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
         {showDebug && (
@@ -1324,7 +1324,6 @@ function ReviewRow({
         <div className="px-4 pb-4 ml-[52px]">
           {isEditing ? (
             <div className="bg-muted/30 rounded-lg p-3 space-y-2">
-              {(() => { /* eslint-disable-next-line react-hooks/rules-of-hooks */ })()}
               {/* Show a small green check beside any field that has just been
                   recorded; the row-level picker below captures the reason. */}
               <div>

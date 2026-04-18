@@ -1013,6 +1013,42 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_connections: {
+        Row: {
+          access_token: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          last_synced_at: string | null
+          location_id: string | null
+          platform: string
+          shop_domain: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          location_id?: string | null
+          platform: string
+          shop_domain?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          location_id?: string | null
+          platform?: string
+          shop_domain?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       pos_connections: {
         Row: {
           connected_at: string
@@ -1121,6 +1157,60 @@ export type Database = {
           supplier_cost?: number | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      product_catalog_cache: {
+        Row: {
+          barcode: string | null
+          cached_at: string
+          colour: string | null
+          current_cost: number | null
+          current_price: number | null
+          current_qty: number | null
+          id: string
+          platform: string
+          platform_product_id: string
+          platform_variant_id: string | null
+          product_title: string | null
+          size: string | null
+          sku: string | null
+          user_id: string
+          variant_title: string | null
+        }
+        Insert: {
+          barcode?: string | null
+          cached_at?: string
+          colour?: string | null
+          current_cost?: number | null
+          current_price?: number | null
+          current_qty?: number | null
+          id?: string
+          platform: string
+          platform_product_id: string
+          platform_variant_id?: string | null
+          product_title?: string | null
+          size?: string | null
+          sku?: string | null
+          user_id: string
+          variant_title?: string | null
+        }
+        Update: {
+          barcode?: string | null
+          cached_at?: string
+          colour?: string | null
+          current_cost?: number | null
+          current_price?: number | null
+          current_qty?: number | null
+          id?: string
+          platform?: string
+          platform_product_id?: string
+          platform_variant_id?: string | null
+          product_title?: string | null
+          size?: string | null
+          sku?: string | null
+          user_id?: string
+          variant_title?: string | null
         }
         Relationships: []
       }
@@ -1335,6 +1425,125 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reconciliation_lines: {
+        Row: {
+          conflict_reason: string | null
+          cost_delta_pct: number | null
+          created_at: string
+          id: string
+          invoice_colour: string | null
+          invoice_cost: number | null
+          invoice_product_name: string | null
+          invoice_qty: number | null
+          invoice_rrp: number | null
+          invoice_size: string | null
+          invoice_sku: string | null
+          match_type: string | null
+          matched_current_cost: number | null
+          matched_current_qty: number | null
+          matched_product_id: string | null
+          matched_variant_id: string | null
+          session_id: string
+          user_decision: string | null
+          user_id: string
+        }
+        Insert: {
+          conflict_reason?: string | null
+          cost_delta_pct?: number | null
+          created_at?: string
+          id?: string
+          invoice_colour?: string | null
+          invoice_cost?: number | null
+          invoice_product_name?: string | null
+          invoice_qty?: number | null
+          invoice_rrp?: number | null
+          invoice_size?: string | null
+          invoice_sku?: string | null
+          match_type?: string | null
+          matched_current_cost?: number | null
+          matched_current_qty?: number | null
+          matched_product_id?: string | null
+          matched_variant_id?: string | null
+          session_id: string
+          user_decision?: string | null
+          user_id: string
+        }
+        Update: {
+          conflict_reason?: string | null
+          cost_delta_pct?: number | null
+          created_at?: string
+          id?: string
+          invoice_colour?: string | null
+          invoice_cost?: number | null
+          invoice_product_name?: string | null
+          invoice_qty?: number | null
+          invoice_rrp?: number | null
+          invoice_size?: string | null
+          invoice_sku?: string | null
+          match_type?: string | null
+          matched_current_cost?: number | null
+          matched_current_qty?: number | null
+          matched_product_id?: string | null
+          matched_variant_id?: string | null
+          session_id?: string
+          user_decision?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_lines_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "reconciliation_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reconciliation_sessions: {
+        Row: {
+          conflicts: number
+          created_at: string
+          exact_refills: number
+          id: string
+          invoice_id: string | null
+          new_products: number
+          new_variants: number
+          platform: string | null
+          status: string
+          supplier_name: string | null
+          total_lines: number | null
+          user_id: string
+        }
+        Insert: {
+          conflicts?: number
+          created_at?: string
+          exact_refills?: number
+          id?: string
+          invoice_id?: string | null
+          new_products?: number
+          new_variants?: number
+          platform?: string | null
+          status?: string
+          supplier_name?: string | null
+          total_lines?: number | null
+          user_id: string
+        }
+        Update: {
+          conflicts?: number
+          created_at?: string
+          exact_refills?: number
+          id?: string
+          invoice_id?: string | null
+          new_products?: number
+          new_variants?: number
+          platform?: string | null
+          status?: string
+          supplier_name?: string | null
+          total_lines?: number | null
+          user_id?: string
+        }
+        Relationships: []
       }
       sales_data: {
         Row: {

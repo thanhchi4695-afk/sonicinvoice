@@ -1483,6 +1483,126 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
   const [isReprocessing, setIsReprocessing] = useState(false);
 
+  // ── Stock reconciliation (auto-runs when reaching export step) ───────────
+  const [platformConnections, setPlatformConnections] = useState<Array<{ platform: string; shop_domain?: string | null }>>([]);
+  const [platformsChecked, setPlatformsChecked] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
+  const [reconcileProgress, setReconcileProgress] = useState(0);
+  const [reconcileResult, setReconcileResult] = useState<any>(null);
+  const [reconcileError, setReconcileError] = useState<string | null>(null);
+  const reconcileStartedRef = useRef(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: userRes } = await supabase.auth.getUser();
+        const uid = userRes?.user?.id;
+        if (!uid) { setPlatformsChecked(true); return; }
+        const { data } = await supabase
+          .from("platform_connections")
+          .select("platform, shop_domain")
+          .eq("user_id", uid)
+          .eq("is_active", true);
+        setPlatformConnections((data ?? []) as any);
+      } catch {
+        // non-fatal
+      } finally {
+        setPlatformsChecked(true);
+      }
+    })();
+  }, []);
+
+  const connectedPlatformLabel = (() => {
+    const set = new Set(platformConnections.map((c) => c.platform));
+    if (set.has("shopify") && set.has("lightspeed")) return "Shopify & Lightspeed";
+    if (set.has("shopify")) return "Shopify";
+    if (set.has("lightspeed")) return "Lightspeed";
+    return null;
+  })();
+
+  useEffect(() => {
+    if (step !== 4) return;
+    if (!platformsChecked) return;
+    if (reconcileStartedRef.current) return;
+    if (platformConnections.length === 0) return;
+    if (productGroups.length === 0) return;
+    reconcileStartedRef.current = true;
+
+    const platform =
+      platformConnections.some((c) => c.platform === "shopify") &&
+      platformConnections.some((c) => c.platform === "lightspeed")
+        ? "both"
+        : platformConnections[0].platform;
+
+    // Flatten productGroups into invoice_lines
+    const invoice_lines = productGroups.flatMap((g) =>
+      (g.variants && g.variants.length > 0)
+        ? g.variants.map((v) => ({
+            sku: v.sku,
+            product_name: g.name,
+            brand: g.brand,
+            colour: v.option1Value || g.colour,
+            size: v.option2Value || g.size,
+            qty: v.qty,
+            cost: v.price ?? g.cogs ?? g.price,
+            rrp: v.rrp ?? g.rrp,
+            barcode: g.barcode,
+          }))
+        : [{
+            sku: (g as any).sku ?? "",
+            product_name: g.name,
+            brand: g.brand,
+            colour: g.colour,
+            size: g.size,
+            qty: 1,
+            cost: g.cogs ?? g.price,
+            rrp: g.rrp,
+            barcode: g.barcode,
+          }]
+    );
+
+    setReconciling(true);
+    setReconcileProgress(0);
+    setReconcileError(null);
+
+    // Indeterminate progress ticker (capped at 92%)
+    const ticker = setInterval(() => {
+      setReconcileProgress((p) => (p < 92 ? p + Math.max(1, Math.round((92 - p) / 12)) : p));
+    }, 350);
+
+    (async () => {
+      try {
+        const { data: userRes } = await supabase.auth.getUser();
+        const uid = userRes?.user?.id;
+        const { data, error } = await supabase.functions.invoke("reconcile-invoice", {
+          body: {
+            user_id: uid,
+            invoice_id: null,
+            supplier_name: supplierName || null,
+            platform,
+            invoice_lines,
+          },
+        });
+        if (error) throw error;
+        setReconcileProgress(100);
+        const enriched = { ...(data as any), platform };
+        setReconcileResult(enriched);
+        // Broadcast so Index can stash before navigating to the review panel
+        window.dispatchEvent(new CustomEvent("sonic:reconciliation-ready", { detail: enriched }));
+      } catch (err: any) {
+        console.error("[reconcile-invoice]", err);
+        setReconcileError(err?.message || "Stock reconciliation failed");
+        toast.error("Stock check failed", { description: "You can still export your invoice as usual." });
+      } finally {
+        clearInterval(ticker);
+        setReconciling(false);
+      }
+    })();
+
+    return () => clearInterval(ticker);
+  }, [step, platformsChecked, platformConnections, productGroups, supplierName]);
+
+
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {
     try {

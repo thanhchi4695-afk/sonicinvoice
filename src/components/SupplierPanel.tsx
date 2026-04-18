@@ -22,11 +22,14 @@ type SupplierRow = DbSupplier;
 interface LinkedInvoice {
   id: string;
   document_number: string | null;
+  source_filename: string | null;
   date: string | null;
   total: number;
   gst: number;
   status: string;
   source_type: string;
+  line_count: number;
+  avg_confidence: number | null;
 }
 
 interface ProductCostSummary {
@@ -104,23 +107,43 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     setLoadingDetail(true);
     setDetailTab("overview");
 
-    // Load linked invoices (by supplier_name or supplier_id)
+    // Load linked invoices: match by supplier_id OR by fuzzy supplier_name
+    // (so "Seafolly" supplier picks up docs stamped "Seafolly Pty Limited")
+    const safeName = supplier.name.replace(/[%,()]/g, "");
     const { data: docs } = await supabase
       .from("documents")
-      .select("id, document_number, date, total, gst, status, source_type")
-      .or(`supplier_name.ilike.${supplier.name},supplier_id.eq.${supplier.id}`)
+      .select("id, document_number, source_filename, date, total, gst, status, source_type")
+      .or(`supplier_id.eq.${supplier.id},supplier_name.ilike.%${safeName}%`)
       .order("date", { ascending: false })
       .limit(50);
 
-    setLinkedInvoices((docs || []) as LinkedInvoice[]);
+    const docList = (docs || []);
 
-    // Load document lines for cost analysis
-    if (docs && docs.length > 0) {
-      const docIds = docs.map(d => d.id);
+    // Load document lines for cost analysis + per-invoice confidence
+    if (docList.length > 0) {
+      const docIds = docList.map(d => d.id);
       const { data: lines } = await supabase
         .from("document_lines")
-        .select("product_title, sku, unit_cost, quantity, document_id")
+        .select("product_title, sku, unit_cost, quantity, document_id, confidence")
         .in("document_id", docIds);
+
+      // Aggregate per-invoice line count + avg confidence
+      const perDoc: Record<string, { count: number; confSum: number; confN: number }> = {};
+      for (const ln of lines || []) {
+        const k = ln.document_id as string;
+        if (!perDoc[k]) perDoc[k] = { count: 0, confSum: 0, confN: 0 };
+        perDoc[k].count += 1;
+        if (typeof ln.confidence === "number") {
+          perDoc[k].confSum += Number(ln.confidence);
+          perDoc[k].confN += 1;
+        }
+      }
+
+      setLinkedInvoices(docList.map(d => ({
+        ...(d as any),
+        line_count: perDoc[d.id]?.count || 0,
+        avg_confidence: perDoc[d.id]?.confN ? perDoc[d.id].confSum / perDoc[d.id].confN : null,
+      })) as LinkedInvoice[]);
 
       if (lines && lines.length > 0) {
         // Group by product_title + sku
@@ -159,6 +182,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
         setProductCosts([]);
       }
     } else {
+      setLinkedInvoices([]);
       setProductCosts([]);
     }
 

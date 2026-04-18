@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DbSupplier } from "@/lib/db-schema-types";
+import { isFuzzySupplierMatch } from "@/lib/invoice-persistence";
 import { getCostHistory } from "@/components/InvoiceFlow";
 import SupplierCatalog from "@/components/SupplierCatalog";
 
@@ -22,11 +23,14 @@ type SupplierRow = DbSupplier;
 interface LinkedInvoice {
   id: string;
   document_number: string | null;
+  source_filename: string | null;
   date: string | null;
   total: number;
   gst: number;
   status: string;
   source_type: string;
+  line_count: number;
+  avg_confidence: number | null;
 }
 
 interface ProductCostSummary {
@@ -104,23 +108,43 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     setLoadingDetail(true);
     setDetailTab("overview");
 
-    // Load linked invoices (by supplier_name or supplier_id)
+    // Load linked invoices: match by supplier_id OR by fuzzy supplier_name
+    // (so "Seafolly" supplier picks up docs stamped "Seafolly Pty Limited")
+    const safeName = supplier.name.replace(/[%,()]/g, "");
     const { data: docs } = await supabase
       .from("documents")
-      .select("id, document_number, date, total, gst, status, source_type")
-      .or(`supplier_name.ilike.${supplier.name},supplier_id.eq.${supplier.id}`)
+      .select("id, document_number, source_filename, date, total, gst, status, source_type")
+      .or(`supplier_id.eq.${supplier.id},supplier_name.ilike.%${safeName}%`)
       .order("date", { ascending: false })
       .limit(50);
 
-    setLinkedInvoices((docs || []) as LinkedInvoice[]);
+    const docList = (docs || []);
 
-    // Load document lines for cost analysis
-    if (docs && docs.length > 0) {
-      const docIds = docs.map(d => d.id);
+    // Load document lines for cost analysis + per-invoice confidence
+    if (docList.length > 0) {
+      const docIds = docList.map(d => d.id);
       const { data: lines } = await supabase
         .from("document_lines")
-        .select("product_title, sku, unit_cost, quantity, document_id")
+        .select("product_title, sku, unit_cost, quantity, document_id, confidence")
         .in("document_id", docIds);
+
+      // Aggregate per-invoice line count + avg confidence
+      const perDoc: Record<string, { count: number; confSum: number; confN: number }> = {};
+      for (const ln of lines || []) {
+        const k = ln.document_id as string;
+        if (!perDoc[k]) perDoc[k] = { count: 0, confSum: 0, confN: 0 };
+        perDoc[k].count += 1;
+        if (typeof ln.confidence === "number") {
+          perDoc[k].confSum += Number(ln.confidence);
+          perDoc[k].confN += 1;
+        }
+      }
+
+      setLinkedInvoices(docList.map(d => ({
+        ...(d as any),
+        line_count: perDoc[d.id]?.count || 0,
+        avg_confidence: perDoc[d.id]?.confN ? perDoc[d.id].confSum / perDoc[d.id].confN : null,
+      })) as LinkedInvoice[]);
 
       if (lines && lines.length > 0) {
         // Group by product_title + sku
@@ -159,6 +183,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
         setProductCosts([]);
       }
     } else {
+      setLinkedInvoices([]);
       setProductCosts([]);
     }
 
@@ -188,19 +213,26 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
       .select("supplier_name, total_inc_gst")
       .eq("user_id", session.user.id);
 
+    // Bucket each document into the best fuzzy-matching supplier
     const spendMap: Record<string, number> = {};
+
+    const bucketByFuzzy = (vendorName: string, amount: number) => {
+      const match = suppliers.find(s => isFuzzySupplierMatch(vendorName, s.name));
+      const key = match ? match.name : vendorName;
+      spendMap[key] = (spendMap[key] || 0) + amount;
+    };
 
     if (docs) {
       for (const row of docs) {
         const name = row.supplier_name || "";
-        if (name) spendMap[name] = (spendMap[name] || 0) + (Number(row.total) || 0);
+        if (name) bucketByFuzzy(name, Number(row.total) || 0);
       }
     }
 
     if (pushHistory) {
       for (const row of pushHistory) {
         const name = row.supplier_name || "";
-        if (name) spendMap[name] = Math.max(spendMap[name] || 0, (spendMap[name] || 0) + (Number(row.total_inc_gst) || 0));
+        if (name) bucketByFuzzy(name, Number(row.total_inc_gst) || 0);
       }
     }
 
@@ -530,28 +562,41 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                       <p className="text-xs text-muted-foreground mt-1">Process an invoice to link it automatically</p>
                     </div>
                   ) : (
-                    linkedInvoices.map(inv => (
-                      <div key={inv.id} className="bg-card rounded-lg border border-border p-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">{inv.document_number || "No number"}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {inv.date ? new Date(inv.date).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "No date"}
-                              {" · "}{inv.source_type}
-                            </p>
+                    linkedInvoices.map(inv => {
+                      const conf = inv.avg_confidence;
+                      const confLabel = conf == null ? null : conf >= 0.9 ? "high" : conf >= 0.7 ? "med" : "low";
+                      const confClass = conf == null ? "" : conf >= 0.9 ? "bg-success/15 text-success" : conf >= 0.7 ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive";
+                      return (
+                        <div key={inv.id} className="bg-card rounded-lg border border-border p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">
+                                {inv.source_filename || inv.document_number || "No number"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {inv.date ? new Date(inv.date).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "No date"}
+                                {" · "}{inv.line_count} product{inv.line_count === 1 ? "" : "s"}
+                                {" · "}{inv.source_type}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-bold">${Number(inv.total).toFixed(2)}</p>
+                              {inv.gst > 0 && <p className="text-[10px] text-muted-foreground">GST ${Number(inv.gst).toFixed(2)}</p>}
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm font-bold">${Number(inv.total).toFixed(2)}</p>
-                            {inv.gst > 0 && <p className="text-[10px] text-muted-foreground">GST ${Number(inv.gst).toFixed(2)}</p>}
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${inv.status === "pushed" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
+                              {inv.status}
+                            </span>
+                            {confLabel && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${confClass}`}>
+                                {Math.round((conf as number) * 100)}% {confLabel}
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div className="mt-1">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${inv.status === "pushed" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
-                            {inv.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}

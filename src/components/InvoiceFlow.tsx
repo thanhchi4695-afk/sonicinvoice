@@ -34,6 +34,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { inferSupplierRules, computeHeaderFingerprint, type InferredRules, type SupplierProfile as InferProfile, type SharedPatternLite } from "@/lib/supplier-inference";
 import { generateLayoutFingerprint, matchFingerprint } from "@/lib/layout-fingerprint";
 import { recordProcessingQuality } from "@/lib/processing-quality";
+import { persistParsedInvoice } from "@/lib/invoice-persistence";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 
@@ -433,8 +434,42 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     });
   };
 
+  /**
+   * Persist the confirmed invoice to the documents/document_lines tables
+   * and update the matched supplier's spend metrics. Runs once per invoice
+   * after the user accepts extraction. Best-effort — failures are logged
+   * but do not block the export flow.
+   */
+  const persistedRef = useRef(false);
+  const persistInvoiceToDb = async () => {
+    if (persistedRef.current) return;
+    persistedRef.current = true;
+    try {
+      const accepted = validatedProducts.filter(p => !p._rejected);
+      if (accepted.length === 0) return;
+      const subtotal = accepted.reduce((s, p) => s + (p.cost || 0) * (p.qty || 0), 0);
+      const total = subtotal; // GST inclusion handled by AccountingBillReview separately
+      const today = new Date().toISOString().slice(0, 10);
+      const { error } = await persistParsedInvoice(
+        {
+          supplier: supplierName || "Unknown",
+          invoiceNumber: "",
+          invoiceDate: today,
+          currency: "AUD",
+          subtotal,
+          gst: null,
+          total,
+          documentType: "invoice",
+          filename: fileName || undefined,
+        },
+        validatedProducts,
+      );
+      if (error) console.warn("[invoice-persistence]", error);
+    } catch (e) {
+      console.error("[invoice-persistence] failed:", e);
+    }
+  };
 
-  // Fetch user's suppliers for dropdown
   useEffect(() => {
     (async () => {
       try {
@@ -2452,8 +2487,8 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                   editCountRef.current += 1;
                   fieldsCorrectedRef.current.add(field);
                 }}
-                onExportAccepted={() => { finalizeQualityMetrics(); setStep(4); }}
-                onPushToShopify={() => { finalizeQualityMetrics(); setStep(4); }}
+                onExportAccepted={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
+                onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
                 onBack={() => setStep(2)}
                 onReprocessDetailed={handleReprocessDetailed}
                 isReprocessing={isReprocessing}

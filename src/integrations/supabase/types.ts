@@ -510,6 +510,7 @@ export type Database = {
           external_url: string | null
           gst: number
           id: string
+          source_filename: string | null
           source_type: string
           status: string
           subtotal: number
@@ -531,6 +532,7 @@ export type Database = {
           external_url?: string | null
           gst?: number
           id?: string
+          source_filename?: string | null
           source_type?: string
           status?: string
           subtotal?: number
@@ -552,6 +554,7 @@ export type Database = {
           external_url?: string | null
           gst?: number
           id?: string
+          source_filename?: string | null
           source_type?: string
           status?: string
           subtotal?: number

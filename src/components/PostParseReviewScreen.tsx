@@ -184,6 +184,14 @@ export default function PostParseReviewScreen({
   }>>({});
   /** Cells where a reason was just recorded — show check for ~1.5s. */
   const [savedReasonFlash, setSavedReasonFlash] = useState<Record<string, boolean>>({});
+  /** Counts every persisted correction in this session — drives the
+   *  "N corrections · SUPPLIER" badge in the AI Parsing Details header. */
+  const [sessionEditCount, setSessionEditCount] = useState(0);
+  /** Per-row state: when true, the row is in "awaiting reason" mode after the
+   *  user clicked Done editing with at least one changed field. */
+  const [awaitingReasonRows, setAwaitingReasonRows] = useState<Set<number>>(new Set());
+  /** Stable session id used as invoice_id when persisting corrections. */
+  const sessionInvoiceId = useMemo(() => `session_${Date.now().toString(36)}`, []);
 
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
@@ -377,55 +385,63 @@ export default function PostParseReviewScreen({
       sampleRows,
       formatType: detectedLayout,
       extractedProducts: products.filter(pp => !pp._rejected) as unknown as Record<string, unknown>[],
-      correctionReason: reason ?? null,
+      correctionReason: reason ?? "unspecified",
       correctionReasonDetail: reasonDetail ?? null,
       fieldCategory: deriveFieldCategory(field),
       autoDetected: lowConfFields.has(field),
+      invoiceId: sessionInvoiceId,
     });
-  }, [supplierName, products, detectedHeaders, detectedLayout, lowConfFields]);
+    setSessionEditCount((c) => c + 1);
+  }, [supplierName, products, detectedHeaders, detectedLayout, lowConfFields, sessionInvoiceId]);
 
-  /** Flush any pending correction for a different cell (user moved away without picking). */
-  const flushOtherPending = useCallback((keepKey: string) => {
-    setPendingCorrections(prev => {
-      const next: typeof prev = {};
-      for (const [k, v] of Object.entries(prev)) {
-        if (k === keepKey) { next[k] = v; continue; }
-        persistCorrection({ ...v, reason: null, reasonDetail: null });
-      }
-      return next;
-    });
-  }, [persistCorrection]);
-
-  /** User picked a reason from the inline picker. */
-  const recordReasonForCell = useCallback((rowIndex: number, field: string, reason: CorrectionReason, detail?: string) => {
-    const key = `${rowIndex}::${field}`;
-    setPendingCorrections(prev => {
-      const entry = prev[key];
-      if (entry) {
-        persistCorrection({ ...entry, reason, reasonDetail: detail ?? null });
-      }
-      const { [key]: _drop, ...rest } = prev;
-      return rest;
-    });
-    setSavedReasonFlash(prev => ({ ...prev, [key]: true }));
+  /** Briefly flash the green check on a cell. */
+  const flashSavedFor = useCallback((key: string) => {
+    setSavedReasonFlash((prev) => ({ ...prev, [key]: true }));
     setTimeout(() => {
-      setSavedReasonFlash(prev => {
+      setSavedReasonFlash((prev) => {
         const { [key]: _drop, ...rest } = prev;
         return rest;
       });
     }, 1500);
-  }, [persistCorrection]);
+  }, []);
 
-  /** User dismissed the picker — log without a reason. */
-  const dismissReasonForCell = useCallback((rowIndex: number, field: string) => {
-    const key = `${rowIndex}::${field}`;
-    setPendingCorrections(prev => {
-      const entry = prev[key];
-      if (entry) persistCorrection({ ...entry, reason: null, reasonDetail: null });
-      const { [key]: _drop, ...rest } = prev;
-      return rest;
+  /** Persist every pending correction for the given row with the chosen reason,
+   *  flash the green check on each, then move the row to Accepted. */
+  const confirmRowReason = useCallback((
+    rowIndex: number,
+    reason: CorrectionReason,
+    detail?: string,
+  ) => {
+    setPendingCorrections((prev) => {
+      const next = { ...prev };
+      for (const [key, entry] of Object.entries(prev)) {
+        if (entry.rowIndex !== rowIndex) continue;
+        persistCorrection({ ...entry, reason, reasonDetail: detail ?? null });
+        flashSavedFor(key);
+        delete next[key];
+      }
+      return next;
     });
-  }, [persistCorrection]);
+    setAwaitingReasonRows((prev) => {
+      const next = new Set(prev);
+      next.delete(rowIndex);
+      return next;
+    });
+    setEditingRow((current) => (current === rowIndex ? null : current));
+    // Move to Accepted (also runs the existing learning hook).
+    approveRow(rowIndex);
+  }, [persistCorrection, flashSavedFor]);
+
+  /** User dismissed without picking — record everything for this row as
+   *  "unspecified" and still move to Accepted. */
+  const skipRowReason = useCallback((rowIndex: number) => {
+    confirmRowReason(rowIndex, "unspecified");
+  }, [confirmRowReason]);
+
+  /** Convenience: derive pending field labels for a row, used for the bar's summary. */
+  const pendingFieldsForRow = useCallback((rowIndex: number) => {
+    return Object.values(pendingCorrections).filter((c) => c.rowIndex === rowIndex);
+  }, [pendingCorrections]);
 
   const updateField = (rowIndex: number, field: string, value: string | number) => {
     onUpdateProducts(products.map(p => {
@@ -437,9 +453,8 @@ export default function PostParseReviewScreen({
         onCellEdited?.(fieldLabel);
         if (supplierName && originalValue) {
           const key = `${rowIndex}::${field}`;
-          // Defer logging — picker will pick a reason. If user moves away without
-          // picking, flushOtherPending() persists with reason=null.
-          flushOtherPending(key);
+          // Queue the change. Reason is captured later via the row-level
+          // picker shown after the user clicks "Done editing".
           setPendingCorrections(prev => ({
             ...prev,
             [key]: { rowIndex, field, fieldLabel, originalValue, correctedValue: newValue },
@@ -818,16 +833,25 @@ export default function PostParseReviewScreen({
                   isSelected={selectedRows.has(p._rowIndex)}
                   onToggleSelect={() => toggleSelectRow(p._rowIndex)}
                   onStartEdit={() => setEditingRow(p._rowIndex)}
-                  onStopEdit={() => setEditingRow(null)}
+                  onStopEdit={() => {
+                    const pendingForRow = pendingFieldsForRow(p._rowIndex);
+                    if (pendingForRow.length > 0) {
+                      // Surface the row-level reason picker; row stays in edit mode.
+                      setAwaitingReasonRows(prev => new Set(prev).add(p._rowIndex));
+                    } else {
+                      setEditingRow(null);
+                    }
+                  }}
                   onApprove={() => approveRow(p._rowIndex)}
                   onReject={() => rejectRow(p._rowIndex)}
                   onMoveToReview={() => moveToReview(p._rowIndex)}
                   onRestore={() => restoreToReview(p._rowIndex)}
                   onUpdateField={(field, value) => updateField(p._rowIndex, field, value)}
-                  pendingFields={new Set(Object.values(pendingCorrections).filter(c => c.rowIndex === p._rowIndex).map(c => c.field))}
+                  pendingRowCorrections={pendingFieldsForRow(p._rowIndex)}
                   savedReasonFields={new Set(Object.keys(savedReasonFlash).filter(k => k.startsWith(`${p._rowIndex}::`)).map(k => k.split("::")[1]))}
-                  onPickReason={(field, reason, detail) => recordReasonForCell(p._rowIndex, field, reason, detail)}
-                  onDismissReason={(field) => dismissReasonForCell(p._rowIndex, field)}
+                  awaitingRowReason={awaitingReasonRows.has(p._rowIndex)}
+                  onConfirmRowReason={(reason, detail) => confirmRowReason(p._rowIndex, reason, detail)}
+                  onSkipRowReason={() => skipRowReason(p._rowIndex)}
                   onMarkAs={(markAs) => markRowAs(p._rowIndex, markAs)}
                   onSplit={() => splitRow(p._rowIndex)}
                   showTeachAI={showTeachAI === p._rowIndex}
@@ -863,7 +887,7 @@ export default function PostParseReviewScreen({
         <button onClick={() => setShowDebug(!showDebug)} className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground hover:bg-muted/30 transition-colors">
           <Bug className="w-3.5 h-3.5" />
           <span className="font-medium">AI Parsing Details</span>
-          <span className="text-[10px] ml-auto mr-2">{debug.corrections.length} corrections · {debug.detectedVendor}</span>
+          <span className="text-[10px] ml-auto mr-2">{debug.corrections.length + sessionEditCount} corrections{supplierName ? ` · ${supplierName}` : ""}</span>
           {showDebug ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
         {showDebug && (
@@ -1127,7 +1151,8 @@ function ReviewRow({
   onUpdateField, onMarkAs, onSplit,
   showTeachAI, onToggleTeachAI, supplierName, parsingPlan,
   invoicePages, onShowSourceTrace,
-  pendingFields, savedReasonFields, onPickReason, onDismissReason,
+  pendingRowCorrections, savedReasonFields,
+  awaitingRowReason, onConfirmRowReason, onSkipRowReason,
   lowConfFields,
 }: {
   product: ReviewProduct;
@@ -1150,10 +1175,15 @@ function ReviewRow({
   parsingPlan?: import("@/lib/invoice-validator").ParsingPlan;
   invoicePages?: string[];
   onShowSourceTrace?: (product: ReviewProduct) => void;
-  pendingFields?: Set<string>;
+  /** All currently-queued field changes for this row, awaiting a reason. */
+  pendingRowCorrections?: Array<{ field: string; fieldLabel: string; originalValue: string; correctedValue: string }>;
   savedReasonFields?: Set<string>;
-  onPickReason?: (field: string, reason: CorrectionReason, detail?: string) => void;
-  onDismissReason?: (field: string) => void;
+  /** True when the user has clicked "Done editing" with pending changes — show the bar. */
+  awaitingRowReason?: boolean;
+  /** Picked a reason for the entire row — applies it to every pending change. */
+  onConfirmRowReason?: (reason: CorrectionReason, detail?: string) => void;
+  /** Dismissed the bar without picking — record everything as "unspecified". */
+  onSkipRowReason?: () => void;
   lowConfFields?: Set<string>;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -1294,29 +1324,22 @@ function ReviewRow({
         <div className="px-4 pb-4 ml-[52px]">
           {isEditing ? (
             <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+              {/* Show a small green check beside any field that has just been
+                  recorded; the row-level picker below captures the reason. */}
               <div>
                 <label className={labelCls("name")}>Product Title</label>
                 <Input defaultValue={p.name} onBlur={e => onUpdateField("name", e.target.value)} className="h-8 text-xs" />
-                {pendingFields?.has("name") && onPickReason && onDismissReason && (
-                  <CorrectionReasonPicker onPick={(r, d) => onPickReason("name", r, d)} onDismiss={() => onDismissReason("name")} />
-                )}
                 {savedReasonFields?.has("name") && <CorrectionSavedCheck />}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className={labelCls("brand")}>Vendor</label>
                   <Input defaultValue={p.brand} onBlur={e => onUpdateField("brand", e.target.value)} className="h-8 text-xs" />
-                  {pendingFields?.has("brand") && onPickReason && onDismissReason && (
-                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("brand", r, d)} onDismiss={() => onDismissReason("brand")} />
-                  )}
                   {savedReasonFields?.has("brand") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className={labelCls("sku")}>Style Code / SKU</label>
                   <Input defaultValue={p.sku} onBlur={e => onUpdateField("sku", e.target.value)} className="h-8 text-xs" />
-                  {pendingFields?.has("sku") && onPickReason && onDismissReason && (
-                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("sku", r, d)} onDismiss={() => onDismissReason("sku")} />
-                  )}
                   {savedReasonFields?.has("sku") && <CorrectionSavedCheck />}
                 </div>
               </div>
@@ -1324,33 +1347,21 @@ function ReviewRow({
                 <div>
                   <label className={labelCls("cost")}>Unit Cost</label>
                   <Input type="number" defaultValue={p.cost} onBlur={e => onUpdateField("cost", parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
-                  {pendingFields?.has("cost") && onPickReason && onDismissReason && (
-                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("cost", r, d)} onDismiss={() => onDismissReason("cost")} />
-                  )}
                   {savedReasonFields?.has("cost") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className={labelCls("qty")}>Qty</label>
                   <Input type="number" defaultValue={p.qty} onBlur={e => onUpdateField("qty", parseInt(e.target.value) || 0)} className="h-8 text-xs" />
-                  {pendingFields?.has("qty") && onPickReason && onDismissReason && (
-                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("qty", r, d)} onDismiss={() => onDismissReason("qty")} />
-                  )}
                   {savedReasonFields?.has("qty") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className={labelCls("size")}>Size</label>
                   <Input defaultValue={p.size} onBlur={e => onUpdateField("size", e.target.value)} className="h-8 text-xs" />
-                  {pendingFields?.has("size") && onPickReason && onDismissReason && (
-                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("size", r, d)} onDismiss={() => onDismissReason("size")} />
-                  )}
                   {savedReasonFields?.has("size") && <CorrectionSavedCheck />}
                 </div>
                 <div>
                   <label className={labelCls("colour")}>Colour</label>
                   <Input defaultValue={p.colour} onBlur={e => onUpdateField("colour", e.target.value)} className="h-8 text-xs" />
-                  {pendingFields?.has("colour") && onPickReason && onDismissReason && (
-                    <CorrectionReasonPicker onPick={(r, d) => onPickReason("colour", r, d)} onDismiss={() => onDismissReason("colour")} />
-                  )}
                   {savedReasonFields?.has("colour") && <CorrectionSavedCheck />}
                 </div>
               </div>
@@ -1373,13 +1384,27 @@ function ReviewRow({
                   }}
                 />
               )}
+
+              {/* Row-level reason picker — shown after the user clicks "Done editing"
+                  and at least one field was changed. Choosing a reason persists every
+                  pending change with that reason and moves the row to Accepted. */}
+              {awaitingRowReason && (pendingRowCorrections?.length ?? 0) > 0 && onConfirmRowReason && onSkipRowReason && (
+                <CorrectionReasonPicker
+                  summary={`${pendingRowCorrections!.length} field${pendingRowCorrections!.length === 1 ? "" : "s"} changed: ${pendingRowCorrections!.map(c => c.fieldLabel).join(", ")}`}
+                  onPick={(r, d) => onConfirmRowReason(r, d)}
+                  onDismiss={onSkipRowReason}
+                />
+              )}
+
               <div className="flex justify-between items-center">
                 <div className="flex gap-1">
                   <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 text-muted-foreground" onClick={onSplit}>
                     <Scissors className="w-3 h-3" /> Split
                   </Button>
                 </div>
-                <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={onStopEdit}>Done editing</Button>
+                <Button variant="ghost" size="sm" className="h-7 text-[10px]" onClick={onStopEdit}>
+                  {awaitingRowReason ? "Pick a reason above" : "Done editing"}
+                </Button>
               </div>
             </div>
           ) : showTeachAI ? (

@@ -3,6 +3,24 @@
 // (product_catalog_cache) and classifies each line as new,
 // exact_refill, new_variant, new_colour, or conflict.
 
+// Re-export legacy stock-check engine for InvoiceFlow / StockCheckFlow / WholesaleImportFlow
+export type {
+  MatchOutcome,
+  InvoiceLineItem,
+  ShopifyVariant,
+  MatchResult,
+  GroupedMatch,
+  ClassifiedItem,
+  ClassificationSummary,
+  ClassificationResult,
+} from "./stock-matcher-legacy";
+export {
+  matchLineItem,
+  matchAllLineItems,
+  classifyAllItems,
+  groupMatchResults,
+} from "./stock-matcher-legacy";
+
 export interface InvoiceLine {
   sku?: string;
   product_name?: string;

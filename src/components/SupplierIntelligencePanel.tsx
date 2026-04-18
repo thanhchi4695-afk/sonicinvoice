@@ -127,7 +127,15 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<IntelligenceRow[]>([]);
   const [logs, setLogs] = useState<LogRow[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const pre = window.sessionStorage.getItem("supplierIntel.filter");
+    if (pre) {
+      window.sessionStorage.removeItem("supplierIntel.filter");
+      return pre;
+    }
+    return "";
+  });
   const [activeTab, setActiveTab] = useState<"known" | "log" | "rules">("known");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);

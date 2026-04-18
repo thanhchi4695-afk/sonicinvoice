@@ -379,9 +379,11 @@ export type Database = {
           field_category: string | null
           field_corrected: string | null
           id: string
+          invoice_id: string | null
           invoice_pattern_id: string | null
           original_value: string | null
           session_invoice_index: number | null
+          supplier_name: string | null
           supplier_profile_id: string | null
           user_id: string
         }
@@ -394,9 +396,11 @@ export type Database = {
           field_category?: string | null
           field_corrected?: string | null
           id?: string
+          invoice_id?: string | null
           invoice_pattern_id?: string | null
           original_value?: string | null
           session_invoice_index?: number | null
+          supplier_name?: string | null
           supplier_profile_id?: string | null
           user_id: string
         }
@@ -409,9 +413,11 @@ export type Database = {
           field_category?: string | null
           field_corrected?: string | null
           id?: string
+          invoice_id?: string | null
           invoice_pattern_id?: string | null
           original_value?: string | null
           session_invoice_index?: number | null
+          supplier_name?: string | null
           supplier_profile_id?: string | null
           user_id?: string
         }

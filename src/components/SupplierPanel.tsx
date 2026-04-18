@@ -200,6 +200,16 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
       setProductCosts([]);
     }
 
+
+    // Load correction_log entries for this supplier — fuzzy by supplier_name.
+    const { data: corrRows } = await supabase
+      .from("correction_log")
+      .select("id, field_corrected, original_value, corrected_value, correction_reason, correction_reason_detail, field_category, created_at, invoice_id")
+      .ilike("supplier_name", `%${safeName}%`)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    setCorrections((corrRows || []) as CorrectionRow[]);
+
     setLoadingDetail(false);
   }, []);
 

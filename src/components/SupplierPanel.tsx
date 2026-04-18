@@ -1174,13 +1174,15 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
 
             {filtered.map(s => {
               const spend = Number(s.total_spend);
+              const sIntel = getIntelFor(s.name);
+              const tone = sIntel ? confidenceTone(sIntel.confidence_score) : null;
               return (
                 <button
                   key={s.id}
                   onClick={() => setSelectedId(s.id)}
                   className="w-full bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors"
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-bold">{s.name}</p>
@@ -1195,6 +1197,23 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                       </div>
                       {s.notes && (
                         <p className="text-[10px] text-muted-foreground mt-1 truncate">{s.notes}</p>
+                      )}
+                    </div>
+                    <div className="w-32 shrink-0">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Confidence</p>
+                      {sIntel && tone ? (
+                        <>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className={`font-mono font-semibold ${tone.text}`}>{sIntel.confidence_score}%</span>
+                            <span className="text-[10px] text-muted-foreground">{sIntel.invoice_count} inv</span>
+                          </div>
+                          <ConfidenceBar value={sIntel.confidence_score} />
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-mono text-muted-foreground">—</p>
+                          <p className="text-[10px] text-muted-foreground">No invoices processed</p>
+                        </>
                       )}
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />

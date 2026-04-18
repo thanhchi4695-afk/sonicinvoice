@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES } from "@/i18n/config";
 const ConnectorsMarketplace = lazy(() => import("@/components/ConnectorsMarketplace"));
 import POSConnectionPanel from "@/components/POSConnectionPanel";
+import PlatformConnectionsSection from "@/components/PlatformConnectionsSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard, Store } from "lucide-react";
@@ -274,6 +275,11 @@ const AccountScreen = () => {
             options={[{ v: "nearest_05", l: "$0.05" }, { v: "nearest_1", l: "$1.00" }, { v: "charm_95", l: ".95" }]}
           />
         </div>
+      </Section>
+
+      {/* Platform connections (Shopify + Lightspeed unified card view) */}
+      <Section title="Platform connections">
+        <PlatformConnectionsSection />
       </Section>
 
       {/* Shopify Connection */}

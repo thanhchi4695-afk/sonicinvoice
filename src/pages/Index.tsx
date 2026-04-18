@@ -91,6 +91,7 @@ const ShopifyCSVSEO = lazy(() => import("@/components/ShopifyCSVSEO"));
 const StockyHomeDashboard = lazy(() => import("@/components/StockyHomeDashboard"));
 const PriceMatchPanel = lazy(() => import("@/components/PriceMatchPanel"));
 const ProductDescriptionPanel = lazy(() => import("@/components/ProductDescriptionPanel"));
+const StockReconciliationPanel = lazy(() => import("@/components/StockReconciliationPanel"));
 // ── Flow keys registry — single source of truth for all activeFlow values ──
 // Add a new flow by adding its key here; TypeScript will enforce usage everywhere.
 const FLOW_KEYS = {
@@ -156,6 +157,7 @@ const FLOW_KEYS = {
   quick_receive: true,
   csv_seo: true,
   stocky_dashboard: true,
+  stock_reconciliation: true,
 } as const;
 
 export type ActiveFlow = keyof typeof FLOW_KEYS;
@@ -179,6 +181,23 @@ const Index = () => {
   const [useStockyDashboard, setUseStockyDashboard] = useState(() => localStorage.getItem("stocky_dashboard_mode") === "true");
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showQuickSearch, setShowQuickSearch] = useState(false);
+  const [reconciliationResult, setReconciliationResult] = useState<any>(null);
+
+  const handleReconciliationExport = useCallback((_sets: unknown) => {
+    // Hand-off back to invoice flow's export step
+    setActiveFlow("invoice");
+  }, []);
+
+  // Allow InvoiceFlow (and others) to stash the reconciliation payload
+  // before navigating to the dedicated review panel.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) setReconciliationResult(detail);
+    };
+    window.addEventListener("sonic:reconciliation-ready", handler as EventListener);
+    return () => window.removeEventListener("sonic:reconciliation-ready", handler as EventListener);
+  }, []);
   
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
@@ -424,6 +443,19 @@ const Index = () => {
       }} onExit={() => { setActiveFlow(null); setActivePipelineId(null); }} /> : null; break;
       case "pipeline_chooser": flowEl = <PipelineChooser onSelect={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }} onBack={() => setActiveFlow(null)} />; break;
       case "supplier_intelligence": flowEl = <SupplierIntelligencePanel onBack={() => setActiveFlow(null)} onOpenInvoiceFlow={() => setActiveFlow("invoice")} />; break;
+      case "stock_reconciliation":
+        flowEl = reconciliationResult ? (
+          <StockReconciliationPanel
+            reconciliationResult={reconciliationResult}
+            onBack={() => setActiveFlow("invoice")}
+            onExport={(sets) => handleReconciliationExport(sets)}
+          />
+        ) : (
+          <div className="p-6 text-center text-sm text-muted-foreground">
+            No reconciliation in progress. <button className="text-primary underline" onClick={() => setActiveFlow("invoice")}>Start an invoice →</button>
+          </div>
+        );
+        break;
       default: return null;
     }
     return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;

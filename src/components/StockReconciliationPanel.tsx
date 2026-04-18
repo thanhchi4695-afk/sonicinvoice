@@ -25,6 +25,9 @@ import {
   exportNewProductsCsv,
   exportStockUpdateCsv,
   exportNewVariantsCsv,
+  exportLightspeedNewProductsCsv,
+  exportLightspeedStockUpdateCsv,
+  exportLightspeedNewVariantsCsv,
 } from "@/lib/reconciliation-csv";
 
 export interface ExportSets {

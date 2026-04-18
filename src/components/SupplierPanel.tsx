@@ -76,6 +76,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   // Detail sub-data
   const [linkedInvoices, setLinkedInvoices] = useState<LinkedInvoice[]>([]);
   const [productCosts, setProductCosts] = useState<ProductCostSummary[]>([]);
+  const [corrections, setCorrections] = useState<CorrectionRow[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailTab, setDetailTab] = useState<"overview" | "invoices" | "costs" | "catalog">("overview");
 

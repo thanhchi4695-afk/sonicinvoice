@@ -80,6 +80,15 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailTab, setDetailTab] = useState<"overview" | "invoices" | "costs" | "catalog" | "corrections">("overview");
 
+  // Supplier intelligence (confidence, invoice_count, last_match_method) keyed by lowercased supplier_name
+  interface IntelSummary {
+    confidence_score: number;
+    invoice_count: number;
+    last_match_method: string | null;
+    last_invoice_date: string | null;
+  }
+  const [intelByName, setIntelByName] = useState<Record<string, IntelSummary>>({});
+
   // Form state
   const [form, setForm] = useState({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
 

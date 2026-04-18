@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft, ChevronDown, ChevronRight, Search, Edit3, Brain,
-  History as HistoryIcon, BookOpen, Sparkles, Save, X,
+  History as HistoryIcon, BookOpen, Sparkles, Save, X, Info,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";

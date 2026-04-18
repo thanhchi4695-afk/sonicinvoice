@@ -337,6 +337,7 @@ export function StockReconciliationPanel({
                         setConflictDecisions((prev) => ({ ...prev, [idx]: d }))
                       }
                       groupBadge={meta.badge}
+                      onOpen={() => setDrawerIdx(idx)}
                     />
                   ))}
                 </div>

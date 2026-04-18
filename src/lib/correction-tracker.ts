@@ -16,7 +16,8 @@ export type CorrectionReason =
   | "size_system_wrong"
   | "missed_field"
   | "wrong_value"
-  | "other";
+  | "other"
+  | "unspecified";
 
 export type FieldCategory = "identification" | "pricing" | "variant" | "metadata";
 
@@ -45,6 +46,8 @@ interface LogCorrectionInput {
   fieldCategory?: FieldCategory;
   autoDetected?: boolean;
   sessionInvoiceIndex?: number | null;
+  /** Optional plain-text invoice identifier (filename, doc number, or session id). */
+  invoiceId?: string | null;
 }
 
 // In-memory tally for this session: key = `${supplierName}::${field}`
@@ -94,6 +97,8 @@ export async function logCorrection(input: LogCorrectionInput): Promise<void> {
       user_id: userId,
       supplier_profile_id: profile?.id ?? null,
       invoice_pattern_id: invoicePatternId,
+      supplier_name: supplierName,
+      invoice_id: input.invoiceId ?? null,
       field_corrected: field,
       original_value: originalValue.slice(0, 500),
       corrected_value: correctedValue.slice(0, 500),

@@ -3,7 +3,7 @@ import {
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   TrendingUp, TrendingDown, Minus, FileText, Package,
   BarChart3, Clock, DollarSign, Save, X, Search, RefreshCw,
-  Receipt, ShoppingBag, AlertTriangle,
+  Receipt, ShoppingBag, AlertTriangle, Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";

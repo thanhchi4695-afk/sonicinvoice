@@ -83,6 +83,111 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   // Form state
   const [form, setForm] = useState({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
 
+  // ── Intelligence form state (variants, column map, pricing) ──
+  type ColMapKey = "product_name" | "sku" | "colour" | "size" | "cost" | "rrp" | "quantity";
+  const COLUMN_FIELDS: { key: ColMapKey; label: string; placeholder: string }[] = [
+    { key: "product_name", label: "Product name column", placeholder: "e.g., Style Description, Product Name" },
+    { key: "sku", label: "SKU column", placeholder: "e.g., Style Code, Item No" },
+    { key: "colour", label: "Colour column", placeholder: "e.g., Colourway, Color" },
+    { key: "size", label: "Size column", placeholder: "e.g., Size, Sizing" },
+    { key: "cost", label: "Cost column", placeholder: "e.g., Wholesale Price, WSP, Buy Price" },
+    { key: "rrp", label: "RRP column", placeholder: "e.g., RRP, Retail, Recommended Retail" },
+    { key: "quantity", label: "Quantity column", placeholder: "e.g., Qty, Quantity, Units" },
+  ];
+  const [nameVariants, setNameVariants] = useState<string[]>([]);
+  const [variantInput, setVariantInput] = useState("");
+  const [columnMap, setColumnMap] = useState<Record<ColMapKey, string>>({
+    product_name: "", sku: "", colour: "", size: "", cost: "", rrp: "", quantity: "",
+  });
+  const [gstOnCost, setGstOnCost] = useState(false); // Ex-GST default
+  const [gstOnRrp, setGstOnRrp] = useState(true); // Incl-GST default
+  const [markupMultiplier, setMarkupMultiplier] = useState<string>("");
+  const [sizeSystem, setSizeSystem] = useState<"AU" | "US" | "UK" | "EU">("AU");
+
+  const resetIntelligenceForm = () => {
+    setNameVariants([]);
+    setVariantInput("");
+    setColumnMap({ product_name: "", sku: "", colour: "", size: "", cost: "", rrp: "", quantity: "" });
+    setGstOnCost(false);
+    setGstOnRrp(true);
+    setMarkupMultiplier("");
+    setSizeSystem("AU");
+  };
+
+  const addVariant = () => {
+    const v = variantInput.trim();
+    if (!v) return;
+    if (nameVariants.some(n => n.toLowerCase() === v.toLowerCase())) { setVariantInput(""); return; }
+    setNameVariants(prev => [...prev, v]);
+    setVariantInput("");
+  };
+
+  const loadIntelligenceForSupplier = useCallback(async (supplierName: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data } = await supabase
+      .from("supplier_intelligence")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .eq("supplier_name", supplierName)
+      .maybeSingle();
+    if (!data) { resetIntelligenceForm(); return; }
+    setNameVariants(((data as any).name_variants as string[]) ?? []);
+    const cm = ((data as any).column_map as Record<string, string>) ?? {};
+    setColumnMap({
+      product_name: cm.product_name ?? "",
+      sku: cm.sku ?? "",
+      colour: cm.colour ?? "",
+      size: cm.size ?? "",
+      cost: cm.cost ?? "",
+      rrp: cm.rrp ?? "",
+      quantity: cm.quantity ?? "",
+    });
+    setGstOnCost(Boolean((data as any).gst_on_cost));
+    setGstOnRrp((data as any).gst_on_rrp ?? true);
+    setMarkupMultiplier((data as any).markup_multiplier != null ? String((data as any).markup_multiplier) : "");
+    const ss = ((data as any).size_system as string) ?? "AU";
+    setSizeSystem((["AU", "US", "UK", "EU"].includes(ss) ? ss : "AU") as "AU" | "US" | "UK" | "EU");
+  }, []);
+
+  const upsertSupplierIntelligence = async (supplierName: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const cleanedColMap = Object.fromEntries(
+      Object.entries(columnMap).filter(([, v]) => v && v.trim().length > 0).map(([k, v]) => [k, v.trim()]),
+    );
+    const markup = markupMultiplier ? parseFloat(markupMultiplier) : null;
+
+    const { data: existing } = await supabase
+      .from("supplier_intelligence")
+      .select("id, confidence_score")
+      .eq("user_id", session.user.id)
+      .eq("supplier_name", supplierName)
+      .maybeSingle();
+
+    const payload: Record<string, unknown> = {
+      user_id: session.user.id,
+      supplier_name: supplierName,
+      name_variants: nameVariants,
+      column_map: cleanedColMap,
+      gst_on_cost: gstOnCost,
+      gst_on_rrp: gstOnRrp,
+      markup_multiplier: markup,
+      size_system: sizeSystem,
+    };
+
+    if (existing?.id) {
+      await supabase.from("supplier_intelligence").update(payload as never).eq("id", existing.id);
+    } else {
+      await supabase.from("supplier_intelligence").insert({
+        ...payload,
+        confidence_score: 40,
+        invoice_count: 0,
+        last_match_method: "manual",
+      } as never);
+    }
+  };
+
   // ── Load suppliers ──────────────────────────────────────
   const loadSuppliers = useCallback(async () => {
     setLoading(true);
@@ -295,9 +400,11 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     });
 
     if (error) { toast.error("Failed to add supplier"); return; }
+    await upsertSupplierIntelligence(form.name.trim());
     toast.success(`${form.name} added`);
     setAddMode(false);
     setForm({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" });
+    resetIntelligenceForm();
     loadSuppliers();
   };
 
@@ -316,6 +423,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     }).eq("id", selectedId);
 
     if (error) { toast.error("Failed to update"); return; }
+    await upsertSupplierIntelligence(form.name.trim());
     toast.success("Supplier updated");
     setEditMode(false);
     loadSuppliers();
@@ -387,6 +495,126 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
               className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm resize-none"
             />
           </div>
+
+          {/* ── Section 2: Name Variants ─────────────────── */}
+          <div className="border-t border-border pt-4">
+            <label className="text-sm font-semibold block">Name variants</label>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+              Alternative names this supplier may appear as on invoices
+            </p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {nameVariants.map((v, i) => (
+                <span key={`${v}-${i}`} className="inline-flex items-center gap-1 rounded-full bg-primary/15 text-primary border border-primary/30 px-2.5 py-1 text-xs">
+                  {v}
+                  <button
+                    type="button"
+                    onClick={() => setNameVariants(prev => prev.filter((_, idx) => idx !== i))}
+                    className="hover:text-destructive"
+                    aria-label={`Remove ${v}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <input
+              value={variantInput}
+              onChange={e => setVariantInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addVariant(); }
+                else if (e.key === "Backspace" && !variantInput && nameVariants.length > 0) {
+                  setNameVariants(prev => prev.slice(0, -1));
+                }
+              }}
+              onBlur={addVariant}
+              placeholder="e.g., Seafolly Pty Ltd, Seafolly Australia"
+              className="w-full rounded-md bg-input border border-border px-3 py-2.5 text-sm"
+            />
+          </div>
+
+          {/* ── Section 3: Invoice Column Mappings ───────── */}
+          <div className="border-t border-border pt-4">
+            <label className="text-sm font-semibold block">Invoice Column Mappings</label>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+              What column headers does this supplier use on their invoices?
+            </p>
+            <div className="space-y-2.5">
+              {COLUMN_FIELDS.map(f => (
+                <div key={f.key} className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-2 sm:items-center">
+                  <label className="text-xs font-medium text-muted-foreground">{f.label}</label>
+                  <input
+                    value={columnMap[f.key]}
+                    onChange={e => setColumnMap(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder}
+                    className="w-full rounded-md bg-input border border-border px-3 py-2 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Section 4: Pricing & Tax ─────────────────── */}
+          <div className="border-t border-border pt-4">
+            <label className="text-sm font-semibold block mb-3">Pricing & Tax</label>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm">GST on cost</p>
+                  <p className="text-xs text-muted-foreground">Off = Ex-GST (default)</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={gstOnCost}
+                  onClick={() => setGstOnCost(v => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${gstOnCost ? "bg-primary" : "bg-muted"}`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform ${gstOnCost ? "translate-x-5" : "translate-x-0.5"}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm">GST on RRP</p>
+                  <p className="text-xs text-muted-foreground">On = Incl-GST (default)</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={gstOnRrp}
+                  onClick={() => setGstOnRrp(v => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${gstOnRrp ? "bg-primary" : "bg-muted"}`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform ${gstOnRrp ? "translate-x-5" : "translate-x-0.5"}`} />
+                </button>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Markup multiplier</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={markupMultiplier}
+                  onChange={e => setMarkupMultiplier(e.target.value)}
+                  placeholder="e.g., 2.3"
+                  className="w-full rounded-md bg-input border border-border px-3 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Size system</label>
+                <select
+                  value={sizeSystem}
+                  onChange={e => setSizeSystem(e.target.value as "AU" | "US" | "UK" | "EU")}
+                  className="w-full rounded-md bg-input border border-border px-3 py-2.5 text-sm"
+                >
+                  <option value="AU">AU</option>
+                  <option value="US">US</option>
+                  <option value="UK">UK</option>
+                  <option value="EU">EU</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <Button className="w-full" onClick={addMode ? handleAdd : handleUpdate}>
             <Save className="w-4 h-4 mr-2" />{addMode ? "Add Supplier" : "Save Changes"}
           </Button>
@@ -426,6 +654,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
                     currency: detail.currency,
                     notes: detail.notes || "",
                   });
+                  loadIntelligenceForSupplier(detail.name);
                   setEditMode(true);
                 }}
                 className="p-2 rounded-lg text-muted-foreground hover:bg-muted"
@@ -763,7 +992,7 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
             <button onClick={syncSpend} disabled={syncing} className="p-2 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-50">
               <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
             </button>
-            <Button size="sm" onClick={() => { setForm({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" }); setAddMode(true); }}>
+            <Button size="sm" onClick={() => { setForm({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" }); resetIntelligenceForm(); setAddMode(true); }}>
               <Plus className="w-4 h-4 mr-1" /> Add
             </Button>
           </div>

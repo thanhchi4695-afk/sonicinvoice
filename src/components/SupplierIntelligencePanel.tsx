@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft, ChevronDown, ChevronRight, Search, Edit3, Brain,
-  History as HistoryIcon, BookOpen, Sparkles, Save, X,
+  History as HistoryIcon, BookOpen, Sparkles, Save, X, Info,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -47,49 +48,40 @@ interface LogRow {
   created_at: string;
 }
 
-const COMMON_SENSE_RULES: Array<{ category: string; rules: Array<{ field: string; logic: string }> }> = [
+const COMMON_SENSE_RULES: Array<{
+  category: string;
+  rules: Array<{ field: string; logic: string; tooltip: string }>;
+}> = [
   {
-    category: "Column detection",
+    category: "Column Detection",
     rules: [
-      { field: "Cost column", logic: "Header contains \"wholesale\", \"WSP\", \"buy price\", \"cost\" or \"ex GST\"  →  Unit Cost" },
-      { field: "RRP column", logic: "Header contains \"RRP\", \"retail\", \"sell price\" or \"recommended\"  →  Retail Price" },
-      { field: "SKU column", logic: "Header contains \"style no\", \"SKU\", \"item code\", \"ref\" or \"product code\"  →  SKU" },
-      { field: "Colour column", logic: "Header contains \"colour\", \"color\", \"col\" or \"colourway\"  →  Colour" },
-      { field: "Product name", logic: "Header contains \"description\", \"name\", \"product\" or \"style name\"  →  Title" },
+      { field: "Unit Cost", logic: "\"Wholesale\", \"WSP\", \"Buy Price\", \"Cost\" → Unit Cost", tooltip: "Applied when scanning invoice headers — case-insensitive match maps the column to the wholesale cost field." },
+      { field: "Retail Price", logic: "\"RRP\", \"Retail\", \"Recommended Retail\", \"SRP\" → Retail Price", tooltip: "Applied to identify the consumer-facing recommended retail price column." },
+      { field: "SKU", logic: "\"Style\", \"Style Code\", \"Item No\", \"SKU\" → SKU", tooltip: "Applied to detect the unique product/style identifier column used for matching to your catalog." },
+      { field: "Product Title", logic: "\"Description\", \"Style Description\", \"Product Name\" → Product Title", tooltip: "Applied to capture the human-readable product name used as the title in Shopify or your POS." },
+      { field: "Colour", logic: "\"Colour\", \"Color\", \"Colourway\" → Colour", tooltip: "Applied to detect colour variant data — accepts both AU/UK and US spellings." },
+      { field: "Size", logic: "\"Size\", \"Sizing\" → Size", tooltip: "Applied when a single size column exists (as opposed to a size matrix grid)." },
     ],
   },
   {
-    category: "Size matrix detection",
+    category: "Size Matrix Detection",
     rules: [
-      { field: "Numeric size grid", logic: "3+ numeric-only headers in a row (e.g. 8, 10, 12, 14, 16) → treat row as size matrix" },
-      { field: "Letter size grid", logic: "Headers contain XS, S, M, L, XL, XXL → letter size matrix" },
-      { field: "Pack notation", logic: "Header matches pattern like \"1x8\" or \"2x10\" → expand into individual size lines" },
+      { field: "Numeric size grid", logic: "Numeric column headers (6, 8, 10, 12, 14, 16) → detected as size grid, expanded to individual rows", tooltip: "Applied when 3+ adjacent headers are numeric only — each cell value becomes a separate variant row with that size." },
     ],
   },
   {
-    category: "Australian GST defaults",
+    category: "Australian GST Defaults",
     rules: [
-      { field: "GST on cost", logic: "Default: cost is ex-GST (Australian wholesale standard)" },
-      { field: "GST on RRP", logic: "Default: RRP is incl-GST (consumer-facing price)" },
-      { field: "GST rate", logic: "Default 10% — applied when adding GST to ex-GST cost or extracting GST from incl-GST RRP" },
-      { field: "Currency default", logic: "Australian retail → AUD unless evidence suggests otherwise" },
+      { field: "Cost prices", logic: "Cost prices assumed ex-GST unless marked otherwise", tooltip: "Applied for AU wholesale invoices where the supplier doesn't explicitly tag the cost as GST-inclusive." },
+      { field: "RRP prices", logic: "RRP prices assumed incl-GST unless marked otherwise", tooltip: "Applied because consumer-facing retail prices in Australia are quoted GST-inclusive by law." },
+      { field: "GST rate", logic: "GST rate: 10%", tooltip: "Applied when adding GST to ex-GST cost or extracting GST from incl-GST RRP." },
     ],
   },
   {
-    category: "SKU pattern detection",
+    category: "SKU Pattern Detection",
     rules: [
-      { field: "Prefix detection", logic: "First alphanumeric segment before '-', '_' or whitespace becomes the SKU prefix (e.g. SF-2419 → SF)" },
-      { field: "Length normalisation", logic: "SKUs of consistent length (5–10 chars) treated as primary identifier; longer → variant code" },
-      { field: "Fuzzy supplier match", logic: "Levenshtein distance < 3 between names → treat as same supplier" },
-      { field: "Header fingerprint", logic: "Sorted+normalised headers match a saved invoice → reuse that pattern" },
-    ],
-  },
-  {
-    category: "Markup defaults (when no RRP given)",
-    rules: [
-      { field: "Fashion", logic: "Default 2.2× cost" },
-      { field: "Accessories", logic: "Default 2.5× cost (higher margin category)" },
-      { field: "Basics", logic: "Default 2.0× cost (commodity items, tighter margin)" },
+      { field: "Style code format", logic: "Alphanumeric codes with hyphens detected as style codes", tooltip: "Applied to identify codes like SF-2419 or AB_1234 as the primary SKU; longer suffixes treated as variant codes." },
+      { field: "Brand prefix learning", logic: "Brand prefix patterns learned after 2+ invoices", tooltip: "Applied after the system sees the same supplier twice — the common prefix (e.g. \"SF-\") is locked into the supplier profile." },
     ],
   },
 ];
@@ -542,29 +534,49 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
 
           {/* ── Tab 3: Common Sense Rules (read-only) ─────── */}
           <TabsContent value="rules" className="space-y-3 mt-0">
+            <div>
+              <h3 className="text-sm font-semibold font-display">Universal Detection Rules</h3>
+              <p className="text-xs text-muted-foreground">Applied when no supplier profile exists</p>
+            </div>
             <Card className="p-3 bg-muted/20 border-dashed">
               <p className="text-xs text-muted-foreground">
-                These are the universal rules the AI applies when it sees a supplier for the first time
-                (no learned profile yet). They're read-only — once a real invoice is processed, the
-                supplier's specific learned rules take over.
+                These universal rules run on every brand-new supplier — once a real invoice is processed,
+                the supplier's learned profile takes over. Hover the <Info className="w-3 h-3 inline -mt-0.5" /> icon
+                on any rule to see when it's applied.
               </p>
             </Card>
 
-            {COMMON_SENSE_RULES.map((section) => (
-              <Card key={section.category} className="overflow-hidden">
-                <div className="px-3 py-2 bg-muted/30 border-b border-border">
-                  <p className="text-xs font-semibold">{section.category}</p>
-                </div>
-                <div className="divide-y divide-border">
-                  {section.rules.map((rule) => (
-                    <div key={rule.field} className="grid grid-cols-[160px_1fr] gap-3 px-3 py-2 text-xs">
-                      <span className="font-medium text-foreground">{rule.field}</span>
-                      <span className="text-muted-foreground">{rule.logic}</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            ))}
+            <TooltipProvider delayDuration={150}>
+              {COMMON_SENSE_RULES.map((section) => (
+                <Card key={section.category} className="overflow-hidden">
+                  <div className="px-3 py-2 bg-muted/30 border-b border-border">
+                    <p className="text-xs font-semibold">{section.category}</p>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {section.rules.map((rule) => (
+                      <div key={rule.field} className="grid grid-cols-[160px_1fr_28px] gap-3 px-3 py-2 text-xs items-start">
+                        <span className="font-medium text-foreground">{rule.field}</span>
+                        <span className="text-muted-foreground">{rule.logic}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`When this rule is applied: ${rule.tooltip}`}
+                              className="text-muted-foreground hover:text-foreground transition-colors justify-self-end"
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="max-w-xs text-xs">
+                            {rule.tooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ))}
+            </TooltipProvider>
           </TabsContent>
         </Tabs>
       </div>

@@ -150,21 +150,22 @@ export async function logCorrection(input: LogCorrectionInput): Promise<void> {
 }
 
 interface PromptArgs {
-  supplierProfileId: string;
+  supplierProfileId: string | null;
   supplierName: string;
   field: string;
+  originalValue: string;
   latestCorrected: string;
   rawHeaders: string[];
   sampleRows: Record<string, unknown>[];
   formatType: string | null;
   extractedProducts: Record<string, unknown>[];
+  tallyKey: string;
 }
 
 function promptUpdateRule(args: PromptArgs) {
-  const { supplierName, field } = args;
-  toast(`You've corrected ${field} for ${supplierName} multiple times`, {
-    description:
-      "Would you like to update the saved rule so the app learns from this?",
+  const { supplierName, field, tallyKey } = args;
+  toast(`You've corrected ${field} for ${supplierName} 3 times`, {
+    description: "Update the saved rule for future invoices?",
     duration: 12000,
     action: {
       label: "Update rule",
@@ -172,42 +173,138 @@ function promptUpdateRule(args: PromptArgs) {
     },
     cancel: {
       label: "Ignore",
-      onClick: () => {},
+      onClick: () => {
+        ignoredKeys.add(tallyKey);
+      },
     },
   });
 }
 
+/** Bump confidence_score by +5 (clamped 0–100) and merge the field into column_map. */
+async function updateSupplierIntelligence(
+  userId: string,
+  supplierName: string,
+  field: string,
+  correctedValue: string,
+) {
+  const { data: row } = await supabase
+    .from("supplier_intelligence")
+    .select("id, confidence_score, column_map")
+    .eq("user_id", userId)
+    .eq("supplier_name", supplierName)
+    .maybeSingle();
+
+  const existingMap =
+    (row?.column_map as Record<string, string> | null) ?? {};
+  const mergedMap = { ...existingMap, [field]: correctedValue };
+  const nextConfidence = Math.min(
+    100,
+    Math.max(0, (row?.confidence_score ?? 20) + 5),
+  );
+
+  if (row?.id) {
+    await supabase
+      .from("supplier_intelligence")
+      .update({
+        confidence_score: nextConfidence,
+        column_map: mergedMap as never,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", row.id);
+  } else {
+    await supabase.from("supplier_intelligence").insert({
+      user_id: userId,
+      supplier_name: supplierName,
+      column_map: mergedMap as never,
+      confidence_score: 25,
+      invoice_count: 1,
+      last_match_method: "manual_edit",
+      last_invoice_date: new Date().toISOString(),
+    } as never);
+  }
+  return nextConfidence;
+}
+
 async function triggerRuleUpdate(args: PromptArgs) {
   try {
-    const { data, error } = await supabase.functions.invoke(
-      "extract-supplier-pattern",
-      {
-        body: {
-          supplier_name: args.supplierName,
-          raw_headers: args.rawHeaders,
-          sample_rows: args.sampleRows,
-          format_type: args.formatType,
-          extracted_products: args.extractedProducts,
-          corrections_override: {
-            field: args.field,
-            corrected_value: args.latestCorrected,
-            supplier_profile_id: args.supplierProfileId,
-          },
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+
+    // Fire pattern-extraction in parallel; don't block the toast on it.
+    void supabase.functions.invoke("extract-supplier-pattern", {
+      body: {
+        supplier_name: args.supplierName,
+        raw_headers: args.rawHeaders,
+        sample_rows: args.sampleRows,
+        format_type: args.formatType,
+        extracted_products: args.extractedProducts,
+        corrections_override: {
+          field: args.field,
+          corrected_value: args.latestCorrected,
+          supplier_profile_id: args.supplierProfileId,
         },
       },
-    );
-
-    if (error) throw error;
-
-    toast.success("Rule updated", {
-      description: `The app will now prefer your correction for ${args.field} on future ${args.supplierName} invoices.`,
-      duration: 4000,
     });
 
-    // Reset the tally so we don't immediately re-prompt.
-    correctionTally.set(`${args.supplierProfileId}::${args.field}`, 0);
-    promptedKeys.delete(`${args.supplierProfileId}::${args.field}`);
-    void data;
+    if (userId) {
+      await updateSupplierIntelligence(
+        userId,
+        args.supplierName,
+        args.field,
+        args.latestCorrected,
+      );
+      // Audit trail entry.
+      await supabase.from("supplier_learning_log").insert({
+        user_id: userId,
+        supplier_name: args.supplierName,
+        event_type: "manual_edit",
+        match_method: "rule_prompt",
+        confidence_before: null,
+        confidence_after: null,
+        details: { field: args.field, corrected_value: args.latestCorrected } as never,
+      } as never);
+    }
+
+    toast.success(
+      `Rule updated — ${args.field} mapping saved for ${args.supplierName}`,
+      { duration: 3500 },
+    );
+
+    // Reset the tally so we don't immediately re-prompt for the same field.
+    correctionTally.set(args.tallyKey, 0);
+    promptedKeys.delete(args.tallyKey);
+
+    // Follow-up: offer to bulk-apply this same correction to remaining rows.
+    if (applyToRemainingRowsFn) {
+      // Dry-run count — handler should return the count without mutating state
+      // when called via the toast button below; we estimate up-front using the
+      // sampleRows the caller passed in. For simplicity we always show the
+      // prompt and let the handler skip if zero.
+      setTimeout(() => {
+        toast(`Apply this correction to other rows with the same value?`, {
+          description: `"${args.originalValue}" → "${args.latestCorrected}" in ${args.field}`,
+          duration: 10000,
+          action: {
+            label: "Apply to all",
+            onClick: () => {
+              const updated = applyToRemainingRowsFn?.({
+                field: args.field,
+                originalValue: args.originalValue,
+                correctedValue: args.latestCorrected,
+              }) ?? 0;
+              if (updated > 0) {
+                toast.success(`Applied to ${updated} row${updated === 1 ? "" : "s"}`, {
+                  duration: 2500,
+                });
+              } else {
+                toast.info("No other rows matched", { duration: 2000 });
+              }
+            },
+          },
+          cancel: { label: "No, just save the rule", onClick: () => {} },
+        });
+      }, 600);
+    }
   } catch (err) {
     console.warn("Rule update failed:", err);
     toast.error("Couldn't update rule", {
@@ -220,4 +317,5 @@ async function triggerRuleUpdate(args: PromptArgs) {
 export function resetCorrectionTally() {
   correctionTally.clear();
   promptedKeys.clear();
+  ignoredKeys.clear();
 }

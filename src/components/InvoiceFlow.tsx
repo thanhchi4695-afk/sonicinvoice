@@ -2003,11 +2003,13 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   // ── If image helper is active, render it pre-scoped to current invoice ──
   if (imageHelperActive) {
     const scopedProducts = productGroups
-      .filter((g: any) => g.imageSrc || (g.imageUrls && g.imageUrls.length > 0))
+      .filter((g: any) => g.name)
       .map((g: any) => ({
         title: g.name,
         sku: g.vendorCode || g.sku || "",
         colour: g.colour || "",
+        brand: g.brand || "",
+        type: g.type || "",
         imageSrc: g.imageSrc || (g.imageUrls && g.imageUrls[0]) || "",
         imageUrls: g.imageUrls || [],
       }));

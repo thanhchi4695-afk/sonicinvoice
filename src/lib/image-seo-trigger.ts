@@ -5,7 +5,7 @@
  */
 
 export interface ImageSeoTriggerDetail {
-  source: "invoice" | "wholesale" | "lookbook";
+  source: "invoice" | "lookbook" | "wholesale" | string;
   productCount: number;
 }
 

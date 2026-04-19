@@ -898,12 +898,108 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
   );
 }
 // ── Image Download Helper Panel ──────────────────────────────
+type EnrichedImageProduct = {
+  title: string;
+  sku?: string;
+  colour?: string;
+  imageSrc: string;
+  imageUrls?: string[];
+};
+
+function slugifyForFilename(s: string): string {
+  return (s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function ImageTile({ product, index, onReenrich }: { product: EnrichedImageProduct; index: number; onReenrich: () => void }) {
+  const [errored, setErrored] = useState(false);
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const url = product.imageSrc || (product.imageUrls && product.imageUrls[0]) || '';
+  let domain = '';
+  try { domain = url ? new URL(url).hostname.replace(/^www\./, '') : ''; } catch {}
+
+  const filename = (() => {
+    const sku = slugifyForFilename(product.sku || '');
+    const colour = slugifyForFilename(product.colour || '');
+    const base = sku || slugifyForFilename(product.title) || `image-${index + 1}`;
+    return colour ? `${base}-${colour}.jpg` : `${base}.jpg`;
+  })();
+
+  const handleDownload = async () => {
+    if (!url) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error('fetch failed');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch {
+      window.open(url, '_blank');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="bg-card rounded-md border border-border overflow-hidden flex flex-col">
+      <div className="relative w-full aspect-square bg-muted">
+        {!errored && url ? (
+          <img
+            src={url}
+            alt={product.title}
+            crossOrigin="anonymous"
+            className="w-full h-full object-cover cursor-pointer"
+            onClick={() => window.open(url, '_blank')}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              setDims({ w: img.naturalWidth, h: img.naturalHeight });
+            }}
+            onError={() => setErrored(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center text-center p-2 gap-2">
+            <p className="text-[10px] text-muted-foreground leading-tight">Image not available — try re-enriching</p>
+            <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={onReenrich}>
+              Re-enrich
+            </Button>
+          </div>
+        )}
+      </div>
+      <div className="p-2 space-y-0.5">
+        <p className="text-[11px] font-medium truncate" title={product.title}>{product.title}</p>
+        {product.sku && <p className="text-[10px] text-muted-foreground truncate font-mono-data">{product.sku}</p>}
+        {!errored && dims && (
+          <p className="text-[10px] text-muted-foreground">{dims.w} × {dims.h}px</p>
+        )}
+        {!errored && domain && (
+          <p className="text-[10px] text-muted-foreground truncate">{domain}</p>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full h-7 text-[11px] gap-1 mt-1"
+          onClick={handleDownload}
+          disabled={errored || !url || downloading}
+        >
+          <Download className="w-3 h-3" /> {downloading ? 'Downloading…' : 'Download'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function ImageHelperPanel({ onBack }: { onBack: () => void }) {
   const [copied, setCopied] = useState(false);
-  const [imgErrors, setImgErrors] = useState<Set<number>>(new Set());
 
-  // Read enriched products from localStorage (saved by InvoiceFlow)
-  const getEnrichedProducts = (): { title: string; imageSrc: string; imageUrls: string[] }[] => {
+  const getEnrichedProducts = (): EnrichedImageProduct[] => {
     try {
       const raw = localStorage.getItem('last_enriched_products');
       if (!raw) return [];
@@ -928,8 +1024,8 @@ function ImageHelperPanel({ onBack }: { onBack: () => void }) {
     urls.forEach(url => window.open(url, '_blank'));
   };
 
-  const handleImgError = (idx: number) => {
-    setImgErrors(prev => new Set(prev).add(idx));
+  const handleReenrich = () => {
+    alert('Open the invoice review screen and click Enrich All to refetch images.');
   };
 
   return (
@@ -950,32 +1046,16 @@ function ImageHelperPanel({ onBack }: { onBack: () => void }) {
         </p>
 
         {products.length > 0 && (
-          <div className="grid grid-cols-4 gap-2 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
             {products.map((p, i) => (
-              <div key={i} className="text-center">
-                {!imgErrors.has(i) ? (
-                  <img
-                    src={p.imageSrc}
-                    alt={p.title}
-                    className="w-full aspect-square object-cover rounded-md border border-border cursor-pointer"
-                    onClick={() => window.open(p.imageSrc, '_blank')}
-                    onError={() => handleImgError(i)}
-                  />
-                ) : (
-                  <div className="w-full aspect-square rounded-md border border-border bg-muted flex items-center justify-center text-muted-foreground text-lg">📷</div>
-                )}
-                <p className="text-[10px] text-muted-foreground mt-1 truncate">{(p.title || '').slice(0, 20)}</p>
-              </div>
+              <ImageTile key={i} product={p} index={i} onReenrich={handleReenrich} />
             ))}
           </div>
         )}
 
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4">
           <p className="text-xs text-muted-foreground">
-            <span className="font-semibold text-primary">💡 Tip:</span> To save images to your computer: right-click any image above → Save image as. Or use "Open all in tabs" to open them in new browser tabs then save from there.
-          </p>
-          <p className="text-xs text-muted-foreground mt-2">
-            <span className="font-semibold text-foreground">Shopify auto-imports images:</span> The Image Src column in your CSV tells Shopify where to find each image. When you import the CSV, Shopify fetches and hosts the images automatically — you do not need to download them manually unless you want local copies.
+            <span className="font-semibold text-primary">💡 Tip:</span> Use the Download button on each tile to save with SKU-based filenames, or "Open all in tabs" to save many at once.
           </p>
         </div>
 

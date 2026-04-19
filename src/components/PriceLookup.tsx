@@ -542,6 +542,7 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
             <div className="space-y-3">
               {searchResults.map((r, i) => {
                 const IconComp = RETAILER_ICONS[r.retailer_type] || Globe;
+                const pageType = classifyPageType(r.url);
                 return (
                   <button
                     key={i}
@@ -554,8 +555,19 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold line-clamp-1">{r.title}</p>
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
                           <span className="text-[10px] text-primary font-mono truncate">{r.domain}</span>
+                          {pageType === "product" && (
+                            <Badge className="text-[9px] px-1.5 py-0 bg-success text-success-foreground hover:bg-success/90">Product page</Badge>
+                          )}
+                          {pageType === "collection" && (
+                            <Badge className="text-[9px] px-1.5 py-0 bg-warning text-warning-foreground hover:bg-warning/90">
+                              Collection page — may not find price
+                            </Badge>
+                          )}
+                          {pageType === "unknown" && (
+                            <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Unknown</Badge>
+                          )}
                           {r.is_australian && (
                             <Badge variant="secondary" className="text-[9px] px-1.5 py-0">🇦🇺 AU</Badge>
                           )}

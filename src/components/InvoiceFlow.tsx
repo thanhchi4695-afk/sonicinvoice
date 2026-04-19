@@ -1716,7 +1716,13 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       const updated = prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g);
       // Persist enriched products for Image Download Helper
       const enrichedForStorage = updated.filter(g => g.enriched && (g.imageSrc || (g.imageUrls && g.imageUrls.length > 0)))
-        .map(g => ({ title: g.name, imageSrc: g.imageSrc || '', imageUrls: g.imageUrls || [] }));
+        .map(g => ({
+          title: g.name,
+          sku: (g as any).vendorCode || (g as any).sku || '',
+          colour: g.colour || '',
+          imageSrc: g.imageSrc || (g.imageUrls && g.imageUrls[0]) || '',
+          imageUrls: g.imageUrls || [],
+        }));
       try { localStorage.setItem('last_enriched_products', JSON.stringify(enrichedForStorage)); } catch {}
       return updated;
     });

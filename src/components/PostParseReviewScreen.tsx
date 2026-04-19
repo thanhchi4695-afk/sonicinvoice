@@ -4,7 +4,7 @@ import {
   Check, X, AlertTriangle, ChevronDown, ChevronRight, RotateCcw,
   ShieldCheck, Bug, Search, Filter, CheckCheck, ArrowRight,
   Edit3, Download, Zap, ArrowUpRight, Layers, Merge, Scissors,
-  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash, MapPin, ScanLine
+  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash, MapPin, ScanLine, Tag
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +39,9 @@ interface PostParseReviewScreenProps {
   onCellEdited?: (field: string) => void;
   onExportAccepted: () => void;
   onPushToShopify: () => void;
+  /** Optional — when provided, renders a "Price Match" button in the action bar that
+   *  opens PriceMatchPanel with the current invoice's line items pre-loaded. */
+  onPriceMatch?: () => void;
   onBack: () => void;
   onReprocessDetailed?: (expectedRowCount?: number) => void;
   isReprocessing?: boolean;
@@ -150,6 +153,7 @@ export default function PostParseReviewScreen({
   onCellEdited,
   onExportAccepted,
   onPushToShopify,
+  onPriceMatch,
   onBack,
   onReprocessDetailed,
   isReprocessing = false,
@@ -1078,6 +1082,11 @@ export default function PostParseReviewScreen({
             <Package className="w-3.5 h-3.5" /> {savingToCatalog ? "Saving…" : "Save to Catalog"}
           </Button>
           <div className="flex-1" />
+          {onPriceMatch && (
+            <Button variant="secondary" size="sm" onClick={onPriceMatch} className="gap-1">
+              <Tag className="w-3.5 h-3.5" /> Price Match
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleExportClick} className="gap-1">
             <Download className="w-3.5 h-3.5" /> Export Accepted ({accepted.length})
           </Button>

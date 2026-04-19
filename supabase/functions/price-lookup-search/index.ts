@@ -7,6 +7,50 @@ const corsHeaders = {
 
 const FIRECRAWL_API = "https://api.firecrawl.dev/v2";
 
+// Known brand → AU domain map for direct URL probing (point 3)
+const BRAND_DOMAINS: Record<string, string> = {
+  seafolly: "seafolly.com.au",
+  baku: "bakuswimwear.com.au",
+  "bond-eye": "bond-eyeswim.com",
+  bondeye: "bond-eyeswim.com",
+  jets: "jets.com.au",
+  zimmermann: "zimmermann.com",
+  jantzen: "jantzen.com.au",
+  sunseeker: "sunseeker.com.au",
+  "sea level": "sealevelaustralia.com",
+};
+
+function slugify(s: string): string {
+  return s.toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function isCollectionUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  return /\/collections?\//.test(u) || /\/categor(y|ies)\//.test(u) || /\/search\//.test(u);
+}
+
+function isProductUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  return /\/products?\//.test(u) || /\/p\//.test(u);
+}
+
+async function tryDirectBrandUrl(brand: string, productName: string): Promise<string | null> {
+  const key = brand.toLowerCase().trim();
+  const domain = BRAND_DOMAINS[key];
+  if (!domain) return null;
+  const slug = slugify(productName);
+  if (!slug) return null;
+  const url = `https://${domain}/products/${slug}`;
+  try {
+    const res = await fetch(url, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(5000) });
+    if (res.ok) return url;
+  } catch { /* ignore */ }
+  return null;
+}
+
 // Domains we trust as Australian retailers (used to enrich + sort results)
 const AU_RETAILERS: Record<string, { type: string; au: boolean }> = {
   "theiconic.com.au": { type: "department_store", au: true },

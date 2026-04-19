@@ -217,7 +217,42 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const handleExtract = async (url: string) => {
+  // Helper: classify a URL as product, collection, or unknown (point 4)
+  const classifyPageType = (url: string): "product" | "collection" | "unknown" => {
+    const u = (url || "").toLowerCase();
+    if (/\/products?\//.test(u) || /\/p\//.test(u)) return "product";
+    if (/\/collections?\//.test(u) || /\/categor(y|ies)\//.test(u) || /\/search\//.test(u)) return "collection";
+    return "unknown";
+  };
+
+  // Run a fallback search in a specific mode and auto-extract from the top product result
+  const runFallback = async (mode: "sku" | "direct", label: string): Promise<boolean> => {
+    toast.info(label);
+    try {
+      const apiKeys = getApiKeys();
+      const { data, error } = await supabase.functions.invoke("price-lookup-search", {
+        body: {
+          product_name: productName, supplier, style_number: styleNumber, colour,
+          serpapi_key: apiKeys.serpApi || undefined,
+          mode,
+        },
+      });
+      if (error) throw error;
+      const results: SearchResult[] = data?.results || [];
+      const productResult = results.find(r => classifyPageType(r.url) === "product") || results[0];
+      if (productResult) {
+        setSearchResults(results);
+        setSearchQuery(data.search_query || "");
+        await handleExtract(productResult.url, { skipFallback: true });
+        return true;
+      }
+    } catch (err) {
+      console.warn(`Fallback ${mode} failed:`, err);
+    }
+    return false;
+  };
+
+  const handleExtract = async (url: string, opts?: { skipFallback?: boolean }) => {
     setSelectedUrl(url);
     setStep("extracting");
 
@@ -234,13 +269,29 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
       });
       if (error) throw error;
 
+      // Auto-fallback (point 5): collection page detected OR no price found
+      const looksLikeCollection = classifyPageType(url) === "collection" ||
+        /collection page/i.test(data?.fetch_error || "") ||
+        /collection page/i.test(data?.extraction_notes || "");
+      const noPrice = data?.retail_price_aud == null;
+
+      if (!opts?.skipFallback && (looksLikeCollection || noPrice)) {
+        if (styleNumber) {
+          const ok = await runFallback("sku", "Product page not found — trying SKU search…");
+          if (ok) return;
+        }
+        if (supplier) {
+          const ok = await runFallback("direct", "Trying direct brand URL…");
+          if (ok) return;
+        }
+      }
+
       setExtracted(data);
       const scrapedDesc = (data.description || "").trim();
       setEditDescription(scrapedDesc);
       setDescriptionSource(scrapedDesc.length > 20 ? "scraped" : null);
       setStep("review");
 
-      // Path 3: auto-generate when scraping returned nothing usable
       if (scrapedDesc.length <= 20) {
         void generateDescription(data);
       }

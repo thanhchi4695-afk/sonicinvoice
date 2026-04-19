@@ -1999,6 +1999,26 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     return <ProductDescriptionPanel lineItems={items} onBack={() => setDescriptionsActive(false)} />;
   }
 
+  // ── If image helper is active, render it pre-scoped to current invoice ──
+  if (imageHelperActive) {
+    const scopedProducts = productGroups
+      .filter((g: any) => g.imageSrc || (g.imageUrls && g.imageUrls.length > 0))
+      .map((g: any) => ({
+        title: g.name,
+        sku: g.vendorCode || g.sku || "",
+        colour: g.colour || "",
+        imageSrc: g.imageSrc || (g.imageUrls && g.imageUrls[0]) || "",
+        imageUrls: g.imageUrls || [],
+      }));
+    return (
+      <ImageHelperPanel
+        onBack={() => setImageHelperActive(false)}
+        products={scopedProducts}
+        scopeLabel="this invoice"
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
       {/* Header */}
@@ -2743,6 +2763,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 <span className="text-[10px] text-muted-foreground self-center">Select {2 - mergeSelection.length} more to group</span>
               ) : null}
               <Button variant="outline" size="sm" onClick={() => setPreviewAll(true)} className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview all</Button>
+              <Button variant="outline" size="sm" onClick={() => setImageHelperActive(true)} className="gap-1"><ImageIcon className="w-3.5 h-3.5" /> Images</Button>
               <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
               <Button variant="teal" size="sm" onClick={() => { finalizeQualityMetrics(); setStep(4); }}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>

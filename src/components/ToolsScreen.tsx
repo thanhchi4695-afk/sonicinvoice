@@ -1298,6 +1298,10 @@ const ToolsScreen = () => {
     const GeoAgenticFlow = lazy(() => import("@/components/GeoAgenticFlow"));
     return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><GeoAgenticFlow onBack={() => setActiveTool(null)} /></Suspense>;
   }
+  if (activeTool === "image_optimise") {
+    const ImageOptimisePanel = lazy(() => import("@/components/ImageOptimisePanel"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><ImageOptimisePanel onBack={() => setActiveTool(null)} /></Suspense>;
+  }
 
   if (activeTool === "ai") {
     return (

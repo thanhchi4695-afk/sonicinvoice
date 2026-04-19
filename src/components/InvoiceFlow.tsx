@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import StockCheckFlow from "@/components/StockCheckFlow";
 import PriceLookup from "@/components/PriceLookup";
 import PriceMatchPanel from "@/components/PriceMatchPanel";
 import ProductDescriptionPanel from "@/components/ProductDescriptionPanel";
+import ImageHelperPanel from "@/components/ImageHelperPanel";
 import { mapInvoiceItemsToPriceMatch } from "@/lib/price-match-utils";
 import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import SupplierTemplateTeach from "@/components/SupplierTemplateTeach";
@@ -1533,6 +1534,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [bulkPriceLookupActive, setBulkPriceLookupActive] = useState(false);
   const [priceMatchActive, setPriceMatchActive] = useState(false);
   const [descriptionsActive, setDescriptionsActive] = useState(false);
+  const [imageHelperActive, setImageHelperActive] = useState(false);
   const [collectionSeoActive, setCollectionSeoActive] = useState(false);
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
   const [isReprocessing, setIsReprocessing] = useState(false);
@@ -1996,6 +1998,26 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   if (descriptionsActive) {
     const items = mapInvoiceItemsToPriceMatch(productGroups as any);
     return <ProductDescriptionPanel lineItems={items} onBack={() => setDescriptionsActive(false)} />;
+  }
+
+  // ── If image helper is active, render it pre-scoped to current invoice ──
+  if (imageHelperActive) {
+    const scopedProducts = productGroups
+      .filter((g: any) => g.imageSrc || (g.imageUrls && g.imageUrls.length > 0))
+      .map((g: any) => ({
+        title: g.name,
+        sku: g.vendorCode || g.sku || "",
+        colour: g.colour || "",
+        imageSrc: g.imageSrc || (g.imageUrls && g.imageUrls[0]) || "",
+        imageUrls: g.imageUrls || [],
+      }));
+    return (
+      <ImageHelperPanel
+        onBack={() => setImageHelperActive(false)}
+        products={scopedProducts}
+        scopeLabel="this invoice"
+      />
+    );
   }
 
   return (
@@ -2742,6 +2764,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 <span className="text-[10px] text-muted-foreground self-center">Select {2 - mergeSelection.length} more to group</span>
               ) : null}
               <Button variant="outline" size="sm" onClick={() => setPreviewAll(true)} className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview all</Button>
+              <Button variant="outline" size="sm" onClick={() => setImageHelperActive(true)} className="gap-1"><ImageIcon className="w-3.5 h-3.5" /> Images</Button>
               <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
               <Button variant="teal" size="sm" onClick={() => { finalizeQualityMetrics(); setStep(4); }}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>

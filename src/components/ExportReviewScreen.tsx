@@ -218,6 +218,14 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
       productCount: filtered.length, date: new Date().toISOString(),
     });
     localStorage.setItem("export_history", JSON.stringify(exports.slice(0, 100)));
+
+    // Auto-trigger image SEO optimization toast (fires after final Download click)
+    import("@/lib/image-seo-trigger").then((m) =>
+      m.dispatchImageSeoTrigger({
+        source: supplierName || "invoice",
+        productCount: filtered.length,
+      })
+    );
   };
 
   return (

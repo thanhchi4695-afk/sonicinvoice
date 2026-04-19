@@ -2536,6 +2536,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
                 }}
                 onExportAccepted={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
                 onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
+                onPriceMatch={() => setPriceMatchActive(true)}
                 onBack={() => setStep(2)}
                 matchMethod={matchMethod}
                 onReprocessDetailed={handleReprocessDetailed}

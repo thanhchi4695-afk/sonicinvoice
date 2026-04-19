@@ -153,6 +153,7 @@ export default function PostParseReviewScreen({
   onCellEdited,
   onExportAccepted,
   onPushToShopify,
+  onPriceMatch,
   onBack,
   onReprocessDetailed,
   isReprocessing = false,
@@ -1081,6 +1082,11 @@ export default function PostParseReviewScreen({
             <Package className="w-3.5 h-3.5" /> {savingToCatalog ? "Saving…" : "Save to Catalog"}
           </Button>
           <div className="flex-1" />
+          {onPriceMatch && (
+            <Button variant="secondary" size="sm" onClick={onPriceMatch} className="gap-1">
+              <Tag className="w-3.5 h-3.5" /> Price Match
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleExportClick} className="gap-1">
             <Download className="w-3.5 h-3.5" /> Export Accepted ({accepted.length})
           </Button>

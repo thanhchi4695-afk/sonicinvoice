@@ -7,6 +7,50 @@ const corsHeaders = {
 
 const FIRECRAWL_API = "https://api.firecrawl.dev/v2";
 
+// Known brand → AU domain map for direct URL probing (point 3)
+const BRAND_DOMAINS: Record<string, string> = {
+  seafolly: "seafolly.com.au",
+  baku: "bakuswimwear.com.au",
+  "bond-eye": "bond-eyeswim.com",
+  bondeye: "bond-eyeswim.com",
+  jets: "jets.com.au",
+  zimmermann: "zimmermann.com",
+  jantzen: "jantzen.com.au",
+  sunseeker: "sunseeker.com.au",
+  "sea level": "sealevelaustralia.com",
+};
+
+function slugify(s: string): string {
+  return s.toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function isCollectionUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  return /\/collections?\//.test(u) || /\/categor(y|ies)\//.test(u) || /\/search\//.test(u);
+}
+
+function isProductUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  return /\/products?\//.test(u) || /\/p\//.test(u);
+}
+
+async function tryDirectBrandUrl(brand: string, productName: string): Promise<string | null> {
+  const key = brand.toLowerCase().trim();
+  const domain = BRAND_DOMAINS[key];
+  if (!domain) return null;
+  const slug = slugify(productName);
+  if (!slug) return null;
+  const url = `https://${domain}/products/${slug}`;
+  try {
+    const res = await fetch(url, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(5000) });
+    if (res.ok) return url;
+  } catch { /* ignore */ }
+  return null;
+}
+
 // Domains we trust as Australian retailers (used to enrich + sort results)
 const AU_RETAILERS: Record<string, { type: string; au: boolean }> = {
   "theiconic.com.au": { type: "department_store", au: true },
@@ -43,7 +87,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { product_name, supplier, style_number, colour, serpapi_key } = await req.json();
+    const { product_name, supplier, style_number, colour, serpapi_key, mode } = await req.json();
 
     if (!product_name) {
       return new Response(JSON.stringify({ error: "product_name is required" }), {
@@ -54,17 +98,59 @@ serve(async (req) => {
     const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
     const SERPAPI_KEY = serpapi_key || Deno.env.get("SERPAPI_KEY");
 
-    // ── Build a tight query — supplier + product + style number ──
-    // Bug fix: strip leading supplier from product_name to avoid duplicating it (e.g. "Seafolly Seafolly Active Bralette")
+    // Strip leading supplier from product_name to avoid duplication
     let cleanProductName = String(product_name).trim();
     if (supplier) {
       const supRe = new RegExp(`^${supplier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+`, "i");
       cleanProductName = cleanProductName.replace(supRe, "").trim();
     }
-    const queryParts = [supplier, cleanProductName, style_number, colour].filter(Boolean);
-    const searchQuery = `${queryParts.join(" ")} buy Australia`;
 
-    // ── Source 1 (PREFERRED): SerpApi Google Shopping — structured price + retailer ──
+    // ── Query construction by mode ──
+    // mode = "primary" (default) → product-page query with collection exclusions
+    // mode = "sku"               → fallback by style number
+    // mode = "direct"            → only attempt direct brand-URL probe (no search)
+    const searchMode: "primary" | "sku" | "direct" = mode === "sku" ? "sku" : mode === "direct" ? "direct" : "primary";
+
+    let searchQuery = "";
+    if (searchMode === "primary") {
+      const parts = [cleanProductName, supplier, colour].filter(Boolean);
+      searchQuery = `${parts.join(" ")} Australia -collection -collections -category -categories`;
+    } else if (searchMode === "sku") {
+      const parts = [style_number, supplier].filter(Boolean);
+      searchQuery = parts.length > 0
+        ? `${parts.join(" ")} Australia`
+        : `${cleanProductName} ${supplier || ""} Australia`.trim();
+    }
+
+    // ── Mode: direct brand URL probe (point 3) ──
+    if (searchMode === "direct") {
+      const directUrl = supplier ? await tryDirectBrandUrl(supplier, cleanProductName) : null;
+      if (directUrl) {
+        let domain = "";
+        try { domain = new URL(directUrl).hostname.replace(/^www\./, ""); } catch {}
+        const meta = classifyDomain(domain, supplier);
+        return new Response(JSON.stringify({
+          search_query: `direct: ${directUrl}`,
+          source: "direct_url",
+          results: [{
+            title: `${supplier} — ${cleanProductName}`,
+            url: directUrl,
+            domain,
+            snippet: "Direct brand product URL",
+            is_australian: meta.au,
+            is_official_brand: true,
+            retailer_type: "brand_direct",
+          }],
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({
+        search_query: "direct probe failed",
+        source: "direct_url",
+        results: [],
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ── Source 1 (PREFERRED): SerpApi Google Shopping ──
     if (SERPAPI_KEY) {
       try {
         const params = new URLSearchParams({
@@ -83,7 +169,6 @@ serve(async (req) => {
             let domain = "";
             try { domain = new URL(url).hostname.replace(/^www\./, ""); } catch {}
             const meta = classifyDomain(domain, supplier);
-            // Parse price like "A$129.95" → 129.95
             let price: number | null = null;
             if (typeof r.extracted_price === "number") price = r.extracted_price;
             else if (typeof r.price === "string") {
@@ -98,7 +183,6 @@ serve(async (req) => {
               is_australian: meta.au,
               is_official_brand: meta.is_official_brand,
               retailer_type: meta.type,
-              // SerpApi-only structured fields
               price_aud: price,
               retailer: r.source || domain,
               thumbnail: r.thumbnail || null,
@@ -106,17 +190,33 @@ serve(async (req) => {
           }).filter((r: any) => r.url);
 
           results.sort((a: any, b: any) => {
-            const score = (x: any) => (x.is_official_brand ? 3 : 0) + (x.is_australian ? 1 : 0);
+            const score = (x: any) =>
+              (isProductUrl(x.url) ? 5 : 0) +
+              (isCollectionUrl(x.url) ? -3 : 0) +
+              (x.is_official_brand ? 3 : 0) +
+              (x.is_australian ? 1 : 0);
             return score(b) - score(a);
           });
+
+          // Auto-fallback: if every result is a collection page, retry with SKU query
+          const allCollections = results.length > 0 && results.every((r: any) => isCollectionUrl(r.url));
+          if (allCollections && searchMode === "primary" && style_number) {
+            // Recurse via internal call: switch to SKU mode
+            const skuRes = await fetch(req.url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ product_name, supplier, style_number, colour, serpapi_key, mode: "sku" }),
+            });
+            if (skuRes.ok) return new Response(skuRes.body, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
 
           return new Response(JSON.stringify({
             search_query: searchQuery,
             source: "serpapi",
+            mode: searchMode,
             results: results.slice(0, 8),
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
-        // SerpApi returned nothing usable — fall through to Firecrawl
         console.log("SerpApi returned no shopping_results, falling back to Firecrawl");
       } catch (e) {
         console.warn("SerpApi failed, falling back to Firecrawl:", e);
@@ -149,7 +249,6 @@ serve(async (req) => {
       throw new Error(`Firecrawl search failed [${fcRes.status}]: ${JSON.stringify(fcData)}`);
     }
 
-    // Firecrawl v2 returns either { data: [...] } or { web: [...] } depending on version — handle both
     const rawResults: any[] = Array.isArray(fcData?.data)
       ? fcData.data
       : Array.isArray(fcData?.web)
@@ -167,7 +266,7 @@ serve(async (req) => {
         const meta = classifyDomain(domain, supplier);
         return {
           title: r.title || r.name || domain,
-          url, // ← REAL URL from search engine, never AI-fabricated
+          url,
           domain,
           snippet: r.description || r.snippet || "",
           is_australian: meta.au,
@@ -177,15 +276,20 @@ serve(async (req) => {
       })
       .filter(Boolean) as any[];
 
-    // Sort: official brand → AU retailers → others
+    // Sort: product pages first, collection pages last
     results.sort((a, b) => {
-      const score = (x: any) => (x.is_official_brand ? 3 : 0) + (x.is_australian ? 1 : 0);
+      const score = (x: any) =>
+        (isProductUrl(x.url) ? 5 : 0) +
+        (isCollectionUrl(x.url) ? -3 : 0) +
+        (x.is_official_brand ? 3 : 0) +
+        (x.is_australian ? 1 : 0);
       return score(b) - score(a);
     });
 
     return new Response(JSON.stringify({
       search_query: searchQuery,
       source: "firecrawl",
+      mode: searchMode,
       results: results.slice(0, 8),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -42,6 +42,9 @@ interface PostParseReviewScreenProps {
   /** Optional — when provided, renders a "Price Match" button in the action bar that
    *  opens PriceMatchPanel with the current invoice's line items pre-loaded. */
   onPriceMatch?: () => void;
+  /** Optional — when provided, renders a "Get Descriptions" button in the action bar
+   *  that opens ProductDescriptionPanel with the current invoice's line items pre-loaded. */
+  onGetDescriptions?: () => void;
   onBack: () => void;
   onReprocessDetailed?: (expectedRowCount?: number) => void;
   isReprocessing?: boolean;
@@ -154,6 +157,7 @@ export default function PostParseReviewScreen({
   onExportAccepted,
   onPushToShopify,
   onPriceMatch,
+  onGetDescriptions,
   onBack,
   onReprocessDetailed,
   isReprocessing = false,
@@ -1085,6 +1089,11 @@ export default function PostParseReviewScreen({
           {onPriceMatch && (
             <Button variant="secondary" size="sm" onClick={onPriceMatch} className="gap-1">
               <Tag className="w-3.5 h-3.5" /> Price Match
+            </Button>
+          )}
+          {onGetDescriptions && (
+            <Button variant="secondary" size="sm" onClick={onGetDescriptions} className="gap-1">
+              <FileText className="w-3.5 h-3.5" /> Get Descriptions
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={handleExportClick} className="gap-1">

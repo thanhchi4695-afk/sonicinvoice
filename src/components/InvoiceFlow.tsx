@@ -1533,6 +1533,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [bulkPriceLookupActive, setBulkPriceLookupActive] = useState(false);
   const [priceMatchActive, setPriceMatchActive] = useState(false);
   const [descriptionsActive, setDescriptionsActive] = useState(false);
+  const [imageHelperActive, setImageHelperActive] = useState(false);
   const [collectionSeoActive, setCollectionSeoActive] = useState(false);
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
   const [isReprocessing, setIsReprocessing] = useState(false);

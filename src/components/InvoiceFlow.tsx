@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import StockCheckFlow from "@/components/StockCheckFlow";
 import PriceLookup from "@/components/PriceLookup";
 import PriceMatchPanel from "@/components/PriceMatchPanel";
 import ProductDescriptionPanel from "@/components/ProductDescriptionPanel";
+import ImageHelperPanel from "@/components/ImageHelperPanel";
 import { mapInvoiceItemsToPriceMatch } from "@/lib/price-match-utils";
 import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import SupplierTemplateTeach from "@/components/SupplierTemplateTeach";

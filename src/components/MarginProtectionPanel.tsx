@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { ChevronLeft, ShieldCheck, ShieldAlert, ShieldX, HelpCircle, TrendingUp, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ShieldCheck, ShieldAlert, ShieldX, HelpCircle, TrendingUp, AlertTriangle, Download } from "lucide-react";
 import {
   getMarginSettings, saveMarginSettings, bulkMarginCheck,
   marginStatusColor, marginStatusBg, getMarginAuditLog,
@@ -50,6 +50,39 @@ export default function MarginProtectionPanel({ onBack }: { onBack: () => void }
   );
 
   const auditLog = useMemo(() => getMarginAuditLog().slice(0, 50), []);
+
+  const minPriceFor = (cost: number) => cost / (1 - settings.globalMinMargin / 100);
+
+  const exportPriceFloor = () => {
+    const blocked = summary.results.filter(r => r.status === "blocked" && r.cost);
+    if (blocked.length === 0) {
+      toast.info("No blocked products to export");
+      return;
+    }
+    const headers = ["Product", "Brand", "SKU", "Current RRP", "Min Price Required", "Current Margin %", "Target Margin %"];
+    const rows = blocked.map(r => {
+      const sp = sessionProducts.find(p => (p.sku || p.product_title).toLowerCase().replace(/\s+/g, "-") === r.handle);
+      const minPrice = r.cost ? minPriceFor(r.cost) : 0;
+      return [
+        `"${r.title.replace(/"/g, '""')}"`,
+        `"${(sp?.vendor || "").replace(/"/g, '""')}"`,
+        `"${sp?.sku || ""}"`,
+        r.price.toFixed(2),
+        minPrice.toFixed(2),
+        r.margin_percentage?.toFixed(1) || "",
+        settings.globalMinMargin.toString(),
+      ].join(",");
+    });
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `margin-protection-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${blocked.length} blocked products`);
+  };
 
   const updateSetting = <K extends keyof MarginSettings>(key: K, val: MarginSettings[K]) => {
     const next = { ...settings, [key]: val };
@@ -149,24 +182,38 @@ export default function MarginProtectionPanel({ onBack }: { onBack: () => void }
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mb-2">
                 <span>{summary.total} products</span>
-                <span>{summary.safe} safe · {summary.warning} warning · {summary.blocked} blocked</span>
+                <div className="flex items-center gap-3">
+                  <span>{summary.safe} safe · {summary.warning} warning · {summary.blocked} blocked</span>
+                  {summary.blocked > 0 && (
+                    <Button size="sm" variant="outline" onClick={exportPriceFloor} className="h-7 text-xs">
+                      <Download className="w-3 h-3 mr-1" /> Export price floor list
+                    </Button>
+                  )}
+                </div>
               </div>
               {summary.results.map((r, i) => (
-                <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${r.status === "blocked" ? "border-destructive/30 bg-destructive/5" : r.status === "warning" ? "border-warning/30 bg-warning/5" : "border-border"}`}>
-                  {statusIcon(r.status)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{r.title}</p>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                      <span>Cost: {r.cost !== null ? `$${r.cost.toFixed(2)}` : "—"}</span>
-                      <span>Price: ${r.price.toFixed(2)}</span>
-                      <span className={marginStatusColor(r.status)}>
-                        {r.margin_percentage !== null ? `${r.margin_percentage.toFixed(1)}%` : "—"}
-                      </span>
+                <div key={i} className={`p-3 rounded-lg border ${r.status === "blocked" ? "border-destructive/30 bg-destructive/5" : r.status === "warning" ? "border-warning/30 bg-warning/5" : "border-border"}`}>
+                  <div className="flex items-center gap-3">
+                    {statusIcon(r.status)}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{r.title}</p>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                        <span>Cost: {r.cost !== null ? `$${r.cost.toFixed(2)}` : "—"}</span>
+                        <span>Price: ${r.price.toFixed(2)}</span>
+                        <span className={marginStatusColor(r.status)}>
+                          {r.margin_percentage !== null ? `${r.margin_percentage.toFixed(1)}%` : "—"}
+                        </span>
+                      </div>
                     </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${marginStatusBg(r.status)} ${marginStatusColor(r.status)}`}>
+                      {r.status}
+                    </span>
                   </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${marginStatusBg(r.status)} ${marginStatusColor(r.status)}`}>
-                    {r.status}
-                  </span>
+                  {r.status === "blocked" && r.cost && (
+                    <div className="mt-2 ml-7 text-xs text-destructive">
+                      Minimum price at {settings.globalMinMargin}% margin: <span className="font-semibold">${minPriceFor(r.cost).toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -71,14 +71,54 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
       currentPrice: Number(p.rrp) || 0,
       compareAtPrice: null,
       costPrice: Number(p.unit_cost) || 0,
-      sku: p.sku || undefined,
-    })),
-    [sessionProducts],
-  );
+  // Catalog products loaded from Supabase (variants joined to products).
+  const [catalogProducts, setCatalogProducts] = useState<ProductForAdjustment[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setCatalogLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        if (!cancelled) { setCatalogProducts([]); setCatalogLoading(false); }
+        return;
+      }
+      const { data, error } = await supabase
+        .from("variants")
+        .select("id, sku, cost, retail_price, products (title, vendor, product_type)")
+        .eq("user_id", user.id)
+        .not("retail_price", "is", null);
+      if (cancelled) return;
+      if (error) {
+        console.error("[PriceAdjustment] catalog query failed:", error.message);
+        setCatalogProducts([]);
+      } else {
+        const mapped: ProductForAdjustment[] = (data || []).map((v: any) => {
+          const title = v.products?.title || "Untitled";
+          const vendor = v.products?.vendor || "Unknown";
+          return {
+            handle: (v.sku || title).toString().toLowerCase().replace(/\s+/g, "-"),
+            title,
+            vendor,
+            type: v.products?.product_type || "",
+            tags: [],
+            currentPrice: Number(v.retail_price) || 0,
+            compareAtPrice: null,
+            costPrice: Number(v.cost) || 0,
+            sku: v.sku || undefined,
+          };
+        });
+        setCatalogProducts(mapped);
+      }
+      setCatalogLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const products = externalProducts && externalProducts.length > 0
     ? externalProducts
-    : (source === "invoice" && invoiceProducts.length > 0 ? invoiceProducts : DEMO_PRODUCTS);
+    : (source === "invoice" && invoiceProducts.length > 0 ? invoiceProducts : catalogProducts);
 
   // Filter state
   const [filter, setFilter] = useState<AdjustmentFilter>({ ...DEFAULT_FILTER });

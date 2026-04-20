@@ -870,8 +870,11 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
                   </div>
 
                   <div className="flex gap-2 mt-3 flex-wrap">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportLadderScheduleWide(ladder)}>
+                      <Download className="w-3 h-3 mr-1" /> Download schedule
+                    </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportLadderSchedule(ladder)}>
-                      <Download className="w-3 h-3 mr-1" /> Export schedule
+                      <Download className="w-3 h-3 mr-1" /> Export (long)
                     </Button>
                     {stages.map(s => (
                       <Button key={s.stageNumber} size="sm" variant="ghost" className="h-7 text-xs" onClick={() => exportShopifyStage(ladder, s)}>

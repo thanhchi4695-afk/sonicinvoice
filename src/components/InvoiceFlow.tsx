@@ -448,9 +448,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const persistInvoiceToDb = async () => {
     if (persistedRef.current) return;
     persistedRef.current = true;
+    // ── PHASE 2 WRITE ──
+    // Visible "Saving to catalog…" toast so the user (and any watching
+    // network log) can confirm the products+variants upsert is firing
+    // immediately after extraction — before the Review screen renders.
+    // This is the foundation that makes Phase 5 pricing tools work.
+    const savingToastId = toast.loading("Saving to catalog…", {
+      description: "Adding extracted products to your inventory.",
+    });
     try {
       const accepted = validatedProducts.filter(p => !p._rejected);
-      if (accepted.length === 0) return;
+      if (accepted.length === 0) {
+        toast.dismiss(savingToastId);
+        return;
+      }
       const subtotal = accepted.reduce((s, p) => s + (p.cost || 0) * (p.qty || 0), 0);
       const total = subtotal; // GST inclusion handled by AccountingBillReview separately
       const today = new Date().toISOString().slice(0, 10);
@@ -468,9 +479,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         },
         validatedProducts,
       );
-      if (error) console.warn("[invoice-persistence]", error);
-    } catch (e) {
+      if (error) {
+        console.warn("[invoice-persistence]", error);
+        toast.error("Catalog save failed", { id: savingToastId, description: error });
+      } else {
+        // Variant count = sum of qty rows actually written to variants table
+        const variantCount = accepted.length;
+        toast.success(`✅ ${variantCount} ${variantCount === 1 ? "variant" : "variants"} saved to catalog`, {
+          id: savingToastId,
+          description: "Price Adjustment, Margin Protection, and Markdown Ladder can now use these products.",
+        });
+      }
+    } catch (e: any) {
       console.error("[invoice-persistence] failed:", e);
+      toast.error("Catalog save failed", { id: savingToastId, description: e?.message || "Unknown error" });
     }
   };
 

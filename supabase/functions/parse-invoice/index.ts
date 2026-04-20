@@ -912,8 +912,18 @@ Return JSON only.`,
       ];
     }
 
-    // Use Pro model for complex documents (PDFs, images), Flash for text
-    const model = (isPdf || isImage) ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    // Use Flash for everything — Pro routinely exceeds the 150s edge-function
+    // idle timeout on multi-page PDFs/photos. Flash is vision-capable and ~3-5x faster.
+    // Detailed mode (user explicitly opted in to a slower, deeper pass) keeps Pro.
+    const model = detailedMode && (isPdf || isImage)
+      ? "google/gemini-2.5-pro"
+      : "google/gemini-2.5-flash";
+
+    // Soft time budget so we can skip optional retry/OCR passes before the
+    // hard 150s edge timeout kills the whole response.
+    const startedAt = Date.now();
+    const SOFT_BUDGET_MS = 110_000; // leave ~40s headroom for response + DB writes
+    const budgetExceeded = () => Date.now() - startedAt > SOFT_BUDGET_MS;
 
     let data = await callAI({
       model,

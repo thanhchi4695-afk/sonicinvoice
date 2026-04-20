@@ -564,12 +564,29 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               toast.loading(`🔍 Researching prices… ${done}/${total}`, { id: phase3Toast });
             },
           });
+          // Write researched RRPs back into in-memory products so the Shopify
+          // Preview / export step pick them up. Match by lowercased title.
+          const rrpByKey = new Map<string, number>();
+          for (const r of summary.results) {
+            if (r.recommended_rrp && r.recommended_rrp > 0) {
+              rrpByKey.set((r.product_title || "").toLowerCase().trim(), r.recommended_rrp);
+            }
+          }
+          if (rrpByKey.size > 0) {
+            setValidatedProducts((prev) =>
+              prev.map((p) => {
+                const newRrp = rrpByKey.get((p.name || "").toLowerCase().trim());
+                if (!newRrp || Number(p.rrp) > 0) return p;
+                return { ...p, rrp: newRrp } as ValidatedProduct;
+              }),
+            );
+          }
           const breakdown = Object.entries(summary.bySource)
             .map(([k, v]) => `${v} ${k.replace("_", " ")}`)
             .join(" · ");
-          toast.success(`💰 Price research complete: ${summary.succeeded}/${summary.total}`, {
+          toast.success(`💰 Price research complete: ${summary.succeeded}/${summary.total} · RRPs applied`, {
             id: phase3Toast,
-            description: breakdown || "Recommended RRPs saved to Price Lookups.",
+            description: breakdown || "Recommended RRPs applied to products.",
           });
           console.log("[Phase3] summary:", summary);
         } catch (e: any) {

@@ -352,7 +352,7 @@ Deno.serve(async (req) => {
           descriptionHtml: p.body_html || "",
           vendor: p.vendor || "",
           productType: p.product_type || "",
-          status: (p.status || "DRAFT").toUpperCase(),
+          status: String(p.status || "DRAFT").toUpperCase(),
           tags: p.tags ? (p.tags as string).split(",").map((t: string) => t.trim()) : [],
         };
 

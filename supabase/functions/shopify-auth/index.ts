@@ -232,7 +232,8 @@ Deno.serve(async (req) => {
       // token_hash inside a redirect URL, not access/refresh tokens directly,
       // so hashParams.get("access_token") always returns null.
       const { data: sessionData, error: sessionErr } =
-        await supabaseAdmin.auth.admin.createSession({ user_id: loginData.user_id });
+        // deno-lint-ignore no-explicit-any
+        await (supabaseAdmin.auth.admin as any).createSession({ user_id: loginData.user_id });
 
       if (sessionErr || !sessionData?.session) {
         console.error("Failed to create session:", sessionErr);

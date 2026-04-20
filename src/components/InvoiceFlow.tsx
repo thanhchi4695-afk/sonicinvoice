@@ -1577,6 +1577,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         void syncPhase2Catalog(validated, "reprocess");
       }
     } catch (err) {
+      console.log('[SONIC-DEBUG] Invoice processing error', err);
       console.error("Detailed reprocess error:", err);
       toast.error("Reprocessing failed");
     } finally {

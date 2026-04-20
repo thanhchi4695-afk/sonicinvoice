@@ -25,6 +25,7 @@ import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugIn
 import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import PhaseThreeFourPanel from "@/components/PhaseThreeFourPanel";
+import PhaseFiveSixPanel from "@/components/PhaseFiveSixPanel";
 import AccountingBillReview from "@/components/AccountingBillReview";
 import StockCheckFlow from "@/components/StockCheckFlow";
 import PriceLookup from "@/components/PriceLookup";
@@ -2847,6 +2848,17 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 extractionNotes={aiExtractionNotes}
               />
             </div>
+          )}
+
+          {/* ── Phase 5 + 6 — Prepare tabs & Export hub (additive, mounts below review) ── */}
+          {validatedProducts.length > 0 && (
+            <PhaseFiveSixPanel
+              products={validatedProducts}
+              supplierName={supplierName}
+              onExportCSV={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
+              onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
+              onProcessAnother={() => { setStep(1); }}
+            />
           )}
 
           {processingDone && finalProcessingTime > 0 && (

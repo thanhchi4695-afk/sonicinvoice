@@ -1195,11 +1195,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       });
 
       if (!response.ok) {
-        console.error("AI parse failed:", await response.text());
+        const errText = await response.text();
+        console.log('[SONIC-DEBUG] Edge function response received', { data: null, error: errText });
+        console.error("AI parse failed:", errText);
         return [];
       }
 
       const data = await response.json();
+      console.log('[SONIC-DEBUG] Edge function response received', { data, error: null });
       if (data.supplier && !supplierName) {
         setSupplierName(data.supplier);
       }
@@ -1521,12 +1524,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       });
 
       if (!response.ok) {
+        const errText = await response.text();
+        console.log('[SONIC-DEBUG] Edge function response received', { data: null, error: errText });
         toast.error("Reprocessing failed", { description: "Could not re-extract products" });
         setIsReprocessing(false);
         return;
       }
 
       const data = await response.json();
+      console.log('[SONIC-DEBUG] Edge function response received', { data, error: null });
       const products = data.products || [];
 
       if (data.parsing_plan) setAiParsingPlan(data.parsing_plan);

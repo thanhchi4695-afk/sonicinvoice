@@ -7,13 +7,15 @@ import { useKeyboardShortcuts, type ShortcutDef } from "@/hooks/use-keyboard-sho
 import { useMediaQuery } from "@/hooks/use-media-query";
 
 // ── Eagerly loaded (critical path) ──
-import HomeScreen from "@/components/HomeScreen";
+import HomeWizard from "@/components/HomeWizard";
 import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
 import StockyLayout from "@/components/StockyLayout";
 import QuickActionsBar from "@/components/QuickActionsBar";
 import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
 import QuickSearchModal from "@/components/QuickSearchModal";
+// HomeScreen kept available (now lazy) — accessible from Tools as "Classic dashboard".
+const HomeScreen = lazy(() => import("@/components/HomeScreen"));
 
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
@@ -503,59 +505,14 @@ const Index = () => {
         </Suspense>
       )}
       {activeTab === "home" && !useStockyDashboard && (
-        <HomeScreen
+        <HomeWizard
           onStartInvoice={() => setActiveFlow("invoice")}
-          onStartSale={() => setActiveFlow("sale")}
-          onStartRestock={() => setActiveFlow("restock")}
-          onStartPriceAdjust={() => setActiveFlow("price_adjust")}
-          onStartOrderForm={() => setActiveFlow("order_form")}
-          onStartReorder={() => setActiveFlow("reorder")}
-          onStartSuppliers={() => setActiveFlow("suppliers")}
-          onOpenAuditLog={() => setActiveFlow("audit_log")}
-          onStartPurchaseOrders={() => setActiveFlow("purchase_orders")}
-          onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
-          onStartEmailInbox={() => setActiveFlow("email_inbox")}
-          onStartCollabSEO={() => setActiveFlow("collab_seo")}
-          onStartGoogleAdsSetup={() => setActiveFlow("google_ads_setup")}
-          onStartMetaAdsSetup={() => setActiveFlow("meta_ads_setup")}
-          onStartLightspeedConvert={() => setActiveFlow("lightspeed_convert")}
-          onStartScanMode={() => setActiveFlow("scan_mode")}
-          onStartPerformance={() => setActiveFlow("performance")}
-          onStartFeedOptimise={() => setActiveFlow("feed_optimise")}
-          onStartFeedHealth={() => setActiveFlow("feed_health")}
-          onStartGoogleColour={() => setActiveFlow("google_colour")}
-          onStartGoogleAds={() => setActiveFlow("google_ads")}
-          onStartStyleGrouping={() => setActiveFlow("style_grouping")}
-          onStartCompetitorIntel={() => setActiveFlow("competitor_intel")}
-          onStartCollectionSEO={() => setActiveFlow("collection_seo")}
-          onStartGeoAgentic={() => setActiveFlow("geo_agentic")}
-          onStartOrganicSEO={() => setActiveFlow("organic_seo")}
-          onStartMarginProtection={() => setActiveFlow("margin_protection")}
-          onStartMarkdownLadder={() => setActiveFlow("markdown_ladder")}
-          onStartStockMonitor={() => setActiveFlow("stock_monitor")}
-          onStartSocialMedia={() => setActiveFlow("social_media")}
-           onStartInventoryPlanning={() => setActiveFlow("inventory_planning")}
-           onStartStockyHub={() => setActiveFlow("stocky_hub")}
           onStartPackingSlip={() => setActiveFlow("packing_slip")}
+          onStartEmailInbox={() => setActiveFlow("email_inbox")}
           onStartJoor={() => setActiveFlow("joor")}
           onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
           onStartLookbookImport={() => setActiveFlow("lookbook_import")}
-           onStartAccounting={() => setActiveFlow("accounting")}
-           onStartProfitLoss={() => setActiveFlow("profit_loss")}
-           onStartImageOptimise={() => setActiveFlow("image_optimise")}
-           onStartStockCheck={() => setActiveFlow("stock_check")}
-           onStartPriceLookup={() => setActiveFlow("price_lookup")}
-           onStartPriceMatch={() => setActiveFlow("price_match")}
-           onStartProductDescriptions={() => setActiveFlow("product_descriptions")}
-           onStartSeasons={() => setActiveFlow("seasons")}
-            onNavigateToTab={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
-            onStartPipeline={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }}
-            onStartPipelineChooser={() => setActiveFlow("pipeline_chooser")}
-              onStartStockyOnboarding={() => setActiveFlow("stocky_onboarding")}
-              onStartSupplierProfileBuilder={() => setActiveFlow("supplier_profile_builder")}
-              onStartSupplierIntelligence={() => setActiveFlow("supplier_intelligence")}
-              onStartCollectionSEOExport={() => setActiveFlow("collection_seo_export")}
-              onSwitchToStockyDashboard={() => { setUseStockyDashboard(true); localStorage.setItem("stocky_dashboard_mode", "true"); }}
+          onStartScanMode={() => setActiveFlow("scan_mode")}
         />
       )}
       <Suspense fallback={suspenseFallback}>

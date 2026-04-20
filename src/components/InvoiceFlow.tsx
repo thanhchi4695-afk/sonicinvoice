@@ -1178,9 +1178,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       products = await parseWithAI(file);
     }
 
-    if (cancelledRef.current) return;
+    console.log('[Phase2 trace] startProcessing got products:', products?.length, 'first:', products?.[0]);
+    if (cancelledRef.current) { console.log('[Phase2 trace] cancelled exit'); return; }
 
     if (products.length === 0) {
+      console.log('[Phase2 trace] zero-products exit');
       setEnrichLines([{ name: "No products found", status: "not_found", action: "Could not extract products from this file. Try CSV/Excel format or check column headers.", confidence: 0 }]);
       setProcessingDone(true);
       setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));

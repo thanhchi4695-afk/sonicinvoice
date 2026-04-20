@@ -165,11 +165,83 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
     }
   }, [aiInstruction, products, allBrands, allTypes, allTags]);
 
-  const handleApply = () => {
+  const runApply = useCallback(async () => {
+    setConfirmOpen(false);
+    setSaving(true);
+    setSaveErrors([]);
+    setApplied(false);
+    setSaveProgress({ current: 0, total: adjusted.length });
+
+    const errors: { title: string; sku?: string; reason: string }[] = [];
+    let done = 0;
+
+    for (const p of adjusted) {
+      try {
+        if (!p.sku) {
+          errors.push({ title: p.title, reason: "Missing SKU — cannot match catalog" });
+        } else {
+          // 1. Persist to Supabase variants by SKU
+          const { data: variantRows, error: vErr } = await supabase
+            .from("variants")
+            .update({ retail_price: Number(p.newPrice.toFixed(2)) })
+            .eq("sku", p.sku)
+            .select("id, shopify_variant_id");
+          if (vErr) throw new Error(vErr.message);
+          if (!variantRows || variantRows.length === 0) {
+            errors.push({ title: p.title, sku: p.sku, reason: "SKU not found in catalog" });
+          } else {
+            // 2. Push to Shopify if linked
+            const shopifyId = (p.shopifyVariantId as string | undefined)
+              || variantRows.find(r => r.shopify_variant_id)?.shopify_variant_id;
+            if (shopifyId) {
+              try {
+                await updateVariantPrice(
+                  String(shopifyId),
+                  p.newPrice.toFixed(2),
+                  p.compareAtPrice != null ? Number(p.compareAtPrice).toFixed(2) : null,
+                );
+              } catch (e) {
+                errors.push({
+                  title: p.title, sku: p.sku,
+                  reason: `Saved locally; Shopify failed: ${e instanceof Error ? e.message : "unknown"}`,
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        errors.push({
+          title: p.title, sku: p.sku,
+          reason: e instanceof Error ? e.message : "Unknown error",
+        });
+      }
+      done += 1;
+      setSaveProgress({ current: done, total: adjusted.length });
+    }
+
+    setSaveErrors(errors);
+    setSaving(false);
     setApplied(true);
     setShowUndo(true);
-    toast.success(`Prices adjusted for ${summary.affected} products`);
     setTimeout(() => setShowUndo(false), 10000);
+
+    const succeeded = adjusted.length - errors.length;
+    if (errors.length === 0) {
+      toast.success(`✅ ${succeeded} prices updated and saved`);
+    } else if (succeeded > 0) {
+      toast.warning(`${succeeded} saved · ${errors.length} failed`);
+    } else {
+      toast.error(`Failed to save ${errors.length} prices`);
+    }
+  }, [adjusted]);
+
+  const handleApply = () => {
+    if (adjusted.length === 0) return;
+    setConfirmOpen(true);
+  };
+
+  const handleRetry = () => {
+    runApply();
   };
 
   const handleUndo = () => {
@@ -206,21 +278,39 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
     toast("Template deleted");
   };
 
-  const handleExportPreview = () => {
-    const csv = [
-      "Product,Brand,Current Price,New Price,Change %",
-      ...adjusted.map(p =>
-        `"${p.title}","${p.vendor}",${p.currentPrice.toFixed(2)},${p.newPrice.toFixed(2)},${p.changePercent.toFixed(1)}%`
-      ),
-    ].join("\n");
+  const slugify = (s: string) =>
+    s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  const downloadCsv = (csv: string, filename: string) => {
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `price_adjustment_preview_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
-    toast.success("Preview CSV downloaded");
+  };
+
+  const handleExportShopify = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = [
+      "Handle,Title,Variant SKU,Variant Price,Variant Compare At Price",
+      ...adjusted.map(p => {
+        const handle = slugify(p.sku || p.handle || p.title);
+        const sku = p.sku || "";
+        return `"${handle}","${p.title.replace(/"/g, '""')}","${sku}",${p.newPrice.toFixed(2)},${p.currentPrice.toFixed(2)}`;
+      }),
+    ].join("\n");
+    downloadCsv(rows, `price-update-shopify-${today}.csv`);
+    toast.success("Shopify CSV downloaded");
+  };
+
+  const handleExportLightspeed = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = [
+      "sku,price_including_tax",
+      ...adjusted.map(p => `"${p.sku || ""}",${p.newPrice.toFixed(2)}`),
+    ].join("\n");
+    downloadCsv(rows, `price-update-lightspeed-${today}.csv`);
+    toast.success("Lightspeed CSV downloaded");
   };
 
   // Inline filter toggle helper

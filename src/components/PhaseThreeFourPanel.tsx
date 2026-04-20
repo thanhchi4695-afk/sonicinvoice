@@ -285,10 +285,10 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
         <div className="p-4 space-y-4">
           {/* ── Connect POS banner ── */}
           {!catalogConnected && (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+            <div className="rounded-md border border-warning/30 bg-warning/5 p-3 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
               <div className="text-xs">
-                <div className="font-semibold text-amber-700 dark:text-amber-400">No {pos} catalog cached</div>
+                <div className="font-semibold text-warning">No {pos} catalog cached</div>
                 <div className="text-muted-foreground mt-0.5">
                   Connect {pos === "shopify" ? "Shopify" : "Lightspeed"} to automatically identify new vs existing stock.
                   All items have been treated as new for now — you can still proceed.
@@ -462,7 +462,7 @@ const Stat = ({ label, value, tone, icon }: {
     "rounded-md border p-2",
     tone === "primary" && "border-primary/30 bg-primary/5",
     tone === "success" && "border-success/30 bg-success/5",
-    tone === "info" && "border-blue-500/30 bg-blue-500/5",
+    tone === "info" && "border-secondary/30 bg-secondary/5",
     tone === "muted" && "border-border bg-muted/30",
   )}>
     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase tracking-wide">
@@ -477,7 +477,7 @@ const Badge = ({ classification }: { classification: ClassifiedItem["classificat
     return <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-success/15 text-success">Update qty only</span>;
   }
   if (classification === "new_colour") {
-    return <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/15 text-blue-400">New variant</span>;
+    return <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary/15 text-secondary-foreground">New variant</span>;
   }
   return <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/15 text-primary">New product</span>;
 };
@@ -491,7 +491,7 @@ const EnrichCell = ({ state }: { state: EnrichState }) => {
     );
   }
   if (state.status === "failed") {
-    return <span className="text-[10px] text-amber-500">Fetch manually</span>;
+    return <span className="text-[10px] text-warning">Fetch manually</span>;
   }
   return (
     <div className="flex items-center gap-2 text-[10px]">
@@ -506,7 +506,7 @@ const EnrichCell = ({ state }: { state: EnrichState }) => {
         </span>
       )}
       {state.imageUrl && (
-        <span className="inline-flex items-center gap-0.5 text-blue-400" title={state.imageUrl}>
+        <span className="inline-flex items-center gap-0.5 text-secondary-foreground" title={state.imageUrl}>
           <ImageIcon className="w-2.5 h-2.5" />Img
         </span>
       )}

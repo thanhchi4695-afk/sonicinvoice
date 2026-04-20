@@ -15,6 +15,7 @@ import StockyLayout from "@/components/StockyLayout";
 import QuickActionsBar from "@/components/QuickActionsBar";
 import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
 import QuickSearchModal from "@/components/QuickSearchModal";
+import PhaseProgressBar from "@/components/PhaseProgressBar";
 // HomeScreen kept available (now lazy) — accessible from Tools as "Classic dashboard".
 const HomeScreen = lazy(() => import("@/components/HomeScreen"));
 
@@ -593,6 +594,14 @@ const Index = () => {
               }}
             />
           </div>
+          <PhaseProgressBar
+            activeTab={activeTab}
+            activeFlow={activeFlow}
+            onNavigate={(t) => {
+              if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
+              else { setActiveFlow(t.id as any); }
+            }}
+          />
           {activeFlow ? renderFlow() : mainContent}
         </div>
         {/* Mobile bottom tabs for embedded mode */}
@@ -637,6 +646,14 @@ const Index = () => {
               {mode.modeBadge.label}
             </button>
           </div>
+          <PhaseProgressBar
+            activeTab={activeTab}
+            activeFlow={activeFlow}
+            onNavigate={(t) => {
+              if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
+              else { setActiveFlow(t.id as any); }
+            }}
+          />
           <QuickActionsBar onAction={handleStartFlow} />
           {activeFlow ? renderFlow() : mainContent}
         </StockyLayout>
@@ -666,6 +683,14 @@ const Index = () => {
             {mode.modeBadge.label}
           </button>
         </div>
+        <PhaseProgressBar
+          activeTab={activeTab}
+          activeFlow={activeFlow}
+          onNavigate={(t) => {
+            if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
+            else { setActiveFlow(t.id as any); }
+          }}
+        />
         <QuickActionsBar onAction={handleStartFlow} />
         {activeFlow ? renderFlow() : mainContent}
         <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />

@@ -2,12 +2,16 @@ import { useState, useMemo, useCallback } from "react";
 import {
   ChevronLeft, Sparkles, Percent, TrendingUp, Target, X as XIcon,
   ChevronDown, ChevronUp, AlertTriangle, Check, Download, Copy, Trash2, Save,
-  DollarSign, ShoppingCart,
+  DollarSign, ShoppingCart, Loader2, RotateCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   type AdjustmentType, type AdjustField, type PriceRounding,
   type AdjustmentFilter, type AdjustmentRule, type AdjustmentTemplate,
@@ -20,6 +24,7 @@ import {
 import { useInvoiceSession } from "@/stores/invoice-session-store";
 import InvoiceSessionBanner from "@/components/InvoiceSessionBanner";
 import { supabase } from "@/integrations/supabase/client";
+import { updateVariantPrice } from "@/lib/shopify-api";
 import { toast } from "sonner";
 
 interface Props {

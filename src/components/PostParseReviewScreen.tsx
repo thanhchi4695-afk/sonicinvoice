@@ -17,6 +17,7 @@ import { updateSupplierProfileWithCorrections } from "@/lib/supplier-profile-upd
 import { logCorrection, deriveFieldCategory, registerApplyToRemainingRowsHandler, type CorrectionReason } from "@/lib/correction-tracker";
 import CorrectionReasonPicker, { CorrectionSavedCheck } from "@/components/CorrectionReasonPicker";
 import { saveInvoiceLinesToCatalog } from "@/components/SupplierCatalog";
+import { persistParsedInvoice } from "@/lib/invoice-persistence";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
@@ -654,12 +655,15 @@ export default function PostParseReviewScreen({
 
   const [savingToCatalog, setSavingToCatalog] = useState(false);
 
+  const [savedToCatalog, setSavedToCatalog] = useState(false);
+
   const handleSaveToCatalog = async () => {
     if (!supplierName || accepted.length === 0) {
       toast.error("No accepted products to save");
       return;
     }
     setSavingToCatalog(true);
+    setSavedToCatalog(false);
     try {
       const { data: session } = await supabase.auth.getSession();
       if (!session?.session) { toast.error("Please sign in first"); return; }
@@ -691,11 +695,33 @@ export default function PostParseReviewScreen({
         size: p.size,
       }));
 
+      // 1. Save to supplier_catalog_items (existing behaviour)
       const saved = await saveInvoiceLinesToCatalog(supplier.id, userId, lines);
-      if (saved > 0) {
-        toast.success(`Saved ${saved} item${saved > 1 ? "s" : ""} to ${supplierName} catalog`);
-      } else {
-        toast.info("All items already exist in catalog");
+
+      // 2. ALSO write to products + variants so pricing tools can see them.
+      const subtotal = accepted.reduce((s, p) => s + (p.cost || 0) * (p.qty || 0), 0);
+      await persistParsedInvoice(
+        {
+          supplier: supplierName,
+          invoiceNumber: "",
+          invoiceDate: new Date().toISOString().slice(0, 10),
+          currency: "AUD",
+          subtotal,
+          gst: null,
+          total: subtotal,
+          documentType: "invoice",
+        },
+        accepted,
+      );
+
+      setSavedToCatalog(true);
+      const n = accepted.length;
+      toast.success(
+        `${n} product${n === 1 ? "" : "s"} saved to your catalog. Price Adjustment, Margin Protection, and Markdown Ladder can now use these products.`,
+        { duration: 6000 },
+      );
+      if (saved === 0) {
+        toast.info("All items already existed in supplier catalog");
       }
     } catch (err) {
       console.error(err);
@@ -1083,7 +1109,8 @@ export default function PostParseReviewScreen({
             <ChevronDown className="w-3.5 h-3.5 rotate-90" /> Back
           </Button>
           <Button variant="outline" size="sm" onClick={handleSaveToCatalog} className="gap-1" disabled={savingToCatalog}>
-            <Package className="w-3.5 h-3.5" /> {savingToCatalog ? "Saving…" : "Save to Catalog"}
+            <Package className="w-3.5 h-3.5" />
+            {savingToCatalog ? "Saving…" : savedToCatalog ? "✅ Saved to catalog" : "Save to Catalog"}
           </Button>
           {onPriceMatch && (
             <Button variant="outline" size="sm" onClick={onPriceMatch} className="gap-1">

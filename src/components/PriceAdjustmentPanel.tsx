@@ -1,8 +1,8 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   ChevronLeft, Sparkles, Percent, TrendingUp, Target, X as XIcon,
   ChevronDown, ChevronUp, AlertTriangle, Check, Download, Copy, Trash2, Save,
-  DollarSign, ShoppingCart, Loader2, RotateCw,
+  DollarSign, ShoppingCart, Loader2, RotateCw, Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,16 +52,9 @@ const ROUNDING_OPTIONS: { value: PriceRounding; label: string }[] = [
 const QUICK_PERCENTS = [5, 10, 15, 20, 25, 30, 50];
 const QUICK_FACTORS = [1.5, 2.0, 2.5, 3.0];
 
-// Demo products for standalone mode
-const DEMO_PRODUCTS: ProductForAdjustment[] = [
-  { handle: "mara-one-piece", title: "Mara One Piece", vendor: "Bond Eye", type: "One Piece", tags: ["new arrivals", "full_price"], currentPrice: 199.95, compareAtPrice: null, costPrice: 58 },
-  { handle: "gracie-top", title: "Gracie Balconette Top", vendor: "Bond Eye", type: "Bikini Top", tags: ["full_price"], currentPrice: 179.95, compareAtPrice: null, costPrice: 52 },
-  { handle: "inez-bottom", title: "Inez Bikini Bottom", vendor: "Bond Eye", type: "Bikini Bottom", tags: ["full_price"], currentPrice: 149.95, compareAtPrice: null, costPrice: 44 },
-  { handle: "sahara-kaftan", title: "Sahara Kaftan", vendor: "Jantzen", type: "Kaftan", tags: ["new arrivals", "sale"], currentPrice: 89.95, compareAtPrice: 120.00, costPrice: 42 },
-  { handle: "mira-one-piece", title: "Mira One Piece", vendor: "Seafolly", type: "One Piece", tags: ["full_price"], currentPrice: 159.95, compareAtPrice: null, costPrice: 50 },
-  { handle: "costa-bikini", title: "Costa Rica Bikini Set", vendor: "Seafolly", type: "Bikini Set", tags: ["new arrivals", "full_price"], currentPrice: 219.95, compareAtPrice: null, costPrice: 68 },
-  { handle: "linen-shirt", title: "Linen Beach Shirt", vendor: "Jantzen", type: "Cover Up", tags: ["sale"], currentPrice: 49.95, compareAtPrice: 79.95, costPrice: 22 },
-];
+// NOTE: Demo products removed — catalog now sources real data from Supabase
+// (variants joined to products). If the user has not processed any invoices
+// yet, the catalog tab shows an empty state instead of fake demo rows.
 
 const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => {
   const { sessionProducts, hasSession } = useInvoiceSession();
@@ -83,9 +76,54 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
     [sessionProducts],
   );
 
+  // Catalog products loaded from Supabase (variants joined to products).
+  const [catalogProducts, setCatalogProducts] = useState<ProductForAdjustment[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setCatalogLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        if (!cancelled) { setCatalogProducts([]); setCatalogLoading(false); }
+        return;
+      }
+      const { data, error } = await supabase
+        .from("variants")
+        .select("id, sku, cost, retail_price, products (title, vendor, product_type)")
+        .eq("user_id", user.id)
+        .not("retail_price", "is", null);
+      if (cancelled) return;
+      if (error) {
+        console.error("[PriceAdjustment] catalog query failed:", error.message);
+        setCatalogProducts([]);
+      } else {
+        const mapped: ProductForAdjustment[] = (data || []).map((v: any) => {
+          const title = v.products?.title || "Untitled";
+          const vendor = v.products?.vendor || "Unknown";
+          return {
+            handle: (v.sku || title).toString().toLowerCase().replace(/\s+/g, "-"),
+            title,
+            vendor,
+            type: v.products?.product_type || "",
+            tags: [],
+            currentPrice: Number(v.retail_price) || 0,
+            compareAtPrice: null,
+            costPrice: Number(v.cost) || 0,
+            sku: v.sku || undefined,
+          };
+        });
+        setCatalogProducts(mapped);
+      }
+      setCatalogLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const products = externalProducts && externalProducts.length > 0
     ? externalProducts
-    : (source === "invoice" && invoiceProducts.length > 0 ? invoiceProducts : DEMO_PRODUCTS);
+    : (source === "invoice" && invoiceProducts.length > 0 ? invoiceProducts : catalogProducts);
 
   // Filter state
   const [filter, setFilter] = useState<AdjustmentFilter>({ ...DEFAULT_FILTER });
@@ -346,7 +384,23 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
           </div>
         )}
 
-        {/* Templates bar */}
+        {/* Empty state — no products in catalog */}
+        {!externalProducts && products.length === 0 && !catalogLoading && (
+          <div className="rounded-lg border border-dashed border-border p-8 text-center">
+            <Package className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+            <p className="text-sm font-medium">No products in your catalog yet.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Process an invoice to add products.
+            </p>
+          </div>
+        )}
+        {!externalProducts && catalogLoading && products.length === 0 && (
+          <div className="rounded-lg border border-border p-8 text-center text-sm text-muted-foreground">
+            <Loader2 className="w-5 h-5 mx-auto mb-2 animate-spin" />
+            Loading your catalog…
+          </div>
+        )}
+
         {templates.length > 0 && (
           <div>
             <p className="text-xs text-muted-foreground mb-2">📋 Saved templates</p>

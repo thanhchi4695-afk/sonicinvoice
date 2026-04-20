@@ -255,11 +255,14 @@ serve(async (req) => {
         colours_available: null,
         page_title: pageTitle || null,
         extraction_notes: fetchError
-          ? `Could not load page (${fetchError}). Try a different result or paste a working URL.`
+          ? `Could not load page (${fetchError}). ${fallbacksTried.length ? `Tried ${fallbacksTried.length} retailer fallback(s) — none returned a usable AUD price. ` : ""}Try a different result or paste a working URL.`
           : "No content extracted from page.",
         price_matches_cost: false,
         price_vs_cost_note: null,
         source_url: finalUrl,
+        source_type: sourceType,
+        retailer_name: retailerName,
+        fallbacks_tried: fallbacksTried,
         fetch_success: false,
         fetch_error: fetchError || "no_content",
         status_code: statusCode || null,
@@ -268,6 +271,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Recompute brandHint for the AI prompt (helper used a local one for scraping)
+    const brandHint = findBrandHint(finalUrl);
 
     // ── Bug 3 fix: explicit, granular extraction prompt ──
     const systemPrompt = `You are a product data extraction specialist for Australian fashion retailers.

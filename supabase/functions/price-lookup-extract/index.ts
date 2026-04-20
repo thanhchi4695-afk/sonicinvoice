@@ -11,6 +11,124 @@ const corsHeaders = {
 const FIRECRAWL_API = "https://api.firecrawl.dev/v2";
 const CACHE_TTL_HOURS = 24;
 
+// ── Retailer fallback chain ──
+// When a brand site blocks scrapers (404 / bot wall), try these AU retailers
+// that serve real content to headless browsers.
+// Tokens: [slug] = lowercased + spaces→'+'  •  [product_name] = URL-encoded
+const RETAILER_FALLBACKS: Record<string, string[]> = {
+  seafolly: [
+    "https://www.myer.com.au/search?query=seafolly+[slug]",
+    "https://www.theiconic.com.au/search/?q=seafolly+[product_name]",
+    "https://www.surfstitch.com/search?q=seafolly+[product_name]",
+  ],
+  sunseeker: [
+    "https://www.myer.com.au/search?query=sunseeker+[slug]",
+    "https://www.theiconic.com.au/search/?q=sunseeker+[product_name]",
+  ],
+  baku: [
+    "https://www.theiconic.com.au/search/?q=baku+[product_name]",
+    "https://www.davidjones.com/search?q=baku+swimwear",
+  ],
+};
+
+// Per-retailer currency confidence for AUD pricing
+const RETAILER_AUD_CONFIDENCE: Record<string, number> = {
+  "myer.com.au": 95,
+  "theiconic.com.au": 95,
+  "surfstitch.com": 90,
+  "davidjones.com": 95,
+};
+
+function retailerNameFromUrl(u: string): string {
+  try {
+    const host = new URL(u).hostname.toLowerCase().replace(/^www\./, "");
+    if (host.includes("myer")) return "Myer";
+    if (host.includes("theiconic")) return "The Iconic";
+    if (host.includes("surfstitch")) return "Surfstitch";
+    if (host.includes("davidjones")) return "David Jones";
+    return host;
+  } catch { return "retailer"; }
+}
+
+function audConfidenceForUrl(u: string): number | null {
+  try {
+    const host = new URL(u).hostname.toLowerCase().replace(/^www\./, "");
+    for (const [domain, conf] of Object.entries(RETAILER_AUD_CONFIDENCE)) {
+      if (host === domain || host.endsWith("." + domain)) return conf;
+    }
+  } catch { /* noop */ }
+  return null;
+}
+
+function buildFallbackUrls(brand: string | undefined, productName: string | undefined): string[] {
+  if (!brand || !productName) return [];
+  const key = brand.toLowerCase().trim();
+  const templates = RETAILER_FALLBACKS[key];
+  if (!templates) return [];
+  const slug = productName.toLowerCase().trim().replace(/\s+/g, "+");
+  const encoded = encodeURIComponent(productName.trim());
+  return templates.map(t => t.replace(/\[slug\]/g, slug).replace(/\[product_name\]/g, encoded));
+}
+
+interface ScrapeResult {
+  pageMarkdown: string;
+  pageTitle: string;
+  finalUrl: string;
+  statusCode: number;
+  fetchError: string;
+}
+
+async function scrapeWithFirecrawl(targetUrl: string, apiKey: string): Promise<ScrapeResult> {
+  let pageMarkdown = "", pageTitle = "", finalUrl = targetUrl, fetchError = "", statusCode = 0;
+  const brandHint = findBrandHint(targetUrl);
+  const scrapeBody: Record<string, unknown> = {
+    url: targetUrl,
+    formats: ["markdown"],
+    onlyMainContent: true,
+    waitFor: brandHint?.waitFor ?? 2500,
+    mobile: false,
+    blockAds: true,
+    location: { country: "AU", languages: ["en-AU", "en"] },
+  };
+  if (brandHint?.includeTags?.length) scrapeBody.includeTags = brandHint.includeTags;
+  if (brandHint?.excludeTags?.length) scrapeBody.excludeTags = brandHint.excludeTags;
+
+  try {
+    const fcRes = await fetch(`${FIRECRAWL_API}/scrape`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(scrapeBody),
+    });
+    const fcData = await fcRes.json();
+    if (!fcRes.ok) {
+      fetchError = `Firecrawl ${fcRes.status}: ${fcData?.error || "scrape failed"}`;
+    } else {
+      const doc = fcData?.data ?? fcData;
+      pageMarkdown = doc?.markdown || "";
+      const meta = doc?.metadata || {};
+      pageTitle = meta.title || "";
+      finalUrl = meta.sourceURL || meta.url || targetUrl;
+      statusCode = meta.statusCode || 0;
+      if (statusCode === 404) {
+        fetchError = `HTTP 404 — page does not exist`;
+        pageMarkdown = "";
+      } else if (!pageMarkdown || pageMarkdown.length < 200) {
+        fetchError = "Page returned empty or too-short content";
+      }
+      if (pageMarkdown.length > 20000) pageMarkdown = pageMarkdown.slice(0, 20000);
+    }
+  } catch (e) {
+    fetchError = e instanceof Error ? e.message : "Failed to scrape page";
+  }
+  return { pageMarkdown, pageTitle, finalUrl, statusCode, fetchError };
+}
+
+// Quick heuristic: does the markdown contain an AUD price signal?
+function hasAudPrice(markdown: string): boolean {
+  if (!markdown) return false;
+  return /(?:A\$|AU\$|AUD\s*\$?|\$)\s*\d{1,5}(?:[.,]\d{2})?/i.test(markdown);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 

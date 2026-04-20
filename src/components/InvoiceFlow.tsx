@@ -1231,6 +1231,70 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     const groups = convertToProductGroups(cleanProducts);
     setProductGroups(groups);
 
+    // ── Phase 2 DB write ──────────────────────────
+    ;(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.id) {
+          console.warn('[Phase2] no user id');
+          return;
+        }
+        const rows = cleanProducts;
+        if (!Array.isArray(rows) || !rows.length) {
+          console.warn('[Phase2] no rows:', typeof rows, rows?.length);
+          return;
+        }
+        console.log('[Phase2] writing', rows.length, 'rows');
+        await Promise.all(rows.map(async (item: any) => {
+          const title =
+            item.product_title ?? item.title ??
+            item.style_name ?? item.name ?? 'Unknown';
+          const vendor =
+            item.vendor ?? item.supplier ??
+            item.brand ?? supplierName ?? 'Unknown';
+          const sku =
+            item.sku ?? item.style_number ??
+            item.style_code ?? item.code ?? null;
+          const cost = parseFloat(
+            item.unit_cost ?? item.cost ??
+            item.cost_ex_gst ?? 0);
+          const retail_price = parseFloat(
+            item.rrp ?? item.retail_price ??
+            item.rrp_incl_gst ?? 0);
+          const { data: prod, error: pe } =
+            await supabase.from('products')
+              .upsert({
+                user_id: user.id, title, vendor,
+                source: 'invoice_unreviewed',
+                updated_at: new Date().toISOString()
+              } as any, { onConflict: 'user_id,title,vendor' })
+              .select('id').single();
+          if (pe || !prod?.id) {
+            console.warn('[Phase2] product err:', pe?.message, title);
+            return;
+          }
+          if (!sku) {
+            console.warn('[Phase2] no sku:', title);
+            return;
+          }
+          const { error: ve } =
+            await supabase.from('variants')
+              .upsert({
+                user_id: user.id,
+                product_id: prod.id,
+                sku, cost, retail_price,
+                source: 'invoice_unreviewed',
+                updated_at: new Date().toISOString()
+              } as any, { onConflict: 'user_id,sku' });
+          if (ve) console.warn('[Phase2] variant err:', ve.message, sku);
+        }));
+        console.log('[Phase2] done:', rows.length);
+      } catch (e: any) {
+        console.warn('[Phase2] caught:', e?.message);
+      }
+    })();
+    // ── End Phase 2 ───────────────────────────────
+
     const names = groups.map(g => g.name);
     setParsedNames(names);
     runEnrichmentSim(cancelledRef, names);
@@ -1370,6 +1434,70 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         const groups = convertToProductGroups(cleanProducts);
         setProductGroups(groups);
         setParsedNames(groups.map(g => g.name));
+
+        // ── Phase 2 DB write ──────────────────────────
+        ;(async () => {
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user?.id) {
+              console.warn('[Phase2] no user id');
+              return;
+            }
+            const rows = cleanProducts;
+            if (!Array.isArray(rows) || !rows.length) {
+              console.warn('[Phase2] no rows:', typeof rows, rows?.length);
+              return;
+            }
+            console.log('[Phase2] writing', rows.length, 'rows');
+            await Promise.all(rows.map(async (item: any) => {
+              const title =
+                item.product_title ?? item.title ??
+                item.style_name ?? item.name ?? 'Unknown';
+              const vendor =
+                item.vendor ?? item.supplier ??
+                item.brand ?? supplierName ?? 'Unknown';
+              const sku =
+                item.sku ?? item.style_number ??
+                item.style_code ?? item.code ?? null;
+              const cost = parseFloat(
+                item.unit_cost ?? item.cost ??
+                item.cost_ex_gst ?? 0);
+              const retail_price = parseFloat(
+                item.rrp ?? item.retail_price ??
+                item.rrp_incl_gst ?? 0);
+              const { data: prod, error: pe } =
+                await supabase.from('products')
+                  .upsert({
+                    user_id: user.id, title, vendor,
+                    source: 'invoice_unreviewed',
+                    updated_at: new Date().toISOString()
+                  } as any, { onConflict: 'user_id,title,vendor' })
+                  .select('id').single();
+              if (pe || !prod?.id) {
+                console.warn('[Phase2] product err:', pe?.message, title);
+                return;
+              }
+              if (!sku) {
+                console.warn('[Phase2] no sku:', title);
+                return;
+              }
+              const { error: ve } =
+                await supabase.from('variants')
+                  .upsert({
+                    user_id: user.id,
+                    product_id: prod.id,
+                    sku, cost, retail_price,
+                    source: 'invoice_unreviewed',
+                    updated_at: new Date().toISOString()
+                  } as any, { onConflict: 'user_id,sku' });
+              if (ve) console.warn('[Phase2] variant err:', ve.message, sku);
+            }));
+            console.log('[Phase2] done:', rows.length);
+          } catch (e: any) {
+            console.warn('[Phase2] caught:', e?.message);
+          }
+        })();
+        // ── End Phase 2 ───────────────────────────────
       }
     } catch (err) {
       console.error("Detailed reprocess error:", err);

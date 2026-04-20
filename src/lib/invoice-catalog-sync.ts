@@ -12,6 +12,7 @@ export interface InvoiceCatalogItem {
   product_title: string;
   vendor?: string;
   sku?: string;
+  barcode?: string;
   colour?: string;
   size?: string;
   unit_cost?: number;

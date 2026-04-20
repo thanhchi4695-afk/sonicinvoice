@@ -176,6 +176,9 @@ async function buildInferredRules(
 
 interface InvoiceFlowProps {
   onBack: () => void;
+  /** Optional — used to auto-route to a different flow when the AI classifier
+   *  detects a packing slip while the user left "Process as" on Auto. */
+  onNavigate?: (flowKey: string) => void;
 }
 
 type Step = 1 | 2 | 3 | 4;
@@ -358,7 +361,7 @@ const MatchSourceBadge = ({ source, barcode }: { source: MatchSource; barcode?: 
   );
 };
 
-const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
+const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [step, setStep] = useState<Step>(1);
   const [showDetails, setShowDetails] = useState(false);
   const [fileName, setFileName] = useState("");

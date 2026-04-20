@@ -375,6 +375,19 @@ export async function updateVariantCost(variantId: string, cost: string): Promis
   await callProxy({ action: "update_variant_cost", variant_id: variantId, cost });
 }
 
+export async function updateVariantPrice(
+  variantId: string,
+  price: string,
+  compareAtPrice?: string | null,
+): Promise<void> {
+  await callProxy({
+    action: "update_variant_price",
+    variant_id: variantId,
+    price,
+    compare_at_price: compareAtPrice ?? null,
+  });
+}
+
 export async function getProductsPage(pageInfo?: string, limit: number = 250): Promise<{
   products: Array<{
     id: number;

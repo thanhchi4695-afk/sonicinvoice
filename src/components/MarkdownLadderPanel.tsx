@@ -438,6 +438,34 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
     toast.success(`Exported ${items.length} products × ${ladder.stages.length} stages`);
   };
 
+  // Wide-format schedule: one row per product with Stage N Price / Stage N Date columns.
+  const exportLadderScheduleWide = (ladder: Ladder) => {
+    const items = ladderItems.filter(i => i.ladder_id === ladder.id);
+    if (items.length === 0) { toast.info("No items to export"); return; }
+    const stages = ladder.stages;
+    const header = ["Product", "SKU", "Original Price"];
+    stages.forEach(s => { header.push(`Stage ${s.stageNumber} Price`, `Stage ${s.stageNumber} Date`); });
+    header.push(`Margin at Stage ${stages.length}`);
+    const rows: string[][] = [header];
+    const start = ladder.created_at ? new Date(ladder.created_at) : new Date();
+    for (const item of items) {
+      const row: string[] = [item.product_title, item.variant_info || "", item.original_price.toFixed(2)];
+      let cumulativeDays = 0;
+      let finalMargin: number | null = null;
+      for (const s of stages) {
+        cumulativeDays += s.triggerDays;
+        const stageDate = new Date(start.getTime() + cumulativeDays * 86400000).toISOString().slice(0, 10);
+        const stagePrice = +(item.original_price * (1 - s.discountPercent / 100)).toFixed(2);
+        row.push(stagePrice.toFixed(2), stageDate);
+        if (item.cost && item.cost > 0) finalMargin = ((stagePrice - item.cost) / stagePrice) * 100;
+      }
+      row.push(finalMargin !== null ? finalMargin.toFixed(1) : "");
+      rows.push(row);
+    }
+    downloadCsv(`markdown-ladder-${today()}.csv`, rows);
+    toast.success(`Schedule exported (${items.length} products)`);
+  };
+
   const exportShopifyStage = (ladder: Ladder, stage: LadderStage) => {
     const items = ladderItems.filter(i => i.ladder_id === ladder.id);
     if (items.length === 0) { toast.info("No items to export"); return; }

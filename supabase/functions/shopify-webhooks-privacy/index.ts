@@ -40,7 +40,7 @@ async function verifyShopifyHmac(
   );
 
   const computedSignature = new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, rawBytes)
+    await crypto.subtle.sign("HMAC", key, rawBytes as BufferSource)
   );
 
   let expectedSignature: Uint8Array;

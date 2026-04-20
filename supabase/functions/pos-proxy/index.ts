@@ -393,7 +393,8 @@ Deno.serve(async (req) => {
 
 async function ensureValidTokenX(
   conn: Record<string, string>,
-  supabase: ReturnType<typeof createClient>,
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
   userId: string,
 ): Promise<string> {
   const expiresAt = new Date(conn.ls_x_token_expires_at).getTime();
@@ -425,7 +426,8 @@ async function ensureValidTokenX(
 
 async function ensureValidTokenR(
   conn: Record<string, string>,
-  supabase: ReturnType<typeof createClient>,
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
   userId: string,
 ): Promise<string> {
   const expiresAt = new Date(conn.ls_r_token_expires_at).getTime();

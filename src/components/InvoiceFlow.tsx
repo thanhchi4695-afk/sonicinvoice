@@ -519,6 +519,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
     try {
       console.log("[Phase2] writing", accepted.length, "rows from", source);
+      console.log("[InvoiceFlow] 🔄 Reached catalog sync insertion point — calling syncInvoiceItemsToCatalog with", accepted.length, "items");
       const result = await syncInvoiceItemsToCatalog(
         accepted.map((item) => ({
           product_title: item.name || "Untitled",

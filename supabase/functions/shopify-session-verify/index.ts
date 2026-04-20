@@ -110,7 +110,8 @@ Deno.serve(async (req) => {
     // Use createSession() — NOT generateLink(). generateLink() in Supabase v2
     // returns a token_hash inside a redirect URL, not access/refresh tokens.
     const { data: sessionData, error: sessionErr } =
-      await supabaseAdmin.auth.admin.createSession({ user_id: conn.user_id });
+      // deno-lint-ignore no-explicit-any
+      await (supabaseAdmin.auth.admin as any).createSession({ user_id: conn.user_id });
 
     if (sessionErr || !sessionData?.session) {
       console.error("Failed to create session:", sessionErr);

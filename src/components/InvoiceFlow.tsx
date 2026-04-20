@@ -501,6 +501,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         });
       }
     } catch (e: any) {
+      console.log('[SONIC-DEBUG] Invoice processing error', e);
       console.warn("[Phase2] caught:", e?.message || "Unknown error");
       toast.error("Catalog save failed", { id: savingToastId, description: e?.message || "Unknown error" });
     }
@@ -634,6 +635,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         }
       }
     } catch (e: any) {
+      console.log('[SONIC-DEBUG] Invoice processing error', e);
       console.warn("[Phase2] caught:", e?.message || "Unknown error");
       toast.error("Catalog save failed", { id: savingToastId, description: e?.message || "Unknown error" });
     }
@@ -1287,6 +1289,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
       return data.products || [];
     } catch (err) {
+      console.log('[SONIC-DEBUG] Invoice processing error', err);
       console.error("AI parse error:", err);
       return [];
     }

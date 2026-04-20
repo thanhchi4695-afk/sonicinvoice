@@ -666,6 +666,8 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
         </div>
       </div>
 
+      <InvoiceSessionBanner />
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full mb-4">
           <TabsTrigger value="dashboard" className="flex-1 text-xs">Dashboard</TabsTrigger>

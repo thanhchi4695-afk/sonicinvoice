@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { setSessionProducts as setInvoiceSessionProducts } from "@/stores/invoice-session-store";
 import { syncInvoiceItemsToCatalog } from "@/lib/invoice-catalog-sync";
 import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orchestrator";
+import POSPickerDialog, { hasPickedPOS } from "@/components/POSPickerDialog";
 import { toast } from "sonner";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
@@ -513,6 +514,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           product_title: item.name || "Untitled",
           vendor: item.brand || supplierName || undefined,
           sku: item.sku || undefined,
+          barcode: (item as any).barcode || undefined,
           colour: item.colour || undefined,
           size: item.size || undefined,
           unit_cost: Number(item.cost) || 0,
@@ -717,12 +719,34 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const cancelledRef = { current: false };
   const [parsedNames, setParsedNames] = useState<string[]>([]);
 
+  const [posPickerOpen, setPOSPickerOpen] = useState(false);
+  const pendingUploadKindRef = useRef<"file" | "camera" | null>(null);
+
   const handleFileSelect = () => {
+    if (!hasPickedPOS()) {
+      pendingUploadKindRef.current = "file";
+      setPOSPickerOpen(true);
+      return;
+    }
     fileInputRef.current?.click();
   };
 
   const handleCameraSelect = () => {
+    if (!hasPickedPOS()) {
+      pendingUploadKindRef.current = "camera";
+      setPOSPickerOpen(true);
+      return;
+    }
     cameraInputRef.current?.click();
+  };
+
+  const handlePOSPicked = () => {
+    const kind = pendingUploadKindRef.current;
+    pendingUploadKindRef.current = null;
+    setTimeout(() => {
+      if (kind === "camera") cameraInputRef.current?.click();
+      else fileInputRef.current?.click();
+    }, 100);
   };
 
   const [originalFileMeta, setOriginalFileMeta] = useState<{
@@ -2238,6 +2262,12 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             capture="environment"
             onChange={handleFileChosen}
             className="hidden"
+          />
+
+          <POSPickerDialog
+            open={posPickerOpen}
+            onClose={() => setPOSPickerOpen(false)}
+            onPicked={handlePOSPicked}
           />
 
           <button

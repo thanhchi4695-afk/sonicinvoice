@@ -12,6 +12,7 @@ export interface InvoiceCatalogItem {
   product_title: string;
   vendor?: string;
   sku?: string;
+  barcode?: string;
   colour?: string;
   size?: string;
   unit_cost?: number;
@@ -86,6 +87,7 @@ export async function syncInvoiceItemsToCatalog(
         user_id: userId,
         product_id: productId,
         sku: sku || null,
+        barcode: (item.barcode || "").trim() || null,
         color: colour,
         size,
         cost: Number(item.unit_cost) || 0,

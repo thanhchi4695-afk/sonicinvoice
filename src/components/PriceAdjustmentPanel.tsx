@@ -78,6 +78,7 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
       currentPrice: Number(p.rrp) || 0,
       compareAtPrice: null,
       costPrice: Number(p.unit_cost) || 0,
+      sku: p.sku || undefined,
     })),
     [sessionProducts],
   );

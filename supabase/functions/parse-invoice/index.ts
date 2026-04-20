@@ -970,7 +970,7 @@ INSTRUCTIONS FOR RETRY:
     const products = parsed.products || [];
     const hasLowConfidence = products.some((p: Record<string, unknown>) => (Number(p.confidence) || 0) < 70);
     const hasQualityWarning = parsed.quality_warning === true || parsed.parsing_plan?.expected_review_level === "high";
-    const shouldFallbackOCR = (hasLowConfidence || hasQualityWarning) && (isImage || isPdf) && !detailedMode;
+    const shouldFallbackOCR = (hasLowConfidence || hasQualityWarning) && (isImage || isPdf) && !detailedMode && !budgetExceeded();
 
     if (shouldFallbackOCR) {
       console.log(`[parse-invoice] Step B: OCR text fallback triggered — lowConf=${hasLowConfidence}, qualityWarn=${hasQualityWarning}`);

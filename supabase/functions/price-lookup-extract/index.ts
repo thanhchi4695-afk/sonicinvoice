@@ -11,6 +11,124 @@ const corsHeaders = {
 const FIRECRAWL_API = "https://api.firecrawl.dev/v2";
 const CACHE_TTL_HOURS = 24;
 
+// ── Retailer fallback chain ──
+// When a brand site blocks scrapers (404 / bot wall), try these AU retailers
+// that serve real content to headless browsers.
+// Tokens: [slug] = lowercased + spaces→'+'  •  [product_name] = URL-encoded
+const RETAILER_FALLBACKS: Record<string, string[]> = {
+  seafolly: [
+    "https://www.myer.com.au/search?query=seafolly+[slug]",
+    "https://www.theiconic.com.au/search/?q=seafolly+[product_name]",
+    "https://www.surfstitch.com/search?q=seafolly+[product_name]",
+  ],
+  sunseeker: [
+    "https://www.myer.com.au/search?query=sunseeker+[slug]",
+    "https://www.theiconic.com.au/search/?q=sunseeker+[product_name]",
+  ],
+  baku: [
+    "https://www.theiconic.com.au/search/?q=baku+[product_name]",
+    "https://www.davidjones.com/search?q=baku+swimwear",
+  ],
+};
+
+// Per-retailer currency confidence for AUD pricing
+const RETAILER_AUD_CONFIDENCE: Record<string, number> = {
+  "myer.com.au": 95,
+  "theiconic.com.au": 95,
+  "surfstitch.com": 90,
+  "davidjones.com": 95,
+};
+
+function retailerNameFromUrl(u: string): string {
+  try {
+    const host = new URL(u).hostname.toLowerCase().replace(/^www\./, "");
+    if (host.includes("myer")) return "Myer";
+    if (host.includes("theiconic")) return "The Iconic";
+    if (host.includes("surfstitch")) return "Surfstitch";
+    if (host.includes("davidjones")) return "David Jones";
+    return host;
+  } catch { return "retailer"; }
+}
+
+function audConfidenceForUrl(u: string): number | null {
+  try {
+    const host = new URL(u).hostname.toLowerCase().replace(/^www\./, "");
+    for (const [domain, conf] of Object.entries(RETAILER_AUD_CONFIDENCE)) {
+      if (host === domain || host.endsWith("." + domain)) return conf;
+    }
+  } catch { /* noop */ }
+  return null;
+}
+
+function buildFallbackUrls(brand: string | undefined, productName: string | undefined): string[] {
+  if (!brand || !productName) return [];
+  const key = brand.toLowerCase().trim();
+  const templates = RETAILER_FALLBACKS[key];
+  if (!templates) return [];
+  const slug = productName.toLowerCase().trim().replace(/\s+/g, "+");
+  const encoded = encodeURIComponent(productName.trim());
+  return templates.map(t => t.replace(/\[slug\]/g, slug).replace(/\[product_name\]/g, encoded));
+}
+
+interface ScrapeResult {
+  pageMarkdown: string;
+  pageTitle: string;
+  finalUrl: string;
+  statusCode: number;
+  fetchError: string;
+}
+
+async function scrapeWithFirecrawl(targetUrl: string, apiKey: string): Promise<ScrapeResult> {
+  let pageMarkdown = "", pageTitle = "", finalUrl = targetUrl, fetchError = "", statusCode = 0;
+  const brandHint = findBrandHint(targetUrl);
+  const scrapeBody: Record<string, unknown> = {
+    url: targetUrl,
+    formats: ["markdown"],
+    onlyMainContent: true,
+    waitFor: brandHint?.waitFor ?? 2500,
+    mobile: false,
+    blockAds: true,
+    location: { country: "AU", languages: ["en-AU", "en"] },
+  };
+  if (brandHint?.includeTags?.length) scrapeBody.includeTags = brandHint.includeTags;
+  if (brandHint?.excludeTags?.length) scrapeBody.excludeTags = brandHint.excludeTags;
+
+  try {
+    const fcRes = await fetch(`${FIRECRAWL_API}/scrape`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(scrapeBody),
+    });
+    const fcData = await fcRes.json();
+    if (!fcRes.ok) {
+      fetchError = `Firecrawl ${fcRes.status}: ${fcData?.error || "scrape failed"}`;
+    } else {
+      const doc = fcData?.data ?? fcData;
+      pageMarkdown = doc?.markdown || "";
+      const meta = doc?.metadata || {};
+      pageTitle = meta.title || "";
+      finalUrl = meta.sourceURL || meta.url || targetUrl;
+      statusCode = meta.statusCode || 0;
+      if (statusCode === 404) {
+        fetchError = `HTTP 404 — page does not exist`;
+        pageMarkdown = "";
+      } else if (!pageMarkdown || pageMarkdown.length < 200) {
+        fetchError = "Page returned empty or too-short content";
+      }
+      if (pageMarkdown.length > 20000) pageMarkdown = pageMarkdown.slice(0, 20000);
+    }
+  } catch (e) {
+    fetchError = e instanceof Error ? e.message : "Failed to scrape page";
+  }
+  return { pageMarkdown, pageTitle, finalUrl, statusCode, fetchError };
+}
+
+// Quick heuristic: does the markdown contain an AUD price signal?
+function hasAudPrice(markdown: string): boolean {
+  if (!markdown) return false;
+  return /(?:A\$|AU\$|AUD\s*\$?|\$)\s*\d{1,5}(?:[.,]\d{2})?/i.test(markdown);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -88,67 +206,32 @@ serve(async (req) => {
       });
     }
 
-    // ── Scrape via Firecrawl (renders JS, follows redirects, beats bot blockers) ──
-    let pageMarkdown = "";
-    let pageTitle = "";
-    let finalUrl = url;
-    let fetchError = "";
-    let statusCode = 0;
+    // ── Scrape primary URL via Firecrawl ──
+    let { pageMarkdown, pageTitle, finalUrl, statusCode, fetchError } =
+      await scrapeWithFirecrawl(url, FIRECRAWL_API_KEY);
 
-    // Per-brand hints: pass tighter includeTags/excludeTags + longer waitFor for known sites.
-    const brandHint = findBrandHint(url);
-    const scrapeBody: Record<string, unknown> = {
-      url,
-      formats: ["markdown"],
-      onlyMainContent: true,
-      // JS-rendered sites (Iconic, Myer, David Jones, Zimmermann) need longer waits
-      // Firecrawl runs a real headless browser, so this gives JS time to hydrate
-      waitFor: brandHint?.waitFor ?? 2500,
-      mobile: false,
-      blockAds: true,
-      location: { country: "AU", languages: ["en-AU", "en"] },
-    };
-    if (brandHint?.includeTags?.length) scrapeBody.includeTags = brandHint.includeTags;
-    if (brandHint?.excludeTags?.length) scrapeBody.excludeTags = brandHint.excludeTags;
+    let sourceType: "brand" | "retailer" = "brand";
+    let retailerName: string | null = null;
+    const fallbacksTried: { url: string; status: number; error: string }[] = [];
 
-    try {
-      const fcRes = await fetch(`${FIRECRAWL_API}/scrape`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(scrapeBody),
-      });
-
-      const fcData = await fcRes.json();
-
-      if (!fcRes.ok) {
-        fetchError = `Firecrawl ${fcRes.status}: ${fcData?.error || "scrape failed"}`;
-      } else {
-        // v2 SDK shape vs raw REST shape
-        const doc = fcData?.data ?? fcData;
-        pageMarkdown = doc?.markdown || "";
-        const meta = doc?.metadata || {};
-        pageTitle = meta.title || "";
-        finalUrl = meta.sourceURL || meta.url || url;
-        statusCode = meta.statusCode || 0;
-
-        // Bug 1 guard: if Firecrawl landed on a category/listing page (no real product info), flag it
-        if (statusCode === 404) {
-          fetchError = `HTTP 404 — page does not exist`;
-          pageMarkdown = "";
-        } else if (!pageMarkdown || pageMarkdown.length < 200) {
-          fetchError = "Page returned empty or too-short content";
-        }
-
-        // Truncate to fit AI context
-        if (pageMarkdown.length > 20000) {
-          pageMarkdown = pageMarkdown.slice(0, 20000);
+    // ── Fallback: if 404 (or empty) AND brand has retailer fallbacks, try them ──
+    const isBlocked = statusCode === 404 || (!pageMarkdown && fetchError);
+    if (isBlocked) {
+      const fallbackUrls = buildFallbackUrls(supplier, product_name);
+      for (const fbUrl of fallbackUrls) {
+        const fb = await scrapeWithFirecrawl(fbUrl, FIRECRAWL_API_KEY);
+        fallbacksTried.push({ url: fbUrl, status: fb.statusCode, error: fb.fetchError });
+        if (fb.statusCode === 200 && fb.pageMarkdown && hasAudPrice(fb.pageMarkdown)) {
+          pageMarkdown = fb.pageMarkdown;
+          pageTitle = fb.pageTitle;
+          finalUrl = fb.finalUrl;
+          statusCode = fb.statusCode;
+          fetchError = "";
+          sourceType = "retailer";
+          retailerName = retailerNameFromUrl(fb.finalUrl);
+          break;
         }
       }
-    } catch (e) {
-      fetchError = e instanceof Error ? e.message : "Failed to scrape page";
     }
 
     // ── If we couldn't fetch the page, return early with a HONEST empty result.
@@ -172,11 +255,14 @@ serve(async (req) => {
         colours_available: null,
         page_title: pageTitle || null,
         extraction_notes: fetchError
-          ? `Could not load page (${fetchError}). Try a different result or paste a working URL.`
+          ? `Could not load page (${fetchError}). ${fallbacksTried.length ? `Tried ${fallbacksTried.length} retailer fallback(s) — none returned a usable AUD price. ` : ""}Try a different result or paste a working URL.`
           : "No content extracted from page.",
         price_matches_cost: false,
         price_vs_cost_note: null,
         source_url: finalUrl,
+        source_type: sourceType,
+        retailer_name: retailerName,
+        fallbacks_tried: fallbacksTried,
         fetch_success: false,
         fetch_error: fetchError || "no_content",
         status_code: statusCode || null,
@@ -185,6 +271,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Recompute brandHint for the AI prompt (helper used a local one for scraping)
+    const brandHint = findBrandHint(finalUrl);
 
     // ── Bug 3 fix: explicit, granular extraction prompt ──
     const systemPrompt = `You are a product data extraction specialist for Australian fashion retailers.
@@ -280,14 +369,30 @@ ${pageMarkdown}
     }
 
     parsed.source_url = finalUrl;
+    parsed.source_type = sourceType;
+    parsed.retailer_name = retailerName;
+    parsed.fallbacks_tried = fallbacksTried;
     parsed.fetch_success = true;
     parsed.fetch_error = null;
     parsed.page_title = parsed.page_title || pageTitle || null;
     parsed.brand_hint_applied = brandHint?.name || null;
     parsed.status_code = statusCode || 200;
     parsed.scraper = "firecrawl";
-    // Mark whether the description was successfully scraped from the page
     parsed.description_source = parsed.description && parsed.description.trim().length > 20 ? "scraped" : null;
+
+    // Bump AUD confidence when sourced from a trusted AU retailer with a real price
+    if (sourceType === "retailer" && parsed.retail_price_aud != null) {
+      const retailerConf = audConfidenceForUrl(finalUrl);
+      if (retailerConf != null) {
+        parsed.currency_detected = "AUD";
+        parsed.currency_confidence = Math.max(parsed.currency_confidence ?? 0, retailerConf);
+      }
+      // Annotate Product Details so the user knows where the price came from
+      const note = `Price sourced from ${retailerName ?? "retailer"} — brand site not accessible to automated tools.`;
+      parsed.extraction_notes = parsed.extraction_notes
+        ? `${note} ${parsed.extraction_notes}`
+        : note;
+    }
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { setSessionProducts as setInvoiceSessionProducts } from "@/stores/invoice-session-store";
 import { toast } from "sonner";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
@@ -1616,6 +1617,34 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             barcode: g.barcode,
           }]
     );
+
+    // ── Push products into shared invoice session store for downstream tools ──
+    try {
+      const sessionProds = productGroups.map((g) => {
+        const cost = Number(g.cogs ?? g.price ?? 0);
+        const rrp = Number(g.rrp ?? 0);
+        const margin = rrp > 0 ? ((rrp - cost) / rrp) * 100 : 0;
+        const qty = (g.variants && g.variants.length > 0)
+          ? g.variants.reduce((s: number, v: any) => s + (Number(v.qty) || 0), 0)
+          : 1;
+        return {
+          product_title: g.name || "Untitled",
+          sku: (g as any).sku ?? (g.variants?.[0] as any)?.sku ?? "",
+          vendor: g.brand || "",
+          unit_cost: cost,
+          rrp,
+          margin_pct: Math.round(margin * 10) / 10,
+          qty,
+        };
+      });
+      setInvoiceSessionProducts(
+        sessionProds,
+        supplierName || "",
+        new Date().toISOString().slice(0, 10),
+      );
+    } catch (e) {
+      console.warn("[invoice-session-store] write failed", e);
+    }
 
     setReconciling(true);
     setReconcileProgress(0);

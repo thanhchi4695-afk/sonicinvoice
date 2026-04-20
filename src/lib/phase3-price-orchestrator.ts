@@ -66,9 +66,10 @@ async function callSupplierScrape(item: Phase3Item): Promise<Phase3ProductResult
   try {
     const { data, error } = await supabase.functions.invoke("price-lookup-search", {
       body: {
-        productName: item.product_title,
+        product_name: item.product_title,
         supplier: item.vendor || "",
-        styleNumber: item.sku || "",
+        style_number: item.sku || "",
+        colour: undefined,
       },
     });
     if (error || !data?.results?.length) return null;

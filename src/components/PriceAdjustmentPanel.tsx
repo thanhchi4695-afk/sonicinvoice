@@ -183,7 +183,7 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
           // 1. Persist to Supabase variants by SKU
           const { data: variantRows, error: vErr } = await supabase
             .from("variants")
-            .update({ retail_price: Number(p.newPrice.toFixed(2)) })
+            .update({ retail_price: Number(p.newPrice.toFixed(2)), updated_at: new Date().toISOString() } as never)
             .eq("sku", p.sku)
             .select("id, shopify_variant_id");
           if (vErr) throw new Error(vErr.message);

@@ -158,6 +158,14 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
           daysSinceLastSale,
         };
       }));
+
+      // Diagnostic — confirm the variants query actually returned rows.
+      const variantCount = (variantsRes.data || []).length;
+      console.log("[MarkdownLadder] variants query returned", variantCount, "rows for user", user.id);
+      if (variantsRes.error) {
+        console.error("[MarkdownLadder] variants query error:", variantsRes.error);
+        toast.error(`Variants query failed: ${variantsRes.error.message}`);
+      }
     } catch (e) {
       console.error("Load ladders error:", e);
     } finally {
@@ -430,6 +438,34 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
     toast.success(`Exported ${items.length} products × ${ladder.stages.length} stages`);
   };
 
+  // Wide-format schedule: one row per product with Stage N Price / Stage N Date columns.
+  const exportLadderScheduleWide = (ladder: Ladder) => {
+    const items = ladderItems.filter(i => i.ladder_id === ladder.id);
+    if (items.length === 0) { toast.info("No items to export"); return; }
+    const stages = ladder.stages;
+    const header = ["Product", "SKU", "Original Price"];
+    stages.forEach(s => { header.push(`Stage ${s.stageNumber} Price`, `Stage ${s.stageNumber} Date`); });
+    header.push(`Margin at Stage ${stages.length}`);
+    const rows: string[][] = [header];
+    const start = ladder.created_at ? new Date(ladder.created_at) : new Date();
+    for (const item of items) {
+      const row: string[] = [item.product_title, item.variant_info || "", item.original_price.toFixed(2)];
+      let cumulativeDays = 0;
+      let finalMargin: number | null = null;
+      for (const s of stages) {
+        cumulativeDays += s.triggerDays;
+        const stageDate = new Date(start.getTime() + cumulativeDays * 86400000).toISOString().slice(0, 10);
+        const stagePrice = +(item.original_price * (1 - s.discountPercent / 100)).toFixed(2);
+        row.push(stagePrice.toFixed(2), stageDate);
+        if (item.cost && item.cost > 0) finalMargin = ((stagePrice - item.cost) / stagePrice) * 100;
+      }
+      row.push(finalMargin !== null ? finalMargin.toFixed(1) : "");
+      rows.push(row);
+    }
+    downloadCsv(`markdown-ladder-${today()}.csv`, rows);
+    toast.success(`Schedule exported (${items.length} products)`);
+  };
+
   const exportShopifyStage = (ladder: Ladder, stage: LadderStage) => {
     const items = ladderItems.filter(i => i.ladder_id === ladder.id);
     if (items.length === 0) { toast.info("No items to export"); return; }
@@ -595,6 +631,32 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
                   {marginCheck?.blocked && (
                     <div className="mt-2 flex items-center gap-1 text-xs text-destructive">
                       <ShieldAlert className="w-3 h-3" /> {stage.discountPercent}% discount breaches margin. Max safe: {marginCheck.maxDiscount}%
+                    </div>
+                  )}
+                  {/* Live per-product preview for this stage */}
+                  {selectedProducts.length > 0 && (
+                    <div className="mt-3 border-t border-border pt-2 space-y-1">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Preview at -{stage.discountPercent}%</p>
+                      {selectedProducts.slice(0, 5).map(p => {
+                        const newPrice = +(p.retailPrice * (1 - stage.discountPercent / 100)).toFixed(2);
+                        const margin = p.cost > 0 ? ((newPrice - p.cost) / newPrice) * 100 : null;
+                        const breach = margin !== null && margin < newLadder.min_margin_pct;
+                        return (
+                          <div key={p.variantId} className="flex items-center gap-2 text-[11px]">
+                            {breach && <AlertTriangle className="w-3 h-3 text-yellow-600 shrink-0" />}
+                            <span className="truncate flex-1">{p.productTitle}</span>
+                            <span className="font-mono text-muted-foreground">{fmt(p.retailPrice)} → {fmt(newPrice)}</span>
+                            {margin !== null && (
+                              <span className={cn("font-mono", breach ? "text-yellow-600" : "text-muted-foreground")}>
+                                {margin.toFixed(1)}%{breach && " ⚠"}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {selectedProducts.length > 5 && (
+                        <p className="text-[10px] text-muted-foreground">+{selectedProducts.length - 5} more</p>
+                      )}
                     </div>
                   )}
                 </Card>
@@ -808,8 +870,11 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
                   </div>
 
                   <div className="flex gap-2 mt-3 flex-wrap">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportLadderScheduleWide(ladder)}>
+                      <Download className="w-3 h-3 mr-1" /> Download schedule
+                    </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportLadderSchedule(ladder)}>
-                      <Download className="w-3 h-3 mr-1" /> Export schedule
+                      <Download className="w-3 h-3 mr-1" /> Export (long)
                     </Button>
                     {stages.map(s => (
                       <Button key={s.stageNumber} size="sm" variant="ghost" className="h-7 text-xs" onClick={() => exportShopifyStage(ladder, s)}>

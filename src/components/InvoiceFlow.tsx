@@ -1186,6 +1186,30 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         setAiRejectedRows(data.rejected_rows);
       }
 
+      // ── #1 Document type detector: surface AI classification & auto-route ──
+      const aiDocType = data.parsing_plan?.document_type || data.document_type;
+      if (aiDocType) {
+        setDetectedDocType(aiDocType);
+        // If user left it on "auto" and AI said packing slip, prompt to switch flows.
+        if (
+          processAs === "auto" &&
+          aiDocType === "packing_slip" &&
+          !packingSlipPromptShown
+        ) {
+          setPackingSlipPromptShown(true);
+          toast.warning("This looks like a Packing Slip, not an invoice", {
+            description: "Items & quantities only — no prices were extracted. Use the Packing Slip flow for stock check.",
+            duration: 12000,
+            action: {
+              label: "Open Packing Slip flow",
+              onClick: () => {
+                if (onNavigate) onNavigate("packing_slip");
+              },
+            },
+          });
+        }
+      }
+
       // OCR fallback notifications
       if (data.ocr_fallback_used) {
         toast.info("OCR fallback was used for better extraction accuracy", {
@@ -1675,6 +1699,11 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const [bulkPriceLookupActive, setBulkPriceLookupActive] = useState(false);
   const [priceMatchActive, setPriceMatchActive] = useState(false);
   const [descriptionsActive, setDescriptionsActive] = useState(false);
+  // Auto-detected document type from parse-invoice (#1 Document type detector)
+  const [detectedDocType, setDetectedDocType] = useState<
+    "tax_invoice" | "packing_slip" | "handwritten_invoice" | "statement" | "unknown" | null
+  >(null);
+  const [packingSlipPromptShown, setPackingSlipPromptShown] = useState(false);
   const [imageHelperActive, setImageHelperActive] = useState(false);
   const [collectionSeoActive, setCollectionSeoActive] = useState(false);
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);

@@ -1158,20 +1158,66 @@ const ToolsScreen = () => {
     );
   }
 
+  // ── Tool taxonomy: 6 sections per Phase 5 brief.
+  // Every existing tool ID is preserved; this is purely organisational.
+  const TOOL_SECTIONS: { title: string; ids: string[] }[] = [
+    {
+      title: "Pricing",
+      ids: ["price_lookup", "price_monitor"],
+    },
+    {
+      title: "Marketing & SEO",
+      ids: ["seo", "tags", "collection_seo", "collection_seo_export", "csv_seo", "organic_seo", "geo_agentic", "collab_seo", "auto_collections", "image_optimise", "image_helper", "google_feed", "feed_optimise", "feed_health"],
+    },
+    {
+      title: "Advertising",
+      ids: ["ads_guide", "google_ads_wizard", "meta_ads_wizard", "performance_dash", "social_media"],
+    },
+    {
+      title: "Suppliers & Intelligence",
+      ids: ["supplier_emails", "seasons", "brands", "ai", "learning_memory", "competitor_intel"],
+    },
+    {
+      title: "Import & Export",
+      ids: ["lightspeed_convert", "export_collections", "import_collections"],
+    },
+  ];
+
+  const knownIds = new Set(TOOL_SECTIONS.flatMap(s => s.ids));
+  const others = tools.filter(t => !knownIds.has(t.id));
+  if (others.length > 0) {
+    TOOL_SECTIONS.push({ title: "Other", ids: others.map(t => t.id) });
+  }
+
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
       <h1 className="text-2xl font-bold font-display mb-1">Tools</h1>
-      <p className="text-muted-foreground text-sm mb-6">Power user features</p>
-      <div className="grid grid-cols-2 gap-3">
-        {tools.map((tool) => {
-          const Icon = tool.icon;
+      <p className="text-muted-foreground text-sm mb-6">Every standalone tool, organised by phase.</p>
+      <div className="space-y-6">
+        {TOOL_SECTIONS.map(section => {
+          const sectionTools = section.ids
+            .map(id => tools.find(t => t.id === id))
+            .filter((t): t is typeof tools[number] => Boolean(t));
+          if (sectionTools.length === 0) return null;
           return (
-            <button key={tool.id} onClick={() => setActiveTool(tool.id)}
-              className="bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors">
-              <Icon className={`w-6 h-6 ${tool.color} mb-3`} />
-              <p className="text-sm font-semibold">{tool.label}</p>
-              <p className="text-xs text-muted-foreground mt-1">{tool.desc}</p>
-            </button>
+            <section key={section.title}>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                {section.title}
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                {sectionTools.map((tool) => {
+                  const Icon = tool.icon;
+                  return (
+                    <button key={tool.id} onClick={() => setActiveTool(tool.id)}
+                      className="bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors">
+                      <Icon className={`w-6 h-6 ${tool.color} mb-3`} />
+                      <p className="text-sm font-semibold">{tool.label}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{tool.desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
           );
         })}
       </div>

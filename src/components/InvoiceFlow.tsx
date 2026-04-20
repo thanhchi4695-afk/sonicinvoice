@@ -1124,6 +1124,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     setProcessingCancelled(false);
     setProcessingElapsed(0);
     setShowCompletionSummary(false);
+    persistedRef.current = false;
     cancelledRef.current = false;
     setStep(2);
     setInvoicePageImages([]);

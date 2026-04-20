@@ -4,6 +4,7 @@
  */
 
 import Papa from "papaparse";
+import { matchCollectionsWithBrand } from "./collection-engine";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -97,6 +98,8 @@ interface GroupedProduct {
   imageUrl: string;
   status: string;
   metafields: Record<string, string>;
+  /** #6 Collection assignment — derived from tags + brand via matchCollectionsWithBrand. */
+  collections: string[];
   variants: {
     option1Name: string;
     option1Value: string;
@@ -108,6 +111,15 @@ interface GroupedProduct {
     barcode: string;
     cogs?: string;
   }[];
+}
+
+/** #6 Collection assignment helper — splits a "Tag, Tag" string and derives collections. */
+function deriveCollections(tagsStr: string, brand: string): string[] {
+  const tagList = (tagsStr || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return matchCollectionsWithBrand(tagList, brand || "");
 }
 
 function normalizeBaseTitle(name: string): string {
@@ -135,6 +147,7 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
         imageUrl: ln.imageUrl || "",
         status: ln.status === "active" ? "active" : "draft",
         metafields: ln.metafields || {},
+        collections: deriveCollections(ln.tags || `${ln.brand}, ${ln.type}, New Arrival`, ln.brand),
         variants: [{
           option1Name: "Title",
           option1Value: "Default Title",
@@ -180,6 +193,7 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
         imageUrl: base.imageUrl || "",
         status: base.status === "active" ? "active" : "draft",
         metafields: base.metafields || {},
+        collections: deriveCollections(base.tags || `${base.brand}, ${base.type}, New Arrival`, base.brand),
         variants: [{
           option1Name: "Title",
           option1Value: "Default Title",
@@ -220,6 +234,7 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
       imageUrl: base.imageUrl || "",
       status: base.status === "active" ? "active" : "draft",
       metafields: base.metafields || {},
+      collections: deriveCollections(base.tags || `${base.brand}, ${base.type}, New Arrival`, base.brand),
       variants,
     };
   });
@@ -339,6 +354,8 @@ export function generateShopifyCSV(
         Status: isFirstRow ? prod.status : "",
         "SEO Title": isFirstRow ? prod.seoTitle : "",
         "SEO Description": isFirstRow ? prod.seoDesc : "",
+        // #6 Collection assignment — comma-joined list, used by importers/Shopify push.
+        Collection: isFirstRow ? prod.collections.join(", ") : "",
         ...(v.cogs ? { "Cost per item": v.cogs } : {}),
       };
 
@@ -366,6 +383,11 @@ export function generateShopifyCSV(
     "Variant Requires Shipping", "Variant Taxable", "Variant Weight Unit",
     "Image Src", "Status", "SEO Title", "SEO Description",
   ];
+
+  // #6 Only include Collection column if at least one product has assignments
+  if (rows.some((r) => r.Collection?.trim())) {
+    baseColumns.push("Collection");
+  }
 
   // Only include Cost if any row has it
   if (rows.some(r => r["Cost per item"])) {

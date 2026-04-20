@@ -373,7 +373,7 @@ const Index = () => {
   const renderFlow = () => {
     let flowEl: React.ReactNode = null;
     switch (activeFlow) {
-      case "invoice": flowEl = <InvoiceFlow onBack={() => setActiveFlow(null)} />; break;
+      case "invoice": flowEl = <InvoiceFlow onBack={() => setActiveFlow(null)} onNavigate={(f) => setActiveFlow(f as any)} />; break;
       case "sale": flowEl = <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />; break;
       case "restock": flowEl = <RestockAnalytics onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
       case "price_adjust": flowEl = <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;

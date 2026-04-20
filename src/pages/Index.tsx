@@ -8,6 +8,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 
 // ── Eagerly loaded (critical path) ──
 import HomeWizard from "@/components/HomeWizard";
+import PhaseFlowHome from "@/components/PhaseFlowHome";
 import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
 import StockyLayout from "@/components/StockyLayout";
@@ -505,7 +506,7 @@ const Index = () => {
         </Suspense>
       )}
       {activeTab === "home" && !useStockyDashboard && (
-        <HomeWizard
+        <PhaseFlowHome
           onStartInvoice={() => setActiveFlow("invoice")}
           onStartPackingSlip={() => setActiveFlow("packing_slip")}
           onStartEmailInbox={() => setActiveFlow("email_inbox")}

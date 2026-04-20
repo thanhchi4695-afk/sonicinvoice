@@ -660,31 +660,94 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
 
         {/* Action buttons */}
         <div className="space-y-2">
-          {!applied ? (
+          {saving ? (
+            <div className="bg-card border border-border rounded-lg p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                Saving prices — {saveProgress.current} of {saveProgress.total}…
+              </div>
+              <Progress value={saveProgress.total ? (saveProgress.current / saveProgress.total) * 100 : 0} />
+            </div>
+          ) : !applied ? (
             <>
               <Button variant="teal" className="w-full h-12 text-base" onClick={handleApply} disabled={adjusted.length === 0}>
                 <Check className="w-4 h-4 mr-2" /> Apply to {summary.affected} products
               </Button>
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={handleExportPreview}>
-                  <Download className="w-4 h-4 mr-1" /> Export preview
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={handleExportShopify} disabled={adjusted.length === 0}>
+                  <Download className="w-4 h-4 mr-1" /> Export for Shopify
                 </Button>
-                <Button variant="outline" className="flex-1" onClick={() => setShowSaveTemplate(true)}>
-                  <Save className="w-4 h-4 mr-1" /> Save template
+                <Button variant="outline" onClick={handleExportLightspeed} disabled={adjusted.length === 0}>
+                  <Download className="w-4 h-4 mr-1" /> Export for Lightspeed
                 </Button>
               </div>
+              <Button variant="outline" className="w-full" onClick={() => setShowSaveTemplate(true)}>
+                <Save className="w-4 h-4 mr-1" /> Save template
+              </Button>
             </>
           ) : (
-            <div className="bg-success/10 border border-success/20 rounded-lg p-4 text-center">
-              <p className="text-sm font-semibold text-success">✅ Prices adjusted for {summary.affected} products</p>
-              {showUndo && (
-                <Button variant="outline" size="sm" className="mt-2" onClick={handleUndo}>
-                  Undo ↩
-                </Button>
+            <div className="space-y-2">
+              {saveErrors.length === 0 ? (
+                <div className="bg-success/10 border border-success/20 rounded-lg p-4 text-center">
+                  <p className="text-sm font-semibold text-success">
+                    ✅ {summary.affected} prices updated and saved
+                  </p>
+                  {showUndo && (
+                    <Button variant="outline" size="sm" className="mt-2" onClick={handleUndo}>
+                      Undo ↩
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-destructive">
+                      {summary.affected - saveErrors.length} saved · {saveErrors.length} failed
+                    </p>
+                    <Button variant="outline" size="sm" onClick={handleRetry}>
+                      <RotateCw className="w-3.5 h-3.5 mr-1" /> Retry
+                    </Button>
+                  </div>
+                  <ul className="text-xs space-y-1 max-h-40 overflow-y-auto">
+                    {saveErrors.map((e, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
+                        <span>
+                          <span className="font-semibold">{e.title}</span>
+                          {e.sku && <span className="text-muted-foreground"> ({e.sku})</span>}
+                          <span className="text-muted-foreground"> — {e.reason}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           )}
         </div>
+
+        {/* Confirmation dialog */}
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Update prices for {summary.affected} products?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You are about to update prices for {summary.affected} products. This will overwrite
+                current prices in your catalog{adjusted.some(p => p.shopifyVariantId) ? " and Shopify" : ""}.
+                Continue?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={runApply}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Update prices
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Save template modal */}
         {showSaveTemplate && (

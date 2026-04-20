@@ -1218,7 +1218,9 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       .filter(p => !p._rejected)
       .map(({ _confidence, _confidenceLevel, _issues, _rejected, _rejectReason, ...rest }) => rest);
 
+    console.log('[Phase2 trace] after validate, cleanProducts:', cleanProducts.length, 'rejected:', validated.filter(p=>p._rejected).length);
     if (cleanProducts.length === 0) {
+      console.log('[Phase2 trace] zero-cleanProducts exit, debug:', debug);
       setEnrichLines([{ name: "No valid products found", status: "not_found", action: `${debug.rejected} rows rejected. Check Debug View for details.`, confidence: 0 }]);
       setProcessingDone(true);
       setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));

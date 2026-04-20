@@ -1,14 +1,20 @@
-# Sonic Invoices — Shopify App Configuration
-# https://shopify.dev/docs/apps/tools/cli/configuration
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "3f44206b5d064558111c0f6c9f4fdf76"
-
+client_id = "aebbc68f4f67197beb20489d6d2987e4"
 name = "Sonic Invoices"
 application_url = "https://sonicinvoice.lovable.app"
 embedded = true
 
+[webhooks]
+api_version = "2025-01"
+
+  [[webhooks.subscriptions]]
+  uri = "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-webhooks-privacy"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
 [access_scopes]
-scopes = "read_products,write_products,read_orders,read_inventory,write_inventory"
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_inventory,read_orders,read_products,write_inventory,write_products"
 
 [auth]
 redirect_urls = [
@@ -16,13 +22,6 @@ redirect_urls = [
   "https://sonicinvoice.lovable.app/auth",
   "https://sonicinvoice.lovable.app"
 ]
-
-[webhooks]
-api_version = "2025-01"
-
-  [[webhooks.subscriptions]]
-  compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
-  uri = "https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/shopify-webhooks-privacy"
 
 [pos]
 embedded = false

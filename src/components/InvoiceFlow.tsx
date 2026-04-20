@@ -1376,6 +1376,10 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     setShowCompletionSummary(false);
     setStep(3);
     beginReviewTimer();
+    // Write extracted products to Supabase products + variants tables so
+    // pricing tools (Price Adjustment, Margin Protection, Markdown Ladder)
+    // can see them immediately — no need to wait for Export.
+    persistInvoiceToDb();
     if (!matchedTemplate && supplierName.trim()) {
       setShowSaveTemplate(true);
     }

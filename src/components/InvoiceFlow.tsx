@@ -1232,6 +1232,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     setProductGroups(groups);
 
     // ── Phase 2 DB write ──────────────────────────
+    console.log('[Phase2 reached]', { cleanProductsLen: cleanProducts?.length, firstItem: cleanProducts?.[0] });
     ;(async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();

@@ -507,6 +507,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   };
 
   const syncPhase2Catalog = async (products: ValidatedProduct[], source: "parse" | "reprocess") => {
+    console.log('[SONIC-DEBUG] Invoice processing insertion point reached', { timestamp: new Date().toISOString() });
     const accepted = products.filter((p) => !p._rejected);
     if (accepted.length === 0) {
       console.warn(`[Phase2] no rows from ${source}`);

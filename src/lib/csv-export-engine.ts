@@ -147,6 +147,7 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
         imageUrl: ln.imageUrl || "",
         status: ln.status === "active" ? "active" : "draft",
         metafields: ln.metafields || {},
+        collections: deriveCollections(ln.tags || `${ln.brand}, ${ln.type}, New Arrival`, ln.brand),
         variants: [{
           option1Name: "Title",
           option1Value: "Default Title",
@@ -192,8 +193,7 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
         imageUrl: base.imageUrl || "",
         status: base.status === "active" ? "active" : "draft",
         metafields: base.metafields || {},
-        variants: [{
-          option1Name: "Title",
+        collections: deriveCollections(base.tags || `${base.brand}, ${base.type}, New Arrival`, base.brand),
           option1Value: "Default Title",
           price: base.rrp.toFixed(2),
           compareAtPrice: base.price < base.rrp ? base.rrp.toFixed(2) : "",
@@ -232,6 +232,7 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
       imageUrl: base.imageUrl || "",
       status: base.status === "active" ? "active" : "draft",
       metafields: base.metafields || {},
+      collections: deriveCollections(base.tags || `${base.brand}, ${base.type}, New Arrival`, base.brand),
       variants,
     };
   });

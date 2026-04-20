@@ -90,12 +90,11 @@ const PhaseFiveSixPanel = ({
       const id = p.sku || `row-${i}`;
       try {
         initial[id] = generateTagString({
-          productName: p.name || "",
+          title: p.name || "",
           brand: p.brand || supplierName || "",
           productType: (p as any).type || "",
-          color: p.colour || "",
-          size: p.size || "",
-          rrp: Number(p.rrp) || 0,
+          priceStatus: "full_price",
+          isNew: true,
         });
       } catch {
         initial[id] = "";
@@ -127,9 +126,11 @@ const PhaseFiveSixPanel = ({
   const imageProducts: EnrichedImageProduct[] = useMemo(
     () => accepted.map(p => ({
       title: p.name || "",
-      vendor: p.brand || supplierName || "",
+      sku: p.sku || "",
+      brand: p.brand || supplierName || "",
       colour: p.colour,
-      productType: (p as any).type || "",
+      type: (p as any).type || "",
+      imageSrc: (p as any).image_url || (p as any).imageUrl || "",
     })),
     [accepted, supplierName],
   );

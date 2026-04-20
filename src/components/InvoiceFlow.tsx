@@ -24,6 +24,7 @@ import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource
 import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugInfo } from "@/lib/invoice-validator";
 import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
+import PhaseThreeFourPanel from "@/components/PhaseThreeFourPanel";
 import AccountingBillReview from "@/components/AccountingBillReview";
 import StockCheckFlow from "@/components/StockCheckFlow";
 import PriceLookup from "@/components/PriceLookup";
@@ -2794,6 +2795,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               <Check className="w-3.5 h-3.5 text-success" />
               <span className="text-xs text-success font-medium">Template saved — future {supplierName} invoices will parse faster</span>
             </div>
+          )}
+
+          {/* ── Phase 3 + 4 — Stock check & enrichment (additive, mounts above review) ── */}
+          {validatedProducts.length > 0 && (
+            <PhaseThreeFourPanel
+              products={validatedProducts}
+              supplierName={supplierName}
+            />
           )}
 
           {/* Post-Parse Review Screen */}

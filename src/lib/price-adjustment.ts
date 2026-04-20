@@ -41,6 +41,10 @@ export interface ProductForAdjustment {
   currentPrice: number;
   compareAtPrice: number | null;
   costPrice: number;
+  /** Optional: SKU used for Supabase lookup when persisting */
+  sku?: string;
+  /** Optional: Shopify variant GID (gid://shopify/ProductVariant/...) */
+  shopifyVariantId?: string;
 }
 
 export interface AdjustedProduct extends ProductForAdjustment {

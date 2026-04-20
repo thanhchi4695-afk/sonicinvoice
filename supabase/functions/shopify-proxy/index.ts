@@ -764,6 +764,65 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "update_variant_price": {
+        if (!body.variant_id || body.price === undefined) {
+          return new Response(JSON.stringify({ error: "Missing variant_id or price" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Normalise to GID
+        const variantGid = String(body.variant_id).startsWith("gid://")
+          ? String(body.variant_id)
+          : `gid://shopify/ProductVariant/${body.variant_id}`;
+        const priceGqlUrl = `https://${store_url}/admin/api/${conn.api_version}/graphql.json`;
+        // Look up parent product GID
+        const lookupQuery = `{ productVariant(id: "${variantGid}") { id product { id } } }`;
+        const lookupResp = await fetch(priceGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({ query: lookupQuery }),
+        });
+        const lookupData = await lookupResp.json();
+        const productGid = lookupData.data?.productVariant?.product?.id;
+        if (!productGid) {
+          return new Response(JSON.stringify({ error: "Variant not found" }), {
+            status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const variantsInput: Record<string, unknown> = {
+          id: variantGid,
+          price: String(parseFloat(body.price).toFixed(2)),
+        };
+        if (body.compare_at_price !== undefined && body.compare_at_price !== null) {
+          variantsInput.compareAtPrice = String(parseFloat(body.compare_at_price).toFixed(2));
+        }
+        const updateMutation = `
+          mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+            productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+              productVariants { id price compareAtPrice }
+              userErrors { field message }
+            }
+          }
+        `;
+        const updateResp = await fetch(priceGqlUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": access_token },
+          body: JSON.stringify({
+            query: updateMutation,
+            variables: { productId: productGid, variants: [variantsInput] },
+          }),
+        });
+        const updateData = await updateResp.json();
+        const priceErrors = updateData.data?.productVariantsBulkUpdate?.userErrors || [];
+        if (priceErrors.length > 0) {
+          return new Response(JSON.stringify({ error: priceErrors.map((e: any) => e.message).join(", ") }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { variant: updateData.data?.productVariantsBulkUpdate?.productVariants?.[0], success: true };
+        break;
+      }
+
       case "update_image_alt": {
         if (!body.image_updates || body.image_updates.length === 0) {
           return new Response(JSON.stringify({ error: "Missing image_updates" }), {

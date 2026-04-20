@@ -2,12 +2,16 @@ import { useState, useMemo, useCallback } from "react";
 import {
   ChevronLeft, Sparkles, Percent, TrendingUp, Target, X as XIcon,
   ChevronDown, ChevronUp, AlertTriangle, Check, Download, Copy, Trash2, Save,
-  DollarSign, ShoppingCart,
+  DollarSign, ShoppingCart, Loader2, RotateCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   type AdjustmentType, type AdjustField, type PriceRounding,
   type AdjustmentFilter, type AdjustmentRule, type AdjustmentTemplate,
@@ -20,6 +24,7 @@ import {
 import { useInvoiceSession } from "@/stores/invoice-session-store";
 import InvoiceSessionBanner from "@/components/InvoiceSessionBanner";
 import { supabase } from "@/integrations/supabase/client";
+import { updateVariantPrice } from "@/lib/shopify-api";
 import { toast } from "sonner";
 
 interface Props {
@@ -73,6 +78,7 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
       currentPrice: Number(p.rrp) || 0,
       compareAtPrice: null,
       costPrice: Number(p.unit_cost) || 0,
+      sku: p.sku || undefined,
     })),
     [sessionProducts],
   );
@@ -97,6 +103,11 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
   const [showGuardrails, setShowGuardrails] = useState(false);
   const [applied, setApplied] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
+  // Save flow
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState({ current: 0, total: 0 });
+  const [saveErrors, setSaveErrors] = useState<{ title: string; sku?: string; reason: string }[]>([]);
 
   // Derived
   const allBrands = useMemo(() => [...new Set(products.map(p => p.vendor))].sort(), [products]);
@@ -154,11 +165,83 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
     }
   }, [aiInstruction, products, allBrands, allTypes, allTags]);
 
-  const handleApply = () => {
+  const runApply = useCallback(async () => {
+    setConfirmOpen(false);
+    setSaving(true);
+    setSaveErrors([]);
+    setApplied(false);
+    setSaveProgress({ current: 0, total: adjusted.length });
+
+    const errors: { title: string; sku?: string; reason: string }[] = [];
+    let done = 0;
+
+    for (const p of adjusted) {
+      try {
+        if (!p.sku) {
+          errors.push({ title: p.title, reason: "Missing SKU — cannot match catalog" });
+        } else {
+          // 1. Persist to Supabase variants by SKU
+          const { data: variantRows, error: vErr } = await supabase
+            .from("variants")
+            .update({ retail_price: Number(p.newPrice.toFixed(2)) })
+            .eq("sku", p.sku)
+            .select("id, shopify_variant_id");
+          if (vErr) throw new Error(vErr.message);
+          if (!variantRows || variantRows.length === 0) {
+            errors.push({ title: p.title, sku: p.sku, reason: "SKU not found in catalog" });
+          } else {
+            // 2. Push to Shopify if linked
+            const shopifyId = (p.shopifyVariantId as string | undefined)
+              || variantRows.find(r => r.shopify_variant_id)?.shopify_variant_id;
+            if (shopifyId) {
+              try {
+                await updateVariantPrice(
+                  String(shopifyId),
+                  p.newPrice.toFixed(2),
+                  p.compareAtPrice != null ? Number(p.compareAtPrice).toFixed(2) : null,
+                );
+              } catch (e) {
+                errors.push({
+                  title: p.title, sku: p.sku,
+                  reason: `Saved locally; Shopify failed: ${e instanceof Error ? e.message : "unknown"}`,
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        errors.push({
+          title: p.title, sku: p.sku,
+          reason: e instanceof Error ? e.message : "Unknown error",
+        });
+      }
+      done += 1;
+      setSaveProgress({ current: done, total: adjusted.length });
+    }
+
+    setSaveErrors(errors);
+    setSaving(false);
     setApplied(true);
     setShowUndo(true);
-    toast.success(`Prices adjusted for ${summary.affected} products`);
     setTimeout(() => setShowUndo(false), 10000);
+
+    const succeeded = adjusted.length - errors.length;
+    if (errors.length === 0) {
+      toast.success(`✅ ${succeeded} prices updated and saved`);
+    } else if (succeeded > 0) {
+      toast.warning(`${succeeded} saved · ${errors.length} failed`);
+    } else {
+      toast.error(`Failed to save ${errors.length} prices`);
+    }
+  }, [adjusted]);
+
+  const handleApply = () => {
+    if (adjusted.length === 0) return;
+    setConfirmOpen(true);
+  };
+
+  const handleRetry = () => {
+    runApply();
   };
 
   const handleUndo = () => {
@@ -195,21 +278,39 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
     toast("Template deleted");
   };
 
-  const handleExportPreview = () => {
-    const csv = [
-      "Product,Brand,Current Price,New Price,Change %",
-      ...adjusted.map(p =>
-        `"${p.title}","${p.vendor}",${p.currentPrice.toFixed(2)},${p.newPrice.toFixed(2)},${p.changePercent.toFixed(1)}%`
-      ),
-    ].join("\n");
+  const slugify = (s: string) =>
+    s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  const downloadCsv = (csv: string, filename: string) => {
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `price_adjustment_preview_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
-    toast.success("Preview CSV downloaded");
+  };
+
+  const handleExportShopify = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = [
+      "Handle,Title,Variant SKU,Variant Price,Variant Compare At Price",
+      ...adjusted.map(p => {
+        const handle = slugify(p.sku || p.handle || p.title);
+        const sku = p.sku || "";
+        return `"${handle}","${p.title.replace(/"/g, '""')}","${sku}",${p.newPrice.toFixed(2)},${p.currentPrice.toFixed(2)}`;
+      }),
+    ].join("\n");
+    downloadCsv(rows, `price-update-shopify-${today}.csv`);
+    toast.success("Shopify CSV downloaded");
+  };
+
+  const handleExportLightspeed = () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = [
+      "sku,price_including_tax",
+      ...adjusted.map(p => `"${p.sku || ""}",${p.newPrice.toFixed(2)}`),
+    ].join("\n");
+    downloadCsv(rows, `price-update-lightspeed-${today}.csv`);
+    toast.success("Lightspeed CSV downloaded");
   };
 
   // Inline filter toggle helper
@@ -559,31 +660,94 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
 
         {/* Action buttons */}
         <div className="space-y-2">
-          {!applied ? (
+          {saving ? (
+            <div className="bg-card border border-border rounded-lg p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                Saving prices — {saveProgress.current} of {saveProgress.total}…
+              </div>
+              <Progress value={saveProgress.total ? (saveProgress.current / saveProgress.total) * 100 : 0} />
+            </div>
+          ) : !applied ? (
             <>
               <Button variant="teal" className="w-full h-12 text-base" onClick={handleApply} disabled={adjusted.length === 0}>
                 <Check className="w-4 h-4 mr-2" /> Apply to {summary.affected} products
               </Button>
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={handleExportPreview}>
-                  <Download className="w-4 h-4 mr-1" /> Export preview
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={handleExportShopify} disabled={adjusted.length === 0}>
+                  <Download className="w-4 h-4 mr-1" /> Export for Shopify
                 </Button>
-                <Button variant="outline" className="flex-1" onClick={() => setShowSaveTemplate(true)}>
-                  <Save className="w-4 h-4 mr-1" /> Save template
+                <Button variant="outline" onClick={handleExportLightspeed} disabled={adjusted.length === 0}>
+                  <Download className="w-4 h-4 mr-1" /> Export for Lightspeed
                 </Button>
               </div>
+              <Button variant="outline" className="w-full" onClick={() => setShowSaveTemplate(true)}>
+                <Save className="w-4 h-4 mr-1" /> Save template
+              </Button>
             </>
           ) : (
-            <div className="bg-success/10 border border-success/20 rounded-lg p-4 text-center">
-              <p className="text-sm font-semibold text-success">✅ Prices adjusted for {summary.affected} products</p>
-              {showUndo && (
-                <Button variant="outline" size="sm" className="mt-2" onClick={handleUndo}>
-                  Undo ↩
-                </Button>
+            <div className="space-y-2">
+              {saveErrors.length === 0 ? (
+                <div className="bg-success/10 border border-success/20 rounded-lg p-4 text-center">
+                  <p className="text-sm font-semibold text-success">
+                    ✅ {summary.affected} prices updated and saved
+                  </p>
+                  {showUndo && (
+                    <Button variant="outline" size="sm" className="mt-2" onClick={handleUndo}>
+                      Undo ↩
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-destructive">
+                      {summary.affected - saveErrors.length} saved · {saveErrors.length} failed
+                    </p>
+                    <Button variant="outline" size="sm" onClick={handleRetry}>
+                      <RotateCw className="w-3.5 h-3.5 mr-1" /> Retry
+                    </Button>
+                  </div>
+                  <ul className="text-xs space-y-1 max-h-40 overflow-y-auto">
+                    {saveErrors.map((e, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
+                        <span>
+                          <span className="font-semibold">{e.title}</span>
+                          {e.sku && <span className="text-muted-foreground"> ({e.sku})</span>}
+                          <span className="text-muted-foreground"> — {e.reason}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           )}
         </div>
+
+        {/* Confirmation dialog */}
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Update prices for {summary.affected} products?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You are about to update prices for {summary.affected} products. This will overwrite
+                current prices in your catalog{adjusted.some(p => p.shopifyVariantId) ? " and Shopify" : ""}.
+                Continue?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={runApply}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Update prices
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Save template modal */}
         {showSaveTemplate && (

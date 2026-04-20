@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { ChevronLeft, ShieldCheck, ShieldAlert, ShieldX, HelpCircle, TrendingUp, AlertTriangle, Download } from "lucide-react";
+import { ChevronLeft, ShieldCheck, ShieldAlert, ShieldX, HelpCircle, TrendingUp, AlertTriangle, Download, Loader2 } from "lucide-react";
 import {
   getMarginSettings, saveMarginSettings, bulkMarginCheck,
   marginStatusColor, marginStatusBg, getMarginAuditLog,
@@ -14,44 +14,107 @@ import {
 } from "@/lib/margin-protection";
 import { useInvoiceSession } from "@/stores/invoice-session-store";
 import InvoiceSessionBanner from "@/components/InvoiceSessionBanner";
+import { supabase } from "@/integrations/supabase/client";
+
+interface VariantRow {
+  id: string;
+  sku: string | null;
+  cost: number | null;
+  retail_price: number | null;
+  product_title: string;
+  vendor: string | null;
+}
 
 export default function MarginProtectionPanel({ onBack }: { onBack: () => void }) {
   const [settings, setSettings] = useState<MarginSettings>(getMarginSettings);
   const [activeTab, setActiveTab] = useState("dashboard");
   const { sessionProducts, hasSession } = useInvoiceSession();
 
-  // Prefer invoice session products; fall back to legacy localStorage invoice_lines
+  const [variants, setVariants] = useState<VariantRow[]>([]);
+  const [noCostCount, setNoCostCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch from Supabase variants joined with product titles
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoading(false); return; }
+
+      // Total count (incl. null cost) for "No Cost" stat
+      const { count: totalCount } = await supabase
+        .from("variants")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      const { data, error } = await supabase
+        .from("variants")
+        .select("id, sku, cost, retail_price, products(title, vendor)")
+        .eq("user_id", user.id)
+        .not("cost", "is", null)
+        .not("retail_price", "is", null);
+
+      if (cancelled) return;
+      if (error) {
+        console.error(error);
+        toast.error("Failed to load catalog variants");
+      } else {
+        const rows: VariantRow[] = (data || []).map((v: any) => ({
+          id: v.id,
+          sku: v.sku,
+          cost: v.cost != null ? Number(v.cost) : null,
+          retail_price: v.retail_price != null ? Number(v.retail_price) : null,
+          product_title: v.products?.title || v.sku || "Untitled",
+          vendor: v.products?.vendor ?? null,
+        }));
+        setVariants(rows);
+        setNoCostCount(Math.max(0, (totalCount ?? 0) - rows.length));
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Build product list: prefer Supabase variants, fall back to invoice session
   const products = useMemo(() => {
+    if (variants.length > 0) {
+      return variants.map(v => ({
+        handle: (v.sku || v.product_title).toLowerCase().replace(/\s+/g, "-"),
+        title: v.product_title,
+        price: v.retail_price ?? 0,
+        costPrice: v.cost ?? 0,
+        sku: v.sku || "",
+        vendor: v.vendor || "",
+      }));
+    }
     if (hasSession) {
       return sessionProducts.map(p => ({
         handle: (p.sku || p.product_title).toLowerCase().replace(/\s+/g, "-"),
         title: p.product_title,
         price: Number(p.rrp) || 0,
         costPrice: Number(p.unit_cost) || 0,
+        sku: p.sku || "",
+        vendor: p.vendor || "",
       }));
     }
-    try {
-      const raw = localStorage.getItem("invoice_lines");
-      if (!raw) return [];
-      const lines = JSON.parse(raw);
-      return lines.map((l: any) => ({
-        handle: l.sku || l.title?.toLowerCase().replace(/\s+/g, "-") || "unknown",
-        title: l.title || l.product_name || "Untitled",
-        price: l.price || l.rrp || 0,
-        costPrice: l.cost || l.costPrice || 0,
-      }));
-    } catch { return []; }
-  }, [hasSession, sessionProducts]);
-
+    return [];
+  }, [variants, hasSession, sessionProducts]);
 
   const summary: BulkMarginSummary = useMemo(
     () => bulkMarginCheck(products, settings),
     [products, settings]
   );
 
+  // Override noCost with DB count if we have variants from DB
+  const displayNoCost = variants.length > 0 ? noCostCount : summary.noCost;
+
   const auditLog = useMemo(() => getMarginAuditLog().slice(0, 50), []);
 
   const minPriceFor = (cost: number) => cost / (1 - settings.globalMinMargin / 100);
+
+  const findProductMeta = (handle: string) =>
+    products.find(p => p.handle === handle);
 
   const exportPriceFloor = () => {
     const blocked = summary.results.filter(r => r.status === "blocked" && r.cost);
@@ -61,12 +124,12 @@ export default function MarginProtectionPanel({ onBack }: { onBack: () => void }
     }
     const headers = ["Product", "Brand", "SKU", "Current RRP", "Min Price Required", "Current Margin %", "Target Margin %"];
     const rows = blocked.map(r => {
-      const sp = sessionProducts.find(p => (p.sku || p.product_title).toLowerCase().replace(/\s+/g, "-") === r.handle);
+      const meta = findProductMeta(r.handle);
       const minPrice = r.cost ? minPriceFor(r.cost) : 0;
       return [
         `"${r.title.replace(/"/g, '""')}"`,
-        `"${(sp?.vendor || "").replace(/"/g, '""')}"`,
-        `"${sp?.sku || ""}"`,
+        `"${(meta?.vendor || "").replace(/"/g, '""')}"`,
+        `"${meta?.sku || ""}"`,
         r.price.toFixed(2),
         minPrice.toFixed(2),
         r.margin_percentage?.toFixed(1) || "",
@@ -74,14 +137,40 @@ export default function MarginProtectionPanel({ onBack }: { onBack: () => void }
       ].join(",");
     });
     const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    downloadCsv(csv, `margin-protection-${new Date().toISOString().slice(0, 10)}.csv`);
+    toast.success(`Exported ${blocked.length} blocked products`);
+  };
+
+  const exportMarginReport = () => {
+    if (summary.results.length === 0) {
+      toast.info("No products to export");
+      return;
+    }
+    const headers = ["Product", "SKU", "Cost", "RRP", "Gross Margin %", "Status", "Min Safe Price"];
+    const rows = summary.results.map(r => {
+      const meta = findProductMeta(r.handle);
+      const minPrice = r.cost ? minPriceFor(r.cost) : 0;
+      return [
+        `"${r.title.replace(/"/g, '""')}"`,
+        `"${meta?.sku || ""}"`,
+        r.cost != null ? r.cost.toFixed(2) : "",
+        r.price.toFixed(2),
+        r.margin_percentage != null ? r.margin_percentage.toFixed(1) : "",
+        r.status,
+        minPrice ? minPrice.toFixed(2) : "",
+      ].join(",");
+    });
+    const csv = [headers.join(","), ...rows].join("\n");
+    downloadCsv(csv, `margin-report-${new Date().toISOString().slice(0, 10)}.csv`);
+    toast.success(`Exported ${summary.results.length} products`);
+  };
+
+  const downloadCsv = (csv: string, filename: string) => {
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `margin-protection-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
+    a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${blocked.length} blocked products`);
   };
 
   const updateSetting = <K extends keyof MarginSettings>(key: K, val: MarginSettings[K]) => {
@@ -98,6 +187,13 @@ export default function MarginProtectionPanel({ onBack }: { onBack: () => void }
       case "no_cost": return <HelpCircle className="w-4 h-4 text-muted-foreground" />;
     }
   };
+
+  const emptyMessage = (
+    <Card className="border-dashed"><CardContent className="p-8 text-center text-muted-foreground text-sm">
+      No products with cost data found. Process an invoice to load products with cost prices,
+      or add cost prices to your existing catalog products.
+    </CardContent></Card>
+  );
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 pb-32">
@@ -123,7 +219,7 @@ export default function MarginProtectionPanel({ onBack }: { onBack: () => void }
               { label: "Safe", count: summary.safe, color: "text-primary", bg: "bg-primary/15", icon: <ShieldCheck className="w-5 h-5" /> },
               { label: "Warning", count: summary.warning, color: "text-warning", bg: "bg-warning/15", icon: <ShieldAlert className="w-5 h-5" /> },
               { label: "Blocked", count: summary.blocked, color: "text-destructive", bg: "bg-destructive/15", icon: <ShieldX className="w-5 h-5" /> },
-              { label: "No Cost", count: summary.noCost, color: "text-muted-foreground", bg: "bg-muted", icon: <HelpCircle className="w-5 h-5" /> },
+              { label: "No Cost", count: displayNoCost, color: "text-muted-foreground", bg: "bg-muted", icon: <HelpCircle className="w-5 h-5" /> },
             ] as const).map((s, i) => (
               <Card key={i} className="border-border">
                 <CardContent className="p-4 text-center">
@@ -153,11 +249,11 @@ export default function MarginProtectionPanel({ onBack }: { onBack: () => void }
             </CardContent>
           </Card>
 
-          {summary.total === 0 && (
+          {loading ? (
             <Card className="border-dashed"><CardContent className="p-8 text-center text-muted-foreground text-sm">
-              No products loaded. Import an invoice to see margin analysis.
+              <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading catalog…
             </CardContent></Card>
-          )}
+          ) : summary.total === 0 ? emptyMessage : null}
 
           {summary.blocked > 0 && (
             <Card className="border-destructive/30 mb-4">
@@ -170,52 +266,67 @@ export default function MarginProtectionPanel({ onBack }: { onBack: () => void }
               </CardContent>
             </Card>
           )}
+
+          {summary.total > 0 && (
+            <div className="flex justify-end">
+              <Button size="sm" variant="outline" onClick={exportMarginReport}>
+                <Download className="w-3.5 h-3.5 mr-1" /> Export margin report
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         {/* ── Products ── */}
         <TabsContent value="products">
-          {summary.total === 0 ? (
+          {loading ? (
             <Card className="border-dashed"><CardContent className="p-8 text-center text-muted-foreground text-sm">
-              No products loaded. Import an invoice first.
+              <Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Loading…
             </CardContent></Card>
-          ) : (
+          ) : summary.total === 0 ? emptyMessage : (
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mb-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mb-2 flex-wrap gap-2">
                 <span>{summary.total} products</span>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span>{summary.safe} safe · {summary.warning} warning · {summary.blocked} blocked</span>
+                  <Button size="sm" variant="outline" onClick={exportMarginReport} className="h-7 text-xs">
+                    <Download className="w-3 h-3 mr-1" /> Margin report
+                  </Button>
                   {summary.blocked > 0 && (
                     <Button size="sm" variant="outline" onClick={exportPriceFloor} className="h-7 text-xs">
-                      <Download className="w-3 h-3 mr-1" /> Export price floor list
+                      <Download className="w-3 h-3 mr-1" /> Price floor
                     </Button>
                   )}
                 </div>
               </div>
-              {summary.results.map((r, i) => (
-                <div key={i} className={`p-3 rounded-lg border ${r.status === "blocked" ? "border-destructive/30 bg-destructive/5" : r.status === "warning" ? "border-warning/30 bg-warning/5" : "border-border"}`}>
-                  <div className="flex items-center gap-3">
-                    {statusIcon(r.status)}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{r.title}</p>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                        <span>Cost: {r.cost !== null ? `$${r.cost.toFixed(2)}` : "—"}</span>
-                        <span>Price: ${r.price.toFixed(2)}</span>
-                        <span className={marginStatusColor(r.status)}>
-                          {r.margin_percentage !== null ? `${r.margin_percentage.toFixed(1)}%` : "—"}
-                        </span>
+              {summary.results.map((r, i) => {
+                const meta = findProductMeta(r.handle);
+                return (
+                  <div key={i} className={`p-3 rounded-lg border ${r.status === "blocked" ? "border-destructive/30 bg-destructive/5" : r.status === "warning" ? "border-warning/30 bg-warning/5" : "border-border"}`}>
+                    <div className="flex items-center gap-3">
+                      {statusIcon(r.status)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{r.title}</p>
+                        {meta?.sku && <p className="text-[10px] text-muted-foreground font-mono">SKU: {meta.sku}</p>}
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                          <span>Cost: {r.cost !== null ? `$${r.cost.toFixed(2)}` : "—"}</span>
+                          <span>RRP: ${r.price.toFixed(2)}</span>
+                          <span className={marginStatusColor(r.status)}>
+                            Margin: {r.margin_percentage !== null ? `${r.margin_percentage.toFixed(1)}%` : "—"}
+                          </span>
+                        </div>
                       </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${marginStatusBg(r.status)} ${marginStatusColor(r.status)}`}>
+                        {r.status}
+                      </span>
                     </div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${marginStatusBg(r.status)} ${marginStatusColor(r.status)}`}>
-                      {r.status}
-                    </span>
+                    {r.status === "blocked" && r.cost && (
+                      <div className="mt-2 ml-7 text-xs text-destructive">
+                        Min price at {settings.globalMinMargin}% margin: <span className="font-semibold">${minPriceFor(r.cost).toFixed(2)}</span>
+                      </div>
+                    )}
                   </div>
-                  {r.status === "blocked" && r.cost && (
-                    <div className="mt-2 ml-7 text-xs text-destructive">
-                      Minimum price at {settings.globalMinMargin}% margin: <span className="font-semibold">${minPriceFor(r.cost).toFixed(2)}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </TabsContent>

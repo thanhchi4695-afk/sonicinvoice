@@ -17,6 +17,8 @@ import { checkMargin, getMarginSettings } from "@/lib/margin-protection";
 import { addAuditEntry } from "@/lib/audit-log";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useInvoiceSession } from "@/stores/invoice-session-store";
+import InvoiceSessionBanner from "@/components/InvoiceSessionBanner";
 
 /* ─── Types ─── */
 
@@ -80,6 +82,7 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
   const [ladders, setLadders] = useState<Ladder[]>([]);
   const [ladderItems, setLadderItems] = useState<LadderItem[]>([]);
   const [showWizard, setShowWizard] = useState(false);
+  const { sessionProducts: invoiceSessionProducts, hasSession } = useInvoiceSession();
   const [wizardStep, setWizardStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -92,7 +95,7 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
   const [newLadder, setNewLadder] = useState({
     name: "",
     trigger_type: "time" as string,
-    selection_type: "dead_stock" as string,
+    selection_type: hasSession ? "current_invoice" : "dead_stock" as string,
     selection_value: "",
     stages: [
       { stageNumber: 1, discountPercent: 20, triggerDays: 30 },
@@ -166,8 +169,27 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
 
   /* ─── Product selection for wizard ─── */
 
+  const invoiceAsAvailable = useMemo(
+    () => invoiceSessionProducts.map((p, i) => ({
+      variantId: `invoice-${p.sku || i}`,
+      productTitle: p.product_title,
+      vendor: p.vendor || null,
+      sku: p.sku || null,
+      color: null as string | null,
+      size: null as string | null,
+      retailPrice: Number(p.rrp) || 0,
+      cost: Number(p.unit_cost) || 0,
+      lastSaleAt: null as string | null,
+      daysSinceLastSale: 0,
+    })),
+    [invoiceSessionProducts],
+  );
+
   const selectedProducts = useMemo(() => {
     const { selection_type, selection_value } = newLadder;
+    if (selection_type === "current_invoice") {
+      return invoiceAsAvailable.filter(p => p.retailPrice > 0);
+    }
     if (selection_type === "dead_stock") {
       return availableProducts.filter(p => p.daysSinceLastSale >= 60 && p.retailPrice > 0);
     }
@@ -175,7 +197,7 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
       return availableProducts.filter(p => p.vendor?.toLowerCase() === selection_value.toLowerCase());
     }
     return availableProducts.filter(p => p.retailPrice > 0);
-  }, [newLadder.selection_type, newLadder.selection_value, availableProducts]);
+  }, [newLadder.selection_type, newLadder.selection_value, availableProducts, invoiceAsAvailable]);
 
   /* ─── Margin check helper ─── */
 
@@ -411,6 +433,9 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
               <Select value={newLadder.selection_type} onValueChange={v => setNewLadder({ ...newLadder, selection_type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  {hasSession && (
+                    <SelectItem value="current_invoice">Current invoice ({invoiceSessionProducts.length} products)</SelectItem>
+                  )}
                   <SelectItem value="dead_stock">Dead stock (no sales in 60+ days)</SelectItem>
                   <SelectItem value="vendor">Vendor</SelectItem>
                   <SelectItem value="tag">Products with tag</SelectItem>
@@ -640,6 +665,8 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
           </Button>
         </div>
       </div>
+
+      <InvoiceSessionBanner />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full mb-4">

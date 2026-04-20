@@ -17,6 +17,8 @@ import {
   loadTemplates, saveTemplate, deleteTemplate,
   applyPriceRounding,
 } from "@/lib/price-adjustment";
+import { useInvoiceSession } from "@/stores/invoice-session-store";
+import InvoiceSessionBanner from "@/components/InvoiceSessionBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -57,7 +59,27 @@ const DEMO_PRODUCTS: ProductForAdjustment[] = [
 ];
 
 const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => {
-  const products = externalProducts && externalProducts.length > 0 ? externalProducts : DEMO_PRODUCTS;
+  const { sessionProducts, hasSession } = useInvoiceSession();
+  const [source, setSource] = useState<"invoice" | "catalog">(hasSession ? "invoice" : "catalog");
+
+  // Map invoice session products → ProductForAdjustment shape
+  const invoiceProducts: ProductForAdjustment[] = useMemo(
+    () => sessionProducts.map(p => ({
+      handle: (p.sku || p.product_title).toLowerCase().replace(/\s+/g, "-"),
+      title: p.product_title,
+      vendor: p.vendor || "Unknown",
+      type: "",
+      tags: [],
+      currentPrice: Number(p.rrp) || 0,
+      compareAtPrice: null,
+      costPrice: Number(p.unit_cost) || 0,
+    })),
+    [sessionProducts],
+  );
+
+  const products = externalProducts && externalProducts.length > 0
+    ? externalProducts
+    : (source === "invoice" && invoiceProducts.length > 0 ? invoiceProducts : DEMO_PRODUCTS);
 
   // Filter state
   const [filter, setFilter] = useState<AdjustmentFilter>({ ...DEFAULT_FILTER });
@@ -203,6 +225,26 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
       </div>
 
       <div className="px-4 pt-4 space-y-4">
+        <InvoiceSessionBanner />
+
+        {hasSession && !externalProducts && (
+          <div className="flex items-center gap-2 text-xs flex-wrap">
+            <span className="text-muted-foreground">Show:</span>
+            <button
+              onClick={() => setSource("invoice")}
+              className={`px-3 py-1.5 rounded-full border transition-colors ${source === "invoice" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+            >
+              Current invoice ({invoiceProducts.length} products)
+            </button>
+            <button
+              onClick={() => setSource("catalog")}
+              className={`px-3 py-1.5 rounded-full border transition-colors ${source === "catalog" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+            >
+              All catalog
+            </button>
+          </div>
+        )}
+
         {/* Templates bar */}
         {templates.length > 0 && (
           <div>

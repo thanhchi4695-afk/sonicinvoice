@@ -494,6 +494,55 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
     }
   };
 
+  const syncPhase2Catalog = async (products: ValidatedProduct[], source: "parse" | "reprocess") => {
+    const accepted = products.filter((p) => !p._rejected);
+    if (accepted.length === 0) {
+      console.warn(`[Phase2] no rows from ${source}`);
+      return;
+    }
+
+    const savingToastId = toast.loading("Saving to catalog…", {
+      description: "Adding extracted products to your inventory.",
+    });
+
+    try {
+      console.log("[Phase2] writing", accepted.length, "rows from", source);
+      const result = await syncInvoiceItemsToCatalog(
+        accepted.map((item) => ({
+          product_title: item.name || "Untitled",
+          vendor: item.brand || supplierName || undefined,
+          sku: item.sku || undefined,
+          colour: item.colour || undefined,
+          size: item.size || undefined,
+          unit_cost: Number(item.cost) || 0,
+          rrp: Number(item.rrp) || 0,
+          qty: Number(item.qty) || 0,
+        })),
+      );
+
+      if (result.written > 0) {
+        toast.success(`✅ ${result.written} ${result.written === 1 ? "variant" : "variants"} saved to catalog`, {
+          id: savingToastId,
+          description: "Price Adjustment, Margin Protection, and Markdown Ladder can now use these products.",
+        });
+      } else {
+        toast.dismiss(savingToastId);
+      }
+
+      if (result.failed > 0) {
+        console.warn("[Phase2] catalog sync failures:", result.errors);
+        toast.warning(`${result.failed} product${result.failed === 1 ? "" : "s"} could not be saved`, {
+          description: result.errors.slice(0, 2).join(" · ") || "Please retry after review.",
+        });
+      }
+
+      console.log("[Phase2] done:", result.written, "written,", result.failed, "failed");
+    } catch (e: any) {
+      console.warn("[Phase2] caught:", e?.message || "Unknown error");
+      toast.error("Catalog save failed", { id: savingToastId, description: e?.message || "Unknown error" });
+    }
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -592,7 +641,6 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           setProcessingDone(true);
           setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
           setShowCompletionSummary(true);
-          void persistInvoiceToDb();
           const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
           history.unshift({
             supplier: supplierName || "Unknown",
@@ -1234,71 +1282,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
 
     const groups = convertToProductGroups(cleanProducts);
     setProductGroups(groups);
-
-    // ── Phase 2 DB write ──────────────────────────
-    console.log('[Phase2 reached]', { cleanProductsLen: cleanProducts?.length, firstItem: cleanProducts?.[0] });
-    ;(async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user?.id) {
-          console.warn('[Phase2] no user id');
-          return;
-        }
-        const rows = cleanProducts;
-        if (!Array.isArray(rows) || !rows.length) {
-          console.warn('[Phase2] no rows:', typeof rows, rows?.length);
-          return;
-        }
-        console.log('[Phase2] writing', rows.length, 'rows');
-        await Promise.all(rows.map(async (item: any) => {
-          const title =
-            item.product_title ?? item.title ??
-            item.style_name ?? item.name ?? 'Unknown';
-          const vendor =
-            item.vendor ?? item.supplier ??
-            item.brand ?? supplierName ?? 'Unknown';
-          const sku =
-            item.sku ?? item.style_number ??
-            item.style_code ?? item.code ?? null;
-          const cost = parseFloat(
-            item.unit_cost ?? item.cost ??
-            item.cost_ex_gst ?? 0);
-          const retail_price = parseFloat(
-            item.rrp ?? item.retail_price ??
-            item.rrp_incl_gst ?? 0);
-          const { data: prod, error: pe } =
-            await supabase.from('products')
-              .upsert({
-                user_id: user.id, title, vendor,
-                source: 'invoice_unreviewed',
-                updated_at: new Date().toISOString()
-              } as any, { onConflict: 'user_id,title,vendor' })
-              .select('id').single();
-          if (pe || !prod?.id) {
-            console.warn('[Phase2] product err:', pe?.message, title);
-            return;
-          }
-          if (!sku) {
-            console.warn('[Phase2] no sku:', title);
-            return;
-          }
-          const { error: ve } =
-            await supabase.from('variants')
-              .upsert({
-                user_id: user.id,
-                product_id: prod.id,
-                sku, cost, retail_price,
-                source: 'invoice_unreviewed',
-                updated_at: new Date().toISOString()
-              } as any, { onConflict: 'user_id,sku' });
-          if (ve) console.warn('[Phase2] variant err:', ve.message, sku);
-        }));
-        console.log('[Phase2] done:', rows.length);
-      } catch (e: any) {
-        console.warn('[Phase2] caught:', e?.message);
-      }
-    })();
-    // ── End Phase 2 ───────────────────────────────
+    void syncPhase2Catalog(validated, "parse");
 
     const names = groups.map(g => g.name);
     setParsedNames(names);
@@ -1439,70 +1423,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         const groups = convertToProductGroups(cleanProducts);
         setProductGroups(groups);
         setParsedNames(groups.map(g => g.name));
-
-        // ── Phase 2 DB write ──────────────────────────
-        ;(async () => {
-          try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user?.id) {
-              console.warn('[Phase2] no user id');
-              return;
-            }
-            const rows = cleanProducts;
-            if (!Array.isArray(rows) || !rows.length) {
-              console.warn('[Phase2] no rows:', typeof rows, rows?.length);
-              return;
-            }
-            console.log('[Phase2] writing', rows.length, 'rows');
-            await Promise.all(rows.map(async (item: any) => {
-              const title =
-                item.product_title ?? item.title ??
-                item.style_name ?? item.name ?? 'Unknown';
-              const vendor =
-                item.vendor ?? item.supplier ??
-                item.brand ?? supplierName ?? 'Unknown';
-              const sku =
-                item.sku ?? item.style_number ??
-                item.style_code ?? item.code ?? null;
-              const cost = parseFloat(
-                item.unit_cost ?? item.cost ??
-                item.cost_ex_gst ?? 0);
-              const retail_price = parseFloat(
-                item.rrp ?? item.retail_price ??
-                item.rrp_incl_gst ?? 0);
-              const { data: prod, error: pe } =
-                await supabase.from('products')
-                  .upsert({
-                    user_id: user.id, title, vendor,
-                    source: 'invoice_unreviewed',
-                    updated_at: new Date().toISOString()
-                  } as any, { onConflict: 'user_id,title,vendor' })
-                  .select('id').single();
-              if (pe || !prod?.id) {
-                console.warn('[Phase2] product err:', pe?.message, title);
-                return;
-              }
-              if (!sku) {
-                console.warn('[Phase2] no sku:', title);
-                return;
-              }
-              const { error: ve } =
-                await supabase.from('variants')
-                  .upsert({
-                    user_id: user.id,
-                    product_id: prod.id,
-                    sku, cost, retail_price,
-                    source: 'invoice_unreviewed',
-                    updated_at: new Date().toISOString()
-                  } as any, { onConflict: 'user_id,sku' });
-              if (ve) console.warn('[Phase2] variant err:', ve.message, sku);
-            }));
-            console.log('[Phase2] done:', rows.length);
-          } catch (e: any) {
-            console.warn('[Phase2] caught:', e?.message);
-          }
-        })();
-        // ── End Phase 2 ───────────────────────────────
+        void syncPhase2Catalog(validated, "reprocess");
       }
     } catch (err) {
       console.error("Detailed reprocess error:", err);
@@ -1803,50 +1724,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         new Date().toISOString().slice(0, 10),
       );
 
-      // ── Persist to products + variants tables so pricing tools can read them ──
-      const catalogItems = productGroups.flatMap((g) =>
-        g.variants && g.variants.length > 0
-          ? g.variants.map((v: any) => ({
-              product_title: g.name || "Untitled",
-              vendor: g.brand || "",
-              sku: v.sku || (g as any).sku || "",
-              colour: v.option1Value || g.colour || "",
-              size: v.option2Value || g.size || "",
-              unit_cost: Number(v.price ?? g.cogs ?? g.price ?? 0),
-              rrp: Number(v.rrp ?? g.rrp ?? 0),
-              qty: Number(v.qty) || 0,
-            }))
-          : [{
-              product_title: g.name || "Untitled",
-              vendor: g.brand || "",
-              sku: (g as any).sku || "",
-              colour: g.colour || "",
-              size: g.size || "",
-              unit_cost: Number(g.cogs ?? g.price ?? 0),
-              rrp: Number(g.rrp ?? 0),
-              qty: 1,
-            }],
-      );
-      if (catalogItems.length > 0) {
-        const savingToast = toast.loading(`Saving ${catalogItems.length} products to catalog…`);
-        syncInvoiceItemsToCatalog(catalogItems)
-          .then((res) => {
-            toast.dismiss(savingToast);
-            if (res.written > 0) {
-              toast.success(`✅ ${res.written} products saved to catalog`, {
-                description: "Available now in Price Adjustment, Margin Protection & Markdown Ladder.",
-              });
-            }
-            if (res.failed > 0) {
-              toast.warning(`${res.failed} products could not be saved`);
-              console.warn("[catalog-sync] failures:", res.errors);
-            }
-          })
-          .catch((e) => {
-            toast.dismiss(savingToast);
-            console.warn("[catalog-sync] failed", e);
-          });
-      }
+      // Phase 2 catalog sync now runs immediately after parse/reprocess completion.
     } catch (e) {
       console.warn("[invoice-session-store] write failed", e);
     }

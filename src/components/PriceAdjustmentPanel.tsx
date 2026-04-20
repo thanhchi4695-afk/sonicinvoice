@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   ChevronLeft, Sparkles, Percent, TrendingUp, Target, X as XIcon,
   ChevronDown, ChevronUp, AlertTriangle, Check, Download, Copy, Trash2, Save,
-  DollarSign, ShoppingCart, Loader2, RotateCw,
+  DollarSign, ShoppingCart, Loader2, RotateCw, Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

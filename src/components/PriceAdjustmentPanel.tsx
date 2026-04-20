@@ -384,7 +384,23 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
           </div>
         )}
 
-        {/* Templates bar */}
+        {/* Empty state — no products in catalog */}
+        {!externalProducts && products.length === 0 && !catalogLoading && (
+          <div className="rounded-lg border border-dashed border-border p-8 text-center">
+            <Package className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+            <p className="text-sm font-medium">No products in your catalog yet.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Process an invoice to add products.
+            </p>
+          </div>
+        )}
+        {!externalProducts && catalogLoading && products.length === 0 && (
+          <div className="rounded-lg border border-border p-8 text-center text-sm text-muted-foreground">
+            <Loader2 className="w-5 h-5 mx-auto mb-2 animate-spin" />
+            Loading your catalog…
+          </div>
+        )}
+
         {templates.length > 0 && (
           <div>
             <p className="text-xs text-muted-foreground mb-2">📋 Saved templates</p>

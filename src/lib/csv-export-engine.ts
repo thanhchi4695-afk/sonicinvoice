@@ -194,6 +194,8 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
         status: base.status === "active" ? "active" : "draft",
         metafields: base.metafields || {},
         collections: deriveCollections(base.tags || `${base.brand}, ${base.type}, New Arrival`, base.brand),
+        variants: [{
+          option1Name: "Title",
           option1Value: "Default Title",
           price: base.rrp.toFixed(2),
           compareAtPrice: base.price < base.rrp ? base.rrp.toFixed(2) : "",

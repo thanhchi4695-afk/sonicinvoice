@@ -806,6 +806,17 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
                       </Badge>
                     ))}
                   </div>
+
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportLadderSchedule(ladder)}>
+                      <Download className="w-3 h-3 mr-1" /> Export schedule
+                    </Button>
+                    {stages.map(s => (
+                      <Button key={s.stageNumber} size="sm" variant="ghost" className="h-7 text-xs" onClick={() => exportShopifyStage(ladder, s)}>
+                        <Download className="w-3 h-3 mr-1" /> Stage {s.stageNumber} CSV
+                      </Button>
+                    ))}
+                  </div>
                 </Card>
               );
             })
@@ -884,6 +895,31 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                     <Clock className="w-3 h-3" /> {item.days_since_last_sale}d since last sale
                   </div>
+
+                  {stages && stages.length > 0 && (
+                    <div className="mt-2 mb-2 border-t border-border pt-2 space-y-1">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Price schedule</p>
+                      {stages.map(s => {
+                        const stagePrice = +(item.original_price * (1 - s.discountPercent / 100)).toFixed(2);
+                        const stageMargin = item.cost && item.cost > 0 ? ((stagePrice - item.cost) / stagePrice) * 100 : null;
+                        const isApplied = item.current_stage >= s.stageNumber;
+                        const isCurrent = item.current_stage === s.stageNumber;
+                        return (
+                          <div key={s.stageNumber} className={cn("flex items-center gap-2 text-[11px]", isCurrent && "font-semibold")}>
+                            <Badge variant={isApplied ? "default" : "outline"} className="text-[9px] px-1.5 py-0">S{s.stageNumber}</Badge>
+                            <span className="text-muted-foreground">-{s.discountPercent}%</span>
+                            <span className="font-mono">{fmt(stagePrice)}</span>
+                            {stageMargin !== null && (
+                              <span className={cn("font-mono ml-auto", stageMargin < 30 ? "text-destructive" : "text-muted-foreground")}>
+                                {stageMargin.toFixed(1)}%
+                              </span>
+                            )}
+                            <span className="text-muted-foreground text-[9px]">@ {s.triggerDays}d</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   <div className="flex gap-1">
                     {item.status === "active" && item.current_stage < (stages?.length || 0) && (

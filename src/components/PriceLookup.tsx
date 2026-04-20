@@ -94,6 +94,7 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
   const [step, setStep] = useState<Step>(initialProduct?.product_name ? "input" : "input");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [brandAuDomain, setBrandAuDomain] = useState<string | null>(null);
   const [selectedUrl, setSelectedUrl] = useState("");
   const [manualUrl, setManualUrl] = useState("");
   const [extracted, setExtracted] = useState<ExtractedProduct | null>(null);
@@ -139,6 +140,7 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
 
       setSearchQuery(data.search_query || "");
       setSearchResults(data.results || []);
+      setBrandAuDomain(data.brand_au_domain || null);
       setStep("results");
       toast.success(`Found ${data.results?.length || 0} results${data.source === "serpapi" ? " (Google Shopping)" : ""}`);
     } catch (err: any) {
@@ -543,11 +545,16 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
               {searchResults.map((r, i) => {
                 const IconComp = RETAILER_ICONS[r.retailer_type] || Globe;
                 const pageType = classifyPageType(r.url);
+                const isDirectBrand = (r as any).is_direct_brand_url === true;
+                // Warn when we know an AU domain for this brand but this result is not AU.
+                const showNonAuWarning = !!brandAuDomain && !r.is_australian && !isDirectBrand;
                 return (
                   <button
                     key={i}
                     onClick={() => handleExtract(r.url)}
-                    className="w-full text-left bg-card rounded-xl border border-border p-4 hover:border-primary/50 hover:bg-primary/5 transition-all"
+                    className={`w-full text-left bg-card rounded-xl border p-4 hover:bg-primary/5 transition-all ${
+                      isDirectBrand ? "border-success/60 ring-1 ring-success/30" : "border-border hover:border-primary/50"
+                    }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -557,7 +564,12 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
                         <p className="text-sm font-semibold line-clamp-1">{r.title}</p>
                         <div className="flex flex-wrap items-center gap-1.5 mb-1">
                           <span className="text-[10px] text-primary font-mono truncate">{r.domain}</span>
-                          {pageType === "product" && (
+                          {isDirectBrand && (
+                            <Badge className="text-[9px] px-1.5 py-0 bg-success text-success-foreground hover:bg-success/90">
+                              Direct brand URL
+                            </Badge>
+                          )}
+                          {pageType === "product" && !isDirectBrand && (
                             <Badge className="text-[9px] px-1.5 py-0 bg-success text-success-foreground hover:bg-success/90">Product page</Badge>
                           )}
                           {pageType === "collection" && (
@@ -565,7 +577,7 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
                               Collection page — may not find price
                             </Badge>
                           )}
-                          {pageType === "unknown" && (
+                          {pageType === "unknown" && !isDirectBrand && (
                             <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Unknown</Badge>
                           )}
                           {r.is_australian && (
@@ -575,6 +587,15 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
                             <Badge variant="secondary" className="text-[9px] px-1.5 py-0">Official</Badge>
                           )}
                         </div>
+                        {showNonAuWarning && (
+                          <p className="text-[11px] text-warning mb-1 flex items-start gap-1">
+                            <span aria-hidden>⚠</span>
+                            <span>
+                              US/international store — price may not be in AUD. The Australian store is{" "}
+                              <span className="font-mono">{brandAuDomain}</span>.
+                            </span>
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground line-clamp-2">{r.snippet}</p>
                       </div>
                       <ExternalLink className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />

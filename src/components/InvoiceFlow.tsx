@@ -2264,6 +2264,12 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
             className="hidden"
           />
 
+          <POSPickerDialog
+            open={posPickerOpen}
+            onClose={() => setPOSPickerOpen(false)}
+            onPicked={handlePOSPicked}
+          />
+
           <button
             onClick={handleCameraSelect}
             className="w-full mt-3 h-12 rounded-lg border border-border bg-card flex items-center justify-center gap-2 text-sm active:bg-muted"

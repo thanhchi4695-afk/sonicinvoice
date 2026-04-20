@@ -13,12 +13,28 @@ const BRAND_DOMAINS: Record<string, string> = {
   baku: "bakuswimwear.com.au",
   "bond-eye": "bond-eyeswim.com",
   bondeye: "bond-eyeswim.com",
+  "bond eye": "bond-eyeswim.com",
   jets: "jets.com.au",
   zimmermann: "zimmermann.com",
   jantzen: "jantzen.com.au",
-  sunseeker: "sunseeker.com.au",
-  "sea level": "sealevelaustralia.com",
+  sunseeker: "sunseekerbathers.com.au",
+  "sea level": "sealevelswimwear.com.au",
+  sealevel: "sealevelswimwear.com.au",
+  "kulani kinis": "kulanikinis.com",
+  kulanikinis: "kulanikinis.com",
 };
+
+// Domains that are noise for product searches — social, editorial, blog
+const NOISE_DOMAINS = [
+  "instagram.com", "facebook.com", "tiktok.com", "pinterest.com",
+  "youtube.com", "twitter.com", "x.com", "shopltk.com", "liketoknow.it",
+  "glamadelaide.com.au", "reddit.com", "quora.com",
+];
+
+function isNoiseUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  return NOISE_DOMAINS.some(d => u.includes(d));
+}
 
 function slugify(s: string): string {
   return s.toLowerCase().trim()
@@ -114,11 +130,13 @@ serve(async (req) => {
     let searchQuery = "";
     if (searchMode === "primary") {
       const parts = [cleanProductName, supplier, colour].filter(Boolean);
-      searchQuery = `${parts.join(" ")} Australia -collection -collections -category -categories`;
+      // Force product-page intent + exclude social / editorial / collection noise
+      const exclusions = "-site:instagram.com -site:facebook.com -site:tiktok.com -site:pinterest.com -site:youtube.com -site:shopltk.com -site:glamadelaide.com.au -inurl:collection -inurl:collections -inurl:category";
+      searchQuery = `${parts.join(" ")} buy (inurl:/products/ OR inurl:/product/) ${exclusions}`;
     } else if (searchMode === "sku") {
       const parts = [style_number, supplier].filter(Boolean);
       searchQuery = parts.length > 0
-        ? `${parts.join(" ")} Australia`
+        ? `${parts.join(" ")} Australia (inurl:/products/ OR inurl:/product/)`
         : `${cleanProductName} ${supplier || ""} Australia`.trim();
     }
 
@@ -187,7 +205,7 @@ serve(async (req) => {
               retailer: r.source || domain,
               thumbnail: r.thumbnail || null,
             };
-          }).filter((r: any) => r.url);
+          }).filter((r: any) => r.url && !isNoiseUrl(r.url));
 
           results.sort((a: any, b: any) => {
             const score = (x: any) =>
@@ -198,13 +216,12 @@ serve(async (req) => {
             return score(b) - score(a);
           });
 
-          // Auto-fallback: if every result is a collection page, retry with SKU query
-          const allCollections = results.length > 0 && results.every((r: any) => isCollectionUrl(r.url));
-          if (allCollections && searchMode === "primary" && style_number) {
-            // Recurse via internal call: switch to SKU mode
+          // Auto-fallback: retry with SKU query if no usable product page came back
+          const hasProductPage = results.some((r: any) => isProductUrl(r.url));
+          if (!hasProductPage && searchMode === "primary" && style_number) {
             const skuRes = await fetch(req.url, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", Authorization: req.headers.get("Authorization") || "" },
               body: JSON.stringify({ product_name, supplier, style_number, colour, serpapi_key, mode: "sku" }),
             });
             if (skuRes.ok) return new Response(skuRes.body, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -274,7 +291,18 @@ serve(async (req) => {
           retailer_type: meta.type,
         };
       })
-      .filter(Boolean) as any[];
+      .filter((r) => r && !isNoiseUrl(r.url)) as any[];
+
+    // Auto-fallback for Firecrawl path too: retry with SKU if no product page
+    const hasProductPageFc = results.some((r: any) => isProductUrl(r.url));
+    if (!hasProductPageFc && searchMode === "primary" && style_number) {
+      const skuRes = await fetch(req.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: req.headers.get("Authorization") || "" },
+        body: JSON.stringify({ product_name, supplier, style_number, colour, serpapi_key, mode: "sku" }),
+      });
+      if (skuRes.ok) return new Response(skuRes.body, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Sort: product pages first, collection pages last
     results.sort((a, b) => {

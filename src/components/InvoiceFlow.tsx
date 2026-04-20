@@ -513,6 +513,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           product_title: item.name || "Untitled",
           vendor: item.brand || supplierName || undefined,
           sku: item.sku || undefined,
+          barcode: (item as any).barcode || undefined,
           colour: item.colour || undefined,
           size: item.size || undefined,
           unit_cost: Number(item.cost) || 0,

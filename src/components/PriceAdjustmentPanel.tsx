@@ -103,6 +103,11 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
   const [showGuardrails, setShowGuardrails] = useState(false);
   const [applied, setApplied] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
+  // Save flow
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState({ current: 0, total: 0 });
+  const [saveErrors, setSaveErrors] = useState<{ title: string; sku?: string; reason: string }[]>([]);
 
   // Derived
   const allBrands = useMemo(() => [...new Set(products.map(p => p.vendor))].sort(), [products]);

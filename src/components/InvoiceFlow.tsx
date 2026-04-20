@@ -592,6 +592,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
           setProcessingDone(true);
           setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
           setShowCompletionSummary(true);
+          void persistInvoiceToDb();
           const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
           history.unshift({
             supplier: supplierName || "Unknown",

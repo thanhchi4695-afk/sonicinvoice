@@ -506,6 +506,17 @@ const Index = () => {
         </Suspense>
       )}
       {activeTab === "home" && !useStockyDashboard && (
+        <HomeWizard
+          onStartInvoice={() => setActiveFlow("invoice")}
+          onStartPackingSlip={() => setActiveFlow("packing_slip")}
+          onStartEmailInbox={() => setActiveFlow("email_inbox")}
+          onStartJoor={() => setActiveFlow("joor")}
+          onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
+          onStartLookbookImport={() => setActiveFlow("lookbook_import")}
+          onStartScanMode={() => setActiveFlow("scan_mode")}
+        />
+      )}
+      {activeTab === "start" && (
         <PhaseFlowHome
           onStartInvoice={() => setActiveFlow("invoice")}
           onStartPackingSlip={() => setActiveFlow("packing_slip")}

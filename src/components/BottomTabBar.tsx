@@ -1,4 +1,4 @@
-import { Home, FileText, Wrench, CreditCard, User, Monitor, BookOpen } from "lucide-react";
+import { Home, FileText, Wrench, CreditCard, User, Monitor, BookOpen, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useTranslation } from "react-i18next";
@@ -13,6 +13,7 @@ const BottomTabBar = ({ activeTab, onTabChange }: BottomTabBarProps) => {
   const mode = useStoreMode();
 
   const baseTabs = [
+    { id: "start", label: t("nav.start", "Start"), icon: Rocket },
     { id: "home", label: t("nav.home"), icon: Home },
     { id: "invoices", label: t("nav.invoices"), icon: FileText },
     { id: "tools", label: t("nav.tools"), icon: Wrench },

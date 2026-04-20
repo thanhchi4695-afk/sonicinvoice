@@ -538,6 +538,40 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
       }
 
       console.log("[Phase2] done:", result.written, "written,", result.failed, "failed");
+
+      // ── Phase 3 — auto price research ──────────────────────
+      if (accepted.length > 0) {
+        const phase3Items: Phase3Item[] = accepted.map((item) => ({
+          product_title: item.name || "Untitled",
+          vendor: item.brand || supplierName || undefined,
+          sku: item.sku || undefined,
+          barcode: (item as any).barcode || undefined,
+          unit_cost: Number(item.cost) || 0,
+          rrp: Number(item.rrp) || 0,
+          product_type: (item as any).product_type || (item as any).type || undefined,
+        }));
+        const phase3Toast = toast.loading(`🔍 Researching prices for ${phase3Items.length} products…`, {
+          description: "Checking supplier sites, retailers, and applying markup rules.",
+        });
+        try {
+          const summary = await runPhase3PriceResearch(phase3Items, {
+            onProgress: (done, total) => {
+              toast.loading(`🔍 Researching prices… ${done}/${total}`, { id: phase3Toast });
+            },
+          });
+          const breakdown = Object.entries(summary.bySource)
+            .map(([k, v]) => `${v} ${k.replace("_", " ")}`)
+            .join(" · ");
+          toast.success(`💰 Price research complete: ${summary.succeeded}/${summary.total}`, {
+            id: phase3Toast,
+            description: breakdown || "Recommended RRPs saved to Price Lookups.",
+          });
+          console.log("[Phase3] summary:", summary);
+        } catch (e: any) {
+          console.warn("[Phase3] orchestrator failed:", e);
+          toast.error("Price research failed", { id: phase3Toast, description: e?.message || "Unknown error" });
+        }
+      }
     } catch (e: any) {
       console.warn("[Phase2] caught:", e?.message || "Unknown error");
       toast.error("Catalog save failed", { id: savingToastId, description: e?.message || "Unknown error" });

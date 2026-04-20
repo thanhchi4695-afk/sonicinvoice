@@ -134,6 +134,112 @@ export async function persistParsedInvoice(
     }
   }
 
+  // ── 4b. Upsert into products + variants so pricing tools (Price
+  //        Adjustment, Margin Protection, Markdown Ladder) can see
+  //        the newly-processed invoice products. Without this, those
+  //        tools only ever show demo rows.
+  try {
+    // Group accepted lines by product title (variants share a product)
+    const byTitle = new Map<string, ValidatedProduct[]>();
+    for (const p of accepted) {
+      const title = (p.name || "Untitled product").trim();
+      if (!byTitle.has(title)) byTitle.set(title, []);
+      byTitle.get(title)!.push(p);
+    }
+
+    for (const [title, lines] of byTitle.entries()) {
+      // 1. Upsert product (keyed by user_id + title)
+      let productId: string | null = null;
+      const { data: existingProduct } = await supabase
+        .from("products")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("title", title)
+        .maybeSingle();
+
+      if (existingProduct?.id) {
+        productId = existingProduct.id as string;
+        await supabase.from("products").update({
+          vendor: meta.supplier || null,
+          updated_at: new Date().toISOString(),
+        }).eq("id", productId);
+      } else {
+        const { data: newProduct, error: prodErr } = await supabase
+          .from("products")
+          .insert({
+            user_id: userId,
+            title,
+            vendor: meta.supplier || null,
+          })
+          .select("id")
+          .single();
+        if (prodErr) {
+          console.warn("[invoice-persistence] product insert failed:", prodErr.message);
+          continue;
+        }
+        productId = newProduct?.id as string;
+      }
+      if (!productId) continue;
+
+      // 2. Upsert each variant. variants_user_sku_unique covers (user_id, sku)
+      //    where sku is non-empty — fall back to insert when sku is blank.
+      for (const line of lines) {
+        const sku = (line.sku || "").trim();
+        const cost = Number(line.cost) || 0;
+        const rrp = Number(line.rrp) || 0;
+        // RRP fallback: if missing, default to cost * 2.5 so the row still
+        // appears in pricing tools (better than retail_price = 0).
+        const retailPrice = rrp > 0 ? rrp : cost > 0 ? +(cost * 2.5).toFixed(2) : 0;
+
+        if (sku) {
+          // Upsert by (user_id, sku) — matches the partial unique index
+          await supabase
+            .from("variants")
+            .upsert({
+              user_id: userId,
+              product_id: productId,
+              sku,
+              color: line.colour || null,
+              size: line.size || null,
+              quantity: Number(line.qty) || 0,
+              cost,
+              retail_price: retailPrice,
+            } as any, { onConflict: "user_id,sku" });
+        } else {
+          // No SKU — find existing by product+colour+size or insert new
+          const { data: existingVar } = await supabase
+            .from("variants")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("product_id", productId)
+            .eq("color", line.colour || "")
+            .eq("size", line.size || "")
+            .maybeSingle();
+          if (existingVar?.id) {
+            await supabase.from("variants").update({
+              cost,
+              retail_price: retailPrice,
+              quantity: Number(line.qty) || 0,
+              updated_at: new Date().toISOString(),
+            } as any).eq("id", existingVar.id as string);
+          } else {
+            await supabase.from("variants").insert({
+              user_id: userId,
+              product_id: productId,
+              color: line.colour || null,
+              size: line.size || null,
+              quantity: Number(line.qty) || 0,
+              cost,
+              retail_price: retailPrice,
+            } as any);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[invoice-persistence] product/variant upsert failed:", e);
+  }
+
   // ── 5. Update or create supplier with rolled-up metrics ───
   if (matchedSupplierId) {
     // Existing supplier — bump spend (other metrics like avg_order /

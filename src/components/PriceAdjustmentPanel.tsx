@@ -71,6 +71,11 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
       currentPrice: Number(p.rrp) || 0,
       compareAtPrice: null,
       costPrice: Number(p.unit_cost) || 0,
+      sku: p.sku || undefined,
+    })),
+    [sessionProducts],
+  );
+
   // Catalog products loaded from Supabase (variants joined to products).
   const [catalogProducts, setCatalogProducts] = useState<ProductForAdjustment[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);

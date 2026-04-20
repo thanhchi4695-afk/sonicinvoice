@@ -448,22 +448,20 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const persistInvoiceToDb = async () => {
     if (persistedRef.current) return;
     persistedRef.current = true;
-    // ── PHASE 2 WRITE ──
-    // Visible "Saving to catalog…" toast so the user (and any watching
-    // network log) can confirm the products+variants upsert is firing
-    // immediately after extraction — before the Review screen renders.
-    // This is the foundation that makes Phase 5 pricing tools work.
+    console.log("[Phase2] persistInvoiceToDb called");
     const savingToastId = toast.loading("Saving to catalog…", {
       description: "Adding extracted products to your inventory.",
     });
     try {
       const accepted = validatedProducts.filter(p => !p._rejected);
       if (accepted.length === 0) {
+        console.warn("[Phase2] no rows");
         toast.dismiss(savingToastId);
         return;
       }
+      console.log("[Phase2] writing", accepted.length, "rows");
       const subtotal = accepted.reduce((s, p) => s + (p.cost || 0) * (p.qty || 0), 0);
-      const total = subtotal; // GST inclusion handled by AccountingBillReview separately
+      const total = subtotal;
       const today = new Date().toISOString().slice(0, 10);
       const { error } = await persistParsedInvoice(
         {
@@ -480,10 +478,10 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         validatedProducts,
       );
       if (error) {
-        console.warn("[invoice-persistence]", error);
+        console.warn("[Phase2] caught:", error);
         toast.error("Catalog save failed", { id: savingToastId, description: error });
       } else {
-        // Variant count = sum of qty rows actually written to variants table
+        console.log("[Phase2] done:", accepted.length);
         const variantCount = accepted.length;
         toast.success(`✅ ${variantCount} ${variantCount === 1 ? "variant" : "variants"} saved to catalog`, {
           id: savingToastId,
@@ -491,7 +489,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         });
       }
     } catch (e: any) {
-      console.error("[invoice-persistence] failed:", e);
+      console.warn("[Phase2] caught:", e?.message || "Unknown error");
       toast.error("Catalog save failed", { id: savingToastId, description: e?.message || "Unknown error" });
     }
   };

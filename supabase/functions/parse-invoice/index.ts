@@ -939,7 +939,7 @@ Return JSON only.`,
 
     // ── Zero-product retry: if AI returned 0 products, retry with enhanced prompt ──
     const rawProductCount = (parsed.products || []).length;
-    if (rawProductCount === 0 && (isImage || isPdf) && !detailedMode) {
+    if (rawProductCount === 0 && (isImage || isPdf) && !detailedMode && !budgetExceeded()) {
       console.log("[parse-invoice] Zero products detected on first pass — retrying with enhanced prompt");
       const retryMessages = [
         { role: "system", content: systemPrompt + `\n\n## RETRY — ZERO PRODUCTS FOUND ON FIRST PASS

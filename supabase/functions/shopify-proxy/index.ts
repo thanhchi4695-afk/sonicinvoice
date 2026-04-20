@@ -821,6 +821,9 @@ Deno.serve(async (req) => {
         }
         result = { variant: updateData.data?.productVariantsBulkUpdate?.productVariants?.[0], success: true };
         break;
+      }
+
+      case "update_image_alt": {
         if (!body.image_updates || body.image_updates.length === 0) {
           return new Response(JSON.stringify({ error: "Missing image_updates" }), {
             status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

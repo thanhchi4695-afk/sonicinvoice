@@ -565,30 +565,45 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             },
           });
           // Write researched RRPs back into in-memory products so the Shopify
-          // Preview / export step pick them up. Match by lowercased title.
-          const rrpByKey = new Map<string, number>();
-          for (const r of summary.results) {
-            if (r.recommended_rrp && r.recommended_rrp > 0) {
-              rrpByKey.set((r.product_title || "").toLowerCase().trim(), r.recommended_rrp);
+          // Preview / export step pick them up. Match by lowercased title OR sku
+          // (productGroups prefixes the brand into name, so title-only misses).
+          const rrpByTitle = new Map<string, number>();
+          const rrpBySku = new Map<string, number>();
+          const norm = (s: string) => (s || "").toLowerCase().trim();
+          accepted.forEach((item, idx) => {
+            const r = summary.results[idx];
+            if (!r?.recommended_rrp || r.recommended_rrp <= 0) return;
+            const title = norm(item.name || "");
+            const sku = norm(item.sku || "");
+            if (title) rrpByTitle.set(title, r.recommended_rrp);
+            if (sku) rrpBySku.set(sku, r.recommended_rrp);
+          });
+          const lookupRrp = (name?: string, sku?: string): number | undefined => {
+            const bySku = sku ? rrpBySku.get(norm(sku)) : undefined;
+            if (bySku) return bySku;
+            const t = norm(name || "");
+            if (rrpByTitle.has(t)) return rrpByTitle.get(t);
+            // fuzzy: productGroups name may be "Brand Title" — try suffix match
+            for (const [key, val] of rrpByTitle) {
+              if (key && (t.endsWith(key) || t.includes(key))) return val;
             }
-          }
-          if (rrpByKey.size > 0) {
+            return undefined;
+          };
+          if (rrpByTitle.size > 0 || rrpBySku.size > 0) {
             setValidatedProducts((prev) =>
               prev.map((p) => {
-                const newRrp = rrpByKey.get((p.name || "").toLowerCase().trim());
+                const newRrp = lookupRrp(p.name, p.sku);
                 if (!newRrp || Number(p.rrp) > 0) return p;
                 return { ...p, rrp: newRrp } as ValidatedProduct;
               }),
             );
-            // Also patch productGroups — that's what the Shopify Preview,
-            // ProductCard list, and CSV export actually read from.
             setProductGroups((prev) =>
               prev.map((g) => {
-                const newRrp = rrpByKey.get((g.name || "").toLowerCase().trim());
-                if (!newRrp || Number(g.rrp) > 0) return g;
+                const newRrp = lookupRrp(g.name, g.variants?.[0]?.sku || g.vendorCode);
+                if (!newRrp) return g;
                 return {
                   ...g,
-                  rrp: newRrp,
+                  rrp: Number(g.rrp) > 0 ? g.rrp : newRrp,
                   variants: g.variants?.map((v) =>
                     Number(v.rrp) > 0 ? v : { ...v, rrp: newRrp },
                   ),

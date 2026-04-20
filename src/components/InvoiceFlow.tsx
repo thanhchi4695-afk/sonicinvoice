@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { setSessionProducts as setInvoiceSessionProducts } from "@/stores/invoice-session-store";
 import { toast } from "sonner";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -2796,6 +2796,7 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
               ) : null}
               <Button variant="outline" size="sm" onClick={() => setPreviewAll(true)} className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview all</Button>
               <Button variant="outline" size="sm" onClick={() => setImageHelperActive(true)} className="gap-1"><ImageIcon className="w-3.5 h-3.5" /> Images</Button>
+              <Button variant="outline" size="sm" onClick={() => setPriceMatchActive(true)} className="gap-1"><Tag className="w-3.5 h-3.5" /> Price Match</Button>
               <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
               <Button variant="teal" size="sm" onClick={() => { finalizeQualityMetrics(); setStep(4); }}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>

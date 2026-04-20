@@ -1085,12 +1085,12 @@ export default function PostParseReviewScreen({
           <Button variant="outline" size="sm" onClick={handleSaveToCatalog} className="gap-1" disabled={savingToCatalog}>
             <Package className="w-3.5 h-3.5" /> {savingToCatalog ? "Saving…" : "Save to Catalog"}
           </Button>
-          <div className="flex-1" />
           {onPriceMatch && (
-            <Button variant="secondary" size="sm" onClick={onPriceMatch} className="gap-1">
+            <Button variant="outline" size="sm" onClick={onPriceMatch} className="gap-1">
               <Tag className="w-3.5 h-3.5" /> Price Match
             </Button>
           )}
+          <div className="flex-1" />
           {onGetDescriptions && (
             <Button variant="secondary" size="sm" onClick={onGetDescriptions} className="gap-1">
               <FileText className="w-3.5 h-3.5" /> Get Descriptions

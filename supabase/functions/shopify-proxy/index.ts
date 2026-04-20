@@ -11,15 +11,17 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog" | "graphql_create_collection";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "update_variant_price" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog" | "graphql_create_collection";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant / find_by_barcode
   sku?: string;
   barcode?: string;
-  // For update_variant_cost
+  // For update_variant_cost / update_variant_price
   variant_id?: string;
   cost?: string;
+  price?: string | number;
+  compare_at_price?: string | number | null;
   // For adjust_inventory
   location_id?: string;
   inventory_item_id?: string;
@@ -791,10 +793,10 @@ Deno.serve(async (req) => {
         }
         const variantsInput: Record<string, unknown> = {
           id: variantGid,
-          price: String(parseFloat(body.price).toFixed(2)),
+          price: String(parseFloat(String(body.price)).toFixed(2)),
         };
         if (body.compare_at_price !== undefined && body.compare_at_price !== null) {
-          variantsInput.compareAtPrice = String(parseFloat(body.compare_at_price).toFixed(2));
+          variantsInput.compareAtPrice = String(parseFloat(String(body.compare_at_price)).toFixed(2));
         }
         const updateMutation = `
           mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {

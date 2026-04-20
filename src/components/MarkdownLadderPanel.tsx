@@ -158,6 +158,14 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
           daysSinceLastSale,
         };
       }));
+
+      // Diagnostic — confirm the variants query actually returned rows.
+      const variantCount = (variantsRes.data || []).length;
+      console.log("[MarkdownLadder] variants query returned", variantCount, "rows for user", user.id);
+      if (variantsRes.error) {
+        console.error("[MarkdownLadder] variants query error:", variantsRes.error);
+        toast.error(`Variants query failed: ${variantsRes.error.message}`);
+      }
     } catch (e) {
       console.error("Load ladders error:", e);
     } finally {

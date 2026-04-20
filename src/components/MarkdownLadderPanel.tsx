@@ -433,6 +433,9 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
               <Select value={newLadder.selection_type} onValueChange={v => setNewLadder({ ...newLadder, selection_type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  {hasSession && (
+                    <SelectItem value="current_invoice">Current invoice ({invoiceSessionProducts.length} products)</SelectItem>
+                  )}
                   <SelectItem value="dead_stock">Dead stock (no sales in 60+ days)</SelectItem>
                   <SelectItem value="vendor">Vendor</SelectItem>
                   <SelectItem value="tag">Products with tag</SelectItem>

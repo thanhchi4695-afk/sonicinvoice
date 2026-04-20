@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import {
   ArrowLeft, Plus, Trash2, Play, Pause, SkipForward, RotateCcw,
   AlertTriangle, Clock, ShieldAlert, ChevronRight, Loader2, RefreshCw,
-  Tag, Sparkles, BarChart3,
+  Tag, Sparkles, BarChart3, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { checkMargin, getMarginSettings } from "@/lib/margin-protection";
@@ -389,6 +389,59 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
   const completedItems = ladderItems.filter(p => p.status === "completed" || p.status === "sold_through");
   const totalSavings = ladderItems.reduce((s, p) => s + (p.original_price - p.current_price), 0);
 
+  /* ─── Export helpers ─── */
+
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const today = () => new Date().toISOString().slice(0, 10);
+  const downloadCsv = (filename: string, rows: string[][]) => {
+    const csv = rows.map(r => r.map(c => {
+      const v = String(c ?? "");
+      return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+    }).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportLadderSchedule = (ladder: Ladder) => {
+    const items = ladderItems.filter(i => i.ladder_id === ladder.id);
+    if (items.length === 0) { toast.info("No items to export"); return; }
+    const rows: string[][] = [["Product", "SKU", "Original Price", "Stage", "Discount %", "New Price", "Margin %", "Trigger Days", "Status"]];
+    for (const item of items) {
+      for (const stage of ladder.stages) {
+        const newPrice = +(item.original_price * (1 - stage.discountPercent / 100)).toFixed(2);
+        const margin = item.cost && item.cost > 0 ? ((newPrice - item.cost) / newPrice) * 100 : null;
+        rows.push([
+          item.product_title,
+          item.variant_info || "",
+          item.original_price.toFixed(2),
+          String(stage.stageNumber),
+          String(stage.discountPercent),
+          newPrice.toFixed(2),
+          margin !== null ? margin.toFixed(1) : "",
+          String(stage.triggerDays),
+          item.current_stage >= stage.stageNumber ? "applied" : "scheduled",
+        ]);
+      }
+    }
+    downloadCsv(`markdown-ladder-${today()}.csv`, rows);
+    toast.success(`Exported ${items.length} products × ${ladder.stages.length} stages`);
+  };
+
+  const exportShopifyStage = (ladder: Ladder, stage: LadderStage) => {
+    const items = ladderItems.filter(i => i.ladder_id === ladder.id);
+    if (items.length === 0) { toast.info("No items to export"); return; }
+    const rows: string[][] = [["Handle", "Variant Price", "Variant Compare At Price"]];
+    for (const item of items) {
+      const newPrice = +(item.original_price * (1 - stage.discountPercent / 100)).toFixed(2);
+      rows.push([slugify(item.product_title), newPrice.toFixed(2), item.original_price.toFixed(2)]);
+    }
+    downloadCsv(`markdown-stage-${stage.stageNumber}-shopify-${today()}.csv`, rows);
+    toast.success(`Stage ${stage.stageNumber} Shopify CSV downloaded`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -753,6 +806,17 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
                       </Badge>
                     ))}
                   </div>
+
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportLadderSchedule(ladder)}>
+                      <Download className="w-3 h-3 mr-1" /> Export schedule
+                    </Button>
+                    {stages.map(s => (
+                      <Button key={s.stageNumber} size="sm" variant="ghost" className="h-7 text-xs" onClick={() => exportShopifyStage(ladder, s)}>
+                        <Download className="w-3 h-3 mr-1" /> Stage {s.stageNumber} CSV
+                      </Button>
+                    ))}
+                  </div>
                 </Card>
               );
             })
@@ -831,6 +895,31 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                     <Clock className="w-3 h-3" /> {item.days_since_last_sale}d since last sale
                   </div>
+
+                  {stages && stages.length > 0 && (
+                    <div className="mt-2 mb-2 border-t border-border pt-2 space-y-1">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Price schedule</p>
+                      {stages.map(s => {
+                        const stagePrice = +(item.original_price * (1 - s.discountPercent / 100)).toFixed(2);
+                        const stageMargin = item.cost && item.cost > 0 ? ((stagePrice - item.cost) / stagePrice) * 100 : null;
+                        const isApplied = item.current_stage >= s.stageNumber;
+                        const isCurrent = item.current_stage === s.stageNumber;
+                        return (
+                          <div key={s.stageNumber} className={cn("flex items-center gap-2 text-[11px]", isCurrent && "font-semibold")}>
+                            <Badge variant={isApplied ? "default" : "outline"} className="text-[9px] px-1.5 py-0">S{s.stageNumber}</Badge>
+                            <span className="text-muted-foreground">-{s.discountPercent}%</span>
+                            <span className="font-mono">{fmt(stagePrice)}</span>
+                            {stageMargin !== null && (
+                              <span className={cn("font-mono ml-auto", stageMargin < 30 ? "text-destructive" : "text-muted-foreground")}>
+                                {stageMargin.toFixed(1)}%
+                              </span>
+                            )}
+                            <span className="text-muted-foreground text-[9px]">@ {s.triggerDays}d</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   <div className="flex gap-1">
                     {item.status === "active" && item.current_stage < (stages?.length || 0) && (

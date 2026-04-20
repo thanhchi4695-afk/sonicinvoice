@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   ChevronLeft, Sparkles, Percent, TrendingUp, Target, X as XIcon,
   ChevronDown, ChevronUp, AlertTriangle, Check, Download, Copy, Trash2, Save,
@@ -52,16 +52,9 @@ const ROUNDING_OPTIONS: { value: PriceRounding; label: string }[] = [
 const QUICK_PERCENTS = [5, 10, 15, 20, 25, 30, 50];
 const QUICK_FACTORS = [1.5, 2.0, 2.5, 3.0];
 
-// Demo products for standalone mode
-const DEMO_PRODUCTS: ProductForAdjustment[] = [
-  { handle: "mara-one-piece", title: "Mara One Piece", vendor: "Bond Eye", type: "One Piece", tags: ["new arrivals", "full_price"], currentPrice: 199.95, compareAtPrice: null, costPrice: 58 },
-  { handle: "gracie-top", title: "Gracie Balconette Top", vendor: "Bond Eye", type: "Bikini Top", tags: ["full_price"], currentPrice: 179.95, compareAtPrice: null, costPrice: 52 },
-  { handle: "inez-bottom", title: "Inez Bikini Bottom", vendor: "Bond Eye", type: "Bikini Bottom", tags: ["full_price"], currentPrice: 149.95, compareAtPrice: null, costPrice: 44 },
-  { handle: "sahara-kaftan", title: "Sahara Kaftan", vendor: "Jantzen", type: "Kaftan", tags: ["new arrivals", "sale"], currentPrice: 89.95, compareAtPrice: 120.00, costPrice: 42 },
-  { handle: "mira-one-piece", title: "Mira One Piece", vendor: "Seafolly", type: "One Piece", tags: ["full_price"], currentPrice: 159.95, compareAtPrice: null, costPrice: 50 },
-  { handle: "costa-bikini", title: "Costa Rica Bikini Set", vendor: "Seafolly", type: "Bikini Set", tags: ["new arrivals", "full_price"], currentPrice: 219.95, compareAtPrice: null, costPrice: 68 },
-  { handle: "linen-shirt", title: "Linen Beach Shirt", vendor: "Jantzen", type: "Cover Up", tags: ["sale"], currentPrice: 49.95, compareAtPrice: 79.95, costPrice: 22 },
-];
+// NOTE: Demo products removed — catalog now sources real data from Supabase
+// (variants joined to products). If the user has not processed any invoices
+// yet, the catalog tab shows an empty state instead of fake demo rows.
 
 const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => {
   const { sessionProducts, hasSession } = useInvoiceSession();

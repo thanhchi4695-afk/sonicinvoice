@@ -12,25 +12,37 @@ import {
   marginStatusColor, marginStatusBg, getMarginAuditLog,
   type MarginSettings, type BulkMarginSummary, type MarginStatus,
 } from "@/lib/margin-protection";
+import { useInvoiceSession } from "@/stores/invoice-session-store";
+import InvoiceSessionBanner from "@/components/InvoiceSessionBanner";
 
 export default function MarginProtectionPanel({ onBack }: { onBack: () => void }) {
   const [settings, setSettings] = useState<MarginSettings>(getMarginSettings);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const { sessionProducts, hasSession } = useInvoiceSession();
 
-  // Load products from last invoice import
+  // Prefer invoice session products; fall back to legacy localStorage invoice_lines
   const products = useMemo(() => {
+    if (hasSession) {
+      return sessionProducts.map(p => ({
+        handle: (p.sku || p.product_title).toLowerCase().replace(/\s+/g, "-"),
+        title: p.product_title,
+        price: Number(p.rrp) || 0,
+        costPrice: Number(p.unit_cost) || 0,
+      }));
+    }
     try {
       const raw = localStorage.getItem("invoice_lines");
       if (!raw) return [];
       const lines = JSON.parse(raw);
       return lines.map((l: any) => ({
         handle: l.sku || l.title?.toLowerCase().replace(/\s+/g, "-") || "unknown",
-        title: l.title || "Untitled",
-        price: l.price || 0,
+        title: l.title || l.product_name || "Untitled",
+        price: l.price || l.rrp || 0,
         costPrice: l.cost || l.costPrice || 0,
       }));
     } catch { return []; }
-  }, []);
+  }, [hasSession, sessionProducts]);
+
 
   const summary: BulkMarginSummary = useMemo(
     () => bulkMarginCheck(products, settings),
@@ -60,7 +72,8 @@ export default function MarginProtectionPanel({ onBack }: { onBack: () => void }
         <ChevronLeft className="w-4 h-4" /> Back
       </button>
       <h1 className="text-2xl font-bold mb-1">🛡️ Margin Protection</h1>
-      <p className="text-muted-foreground text-sm mb-6">Prevent selling below cost and protect minimum profit margins.</p>
+      <p className="text-muted-foreground text-sm mb-4">Prevent selling below cost and protect minimum profit margins.</p>
+      <InvoiceSessionBanner />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4 w-full">

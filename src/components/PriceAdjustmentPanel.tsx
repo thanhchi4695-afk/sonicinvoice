@@ -17,6 +17,8 @@ import {
   loadTemplates, saveTemplate, deleteTemplate,
   applyPriceRounding,
 } from "@/lib/price-adjustment";
+import { useInvoiceSession } from "@/stores/invoice-session-store";
+import InvoiceSessionBanner from "@/components/InvoiceSessionBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -57,7 +59,27 @@ const DEMO_PRODUCTS: ProductForAdjustment[] = [
 ];
 
 const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => {
-  const products = externalProducts && externalProducts.length > 0 ? externalProducts : DEMO_PRODUCTS;
+  const { sessionProducts, hasSession } = useInvoiceSession();
+  const [source, setSource] = useState<"invoice" | "catalog">(hasSession ? "invoice" : "catalog");
+
+  // Map invoice session products → ProductForAdjustment shape
+  const invoiceProducts: ProductForAdjustment[] = useMemo(
+    () => sessionProducts.map(p => ({
+      handle: (p.sku || p.product_title).toLowerCase().replace(/\s+/g, "-"),
+      title: p.product_title,
+      vendor: p.vendor || "Unknown",
+      type: "",
+      tags: [],
+      currentPrice: Number(p.rrp) || 0,
+      compareAtPrice: null,
+      costPrice: Number(p.unit_cost) || 0,
+    })),
+    [sessionProducts],
+  );
+
+  const products = externalProducts && externalProducts.length > 0
+    ? externalProducts
+    : (source === "invoice" && invoiceProducts.length > 0 ? invoiceProducts : DEMO_PRODUCTS);
 
   // Filter state
   const [filter, setFilter] = useState<AdjustmentFilter>({ ...DEFAULT_FILTER });

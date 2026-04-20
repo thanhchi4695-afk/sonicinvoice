@@ -912,8 +912,18 @@ Return JSON only.`,
       ];
     }
 
-    // Use Pro model for complex documents (PDFs, images), Flash for text
-    const model = (isPdf || isImage) ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash";
+    // Use Flash for everything — Pro routinely exceeds the 150s edge-function
+    // idle timeout on multi-page PDFs/photos. Flash is vision-capable and ~3-5x faster.
+    // Detailed mode (user explicitly opted in to a slower, deeper pass) keeps Pro.
+    const model = detailedMode && (isPdf || isImage)
+      ? "google/gemini-2.5-pro"
+      : "google/gemini-2.5-flash";
+
+    // Soft time budget so we can skip optional retry/OCR passes before the
+    // hard 150s edge timeout kills the whole response.
+    const startedAt = Date.now();
+    const SOFT_BUDGET_MS = 110_000; // leave ~40s headroom for response + DB writes
+    const budgetExceeded = () => Date.now() - startedAt > SOFT_BUDGET_MS;
 
     let data = await callAI({
       model,
@@ -929,7 +939,7 @@ Return JSON only.`,
 
     // ── Zero-product retry: if AI returned 0 products, retry with enhanced prompt ──
     const rawProductCount = (parsed.products || []).length;
-    if (rawProductCount === 0 && (isImage || isPdf) && !detailedMode) {
+    if (rawProductCount === 0 && (isImage || isPdf) && !detailedMode && !budgetExceeded()) {
       console.log("[parse-invoice] Zero products detected on first pass — retrying with enhanced prompt");
       const retryMessages = [
         { role: "system", content: systemPrompt + `\n\n## RETRY — ZERO PRODUCTS FOUND ON FIRST PASS
@@ -960,7 +970,7 @@ INSTRUCTIONS FOR RETRY:
     const products = parsed.products || [];
     const hasLowConfidence = products.some((p: Record<string, unknown>) => (Number(p.confidence) || 0) < 70);
     const hasQualityWarning = parsed.quality_warning === true || parsed.parsing_plan?.expected_review_level === "high";
-    const shouldFallbackOCR = (hasLowConfidence || hasQualityWarning) && (isImage || isPdf) && !detailedMode;
+    const shouldFallbackOCR = (hasLowConfidence || hasQualityWarning) && (isImage || isPdf) && !detailedMode && !budgetExceeded();
 
     if (shouldFallbackOCR) {
       console.log(`[parse-invoice] Step B: OCR text fallback triggered — lowConf=${hasLowConfidence}, qualityWarn=${hasQualityWarning}`);

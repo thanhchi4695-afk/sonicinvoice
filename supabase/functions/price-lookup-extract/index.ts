@@ -369,14 +369,30 @@ ${pageMarkdown}
     }
 
     parsed.source_url = finalUrl;
+    parsed.source_type = sourceType;
+    parsed.retailer_name = retailerName;
+    parsed.fallbacks_tried = fallbacksTried;
     parsed.fetch_success = true;
     parsed.fetch_error = null;
     parsed.page_title = parsed.page_title || pageTitle || null;
     parsed.brand_hint_applied = brandHint?.name || null;
     parsed.status_code = statusCode || 200;
     parsed.scraper = "firecrawl";
-    // Mark whether the description was successfully scraped from the page
     parsed.description_source = parsed.description && parsed.description.trim().length > 20 ? "scraped" : null;
+
+    // Bump AUD confidence when sourced from a trusted AU retailer with a real price
+    if (sourceType === "retailer" && parsed.retail_price_aud != null) {
+      const retailerConf = audConfidenceForUrl(finalUrl);
+      if (retailerConf != null) {
+        parsed.currency_detected = "AUD";
+        parsed.currency_confidence = Math.max(parsed.currency_confidence ?? 0, retailerConf);
+      }
+      // Annotate Product Details so the user knows where the price came from
+      const note = `Price sourced from ${retailerName ?? "retailer"} — brand site not accessible to automated tools.`;
+      parsed.extraction_notes = parsed.extraction_notes
+        ? `${note} ${parsed.extraction_notes}`
+        : note;
+    }
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

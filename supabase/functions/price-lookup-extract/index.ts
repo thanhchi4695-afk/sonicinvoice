@@ -206,67 +206,32 @@ serve(async (req) => {
       });
     }
 
-    // ── Scrape via Firecrawl (renders JS, follows redirects, beats bot blockers) ──
-    let pageMarkdown = "";
-    let pageTitle = "";
-    let finalUrl = url;
-    let fetchError = "";
-    let statusCode = 0;
+    // ── Scrape primary URL via Firecrawl ──
+    let { pageMarkdown, pageTitle, finalUrl, statusCode, fetchError } =
+      await scrapeWithFirecrawl(url, FIRECRAWL_API_KEY);
 
-    // Per-brand hints: pass tighter includeTags/excludeTags + longer waitFor for known sites.
-    const brandHint = findBrandHint(url);
-    const scrapeBody: Record<string, unknown> = {
-      url,
-      formats: ["markdown"],
-      onlyMainContent: true,
-      // JS-rendered sites (Iconic, Myer, David Jones, Zimmermann) need longer waits
-      // Firecrawl runs a real headless browser, so this gives JS time to hydrate
-      waitFor: brandHint?.waitFor ?? 2500,
-      mobile: false,
-      blockAds: true,
-      location: { country: "AU", languages: ["en-AU", "en"] },
-    };
-    if (brandHint?.includeTags?.length) scrapeBody.includeTags = brandHint.includeTags;
-    if (brandHint?.excludeTags?.length) scrapeBody.excludeTags = brandHint.excludeTags;
+    let sourceType: "brand" | "retailer" = "brand";
+    let retailerName: string | null = null;
+    const fallbacksTried: { url: string; status: number; error: string }[] = [];
 
-    try {
-      const fcRes = await fetch(`${FIRECRAWL_API}/scrape`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(scrapeBody),
-      });
-
-      const fcData = await fcRes.json();
-
-      if (!fcRes.ok) {
-        fetchError = `Firecrawl ${fcRes.status}: ${fcData?.error || "scrape failed"}`;
-      } else {
-        // v2 SDK shape vs raw REST shape
-        const doc = fcData?.data ?? fcData;
-        pageMarkdown = doc?.markdown || "";
-        const meta = doc?.metadata || {};
-        pageTitle = meta.title || "";
-        finalUrl = meta.sourceURL || meta.url || url;
-        statusCode = meta.statusCode || 0;
-
-        // Bug 1 guard: if Firecrawl landed on a category/listing page (no real product info), flag it
-        if (statusCode === 404) {
-          fetchError = `HTTP 404 — page does not exist`;
-          pageMarkdown = "";
-        } else if (!pageMarkdown || pageMarkdown.length < 200) {
-          fetchError = "Page returned empty or too-short content";
-        }
-
-        // Truncate to fit AI context
-        if (pageMarkdown.length > 20000) {
-          pageMarkdown = pageMarkdown.slice(0, 20000);
+    // ── Fallback: if 404 (or empty) AND brand has retailer fallbacks, try them ──
+    const isBlocked = statusCode === 404 || (!pageMarkdown && fetchError);
+    if (isBlocked) {
+      const fallbackUrls = buildFallbackUrls(supplier, product_name);
+      for (const fbUrl of fallbackUrls) {
+        const fb = await scrapeWithFirecrawl(fbUrl, FIRECRAWL_API_KEY);
+        fallbacksTried.push({ url: fbUrl, status: fb.statusCode, error: fb.fetchError });
+        if (fb.statusCode === 200 && fb.pageMarkdown && hasAudPrice(fb.pageMarkdown)) {
+          pageMarkdown = fb.pageMarkdown;
+          pageTitle = fb.pageTitle;
+          finalUrl = fb.finalUrl;
+          statusCode = fb.statusCode;
+          fetchError = "";
+          sourceType = "retailer";
+          retailerName = retailerNameFromUrl(fb.finalUrl);
+          break;
         }
       }
-    } catch (e) {
-      fetchError = e instanceof Error ? e.message : "Failed to scrape page";
     }
 
     // ── If we couldn't fetch the page, return early with a HONEST empty result.

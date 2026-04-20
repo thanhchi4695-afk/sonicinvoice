@@ -4,6 +4,7 @@
  */
 
 import Papa from "papaparse";
+import { matchCollectionsWithBrand } from "./collection-engine";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -97,6 +98,8 @@ interface GroupedProduct {
   imageUrl: string;
   status: string;
   metafields: Record<string, string>;
+  /** #6 Collection assignment — derived from tags + brand via matchCollectionsWithBrand. */
+  collections: string[];
   variants: {
     option1Name: string;
     option1Value: string;
@@ -108,6 +111,15 @@ interface GroupedProduct {
     barcode: string;
     cogs?: string;
   }[];
+}
+
+/** #6 Collection assignment helper — splits a "Tag, Tag" string and derives collections. */
+function deriveCollections(tagsStr: string, brand: string): string[] {
+  const tagList = (tagsStr || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return matchCollectionsWithBrand(tagList, brand || "");
 }
 
 function normalizeBaseTitle(name: string): string {

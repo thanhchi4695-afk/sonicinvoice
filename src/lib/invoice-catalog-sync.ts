@@ -41,88 +41,107 @@ export async function syncInvoiceItemsToCatalog(
   }
   const userId = user.id;
 
-  // Skip rows without a usable title.
-  const valid = items.filter(i => (i.product_title || "").trim().length > 0);
+  const valid = items.filter((i) => (i.product_title || "").trim().length > 0);
 
   await Promise.all(valid.map(async (item) => {
     try {
       const title = item.product_title.trim();
       const vendor = (item.vendor || "").trim() || null;
+      const colour = (item.colour || "").trim() || null;
+      const size = (item.size || "").trim() || null;
+      const sku = (item.sku || "").trim();
 
-      // ── Upsert product (dedupe by user+title+vendor) ───
-      const { data: prod, error: prodErr } = await supabase
+      let productLookup = supabase
         .from("products")
-        .upsert(
-          {
+        .select("id")
+        .eq("user_id", userId)
+        .eq("title", title)
+        .limit(1);
+
+      const { data: existingProduct, error: productLookupError } = vendor
+        ? await productLookup.eq("vendor", vendor).maybeSingle()
+        : await productLookup.is("vendor", null).maybeSingle();
+
+      if (productLookupError) throw productLookupError;
+
+      let productId = existingProduct?.id as string | undefined;
+      if (!productId) {
+        const { data: createdProduct, error: productInsertError } = await supabase
+          .from("products")
+          .insert({
             user_id: userId,
             title,
             vendor,
-          },
-          { onConflict: "user_id,title,vendor", ignoreDuplicates: false },
-        )
-        .select("id")
-        .single();
-
-      // Fallback: if upsert with onConflict fails (constraint name mismatch),
-      // try select-then-insert.
-      let productId = prod?.id as string | undefined;
-      if (prodErr || !productId) {
-        const { data: existing } = await supabase
-          .from("products")
+          })
           .select("id")
-          .eq("user_id", userId)
-          .eq("title", title)
-          .maybeSingle();
-        if (existing?.id) {
-          productId = existing.id;
-        } else {
-          const { data: created } = await supabase
-            .from("products")
-            .insert({ user_id: userId, title, vendor })
-            .select("id")
-            .single();
-          productId = created?.id;
+          .single();
+
+        if (productInsertError || !createdProduct?.id) {
+          throw productInsertError ?? new Error(`Could not create product for ${title}`);
         }
-      }
-      if (!productId) {
-        result.failed += 1;
-        return;
+        productId = createdProduct.id;
       }
 
-      // ── Upsert variant ─────────────────────────────────
-      const sku = (item.sku || "").trim();
       const variantPayload = {
         user_id: userId,
         product_id: productId,
         sku: sku || null,
-        color: item.colour || null,
-        size: item.size || null,
+        color: colour,
+        size,
         cost: Number(item.unit_cost) || 0,
         retail_price: Number(item.rrp) || 0,
         quantity: Number(item.qty) || 0,
       };
 
       if (sku) {
-        const { error: vErr } = await supabase
+        const { data: existingVariant, error: variantLookupError } = await supabase
           .from("variants")
-          .upsert(variantPayload, { onConflict: "user_id,sku", ignoreDuplicates: false });
-        if (vErr) {
-          // Fallback: manual update or insert
-          const { data: existingV } = await supabase
+          .select("id")
+          .eq("user_id", userId)
+          .eq("sku", sku)
+          .limit(1)
+          .maybeSingle();
+
+        if (variantLookupError) throw variantLookupError;
+
+        if (existingVariant?.id) {
+          const { error: variantUpdateError } = await supabase
             .from("variants")
-            .select("id")
-            .eq("user_id", userId)
-            .eq("sku", sku)
-            .maybeSingle();
-          if (existingV?.id) {
-            await supabase.from("variants").update(variantPayload).eq("id", existingV.id);
-          } else {
-            await supabase.from("variants").insert(variantPayload);
-          }
+            .update(variantPayload)
+            .eq("id", existingVariant.id);
+          if (variantUpdateError) throw variantUpdateError;
+        } else {
+          const { error: variantInsertError } = await supabase
+            .from("variants")
+            .insert(variantPayload);
+          if (variantInsertError) throw variantInsertError;
         }
       } else {
-        // No SKU — just insert (cannot dedupe).
-        await supabase.from("variants").insert(variantPayload);
+        let variantLookup = supabase
+          .from("variants")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("product_id", productId)
+          .limit(1);
+
+        variantLookup = colour ? variantLookup.eq("color", colour) : variantLookup.is("color", null);
+        variantLookup = size ? variantLookup.eq("size", size) : variantLookup.is("size", null);
+
+        const { data: existingVariant, error: variantLookupError } = await variantLookup.maybeSingle();
+        if (variantLookupError) throw variantLookupError;
+
+        if (existingVariant?.id) {
+          const { error: variantUpdateError } = await supabase
+            .from("variants")
+            .update(variantPayload)
+            .eq("id", existingVariant.id);
+          if (variantUpdateError) throw variantUpdateError;
+        } else {
+          const { error: variantInsertError } = await supabase
+            .from("variants")
+            .insert(variantPayload);
+          if (variantInsertError) throw variantInsertError;
+        }
       }
 
       result.written += 1;

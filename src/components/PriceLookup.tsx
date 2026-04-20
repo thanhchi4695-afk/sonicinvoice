@@ -155,10 +155,11 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
     setBulkRunning(true);
     setBulkDone(false);
     const apiKeys = getApiKeys();
+    const { data: { user } } = await supabase.auth.getUser();
+    let savedCount = 0;
 
     for (let i = 0; i < bulkRows.length; i++) {
       const row = bulkRows[i];
-      // 1. Search
       setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "searching" } : r));
       try {
         const { data: searchData, error: searchErr } = await supabase.functions.invoke("price-lookup-search", {
@@ -177,7 +178,6 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
           continue;
         }
 
-        // 2. Extract from the top-ranked result
         setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "extracting" } : r));
         const topUrl = results[0].url;
         const { data: extractData, error: extractErr } = await supabase.functions.invoke("price-lookup-extract", {
@@ -192,24 +192,51 @@ export default function PriceLookup({ onBack, initialProduct, bulkItems }: Price
         });
         if (extractErr) throw extractErr;
 
+        const finalPrice = extractData?.retail_price_aud ?? results[0].price_aud ?? null;
+        const finalDescription = extractData?.description ?? null;
+        const finalImages = Array.isArray(extractData?.image_urls) ? extractData.image_urls : [];
+        const finalRetailer = results[0].retailer ?? results[0].domain ?? null;
+
         setBulkRows(prev => prev.map((r, idx) => idx === i ? {
           ...r,
           status: "done",
           result: {
             url: topUrl,
-            price: extractData?.retail_price_aud ?? results[0].price_aud ?? null,
-            description: extractData?.description ?? null,
-            image: extractData?.image_urls?.[0] ?? results[0].thumbnail ?? null,
-            retailer: results[0].retailer ?? results[0].domain ?? null,
+            price: finalPrice,
+            description: finalDescription,
+            image: finalImages[0] ?? results[0].thumbnail ?? null,
+            retailer: finalRetailer,
           },
         } : r));
+
+        if (user) {
+          const { error: saveError } = await supabase.from("price_lookups").insert({
+            user_id: user.id,
+            supplier: row.supplier || "Unknown",
+            product_name: row.product_name,
+            style_number: row.style_number || null,
+            colour: row.colour || null,
+            supplier_cost: row.supplier_cost ?? null,
+            retail_price_aud: finalPrice,
+            price_confidence: extractData?.currency_confidence ?? 0,
+            image_urls: finalImages,
+            description: finalDescription,
+            source_url: topUrl,
+            notes: finalRetailer || null,
+          });
+          if (saveError) {
+            console.warn("[Phase3] bulk price save failed:", saveError.message);
+          } else {
+            savedCount += 1;
+          }
+        }
       } catch (err: any) {
         setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, status: "failed", error: err?.message || "Unknown error" } : r));
       }
     }
     setBulkRunning(false);
     setBulkDone(true);
-    toast.success("Bulk lookup complete");
+    toast.success(savedCount > 0 ? `Bulk lookup complete — ${savedCount} results saved` : "Bulk lookup complete");
   };
 
   // Auto-start bulk run when entering bulk mode

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { setSessionProducts as setInvoiceSessionProducts } from "@/stores/invoice-session-store";
+import { syncInvoiceItemsToCatalog } from "@/lib/invoice-catalog-sync";
 import { toast } from "sonner";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
@@ -1642,6 +1643,51 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
         supplierName || "",
         new Date().toISOString().slice(0, 10),
       );
+
+      // ── Persist to products + variants tables so pricing tools can read them ──
+      const catalogItems = productGroups.flatMap((g) =>
+        g.variants && g.variants.length > 0
+          ? g.variants.map((v: any) => ({
+              product_title: g.name || "Untitled",
+              vendor: g.brand || "",
+              sku: v.sku || (g as any).sku || "",
+              colour: v.option1Value || g.colour || "",
+              size: v.option2Value || g.size || "",
+              unit_cost: Number(v.price ?? g.cogs ?? g.price ?? 0),
+              rrp: Number(v.rrp ?? g.rrp ?? 0),
+              qty: Number(v.qty) || 0,
+            }))
+          : [{
+              product_title: g.name || "Untitled",
+              vendor: g.brand || "",
+              sku: (g as any).sku || "",
+              colour: g.colour || "",
+              size: g.size || "",
+              unit_cost: Number(g.cogs ?? g.price ?? 0),
+              rrp: Number(g.rrp ?? 0),
+              qty: 1,
+            }],
+      );
+      if (catalogItems.length > 0) {
+        const savingToast = toast.loading(`Saving ${catalogItems.length} products to catalog…`);
+        syncInvoiceItemsToCatalog(catalogItems)
+          .then((res) => {
+            toast.dismiss(savingToast);
+            if (res.written > 0) {
+              toast.success(`✅ ${res.written} products saved to catalog`, {
+                description: "Available now in Price Adjustment, Margin Protection & Markdown Ladder.",
+              });
+            }
+            if (res.failed > 0) {
+              toast.warning(`${res.failed} products could not be saved`);
+              console.warn("[catalog-sync] failures:", res.errors);
+            }
+          })
+          .catch((e) => {
+            toast.dismiss(savingToast);
+            console.warn("[catalog-sync] failed", e);
+          });
+      }
     } catch (e) {
       console.warn("[invoice-session-store] write failed", e);
     }

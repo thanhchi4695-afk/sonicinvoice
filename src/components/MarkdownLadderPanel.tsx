@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import {
   ArrowLeft, Plus, Trash2, Play, Pause, SkipForward, RotateCcw,
   AlertTriangle, Clock, ShieldAlert, ChevronRight, Loader2, RefreshCw,
-  Tag, Sparkles, BarChart3,
+  Tag, Sparkles, BarChart3, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { checkMargin, getMarginSettings } from "@/lib/margin-protection";

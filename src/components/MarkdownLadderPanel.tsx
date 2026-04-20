@@ -605,6 +605,32 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
                       <ShieldAlert className="w-3 h-3" /> {stage.discountPercent}% discount breaches margin. Max safe: {marginCheck.maxDiscount}%
                     </div>
                   )}
+                  {/* Live per-product preview for this stage */}
+                  {selectedProducts.length > 0 && (
+                    <div className="mt-3 border-t border-border pt-2 space-y-1">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Preview at -{stage.discountPercent}%</p>
+                      {selectedProducts.slice(0, 5).map(p => {
+                        const newPrice = +(p.retailPrice * (1 - stage.discountPercent / 100)).toFixed(2);
+                        const margin = p.cost > 0 ? ((newPrice - p.cost) / newPrice) * 100 : null;
+                        const breach = margin !== null && margin < newLadder.min_margin_pct;
+                        return (
+                          <div key={p.variantId} className="flex items-center gap-2 text-[11px]">
+                            {breach && <AlertTriangle className="w-3 h-3 text-yellow-600 shrink-0" />}
+                            <span className="truncate flex-1">{p.productTitle}</span>
+                            <span className="font-mono text-muted-foreground">{fmt(p.retailPrice)} → {fmt(newPrice)}</span>
+                            {margin !== null && (
+                              <span className={cn("font-mono", breach ? "text-yellow-600" : "text-muted-foreground")}>
+                                {margin.toFixed(1)}%{breach && " ⚠"}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {selectedProducts.length > 5 && (
+                        <p className="text-[10px] text-muted-foreground">+{selectedProducts.length - 5} more</p>
+                      )}
+                    </div>
+                  )}
                 </Card>
               );
             })}

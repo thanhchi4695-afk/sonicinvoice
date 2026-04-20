@@ -580,6 +580,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 return { ...p, rrp: newRrp } as ValidatedProduct;
               }),
             );
+            // Also patch productGroups — that's what the Shopify Preview,
+            // ProductCard list, and CSV export actually read from.
+            setProductGroups((prev) =>
+              prev.map((g) => {
+                const newRrp = rrpByKey.get((g.name || "").toLowerCase().trim());
+                if (!newRrp || Number(g.rrp) > 0) return g;
+                return {
+                  ...g,
+                  rrp: newRrp,
+                  variants: g.variants?.map((v) =>
+                    Number(v.rrp) > 0 ? v : { ...v, rrp: newRrp },
+                  ),
+                } as typeof g;
+              }),
+            );
           }
           const breakdown = Object.entries(summary.bySource)
             .map(([k, v]) => `${v} ${k.replace("_", " ")}`)

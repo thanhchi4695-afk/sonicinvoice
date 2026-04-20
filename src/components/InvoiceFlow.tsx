@@ -719,12 +719,34 @@ const InvoiceFlow = ({ onBack }: InvoiceFlowProps) => {
   const cancelledRef = { current: false };
   const [parsedNames, setParsedNames] = useState<string[]>([]);
 
+  const [posPickerOpen, setPOSPickerOpen] = useState(false);
+  const pendingUploadKindRef = useRef<"file" | "camera" | null>(null);
+
   const handleFileSelect = () => {
+    if (!hasPickedPOS()) {
+      pendingUploadKindRef.current = "file";
+      setPOSPickerOpen(true);
+      return;
+    }
     fileInputRef.current?.click();
   };
 
   const handleCameraSelect = () => {
+    if (!hasPickedPOS()) {
+      pendingUploadKindRef.current = "camera";
+      setPOSPickerOpen(true);
+      return;
+    }
     cameraInputRef.current?.click();
+  };
+
+  const handlePOSPicked = () => {
+    const kind = pendingUploadKindRef.current;
+    pendingUploadKindRef.current = null;
+    setTimeout(() => {
+      if (kind === "camera") cameraInputRef.current?.click();
+      else fileInputRef.current?.click();
+    }, 100);
   };
 
   const [originalFileMeta, setOriginalFileMeta] = useState<{

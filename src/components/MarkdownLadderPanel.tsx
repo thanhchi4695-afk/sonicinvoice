@@ -389,6 +389,59 @@ const MarkdownLadderPanel = ({ onBack }: Props) => {
   const completedItems = ladderItems.filter(p => p.status === "completed" || p.status === "sold_through");
   const totalSavings = ladderItems.reduce((s, p) => s + (p.original_price - p.current_price), 0);
 
+  /* ─── Export helpers ─── */
+
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const today = () => new Date().toISOString().slice(0, 10);
+  const downloadCsv = (filename: string, rows: string[][]) => {
+    const csv = rows.map(r => r.map(c => {
+      const v = String(c ?? "");
+      return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+    }).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportLadderSchedule = (ladder: Ladder) => {
+    const items = ladderItems.filter(i => i.ladder_id === ladder.id);
+    if (items.length === 0) { toast.info("No items to export"); return; }
+    const rows: string[][] = [["Product", "SKU", "Original Price", "Stage", "Discount %", "New Price", "Margin %", "Trigger Days", "Status"]];
+    for (const item of items) {
+      for (const stage of ladder.stages) {
+        const newPrice = +(item.original_price * (1 - stage.discountPercent / 100)).toFixed(2);
+        const margin = item.cost && item.cost > 0 ? ((newPrice - item.cost) / newPrice) * 100 : null;
+        rows.push([
+          item.product_title,
+          item.variant_info || "",
+          item.original_price.toFixed(2),
+          String(stage.stageNumber),
+          String(stage.discountPercent),
+          newPrice.toFixed(2),
+          margin !== null ? margin.toFixed(1) : "",
+          String(stage.triggerDays),
+          item.current_stage >= stage.stageNumber ? "applied" : "scheduled",
+        ]);
+      }
+    }
+    downloadCsv(`markdown-ladder-${today()}.csv`, rows);
+    toast.success(`Exported ${items.length} products × ${ladder.stages.length} stages`);
+  };
+
+  const exportShopifyStage = (ladder: Ladder, stage: LadderStage) => {
+    const items = ladderItems.filter(i => i.ladder_id === ladder.id);
+    if (items.length === 0) { toast.info("No items to export"); return; }
+    const rows: string[][] = [["Handle", "Variant Price", "Variant Compare At Price"]];
+    for (const item of items) {
+      const newPrice = +(item.original_price * (1 - stage.discountPercent / 100)).toFixed(2);
+      rows.push([slugify(item.product_title), newPrice.toFixed(2), item.original_price.toFixed(2)]);
+    }
+    downloadCsv(`markdown-stage-${stage.stageNumber}-shopify-${today()}.csv`, rows);
+    toast.success(`Stage ${stage.stageNumber} Shopify CSV downloaded`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">

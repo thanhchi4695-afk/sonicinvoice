@@ -225,6 +225,26 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
       </div>
 
       <div className="px-4 pt-4 space-y-4">
+        <InvoiceSessionBanner />
+
+        {hasSession && !externalProducts && (
+          <div className="flex items-center gap-2 text-xs flex-wrap">
+            <span className="text-muted-foreground">Show:</span>
+            <button
+              onClick={() => setSource("invoice")}
+              className={`px-3 py-1.5 rounded-full border transition-colors ${source === "invoice" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+            >
+              Current invoice ({invoiceProducts.length} products)
+            </button>
+            <button
+              onClick={() => setSource("catalog")}
+              className={`px-3 py-1.5 rounded-full border transition-colors ${source === "catalog" ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}
+            >
+              All catalog
+            </button>
+          </div>
+        )}
+
         {/* Templates bar */}
         {templates.length > 0 && (
           <div>

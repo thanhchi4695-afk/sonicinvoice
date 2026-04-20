@@ -354,6 +354,8 @@ export function generateShopifyCSV(
         Status: isFirstRow ? prod.status : "",
         "SEO Title": isFirstRow ? prod.seoTitle : "",
         "SEO Description": isFirstRow ? prod.seoDesc : "",
+        // #6 Collection assignment — comma-joined list, used by importers/Shopify push.
+        Collection: isFirstRow ? prod.collections.join(", ") : "",
         ...(v.cogs ? { "Cost per item": v.cogs } : {}),
       };
 
@@ -381,6 +383,11 @@ export function generateShopifyCSV(
     "Variant Requires Shipping", "Variant Taxable", "Variant Weight Unit",
     "Image Src", "Status", "SEO Title", "SEO Description",
   ];
+
+  // #6 Only include Collection column if at least one product has assignments
+  if (rows.some((r) => r.Collection?.trim())) {
+    baseColumns.push("Collection");
+  }
 
   // Only include Cost if any row has it
   if (rows.some(r => r["Cost per item"])) {

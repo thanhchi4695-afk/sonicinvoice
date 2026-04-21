@@ -189,6 +189,11 @@ export default function PostParseReviewScreen({
    *  "inclusive" = cost was entered GST-inclusive and we divide by (1 + rate) to
    *  derive the true ex-GST cost. Toggling is fully reversible. */
   const [costGstMode, setCostGstMode] = useState<"exclusive" | "inclusive">("exclusive");
+  /** How multi-colour products should be exported:
+   *  - "variants" (default) → one Shopify product, colours become variants
+   *  - "separate" → one Shopify product per colour, name becomes "Product - Colour"
+   *  Toggle is fully reversible — switching back strips any " - Colour" suffix we added. */
+  const [colourMode, setColourMode] = useState<"variants" | "separate">("variants");
   const [gstRate] = useState(0.10); // AU/NZ default; future: pull from tax-service
 
   /** Pending corrections awaiting a reason. Key = `${rowIndex}::${field}`. */

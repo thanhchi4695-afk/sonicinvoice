@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ShopifyEmbeddedProvider from "@/components/ShopifyEmbeddedProvider";
+import EmbeddedAuthHealthCheck from "@/components/EmbeddedAuthHealthCheck";
 import InstallAppBanner from "@/components/InstallAppBanner";
 import BarcodeProvider from "@/components/BarcodeProvider";
 import Index from "./pages/Index.tsx";
@@ -37,6 +38,7 @@ const App = () => (
             </Routes>
           </BrowserRouter>
           <InstallAppBanner />
+          <EmbeddedAuthHealthCheck />
         </BarcodeProvider>
       </ShopifyEmbeddedProvider>
     </TooltipProvider>

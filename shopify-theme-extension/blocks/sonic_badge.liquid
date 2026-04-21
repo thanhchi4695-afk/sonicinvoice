@@ -1,0 +1,25 @@
+{% comment %}
+  Sonic Invoices "Verified" trust badge.
+  Merchants add this block to a product section to show that the product
+  was imported and verified through Sonic Invoices.
+{% endcomment %}
+
+<div class="sonic-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:{{ block.settings.bg_color }};color:{{ block.settings.text_color }};font-size:{{ block.settings.font_size }}px;font-family:inherit;">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M20 6 9 17l-5-5"/>
+  </svg>
+  <span>{{ block.settings.label }}</span>
+</div>
+
+{% schema %}
+{
+  "name": "Sonic Verified Badge",
+  "target": "section",
+  "settings": [
+    { "type": "text",   "id": "label",      "label": "Badge text", "default": "Verified by Sonic Invoices" },
+    { "type": "color",  "id": "bg_color",   "label": "Background", "default": "#0F172A" },
+    { "type": "color",  "id": "text_color", "label": "Text color", "default": "#FFFFFF" },
+    { "type": "range",  "id": "font_size",  "label": "Font size",  "min": 10, "max": 18, "step": 1, "unit": "px", "default": 12 }
+  ]
+}
+{% endschema %}

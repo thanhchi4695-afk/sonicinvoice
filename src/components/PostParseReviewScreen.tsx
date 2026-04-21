@@ -895,6 +895,8 @@ export default function PostParseReviewScreen({
           </div>
         );
       })()}
+
+      <FieldConfidenceHeader
         fieldConfidence={fieldConfidence}
         extractionNotes={extractionNotes}
       />

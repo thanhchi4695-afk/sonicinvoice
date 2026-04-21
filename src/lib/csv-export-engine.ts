@@ -152,7 +152,9 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
           option1Name: "Title",
           option1Value: "Default Title",
           price: ln.rrp.toFixed(2),
-          compareAtPrice: ln.price < ln.rrp ? ln.rrp.toFixed(2) : "",
+          // Compare-at-price stays blank for new products — only used later when a sale is applied.
+          // (Previously we set it = RRP whenever price < rrp, which caused new items to look discounted.)
+          compareAtPrice: "",
           sku: ln.sku || "",
           barcode: ln.barcode || "",
           cogs: ln.cogs?.toFixed(2),
@@ -198,7 +200,8 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
           option1Name: "Title",
           option1Value: "Default Title",
           price: base.rrp.toFixed(2),
-          compareAtPrice: base.price < base.rrp ? base.rrp.toFixed(2) : "",
+          // Compare-at-price stays blank by default (set only when applying a markdown/sale).
+          compareAtPrice: "",
           sku: base.sku || "",
           barcode: base.barcode || "",
           cogs: base.cogs?.toFixed(2),
@@ -216,7 +219,8 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
       option2Name,
       option2Value: option2Name ? (ln.colour || "Default") : undefined,
       price: ln.rrp.toFixed(2),
-      compareAtPrice: ln.price < ln.rrp ? ln.rrp.toFixed(2) : "",
+      // Compare-at-price stays blank by default (set only when applying a markdown/sale).
+      compareAtPrice: "",
       sku: ln.sku || "",
       barcode: ln.barcode || "",
       cogs: ln.cogs?.toFixed(2),

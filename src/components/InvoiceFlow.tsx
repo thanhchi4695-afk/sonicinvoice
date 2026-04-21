@@ -903,7 +903,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       groups.push({
         styleGroup: first.sku || null as any,
         name: displayName,
-        brand: first.brand || supplierName || "Unknown",
+        // Prefer the user-entered supplierName over AI-extracted brand if supplier was set explicitly,
+        // and never fall back to literal "Unknown" — leave blank so it doesn't pollute product titles.
+        brand: (supplierName?.trim() || first.brand || "").trim(),
         type: first.type || "General",
         colour: hasMultipleColours ? "" : (first.colour || ""),
         size: dedupedVariants.length === 1 ? (dedupedVariants[0].size || "") : "",
@@ -2315,6 +2317,23 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       {/* Step 1: Upload */}
       {step === 1 && (
         <div className="px-4 pt-6">
+          {/* Vendor / Supplier name — set BEFORE upload so CSV vendor is never "Unknown" */}
+          <div className="bg-card rounded-lg border border-border p-3 mb-4">
+            <label className="text-xs font-medium mb-1.5 block">
+              Vendor / Supplier name
+              <span className="text-muted-foreground font-normal"> (recommended)</span>
+            </label>
+            <input
+              value={supplierName}
+              onChange={(e) => setSupplierName(e.target.value)}
+              placeholder="e.g. OM Designs, Sunseeker, Jantzen"
+              className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              This becomes the Vendor in your CSV and helps the AI match prior templates. Set it now to avoid "Unknown" appearing in product names.
+            </p>
+          </div>
+
           {/* Location selector */}
           {storeLocations.length > 1 && (
             <div className="bg-card rounded-lg border border-border p-3 mb-4">

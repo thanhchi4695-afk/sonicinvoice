@@ -776,6 +776,45 @@ export default function PostParseReviewScreen({
         />
       )}
 
+      {/* Vendor / Supplier name banner — apply to all rows missing a vendor.
+          Critical when the AI couldn't infer the supplier (e.g. handwritten slips
+          where rows otherwise show "Unknown" in the product title). */}
+      {(() => {
+        if (products.length === 0) return null;
+        const missingVendor = products.filter(p => !(p.brand || "").trim()).length;
+        return (
+          <div className="mb-3 flex flex-wrap items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/20">
+            <Truck className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium">Vendor / Supplier:</span>
+            <Input
+              value={bulkVendor}
+              onChange={e => setBulkVendor(e.target.value)}
+              placeholder={supplierName || "e.g. OM Designs"}
+              className="h-7 text-xs w-48"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px]"
+              disabled={!bulkVendor.trim()}
+              onClick={() => {
+                const v = bulkVendor.trim();
+                onUpdateProducts(products.map(p => ({ ...p, brand: v, _manuallyEdited: true } as any)));
+                toast.success(`Vendor set to "${v}" on all ${products.length} rows`);
+                setBulkVendor("");
+              }}
+            >
+              Apply to all rows
+            </Button>
+            {missingVendor > 0 && (
+              <span className="text-[10px] text-muted-foreground ml-auto">
+                {missingVendor} of {products.length} rows missing a vendor
+              </span>
+            )}
+          </div>
+        );
+      })()}
+
       {/* GST mode toggle for cost column — additive, fully reversible */}
       {(() => {
         const sampleCost = products.find(p => (p.cost || 0) > 0)?.cost || 0;

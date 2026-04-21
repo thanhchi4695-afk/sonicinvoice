@@ -189,6 +189,11 @@ export default function PostParseReviewScreen({
    *  "inclusive" = cost was entered GST-inclusive and we divide by (1 + rate) to
    *  derive the true ex-GST cost. Toggling is fully reversible. */
   const [costGstMode, setCostGstMode] = useState<"exclusive" | "inclusive">("exclusive");
+  /** How multi-colour products should be exported:
+   *  - "variants" (default) → one Shopify product, colours become variants
+   *  - "separate" → one Shopify product per colour, name becomes "Product - Colour"
+   *  Toggle is fully reversible — switching back strips any " - Colour" suffix we added. */
+  const [colourMode, setColourMode] = useState<"variants" | "separate">("variants");
   const [gstRate] = useState(0.10); // AU/NZ default; future: pull from tax-service
 
   /** Pending corrections awaiting a reason. Key = `${rowIndex}::${field}`. */
@@ -817,6 +822,76 @@ export default function PostParseReviewScreen({
                 e.g. ${sampleCost.toFixed(2)} → ${stripped.toFixed(2)} ex-GST
               </span>
             )}
+          </div>
+        );
+      })()}
+
+      {/* Colour grouping mode — controls how multi-colour styles are exported */}
+      {(() => {
+        const colourCount = new Set(
+          products.map(p => (p.colour || "").trim().toLowerCase()).filter(Boolean)
+        ).size;
+        if (colourCount < 2) return null;
+
+        const COLOUR_SUFFIX = / - [^-]+$/;
+        const stripColourSuffix = (name: string, colour: string) => {
+          const c = (colour || "").trim();
+          if (!c) return name;
+          const re = new RegExp(`\\s*[-–]\\s*${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i");
+          return name.replace(re, "").trim();
+        };
+
+        return (
+          <div className="mb-3 flex flex-wrap items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/20">
+            <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium">Multi-colour products:</span>
+            <div className="flex bg-card rounded-md border border-border overflow-hidden ml-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (colourMode === "variants") return;
+                  // Strip the " - Colour" suffix we previously appended
+                  const updated = products.map(p => ({
+                    ...p,
+                    name: stripColourSuffix(p.name || "", p.colour || ""),
+                  }));
+                  onUpdateProducts(updated);
+                  setColourMode("variants");
+                  toast.success("Colours grouped as variants of one product");
+                }}
+                className={`px-3 py-1 text-[11px] font-medium transition-colors ${
+                  colourMode === "variants" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                One product · colours as variants
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (colourMode === "separate") return;
+                  // Append " - Colour" so InvoiceFlow's grouping key splits them per colour
+                  const updated = products.map(p => {
+                    const baseName = stripColourSuffix(p.name || "", p.colour || "");
+                    const colour = (p.colour || "").trim();
+                    return {
+                      ...p,
+                      name: colour ? `${baseName} - ${colour}` : baseName,
+                    };
+                  });
+                  onUpdateProducts(updated);
+                  setColourMode("separate");
+                  toast.success("Each colour will be exported as a separate product");
+                }}
+                className={`px-3 py-1 text-[11px] font-medium transition-colors ${
+                  colourMode === "separate" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                Separate product per colour
+              </button>
+            </div>
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              {colourCount} colours detected
+            </span>
           </div>
         );
       })()}

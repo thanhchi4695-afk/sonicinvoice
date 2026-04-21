@@ -185,6 +185,11 @@ export default function PostParseReviewScreen({
   const [autoRefineProfile, setAutoRefineProfile] = useState(() => {
     try { return localStorage.getItem("sonic_auto_refine_profile") !== "false"; } catch { return true; }
   });
+  /** GST mode for the cost-per-item column. "exclusive" (default) = cost is ex-GST.
+   *  "inclusive" = cost was entered GST-inclusive and we divide by (1 + rate) to
+   *  derive the true ex-GST cost. Toggling is fully reversible. */
+  const [costGstMode, setCostGstMode] = useState<"exclusive" | "inclusive">("exclusive");
+  const [gstRate] = useState(0.10); // AU/NZ default; future: pull from tax-service
 
   /** Pending corrections awaiting a reason. Key = `${rowIndex}::${field}`. */
   const [pendingCorrections, setPendingCorrections] = useState<Record<string, {

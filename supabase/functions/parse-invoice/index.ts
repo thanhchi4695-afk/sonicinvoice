@@ -699,7 +699,21 @@ The goal is MAXIMUM RECALL — extract everything that could possibly be a produ
 
     // Force mode overrides
     if (forceMode === "packing_slip") {
-      systemPrompt += `\n\nIMPORTANT: The user has confirmed this is a PACKING SLIP. Set document_type to "packing_slip". Do NOT extract prices — set unit_cost and rrp to null.`;
+      systemPrompt += `\n\nIMPORTANT: The user clicked PACKING SLIP mode. Default behaviour: set document_type to "packing_slip" and unit_cost/rrp to null.
+
+EXCEPTION — handwritten tax invoices: if the document clearly shows the words "TAX INVOICE", "STATEMENT", a printed PRICE/GST/TOTAL column, or handwritten unit prices next to product names, treat it as a HANDWRITTEN INVOICE instead:
+- Set document_type to "handwritten_invoice"
+- DO extract unit_cost and any RRP shown beside the cost
+- Add "user_chose_packing_slip_but_doc_has_prices" to parse_notes so the UI can prompt the user to switch flows.
+
+For genuine packing slips with no prices, follow the standard packing slip rules.
+
+HANDWRITTEN PRODUCT EXTRACTION (applies in either case):
+- Each handwritten product line typically has: QTY (left) | DESCRIPTION (centre, may span 2 lines with colour variants below) | PRICE | GST | TOTAL (right)
+- Indented dashed lines under a product (e.g. "- Thar Desert / Spiral Green") are COLOUR VARIANTS of the product above — emit one row per colour
+- If a single QTY (e.g. "4") sits beside a product with multiple colour variants listed, divide qty across colours equally and flag "qty_split_across_colours" in parse_notes
+- Read handwritten numbers carefully — distinguish 4 vs 9, 1 vs 7, 0 vs 6
+- Do NOT skip rows just because handwriting is messy — extract with lower confidence and flag "handwritten_uncertain"`;
     } else if (forceMode === "invoice") {
       systemPrompt += `\n\nIMPORTANT: The user has confirmed this is an INVOICE. Set document_type to "tax_invoice". Extract prices.`;
     } else if (forceMode === "handwritten") {

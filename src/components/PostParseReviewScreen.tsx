@@ -869,18 +869,48 @@ export default function PostParseReviewScreen({
                 type="button"
                 onClick={() => {
                   if (colourMode === "separate") return;
-                  // Append " - Colour" so InvoiceFlow's grouping key splits them per colour
-                  const updated = products.map(p => {
+                  // Split combined colour values (e.g. "Thar Desert / Spiral Green")
+                  // into one row per colour, then append " - Colour" to each name.
+                  const SPLIT_RE = /\s*[\/,&]\s*|\s+(?:and|AND|y|Y)\s+/;
+                  const updated: typeof products = [];
+                  let extraRows = 0;
+                  products.forEach(p => {
                     const baseName = stripColourSuffix(p.name || "", p.colour || "");
-                    const colour = (p.colour || "").trim();
-                    return {
-                      ...p,
-                      name: colour ? `${baseName} - ${colour}` : baseName,
-                    };
+                    const raw = (p.colour || "").trim();
+                    const parts = raw ? raw.split(SPLIT_RE).map(s => s.trim()).filter(Boolean) : [""];
+                    if (parts.length <= 1) {
+                      const colour = parts[0] || "";
+                      updated.push({
+                        ...p,
+                        name: colour ? `${baseName} - ${colour}` : baseName,
+                      });
+                    } else {
+                      // Divide qty as evenly as possible across the split colours
+                      const totalQty = Number((p as any).qty) || 0;
+                      const per = totalQty > 0 ? Math.floor(totalQty / parts.length) : 0;
+                      const remainder = totalQty > 0 ? totalQty - per * parts.length : 0;
+                      parts.forEach((colour, i) => {
+                        const qty = per + (i < remainder ? 1 : 0);
+                        updated.push({
+                          ...p,
+                          _rowIndex: p._rowIndex + i * 0.001, // keep stable-ish order
+                          name: `${baseName} - ${colour}`,
+                          colour,
+                          ...(totalQty > 0 ? { qty } : {}),
+                        } as any);
+                      });
+                      extraRows += parts.length - 1;
+                    }
                   });
-                  onUpdateProducts(updated);
+                  // Re-sequence _rowIndex so downstream logic stays clean
+                  const reindexed = updated.map((p, i) => ({ ...p, _rowIndex: i }));
+                  onUpdateProducts(reindexed);
                   setColourMode("separate");
-                  toast.success("Each colour will be exported as a separate product");
+                  toast.success(
+                    extraRows > 0
+                      ? `Split into ${reindexed.length} separate products (${extraRows} new rows)`
+                      : "Each colour will be exported as a separate product"
+                  );
                 }}
                 className={`px-3 py-1 text-[11px] font-medium transition-colors ${
                   colourMode === "separate" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"

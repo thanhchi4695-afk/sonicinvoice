@@ -4,7 +4,7 @@ import {
   Check, X, AlertTriangle, ChevronDown, ChevronRight, RotateCcw,
   ShieldCheck, Bug, Search, Filter, CheckCheck, ArrowRight,
   Edit3, Download, Zap, ArrowUpRight, Layers, Merge, Scissors,
-  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash, MapPin, ScanLine, Tag
+  Eye, Brain, Truck, Receipt, Package, FileText, DollarSign, Hash, MapPin, ScanLine, Tag, Percent
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -185,6 +185,11 @@ export default function PostParseReviewScreen({
   const [autoRefineProfile, setAutoRefineProfile] = useState(() => {
     try { return localStorage.getItem("sonic_auto_refine_profile") !== "false"; } catch { return true; }
   });
+  /** GST mode for the cost-per-item column. "exclusive" (default) = cost is ex-GST.
+   *  "inclusive" = cost was entered GST-inclusive and we divide by (1 + rate) to
+   *  derive the true ex-GST cost. Toggling is fully reversible. */
+  const [costGstMode, setCostGstMode] = useState<"exclusive" | "inclusive">("exclusive");
+  const [gstRate] = useState(0.10); // AU/NZ default; future: pull from tax-service
 
   /** Pending corrections awaiting a reason. Key = `${rowIndex}::${field}`. */
   const [pendingCorrections, setPendingCorrections] = useState<Record<string, {
@@ -765,6 +770,53 @@ export default function PostParseReviewScreen({
           isReprocessing={isReprocessing}
         />
       )}
+
+      {/* GST mode toggle for cost column — additive, fully reversible */}
+      <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/20">
+        <Percent className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="text-xs font-medium">Cost prices on this invoice are:</span>
+        <div className="flex bg-card rounded-md border border-border overflow-hidden ml-1">
+          <button
+            type="button"
+            onClick={() => {
+              if (costGstMode === "exclusive") return;
+              // inclusive -> exclusive: multiply costs back up by (1 + rate)
+              const factor = 1 + gstRate;
+              const updated = products.map(p => ({ ...p, cost: +(((p.cost || 0) * factor)).toFixed(4) }));
+              onUpdateProducts(updated);
+              setCostGstMode("exclusive");
+              toast.success(`Costs restored to GST-exclusive (×${factor.toFixed(2)})`);
+            }}
+            className={`px-3 py-1 text-[11px] font-medium transition-colors ${
+              costGstMode === "exclusive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"
+            }`}
+          >
+            GST-exclusive (default)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (costGstMode === "inclusive") return;
+              // exclusive -> inclusive: divide costs by (1 + rate) to get true ex-GST
+              const factor = 1 + gstRate;
+              const updated = products.map(p => ({ ...p, cost: +(((p.cost || 0) / factor)).toFixed(4) }));
+              onUpdateProducts(updated);
+              setCostGstMode("inclusive");
+              toast.success(`Costs re-calculated as GST-inclusive (÷${factor.toFixed(2)})`);
+            }}
+            className={`px-3 py-1 text-[11px] font-medium transition-colors ${
+              costGstMode === "inclusive" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"
+            }`}
+          >
+            GST-inclusive ({(gstRate * 100).toFixed(0)}%)
+          </button>
+        </div>
+        <span className="text-[10px] text-muted-foreground ml-auto">
+          {costGstMode === "inclusive"
+            ? `Costs divided by ${(1 + gstRate).toFixed(2)} — toggle back to undo`
+            : "Toggle if your supplier's cost prices include GST"}
+        </span>
+      </div>
 
       <FieldConfidenceHeader
         fieldConfidence={fieldConfidence}

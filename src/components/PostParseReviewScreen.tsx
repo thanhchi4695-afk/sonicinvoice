@@ -776,6 +776,45 @@ export default function PostParseReviewScreen({
         />
       )}
 
+      {/* Vendor / Supplier name banner — apply to all rows missing a vendor.
+          Critical when the AI couldn't infer the supplier (e.g. handwritten slips
+          where rows otherwise show "Unknown" in the product title). */}
+      {(() => {
+        if (products.length === 0) return null;
+        const missingVendor = products.filter(p => !(p.brand || "").trim()).length;
+        return (
+          <div className="mb-3 flex flex-wrap items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/20">
+            <Truck className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium">Vendor / Supplier:</span>
+            <Input
+              value={bulkVendor}
+              onChange={e => setBulkVendor(e.target.value)}
+              placeholder={supplierName || "e.g. OM Designs"}
+              className="h-7 text-xs w-48"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-[11px]"
+              disabled={!bulkVendor.trim()}
+              onClick={() => {
+                const v = bulkVendor.trim();
+                onUpdateProducts(products.map(p => ({ ...p, brand: v, _manuallyEdited: true } as any)));
+                toast.success(`Vendor set to "${v}" on all ${products.length} rows`);
+                setBulkVendor("");
+              }}
+            >
+              Apply to all rows
+            </Button>
+            {missingVendor > 0 && (
+              <span className="text-[10px] text-muted-foreground ml-auto">
+                {missingVendor} of {products.length} rows missing a vendor
+              </span>
+            )}
+          </div>
+        );
+      })()}
+
       {/* GST mode toggle for cost column — additive, fully reversible */}
       {(() => {
         const sampleCost = products.find(p => (p.cost || 0) > 0)?.cost || 0;
@@ -869,18 +908,48 @@ export default function PostParseReviewScreen({
                 type="button"
                 onClick={() => {
                   if (colourMode === "separate") return;
-                  // Append " - Colour" so InvoiceFlow's grouping key splits them per colour
-                  const updated = products.map(p => {
+                  // Split combined colour values (e.g. "Thar Desert / Spiral Green")
+                  // into one row per colour, then append " - Colour" to each name.
+                  const SPLIT_RE = /\s*[\/,&]\s*|\s+(?:and|AND|y|Y)\s+/;
+                  const updated: typeof products = [];
+                  let extraRows = 0;
+                  products.forEach(p => {
                     const baseName = stripColourSuffix(p.name || "", p.colour || "");
-                    const colour = (p.colour || "").trim();
-                    return {
-                      ...p,
-                      name: colour ? `${baseName} - ${colour}` : baseName,
-                    };
+                    const raw = (p.colour || "").trim();
+                    const parts = raw ? raw.split(SPLIT_RE).map(s => s.trim()).filter(Boolean) : [""];
+                    if (parts.length <= 1) {
+                      const colour = parts[0] || "";
+                      updated.push({
+                        ...p,
+                        name: colour ? `${baseName} - ${colour}` : baseName,
+                      });
+                    } else {
+                      // Divide qty as evenly as possible across the split colours
+                      const totalQty = Number((p as any).qty) || 0;
+                      const per = totalQty > 0 ? Math.floor(totalQty / parts.length) : 0;
+                      const remainder = totalQty > 0 ? totalQty - per * parts.length : 0;
+                      parts.forEach((colour, i) => {
+                        const qty = per + (i < remainder ? 1 : 0);
+                        updated.push({
+                          ...p,
+                          _rowIndex: p._rowIndex + i * 0.001, // keep stable-ish order
+                          name: `${baseName} - ${colour}`,
+                          colour,
+                          ...(totalQty > 0 ? { qty } : {}),
+                        } as any);
+                      });
+                      extraRows += parts.length - 1;
+                    }
                   });
-                  onUpdateProducts(updated);
+                  // Re-sequence _rowIndex so downstream logic stays clean
+                  const reindexed = updated.map((p, i) => ({ ...p, _rowIndex: i }));
+                  onUpdateProducts(reindexed);
                   setColourMode("separate");
-                  toast.success("Each colour will be exported as a separate product");
+                  toast.success(
+                    extraRows > 0
+                      ? `Split into ${reindexed.length} separate products (${extraRows} new rows)`
+                      : "Each colour will be exported as a separate product"
+                  );
                 }}
                 className={`px-3 py-1 text-[11px] font-medium transition-colors ${
                   colourMode === "separate" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"

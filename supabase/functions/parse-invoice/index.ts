@@ -711,7 +711,13 @@ For genuine packing slips with no prices, follow the standard packing slip rules
 HANDWRITTEN PRODUCT EXTRACTION (applies in either case):
 - Each handwritten product line typically has: QTY (left) | DESCRIPTION (centre, may span 2 lines with colour variants below) | PRICE | GST | TOTAL (right)
 - Indented dashed lines under a product (e.g. "- Thar Desert / Spiral Green") are COLOUR VARIANTS of the product above — emit one row per colour
-- If a single QTY (e.g. "4") sits beside a product with multiple colour variants listed, divide qty across colours equally and flag "qty_split_across_colours" in parse_notes
+- **TOTAL QUANTITY IS THE SOURCE OF TRUTH.** The single QTY number written next to the product name (e.g. "4") is the AUTHORITATIVE total for that style. NEVER invent or multiply quantities based on assumed size runs.
+- **Quantity splitting rule** — given total QTY = N and C colour variants listed beneath the product:
+    • If N is exactly divisible by C → emit one row per colour with qty = N/C (e.g. QTY 4, 4 colours → 1 each).
+    • If N is NOT divisible by C → emit one row per colour, distribute as evenly as possible (e.g. QTY 5, 2 colours → 3 + 2), and flag "qty_uneven_split_across_colours" in parse_notes.
+    • If only ONE colour is listed → emit a single row with qty = N (do NOT expand into sizes unless a size grid is explicitly drawn).
+    • Never expand a single QTY into a full size run (e.g. QTY 4 must NOT become 2 per size × 5 sizes = 10). Size = "" or "One Size" is acceptable when no size info is present.
+- Add "qty_split_across_colours" to parse_notes whenever a total QTY was divided across colour variants.
 - Read handwritten numbers carefully — distinguish 4 vs 9, 1 vs 7, 0 vs 6
 - Do NOT skip rows just because handwriting is messy — extract with lower confidence and flag "handwritten_uncertain"`;
     } else if (forceMode === "invoice") {

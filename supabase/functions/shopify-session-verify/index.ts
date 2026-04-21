@@ -107,24 +107,69 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Use createSession() — NOT generateLink(). generateLink() in Supabase v2
-    // returns a token_hash inside a redirect URL, not access/refresh tokens.
-    const { data: sessionData, error: sessionErr } =
-      // deno-lint-ignore no-explicit-any
-      await (supabaseAdmin.auth.admin as any).createSession({ user_id: conn.user_id });
-
-    if (sessionErr || !sessionData?.session) {
-      console.error("Failed to create session:", sessionErr);
+    // supabase-js v2 doesn't expose createSession on auth.admin in this runtime.
+    // Use generateLink with type=magiclink — it embeds an access_token + refresh_token
+    // in the action_link's URL hash (#access_token=...&refresh_token=...).
+    const { data: userRow, error: userErr } =
+      await supabaseAdmin.auth.admin.getUserById(conn.user_id);
+    if (userErr || !userRow?.user?.email) {
+      console.error("Failed to load user:", userErr);
       return new Response(
-        JSON.stringify({ error: "Failed to create session" }),
+        JSON.stringify({ error: "Failed to load user" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: linkData, error: linkErr } =
+      await supabaseAdmin.auth.admin.generateLink({
+        type: "magiclink",
+        email: userRow.user.email,
+      });
+
+    if (linkErr || !linkData?.properties?.action_link) {
+      console.error("Failed to generate link:", linkErr);
+      return new Response(
+        JSON.stringify({ error: "Failed to issue session" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Parse tokens from the hash fragment of the action_link
+    const actionUrl = new URL(linkData.properties.action_link);
+    const hash      = new URLSearchParams(actionUrl.hash.replace(/^#/, ""));
+    let accessToken  = hash.get("access_token");
+    let refreshToken = hash.get("refresh_token");
+
+    // Fallback: some Supabase versions return token_hash instead — verify it
+    // server-side to mint a real session.
+    if (!accessToken || !refreshToken) {
+      const tokenHash = linkData.properties.hashed_token;
+      if (tokenHash) {
+        const { data: verified, error: verifyErr } =
+          await supabaseAdmin.auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
+        if (verifyErr || !verified?.session) {
+          console.error("verifyOtp failed:", verifyErr);
+          return new Response(
+            JSON.stringify({ error: "Failed to mint session" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        accessToken  = verified.session.access_token;
+        refreshToken = verified.session.refresh_token;
+      }
+    }
+
+    if (!accessToken || !refreshToken) {
+      return new Response(
+        JSON.stringify({ error: "Could not extract session tokens" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     return new Response(
       JSON.stringify({
-        access_token:  sessionData.session.access_token,
-        refresh_token: sessionData.session.refresh_token,
+        access_token:  accessToken,
+        refresh_token: refreshToken,
         shop,
         shop_name: conn.shop_name,
       }),

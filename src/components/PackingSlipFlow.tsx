@@ -196,8 +196,23 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
 
       if (error) throw error;
 
-      if (data.document_type === "invoice") {
-        toast.info("This looks like an invoice, not a packing slip. Use Invoice mode instead.");
+      if (data.document_type === "invoice" || data.document_type === "tax_invoice" || data.document_type === "handwritten_invoice") {
+        toast.info(
+          data.document_type === "handwritten_invoice"
+            ? "This looks like a handwritten tax invoice (it has prices). Please switch to Invoice mode to capture cost prices."
+            : "This looks like an invoice, not a packing slip. Use Invoice mode instead.",
+          { duration: 6000 }
+        );
+        setStep("upload");
+        return;
+      }
+
+      const rawProducts = (data.products || []) as Record<string, unknown>[];
+      if (rawProducts.length === 0) {
+        toast.error(
+          "Couldn't read any products from this packing slip. Tips: ensure good lighting, the page is flat, and handwriting is legible. Try cropping to just the line-items table.",
+          { duration: 8000 }
+        );
         setStep("upload");
         return;
       }
@@ -205,30 +220,36 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
       setSupplier(data.supplier || supplierInput || "");
       setDocConfidence(data.confidence || 0);
 
-      const parsed: PackingSlipItem[] = (data.products || []).map(
-        (p: Record<string, unknown>, i: number) => {
-          const desc = String(p.style_description || "");
-          const item: PackingSlipItem = {
-            style_code: String(p.style_code || ""),
-            colour_code: String(p.colour_code || ""),
-            style_description: desc,
-            size: String(p.size || ""),
-            quantity: Number(p.quantity) || 0,
-            carton_number: p.carton_number ? String(p.carton_number) : undefined,
-            barcode: p.barcode ? String(p.barcode) : undefined,
-            _title: toTitleCase(desc),
-            _confidence: 0,
-            _confidenceLevel: "low",
-            _rejected: false,
-            _rowIndex: i,
-          };
-          return scoreItem(item);
-        }
-      );
+      const parsed: PackingSlipItem[] = rawProducts.map((p, i) => {
+        const desc = String(p.style_description || p.product_name || p.title || "");
+        const item: PackingSlipItem = {
+          style_code: String(p.style_code || p.sku || ""),
+          colour_code: String(p.colour_code || p.colour || p.color || ""),
+          style_description: desc,
+          size: String(p.size || ""),
+          quantity: Number(p.quantity) || 0,
+          carton_number: p.carton_number ? String(p.carton_number) : undefined,
+          barcode: p.barcode ? String(p.barcode) : undefined,
+          _title: toTitleCase(desc),
+          _confidence: 0,
+          _confidenceLevel: "low",
+          _rejected: false,
+          _rowIndex: i,
+        };
+        return scoreItem(item);
+      });
 
-      setItems(parsed);
+      // Filter out completely empty rows the AI may have hallucinated
+      const nonEmpty = parsed.filter(p => p.style_description.trim() || p.style_code.trim());
+      if (nonEmpty.length === 0) {
+        toast.error("Extracted rows were empty. Please retake the photo with better lighting and focus, or use Invoice mode if the document has prices.", { duration: 8000 });
+        setStep("upload");
+        return;
+      }
+
+      setItems(nonEmpty);
       setStep("review");
-      toast.success(`Extracted ${parsed.length} items from packing slip`);
+      toast.success(`Extracted ${nonEmpty.length} items from packing slip`);
     } catch (err) {
       console.error("Packing slip parse error:", err);
       toast.error("Failed to parse packing slip. Please try again.");

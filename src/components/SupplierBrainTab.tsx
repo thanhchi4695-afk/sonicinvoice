@@ -57,33 +57,128 @@ export default function SupplierBrainTab() {
   const [contribute, setContribute] = useState(true);
   const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState<SupplierRow | null>(null);
-  const [driveUrl, setDriveUrl] = useState("https://drive.google.com/drive/folders/1jx3d-nQlZKoCeZ0LxPppHEEoYlnhpixw?usp=sharing");
-  const [seeding, setSeeding] = useState(false);
+  const [driveUrl, setDriveUrl] = useState("");
 
-  const seedFromDrive = async () => {
+  // Drive picker state machine: idle → picking → seeding → done
+  type FileStatus = "queued" | "running" | "done" | "skipped" | "error";
+  interface DriveFileItem {
+    id: string;
+    name: string;
+    selected: boolean;
+    status: FileStatus;
+    message?: string;
+    supplier?: string;
+  }
+  const [driveStage, setDriveStage] = useState<"idle" | "picking" | "seeding" | "done">("idle");
+  const [listing, setListing] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<DriveFileItem[]>([]);
+
+  const listDriveFiles = async () => {
     if (!driveUrl.trim()) {
       toast.error("Paste a Google Drive folder link first");
       return;
     }
-    setSeeding(true);
+    setListing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("seed-shared-from-drive", {
+      const { data, error } = await supabase.functions.invoke("drive-list", {
         body: { url: driveUrl.trim() },
       });
       if (error) throw error;
-      const { processed = 0, seeded = 0, errors } = data || {};
-      toast.success(`Seeded ${seeded} of ${processed} invoices into the shared pool`, {
-        description: errors?.length ? `${errors.length} skipped — see console for details` : undefined,
-      });
-      if (errors?.length) console.warn("Seed skips:", errors);
-      void load();
+      const files = (data?.files || []) as Array<{ id: string; name: string; mimeType: string }>;
+      if (files.length === 0) {
+        toast.error("No files found", {
+          description: "Make sure the folder is shared as 'Anyone with the link'.",
+        });
+        return;
+      }
+      setDriveFiles(files.map((f) => ({
+        id: f.id,
+        name: f.name,
+        selected: true, // default: all selected
+        status: "queued" as FileStatus,
+      })));
+      setDriveStage("picking");
     } catch (e) {
-      toast.error("Drive seed failed", {
-        description: e instanceof Error ? e.message : "Make sure the folder is shared as 'Anyone with the link'",
+      toast.error("Could not list folder", {
+        description: e instanceof Error ? e.message : "Unknown error",
       });
     } finally {
-      setSeeding(false);
+      setListing(false);
     }
+  };
+
+  const toggleAll = (on: boolean) => {
+    setDriveFiles((prev) => prev.map((f) => ({ ...f, selected: on })));
+  };
+
+  const seedSelected = async () => {
+    const targets = driveFiles.filter((f) => f.selected);
+    if (targets.length === 0) {
+      toast.error("Tick at least one file first");
+      return;
+    }
+    setDriveStage("seeding");
+    setDriveFiles((prev) => prev.map((f) => f.selected ? { ...f, status: "queued" } : f));
+
+    // Parallel with small concurrency cap so we don't hammer the AI gateway.
+    const CONCURRENCY = 3;
+    const queue = [...targets];
+    let active = 0;
+
+    await new Promise<void>((resolve) => {
+      const next = () => {
+        if (queue.length === 0 && active === 0) return resolve();
+        while (active < CONCURRENCY && queue.length > 0) {
+          const file = queue.shift()!;
+          active += 1;
+          setDriveFiles((prev) => prev.map((f) =>
+            f.id === file.id ? { ...f, status: "running" } : f,
+          ));
+          supabase.functions
+            .invoke("drive-seed-one", { body: { fileId: file.id, fileName: file.name } })
+            .then(({ data, error }) => {
+              const ok = !error && data?.ok;
+              setDriveFiles((prev) => prev.map((f) => {
+                if (f.id !== file.id) return f;
+                if (ok) {
+                  return {
+                    ...f,
+                    status: "done",
+                    supplier: data.supplier_name,
+                    message: `Pattern ${data.detected_pattern || "?"} · ${data.confidence}%`,
+                  };
+                }
+                const msg = error?.message || data?.error || "Failed";
+                return {
+                  ...f,
+                  status: msg.toLowerCase().includes("low-confidence") ? "skipped" : "error",
+                  message: msg,
+                };
+              }));
+            })
+            .catch((err) => {
+              setDriveFiles((prev) => prev.map((f) =>
+                f.id === file.id
+                  ? { ...f, status: "error", message: err instanceof Error ? err.message : "Failed" }
+                  : f,
+              ));
+            })
+            .finally(() => {
+              active -= 1;
+              next();
+            });
+        }
+      };
+      next();
+    });
+
+    setDriveStage("done");
+    void load();
+  };
+
+  const resetDrive = () => {
+    setDriveStage("idle");
+    setDriveFiles([]);
   };
 
   const load = async () => {

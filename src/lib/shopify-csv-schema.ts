@@ -1,6 +1,8 @@
 // Shopify CSV Export Schema for Scan Mode
 // Maps scanned products into Shopify-compatible CSV rows
 
+import { expandLineBySize } from "./size-run-expander";
+
 export const SHOPIFY_CSV_HEADERS = [
   "Handle",
   "Title",
@@ -141,11 +143,18 @@ export interface ScannedProductForExport {
 }
 
 export function generateShopifyCSV(products: ScannedProductForExport[]): string {
-  const handles = generateHandles(products.map(p => p.title));
-  // Lazy import to avoid circular deps in some bundlers
+  // Expand size runs ("8-16", "S-L") into one row per size — splits qty evenly.
+  const expanded: ScannedProductForExport[] = products.flatMap((p) =>
+    expandLineBySize({ ...p, qty: p.quantity }).map((x) => ({
+      ...x,
+      quantity: (x as { qty?: number }).qty ?? p.quantity,
+    } as ScannedProductForExport))
+  );
+
+  const handles = generateHandles(expanded.map(p => p.title));
   const status = (typeof localStorage !== "undefined" && localStorage.getItem("sonic_invoice_publish_status") === "draft") ? "draft" : "active";
 
-  const rows = products.map((p, i) => {
+  const rows = expanded.map((p, i) => {
     const desc = p.description
       ? (p.description.startsWith("<") ? p.description : `<p>${p.description}</p>`)
       : fallbackDescription(p.title, p.type, p.colour);
@@ -156,7 +165,7 @@ export function generateShopifyCSV(products: ScannedProductForExport[]): string 
       handles[i],                          // Handle
       p.title,                             // Title
       desc,                                // Body (HTML)
-      p.vendor,                            // Vendor
+      p.vendor,                            // Vendor — propagated to every row
       category,                            // Product Category
       p.type,                              // Type
       tags,                                // Tags
@@ -167,7 +176,7 @@ export function generateShopifyCSV(products: ScannedProductForExport[]): string 
       p.barcode,                           // Variant Barcode
       p.price.toFixed(2),                  // Variant Price
       p.costPerItem ? p.costPerItem.toFixed(2) : "", // Cost per item
-      p.quantity.toString(),               // Variant Inventory Qty
+      String(p.quantity ?? 0),             // Variant Inventory Qty (real, not hardcoded)
       "shopify",                           // Variant Inventory Tracker
       "deny",                              // Variant Inventory Policy
       "manual",                            // Variant Fulfillment Service

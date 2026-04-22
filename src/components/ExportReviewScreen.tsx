@@ -10,7 +10,7 @@ import { getEnabledMetafields } from "@/lib/metafields";
 import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed";
 import ShopifyPushFlow from "@/components/ShopifyPushFlow";
 import type { PushProduct } from "@/lib/shopify-api";
-import { generateShopifyCSV, getVariantMode, setVariantMode, type VariantMode, type ValidationResult } from "@/lib/csv-export-engine";
+import { generateShopifyCSV, generateLightspeedCSV, getVariantMode, setVariantMode, type VariantMode, type ValidationResult } from "@/lib/csv-export-engine";
 import { getPublishStatus, setPublishStatus, type PublishStatus } from "@/lib/publish-status";
 
 export interface ExportProduct {
@@ -24,6 +24,9 @@ export interface ExportProduct {
   price: number;
   rrp: number;
   cogs?: number;
+  /** On-hand qty surfaced from the invoice line. Used for Shopify
+   *  Variant Inventory Qty and Lightspeed inventory_<Outlet>. */
+  qty?: number;
   status: string;
   hasImage?: boolean;
   hasSeo?: boolean;
@@ -40,12 +43,13 @@ interface ExportReviewScreenProps {
   onStartFlow?: (flow: string) => void;
 }
 
-type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "tags_only" | "xlsx" | "summary_pdf" | "google_xml" | "google_tsv";
+type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "lightspeed_full" | "tags_only" | "xlsx" | "summary_pdf" | "google_xml" | "google_tsv";
 
 const FORMAT_CARDS: { id: ExportFormat; icon: React.ReactNode; label: string; desc: string; best: string }[] = [
   { id: "shopify_full", icon: <FileText className="w-5 h-5 text-primary" />, label: "Shopify CSV (Full)", desc: "Complete CSV with all fields for Shopify bulk import. Includes: title, description, type, vendor, tags, SEO, price, compare-at price, cost, images.", best: "New products, full product setup" },
   { id: "shopify_inventory", icon: <Package className="w-5 h-5 text-primary" />, label: "Shopify CSV (Inventory only)", desc: "Lightweight CSV with SKU, barcode, and quantity only. For updating stock on existing Shopify products.", best: "Restocking existing products" },
   { id: "shopify_price", icon: <DollarSign className="w-5 h-5 text-primary" />, label: "Shopify CSV (Price update)", desc: "CSV with price and compare-at price columns only. For updating RRP after a supplier price change.", best: "Seasonal price updates" },
+  { id: "lightspeed_full", icon: <ShoppingBag className="w-5 h-5 text-primary" />, label: "Lightspeed CSV (Full)", desc: "Lightspeed X-Series product import with brand, supplier, supply_price, retail_price, GST, and per-outlet inventory.", best: "Lightspeed catalogue import" },
   { id: "tags_only", icon: <Tag className="w-5 h-5 text-primary" />, label: "Tags only CSV", desc: "CSV with title and tags only. For updating tags on products already in Shopify.", best: "Tag cleanup on existing catalog" },
   { id: "xlsx", icon: <FileSpreadsheet className="w-5 h-5 text-primary" />, label: "Excel (.xlsx)", desc: "Same data as Shopify CSV but in Excel format. Useful for manual review or sharing with your accountant.", best: "Finance review, manual checking" },
   { id: "summary_pdf", icon: <FileText className="w-5 h-5 text-secondary" />, label: "Summary PDF", desc: "A printable summary of the invoice — supplier, date, products, quantities, costs, and totals.", best: "Filing, accounting, manager review" },
@@ -62,6 +66,7 @@ function generateFilename(supplier: string, format: ExportFormat): string {
     shopify_full: "full",
     shopify_inventory: "inventory",
     shopify_price: "price",
+    lightspeed_full: "lightspeed",
     tags_only: "tags",
     xlsx: "review",
     summary_pdf: "summary",
@@ -176,9 +181,18 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
     } else if (selectedFormat === "shopify_inventory") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        "Variant SKU": p.sku || "", Barcode: p.barcode || "", "Variant Inventory Qty": "1", "Variant Inventory Policy": "deny",
+        "Variant SKU": p.sku || "", Barcode: p.barcode || "",
+        "Variant Inventory Qty": String(p.qty ?? 0),
+        "Variant Inventory Policy": "deny",
       }));
       downloadFile("\uFEFF" + Papa.unparse(rows), filename);
+    } else if (selectedFormat === "lightspeed_full") {
+      const { csv } = generateLightspeedCSV(prods.map(p => ({
+        name: p.name, brand: p.brand, type: p.type, colour: p.colour, size: p.size,
+        sku: p.sku, barcode: p.barcode, price: p.price, rrp: p.rrp, cogs: p.cogs,
+        qty: p.qty, status: p.status,
+      })));
+      downloadFile(csv, filename);
     } else if (selectedFormat === "shopify_price") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),

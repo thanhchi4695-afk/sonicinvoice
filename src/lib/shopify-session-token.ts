@@ -9,16 +9,34 @@
 import { isShopifyEmbedded } from "./shopify-embedded";
 
 /**
+ * Wait until App Bridge v4 is loaded and `window.shopify.idToken` is available.
+ * The CDN script is injected from main.tsx but takes a few hundred ms to
+ * register `window.shopify`. Calling `idToken()` before that races to undefined
+ * and falsely surfaces "Embedded auth failed".
+ */
+async function waitForAppBridge(timeoutMs = 8000): Promise<unknown | null> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const sh = (window as unknown as { shopify?: { idToken?: () => Promise<string> } }).shopify;
+    if (sh && typeof sh.idToken === "function") return sh;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return null;
+}
+
+/**
  * Get a Shopify session token from App Bridge v4.
- * Returns null when not embedded or App Bridge is unavailable.
+ * Returns null when not embedded or App Bridge never loads.
  */
 export async function getSessionToken(): Promise<string | null> {
   try {
     if (!isShopifyEmbedded()) return null;
 
-    // App Bridge v4 CDN exposes window.shopify
-    const shopify = (window as any).shopify;
-    if (!shopify?.idToken) return null;
+    const shopify = (await waitForAppBridge()) as { idToken: () => Promise<string> } | null;
+    if (!shopify) {
+      console.warn("[session-token] App Bridge did not load within timeout");
+      return null;
+    }
 
     // ═══ Where session token is acquired ═══
     const token: string = await shopify.idToken();

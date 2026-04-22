@@ -7,11 +7,11 @@ import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
  * exchange all succeeded. Hidden in standalone mode.
  */
 const EmbeddedAuthHealthCheck = () => {
-  const { isEmbedded, authState, shop } = useShopifyEmbedded();
+  const { isEmbedded, authState, shop, authError } = useShopifyEmbedded();
   if (!isEmbedded) return null;
 
   const base =
-    "fixed bottom-3 right-3 z-50 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur";
+    "fixed bottom-3 right-3 z-50 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur max-w-[20rem]";
 
   if (authState === "loading") {
     return (
@@ -31,10 +31,20 @@ const EmbeddedAuthHealthCheck = () => {
     );
   }
 
+  if (authState === "needs_install") {
+    return (
+      <div className={`${base} bg-destructive/10 text-destructive`} title={authError || ""}>
+        <AlertTriangle className="h-3.5 w-3.5" />
+        Reinstall required for {shop || "this shop"}
+      </div>
+    );
+  }
+
+  // Generic unauthenticated — App Bridge timed out, network error, etc.
   return (
-    <div className={`${base} bg-destructive/10 text-destructive`}>
+    <div className={`${base} bg-destructive/10 text-destructive`} title={authError || ""}>
       <AlertTriangle className="h-3.5 w-3.5" />
-      Embedded auth failed — reinstall app
+      Embedded auth failed — try reloading
     </div>
   );
 };

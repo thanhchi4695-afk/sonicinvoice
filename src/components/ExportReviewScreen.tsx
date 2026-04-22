@@ -181,9 +181,18 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
     } else if (selectedFormat === "shopify_inventory") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        "Variant SKU": p.sku || "", Barcode: p.barcode || "", "Variant Inventory Qty": "1", "Variant Inventory Policy": "deny",
+        "Variant SKU": p.sku || "", Barcode: p.barcode || "",
+        "Variant Inventory Qty": String(p.qty ?? 0),
+        "Variant Inventory Policy": "deny",
       }));
       downloadFile("\uFEFF" + Papa.unparse(rows), filename);
+    } else if (selectedFormat === "lightspeed_full") {
+      const { csv } = generateLightspeedCSV(prods.map(p => ({
+        name: p.name, brand: p.brand, type: p.type, colour: p.colour, size: p.size,
+        sku: p.sku, barcode: p.barcode, price: p.price, rrp: p.rrp, cogs: p.cogs,
+        qty: p.qty, status: p.status,
+      })));
+      downloadFile(csv, filename);
     } else if (selectedFormat === "shopify_price") {
       const rows = prods.map(p => ({
         Handle: `${p.name}-${p.brand}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),

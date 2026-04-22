@@ -289,6 +289,9 @@ const CustomInstructionsField = ({
     if (supplierName) {
       const templates = getTemplates();
       const match = templates[supplierName];
+      // If we already have a saved template for this supplier, the learning
+      // toggle should be ON by default so it stays in sync going forward.
+      setSaveForSupplier(getLearnSupplierFlag(supplierName) || !!match);
       if (match && !value) {
         onChange(match.instructions);
         setLoadedTemplate(supplierName);
@@ -298,8 +301,37 @@ const CustomInstructionsField = ({
         const preset = suggestPresetForSupplier(supplierName);
         setSuggestedPreset(preset);
       }
+    } else {
+      setSaveForSupplier(false);
     }
   }, [supplierName]);
+
+  // When the user toggles the checkbox, persist immediately so the rest of
+  // the pipeline (saveLayoutTemplate, future invoices) can honour it.
+  const handleToggleSave = (on: boolean) => {
+    setSaveForSupplier(on);
+    const sup = (templateSupplier || supplierName).trim();
+    if (!sup) {
+      if (on) toast.info("Enter a supplier name to save these requirements.");
+      return;
+    }
+    setLearnSupplierFlag(sup, on);
+    if (on) {
+      if (value.trim()) {
+        saveTemplate(sup, value);
+        toast.success(`Saved for future ${sup} invoices`, {
+          description: "We'll auto-load these requirements next time.",
+        });
+      } else {
+        toast.info(`Learning enabled for ${sup}`, {
+          description: "Your requirements will be saved when you start processing.",
+        });
+      }
+    } else {
+      deleteTemplate(sup);
+      toast(`Stopped learning for ${sup}`, { description: "Saved requirements removed." });
+    }
+  };
 
   const applyPreset = (p: InvoiceLogicPreset) => {
     onChange(p.instructions);

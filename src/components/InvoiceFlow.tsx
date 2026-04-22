@@ -985,6 +985,67 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }, 100);
   };
 
+  const [driveImportOpen, setDriveImportOpen] = useState(false);
+  const [driveImportUrl, setDriveImportUrl] = useState("");
+  const [driveImporting, setDriveImporting] = useState(false);
+  const [driveQueue, setDriveQueue] = useState<{ fileName: string; base64: string; fileType: string }[]>([]);
+
+  const base64ToFile = (base64: string, fileName: string, fileType: string): File => {
+    const mime =
+      fileType === "pdf" ? "application/pdf" :
+      fileType === "png" ? "image/png" :
+      fileType === "webp" ? "image/webp" :
+      `image/${fileType === "jpg" ? "jpeg" : fileType}`;
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new File([bytes], fileName, { type: mime });
+  };
+
+  const acceptDriveFile = (item: { fileName: string; base64: string; fileType: string }) => {
+    const file = base64ToFile(item.base64, item.fileName, item.fileType);
+    setUploadedFile(file);
+    setFileName(file.name);
+    void uploadOriginalToStorage(file);
+    toast("Invoice loaded from Drive", { description: item.fileName });
+    setTimeout(() => {
+      document.getElementById("custom-requirements-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
+
+  const handleDriveImport = async () => {
+    if (!driveImportUrl.trim()) {
+      toast.error("Paste a Google Drive folder or file link first");
+      return;
+    }
+    setDriveImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gdrive-fetch", {
+        body: { url: driveImportUrl.trim() },
+      });
+      if (error) throw error;
+      const invoices = (data?.invoices || []) as { fileName: string; base64: string; fileType: string }[];
+      if (invoices.length === 0) {
+        toast.error("No invoices found", { description: "Make sure the folder is shared as 'Anyone with the link'." });
+        return;
+      }
+      acceptDriveFile(invoices[0]);
+      setDriveQueue(invoices.slice(1));
+      setDriveImportOpen(false);
+      if (invoices.length > 1) {
+        toast(`${invoices.length - 1} more invoice${invoices.length === 2 ? "" : "s"} queued`, {
+          description: "Process this one, then load the next from the queue.",
+        });
+      }
+    } catch (e) {
+      toast.error("Drive import failed", {
+        description: e instanceof Error ? e.message : "Could not access the Drive link",
+      });
+    } finally {
+      setDriveImporting(false);
+    }
+  };
+
   const handleStartProcessingClick = () => {
     if (!uploadedFile) {
       toast.error("Please upload an invoice first");

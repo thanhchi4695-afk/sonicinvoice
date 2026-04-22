@@ -321,10 +321,17 @@ export async function saveBrainLearnings(input: BrainLearnInput): Promise<void> 
       });
     }
 
-    // Insert invoice_pattern row capturing this layout fingerprint
+    // Insert invoice_pattern row capturing this layout fingerprint.
+    // IMPORTANT: include layout_fingerprint + supplier_profile_id so
+    // (a) recordProcessingQuality can match this row on export, and
+    // (b) Processing History can resolve the supplier name.
     const headerLabels = headers.map(h => h.label);
+    const { generateLayoutFingerprint } = await import("@/lib/layout-fingerprint");
+    const brainFingerprint = generateLayoutFingerprint(headerLabels);
     await supabase.from("invoice_patterns").insert({
       user_id: userId,
+      supplier_profile_id: existing?.id ?? null,
+      layout_fingerprint: brainFingerprint,
       column_map: columnMap as never,
       sample_headers: headerLabels as never,
       format_type: (input.layout.layout_type as string) || "flat_rows",

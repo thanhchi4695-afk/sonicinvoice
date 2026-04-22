@@ -279,12 +279,30 @@ export default function POSConnectionPanel() {
             </div>
 
             {status.connected && (
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                <span className="text-xs text-muted-foreground">Use for stock checking</span>
-                <Switch
-                  checked={isChecked}
-                  onCheckedChange={(val) => toggleStockCheck(p.id, val)}
-                />
+              <div className="mt-3 pt-3 border-t border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Use for stock checking</span>
+                  <Switch
+                    checked={isChecked}
+                    onCheckedChange={(val) => toggleStockCheck(p.id, val)}
+                  />
+                </div>
+                {(p.id === "lightspeed_x" || p.id === "lightspeed_r") && shopifyConnected && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBarcodeSync}
+                    disabled={syncingBarcodes}
+                    className="text-xs w-full"
+                  >
+                    {syncingBarcodes ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Barcode className="w-3 h-3 mr-1" />
+                    )}
+                    Sync barcodes to Shopify
+                  </Button>
+                )}
               </div>
             )}
           </div>

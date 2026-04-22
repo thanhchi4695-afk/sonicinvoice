@@ -1476,8 +1476,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const startProcessing = async (file: File) => {
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
-      const saveCheckbox = document.getElementById('save-supplier') as HTMLInputElement;
-      if (saveCheckbox?.checked && supplierName) {
+      // Honour the persisted "remember for this supplier" opt-in instead of
+      // poking at DOM state — the checkbox writes the flag on toggle.
+      if (supplierName && getLearnSupplierFlag(supplierName)) {
         saveTemplate(supplierName, customInstructions);
       }
     }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { cn } from "@/lib/utils";
 import { setSessionProducts as setInvoiceSessionProducts } from "@/stores/invoice-session-store";
 import { syncInvoiceItemsToCatalog } from "@/lib/invoice-catalog-sync";
 import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orchestrator";
@@ -969,20 +970,97 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     path: string; mime: string; name: string;
   } | null>(null);
 
-  const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // ── Shared file-accept routine — used by picker, drag-drop, and paste ──
+  const ACCEPTED_EXT = /\.(pdf|xlsx|xls|csv|doc|docx|jpe?g|png|heic|webp)$/i;
+  const isAcceptedFile = (file: File) =>
+    ACCEPTED_EXT.test(file.name) ||
+    /^(application\/pdf|image\/|application\/vnd\.|text\/csv|application\/msword)/.test(file.type);
+
+  const acceptInvoiceFile = (file: File) => {
+    if (!isAcceptedFile(file)) {
+      toast.error("Unsupported file type", {
+        description: "Please upload a PDF, Excel, CSV, Word, or image file.",
+      });
+      return;
+    }
     setUploadedFile(file);
     setFileName(file.name);
     toast("Invoice uploaded", { description: "Add any custom requirements below, then start processing." });
-    // Upload original to storage in the background so it can be re-processed later.
     void uploadOriginalToStorage(file);
-    // Do NOT auto-start processing — let the user review/add custom requirements first.
-    e.target.value = "";
-    // Scroll the requirements panel into view on the next paint.
     setTimeout(() => {
       document.getElementById("custom-requirements-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
+  };
+
+  const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    acceptInvoiceFile(file);
+    e.target.value = "";
+  };
+
+  // Drag-and-drop state for the upload dropzone (desktop primarily, also works on tablets)
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragDepthRef = useRef(0);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.dataTransfer?.types?.includes("Files")) return;
+    dragDepthRef.current += 1;
+    setIsDragOver(true);
+  };
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setIsDragOver(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepthRef.current = 0;
+    setIsDragOver(false);
+    if (!hasPickedPOS()) {
+      pendingUploadKindRef.current = "file";
+      setPOSPickerOpen(true);
+      // stash dropped file so POS picker can resume? simpler: ask user to drop again after picking POS.
+      toast("Pick your POS first", { description: "Choose Shopify or Lightspeed, then drop the file again." });
+      return;
+    }
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) {
+      toast.error("No file detected", { description: "Try dragging a single PDF, Excel, CSV, or image file." });
+      return;
+    }
+    acceptInvoiceFile(file);
+  };
+
+  // Paste handler — accept clipboard images / files (Cmd/Ctrl+V on the dropzone)
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          if (!hasPickedPOS()) {
+            pendingUploadKindRef.current = "file";
+            setPOSPickerOpen(true);
+            toast("Pick your POS first", { description: "Choose Shopify or Lightspeed, then paste again." });
+            return;
+          }
+          acceptInvoiceFile(file);
+          return;
+        }
+      }
+    }
   };
 
   const [driveImportOpen, setDriveImportOpen] = useState(false);
@@ -2778,15 +2856,37 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
           <button
             onClick={handleFileSelect}
-            className="w-full h-48 rounded-lg border-2 border-dashed border-border bg-card flex flex-col items-center justify-center gap-3 active:bg-muted transition-colors"
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onPaste={handlePaste}
+            tabIndex={0}
+            aria-label="Upload invoice — click, drag and drop, or paste a file"
+            className={cn(
+              "w-full h-48 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-3 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background",
+              isDragOver
+                ? "border-primary bg-primary/10 scale-[1.01]"
+                : "border-border bg-card active:bg-muted hover:border-primary/40"
+            )}
           >
-            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-              <Upload className="w-6 h-6 text-primary" />
+            <div className={cn(
+              "w-14 h-14 rounded-full flex items-center justify-center transition-colors",
+              isDragOver ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
+            )}>
+              <Upload className="w-6 h-6" />
             </div>
-            <div className="text-center">
-              <p className="text-sm font-medium">Tap to upload invoice</p>
+            <div className="text-center px-4">
+              <p className="text-sm font-medium">
+                {isDragOver ? "Drop to upload" : "Tap, drop, or paste invoice"}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">PDF · Excel · CSV · Word · JPG · PNG</p>
-              <p className="text-[11px] text-muted-foreground/70 mt-0.5">📷 Drop a photo of your invoice — AI will read it automatically</p>
+              <p className="text-[11px] text-muted-foreground/70 mt-0.5 hidden sm:block">
+                Drag a file from your desktop, or press ⌘/Ctrl+V to paste a screenshot
+              </p>
+              <p className="text-[11px] text-muted-foreground/70 mt-0.5 sm:hidden">
+                📷 Tap to choose a photo or PDF — AI reads it automatically
+              </p>
             </div>
           </button>
 

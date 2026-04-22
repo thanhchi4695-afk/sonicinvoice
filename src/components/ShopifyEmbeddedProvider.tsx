@@ -26,6 +26,7 @@ const EmbeddedContext = createContext<EmbeddedContextValue>({
   apiKey: "",
   sessionReady: false,
   authState: "loading",
+  authError: null,
 });
 
 export const useShopifyEmbedded = () => useContext(EmbeddedContext);
@@ -46,6 +47,7 @@ interface Props {
  */
 const ShopifyEmbeddedProvider = ({ children }: Props) => {
   const [authState, setAuthState] = useState<EmbeddedAuthState>("loading");
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const base = useMemo(() => ({
     isEmbedded: isShopifyEmbedded(),
@@ -66,16 +68,19 @@ const ShopifyEmbeddedProvider = ({ children }: Props) => {
 
     const authenticate = async () => {
       try {
-        // Step 1: Get session token from App Bridge
+        // Step 1: Get session token from App Bridge (waits for AB to load)
         const token = await getSessionToken();
-        if (!token || cancelled) {
-          if (!cancelled) setAuthState("unauthenticated");
+        if (cancelled) return;
+        if (!token) {
+          setAuthError("App Bridge did not initialise — try reloading the app from Shopify Admin.");
+          setAuthState("unauthenticated");
           return;
         }
 
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         if (!supabaseUrl) {
           console.warn("[embedded-auth] Missing backend URL");
+          setAuthError("Backend URL missing.");
           setAuthState("unauthenticated");
           return;
         }
@@ -93,8 +98,16 @@ const ShopifyEmbeddedProvider = ({ children }: Props) => {
 
         if (cancelled) return;
 
+        if (response.status === 404 && data?.needs_install) {
+          console.warn("[embedded-auth] Shop not installed:", data?.error);
+          setAuthError(data?.error || "App not installed for this shop");
+          setAuthState("needs_install");
+          return;
+        }
+
         if (!response.ok || !data?.access_token || !data?.refresh_token) {
           console.warn("[embedded-auth] Session verify failed:", data?.error || response.statusText);
+          setAuthError(data?.error || `Verify failed (${response.status})`);
           setAuthState("unauthenticated");
           return;
         }
@@ -107,18 +120,23 @@ const ShopifyEmbeddedProvider = ({ children }: Props) => {
 
         if (sessionError) {
           console.warn("[embedded-auth] Failed to set session:", sessionError);
+          setAuthError(sessionError.message);
           setAuthState("unauthenticated");
           return;
         }
 
         if (!cancelled) {
+          setAuthError(null);
           setAuthState("authenticated");
           localStorage.setItem("onboarding_complete", "true");
           addAuditEntry("Login", `Embedded session auth for ${data.shop || base.shop}`);
         }
       } catch (err) {
         console.error("[embedded-auth] Error:", err);
-        if (!cancelled) setAuthState("unauthenticated");
+        if (!cancelled) {
+          setAuthError(err instanceof Error ? err.message : String(err));
+          setAuthState("unauthenticated");
+        }
       }
     };
 
@@ -130,7 +148,8 @@ const ShopifyEmbeddedProvider = ({ children }: Props) => {
     ...base,
     sessionReady: authState === "authenticated",
     authState,
-  }), [base, authState]);
+    authError,
+  }), [base, authState, authError]);
 
   if (value.isEmbedded && value.apiKey && value.host) {
     return (

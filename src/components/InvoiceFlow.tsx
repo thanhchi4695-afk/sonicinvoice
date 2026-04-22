@@ -3231,6 +3231,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             <PhaseThreeFourPanel
               products={validatedProducts}
               supplierName={supplierName}
+              onProceed={() => {
+                document.getElementById("post-parse-review-anchor")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+              }}
             />
           )}
 
@@ -3262,7 +3268,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
           {/* Post-Parse Review Screen */}
           {validationDebug && validatedProducts.length > 0 && (
-            <div className="mb-3">
+            <div className="mb-3" id="post-parse-review-anchor">
               <PostParseReviewScreen
                 debug={validationDebug}
                 products={validatedProducts}

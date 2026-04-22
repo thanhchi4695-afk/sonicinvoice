@@ -2,6 +2,7 @@
 // Schema matches the official Lightspeed product-export CSV
 // (see user-uploads://product-export-12.csv for the canonical header).
 import Papa from 'papaparse';
+import { getPublishStatus, lightspeedActiveValue } from './publish-status';
 
 // ── Types ──────────────────────────────────────────────────
 export interface XSeriesProduct {

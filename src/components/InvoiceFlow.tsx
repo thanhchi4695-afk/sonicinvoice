@@ -999,9 +999,77 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     e.target.value = "";
   };
 
-  // Drag-and-drop state for the upload dropzone (desktop primarily, also works on tablets)
-  const [isDragOver, setIsDragOver] = useState(false);
+  // Drag-and-drop state — split into:
+  //   isWindowDragging → any file is being dragged anywhere over the window (shows overlay)
+  //   isDragOverTarget → the cursor is currently over the highlighted drop target
+  const [isDragOver, setIsDragOver] = useState(false); // legacy, kept for the inline button highlight
+  const [isWindowDragging, setIsWindowDragging] = useState(false);
+  const [isDragOverTarget, setIsDragOverTarget] = useState(false);
   const dragDepthRef = useRef(0);
+  const windowDragDepthRef = useRef(0);
+
+  // Window-level listeners: detect when a file is dragged anywhere onto the page
+  // so we can show a full-screen overlay with a clearly highlighted drop target.
+  useEffect(() => {
+    if (step !== 1) return;
+    const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types?.includes("Files");
+
+    const onWindowDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      windowDragDepthRef.current += 1;
+      setIsWindowDragging(true);
+    };
+    const onWindowDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault(); // required for drop to fire
+    };
+    const onWindowDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      windowDragDepthRef.current = Math.max(0, windowDragDepthRef.current - 1);
+      if (windowDragDepthRef.current === 0) {
+        setIsWindowDragging(false);
+        setIsDragOverTarget(false);
+      }
+    };
+    const onWindowDrop = (e: DragEvent) => {
+      // If the user drops outside our target, swallow it so the browser doesn't navigate to the file.
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      windowDragDepthRef.current = 0;
+      setIsWindowDragging(false);
+      setIsDragOverTarget(false);
+    };
+
+    window.addEventListener("dragenter", onWindowDragEnter);
+    window.addEventListener("dragover", onWindowDragOver);
+    window.addEventListener("dragleave", onWindowDragLeave);
+    window.addEventListener("drop", onWindowDrop);
+    return () => {
+      window.removeEventListener("dragenter", onWindowDragEnter);
+      window.removeEventListener("dragover", onWindowDragOver);
+      window.removeEventListener("dragleave", onWindowDragLeave);
+      window.removeEventListener("drop", onWindowDrop);
+      windowDragDepthRef.current = 0;
+      setIsWindowDragging(false);
+      setIsDragOverTarget(false);
+    };
+  }, [step]);
+
+  // Esc cancels an in-progress drag overlay
+  useEffect(() => {
+    if (!isWindowDragging) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        windowDragDepthRef.current = 0;
+        dragDepthRef.current = 0;
+        setIsWindowDragging(false);
+        setIsDragOverTarget(false);
+        setIsDragOver(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isWindowDragging]);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -1009,6 +1077,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     if (!e.dataTransfer?.types?.includes("Files")) return;
     dragDepthRef.current += 1;
     setIsDragOver(true);
+    setIsDragOverTarget(true);
   };
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -1019,17 +1088,22 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     e.preventDefault();
     e.stopPropagation();
     dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-    if (dragDepthRef.current === 0) setIsDragOver(false);
+    if (dragDepthRef.current === 0) {
+      setIsDragOver(false);
+      setIsDragOverTarget(false);
+    }
   };
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragDepthRef.current = 0;
+    windowDragDepthRef.current = 0;
     setIsDragOver(false);
+    setIsWindowDragging(false);
+    setIsDragOverTarget(false);
     if (!hasPickedPOS()) {
       pendingUploadKindRef.current = "file";
       setPOSPickerOpen(true);
-      // stash dropped file so POS picker can resume? simpler: ask user to drop again after picking POS.
       toast("Pick your POS first", { description: "Choose Shopify or Lightspeed, then drop the file again." });
       return;
     }
@@ -2817,6 +2891,50 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           ))}
         </div>
       </div>
+
+      {/* Full-screen drag overlay — appears whenever a file is dragged anywhere over the page on Step 1 */}
+      {step === 1 && isWindowDragging && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Drop file to upload invoice"
+          aria-live="assertive"
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className="fixed inset-0 z-[100] hidden sm:flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in p-8"
+        >
+          <div
+            className={cn(
+              "w-full max-w-2xl rounded-2xl border-4 border-dashed flex flex-col items-center justify-center gap-5 p-12 transition-all",
+              isDragOverTarget
+                ? "border-primary bg-primary/15 scale-[1.02] shadow-2xl shadow-primary/20"
+                : "border-primary/50 bg-card/80"
+            )}
+          >
+            <div
+              className={cn(
+                "w-20 h-20 rounded-full flex items-center justify-center transition-all",
+                isDragOverTarget ? "bg-primary text-primary-foreground scale-110" : "bg-primary/15 text-primary"
+              )}
+            >
+              <Upload className="w-9 h-9" />
+            </div>
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-display font-semibold text-foreground">
+                {isDragOverTarget ? "Release to upload" : "Drop your invoice anywhere"}
+              </h2>
+              <p className="text-sm text-muted-foreground max-w-md">
+                We accept PDF, Excel, CSV, Word documents, and photos (JPG, PNG, HEIC, WebP). Sonic Invoices will read it automatically.
+              </p>
+              <p className="text-xs text-muted-foreground/70 pt-1">
+                Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[10px]">Esc</kbd> to cancel
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Step 1: Upload */}
       {step === 1 && (

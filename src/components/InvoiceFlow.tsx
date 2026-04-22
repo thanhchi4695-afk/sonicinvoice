@@ -988,7 +988,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [driveImportOpen, setDriveImportOpen] = useState(false);
   const [driveImportUrl, setDriveImportUrl] = useState("");
   const [driveImporting, setDriveImporting] = useState(false);
-  const [driveQueue, setDriveQueue] = useState<{ fileName: string; base64: string; fileType: string }[]>([]);
+  // 2-step Drive flow: "link" → paste URL; "confirm" → see count + auto-process all
+  const [driveStage, setDriveStage] = useState<"link" | "confirm">("link");
+  const [drivePreview, setDrivePreview] = useState<{ fileName: string; base64: string; fileType: string }[]>([]);
+  type DriveQueueItem = { fileName: string; base64: string; fileType: string; status: "queued" | "processing" | "done" | "error" };
+  const [driveQueue, setDriveQueue] = useState<DriveQueueItem[]>([]);
 
   const base64ToFile = (base64: string, fileName: string, fileType: string): File => {
     const mime =
@@ -1013,7 +1017,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }, 100);
   };
 
-  const handleDriveImport = async () => {
+  // Step 1 — paste folder/file link, fetch file list (downloads metadata + content via gdrive-fetch).
+  const handleDriveListFiles = async () => {
     if (!driveImportUrl.trim()) {
       toast.error("Paste a Google Drive folder or file link first");
       return;
@@ -1029,14 +1034,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         toast.error("No invoices found", { description: "Make sure the folder is shared as 'Anyone with the link'." });
         return;
       }
-      acceptDriveFile(invoices[0]);
-      setDriveQueue(invoices.slice(1));
-      setDriveImportOpen(false);
-      if (invoices.length > 1) {
-        toast(`${invoices.length - 1} more invoice${invoices.length === 2 ? "" : "s"} queued`, {
-          description: "Process this one, then load the next from the queue.",
-        });
-      }
+      setDrivePreview(invoices);
+      setDriveStage("confirm");
     } catch (e) {
       toast.error("Drive import failed", {
         description: e instanceof Error ? e.message : "Could not access the Drive link",
@@ -1045,6 +1044,44 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       setDriveImporting(false);
     }
   };
+
+  // Step 2 — confirm: load file 1 immediately and queue the rest. As the user
+  // finishes review of each invoice (uploadedFile cleared), the next is auto-loaded.
+  const handleDriveConfirmAutoProcess = () => {
+    if (drivePreview.length === 0) return;
+    const [first, ...rest] = drivePreview;
+    acceptDriveFile(first);
+    setDriveQueue([
+      { ...first, status: "processing" },
+      ...rest.map<DriveQueueItem>((r) => ({ ...r, status: "queued" })),
+    ]);
+    setDriveImportOpen(false);
+    setDriveStage("link");
+    setDrivePreview([]);
+    setDriveImportUrl("");
+    if (rest.length > 0) {
+      toast(`Auto-processing ${drivePreview.length} invoices`, {
+        description: "The next file loads automatically when you finish each review.",
+      });
+    }
+  };
+
+  // When the current upload is cleared (review accepted/restarted), advance the queue.
+  useEffect(() => {
+    if (uploadedFile) return;
+    setDriveQueue((prev) => {
+      if (prev.length === 0) return prev;
+      // Mark the in-progress file as done
+      const advanced = prev.map((q) => q.status === "processing" ? { ...q, status: "done" as const } : q);
+      const nextIdx = advanced.findIndex((q) => q.status === "queued");
+      if (nextIdx === -1) return advanced;
+      const next = advanced[nextIdx];
+      // Defer the load so we don't update other state mid-render
+      queueMicrotask(() => acceptDriveFile(next));
+      return advanced.map((q, i) => i === nextIdx ? { ...q, status: "processing" } : q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadedFile]);
 
   const handleStartProcessingClick = () => {
     if (!uploadedFile) {
@@ -2793,21 +2830,31 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           </button>
 
           {driveQueue.length > 0 && (
-            <div className="mt-3 rounded-lg border border-border bg-card p-3">
-              <p className="text-xs font-semibold mb-2">Drive queue · {driveQueue.length} remaining</p>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold">
+                  Drive batch · {driveQueue.filter(q => q.status === "done").length}/{driveQueue.length} processed
+                </p>
+                <button
+                  onClick={() => setDriveQueue([])}
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  Clear batch
+                </button>
+              </div>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
                 {driveQueue.map((q, i) => (
-                  <div key={`${q.fileName}-${i}`} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="truncate flex-1">{q.fileName}</span>
-                    <button
-                      onClick={() => {
-                        acceptDriveFile(q);
-                        setDriveQueue(prev => prev.filter((_, idx) => idx !== i));
-                      }}
-                      className="px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20"
-                    >
-                      Load next
-                    </button>
+                  <div key={`${q.fileName}-${i}`} className="flex items-center gap-2 text-xs">
+                    <span className="w-4 shrink-0 text-center">
+                      {q.status === "done" && "✅"}
+                      {q.status === "processing" && "⏳"}
+                      {q.status === "queued" && "•"}
+                      {q.status === "error" && "⚠️"}
+                    </span>
+                    <span className={`truncate flex-1 ${q.status === "done" ? "text-muted-foreground line-through" : ""}`}>
+                      {q.fileName}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground capitalize">{q.status}</span>
                   </div>
                 ))}
               </div>
@@ -2817,33 +2864,72 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           {driveImportOpen && (
             <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !driveImporting && setDriveImportOpen(false)}>
               <div className="bg-card border border-border rounded-lg p-4 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-                <h3 className="text-sm font-semibold mb-1">Import invoice from Google Drive</h3>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Paste a folder or file link. The folder must be shared as <strong>"Anyone with the link"</strong>.
-                </p>
-                <input
-                  value={driveImportUrl}
-                  onChange={(e) => setDriveImportUrl(e.target.value)}
-                  placeholder="https://drive.google.com/drive/folders/..."
-                  className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm mb-3"
-                  disabled={driveImporting}
-                />
-                <div className="flex gap-2 justify-end">
-                  <button
-                    onClick={() => setDriveImportOpen(false)}
-                    disabled={driveImporting}
-                    className="h-9 px-3 rounded-md border border-border text-sm hover:bg-muted disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDriveImport}
-                    disabled={driveImporting}
-                    className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    {driveImporting ? "Fetching…" : "Import"}
-                  </button>
-                </div>
+                {driveStage === "link" ? (
+                  <>
+                    <h3 className="text-sm font-semibold mb-1">Import invoices from Google Drive</h3>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Paste a folder link to auto-process every invoice inside, or a single file link.
+                      The folder must be shared as <strong>"Anyone with the link"</strong>.
+                    </p>
+                    <input
+                      value={driveImportUrl}
+                      onChange={(e) => setDriveImportUrl(e.target.value)}
+                      placeholder="https://drive.google.com/drive/folders/..."
+                      className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm mb-3"
+                      disabled={driveImporting}
+                      onKeyDown={(e) => { if (e.key === "Enter") void handleDriveListFiles(); }}
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => setDriveImportOpen(false)}
+                        disabled={driveImporting}
+                        className="h-9 px-3 rounded-md border border-border text-sm hover:bg-muted disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleDriveListFiles}
+                        disabled={driveImporting}
+                        className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        {driveImporting ? "Fetching…" : "Next"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-sm font-semibold mb-1">
+                      Process {drivePreview.length} invoice{drivePreview.length === 1 ? "" : "s"}?
+                    </h3>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Each invoice will be auto-loaded for extraction one after another. Review and accept
+                      each one when it's ready — the next file loads automatically.
+                    </p>
+                    <div className="max-h-56 overflow-y-auto rounded-md border border-border divide-y divide-border mb-3">
+                      {drivePreview.map((f, i) => (
+                        <div key={`${f.fileName}-${i}`} className="flex items-center gap-2 px-2.5 py-2 text-xs">
+                          <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          <span className="truncate flex-1">{f.fileName}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase">{f.fileType}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => { setDriveStage("link"); setDrivePreview([]); }}
+                        className="h-9 px-3 rounded-md border border-border text-sm hover:bg-muted"
+                      >
+                        Back
+                      </button>
+                      <button
+                        onClick={handleDriveConfirmAutoProcess}
+                        className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90"
+                      >
+                        Auto-process all
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

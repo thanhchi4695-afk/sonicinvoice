@@ -3063,6 +3063,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.heic,.webp"
             onChange={handleFileChosen}
             className="hidden"

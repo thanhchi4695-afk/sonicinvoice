@@ -60,8 +60,31 @@ export default function POSConnectionPanel() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [stockCheckPrefs, setStockCheckPrefs] = useState<Record<string, boolean>>(getStockCheckPrefs);
+  const [syncingBarcodes, setSyncingBarcodes] = useState(false);
 
-  useEffect(() => {
+  const handleBarcodeSync = async () => {
+    setSyncingBarcodes(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-barcodes-to-shopify", { body: {} });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      const updated = data?.updated ?? 0;
+      const already = data?.already_had_barcode ?? 0;
+      const noMatch = data?.no_shopify_match ?? 0;
+      const errs = (data?.errors || []).length;
+      toast.success(
+        `Updated ${updated} Shopify barcodes` +
+          (already ? ` · ${already} already had one` : "") +
+          (noMatch ? ` · ${noMatch} not matched in Shopify` : "") +
+          (errs ? ` · ${errs} errors` : ""),
+      );
+      if (data?.note) toast.info(data.note);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Barcode sync failed");
+    } finally {
+      setSyncingBarcodes(false);
+    }
+  };
     loadConnections();
   }, []);
 

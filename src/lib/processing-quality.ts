@@ -75,10 +75,12 @@ export function buildQualityMetrics(input: QualityMetricsInput): ComputedQuality
 
 /**
  * Fire-and-forget. Records the metrics on the user's most recent
- * invoice_patterns row matching the given fingerprint. Silent on failure.
+ * invoice_patterns row matching the given fingerprint. If no fingerprint
+ * is provided or no match is found, falls back to the user's most recent
+ * pattern row so quality telemetry always lands somewhere visible in
+ * Processing History. Silent on failure.
  */
 export function recordProcessingQuality(input: QualityMetricsInput): void {
-  if (!input.layoutFingerprint) return;
   const metrics = buildQualityMetrics(input);
 
   void (async () => {
@@ -87,17 +89,33 @@ export function recordProcessingQuality(input: QualityMetricsInput): void {
       const userId = sessionData.session?.user?.id;
       if (!userId) return;
 
-      // Find the latest invoice_patterns row for this fingerprint.
-      const { data: rows } = await supabase
-        .from("invoice_patterns" as any)
-        .select("id")
-        .eq("user_id", userId)
-        .eq("layout_fingerprint", input.layoutFingerprint)
-        .order("updated_at", { ascending: false })
-        .limit(1);
+      let patternId: string | undefined;
 
-      const patternId = ((rows || []) as unknown as Array<{ id: string }>)[0]?.id;
-      if (!patternId) return; // training row may not exist yet — silent skip
+      // 1) Try fingerprint match (most accurate).
+      if (input.layoutFingerprint) {
+        const { data: rows } = await supabase
+          .from("invoice_patterns" as any)
+          .select("id")
+          .eq("user_id", userId)
+          .eq("layout_fingerprint", input.layoutFingerprint)
+          .order("updated_at", { ascending: false })
+          .limit(1);
+        patternId = ((rows || []) as unknown as Array<{ id: string }>)[0]?.id;
+      }
+
+      // 2) Fallback: attach to the user's most recent pattern row so the
+      //    Processing History panel still shows quality + time + edits.
+      if (!patternId) {
+        const { data: latest } = await supabase
+          .from("invoice_patterns" as any)
+          .select("id")
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(1);
+        patternId = ((latest || []) as unknown as Array<{ id: string }>)[0]?.id;
+      }
+
+      if (!patternId) return; // no row at all yet — nothing to update
 
       await supabase
         .from("invoice_patterns" as any)

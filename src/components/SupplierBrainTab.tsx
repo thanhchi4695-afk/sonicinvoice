@@ -5,11 +5,12 @@
 // ──────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from "react";
-import { Brain, Eye, RotateCcw, Users, CheckCircle2 } from "lucide-react";
+import { Brain, Eye, RotateCcw, Users, CheckCircle2, CloudDownload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -51,6 +52,34 @@ export default function SupplierBrainTab() {
   const [contribute, setContribute] = useState(true);
   const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState<SupplierRow | null>(null);
+  const [driveUrl, setDriveUrl] = useState("https://drive.google.com/drive/folders/1jx3d-nQlZKoCeZ0LxPppHEEoYlnhpixw?usp=sharing");
+  const [seeding, setSeeding] = useState(false);
+
+  const seedFromDrive = async () => {
+    if (!driveUrl.trim()) {
+      toast.error("Paste a Google Drive folder link first");
+      return;
+    }
+    setSeeding(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("seed-shared-from-drive", {
+        body: { url: driveUrl.trim() },
+      });
+      if (error) throw error;
+      const { processed = 0, seeded = 0, errors } = data || {};
+      toast.success(`Seeded ${seeded} of ${processed} invoices into the shared pool`, {
+        description: errors?.length ? `${errors.length} skipped — see console for details` : undefined,
+      });
+      if (errors?.length) console.warn("Seed skips:", errors);
+      void load();
+    } catch (e) {
+      toast.error("Drive seed failed", {
+        description: e instanceof Error ? e.message : "Make sure the folder is shared as 'Anyone with the link'",
+      });
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -133,6 +162,32 @@ export default function SupplierBrainTab() {
           </div>
         </div>
         <Switch checked={contribute} onCheckedChange={toggleContribute} />
+      </Card>
+
+      {/* Seed shared pool from a Google Drive folder of sample invoices */}
+      <Card className="p-4">
+        <div className="flex items-start gap-2.5 mb-3">
+          <CloudDownload className="w-5 h-5 text-primary mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold">Seed shared templates from Google Drive</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+              Paste a folder of sample invoices. Each one is classified and its <strong>structural template only</strong>
+              (column map + pattern) is added to the shared community pool. Prices and quantities are never stored.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Input
+            value={driveUrl}
+            onChange={(e) => setDriveUrl(e.target.value)}
+            placeholder="https://drive.google.com/drive/folders/..."
+            className="text-xs"
+            disabled={seeding}
+          />
+          <Button onClick={seedFromDrive} disabled={seeding} size="sm">
+            {seeding ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> Seeding…</> : "Seed"}
+          </Button>
+        </div>
       </Card>
 
       {/* Supplier rows */}

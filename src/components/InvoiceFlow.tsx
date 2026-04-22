@@ -4,7 +4,7 @@ import { syncInvoiceItemsToCatalog } from "@/lib/invoice-catalog-sync";
 import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orchestrator";
 import POSPickerDialog, { hasPickedPOS } from "@/components/POSPickerDialog";
 import { toast } from "sonner";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag, CloudDownload } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -983,6 +983,67 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     setTimeout(() => {
       document.getElementById("custom-requirements-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
+  };
+
+  const [driveImportOpen, setDriveImportOpen] = useState(false);
+  const [driveImportUrl, setDriveImportUrl] = useState("");
+  const [driveImporting, setDriveImporting] = useState(false);
+  const [driveQueue, setDriveQueue] = useState<{ fileName: string; base64: string; fileType: string }[]>([]);
+
+  const base64ToFile = (base64: string, fileName: string, fileType: string): File => {
+    const mime =
+      fileType === "pdf" ? "application/pdf" :
+      fileType === "png" ? "image/png" :
+      fileType === "webp" ? "image/webp" :
+      `image/${fileType === "jpg" ? "jpeg" : fileType}`;
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new File([bytes], fileName, { type: mime });
+  };
+
+  const acceptDriveFile = (item: { fileName: string; base64: string; fileType: string }) => {
+    const file = base64ToFile(item.base64, item.fileName, item.fileType);
+    setUploadedFile(file);
+    setFileName(file.name);
+    void uploadOriginalToStorage(file);
+    toast("Invoice loaded from Drive", { description: item.fileName });
+    setTimeout(() => {
+      document.getElementById("custom-requirements-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
+
+  const handleDriveImport = async () => {
+    if (!driveImportUrl.trim()) {
+      toast.error("Paste a Google Drive folder or file link first");
+      return;
+    }
+    setDriveImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gdrive-fetch", {
+        body: { url: driveImportUrl.trim() },
+      });
+      if (error) throw error;
+      const invoices = (data?.invoices || []) as { fileName: string; base64: string; fileType: string }[];
+      if (invoices.length === 0) {
+        toast.error("No invoices found", { description: "Make sure the folder is shared as 'Anyone with the link'." });
+        return;
+      }
+      acceptDriveFile(invoices[0]);
+      setDriveQueue(invoices.slice(1));
+      setDriveImportOpen(false);
+      if (invoices.length > 1) {
+        toast(`${invoices.length - 1} more invoice${invoices.length === 2 ? "" : "s"} queued`, {
+          description: "Process this one, then load the next from the queue.",
+        });
+      }
+    } catch (e) {
+      toast.error("Drive import failed", {
+        description: e instanceof Error ? e.message : "Could not access the Drive link",
+      });
+    } finally {
+      setDriveImporting(false);
+    }
   };
 
   const handleStartProcessingClick = () => {
@@ -2637,6 +2698,70 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             <Camera className="w-4 h-4 text-primary" />
             Take a photo
           </button>
+
+          <button
+            onClick={() => setDriveImportOpen(true)}
+            className="w-full mt-2 h-12 rounded-lg border border-border bg-card flex items-center justify-center gap-2 text-sm active:bg-muted"
+          >
+            <CloudDownload className="w-4 h-4 text-primary" />
+            Import from Google Drive
+          </button>
+
+          {driveQueue.length > 0 && (
+            <div className="mt-3 rounded-lg border border-border bg-card p-3">
+              <p className="text-xs font-semibold mb-2">Drive queue · {driveQueue.length} remaining</p>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {driveQueue.map((q, i) => (
+                  <div key={`${q.fileName}-${i}`} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="truncate flex-1">{q.fileName}</span>
+                    <button
+                      onClick={() => {
+                        acceptDriveFile(q);
+                        setDriveQueue(prev => prev.filter((_, idx) => idx !== i));
+                      }}
+                      className="px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20"
+                    >
+                      Load next
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {driveImportOpen && (
+            <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !driveImporting && setDriveImportOpen(false)}>
+              <div className="bg-card border border-border rounded-lg p-4 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-sm font-semibold mb-1">Import invoice from Google Drive</h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Paste a folder or file link. The folder must be shared as <strong>"Anyone with the link"</strong>.
+                </p>
+                <input
+                  value={driveImportUrl}
+                  onChange={(e) => setDriveImportUrl(e.target.value)}
+                  placeholder="https://drive.google.com/drive/folders/..."
+                  className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm mb-3"
+                  disabled={driveImporting}
+                />
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => setDriveImportOpen(false)}
+                    disabled={driveImporting}
+                    className="h-9 px-3 rounded-md border border-border text-sm hover:bg-muted disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDriveImport}
+                    disabled={driveImporting}
+                    className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {driveImporting ? "Fetching…" : "Import"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* File parse mode indicator */}
           {fileParseMode && (

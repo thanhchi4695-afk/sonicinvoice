@@ -17,6 +17,11 @@ import {
   type BrainProduct,
   type BrainValidationSummary,
 } from "@/lib/brain-validator";
+import {
+  classifyInvoice,
+  contributeSharedProfile,
+  type UniversalClassification,
+} from "@/lib/universal-classifier";
 
 // ── localStorage feature flag (default OFF) ─────────────────
 const FLAG_KEY = "sonic_brain_mode_enabled";
@@ -57,6 +62,10 @@ export interface BrainPipelineResult {
   recognised: boolean;
   /** Supplier name that the brain ended up keyed against. */
   supplierName: string;
+  /** Universal pattern classification (always run). */
+  classification: UniversalClassification;
+  /** True when classifier confidence < 60 → trigger guided wizard. */
+  needsTeach: boolean;
   /** Stage timings (ms) for diagnostics. */
   timings: Record<string, number>;
 }

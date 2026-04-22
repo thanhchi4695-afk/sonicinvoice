@@ -1,6 +1,8 @@
 // Shopify CSV Export Schema for Scan Mode
 // Maps scanned products into Shopify-compatible CSV rows
 
+import { expandLineBySize } from "./size-run-expander";
+
 export const SHOPIFY_CSV_HEADERS = [
   "Handle",
   "Title",
@@ -142,12 +144,11 @@ export interface ScannedProductForExport {
 
 export function generateShopifyCSV(products: ScannedProductForExport[]): string {
   // Expand size runs ("8-16", "S-L") into one row per size — splits qty evenly.
-  const { expandLineBySize } = require("./size-run-expander") as typeof import("./size-run-expander");
   const expanded: ScannedProductForExport[] = products.flatMap((p) =>
-    expandLineBySize({ ...p, qty: p.quantity }).map((x: ScannedProductForExport & { qty?: number }) => ({
+    expandLineBySize({ ...p, qty: p.quantity }).map((x) => ({
       ...x,
-      quantity: x.qty ?? p.quantity,
-    }))
+      quantity: (x as { qty?: number }).qty ?? p.quantity,
+    } as ScannedProductForExport))
   );
 
   const handles = generateHandles(expanded.map(p => p.title));

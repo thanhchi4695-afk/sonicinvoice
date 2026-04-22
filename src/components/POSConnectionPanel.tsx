@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Unplug, ExternalLink, Store } from "lucide-react";
+import { Loader2, Unplug, ExternalLink, Store, Barcode } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getConnection } from "@/lib/shopify-api";
 import { toast } from "sonner";
@@ -60,6 +60,31 @@ export default function POSConnectionPanel() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [stockCheckPrefs, setStockCheckPrefs] = useState<Record<string, boolean>>(getStockCheckPrefs);
+  const [syncingBarcodes, setSyncingBarcodes] = useState(false);
+
+  const handleBarcodeSync = async () => {
+    setSyncingBarcodes(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-barcodes-to-shopify", { body: {} });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      const updated = data?.updated ?? 0;
+      const already = data?.already_had_barcode ?? 0;
+      const noMatch = data?.no_shopify_match ?? 0;
+      const errs = (data?.errors || []).length;
+      toast.success(
+        `Updated ${updated} Shopify barcodes` +
+          (already ? ` · ${already} already had one` : "") +
+          (noMatch ? ` · ${noMatch} not matched in Shopify` : "") +
+          (errs ? ` · ${errs} errors` : ""),
+      );
+      if (data?.note) toast.info(data.note);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Barcode sync failed");
+    } finally {
+      setSyncingBarcodes(false);
+    }
+  };
 
   useEffect(() => {
     loadConnections();
@@ -254,12 +279,30 @@ export default function POSConnectionPanel() {
             </div>
 
             {status.connected && (
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-                <span className="text-xs text-muted-foreground">Use for stock checking</span>
-                <Switch
-                  checked={isChecked}
-                  onCheckedChange={(val) => toggleStockCheck(p.id, val)}
-                />
+              <div className="mt-3 pt-3 border-t border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Use for stock checking</span>
+                  <Switch
+                    checked={isChecked}
+                    onCheckedChange={(val) => toggleStockCheck(p.id, val)}
+                  />
+                </div>
+                {(p.id === "lightspeed_x" || p.id === "lightspeed_r") && shopifyConnected && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleBarcodeSync}
+                    disabled={syncingBarcodes}
+                    className="text-xs w-full"
+                  >
+                    {syncingBarcodes ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Barcode className="w-3 h-3 mr-1" />
+                    )}
+                    Sync barcodes to Shopify
+                  </Button>
+                )}
               </div>
             )}
           </div>

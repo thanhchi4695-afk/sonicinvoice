@@ -137,7 +137,11 @@ function normalizeBaseTitle(name: string): string {
     .trim();
 }
 
-function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[] {
+function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduct[] {
+  // Expand any size-run rows ("8-16", "S-L") into one row per individual size.
+  // Quantity is split evenly across the run; SKU is suffixed with the size.
+  const lines: ExportLine[] = rawLines.flatMap((ln) => expandLineBySize(ln));
+
   if (mode === "simple") {
     return lines.map(ln => {
       const title = deduplicateTitle(ln.name, ln.brand);
@@ -164,6 +168,7 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
           sku: ln.sku || "",
           barcode: ln.barcode || "",
           cogs: ln.cogs?.toFixed(2),
+          qty: String(ln.qty ?? 0),
         }],
       };
     });
@@ -211,6 +216,7 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
           sku: base.sku || "",
           barcode: base.barcode || "",
           cogs: base.cogs?.toFixed(2),
+          qty: String(base.qty ?? 0),
         }],
       };
     }
@@ -231,6 +237,7 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
       sku: ln.sku || "",
       barcode: ln.barcode || "",
       cogs: ln.cogs?.toFixed(2),
+      qty: String(ln.qty ?? 0),
     }));
 
     return {

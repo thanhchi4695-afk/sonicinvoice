@@ -141,8 +141,19 @@ export async function runBrainPipeline(input: BrainPipelineInput): Promise<Brain
   const timings: Record<string, number> = {};
   const t0 = performance.now();
 
-  // ── Try cache hit first (skip Stages 1 + 2) ──
-  const cached = await loadCachedBrain(input.hintedSupplier);
+  // ── Stage 0 — Universal Pattern Classifier (always-on) ──
+  const tCls = performance.now();
+  const classification = await classifyInvoice({
+    fileContent: input.fileContent,
+    fileType: input.fileType,
+    fileName: input.fileName,
+    hintedSupplier: input.hintedSupplier,
+  });
+  timings.stage0_classify = performance.now() - tCls;
+
+  // ── Try cache hit (skip Stages 1 + 2) ──
+  const supplierForCache = input.hintedSupplier || classification.supplier_name;
+  const cached = await loadCachedBrain(supplierForCache);
   let orientation: Record<string, unknown>;
   let layout: Record<string, unknown>;
   let recognised = false;
@@ -172,7 +183,7 @@ export async function runBrainPipeline(input: BrainPipelineInput): Promise<Brain
     timings.stage2_layout = performance.now() - tLay;
   }
 
-  // Stages 3 + 4 — Context map + Extraction
+  // Stages 3 + 4 — Context map + Extraction (passes classification as a hint)
   const tExt = performance.now();
   const extRes = await invokeStage<{
     products: BrainProduct[];
@@ -184,6 +195,7 @@ export async function runBrainPipeline(input: BrainPipelineInput): Promise<Brain
     orientation,
     layout,
     customInstructions: input.customInstructions,
+    classification,
   });
   timings.stage34_extract = performance.now() - tExt;
 
@@ -199,7 +211,9 @@ export async function runBrainPipeline(input: BrainPipelineInput): Promise<Brain
     layout,
     context_map: extRes.context_map || {},
     recognised,
-    supplierName: (cached?.supplier_name || (orientation.supplier_name as string) || input.hintedSupplier || "").trim(),
+    supplierName: (cached?.supplier_name || classification.supplier_name || (orientation.supplier_name as string) || input.hintedSupplier || "").trim(),
+    classification,
+    needsTeach: classification.confidence < 60,
     timings,
   };
 }

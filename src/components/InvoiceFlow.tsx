@@ -454,22 +454,44 @@ const CustomInstructionsField = ({
         </div>
       )}
 
-      {/* Save for supplier + Save as preset */}
-      <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <input type="checkbox" id="save-supplier" checked={saveForSupplier} onChange={e => setSaveForSupplier(e.target.checked)}
-            className="w-4 h-4 rounded border-border accent-primary" />
-          <label htmlFor="save-supplier" className="text-xs text-muted-foreground">Save for future invoices from this supplier</label>
+      {/* Save for supplier — controls supplier-brain template learning */}
+      <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
+        <label htmlFor="save-supplier" className="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            id="save-supplier"
+            checked={saveForSupplier}
+            onChange={e => handleToggleSave(e.target.checked)}
+            className="w-4 h-4 mt-0.5 rounded border-border accent-primary cursor-pointer"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-foreground">
+              Remember these requirements for future invoices from this supplier
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              When on, the supplier brain learns these instructions and auto-applies them next time.
+              When off, no template is saved or updated.
+            </p>
+          </div>
+        </label>
+        {saveForSupplier && (
+          <input
+            value={templateSupplier}
+            onChange={e => setTemplateSupplier(e.target.value)}
+            onBlur={() => {
+              // Persist flag against the latest typed supplier name too.
+              if (templateSupplier.trim()) setLearnSupplierFlag(templateSupplier, true);
+            }}
+            placeholder="Supplier name"
+            className="w-full h-9 rounded-md bg-input border border-border px-3 text-xs mt-2"
+          />
+        )}
+        <div className="flex justify-end mt-2">
+          <button onClick={saveCurrentAsPreset} className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
+            <Save className="w-3 h-3" /> Save as reusable preset instead
+          </button>
         </div>
-        <button onClick={saveCurrentAsPreset} className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
-          <Save className="w-3 h-3" /> Save as preset
-        </button>
       </div>
-      {saveForSupplier && (
-        <input value={templateSupplier} onChange={e => setTemplateSupplier(e.target.value)}
-          placeholder="Supplier name"
-          className="w-full h-9 rounded-md bg-input border border-border px-3 text-xs mt-2" />
-      )}
     </div>
   );
 };

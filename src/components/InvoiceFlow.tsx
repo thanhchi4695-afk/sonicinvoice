@@ -992,10 +992,61 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }, 100);
   };
 
+  // Local multi-file queue — mirrors the Drive queue pattern. When the user drops or
+  // picks N files at once, we load file 1 immediately and queue the rest. Each file
+  // becomes its own history entry because acceptInvoiceFile triggers the normal
+  // single-file flow (uploadOriginalToStorage + processing), and once the user
+  // finishes review (uploadedFile is cleared) the next queued file auto-loads.
+  type LocalQueueItem = { file: File; status: "queued" | "processing" | "done" };
+  const [localQueue, setLocalQueue] = useState<LocalQueueItem[]>([]);
+
+  /** Accept a list of dropped/picked files. Loads the first, queues the rest. */
+  const acceptInvoiceFiles = (files: File[]) => {
+    const valid = files.filter(isAcceptedFile);
+    const rejected = files.length - valid.length;
+    if (rejected > 0) {
+      toast.error(`${rejected} file${rejected === 1 ? "" : "s"} skipped`, {
+        description: "Only PDF, Excel, CSV, Word, and image files are supported.",
+      });
+    }
+    if (valid.length === 0) return;
+    if (valid.length === 1) {
+      acceptInvoiceFile(valid[0]);
+      return;
+    }
+    const [first, ...rest] = valid;
+    acceptInvoiceFile(first);
+    setLocalQueue([
+      { file: first, status: "processing" },
+      ...rest.map<LocalQueueItem>((f) => ({ file: f, status: "queued" })),
+    ]);
+    toast(`Queued ${valid.length} invoices`, {
+      description: "Each file becomes its own history entry. The next one loads when you finish reviewing the current invoice.",
+    });
+  };
+
+  // Auto-advance the local queue when the current upload is cleared (review accepted/restarted).
+  useEffect(() => {
+    if (uploadedFile) return;
+    setLocalQueue((prev) => {
+      if (prev.length === 0) return prev;
+      const advanced = prev.map((q) => q.status === "processing" ? { ...q, status: "done" as const } : q);
+      const nextIdx = advanced.findIndex((q) => q.status === "queued");
+      if (nextIdx === -1) {
+        // Whole batch finished — clear so the panel disappears.
+        return [];
+      }
+      const next = advanced[nextIdx];
+      queueMicrotask(() => acceptInvoiceFile(next.file));
+      return advanced.map((q, i) => i === nextIdx ? { ...q, status: "processing" } : q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadedFile]);
+
   const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    acceptInvoiceFile(file);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    acceptInvoiceFiles(files);
     e.target.value = "";
   };
 
@@ -1107,12 +1158,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       toast("Pick your POS first", { description: "Choose Shopify or Lightspeed, then drop the file again." });
       return;
     }
-    const file = e.dataTransfer?.files?.[0];
-    if (!file) {
-      toast.error("No file detected", { description: "Try dragging a single PDF, Excel, CSV, or image file." });
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (files.length === 0) {
+      toast.error("No file detected", { description: "Try dragging a PDF, Excel, CSV, or image file." });
       return;
     }
-    acceptInvoiceFile(file);
+    acceptInvoiceFiles(files);
   };
 
   // Paste handler — accept clipboard images / files (Cmd/Ctrl+V on the dropzone)
@@ -3012,6 +3063,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.heic,.webp"
             onChange={handleFileChosen}
             className="hidden"
@@ -3076,6 +3128,40 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {localQueue.length > 0 && (
+            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3" aria-live="polite">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold">
+                  Drop batch · {localQueue.filter(q => q.status === "done").length}/{localQueue.length} processed
+                </p>
+                <button
+                  onClick={() => setLocalQueue([])}
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  Clear batch
+                </button>
+              </div>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {localQueue.map((q, i) => (
+                  <div key={`${q.file.name}-${i}`} className="flex items-center gap-2 text-xs">
+                    <span className="w-4 shrink-0 text-center">
+                      {q.status === "done" && "✅"}
+                      {q.status === "processing" && "⏳"}
+                      {q.status === "queued" && "•"}
+                    </span>
+                    <span className={cn("truncate flex-1", q.status === "done" && "text-muted-foreground line-through")}>
+                      {q.file.name}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground capitalize">{q.status}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-2">
+                Each file becomes its own history entry. The next file loads automatically when you finish the current review.
+              </p>
             </div>
           )}
 

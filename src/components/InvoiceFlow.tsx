@@ -314,9 +314,42 @@ const CustomInstructionsField = ({
         Tell the AI exactly how to process this invoice. Plain English — no code needed.
       </p>
 
+      {/* Suggested preset banner */}
+      {suggestedPreset && !value && (
+        <div className="bg-accent/10 border border-accent/30 rounded-md p-2.5 mb-2 flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium">✨ Matched preset: {suggestedPreset.name}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{suggestedPreset.description}</p>
+          </div>
+          <button onClick={() => applyPreset(suggestedPreset)} className="text-xs font-semibold text-primary hover:underline whitespace-nowrap">Use this →</button>
+        </div>
+      )}
+
+      {/* Logic Library picker */}
+      <div className="mb-2">
+        <button onClick={() => setShowLibrary(!showLibrary)} className="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+          <Settings className="w-3.5 h-3.5" />
+          📚 Logic Library ({allPresets.length}) {showLibrary ? '▲' : '▼'}
+        </button>
+        {showLibrary && (
+          <div className="mt-2 space-y-1.5 max-h-60 overflow-y-auto bg-muted/30 rounded-md p-2 border border-border">
+            {allPresets.map(p => (
+              <button key={p.id} onClick={() => applyPreset(p)}
+                className="w-full text-left bg-card hover:bg-accent rounded-md px-3 py-2 border border-border transition-colors">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold">{p.name}</span>
+                  {p.builtin && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">built-in</span>}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {loadedTemplate && (
         <div className="bg-primary/10 border border-primary/20 rounded-md p-2 mb-2 flex items-center justify-between">
-          <p className="text-xs text-primary">💡 Loaded saved instructions for {loadedTemplate}</p>
+          <p className="text-xs text-primary">💡 Loaded: {loadedTemplate}</p>
           <button onClick={() => { onChange(''); setLoadedTemplate(null); }} className="text-xs text-primary font-medium ml-2">Clear</button>
         </div>
       )}

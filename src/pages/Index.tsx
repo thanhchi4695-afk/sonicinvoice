@@ -378,6 +378,32 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     </div>
   );
 
+  // ── Embedded auth gate ──
+  // While the embedded session-token handshake is running, show a loading
+  // state instead of falling through to the public marketing AuthScreen.
+  if (isEmbedded && embeddedAuthState === "loading") {
+    return (
+      <div className="flex items-center justify-center min-h-screen flex-col gap-3 p-6 text-center">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-muted-foreground">Signing you in via Shopify…</p>
+      </div>
+    );
+  }
+
+  // If the shop has no install row in the backend, surface a clear reinstall
+  // prompt rather than the public-marketing login (which would just confuse merchants).
+  if (isEmbedded && embeddedAuthState === "needs_install") {
+    return (
+      <div className="flex items-center justify-center min-h-screen flex-col gap-3 p-6 text-center max-w-md mx-auto">
+        <h1 className="text-lg font-semibold text-foreground">Finish installing Sonic Invoices</h1>
+        <p className="text-sm text-muted-foreground">
+          Your shop hasn't completed the install handshake yet. Reinstall the app from the Shopify App Store
+          (or your dev partner dashboard) to grant access.
+        </p>
+      </div>
+    );
+  }
+
   // When embedded in Shopify, skip standalone auth/onboarding
   // (Shopify handles auth via session tokens or OAuth install flow)
   if (!authed) {

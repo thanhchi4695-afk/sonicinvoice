@@ -141,6 +141,7 @@ export function generateXSeriesCSV(
 
   const allRows: CsvRow[] = [];
   const errors: XSeriesValidationError[] = [];
+  const activeFlag = lightspeedActiveValue(getPublishStatus());
 
   // Generate unique handles per product
   const rawHandles = products.map(p => generateHandle(p.title, p.brand));

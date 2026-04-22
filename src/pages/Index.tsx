@@ -408,11 +408,35 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   // ── Embedded auth gate ──
   // While the embedded session-token handshake is running, show a loading
   // state instead of falling through to the public marketing AuthScreen.
-  if (isEmbedded && embeddedAuthState === "loading") {
+  if (isEmbedded && embeddedAuthState === "loading" && !embeddedAuthTimedOut) {
     return (
       <div className="flex items-center justify-center min-h-screen flex-col gap-3 p-6 text-center">
         <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         <p className="text-sm text-muted-foreground">Signing you in via Shopify…</p>
+      </div>
+    );
+  }
+
+  // Hard timeout reached — App Bridge / verify endpoint never returned.
+  // Show a retry button so the user isn't stuck on an infinite spinner.
+  if (isEmbedded && embeddedAuthState === "loading" && embeddedAuthTimedOut) {
+    return (
+      <div className="flex items-center justify-center min-h-screen flex-col gap-3 p-6 text-center max-w-md mx-auto">
+        <h1 className="text-lg font-semibold text-foreground">Sign-in is taking longer than expected</h1>
+        <p className="text-sm text-muted-foreground">
+          We couldn't complete the Shopify session handshake. This usually clears with a reload.
+          {embeddedAuthError ? <span className="block mt-2 text-xs opacity-70">{embeddedAuthError}</span> : null}
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+        >
+          Reload app
+        </button>
+        <p className="text-xs text-muted-foreground mt-2">
+          Still stuck? Open the app from your Shopify Admin home (Apps → Sonic Invoices).
+        </p>
       </div>
     );
   }

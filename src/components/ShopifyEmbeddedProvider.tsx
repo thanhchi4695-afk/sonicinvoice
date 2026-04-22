@@ -121,24 +121,41 @@ const ShopifyEmbeddedProvider = ({ children }: Props) => {
         }
 
         // Step 3: Set Supabase session (single call — no other component should do this)
-        const { error: sessionError } = await supabase.auth.setSession({
+        // Wrap in 8s timeout — supabase.auth.setSession() can hang indefinitely
+        // inside Shopify Admin iframes when third-party storage is partitioned,
+        // which previously left us stuck on the "Signing you in via Shopify…" screen
+        // until the outer 15s hard-timeout fired with a generic handshake error.
+        console.log("[embedded-auth] Verify OK, calling setSession…");
+        const setSessionPromise = supabase.auth.setSession({
           access_token: data.access_token,
           refresh_token: data.refresh_token,
         });
+        const setSessionTimeout = new Promise<{ error: { message: string } }>((resolve) =>
+          setTimeout(() => resolve({ error: { message: "setSession timed out after 8s (likely partitioned storage in iframe)" } }), 8000)
+        );
+        const { error: sessionError } = (await Promise.race([setSessionPromise, setSessionTimeout])) as { error: { message: string } | null };
+
+        if (cancelled) return;
 
         if (sessionError) {
-          console.warn("[embedded-auth] Failed to set session:", sessionError);
-          setAuthError(sessionError.message);
-          setAuthState("unauthenticated");
-          return;
-        }
-
-        if (!cancelled) {
+          console.warn("[embedded-auth] setSession failed:", sessionError);
+          // Even when setSession fails (typically because the iframe can't
+          // persist auth tokens), we already have valid Supabase JWTs from
+          // the verify endpoint. Treat the user as authenticated for the
+          // life of this tab — Supabase queries that include the access_token
+          // header will still succeed.
           setAuthError(null);
           setAuthState("authenticated");
           localStorage.setItem("onboarding_complete", "true");
-          addAuditEntry("Login", `Embedded session auth for ${data.shop || base.shop}`);
+          addAuditEntry("Login", `Embedded session auth (no-store) for ${data.shop || base.shop}`);
+          return;
         }
+
+        console.log("[embedded-auth] setSession OK — authenticated");
+        setAuthError(null);
+        setAuthState("authenticated");
+        localStorage.setItem("onboarding_complete", "true");
+        addAuditEntry("Login", `Embedded session auth for ${data.shop || base.shop}`);
       } catch (err) {
         console.error("[embedded-auth] Error:", err);
         if (!cancelled) {

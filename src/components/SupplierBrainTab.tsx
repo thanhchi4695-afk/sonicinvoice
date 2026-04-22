@@ -2,15 +2,20 @@
 // Brain tab — lives inside SupplierIntelligencePanel.
 // Pattern-aware view: pattern badge (A–H), confidence colour,
 // shared-template indicator, View / Reset template, totals strip.
+//
+// Drive import flow: paste link → list files → tick the ones
+// you want → seed each in parallel with live per-file progress.
 // ──────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from "react";
-import { Brain, Eye, RotateCcw, Users, CheckCircle2, CloudDownload, Loader2 } from "lucide-react";
+import { Brain, Eye, RotateCcw, Users, CheckCircle2, CloudDownload, Loader2, FileText, AlertCircle, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -52,33 +57,128 @@ export default function SupplierBrainTab() {
   const [contribute, setContribute] = useState(true);
   const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState<SupplierRow | null>(null);
-  const [driveUrl, setDriveUrl] = useState("https://drive.google.com/drive/folders/1jx3d-nQlZKoCeZ0LxPppHEEoYlnhpixw?usp=sharing");
-  const [seeding, setSeeding] = useState(false);
+  const [driveUrl, setDriveUrl] = useState("");
 
-  const seedFromDrive = async () => {
+  // Drive picker state machine: idle → picking → seeding → done
+  type FileStatus = "queued" | "running" | "done" | "skipped" | "error";
+  interface DriveFileItem {
+    id: string;
+    name: string;
+    selected: boolean;
+    status: FileStatus;
+    message?: string;
+    supplier?: string;
+  }
+  const [driveStage, setDriveStage] = useState<"idle" | "picking" | "seeding" | "done">("idle");
+  const [listing, setListing] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<DriveFileItem[]>([]);
+
+  const listDriveFiles = async () => {
     if (!driveUrl.trim()) {
       toast.error("Paste a Google Drive folder link first");
       return;
     }
-    setSeeding(true);
+    setListing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("seed-shared-from-drive", {
+      const { data, error } = await supabase.functions.invoke("drive-list", {
         body: { url: driveUrl.trim() },
       });
       if (error) throw error;
-      const { processed = 0, seeded = 0, errors } = data || {};
-      toast.success(`Seeded ${seeded} of ${processed} invoices into the shared pool`, {
-        description: errors?.length ? `${errors.length} skipped — see console for details` : undefined,
-      });
-      if (errors?.length) console.warn("Seed skips:", errors);
-      void load();
+      const files = (data?.files || []) as Array<{ id: string; name: string; mimeType: string }>;
+      if (files.length === 0) {
+        toast.error("No files found", {
+          description: "Make sure the folder is shared as 'Anyone with the link'.",
+        });
+        return;
+      }
+      setDriveFiles(files.map((f) => ({
+        id: f.id,
+        name: f.name,
+        selected: true, // default: all selected
+        status: "queued" as FileStatus,
+      })));
+      setDriveStage("picking");
     } catch (e) {
-      toast.error("Drive seed failed", {
-        description: e instanceof Error ? e.message : "Make sure the folder is shared as 'Anyone with the link'",
+      toast.error("Could not list folder", {
+        description: e instanceof Error ? e.message : "Unknown error",
       });
     } finally {
-      setSeeding(false);
+      setListing(false);
     }
+  };
+
+  const toggleAll = (on: boolean) => {
+    setDriveFiles((prev) => prev.map((f) => ({ ...f, selected: on })));
+  };
+
+  const seedSelected = async () => {
+    const targets = driveFiles.filter((f) => f.selected);
+    if (targets.length === 0) {
+      toast.error("Tick at least one file first");
+      return;
+    }
+    setDriveStage("seeding");
+    setDriveFiles((prev) => prev.map((f) => f.selected ? { ...f, status: "queued" } : f));
+
+    // Parallel with small concurrency cap so we don't hammer the AI gateway.
+    const CONCURRENCY = 3;
+    const queue = [...targets];
+    let active = 0;
+
+    await new Promise<void>((resolve) => {
+      const next = () => {
+        if (queue.length === 0 && active === 0) return resolve();
+        while (active < CONCURRENCY && queue.length > 0) {
+          const file = queue.shift()!;
+          active += 1;
+          setDriveFiles((prev) => prev.map((f) =>
+            f.id === file.id ? { ...f, status: "running" } : f,
+          ));
+          supabase.functions
+            .invoke("drive-seed-one", { body: { fileId: file.id, fileName: file.name } })
+            .then(({ data, error }) => {
+              const ok = !error && data?.ok;
+              setDriveFiles((prev) => prev.map((f) => {
+                if (f.id !== file.id) return f;
+                if (ok) {
+                  return {
+                    ...f,
+                    status: "done",
+                    supplier: data.supplier_name,
+                    message: `Pattern ${data.detected_pattern || "?"} · ${data.confidence}%`,
+                  };
+                }
+                const msg = error?.message || data?.error || "Failed";
+                return {
+                  ...f,
+                  status: msg.toLowerCase().includes("low-confidence") ? "skipped" : "error",
+                  message: msg,
+                };
+              }));
+            })
+            .catch((err) => {
+              setDriveFiles((prev) => prev.map((f) =>
+                f.id === file.id
+                  ? { ...f, status: "error", message: err instanceof Error ? err.message : "Failed" }
+                  : f,
+              ));
+            })
+            .finally(() => {
+              active -= 1;
+              next();
+            });
+        }
+      };
+      next();
+    });
+
+    setDriveStage("done");
+    void load();
+  };
+
+  const resetDrive = () => {
+    setDriveStage("idle");
+    setDriveFiles([]);
   };
 
   const load = async () => {
@@ -164,30 +264,108 @@ export default function SupplierBrainTab() {
         <Switch checked={contribute} onCheckedChange={toggleContribute} />
       </Card>
 
-      {/* Seed shared pool from a Google Drive folder of sample invoices */}
+      {/* Import from Google Drive — paste link → pick files → seed with live progress */}
       <Card className="p-4">
         <div className="flex items-start gap-2.5 mb-3">
           <CloudDownload className="w-5 h-5 text-primary mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-semibold">Seed shared templates from Google Drive</p>
+            <p className="text-sm font-semibold">Import invoices from Google Drive</p>
             <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-              Paste a folder of sample invoices. Each one is classified and its <strong>structural template only</strong>
-              (column map + pattern) is added to the shared community pool. Prices and quantities are never stored.
+              Paste a public folder link, choose which sample invoices to learn from, then watch each one
+              get classified live. Adds the <strong>structural template only</strong> (column map + pattern) to your
+              personal brain <em>and</em> the shared pool. Prices and quantities are never stored.
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Input
-            value={driveUrl}
-            onChange={(e) => setDriveUrl(e.target.value)}
-            placeholder="https://drive.google.com/drive/folders/..."
-            className="text-xs"
-            disabled={seeding}
-          />
-          <Button onClick={seedFromDrive} disabled={seeding} size="sm">
-            {seeding ? <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> Seeding…</> : "Seed"}
-          </Button>
-        </div>
+
+        {/* Step 1 — paste link */}
+        {driveStage === "idle" && (
+          <div className="flex gap-2">
+            <Input
+              value={driveUrl}
+              onChange={(e) => setDriveUrl(e.target.value)}
+              placeholder="https://drive.google.com/drive/folders/..."
+              className="text-xs"
+              disabled={listing}
+              onKeyDown={(e) => { if (e.key === "Enter") void listDriveFiles(); }}
+            />
+            <Button onClick={listDriveFiles} disabled={listing} size="sm">
+              {listing ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Listing…</> : "List files"}
+            </Button>
+          </div>
+        )}
+
+        {/* Step 2 — pick which to import */}
+        {(driveStage === "picking" || driveStage === "seeding" || driveStage === "done") && (
+          <div className="space-y-3">
+            {driveStage === "seeding" || driveStage === "done" ? (
+              <SeedProgressHeader files={driveFiles} stage={driveStage} onReset={resetDrive} />
+            ) : (
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-muted-foreground">
+                  {driveFiles.length} file{driveFiles.length === 1 ? "" : "s"} found ·{" "}
+                  <strong>{driveFiles.filter((f) => f.selected).length} selected</strong>
+                </span>
+                <div className="flex gap-1.5">
+                  <Button size="sm" variant="ghost" onClick={() => toggleAll(true)}>Select all</Button>
+                  <Button size="sm" variant="ghost" onClick={() => toggleAll(false)}>None</Button>
+                  <Button size="sm" variant="ghost" onClick={resetDrive}>
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="max-h-72 overflow-y-auto rounded-md border border-border divide-y divide-border">
+              {driveFiles.map((f) => (
+                <div key={f.id} className="flex items-center gap-2 px-2.5 py-2 text-xs">
+                  {driveStage === "picking" ? (
+                    <Checkbox
+                      checked={f.selected}
+                      onCheckedChange={(v) => setDriveFiles((prev) => prev.map((p) =>
+                        p.id === f.id ? { ...p, selected: !!v } : p,
+                      ))}
+                    />
+                  ) : (
+                    <StatusIcon status={f.status} />
+                  )}
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{f.name}</p>
+                    {f.message && (
+                      <p className={`truncate text-[10px] ${
+                        f.status === "error" ? "text-destructive" :
+                        f.status === "skipped" ? "text-warning" :
+                        f.status === "done" ? "text-success" : "text-muted-foreground"
+                      }`}>
+                        {f.supplier ? <strong>{f.supplier}</strong> : null}
+                        {f.supplier && f.message ? " · " : null}
+                        {f.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {driveStage === "picking" && (
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={resetDrive}>Cancel</Button>
+                <Button size="sm" onClick={seedSelected}
+                  disabled={driveFiles.filter((f) => f.selected).length === 0}>
+                  Import {driveFiles.filter((f) => f.selected).length} invoice
+                  {driveFiles.filter((f) => f.selected).length === 1 ? "" : "s"}
+                </Button>
+              </div>
+            )}
+
+            {driveStage === "done" && (
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="outline" onClick={resetDrive}>Import another folder</Button>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Supplier rows */}
@@ -260,6 +438,70 @@ export default function SupplierBrainTab() {
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Sub-components for the Drive picker ──────────────────────
+
+function StatusIcon({ status }: { status: "queued" | "running" | "done" | "skipped" | "error" }) {
+  switch (status) {
+    case "running":
+      return <Loader2 className="w-3.5 h-3.5 text-primary animate-spin shrink-0" />;
+    case "done":
+      return <Check className="w-3.5 h-3.5 text-success shrink-0" />;
+    case "skipped":
+      return <AlertCircle className="w-3.5 h-3.5 text-warning shrink-0" />;
+    case "error":
+      return <X className="w-3.5 h-3.5 text-destructive shrink-0" />;
+    case "queued":
+    default:
+      return <div className="w-3.5 h-3.5 rounded-full border border-muted-foreground/40 shrink-0" />;
+  }
+}
+
+function SeedProgressHeader({
+  files,
+  stage,
+  onReset,
+}: {
+  files: Array<{ status: "queued" | "running" | "done" | "skipped" | "error"; selected: boolean }>;
+  stage: "seeding" | "done";
+  onReset: () => void;
+}) {
+  const targets = files.filter((f) => f.selected);
+  const done = targets.filter((f) => f.status === "done").length;
+  const skipped = targets.filter((f) => f.status === "skipped").length;
+  const errored = targets.filter((f) => f.status === "error").length;
+  const running = targets.filter((f) => f.status === "running").length;
+  const finished = done + skipped + errored;
+  const pct = targets.length === 0 ? 0 : Math.round((finished / targets.length) * 100);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2 min-w-0">
+          {stage === "seeding" ? (
+            <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+          ) : (
+            <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+          )}
+          <span className="font-medium">
+            {stage === "seeding"
+              ? `Importing ${finished} / ${targets.length}…`
+              : `Done — ${done} learned${skipped ? `, ${skipped} skipped` : ""}${errored ? `, ${errored} failed` : ""}`}
+          </span>
+        </div>
+        {stage === "done" && (
+          <Button size="sm" variant="ghost" onClick={onReset}>
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        )}
+      </div>
+      <Progress value={pct} className="h-1.5" />
+      {running > 0 && stage === "seeding" && (
+        <p className="text-[10px] text-muted-foreground">Processing {running} in parallel…</p>
       )}
     </div>
   );

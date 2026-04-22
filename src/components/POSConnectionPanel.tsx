@@ -373,20 +373,70 @@ export default function POSConnectionPanel() {
                   />
                 </div>
                 {(p.id === "lightspeed_x" || p.id === "lightspeed_r") && shopifyConnected && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleBarcodeSync}
-                    disabled={syncingBarcodes}
-                    className="text-xs w-full"
-                  >
-                    {syncingBarcodes ? (
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    ) : (
-                      <Barcode className="w-3 h-3 mr-1" />
+                  <div className="space-y-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleBarcodeSync}
+                      disabled={syncingBarcodes}
+                      className="text-xs w-full"
+                    >
+                      {syncingBarcodes ? (
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      ) : (
+                        <Barcode className="w-3 h-3 mr-1" />
+                      )}
+                      Sync barcodes to Shopify
+                    </Button>
+                    {syncProgress && (
+                      <div className="rounded-md bg-background border border-border p-2 space-y-1.5">
+                        {syncProgress.phase === "scanning" && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Scanning Shopify variants… <span className="font-mono text-foreground">{syncProgress.scanned ?? 0}</span> found
+                            {syncProgress.total != null && (
+                              <> · {syncProgress.total} Lightspeed rows queued</>
+                            )}
+                          </p>
+                        )}
+                        {syncProgress.phase === "updating" && (
+                          <>
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-muted-foreground">
+                                Updating barcodes…
+                              </span>
+                              <span className="font-mono text-foreground">
+                                {syncProgress.processed ?? 0} / {syncProgress.total ?? 0}
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary transition-all"
+                                style={{
+                                  width: `${syncProgress.total ? Math.min(100, ((syncProgress.processed ?? 0) / syncProgress.total) * 100) : 0}%`,
+                                }}
+                              />
+                            </div>
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+                              <span>✓ {syncProgress.updated ?? 0} updated</span>
+                              <span>= {syncProgress.already ?? 0} already had</span>
+                              <span>· {syncProgress.noMatch ?? 0} no match</span>
+                              {(syncProgress.errors ?? 0) > 0 && (
+                                <span className="text-destructive">! {syncProgress.errors} errors</span>
+                              )}
+                            </div>
+                          </>
+                        )}
+                        {syncProgress.phase === "done" && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Done · <span className="text-foreground">{syncProgress.updated ?? 0}</span> updated, {syncProgress.already ?? 0} already had, {syncProgress.noMatch ?? 0} not matched
+                            {(syncProgress.errors ?? 0) > 0 && (
+                              <>, <span className="text-destructive">{syncProgress.errors} errors</span></>
+                            )}
+                          </p>
+                        )}
+                      </div>
                     )}
-                    Sync barcodes to Shopify
-                  </Button>
+                  </div>
                 )}
               </div>
             )}

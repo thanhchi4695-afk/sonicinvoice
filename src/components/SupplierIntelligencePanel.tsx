@@ -139,18 +139,86 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
 
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const { data: si } = await supabase
-      .from("supplier_intelligence")
-      .select("*")
-      .order("invoice_count", { ascending: false });
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
 
-    const { data: lg } = await supabase
-      .from("supplier_learning_log")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(200);
+    // Pull intelligence rows + supplier profiles + per-supplier pattern counts
+    // in parallel so we can reconcile the three sources into a single list.
+    const [{ data: si }, { data: lg }, { data: profiles }, { data: patternRows }] =
+      await Promise.all([
+        supabase
+          .from("supplier_intelligence")
+          .select("*")
+          .order("invoice_count", { ascending: false }),
+        supabase
+          .from("supplier_learning_log")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(200),
+        userId
+          ? supabase
+              .from("supplier_profiles")
+              .select("id, supplier_name, invoice_count, updated_at")
+              .eq("user_id", userId)
+          : Promise.resolve({ data: [] as Array<{ id: string; supplier_name: string; invoice_count: number | null; updated_at: string }> }),
+        userId
+          ? supabase
+              .from("invoice_patterns")
+              .select("supplier_profile_id, updated_at")
+              .eq("user_id", userId)
+          : Promise.resolve({ data: [] as Array<{ supplier_profile_id: string | null; updated_at: string }> }),
+      ]);
 
-    setRows((si || []) as IntelligenceRow[]);
+    const intelRows = (si || []) as IntelligenceRow[];
+
+    // Count actual invoice_patterns rows per supplier (matches what
+    // Processing History shows). Falls back to supplier_profiles.invoice_count
+    // when no patterns are linked yet.
+    const profileList = (profiles || []) as Array<{ id: string; supplier_name: string; invoice_count: number | null; updated_at: string }>;
+    const patternsBySupplier = new Map<string, number>();
+    for (const p of (patternRows || []) as Array<{ supplier_profile_id: string | null }>) {
+      if (!p.supplier_profile_id) continue;
+      patternsBySupplier.set(p.supplier_profile_id, (patternsBySupplier.get(p.supplier_profile_id) || 0) + 1);
+    }
+
+    // Override displayed invoice_count using actual pattern counts so the
+    // Supplier Intelligence + Processing History views stay in sync.
+    const intelByName = new Map(intelRows.map(r => [r.supplier_name.toLowerCase(), r] as const));
+    for (const profile of profileList) {
+      const intel = intelByName.get(profile.supplier_name.toLowerCase());
+      if (!intel) continue;
+      const actual = patternsBySupplier.get(profile.id) ?? profile.invoice_count ?? 0;
+      if (actual > 0) intel.invoice_count = actual;
+    }
+
+    // Backfill: any supplier_profiles missing from supplier_intelligence
+    // (so e.g. "Rhythm" appears here when it appears in Processing History).
+    const reconciled: IntelligenceRow[] = [...intelRows];
+    for (const profile of profileList) {
+      if (intelByName.has(profile.supplier_name.toLowerCase())) continue;
+      const count = patternsBySupplier.get(profile.id) ?? profile.invoice_count ?? 0;
+      if (count === 0) continue;
+      reconciled.push({
+        id: `profile-${profile.id}`,
+        supplier_name: profile.supplier_name,
+        name_variants: [],
+        column_map: {},
+        confidence_score: 20,
+        invoice_count: count,
+        size_system: null,
+        sku_prefix_pattern: null,
+        gst_on_cost: null,
+        gst_on_rrp: null,
+        markup_multiplier: null,
+        last_invoice_date: profile.updated_at,
+        last_match_method: null,
+        created_at: profile.updated_at,
+        updated_at: profile.updated_at,
+      });
+    }
+    reconciled.sort((a, b) => b.invoice_count - a.invoice_count);
+
+    setRows(reconciled);
     setLogs((lg || []) as LogRow[]);
     setLoading(false);
   }, []);

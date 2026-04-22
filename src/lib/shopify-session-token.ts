@@ -8,6 +8,17 @@
 
 import { isShopifyEmbedded } from "./shopify-embedded";
 
+function getTokenFromUrl(): string | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("id_token");
+    if (!token) return null;
+    return token.split(".").length === 3 ? token : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Wait until App Bridge v4 is loaded and `window.shopify.idToken` is available.
  * The CDN script is injected from main.tsx but takes a few hundred ms to
@@ -31,6 +42,9 @@ async function waitForAppBridge(timeoutMs = 8000): Promise<unknown | null> {
 export async function getSessionToken(): Promise<string | null> {
   try {
     if (!isShopifyEmbedded()) return null;
+
+    const urlToken = getTokenFromUrl();
+    if (urlToken) return urlToken;
 
     const shopify = (await waitForAppBridge()) as { idToken: () => Promise<string> } | null;
     if (!shopify) {

@@ -455,6 +455,25 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     );
   }
 
+  if (isEmbedded && embeddedAuthState === "unauthenticated") {
+    return (
+      <div className="flex items-center justify-center min-h-screen flex-col gap-3 p-6 text-center max-w-md mx-auto">
+        <h1 className="text-lg font-semibold text-foreground">Shopify sign-in could not be completed</h1>
+        <p className="text-sm text-muted-foreground">
+          We couldn't validate the embedded Shopify session for this load.
+          {embeddedAuthError ? <span className="block mt-2 text-xs opacity-70">{embeddedAuthError}</span> : null}
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+        >
+          Reload app
+        </button>
+      </div>
+    );
+  }
+
   // When embedded in Shopify, skip standalone auth/onboarding
   // (Shopify handles auth via session tokens or OAuth install flow)
   if (!authed) {

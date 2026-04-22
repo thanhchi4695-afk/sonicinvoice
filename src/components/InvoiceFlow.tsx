@@ -1391,7 +1391,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
         // Save to both template system and learning memory
         if (sup) {
-          saveLayoutTemplate(sup, data.layout_type as LayoutType, 85, ext as any, customInstructions || undefined, data.variant_method, data.detected_size_system, data.detected_fields);
+          // Only persist customInstructions to the supplier brain when the
+          // user has explicitly opted in via the "Remember these requirements"
+          // checkbox. Layout/variant/size memory is always recorded so the AI
+          // can still recognise the invoice shape next time.
+          const learnInstructions = getLearnSupplierFlag(sup);
+          saveLayoutTemplate(
+            sup,
+            data.layout_type as LayoutType,
+            85,
+            ext as any,
+            learnInstructions ? (customInstructions || undefined) : undefined,
+            data.variant_method,
+            data.detected_size_system,
+            data.detected_fields,
+          );
 
           // Record to learning memory with full fingerprint
           const fingerprint: LayoutFingerprint = {

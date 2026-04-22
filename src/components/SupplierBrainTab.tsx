@@ -2,15 +2,20 @@
 // Brain tab — lives inside SupplierIntelligencePanel.
 // Pattern-aware view: pattern badge (A–H), confidence colour,
 // shared-template indicator, View / Reset template, totals strip.
+//
+// Drive import flow: paste link → list files → tick the ones
+// you want → seed each in parallel with live per-file progress.
 // ──────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from "react";
-import { Brain, Eye, RotateCcw, Users, CheckCircle2, CloudDownload, Loader2 } from "lucide-react";
+import { Brain, Eye, RotateCcw, Users, CheckCircle2, CloudDownload, Loader2, FileText, AlertCircle, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {

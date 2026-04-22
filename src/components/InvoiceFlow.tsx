@@ -3194,6 +3194,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold">
                   Drop batch · {localQueue.filter(q => q.status === "done").length}/{localQueue.length} processed
+                  {localQueue.some(q => q.status === "failed") && (
+                    <span className="ml-2 text-destructive">
+                      · {localQueue.filter(q => q.status === "failed").length} failed
+                    </span>
+                  )}
                 </p>
                 <button
                   onClick={() => setLocalQueue([])}
@@ -3204,21 +3209,51 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               </div>
               <div className="space-y-1 max-h-48 overflow-y-auto">
                 {localQueue.map((q, i) => (
-                  <div key={`${q.file.name}-${i}`} className="flex items-center gap-2 text-xs">
-                    <span className="w-4 shrink-0 text-center">
-                      {q.status === "done" && "✅"}
-                      {q.status === "processing" && "⏳"}
-                      {q.status === "queued" && "•"}
-                    </span>
-                    <span className={cn("truncate flex-1", q.status === "done" && "text-muted-foreground line-through")}>
-                      {q.file.name}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground capitalize">{q.status}</span>
+                  <div key={`${q.file.name}-${i}`} className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="w-4 shrink-0 text-center">
+                        {q.status === "done" && "✅"}
+                        {q.status === "processing" && "⏳"}
+                        {q.status === "queued" && "•"}
+                        {q.status === "failed" && "❌"}
+                      </span>
+                      <span
+                        className={cn(
+                          "truncate flex-1",
+                          q.status === "done" && "text-muted-foreground line-through",
+                          q.status === "failed" && "text-destructive",
+                        )}
+                      >
+                        {q.file.name}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-[10px] capitalize",
+                          q.status === "failed" ? "text-destructive" : "text-muted-foreground",
+                        )}
+                      >
+                        {q.status}
+                      </span>
+                      {q.status === "processing" && (
+                        <button
+                          onClick={() => skipCurrentBatchFile("Skipped by user")}
+                          className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                          title="Mark this file as failed and continue with the next one"
+                        >
+                          Skip & continue
+                        </button>
+                      )}
+                    </div>
+                    {q.status === "failed" && q.errorMessage && (
+                      <p className="text-[10px] text-destructive/80 pl-6 truncate" title={q.errorMessage}>
+                        Reason: {q.errorMessage}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
               <p className="text-[10px] text-muted-foreground mt-2">
-                Each file becomes its own history entry. The next file loads automatically when you finish the current review.
+                Each file becomes its own history entry. Failed files are flagged here and skipped so the rest of the batch still processes.
               </p>
             </div>
           )}

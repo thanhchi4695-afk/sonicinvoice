@@ -1,27 +1,31 @@
 // Lightspeed X-Series CSV export utilities
+// Schema matches the official Lightspeed product-export CSV
+// (see user-uploads://product-export-12.csv for the canonical header).
 import Papa from 'papaparse';
 
 // ── Types ──────────────────────────────────────────────────
 export interface XSeriesProduct {
   title: string;
   brand: string;
-  type: string;
-  price: number;       // supply/cost price
-  rrp: number;         // retail price
+  type: string;          // → product_category
+  price: number;         // supply/cost price
+  rrp: number;           // retail price
   description?: string;
   tags?: string;
   supplierCode?: string;
+  supplierName?: string;
   variants?: { size?: string; colour?: string; sku?: string; quantity?: number }[];
 }
 
 export interface XSeriesSettings {
-  outletName: string;
-  taxName: string;
+  outletName: string;       // e.g. "Main Outlet"
+  taxName: string;          // e.g. "Default Tax" or "GST"
   useReorderPoints: boolean;
   reorderPoint: number;
-  reorderAmount: number;
+  reorderAmount: number;    // → restock_level_<outlet>
   nameFormat: 'brand_first' | 'product_only';
   attributeOrder: 'size_first' | 'colour_first' | 'auto';
+  trackInventory: boolean;
 }
 
 export interface XSeriesValidationError {
@@ -32,13 +36,14 @@ export interface XSeriesValidationError {
 }
 
 const DEFAULT_SETTINGS: XSeriesSettings = {
-  outletName: 'STORE_NAME_1',
-  taxName: 'GST',
+  outletName: 'Main Outlet',
+  taxName: 'Default Tax',
   useReorderPoints: false,
   reorderPoint: 2,
   reorderAmount: 6,
   nameFormat: 'brand_first',
-  attributeOrder: 'size_first',
+  attributeOrder: 'colour_first', // matches real export (Colour, Size)
+  trackInventory: true,
 };
 
 const LS_SETTINGS_KEY = 'ls_xseries_settings';
@@ -89,25 +94,38 @@ function sizeRank(s: string): number {
 }
 
 // ── CSV Row builder ────────────────────────────────────────
+// Column order MIRRORS the Lightspeed product-export header exactly.
 interface CsvRow {
+  id: string;
   handle: string;
-  name: string;
   sku: string;
-  supplier_code: string;
+  composite_name: string;
+  composite_sku: string;
+  composite_quantity: string;
+  name: string;
   description: string;
-  brand: string;
+  product_category: string;
+  variant_option_one_name: string;
+  variant_option_one_value: string;
+  variant_option_two_name: string;
+  variant_option_two_value: string;
+  variant_option_three_name: string;
+  variant_option_three_value: string;
+  tags: string;
   supply_price: string;
   retail_price: string;
-  tax: string;
+  loyalty_value: string;
+  loyalty_value_default: string;
+  tax_name: string;
+  tax_value: string;
+  account_code: string;
+  account_code_purchase: string;
+  brand_name: string;
+  supplier_name: string;
+  supplier_code: string;
   active: string;
-  tags: string;
-  variant_option_1_name: string;
-  variant_option_1_value: string;
-  variant_option_2_name: string;
-  variant_option_2_value: string;
-  variant_option_3_name: string;
-  variant_option_3_value: string;
-  [key: string]: string;
+  track_inventory: string;
+  [key: string]: string; // dynamic inventory_<outlet>, reorder_point_<outlet>, restock_level_<outlet>
 }
 
 export function generateXSeriesCSV(
@@ -116,13 +134,12 @@ export function generateXSeriesCSV(
 ): { csv: string; errors: XSeriesValidationError[]; rowCount: number } {
   const s = { ...getXSeriesSettings(), ...settings };
   const outletKey = s.outletName.replace(/\s+/g, '_');
-  const stockCol = `${outletKey}_stock`;
-  const reorderPointCol = `${outletKey}_reorder_point`;
-  const reorderAmountCol = `${outletKey}_reorder_amount`;
+  const stockCol = `inventory_${outletKey}`;
+  const reorderPointCol = `reorder_point_${outletKey}`;
+  const restockLevelCol = `restock_level_${outletKey}`;
 
   const allRows: CsvRow[] = [];
   const errors: XSeriesValidationError[] = [];
-  const handleMap: Record<string, string> = {}; // title→handle for grouping
 
   // Generate unique handles per product
   const rawHandles = products.map(p => generateHandle(p.title, p.brand));
@@ -136,35 +153,52 @@ export function generateXSeriesCSV(
     const baseCode = product.supplierCode || product.brand.replace(/\s/g, '').toUpperCase().slice(0, 3) + String(pi + 1).padStart(3, '0');
     const hasVariants = product.variants && product.variants.length > 0;
 
+    const baseRow = (): CsvRow => ({
+      id: '', // blank → Lightspeed creates new
+      handle,
+      sku: '',
+      composite_name: '',
+      composite_sku: '',
+      composite_quantity: '',
+      name: displayName,
+      description: '',
+      product_category: product.type || '',
+      variant_option_one_name: '',
+      variant_option_one_value: '',
+      variant_option_two_name: '',
+      variant_option_two_value: '',
+      variant_option_three_name: '',
+      variant_option_three_value: '',
+      tags: '',
+      supply_price: product.price.toFixed(2),
+      retail_price: product.rrp.toFixed(2),
+      loyalty_value: '',
+      loyalty_value_default: '',
+      tax_name: s.taxName,
+      tax_value: '',
+      account_code: '',
+      account_code_purchase: '',
+      brand_name: product.brand,
+      supplier_name: product.supplierName || '',
+      supplier_code: product.supplierCode || '',
+      active: '1',
+      track_inventory: s.trackInventory ? '1' : '0',
+      [stockCol]: '0',
+      [reorderPointCol]: s.useReorderPoints ? String(s.reorderPoint) : '',
+      [restockLevelCol]: s.useReorderPoints ? String(s.reorderAmount) : '',
+    });
+
     if (!hasVariants) {
-      // Standard (non-variant) product — single row
-      const row: CsvRow = {
-        handle,
-        name: displayName,
-        sku: baseCode.replace(/[^a-zA-Z0-9]/g, ''),
-        supplier_code: product.supplierCode || '',
-        description: (product.description || '').slice(0, 255).replace(/[\r\n]+/g, ' '),
-        brand: product.brand,
-        supply_price: product.price.toFixed(2),
-        retail_price: product.rrp.toFixed(2),
-        tax: s.taxName,
-        active: '1',
-        tags: product.tags || '',
-        variant_option_1_name: '',
-        variant_option_1_value: '',
-        variant_option_2_name: '',
-        variant_option_2_value: '',
-        variant_option_3_name: '',
-        variant_option_3_value: '',
-        [stockCol]: '1',
-        [reorderPointCol]: s.useReorderPoints ? String(s.reorderPoint) : '',
-        [reorderAmountCol]: s.useReorderPoints ? String(s.reorderAmount) : '',
-      };
+      const row = baseRow();
+      row.sku = baseCode.replace(/[^a-zA-Z0-9]/g, '');
+      row.description = (product.description || '').replace(/[\r\n]+/g, ' ');
+      row.tags = product.tags || '';
+      row[stockCol] = '1';
       allRows.push(row);
       return;
     }
 
-    // Sort variants: colour then size (or vice versa)
+    // Sort variants
     const sorted = [...product.variants!].sort((a, b) => {
       if (s.attributeOrder === 'size_first') {
         const sd = sizeRank(a.size || '') - sizeRank(b.size || '');
@@ -187,34 +221,22 @@ export function generateXSeriesCSV(
       const attr1Val = s.attributeOrder === 'size_first' ? (v.size || '') : (v.colour || '');
       const attr2Val = s.attributeOrder === 'size_first' ? (v.colour || '') : (v.size || '');
 
-      const row: CsvRow = {
-        handle,
-        name: displayName,
-        sku,
-        supplier_code: product.supplierCode || '',
-        description: '', // blank for variants
-        brand: product.brand,
-        supply_price: product.price.toFixed(2),
-        retail_price: product.rrp.toFixed(2),
-        tax: s.taxName,
-        active: '1',
-        tags: isFirst ? (product.tags || '') : '',
-        variant_option_1_name: isFirst ? attr1Name : '',
-        variant_option_1_value: attr1Val,
-        variant_option_2_name: isFirst ? attr2Name : '',
-        variant_option_2_value: attr2Val,
-        variant_option_3_name: '',
-        variant_option_3_value: '',
-        [stockCol]: String(v.quantity || 1),
-        [reorderPointCol]: s.useReorderPoints ? String(s.reorderPoint) : '',
-        [reorderAmountCol]: s.useReorderPoints ? String(s.reorderAmount) : '',
-      };
+      const row = baseRow();
+      row.sku = sku;
+      // Description on every variant row matches Lightspeed's own export style
+      row.description = (product.description || '').replace(/[\r\n]+/g, ' ');
+      row.tags = isFirst ? (product.tags || '') : '';
+      // Lightspeed export repeats option NAME on every row, not just the first
+      row.variant_option_one_name = attr1Name;
+      row.variant_option_one_value = attr1Val;
+      row.variant_option_two_name = attr2Name;
+      row.variant_option_two_value = attr2Val;
+      row[stockCol] = String(v.quantity || 1);
       allRows.push(row);
     });
   });
 
   // Validation
-  const seenHandles = new Set<string>();
   const seenSkus = new Set<string>();
   allRows.forEach((r, i) => {
     if (/[^a-z0-9-]/.test(r.handle)) {
@@ -229,17 +251,21 @@ export function generateXSeriesCSV(
     if (r.sku) seenSkus.add(r.sku);
   });
 
-  if (s.outletName === 'STORE_NAME_1') {
-    errors.push({ row: -1, field: 'outlet', message: 'Set your outlet name in Lightspeed settings before importing', severity: 'warning' });
-  }
-
+  // Column order matches the official Lightspeed product-export header exactly
   const columns = [
-    'handle', 'name', 'sku', 'supplier_code', 'description', 'brand',
-    'supply_price', 'retail_price', 'tax', 'active', 'tags',
-    'variant_option_1_name', 'variant_option_1_value', 'variant_option_2_name', 'variant_option_2_value',
-    'variant_option_3_name', 'variant_option_3_value',
-    stockCol,
-    ...(s.useReorderPoints ? [reorderPointCol, reorderAmountCol] : []),
+    'id', 'handle', 'sku',
+    'composite_name', 'composite_sku', 'composite_quantity',
+    'name', 'description', 'product_category',
+    'variant_option_one_name', 'variant_option_one_value',
+    'variant_option_two_name', 'variant_option_two_value',
+    'variant_option_three_name', 'variant_option_three_value',
+    'tags', 'supply_price', 'retail_price',
+    'loyalty_value', 'loyalty_value_default',
+    'tax_name', 'tax_value',
+    'account_code', 'account_code_purchase',
+    'brand_name', 'supplier_name', 'supplier_code',
+    'active', 'track_inventory',
+    stockCol, reorderPointCol, restockLevelCol,
   ];
 
   const csv = Papa.unparse(allRows, { columns });

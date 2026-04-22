@@ -2093,6 +2093,91 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [reconcileError, setReconcileError] = useState<string | null>(null);
   const reconcileStartedRef = useRef(false);
 
+  // ── Onboarding sample invoice seeding ──
+  // If the user clicked "Use this sample invoice" during onboarding, hydrate
+  // validatedProducts directly and jump to the review step (no upload needed).
+  const sampleSeededRef = useRef(false);
+  useEffect(() => {
+    if (sampleSeededRef.current) return;
+    let raw: string | null = null;
+    try { raw = localStorage.getItem("pending_sample_invoice"); } catch { /* ignore */ }
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as {
+        vendor: string;
+        lines: { name: string; variant?: string; qty: number; cost: number }[];
+      };
+      if (!parsed?.lines?.length) {
+        localStorage.removeItem("pending_sample_invoice");
+        return;
+      }
+
+      // Expand variant strings like "Coral · 8,10,12,14" into one row per size.
+      const expanded: ValidatedProduct[] = [];
+      let rowIdx = 0;
+      parsed.lines.forEach((line) => {
+        const variant = (line.variant || "").trim();
+        let colour = "";
+        let sizes: string[] = [""];
+        if (variant) {
+          const [colPart, sizePart] = variant.split("·").map((s) => s.trim());
+          colour = colPart || "";
+          if (sizePart) {
+            sizes = sizePart.split(/[,/]/).map((s) => s.trim()).filter(Boolean);
+            if (sizes.length === 0) sizes = [""];
+          }
+        }
+        const qtyEach = Math.max(1, Math.floor(line.qty / sizes.length));
+        sizes.forEach((size) => {
+          expanded.push({
+            name: line.name,
+            brand: parsed.vendor,
+            sku: "",
+            barcode: "",
+            type: "",
+            colour,
+            size,
+            qty: qtyEach,
+            cost: line.cost,
+            rrp: 0,
+            _rowIndex: rowIdx++,
+            _rawName: line.name,
+            _rawCost: line.cost,
+            _confidence: 95,
+            _confidenceLevel: "high",
+            _confidenceReasons: [{ label: "Sample data", delta: 0 }],
+            _issues: [],
+            _corrections: [],
+            _rejected: false,
+            _classification: "product_title",
+            _suggestedTitle: line.name,
+            _suggestedPrice: line.cost,
+            _suggestedVendor: parsed.vendor,
+          } as ValidatedProduct);
+        });
+      });
+
+      setSupplierName(parsed.vendor);
+      setValidatedProducts(expanded);
+      setValidationDebug({
+        totalRaw: expanded.length,
+        accepted: expanded.length,
+        rejected: 0,
+        corrections: 0,
+        issues: [],
+        rejectedRows: [],
+      } as unknown as ValidationDebugInfo);
+      setStep(3);
+      sampleSeededRef.current = true;
+      try { localStorage.removeItem("pending_sample_invoice"); } catch { /* ignore */ }
+      toast.success(`Loaded sample invoice from ${parsed.vendor}`);
+    } catch (err) {
+      console.warn("Failed to load pending sample invoice:", err);
+      try { localStorage.removeItem("pending_sample_invoice"); } catch { /* ignore */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {

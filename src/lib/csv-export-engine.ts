@@ -211,14 +211,15 @@ function groupProducts(lines: ExportLine[], mode: VariantMode): GroupedProduct[]
     }
 
     const handle = generateHandle(title, base.brand);
-    const option1Name = hasSize ? "Size" : hasColour ? "Colour" : "Title";
-    const option2Name = hasSize && hasColour ? "Colour" : undefined;
+    // Convention: Colour first, Size second — matches Shopify admin UI display order
+    const option1Name = hasColour ? "Colour" : hasSize ? "Size" : "Title";
+    const option2Name = hasColour && hasSize ? "Size" : undefined;
 
     const variants = groupLines.map(ln => ({
       option1Name,
-      option1Value: hasSize ? (ln.size || "One Size") : hasColour ? (ln.colour || "Default") : "Default Title",
+      option1Value: hasColour ? (ln.colour || "Default") : hasSize ? (ln.size || "One Size") : "Default Title",
       option2Name,
-      option2Value: option2Name ? (ln.colour || "Default") : undefined,
+      option2Value: option2Name ? (ln.size || "One Size") : undefined,
       price: ln.rrp.toFixed(2),
       // Compare-at-price stays blank by default (set only when applying a markdown/sale).
       compareAtPrice: "",

@@ -442,3 +442,67 @@ export default function SupplierBrainTab() {
     </div>
   );
 }
+
+// ── Sub-components for the Drive picker ──────────────────────
+
+function StatusIcon({ status }: { status: "queued" | "running" | "done" | "skipped" | "error" }) {
+  switch (status) {
+    case "running":
+      return <Loader2 className="w-3.5 h-3.5 text-primary animate-spin shrink-0" />;
+    case "done":
+      return <Check className="w-3.5 h-3.5 text-success shrink-0" />;
+    case "skipped":
+      return <AlertCircle className="w-3.5 h-3.5 text-warning shrink-0" />;
+    case "error":
+      return <X className="w-3.5 h-3.5 text-destructive shrink-0" />;
+    case "queued":
+    default:
+      return <div className="w-3.5 h-3.5 rounded-full border border-muted-foreground/40 shrink-0" />;
+  }
+}
+
+function SeedProgressHeader({
+  files,
+  stage,
+  onReset,
+}: {
+  files: Array<{ status: "queued" | "running" | "done" | "skipped" | "error"; selected: boolean }>;
+  stage: "seeding" | "done";
+  onReset: () => void;
+}) {
+  const targets = files.filter((f) => f.selected);
+  const done = targets.filter((f) => f.status === "done").length;
+  const skipped = targets.filter((f) => f.status === "skipped").length;
+  const errored = targets.filter((f) => f.status === "error").length;
+  const running = targets.filter((f) => f.status === "running").length;
+  const finished = done + skipped + errored;
+  const pct = targets.length === 0 ? 0 : Math.round((finished / targets.length) * 100);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2 min-w-0">
+          {stage === "seeding" ? (
+            <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+          ) : (
+            <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+          )}
+          <span className="font-medium">
+            {stage === "seeding"
+              ? `Importing ${finished} / ${targets.length}…`
+              : `Done — ${done} learned${skipped ? `, ${skipped} skipped` : ""}${errored ? `, ${errored} failed` : ""}`}
+          </span>
+        </div>
+        {stage === "done" && (
+          <Button size="sm" variant="ghost" onClick={onReset}>
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        )}
+      </div>
+      <Progress value={pct} className="h-1.5" />
+      {running > 0 && stage === "seeding" && (
+        <p className="text-[10px] text-muted-foreground">Processing {running} in parallel…</p>
+      )}
+    </div>
+  );
+}

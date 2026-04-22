@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Package, FileText, AlertTriangle, ClipboardCheck, DollarSign,
   Plus, ArrowDownToLine, ScanBarcode, TrendingUp, TrendingDown,
-  ArrowRight, Loader2, ToggleLeft, ToggleRight,
+  ArrowRight, Loader2, ToggleLeft, ToggleRight, GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -374,6 +374,7 @@ export default function StockyHomeDashboard({ onNavigate, onSwitchToClassic }: S
         <h3 className="text-sm font-semibold mb-3">More Workflows</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {[
+            { label: "Teach Invoices Tour", flow: "teach_invoice_tutorial", icon: GraduationCap },
             { label: "Reorder Suggestions", flow: "reorder", icon: TrendingUp },
             { label: "Suppliers", flow: "suppliers", icon: Package },
             { label: "Transfer Orders", flow: "transfer_orders", icon: ArrowDownToLine },

@@ -61,28 +61,113 @@ export default function POSConnectionPanel() {
   const [connecting, setConnecting] = useState<string | null>(null);
   const [stockCheckPrefs, setStockCheckPrefs] = useState<Record<string, boolean>>(getStockCheckPrefs);
   const [syncingBarcodes, setSyncingBarcodes] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{
+    phase: "scanning" | "updating" | "done";
+    scanned?: number;
+    processed?: number;
+    total?: number;
+    updated?: number;
+    already?: number;
+    noMatch?: number;
+    errors?: number;
+  } | null>(null);
 
   const handleBarcodeSync = async () => {
     setSyncingBarcodes(true);
+    setSyncProgress({ phase: "scanning", scanned: 0 });
     try {
-      const { data, error } = await supabase.functions.invoke("sync-barcodes-to-shopify", { body: {} });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-      const updated = data?.updated ?? 0;
-      const already = data?.already_had_barcode ?? 0;
-      const noMatch = data?.no_shopify_match ?? 0;
-      const errs = (data?.errors || []).length;
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Not signed in");
+
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-barcodes-to-shopify`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok || !res.body) {
+        const txt = await res.text();
+        throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let final: Record<string, unknown> | null = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let evt: Record<string, unknown>;
+          try { evt = JSON.parse(line); } catch { continue; }
+          switch (evt.type) {
+            case "start":
+              setSyncProgress({ phase: "scanning", scanned: 0, total: evt.total_lightspeed as number });
+              break;
+            case "shopify_scan":
+              setSyncProgress(p => ({ ...(p || { phase: "scanning" }), phase: "scanning", scanned: evt.scanned as number }));
+              break;
+            case "shopify_scan_done":
+              setSyncProgress(p => ({ ...(p || { phase: "scanning" }), phase: "updating", scanned: evt.total_shopify as number, processed: 0, updated: 0 }));
+              break;
+            case "progress":
+              setSyncProgress(p => ({
+                ...(p || { phase: "updating" }),
+                phase: "updating",
+                processed: evt.processed as number,
+                total: evt.total as number,
+                updated: evt.updated as number,
+                already: evt.already as number,
+                noMatch: evt.no_match as number,
+                errors: evt.errors as number,
+              }));
+              break;
+            case "done":
+              final = evt;
+              setSyncProgress(p => ({
+                ...(p || { phase: "done" }),
+                phase: "done",
+                updated: evt.updated as number,
+                already: evt.already_had_barcode as number,
+                noMatch: evt.no_shopify_match as number,
+                errors: (evt.errors as unknown[])?.length ?? 0,
+              }));
+              break;
+            case "error":
+              throw new Error(String(evt.message || "Sync failed"));
+          }
+        }
+      }
+
+      if (!final) throw new Error("Sync ended without result");
+      const updated = (final.updated as number) ?? 0;
+      const already = (final.already_had_barcode as number) ?? 0;
+      const noMatch = (final.no_shopify_match as number) ?? 0;
+      const errs = (final.errors as unknown[])?.length ?? 0;
       toast.success(
         `Updated ${updated} Shopify barcodes` +
           (already ? ` · ${already} already had one` : "") +
           (noMatch ? ` · ${noMatch} not matched in Shopify` : "") +
           (errs ? ` · ${errs} errors` : ""),
       );
-      if (data?.note) toast.info(data.note);
+      if (final.note) toast.info(String(final.note));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Barcode sync failed");
+      setSyncProgress(null);
     } finally {
       setSyncingBarcodes(false);
+      // Auto-clear progress display after a moment
+      setTimeout(() => setSyncProgress(null), 8000);
     }
   };
 
@@ -288,20 +373,70 @@ export default function POSConnectionPanel() {
                   />
                 </div>
                 {(p.id === "lightspeed_x" || p.id === "lightspeed_r") && shopifyConnected && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleBarcodeSync}
-                    disabled={syncingBarcodes}
-                    className="text-xs w-full"
-                  >
-                    {syncingBarcodes ? (
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    ) : (
-                      <Barcode className="w-3 h-3 mr-1" />
+                  <div className="space-y-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleBarcodeSync}
+                      disabled={syncingBarcodes}
+                      className="text-xs w-full"
+                    >
+                      {syncingBarcodes ? (
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      ) : (
+                        <Barcode className="w-3 h-3 mr-1" />
+                      )}
+                      Sync barcodes to Shopify
+                    </Button>
+                    {syncProgress && (
+                      <div className="rounded-md bg-background border border-border p-2 space-y-1.5">
+                        {syncProgress.phase === "scanning" && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Scanning Shopify variants… <span className="font-mono text-foreground">{syncProgress.scanned ?? 0}</span> found
+                            {syncProgress.total != null && (
+                              <> · {syncProgress.total} Lightspeed rows queued</>
+                            )}
+                          </p>
+                        )}
+                        {syncProgress.phase === "updating" && (
+                          <>
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-muted-foreground">
+                                Updating barcodes…
+                              </span>
+                              <span className="font-mono text-foreground">
+                                {syncProgress.processed ?? 0} / {syncProgress.total ?? 0}
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary transition-all"
+                                style={{
+                                  width: `${syncProgress.total ? Math.min(100, ((syncProgress.processed ?? 0) / syncProgress.total) * 100) : 0}%`,
+                                }}
+                              />
+                            </div>
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+                              <span>✓ {syncProgress.updated ?? 0} updated</span>
+                              <span>= {syncProgress.already ?? 0} already had</span>
+                              <span>· {syncProgress.noMatch ?? 0} no match</span>
+                              {(syncProgress.errors ?? 0) > 0 && (
+                                <span className="text-destructive">! {syncProgress.errors} errors</span>
+                              )}
+                            </div>
+                          </>
+                        )}
+                        {syncProgress.phase === "done" && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Done · <span className="text-foreground">{syncProgress.updated ?? 0}</span> updated, {syncProgress.already ?? 0} already had, {syncProgress.noMatch ?? 0} not matched
+                            {(syncProgress.errors ?? 0) > 0 && (
+                              <>, <span className="text-destructive">{syncProgress.errors} errors</span></>
+                            )}
+                          </p>
+                        )}
+                      </div>
                     )}
-                    Sync barcodes to Shopify
-                  </Button>
+                  </div>
                 )}
               </div>
             )}

@@ -2638,12 +2638,40 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             </div>
           )}
 
-          {/* Custom AI Instructions */}
-          <CustomInstructionsField
-            value={customInstructions}
-            onChange={setCustomInstructions}
-            supplierName={supplierName}
-          />
+          {/* ── Custom requirements for THIS invoice ─────────────────
+              Appears prominently after upload. Supplier brain auto-loads
+              any instructions saved from prior invoices of the same supplier
+              (see CustomInstructionsField → getTemplates effect). */}
+          <div id="custom-requirements-panel" className={uploadedFile ? "mt-6 ring-2 ring-primary/30 rounded-lg" : "mt-6"}>
+            {uploadedFile && (
+              <div className="bg-primary/10 border border-primary/30 rounded-t-lg px-4 py-2.5 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-primary truncate">📎 {uploadedFile.name}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Add any custom requirements specific to this invoice below — sizing rules, vendor naming, abbreviations, anything the AI should know.
+                  </p>
+                </div>
+              </div>
+            )}
+            <CustomInstructionsField
+              value={customInstructions}
+              onChange={setCustomInstructions}
+              supplierName={supplierName}
+            />
+          </div>
+
+          {/* Start processing — only once a file has been chosen */}
+          {uploadedFile && (
+            <Button
+              variant="success"
+              className="w-full h-14 mt-4 text-base"
+              onClick={handleStartProcessingClick}
+            >
+              <Zap className="w-5 h-5 mr-2" />
+              Start processing {customInstructions.trim() ? "with custom rules" : "invoice"}
+            </Button>
+          )}
 
           <button
             className="mt-6 text-sm text-primary font-medium hover:underline"

@@ -232,7 +232,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   
   const mode = useStoreMode();
   const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
-  const { isEmbedded, shop, authState: embeddedAuthState } = useShopifyEmbedded();
+  const { isEmbedded, shop, authState: embeddedAuthState, authError: embeddedAuthError } = useShopifyEmbedded();
 
   // ── Standalone session management (non-embedded only) ──
   // Embedded auth is handled entirely by ShopifyEmbeddedProvider.

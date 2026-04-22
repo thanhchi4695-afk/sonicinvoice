@@ -183,7 +183,7 @@ export function generateXSeriesCSV(
       brand_name: product.brand,
       supplier_name: product.supplierName || '',
       supplier_code: product.supplierCode || '',
-      active: '1',
+      active: activeFlag,
       track_inventory: s.trackInventory ? '1' : '0',
       [stockCol]: '0',
       [reorderPointCol]: s.useReorderPoints ? String(s.reorderPoint) : '',

@@ -1017,7 +1017,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }, 100);
   };
 
-  const handleDriveImport = async () => {
+  // Step 1 — paste folder/file link, fetch file list (downloads metadata + content via gdrive-fetch).
+  const handleDriveListFiles = async () => {
     if (!driveImportUrl.trim()) {
       toast.error("Paste a Google Drive folder or file link first");
       return;
@@ -1033,14 +1034,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         toast.error("No invoices found", { description: "Make sure the folder is shared as 'Anyone with the link'." });
         return;
       }
-      acceptDriveFile(invoices[0]);
-      setDriveQueue(invoices.slice(1));
-      setDriveImportOpen(false);
-      if (invoices.length > 1) {
-        toast(`${invoices.length - 1} more invoice${invoices.length === 2 ? "" : "s"} queued`, {
-          description: "Process this one, then load the next from the queue.",
-        });
-      }
+      setDrivePreview(invoices);
+      setDriveStage("confirm");
     } catch (e) {
       toast.error("Drive import failed", {
         description: e instanceof Error ? e.message : "Could not access the Drive link",
@@ -1049,6 +1044,44 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       setDriveImporting(false);
     }
   };
+
+  // Step 2 — confirm: load file 1 immediately and queue the rest. As the user
+  // finishes review of each invoice (uploadedFile cleared), the next is auto-loaded.
+  const handleDriveConfirmAutoProcess = () => {
+    if (drivePreview.length === 0) return;
+    const [first, ...rest] = drivePreview;
+    acceptDriveFile(first);
+    setDriveQueue([
+      { ...first, status: "processing" },
+      ...rest.map<DriveQueueItem>((r) => ({ ...r, status: "queued" })),
+    ]);
+    setDriveImportOpen(false);
+    setDriveStage("link");
+    setDrivePreview([]);
+    setDriveImportUrl("");
+    if (rest.length > 0) {
+      toast(`Auto-processing ${drivePreview.length} invoices`, {
+        description: "The next file loads automatically when you finish each review.",
+      });
+    }
+  };
+
+  // When the current upload is cleared (review accepted/restarted), advance the queue.
+  useEffect(() => {
+    if (uploadedFile) return;
+    setDriveQueue((prev) => {
+      if (prev.length === 0) return prev;
+      // Mark the in-progress file as done
+      const advanced = prev.map((q) => q.status === "processing" ? { ...q, status: "done" as const } : q);
+      const nextIdx = advanced.findIndex((q) => q.status === "queued");
+      if (nextIdx === -1) return advanced;
+      const next = advanced[nextIdx];
+      // Defer the load so we don't update other state mid-render
+      queueMicrotask(() => acceptDriveFile(next));
+      return advanced.map((q, i) => i === nextIdx ? { ...q, status: "processing" } : q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadedFile]);
 
   const handleStartProcessingClick = () => {
     if (!uploadedFile) {

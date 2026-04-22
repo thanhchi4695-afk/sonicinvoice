@@ -17,6 +17,11 @@ import {
   type BrainProduct,
   type BrainValidationSummary,
 } from "@/lib/brain-validator";
+import {
+  classifyInvoice,
+  contributeSharedProfile,
+  type UniversalClassification,
+} from "@/lib/universal-classifier";
 
 // ── localStorage feature flag (default OFF) ─────────────────
 const FLAG_KEY = "sonic_brain_mode_enabled";
@@ -57,6 +62,10 @@ export interface BrainPipelineResult {
   recognised: boolean;
   /** Supplier name that the brain ended up keyed against. */
   supplierName: string;
+  /** Universal pattern classification (always run). */
+  classification: UniversalClassification;
+  /** True when classifier confidence < 60 → trigger guided wizard. */
+  needsTeach: boolean;
   /** Stage timings (ms) for diagnostics. */
   timings: Record<string, number>;
 }
@@ -132,8 +141,19 @@ export async function runBrainPipeline(input: BrainPipelineInput): Promise<Brain
   const timings: Record<string, number> = {};
   const t0 = performance.now();
 
-  // ── Try cache hit first (skip Stages 1 + 2) ──
-  const cached = await loadCachedBrain(input.hintedSupplier);
+  // ── Stage 0 — Universal Pattern Classifier (always-on) ──
+  const tCls = performance.now();
+  const classification = await classifyInvoice({
+    fileContent: input.fileContent,
+    fileType: input.fileType,
+    fileName: input.fileName,
+    hintedSupplier: input.hintedSupplier,
+  });
+  timings.stage0_classify = performance.now() - tCls;
+
+  // ── Try cache hit (skip Stages 1 + 2) ──
+  const supplierForCache = input.hintedSupplier || classification.supplier_name;
+  const cached = await loadCachedBrain(supplierForCache);
   let orientation: Record<string, unknown>;
   let layout: Record<string, unknown>;
   let recognised = false;
@@ -163,7 +183,7 @@ export async function runBrainPipeline(input: BrainPipelineInput): Promise<Brain
     timings.stage2_layout = performance.now() - tLay;
   }
 
-  // Stages 3 + 4 — Context map + Extraction
+  // Stages 3 + 4 — Context map + Extraction (passes classification as a hint)
   const tExt = performance.now();
   const extRes = await invokeStage<{
     products: BrainProduct[];
@@ -175,6 +195,7 @@ export async function runBrainPipeline(input: BrainPipelineInput): Promise<Brain
     orientation,
     layout,
     customInstructions: input.customInstructions,
+    classification,
   });
   timings.stage34_extract = performance.now() - tExt;
 
@@ -190,7 +211,9 @@ export async function runBrainPipeline(input: BrainPipelineInput): Promise<Brain
     layout,
     context_map: extRes.context_map || {},
     recognised,
-    supplierName: (cached?.supplier_name || (orientation.supplier_name as string) || input.hintedSupplier || "").trim(),
+    supplierName: (cached?.supplier_name || classification.supplier_name || (orientation.supplier_name as string) || input.hintedSupplier || "").trim(),
+    classification,
+    needsTeach: classification.confidence < 60,
     timings,
   };
 }
@@ -206,6 +229,8 @@ export interface BrainLearnInput {
   layout: Record<string, unknown>;
   acceptedProducts: BrainProduct[];
   correctionCount: number;
+  /** Universal classification result from Stage 0 (used for pattern + shared pool). */
+  classification?: UniversalClassification;
 }
 
 export async function saveBrainLearnings(input: BrainLearnInput): Promise<void> {
@@ -246,6 +271,11 @@ export async function saveBrainLearnings(input: BrainLearnInput): Promise<void> 
       ...columnMap,
     };
 
+    const detectedPattern = input.classification?.detected_pattern || null;
+    const correctionRate = input.acceptedProducts.length
+      ? input.correctionCount / Math.max(1, input.acceptedProducts.length)
+      : 0;
+
     if (existing?.id) {
       await supabase.from("supplier_intelligence").update({
         column_map: mergedColumnMap as never,
@@ -254,6 +284,9 @@ export async function saveBrainLearnings(input: BrainLearnInput): Promise<void> 
         last_match_method: "brain_mode",
         last_invoice_date: new Date().toISOString(),
         gst_on_cost: !!input.orientation.gst_included,
+        detected_pattern: detectedPattern,
+        last_correction_rate: correctionRate,
+        confidence_score: Math.max(60, Math.round(100 - correctionRate * 100)),
       } as never).eq("id", existing.id);
     } else {
       await supabase.from("supplier_intelligence").insert({
@@ -266,7 +299,26 @@ export async function saveBrainLearnings(input: BrainLearnInput): Promise<void> 
         last_match_method: "brain_mode",
         last_invoice_date: new Date().toISOString(),
         gst_on_cost: !!input.orientation.gst_included,
+        detected_pattern: detectedPattern,
+        last_correction_rate: correctionRate,
+        is_shared_origin: input.classification?.source === "shared",
       } as never);
+    }
+
+    // Contribute structural template to the shared pool (only if user opted in)
+    if (input.classification && detectedPattern) {
+      void contributeSharedProfile({
+        supplier_name: input.supplierName,
+        supplier_abn: input.classification.supplier_abn,
+        detected_pattern: detectedPattern,
+        column_map: mergedColumnMap,
+        gst_treatment: input.classification.gst_treatment,
+        has_rrp: input.classification.has_rrp,
+        sku_format: input.classification.sku_format,
+        size_in_sku: input.classification.size_in_sku,
+        colour_in_name: input.classification.colour_in_name,
+        correction_rate: correctionRate,
+      });
     }
 
     // Insert invoice_pattern row capturing this layout fingerprint

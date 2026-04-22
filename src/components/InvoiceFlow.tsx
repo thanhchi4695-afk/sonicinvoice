@@ -26,6 +26,8 @@ import { isBrainModeEnabled, runBrainPipeline, saveBrainLearnings } from "@/lib/
 import type { BrainProduct, BrainValidationSummary } from "@/lib/brain-validator";
 import { BrainModeToggle } from "@/components/BrainModeToggle";
 import { BrainSummaryBanner, BrainRecognitionBanner } from "@/components/BrainModeFlags";
+import TeachSonicWizard from "@/components/TeachSonicWizard";
+import { contributeSharedProfile } from "@/lib/universal-classifier";
 import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import PhaseThreeFourPanel from "@/components/PhaseThreeFourPanel";
@@ -1575,6 +1577,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             hintedSupplier: supplierName,
           });
           brainContextRef.current = { orientation: result.orientation, layout: result.layout };
+          brainClassificationRef.current = result.classification;
+          setNeedsTeach(result.needsTeach);
           setBrainProducts(result.products);
           setBrainSummary(result.summary);
           if (result.recognised) setBrainRecognised(result.supplierName);
@@ -1999,6 +2003,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [brainSummary, setBrainSummary] = useState<BrainValidationSummary | null>(null);
   const [brainRecognised, setBrainRecognised] = useState<string>("");
   const brainContextRef = useRef<{ orientation: Record<string, unknown>; layout: Record<string, unknown> } | null>(null);
+  const brainClassificationRef = useRef<import("@/lib/universal-classifier").UniversalClassification | null>(null);
+  const [needsTeach, setNeedsTeach] = useState(false);
   const [invoicePageImages, setInvoicePageImages] = useState<string[]>([]);
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
@@ -3106,6 +3112,28 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           {/* ── Brain Mode banners (5-stage pipeline) ── */}
           {brainRecognised && <BrainRecognitionBanner supplierName={brainRecognised} />}
           {brainSummary && <BrainSummaryBanner summary={brainSummary} />}
+          {needsTeach && (
+            <TeachSonicWizard
+              initialSupplier={supplierName}
+              onCancel={() => setNeedsTeach(false)}
+              onComplete={(tpl) => {
+                setSupplierName(tpl.supplier_name);
+                void contributeSharedProfile({
+                  supplier_name: tpl.supplier_name,
+                  detected_pattern: tpl.detected_pattern,
+                  column_map: tpl.column_map,
+                  gst_treatment: tpl.gst_treatment,
+                  has_rrp: tpl.has_rrp,
+                  sku_format: "unknown",
+                  size_in_sku: false,
+                  colour_in_name: false,
+                  correction_rate: 0,
+                });
+                toast.success("Saved — Sonic will recognise this supplier next time");
+                setNeedsTeach(false);
+              }}
+            />
+          )}
 
           {/* Post-Parse Review Screen */}
           {validationDebug && validatedProducts.length > 0 && (
@@ -3144,6 +3172,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                       layout: brainContextRef.current.layout,
                       acceptedProducts: brainProducts,
                       correctionCount: editCountRef.current,
+                      classification: brainClassificationRef.current ?? undefined,
                     });
                   }
                   finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);

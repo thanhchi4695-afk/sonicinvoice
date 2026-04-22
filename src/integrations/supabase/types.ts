@@ -1707,6 +1707,69 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_supplier_profiles: {
+        Row: {
+          avg_correction_rate: number | null
+          colour_in_name: boolean | null
+          column_map: Json
+          confidence_score: number | null
+          contributing_users: number
+          created_at: string
+          detected_pattern: string | null
+          gst_treatment: string | null
+          has_rrp: boolean | null
+          id: string
+          is_verified: boolean
+          last_updated: string
+          size_in_sku: boolean | null
+          sku_format: string | null
+          supplier_abn: string | null
+          supplier_name: string
+          supplier_name_normalized: string
+          total_invoices_processed: number
+        }
+        Insert: {
+          avg_correction_rate?: number | null
+          colour_in_name?: boolean | null
+          column_map?: Json
+          confidence_score?: number | null
+          contributing_users?: number
+          created_at?: string
+          detected_pattern?: string | null
+          gst_treatment?: string | null
+          has_rrp?: boolean | null
+          id?: string
+          is_verified?: boolean
+          last_updated?: string
+          size_in_sku?: boolean | null
+          sku_format?: string | null
+          supplier_abn?: string | null
+          supplier_name: string
+          supplier_name_normalized: string
+          total_invoices_processed?: number
+        }
+        Update: {
+          avg_correction_rate?: number | null
+          colour_in_name?: boolean | null
+          column_map?: Json
+          confidence_score?: number | null
+          contributing_users?: number
+          created_at?: string
+          detected_pattern?: string | null
+          gst_treatment?: string | null
+          has_rrp?: boolean | null
+          id?: string
+          is_verified?: boolean
+          last_updated?: string
+          size_in_sku?: boolean | null
+          sku_format?: string | null
+          supplier_abn?: string | null
+          supplier_name?: string
+          supplier_name_normalized?: string
+          total_invoices_processed?: number
+        }
+        Relationships: []
+      }
       shopify_connections: {
         Row: {
           access_token: string
@@ -2022,10 +2085,13 @@ export type Database = {
           column_map: Json
           confidence_score: number
           created_at: string
+          detected_pattern: string | null
           gst_on_cost: boolean | null
           gst_on_rrp: boolean | null
           id: string
           invoice_count: number
+          is_shared_origin: boolean
+          last_correction_rate: number | null
           last_invoice_date: string | null
           last_match_method: string | null
           markup_multiplier: number | null
@@ -2040,10 +2106,13 @@ export type Database = {
           column_map?: Json
           confidence_score?: number
           created_at?: string
+          detected_pattern?: string | null
           gst_on_cost?: boolean | null
           gst_on_rrp?: boolean | null
           id?: string
           invoice_count?: number
+          is_shared_origin?: boolean
+          last_correction_rate?: number | null
           last_invoice_date?: string | null
           last_match_method?: string | null
           markup_multiplier?: number | null
@@ -2058,10 +2127,13 @@ export type Database = {
           column_map?: Json
           confidence_score?: number
           created_at?: string
+          detected_pattern?: string | null
           gst_on_cost?: boolean | null
           gst_on_rrp?: boolean | null
           id?: string
           invoice_count?: number
+          is_shared_origin?: boolean
+          last_correction_rate?: number | null
           last_invoice_date?: string | null
           last_match_method?: string | null
           markup_multiplier?: number | null
@@ -2335,6 +2407,24 @@ export type Database = {
           status?: string
           to_location?: string
           to_location_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_brain_settings: {
+        Row: {
+          contribute_shared: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contribute_shared?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contribute_shared?: boolean
           updated_at?: string
           user_id?: string
         }

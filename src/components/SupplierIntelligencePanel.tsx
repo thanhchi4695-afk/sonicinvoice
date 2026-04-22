@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import SupplierBrainTab from "@/components/SupplierBrainTab";
 
 interface SupplierIntelligencePanelProps {
   onBack: () => void;
@@ -130,7 +131,7 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
     }
     return "";
   });
-  const [activeTab, setActiveTab] = useState<"known" | "log" | "rules">("known");
+  const [activeTab, setActiveTab] = useState<"known" | "brain" | "log" | "rules">("known");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<string>("");
@@ -248,9 +249,12 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
 
       <div className="px-4 py-4">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-          <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsList className="grid w-full grid-cols-4 mb-4">
             <TabsTrigger value="known" className="text-xs gap-1.5">
               <Sparkles className="w-3.5 h-3.5" /> Known Suppliers
+            </TabsTrigger>
+            <TabsTrigger value="brain" className="text-xs gap-1.5">
+              <Brain className="w-3.5 h-3.5" /> Brain
             </TabsTrigger>
             <TabsTrigger value="log" className="text-xs gap-1.5">
               <HistoryIcon className="w-3.5 h-3.5" /> Learning Log
@@ -259,6 +263,10 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
               <BookOpen className="w-3.5 h-3.5" /> Common Sense
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="brain" className="mt-0">
+            <SupplierBrainTab />
+          </TabsContent>
 
           {/* ── Tab 1: Known Suppliers ────────────────────── */}
           <TabsContent value="known" className="space-y-3 mt-0">

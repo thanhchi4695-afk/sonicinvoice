@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,11 +13,18 @@ import { isShopifyEmbedded } from "@/lib/shopify-embedded";
  */
 const Landing = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     if (isShopifyEmbedded()) {
-      navigate("/dashboard", { replace: true });
+      navigate(
+        {
+          pathname: "/dashboard",
+          search: location.search,
+        },
+        { replace: true }
+      );
       return;
     }
     let cancelled = false;
@@ -32,7 +39,7 @@ const Landing = () => {
       }
     });
     return () => { cancelled = true; };
-  }, [navigate]);
+  }, [location.search, navigate]);
 
   if (checking) {
     return (

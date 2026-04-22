@@ -2876,6 +2876,50 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         </div>
       </div>
 
+      {/* Full-screen drag overlay — appears whenever a file is dragged anywhere over the page on Step 1 */}
+      {step === 1 && isWindowDragging && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Drop file to upload invoice"
+          aria-live="assertive"
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className="fixed inset-0 z-[100] hidden sm:flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in p-8"
+        >
+          <div
+            className={cn(
+              "w-full max-w-2xl rounded-2xl border-4 border-dashed flex flex-col items-center justify-center gap-5 p-12 transition-all",
+              isDragOverTarget
+                ? "border-primary bg-primary/15 scale-[1.02] shadow-2xl shadow-primary/20"
+                : "border-primary/50 bg-card/80"
+            )}
+          >
+            <div
+              className={cn(
+                "w-20 h-20 rounded-full flex items-center justify-center transition-all",
+                isDragOverTarget ? "bg-primary text-primary-foreground scale-110" : "bg-primary/15 text-primary"
+              )}
+            >
+              <Upload className="w-9 h-9" />
+            </div>
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-display font-semibold text-foreground">
+                {isDragOverTarget ? "Release to upload" : "Drop your invoice anywhere"}
+              </h2>
+              <p className="text-sm text-muted-foreground max-w-md">
+                We accept PDF, Excel, CSV, Word documents, and photos (JPG, PNG, HEIC, WebP). Sonic Invoices will read it automatically.
+              </p>
+              <p className="text-xs text-muted-foreground/70 pt-1">
+                Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-foreground font-mono text-[10px]">Esc</kbd> to cancel
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Step 1: Upload */}
       {step === 1 && (
         <div className="px-4 pt-6">

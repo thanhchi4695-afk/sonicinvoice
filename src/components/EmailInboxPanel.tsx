@@ -106,7 +106,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [simFile, setSimFile] = useState<string | null>(null);
 
   const username = localStorage.getItem("sonic_invoice_username") || "splash";
-  const inboxAddress = `${username}@suppliersync.app`;
+  const inboxAddress = `${username}@sonicinvoices.com`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(inboxAddress);
@@ -115,11 +115,12 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   };
 
   const handleProcess = (item: InboxItem) => {
-    // Update status
-    const updated = items.map(i => i.id === item.id ? { ...i, status: "done" as const } : i);
+    // ── Don't claim "Processed" until the import flow actually completes.
+    // Mark as 'processing' here; the invoice flow will mark 'done' when finished.
+    const updated = items.map(i => i.id === item.id ? { ...i, status: "processing" as const } : i);
     setItems(updated);
     saveInboxItems(updated);
-    addAuditEntry("Email", `Processed email invoice from ${item.from}: ${item.subject}`);
+    addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
 
     // Extract supplier name from email domain
     const domain = item.fromEmail.split("@")[1] || "";

@@ -1139,7 +1139,7 @@ const ToolsScreen = () => {
           <button onClick={() => setActiveTool(null)} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
           <h2 className="text-lg font-semibold font-display">AI instructions</h2>
         </div>
-        <p className="text-sm text-muted-foreground mb-3">Tell SupplierSync exactly how to process your invoices. These rules override all defaults.</p>
+        <p className="text-sm text-muted-foreground mb-3">Tell Sonic Invoice exactly how to process your invoices. These rules override all defaults.</p>
         <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={8}
           placeholder={`Examples:\n• QTY means quantity, first price is cost, second is retail\n• Add my brand name at the start of every product name\n• Replace 'nk' with Necklace, 'br' with Bracelet`}
           className="w-full rounded-lg bg-input border border-border px-4 py-3 text-sm resize-none leading-relaxed placeholder:text-muted-foreground/50" />

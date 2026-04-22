@@ -297,7 +297,19 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                       </div>
                     ))}
                   </div>
-                  <Button variant="teal" className="w-full h-11 text-sm mt-4" onClick={() => setStep(5)}>
+                  <Button
+                    variant="teal"
+                    className="w-full h-11 text-sm mt-4"
+                    onClick={() => {
+                      try {
+                        localStorage.setItem(
+                          "pending_sample_invoice",
+                          JSON.stringify({ industry: key, ...sample }),
+                        );
+                      } catch {}
+                      handleFinish();
+                    }}
+                  >
                     Use this sample invoice <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </div>
@@ -306,12 +318,14 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
 
             <div className="text-center text-xs text-muted-foreground mb-3">or</div>
 
-            <button onClick={() => setStep(5)}
-              className="w-full h-12 rounded-xl border-2 border-dashed border-border bg-card flex items-center justify-center gap-2 text-sm active:bg-muted">
+            <button
+              onClick={handleFinish}
+              className="w-full h-12 rounded-xl border-2 border-dashed border-border bg-card flex items-center justify-center gap-2 text-sm active:bg-muted"
+            >
               <Upload className="w-4 h-4 text-primary" /> Upload your own invoice
             </button>
 
-            <button onClick={() => setStep(5)} className="w-full mt-4 text-xs text-muted-foreground text-center">
+            <button onClick={handleFinish} className="w-full mt-4 text-xs text-muted-foreground text-center">
               Skip — I'll do this later →
             </button>
           </div>

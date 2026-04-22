@@ -328,9 +328,18 @@ export async function saveBrainLearnings(input: BrainLearnInput): Promise<void> 
     const headerLabels = headers.map(h => h.label);
     const { generateLayoutFingerprint } = await import("@/lib/layout-fingerprint");
     const brainFingerprint = generateLayoutFingerprint(headerLabels);
+
+    // Resolve supplier_profile_id (separate table from supplier_intelligence)
+    const { data: linkedProfile } = await supabase
+      .from("supplier_profiles")
+      .select("id")
+      .eq("user_id", userId)
+      .ilike("supplier_name", input.supplierName)
+      .maybeSingle();
+
     await supabase.from("invoice_patterns").insert({
       user_id: userId,
-      supplier_profile_id: existing?.id ?? null,
+      supplier_profile_id: linkedProfile?.id ?? null,
       layout_fingerprint: brainFingerprint,
       column_map: columnMap as never,
       sample_headers: headerLabels as never,

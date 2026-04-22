@@ -26,6 +26,8 @@ import { isBrainModeEnabled, runBrainPipeline, saveBrainLearnings } from "@/lib/
 import type { BrainProduct, BrainValidationSummary } from "@/lib/brain-validator";
 import { BrainModeToggle } from "@/components/BrainModeToggle";
 import { BrainSummaryBanner, BrainRecognitionBanner } from "@/components/BrainModeFlags";
+import TeachSonicWizard from "@/components/TeachSonicWizard";
+import { contributeSharedProfile } from "@/lib/universal-classifier";
 import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import PhaseThreeFourPanel from "@/components/PhaseThreeFourPanel";
@@ -3110,6 +3112,28 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           {/* ── Brain Mode banners (5-stage pipeline) ── */}
           {brainRecognised && <BrainRecognitionBanner supplierName={brainRecognised} />}
           {brainSummary && <BrainSummaryBanner summary={brainSummary} />}
+          {needsTeach && (
+            <TeachSonicWizard
+              initialSupplier={supplierName}
+              onCancel={() => setNeedsTeach(false)}
+              onComplete={(tpl) => {
+                setSupplierName(tpl.supplier_name);
+                void contributeSharedProfile({
+                  supplier_name: tpl.supplier_name,
+                  detected_pattern: tpl.detected_pattern,
+                  column_map: tpl.column_map,
+                  gst_treatment: tpl.gst_treatment,
+                  has_rrp: tpl.has_rrp,
+                  sku_format: "unknown",
+                  size_in_sku: false,
+                  colour_in_name: false,
+                  correction_rate: 0,
+                });
+                toast.success("Saved — Sonic will recognise this supplier next time");
+                setNeedsTeach(false);
+              }}
+            />
+          )}
 
           {/* Post-Parse Review Screen */}
           {validationDebug && validatedProducts.length > 0 && (

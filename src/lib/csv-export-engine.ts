@@ -321,6 +321,7 @@ export function generateShopifyCSV(
 ): { csv: string; validation: ValidationResult; rowCount: number } {
   const grouped = groupProducts(lines, mode);
   const validation = validateExport(grouped);
+  const defaultStatus = shopifyStatusValue(getPublishStatus());
 
   // Build rows
   const rows: Record<string, string>[] = [];

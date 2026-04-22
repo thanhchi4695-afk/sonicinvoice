@@ -2,10 +2,37 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Loader2, Unplug, ExternalLink, Store, Barcode } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getConnection } from "@/lib/shopify-api";
 import { toast } from "sonner";
+
+const LS_DOMAIN_PREFIX_KEY = "ls_domain_prefix";
+
+/** Extract just the prefix from any of these inputs:
+ *   "stompshoes"
+ *   "stompshoes.retail.lightspeed.app"
+ *   "https://stompshoes.retail.lightspeed.app"
+ *   "https://stompshoes.retail.lightspeed.app/some/path"
+ */
+function extractDomainPrefix(input: string): string {
+  let s = (input || "").trim().toLowerCase();
+  if (!s) return "";
+  s = s.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  s = s.replace(/\.retail\.lightspeed\.app$/, "");
+  s = s.replace(/[^a-z0-9-]/g, "");
+  return s;
+}
 
 interface POSConnection {
   id: string;

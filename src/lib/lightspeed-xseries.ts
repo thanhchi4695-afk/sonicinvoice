@@ -101,13 +101,13 @@ interface CsvRow {
   tax: string;
   active: string;
   tags: string;
-  attribute_1_name: string;
-  attribute_1_value: string;
-  attribute_2_name: string;
-  attribute_2_value: string;
-  attribute_3_name: string;
-  attribute_3_value: string;
-  [key: string]: string; // dynamic stock columns
+  variant_option_1_name: string;
+  variant_option_1_value: string;
+  variant_option_2_name: string;
+  variant_option_2_value: string;
+  variant_option_3_name: string;
+  variant_option_3_value: string;
+  [key: string]: string;
 }
 
 export function generateXSeriesCSV(

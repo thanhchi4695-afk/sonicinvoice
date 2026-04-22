@@ -271,6 +271,11 @@ export async function saveBrainLearnings(input: BrainLearnInput): Promise<void> 
       ...columnMap,
     };
 
+    const detectedPattern = input.classification?.detected_pattern || null;
+    const correctionRate = input.acceptedProducts.length
+      ? input.correctionCount / Math.max(1, input.acceptedProducts.length)
+      : 0;
+
     if (existing?.id) {
       await supabase.from("supplier_intelligence").update({
         column_map: mergedColumnMap as never,
@@ -279,6 +284,9 @@ export async function saveBrainLearnings(input: BrainLearnInput): Promise<void> 
         last_match_method: "brain_mode",
         last_invoice_date: new Date().toISOString(),
         gst_on_cost: !!input.orientation.gst_included,
+        detected_pattern: detectedPattern,
+        last_correction_rate: correctionRate,
+        confidence_score: Math.max(60, Math.round(100 - correctionRate * 100)),
       } as never).eq("id", existing.id);
     } else {
       await supabase.from("supplier_intelligence").insert({
@@ -291,7 +299,26 @@ export async function saveBrainLearnings(input: BrainLearnInput): Promise<void> 
         last_match_method: "brain_mode",
         last_invoice_date: new Date().toISOString(),
         gst_on_cost: !!input.orientation.gst_included,
+        detected_pattern: detectedPattern,
+        last_correction_rate: correctionRate,
+        is_shared_origin: input.classification?.source === "shared",
       } as never);
+    }
+
+    // Contribute structural template to the shared pool (only if user opted in)
+    if (input.classification && detectedPattern) {
+      void contributeSharedProfile({
+        supplier_name: input.supplierName,
+        supplier_abn: input.classification.supplier_abn,
+        detected_pattern: detectedPattern,
+        column_map: mergedColumnMap,
+        gst_treatment: input.classification.gst_treatment,
+        has_rrp: input.classification.has_rrp,
+        sku_format: input.classification.sku_format,
+        size_in_sku: input.classification.size_in_sku,
+        colour_in_name: input.classification.colour_in_name,
+        correction_rate: correctionRate,
+      });
     }
 
     // Insert invoice_pattern row capturing this layout fingerprint

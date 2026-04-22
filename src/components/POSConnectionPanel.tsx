@@ -85,6 +85,8 @@ export default function POSConnectionPanel() {
       setSyncingBarcodes(false);
     }
   };
+
+  useEffect(() => {
     loadConnections();
   }, []);
 

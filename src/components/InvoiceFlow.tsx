@@ -241,6 +241,30 @@ function saveTemplate(supplier: string, instructions: string) {
   t[supplier] = { instructions, savedAt: new Date().toISOString(), useCount: (t[supplier]?.useCount || 0) + 1 };
   localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t));
 }
+function deleteTemplate(supplier: string) {
+  const t = getTemplates();
+  delete t[supplier];
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t));
+}
+
+// Per-supplier opt-in flag for learning custom requirements as a reusable template.
+const LEARN_FLAG_KEY = "invoice_learn_supplier_template";
+export function getLearnSupplierFlag(supplier: string): boolean {
+  if (!supplier) return false;
+  try {
+    const all = JSON.parse(localStorage.getItem(LEARN_FLAG_KEY) || '{}');
+    return !!all[supplier.toLowerCase().trim()];
+  } catch { return false; }
+}
+export function setLearnSupplierFlag(supplier: string, on: boolean) {
+  if (!supplier) return;
+  try {
+    const all = JSON.parse(localStorage.getItem(LEARN_FLAG_KEY) || '{}');
+    const key = supplier.toLowerCase().trim();
+    if (on) all[key] = true; else delete all[key];
+    localStorage.setItem(LEARN_FLAG_KEY, JSON.stringify(all));
+  } catch { /* ignore */ }
+}
 
 // ── Custom Instructions Component ──────────────────────────
 import { getAllPresets, suggestPresetForSupplier, saveUserPreset, type InvoiceLogicPreset } from "@/lib/invoice-logic-presets";

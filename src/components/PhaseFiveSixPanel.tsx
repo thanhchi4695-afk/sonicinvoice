@@ -168,20 +168,20 @@ const PhaseFiveSixPanel = ({
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:shrink-0 w-full sm:w-auto">
             {pos === "shopify" ? (
               <>
-                <Button size="lg" variant="teal" onClick={onPushToShopify} disabled={accepted.length === 0} className="shadow-lg">
+                <Button size="lg" variant="teal" onClick={onPushToShopify} disabled={accepted.length === 0} className="shadow-lg w-full sm:w-auto">
                   <ShoppingBag className="w-4 h-4" />
                   Push to Shopify
                 </Button>
-                <Button size="lg" variant="outline" onClick={onExportCSV} disabled={accepted.length === 0}>
+                <Button size="lg" variant="outline" onClick={onExportCSV} disabled={accepted.length === 0} className="w-full sm:w-auto">
                   <Download className="w-4 h-4" />
                   Export CSV
                 </Button>
               </>
             ) : (
-              <Button size="lg" variant="teal" onClick={onExportCSV} disabled={accepted.length === 0} className="shadow-lg">
+              <Button size="lg" variant="teal" onClick={onExportCSV} disabled={accepted.length === 0} className="shadow-lg w-full sm:w-auto">
                 <Download className="w-4 h-4" />
                 Export Lightspeed CSV
               </Button>

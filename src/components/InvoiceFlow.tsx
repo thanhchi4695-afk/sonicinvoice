@@ -997,8 +997,28 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   // becomes its own history entry because acceptInvoiceFile triggers the normal
   // single-file flow (uploadOriginalToStorage + processing), and once the user
   // finishes review (uploadedFile is cleared) the next queued file auto-loads.
-  type LocalQueueItem = { file: File; status: "queued" | "processing" | "done" };
+  // Failed items keep their "failed" status with a reason — the queue still
+  // advances so the rest of the batch processes, and the user can see what broke.
+  type LocalQueueItem = {
+    file: File;
+    status: "queued" | "processing" | "done" | "failed";
+    errorMessage?: string;
+  };
   const [localQueue, setLocalQueue] = useState<LocalQueueItem[]>([]);
+
+  /** Try to load a file; if anything throws synchronously, mark the current
+   *  batch entry as failed with the reason and let the queue continue. */
+  const safeAcceptInvoiceFile = (file: File): { ok: true } | { ok: false; reason: string } => {
+    try {
+      acceptInvoiceFile(file);
+      return { ok: true };
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "Unknown error while loading file";
+      console.warn("[Batch] failed to load file:", file.name, err);
+      toast.error(`Couldn't load ${file.name}`, { description: reason });
+      return { ok: false, reason };
+    }
+  };
 
   /** Accept a list of dropped/picked files. Loads the first, queues the rest. */
   const acceptInvoiceFiles = (files: File[]) => {
@@ -1011,34 +1031,68 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }
     if (valid.length === 0) return;
     if (valid.length === 1) {
-      acceptInvoiceFile(valid[0]);
+      safeAcceptInvoiceFile(valid[0]);
       return;
     }
     const [first, ...rest] = valid;
-    acceptInvoiceFile(first);
+    const firstResult = safeAcceptInvoiceFile(first);
     setLocalQueue([
-      { file: first, status: "processing" },
+      firstResult.ok
+        ? { file: first, status: "processing" }
+        : { file: first, status: "failed", errorMessage: firstResult.reason },
       ...rest.map<LocalQueueItem>((f) => ({ file: f, status: "queued" })),
     ]);
     toast(`Queued ${valid.length} invoices`, {
-      description: "Each file becomes its own history entry. The next one loads when you finish reviewing the current invoice.",
+      description: "Each file becomes its own history entry. Failed files are flagged and skipped so the rest still process.",
     });
   };
 
+  /** Mark the file currently being reviewed as failed and advance to the next.
+   *  Triggered from the batch panel when the user hits "Skip & continue". */
+  const skipCurrentBatchFile = (reason: string) => {
+    setLocalQueue((prev) =>
+      prev.map((q) =>
+        q.status === "processing"
+          ? { ...q, status: "failed" as const, errorMessage: reason }
+          : q,
+      ),
+    );
+    // Clearing the upload triggers the auto-advance effect below.
+    setUploadedFile(null);
+    setFileName("");
+  };
+
   // Auto-advance the local queue when the current upload is cleared (review accepted/restarted).
+  // Failed entries keep their status + reason so the user can see what broke.
   useEffect(() => {
     if (uploadedFile) return;
     setLocalQueue((prev) => {
       if (prev.length === 0) return prev;
-      const advanced = prev.map((q) => q.status === "processing" ? { ...q, status: "done" as const } : q);
+      const advanced = prev.map((q) =>
+        q.status === "processing" ? { ...q, status: "done" as const } : q,
+      );
       const nextIdx = advanced.findIndex((q) => q.status === "queued");
       if (nextIdx === -1) {
-        // Whole batch finished — clear so the panel disappears.
-        return [];
+        // Whole batch finished. If anything failed, keep the panel visible so the
+        // user can see which files need attention; otherwise clear it.
+        const anyFailed = advanced.some((q) => q.status === "failed");
+        return anyFailed ? advanced : [];
       }
       const next = advanced[nextIdx];
-      queueMicrotask(() => acceptInvoiceFile(next.file));
-      return advanced.map((q, i) => i === nextIdx ? { ...q, status: "processing" } : q);
+      queueMicrotask(() => {
+        const result = safeAcceptInvoiceFile(next.file);
+        if (!result.ok) {
+          // Mark this item failed and re-trigger the effect by leaving uploadedFile null.
+          setLocalQueue((curr) =>
+            curr.map((q, i) =>
+              i === nextIdx
+                ? { ...q, status: "failed" as const, errorMessage: result.reason }
+                : q,
+            ),
+          );
+        }
+      });
+      return advanced.map((q, i) => (i === nextIdx ? { ...q, status: "processing" } : q));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploadedFile]);

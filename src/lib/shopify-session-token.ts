@@ -39,8 +39,19 @@ export async function getSessionToken(): Promise<string | null> {
     }
 
     // ═══ Where session token is acquired ═══
-    const token: string = await shopify.idToken();
-    return token || null;
+    // Race the idToken() call against a 6s timeout. App Bridge can occasionally
+    // hang here (third-party cookie blocks, race with admin reload), and we
+    // never want to leave the embedded auth provider stuck on "loading".
+    const tokenPromise = shopify.idToken();
+    const timeoutPromise = new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), 6000)
+    );
+    const token = (await Promise.race([tokenPromise, timeoutPromise])) as string | null;
+    if (!token) {
+      console.warn("[session-token] idToken() did not resolve within timeout");
+      return null;
+    }
+    return token;
   } catch (err) {
     console.warn("[session-token] Failed to get session token:", err);
     return null;

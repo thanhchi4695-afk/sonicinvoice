@@ -22,6 +22,10 @@ import { calculateConfidence, type ConfidenceBreakdown, type ConfidenceLevel, ge
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource } from "@/lib/barcode-catalog";
 import { validateAndCleanProducts, type ValidatedProduct, type ValidationDebugInfo } from "@/lib/invoice-validator";
+import { isBrainModeEnabled, runBrainPipeline, saveBrainLearnings } from "@/lib/brain-pipeline";
+import type { BrainProduct, BrainValidationSummary } from "@/lib/brain-validator";
+import { BrainModeToggle } from "@/components/BrainModeToggle";
+import { BrainSummaryBanner, BrainRecognitionBanner } from "@/components/BrainModeFlags";
 import InvoiceAutoCorrectPanel from "@/components/InvoiceAutoCorrectPanel";
 import PostParseReviewScreen from "@/components/PostParseReviewScreen";
 import PhaseThreeFourPanel from "@/components/PhaseThreeFourPanel";
@@ -1550,7 +1554,58 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       } catch {}
       products = await parseSpreadsheet(file);
     } else if (products.length === 0) {
-      products = await parseWithAI(file);
+      // ── Brain Mode branch (5-stage pipeline) ──
+      if (isBrainModeEnabled() && ["jpg", "jpeg", "png", "webp", "pdf"].includes(ext)) {
+        try {
+          const reader = new FileReader();
+          const base64: string = await new Promise((resolve, reject) => {
+            reader.onload = () => {
+              const r = reader.result as string;
+              resolve(r.includes(",") ? r.split(",")[1] : r);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          setEnrichLines([{ name: "🧠 Brain Mode", status: "searching", action: "Stage 1/5 — Orientation pass…", confidence: 0 }]);
+          const result = await runBrainPipeline({
+            fileContent: base64,
+            fileType: ext,
+            fileName: file.name,
+            customInstructions,
+            hintedSupplier: supplierName,
+          });
+          brainContextRef.current = { orientation: result.orientation, layout: result.layout };
+          setBrainProducts(result.products);
+          setBrainSummary(result.summary);
+          if (result.recognised) setBrainRecognised(result.supplierName);
+          if (result.supplierName && !supplierName) setSupplierName(result.supplierName);
+          // Flatten BrainProduct[] → existing RawProduct shape so the rest of the
+          // pipeline (validator, review, export) keeps working unchanged.
+          products = result.products.flatMap(p =>
+            (p.variants?.length ? p.variants : [{ size: "", quantity: 0, sku: "", barcode: "" }]).map(v => ({
+              name: p.product_name,
+              brand: result.supplierName || supplierName || "",
+              sku: v.sku || p.style_code || "",
+              barcode: v.barcode || p.barcode || "",
+              type: "",
+              colour: p.colour,
+              size: v.size,
+              qty: Number(v.quantity) || 0,
+              cost: Number(p.cost_ex_gst) || 0,
+              rrp: Number(p.rrp_inc_gst) || 0,
+            })),
+          );
+          toast.success(`🧠 Brain Mode: ${products.length} variants extracted`, {
+            description: `${result.summary.flagged} flagged for review · ${Math.round(Object.values(result.timings).reduce((a,b)=>a+b,0))}ms`,
+          });
+        } catch (err) {
+          console.warn("Brain Mode failed, falling back to standard parser:", err);
+          toast.warning("Brain Mode failed — falling back to standard extraction");
+          products = await parseWithAI(file);
+        }
+      } else {
+        products = await parseWithAI(file);
+      }
     }
 
     console.log('[Phase2 trace] startProcessing got products:', products?.length, 'first:', products?.[0]);
@@ -1939,6 +1994,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
   const [validationDebug, setValidationDebug] = useState<ValidationDebugInfo | null>(null);
   const [validatedProducts, setValidatedProducts] = useState<ValidatedProduct[]>([]);
+  // ── Brain Mode (5-stage pipeline) state — only populated when toggle is ON ──
+  const [brainProducts, setBrainProducts] = useState<BrainProduct[] | null>(null);
+  const [brainSummary, setBrainSummary] = useState<BrainValidationSummary | null>(null);
+  const [brainRecognised, setBrainRecognised] = useState<string>("");
+  const brainContextRef = useRef<{ orientation: Record<string, unknown>; layout: Record<string, unknown> } | null>(null);
   const [invoicePageImages, setInvoicePageImages] = useState<string[]>([]);
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
@@ -2752,6 +2812,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               onChange={setCustomInstructions}
               supplierName={supplierName}
             />
+            <BrainModeToggle />
           </div>
 
           {/* Start processing — only once a file has been chosen */}
@@ -3042,6 +3103,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             />
           )}
 
+          {/* ── Brain Mode banners (5-stage pipeline) ── */}
+          {brainRecognised && <BrainRecognitionBanner supplierName={brainRecognised} />}
+          {brainSummary && <BrainSummaryBanner summary={brainSummary} />}
+
           {/* Post-Parse Review Screen */}
           {validationDebug && validatedProducts.length > 0 && (
             <div className="mb-3">
@@ -3071,7 +3136,18 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                   editCountRef.current += 1;
                   fieldsCorrectedRef.current.add(field);
                 }}
-                onExportAccepted={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
+                onExportAccepted={() => {
+                  if (brainContextRef.current && brainProducts && brainRecognised !== undefined) {
+                    void saveBrainLearnings({
+                      supplierName: supplierName || brainRecognised,
+                      orientation: brainContextRef.current.orientation,
+                      layout: brainContextRef.current.layout,
+                      acceptedProducts: brainProducts,
+                      correctionCount: editCountRef.current,
+                    });
+                  }
+                  finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
+                }}
                 onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
                 onPriceMatch={() => setPriceMatchActive(true)}
                 onGetDescriptions={() => setDescriptionsActive(true)}

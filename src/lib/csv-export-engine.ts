@@ -359,7 +359,10 @@ export function generateShopifyCSV(
           "Option2 Name": "",
           "Option2 Value": "",
         }),
+        "Option3 Name": "",
+        "Option3 Value": "",
         "Variant SKU": v.sku,
+        "Variant Grams": "",
         "Variant Barcode": v.barcode,
         "Variant Price": v.price,
         "Variant Compare At Price": v.compareAtPrice,
@@ -374,12 +377,10 @@ export function generateShopifyCSV(
         Status: isFirstRow ? defaultStatus : "",
         "SEO Title": isFirstRow ? prod.seoTitle : "",
         "SEO Description": isFirstRow ? prod.seoDesc : "",
-        // #6 Collection assignment — comma-joined list, used by importers/Shopify push.
         Collection: isFirstRow ? prod.collections.join(", ") : "",
         ...(v.cogs ? { "Cost per item": v.cogs } : {}),
       };
 
-      // Add metafield columns on first row
       if (isFirstRow) {
         for (const mf of enabledMetaColumns) {
           row[mf.shopifyColumn] = prod.metafields[mf.key] || "";
@@ -394,28 +395,25 @@ export function generateShopifyCSV(
     });
   }
 
-  // Build column order
   const baseColumns = [
     "Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published",
     "Option1 Name", "Option1 Value", "Option2 Name", "Option2 Value",
-    "Variant SKU", "Variant Barcode", "Variant Price", "Variant Compare At Price",
+    "Option3 Name", "Option3 Value",
+    "Variant SKU", "Variant Grams", "Variant Barcode", "Variant Price", "Variant Compare At Price",
     "Variant Inventory Tracker", "Variant Inventory Policy", "Variant Inventory Qty",
     "Variant Fulfillment Service",
     "Variant Requires Shipping", "Variant Taxable", "Variant Weight Unit",
     "Image Src", "Status", "SEO Title", "SEO Description",
   ];
 
-  // #6 Only include Collection column if at least one product has assignments
   if (rows.some((r) => r.Collection?.trim())) {
     baseColumns.push("Collection");
   }
 
-  // Only include Cost if any row has it
   if (rows.some(r => r["Cost per item"])) {
     baseColumns.push("Cost per item");
   }
 
-  // Only include metafield columns that have data
   const metaCols = enabledMetaColumns
     .filter(mf => rows.some(r => r[mf.shopifyColumn]?.trim()))
     .map(mf => mf.shopifyColumn);
@@ -440,44 +438,50 @@ export function setVariantMode(mode: VariantMode): void {
 
 // ── Lightspeed (X-Series) CSV exporter ─────────────────────
 //
-// Maps the same ExportLine[] into Lightspeed's product-export-12
-// schema (32 columns). Unlike Shopify, Lightspeed expects every
-// column populated on every row — no "first row only" convention —
-// so brand_name and supplier_name are propagated to every variant.
+// Maps the same ExportLine[] into the Lightspeed product-export-12
+// schema (18 columns) — the format Lightspeed actually emits when
+// you export from the X-Series catalogue. Every column is populated
+// on every row (no "first row only" convention), so brand and
+// supplier_code are propagated to every variant.
+//
+// Reference column order (matches Lightspeed's own export):
+//   handle, name, sku, supplier_code, description, brand,
+//   supply_price, retail_price, tax, active, tags,
+//   attribute_1_name, attribute_1_value,
+//   attribute_2_name, attribute_2_value,
+//   attribute_3_name, attribute_3_value,
+//   <STORE>_stock
 
 export function generateLightspeedCSV(
   rawLines: ExportLine[],
-  opts?: { taxName?: string; taxValue?: number; outletName?: string; defaultLeadDays?: number }
+  opts?: { taxName?: string; outletName?: string }
 ): { csv: string; rowCount: number } {
   const taxName = opts?.taxName ?? "GST";
-  const taxValue = opts?.taxValue ?? 10;
   const outlet = opts?.outletName ?? "Main Outlet";
+  const stockCol = `${outlet.replace(/\s+/g, "_")}_stock`;
 
-  // Expand size runs the same way Shopify path does.
+  // Expand size runs the same way the Shopify path does.
   const lines: ExportLine[] = rawLines.flatMap((ln) => expandLineBySize(ln));
 
-  // Lightspeed columns we know how to fill from invoice data.
   const headers = [
     "handle",
-    "sku",
     "name",
+    "sku",
+    "supplier_code",
     "description",
-    "product_category",
-    "variant_option_one_name",
-    "variant_option_one_value",
-    "variant_option_two_name",
-    "variant_option_two_value",
-    "tags",
+    "brand",
     "supply_price",
     "retail_price",
-    "loyalty_value_default",
-    "tax_name",
-    "tax_value",
-    "brand_name",
-    "supplier_name",
+    "tax",
     "active",
-    "track_inventory",
-    `inventory_${outlet.replace(/\s+/g, "_")}`,
+    "tags",
+    "attribute_1_name",
+    "attribute_1_value",
+    "attribute_2_name",
+    "attribute_2_value",
+    "attribute_3_name",
+    "attribute_3_value",
+    stockCol,
   ];
 
   const rows = lines.map((ln) => {
@@ -486,35 +490,36 @@ export function generateLightspeedCSV(
     const tags = ln.tags || [ln.brand, ln.type, ln.colour, "New Arrival"].filter(Boolean).join(", ");
 
     // Convention: Colour first, Size second (matches Shopify export + Sonic memory)
-    const opt1Name = ln.colour ? "Colour" : ln.size ? "Size" : "";
-    const opt1Value = ln.colour || ln.size || "";
-    const opt2Name = ln.colour && ln.size ? "Size" : "";
-    const opt2Value = ln.colour && ln.size ? (ln.size || "") : "";
+    const attr1Name = ln.colour ? "Colour" : ln.size ? "Size" : "";
+    const attr1Value = ln.colour || ln.size || "";
+    const attr2Name = ln.colour && ln.size ? "Size" : "";
+    const attr2Value = ln.colour && ln.size ? (ln.size || "") : "";
 
     return {
       handle,
-      sku: ln.sku || "",
       name: title,
+      sku: ln.sku || "",
+      // supplier_code = vendor name; merchants can map this to their internal
+      // Lightspeed supplier ID later. Propagated to every row (#4 from gap analysis).
+      supplier_code: ln.brand || "",
       description: ln.bodyHtml || "",
-      product_category: ln.type || "",
-      variant_option_one_name: opt1Name,
-      variant_option_one_value: opt1Value,
-      variant_option_two_name: opt2Name,
-      variant_option_two_value: opt2Value,
-      tags,
+      brand: ln.brand || "",
       supply_price: ln.cogs != null ? ln.cogs.toFixed(2) : "",
       retail_price: ln.rrp.toFixed(2),
-      loyalty_value_default: "TRUE",
-      tax_name: taxName,
-      tax_value: String(taxValue),
-      brand_name: ln.brand || "",       // ← #4 vendor propagated to every row
-      supplier_name: ln.brand || "",    // ← brand and supplier are normally identical for fashion
+      tax: taxName,
       active: ln.status === "active" ? "TRUE" : "FALSE",
-      track_inventory: "TRUE",
-      [`inventory_${outlet.replace(/\s+/g, "_")}`]: String(ln.qty ?? 0),
+      tags,
+      attribute_1_name: attr1Name,
+      attribute_1_value: attr1Value,
+      attribute_2_name: attr2Name,
+      attribute_2_value: attr2Value,
+      attribute_3_name: "",
+      attribute_3_value: "",
+      [stockCol]: String(ln.qty ?? 0),
     } as Record<string, string>;
   });
 
   const csv = "\uFEFF" + Papa.unparse(rows, { columns: headers });
   return { csv, rowCount: rows.length };
 }
+

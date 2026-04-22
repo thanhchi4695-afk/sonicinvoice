@@ -1008,10 +1008,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   /** Try to load a file; if anything throws synchronously, mark the current
    *  batch entry as failed with the reason and let the queue continue. */
-  const safeAcceptInvoiceFile = (file: File): { ok: true } | { ok: false; reason: string } => {
+  const safeAcceptInvoiceFile = (file: File): { ok: boolean; reason: string } => {
     try {
       acceptInvoiceFile(file);
-      return { ok: true };
+      return { ok: true, reason: "" };
     } catch (err) {
       const reason = err instanceof Error ? err.message : "Unknown error while loading file";
       console.warn("[Batch] failed to load file:", file.name, err);

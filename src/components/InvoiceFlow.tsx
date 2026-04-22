@@ -243,18 +243,23 @@ function saveTemplate(supplier: string, instructions: string) {
 }
 
 // ── Custom Instructions Component ──────────────────────────
+import { getAllPresets, suggestPresetForSupplier, saveUserPreset, type InvoiceLogicPreset } from "@/lib/invoice-logic-presets";
+
 const CustomInstructionsField = ({
   value, onChange, supplierName,
 }: {
   value: string; onChange: (v: string) => void; supplierName: string;
 }) => {
   const [showHistory, setShowHistory] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
   const [saveForSupplier, setSaveForSupplier] = useState(false);
   const [templateSupplier, setTemplateSupplier] = useState(supplierName);
   const [loadedTemplate, setLoadedTemplate] = useState<string | null>(null);
+  const [suggestedPreset, setSuggestedPreset] = useState<InvoiceLogicPreset | null>(null);
   const history = getHistory();
+  const allPresets = getAllPresets();
 
-  // Auto-load saved template when supplier changes
+  // Auto-load saved template OR suggest a built-in preset when supplier changes
   useEffect(() => {
     setTemplateSupplier(supplierName);
     if (supplierName) {
@@ -263,9 +268,37 @@ const CustomInstructionsField = ({
       if (match && !value) {
         onChange(match.instructions);
         setLoadedTemplate(supplierName);
+        setSuggestedPreset(null);
+      } else if (!value) {
+        // No saved template — try matching a built-in preset (e.g. Lula Soul)
+        const preset = suggestPresetForSupplier(supplierName);
+        setSuggestedPreset(preset);
       }
     }
   }, [supplierName]);
+
+  const applyPreset = (p: InvoiceLogicPreset) => {
+    onChange(p.instructions);
+    setLoadedTemplate(p.name);
+    setShowLibrary(false);
+    setSuggestedPreset(null);
+    toast.success(`Loaded "${p.name}"`, { description: "AI will follow these rules for this invoice." });
+  };
+
+  const saveCurrentAsPreset = () => {
+    if (!value.trim()) { toast.error("Write some instructions first"); return; }
+    const name = window.prompt("Name this logic preset:", supplierName || "My custom logic");
+    if (!name) return;
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
+    saveUserPreset({
+      id, name,
+      description: `Saved ${new Date().toLocaleDateString()}`,
+      matches: supplierName ? [supplierName.toLowerCase()] : [],
+      instructions: value,
+      posTarget: "any",
+    });
+    toast.success(`Saved "${name}" to your Logic Library`);
+  };
 
   const handleInsert = (text: string) => {
     onChange(value ? value + '\n' + text : text);

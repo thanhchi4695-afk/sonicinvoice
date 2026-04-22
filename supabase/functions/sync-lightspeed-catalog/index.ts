@@ -76,7 +76,12 @@ async function syncRSeries(
   const items: any[] = [];
   let offset = 0;
   const limit = 100;
-  const relations = encodeURIComponent('["ItemShops","Prices","ItemMatrix"]');
+  // Include SKUCodes so we can pull custom SKU + ISBN-style barcodes
+  // (some accounts store barcodes as sku_codes entries with type=ISBN
+  // and the matching SKU as type=Custom).
+  const relations = encodeURIComponent(
+    '["ItemShops","Prices","ItemMatrix","SKUCodes"]',
+  );
 
   while (true) {
     const url =

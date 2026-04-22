@@ -4,7 +4,7 @@ import { getSessionToken } from "@/lib/shopify-session-token";
 import { supabase } from "@/integrations/supabase/client";
 import { addAuditEntry } from "@/lib/audit-log";
 
-export type EmbeddedAuthState = "loading" | "authenticated" | "unauthenticated";
+export type EmbeddedAuthState = "loading" | "authenticated" | "needs_install" | "unauthenticated";
 
 interface EmbeddedContextValue {
   isEmbedded: boolean;
@@ -15,6 +15,8 @@ interface EmbeddedContextValue {
   sessionReady: boolean;
   /** Granular auth state for the embedded flow */
   authState: EmbeddedAuthState;
+  /** Last error message (if any) for diagnostics */
+  authError: string | null;
 }
 
 const EmbeddedContext = createContext<EmbeddedContextValue>({

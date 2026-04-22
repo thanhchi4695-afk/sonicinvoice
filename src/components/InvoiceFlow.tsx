@@ -4,7 +4,7 @@ import { syncInvoiceItemsToCatalog } from "@/lib/invoice-catalog-sync";
 import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orchestrator";
 import POSPickerDialog, { hasPickedPOS } from "@/components/POSPickerDialog";
 import { toast } from "sonner";
-import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag } from "lucide-react";
+import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag, CloudDownload } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";

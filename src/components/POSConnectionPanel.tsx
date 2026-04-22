@@ -500,6 +500,54 @@ export default function POSConnectionPanel() {
           </div>
         );
       })}
+
+      <Dialog open={lsxDialogOpen} onOpenChange={setLsxDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Connect Lightspeed X-Series</DialogTitle>
+            <DialogDescription>
+              Enter your Lightspeed store URL so we know which account to connect to.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="ls-prefix">Your Lightspeed store URL</Label>
+            <div className="flex items-center gap-1 rounded-md border border-input bg-background pr-3 focus-within:ring-2 focus-within:ring-ring">
+              <Input
+                id="ls-prefix"
+                value={lsxPrefixInput}
+                onChange={(e) => setLsxPrefixInput(e.target.value)}
+                placeholder="yourstore"
+                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleLsxConfirm();
+                }}
+              />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                .retail.lightspeed.app
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              The URL you use to log into Lightspeed — just the part before
+              <code className="mx-1 px-1 rounded bg-muted">.retail.lightspeed.app</code>.
+              You can also paste the full URL.
+            </p>
+            {lsxPrefixInput && (
+              <p className="text-[11px] text-muted-foreground font-mono">
+                → {extractDomainPrefix(lsxPrefixInput) || "(invalid)"}.retail.lightspeed.app
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setLsxDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleLsxConfirm} disabled={!extractDomainPrefix(lsxPrefixInput)}>
+              Continue to Lightspeed
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

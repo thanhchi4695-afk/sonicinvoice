@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Unplug, ExternalLink, Store } from "lucide-react";
+import { Loader2, Unplug, ExternalLink, Store, Barcode } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getConnection } from "@/lib/shopify-api";
 import { toast } from "sonner";

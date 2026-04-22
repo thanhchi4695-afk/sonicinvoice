@@ -992,10 +992,61 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }, 100);
   };
 
+  // Local multi-file queue — mirrors the Drive queue pattern. When the user drops or
+  // picks N files at once, we load file 1 immediately and queue the rest. Each file
+  // becomes its own history entry because acceptInvoiceFile triggers the normal
+  // single-file flow (uploadOriginalToStorage + processing), and once the user
+  // finishes review (uploadedFile is cleared) the next queued file auto-loads.
+  type LocalQueueItem = { file: File; status: "queued" | "processing" | "done" };
+  const [localQueue, setLocalQueue] = useState<LocalQueueItem[]>([]);
+
+  /** Accept a list of dropped/picked files. Loads the first, queues the rest. */
+  const acceptInvoiceFiles = (files: File[]) => {
+    const valid = files.filter(isAcceptedFile);
+    const rejected = files.length - valid.length;
+    if (rejected > 0) {
+      toast.error(`${rejected} file${rejected === 1 ? "" : "s"} skipped`, {
+        description: "Only PDF, Excel, CSV, Word, and image files are supported.",
+      });
+    }
+    if (valid.length === 0) return;
+    if (valid.length === 1) {
+      acceptInvoiceFile(valid[0]);
+      return;
+    }
+    const [first, ...rest] = valid;
+    acceptInvoiceFile(first);
+    setLocalQueue([
+      { file: first, status: "processing" },
+      ...rest.map<LocalQueueItem>((f) => ({ file: f, status: "queued" })),
+    ]);
+    toast(`Queued ${valid.length} invoices`, {
+      description: "Each file becomes its own history entry. The next one loads when you finish reviewing the current invoice.",
+    });
+  };
+
+  // Auto-advance the local queue when the current upload is cleared (review accepted/restarted).
+  useEffect(() => {
+    if (uploadedFile) return;
+    setLocalQueue((prev) => {
+      if (prev.length === 0) return prev;
+      const advanced = prev.map((q) => q.status === "processing" ? { ...q, status: "done" as const } : q);
+      const nextIdx = advanced.findIndex((q) => q.status === "queued");
+      if (nextIdx === -1) {
+        // Whole batch finished — clear so the panel disappears.
+        return [];
+      }
+      const next = advanced[nextIdx];
+      queueMicrotask(() => acceptInvoiceFile(next.file));
+      return advanced.map((q, i) => i === nextIdx ? { ...q, status: "processing" } : q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadedFile]);
+
   const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    acceptInvoiceFile(file);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    acceptInvoiceFiles(files);
     e.target.value = "";
   };
 

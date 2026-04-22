@@ -76,7 +76,12 @@ async function syncRSeries(
   const items: any[] = [];
   let offset = 0;
   const limit = 100;
-  const relations = encodeURIComponent('["ItemShops","Prices","ItemMatrix"]');
+  // Include SKUCodes so we can pull custom SKU + ISBN-style barcodes
+  // (some accounts store barcodes as sku_codes entries with type=ISBN
+  // and the matching SKU as type=Custom).
+  const relations = encodeURIComponent(
+    '["ItemShops","Prices","ItemMatrix","SKUCodes"]',
+  );
 
   while (true) {
     const url =
@@ -126,11 +131,33 @@ async function syncRSeries(
 
     const { colour, size } = parseColourSize(item.description || "", attrs);
 
+    // Extract custom SKU + ISBN/UPC/EAN barcode from SKUCodes if present
+    const skuCodesRaw = item.SKUCodes?.SKUCode;
+    const skuCodes: any[] = Array.isArray(skuCodesRaw)
+      ? skuCodesRaw
+      : skuCodesRaw
+      ? [skuCodesRaw]
+      : [];
+    const findCode = (t: string) =>
+      skuCodes.find(
+        (c) => String(c?.type || "").toLowerCase() === t.toLowerCase(),
+      )?.code as string | undefined;
+
+    const customSkuCode = findCode("Custom");
+    const isbnCode = findCode("ISBN");
+    const upcCode = findCode("UPC");
+    const eanCode = findCode("EAN");
+
+    const resolvedSku =
+      customSkuCode || item.customSku || item.systemSku || null;
+    const resolvedBarcode =
+      isbnCode || upcCode || eanCode || item.upc || item.ean || null;
+
     rows.push({
       platform: "lightspeed",
       platform_product_id: String(item.itemMatrixID || item.itemID),
       platform_variant_id: String(item.itemID),
-      sku: item.systemSku || item.customSku || null,
+      sku: resolvedSku,
       product_title: item.description || "",
       variant_title: [attrs.colour || attrs.color, attrs.size]
         .filter(Boolean)
@@ -140,7 +167,7 @@ async function syncRSeries(
       current_qty: qty,
       current_cost: cost,
       current_price: price,
-      barcode: item.upc || item.ean || null,
+      barcode: resolvedBarcode,
     });
   }
 

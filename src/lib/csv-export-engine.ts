@@ -399,7 +399,8 @@ export function generateShopifyCSV(
     "Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published",
     "Option1 Name", "Option1 Value", "Option2 Name", "Option2 Value",
     "Variant SKU", "Variant Barcode", "Variant Price", "Variant Compare At Price",
-    "Variant Inventory Policy", "Variant Inventory Qty", "Variant Fulfillment Service",
+    "Variant Inventory Tracker", "Variant Inventory Policy", "Variant Inventory Qty",
+    "Variant Fulfillment Service",
     "Variant Requires Shipping", "Variant Taxable", "Variant Weight Unit",
     "Image Src", "Status", "SEO Title", "SEO Description",
   ];

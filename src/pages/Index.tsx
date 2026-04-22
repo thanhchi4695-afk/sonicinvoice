@@ -622,10 +622,10 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           />
           {activeFlow ? renderFlow() : mainContent}
         </div>
-        {/* Mobile bottom tabs for embedded mode */}
-        <div className="lg:hidden">
+        {/* Mobile bottom tabs for embedded mode — conditional render to avoid duplicate DOM */}
+        {!isDesktop && (
           <BottomTabBar activeTab={activeTab} onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }} />
-        </div>
+        )}
       </StockyLayout>
     );
   }
@@ -634,14 +634,55 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   // Desktop (≥1024px): use StockyLayout sidebar; Mobile: use BottomTabBar
   return (
     <div className="min-h-screen">
-      {/* Desktop sidebar wrapper — hidden on mobile */}
-      <div className="hidden lg:block h-screen">
-        <StockyLayout
-          activeTab={activeFlow ? "" : activeTab}
-          activeFlow={activeFlow}
-          onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
-          onFlowChange={(flow) => setActiveFlow(flow as any)}
-        >
+      {/* Desktop layout — only mounted on desktop viewports (eliminates duplicate DOM) */}
+      {isDesktop && (
+        <div className="h-screen">
+          <StockyLayout
+            activeTab={activeFlow ? "" : activeTab}
+            activeFlow={activeFlow}
+            onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
+            onFlowChange={(flow) => setActiveFlow(flow as any)}
+          >
+            <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
+              <NotificationBell
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkRead={markRead}
+                onMarkAllRead={markAllRead}
+                onNavigate={(link) => {
+                  if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
+                    setActiveFlow(link as any);
+                  } else {
+                    setActiveTab(link);
+                  }
+                }}
+              />
+              <button
+                onClick={() => setActiveTab("account")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${mode.modeBadge.color}`}
+                title="Open account & integrations"
+              >
+                <span>{mode.modeBadge.emoji}</span>
+                {mode.modeBadge.label}
+              </button>
+            </div>
+            <PhaseProgressBar
+              activeTab={activeTab}
+              activeFlow={activeFlow}
+              onNavigate={(t) => {
+                if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
+                else { setActiveFlow(t.id as any); }
+              }}
+            />
+            <QuickActionsBar onAction={handleStartFlow} />
+            {activeFlow ? renderFlow() : mainContent}
+          </StockyLayout>
+        </div>
+      )}
+
+      {/* Mobile layout — only mounted on mobile viewports */}
+      {!isDesktop && (
+        <div className="pb-24">
           <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
             <NotificationBell
               notifications={notifications}
@@ -659,6 +700,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             <button
               onClick={() => setActiveTab("account")}
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${mode.modeBadge.color}`}
+              title="Open account & integrations"
             >
               <span>{mode.modeBadge.emoji}</span>
               {mode.modeBadge.label}
@@ -674,44 +716,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           />
           <QuickActionsBar onAction={handleStartFlow} />
           {activeFlow ? renderFlow() : mainContent}
-        </StockyLayout>
-      </div>
-
-      {/* Mobile layout — hidden on desktop */}
-      <div className="lg:hidden pb-24">
-        <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
-          <NotificationBell
-            notifications={notifications}
-            unreadCount={unreadCount}
-            onMarkRead={markRead}
-            onMarkAllRead={markAllRead}
-            onNavigate={(link) => {
-              if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
-                setActiveFlow(link as any);
-              } else {
-                setActiveTab(link);
-              }
-            }}
-          />
-          <button
-            onClick={() => setActiveTab("account")}
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${mode.modeBadge.color}`}
-          >
-            <span>{mode.modeBadge.emoji}</span>
-            {mode.modeBadge.label}
-          </button>
-        </div>
-        <PhaseProgressBar
-          activeTab={activeTab}
-          activeFlow={activeFlow}
-          onNavigate={(t) => {
-            if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-            else { setActiveFlow(t.id as any); }
-          }}
-        />
-        <QuickActionsBar onAction={handleStartFlow} />
-        {activeFlow ? renderFlow() : mainContent}
-        <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+          <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Floating Quick Capture button — mobile only */}
         <button
@@ -722,8 +727,9 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           <span className="text-2xl">📷</span>
         </button>
 
-        {showCapture && <QuickCapture onClose={() => setShowCapture(false)} />}
-      </div>
+          {showCapture && <QuickCapture onClose={() => setShowCapture(false)} />}
+        </div>
+      )}
 
       {/* Global modals */}
       <KeyboardShortcutsModal open={showShortcuts} onOpenChange={setShowShortcuts} />

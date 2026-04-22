@@ -81,6 +81,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
   const [filterUpdates, setFilterUpdates] = useState(true);
   const [filterMissingImages, setFilterMissingImages] = useState(true);
   const [variantMode, setVariantModeState] = useState<VariantMode>(getVariantMode());
+  const [publishStatus, setPublishStatusState] = useState<PublishStatus>(getPublishStatus());
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [exportBlocked, setExportBlocked] = useState(false);
   const mode = useStoreMode();

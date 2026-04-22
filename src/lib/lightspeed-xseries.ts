@@ -2,6 +2,7 @@
 // Schema matches the official Lightspeed product-export CSV
 // (see user-uploads://product-export-12.csv for the canonical header).
 import Papa from 'papaparse';
+import { getPublishStatus, lightspeedActiveValue } from './publish-status';
 
 // ── Types ──────────────────────────────────────────────────
 export interface XSeriesProduct {
@@ -140,6 +141,7 @@ export function generateXSeriesCSV(
 
   const allRows: CsvRow[] = [];
   const errors: XSeriesValidationError[] = [];
+  const activeFlag = lightspeedActiveValue(getPublishStatus());
 
   // Generate unique handles per product
   const rawHandles = products.map(p => generateHandle(p.title, p.brand));
@@ -181,7 +183,7 @@ export function generateXSeriesCSV(
       brand_name: product.brand,
       supplier_name: product.supplierName || '',
       supplier_code: product.supplierCode || '',
-      active: '1',
+      active: activeFlag,
       track_inventory: s.trackInventory ? '1' : '0',
       [stockCol]: '0',
       [reorderPointCol]: s.useReorderPoints ? String(s.reorderPoint) : '',

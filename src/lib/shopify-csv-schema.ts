@@ -142,6 +142,8 @@ export interface ScannedProductForExport {
 
 export function generateShopifyCSV(products: ScannedProductForExport[]): string {
   const handles = generateHandles(products.map(p => p.title));
+  // Lazy import to avoid circular deps in some bundlers
+  const status = (typeof localStorage !== "undefined" && localStorage.getItem("sonic_invoice_publish_status") === "draft") ? "draft" : "active";
 
   const rows = products.map((p, i) => {
     const desc = p.description
@@ -169,7 +171,7 @@ export function generateShopifyCSV(products: ScannedProductForExport[]): string 
       "shopify",                           // Variant Inventory Tracker
       "deny",                              // Variant Inventory Policy
       "manual",                            // Variant Fulfillment Service
-      "active",                            // Status
+      status,                              // Status
     ];
   });
 

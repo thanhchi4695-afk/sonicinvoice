@@ -5,6 +5,7 @@
 
 import Papa from "papaparse";
 import { matchCollectionsWithBrand } from "./collection-engine";
+import { getPublishStatus, shopifyStatusValue } from "./publish-status";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -320,6 +321,7 @@ export function generateShopifyCSV(
 ): { csv: string; validation: ValidationResult; rowCount: number } {
   const grouped = groupProducts(lines, mode);
   const validation = validateExport(grouped);
+  const defaultStatus = shopifyStatusValue(getPublishStatus());
 
   // Build rows
   const rows: Record<string, string>[] = [];
@@ -355,7 +357,7 @@ export function generateShopifyCSV(
         "Variant Taxable": "TRUE",
         "Variant Weight Unit": "kg",
         "Image Src": isFirstRow ? prod.imageUrl : "",
-        Status: isFirstRow ? prod.status : "",
+        Status: isFirstRow ? defaultStatus : "",
         "SEO Title": isFirstRow ? prod.seoTitle : "",
         "SEO Description": isFirstRow ? prod.seoDesc : "",
         // #6 Collection assignment — comma-joined list, used by importers/Shopify push.

@@ -11,6 +11,7 @@ import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed"
 import ShopifyPushFlow from "@/components/ShopifyPushFlow";
 import type { PushProduct } from "@/lib/shopify-api";
 import { generateShopifyCSV, getVariantMode, setVariantMode, type VariantMode, type ValidationResult } from "@/lib/csv-export-engine";
+import { getPublishStatus, setPublishStatus, type PublishStatus } from "@/lib/publish-status";
 
 export interface ExportProduct {
   name: string;
@@ -80,6 +81,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
   const [filterUpdates, setFilterUpdates] = useState(true);
   const [filterMissingImages, setFilterMissingImages] = useState(true);
   const [variantMode, setVariantModeState] = useState<VariantMode>(getVariantMode());
+  const [publishStatus, setPublishStatusState] = useState<PublishStatus>(getPublishStatus());
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [exportBlocked, setExportBlocked] = useState(false);
   const mode = useStoreMode();
@@ -342,6 +344,33 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
               </div>
             </div>
           )}
+
+          {/* Publish status — Active vs Draft (applies to Shopify Status column and Lightspeed active flag) */}
+          <div className="bg-card rounded-lg border border-border p-4">
+            <h3 className="text-sm font-semibold mb-3">Publish status</h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Choose whether new products are imported as <strong>Active</strong> (live in your store) or <strong>Draft</strong> (hidden — visible only in admin). Applies to both Shopify and Lightspeed exports.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { setPublishStatus("active"); setPublishStatusState("active"); setValidationResult(null); }}
+                className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
+                  publishStatus === "active" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-muted-foreground/30"
+                }`}
+              >
+                {publishStatus === "active" && <Check className="w-3.5 h-3.5 inline mr-1.5" />}Active (live)
+              </button>
+              <button
+                onClick={() => { setPublishStatus("draft"); setPublishStatusState("draft"); setValidationResult(null); }}
+                className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
+                  publishStatus === "draft" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-muted-foreground/30"
+                }`}
+              >
+                {publishStatus === "draft" && <Check className="w-3.5 h-3.5 inline mr-1.5" />}Draft (hidden)
+              </button>
+            </div>
+          </div>
+
 
           <div className="bg-card rounded-lg border border-border p-4">
             <h3 className="text-sm font-semibold mb-3">Export format</h3>

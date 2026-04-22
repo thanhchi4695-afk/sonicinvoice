@@ -437,3 +437,84 @@ export function getVariantMode(): VariantMode {
 export function setVariantMode(mode: VariantMode): void {
   localStorage.setItem(VARIANT_MODE_KEY, mode);
 }
+
+// ── Lightspeed (X-Series) CSV exporter ─────────────────────
+//
+// Maps the same ExportLine[] into Lightspeed's product-export-12
+// schema (32 columns). Unlike Shopify, Lightspeed expects every
+// column populated on every row — no "first row only" convention —
+// so brand_name and supplier_name are propagated to every variant.
+
+export function generateLightspeedCSV(
+  rawLines: ExportLine[],
+  opts?: { taxName?: string; taxValue?: number; outletName?: string; defaultLeadDays?: number }
+): { csv: string; rowCount: number } {
+  const taxName = opts?.taxName ?? "GST";
+  const taxValue = opts?.taxValue ?? 10;
+  const outlet = opts?.outletName ?? "Main Outlet";
+
+  // Expand size runs the same way Shopify path does.
+  const lines: ExportLine[] = rawLines.flatMap((ln) => expandLineBySize(ln));
+
+  // Lightspeed columns we know how to fill from invoice data.
+  const headers = [
+    "handle",
+    "sku",
+    "name",
+    "description",
+    "product_category",
+    "variant_option_one_name",
+    "variant_option_one_value",
+    "variant_option_two_name",
+    "variant_option_two_value",
+    "tags",
+    "supply_price",
+    "retail_price",
+    "loyalty_value_default",
+    "tax_name",
+    "tax_value",
+    "brand_name",
+    "supplier_name",
+    "active",
+    "track_inventory",
+    `inventory_${outlet.replace(/\s+/g, "_")}`,
+  ];
+
+  const rows = lines.map((ln) => {
+    const title = deduplicateTitle(ln.name, ln.brand);
+    const handle = generateHandle(title, ln.brand);
+    const tags = ln.tags || [ln.brand, ln.type, ln.colour, "New Arrival"].filter(Boolean).join(", ");
+
+    // Convention: Colour first, Size second (matches Shopify export + Sonic memory)
+    const opt1Name = ln.colour ? "Colour" : ln.size ? "Size" : "";
+    const opt1Value = ln.colour || ln.size || "";
+    const opt2Name = ln.colour && ln.size ? "Size" : "";
+    const opt2Value = ln.colour && ln.size ? (ln.size || "") : "";
+
+    return {
+      handle,
+      sku: ln.sku || "",
+      name: title,
+      description: ln.bodyHtml || "",
+      product_category: ln.type || "",
+      variant_option_one_name: opt1Name,
+      variant_option_one_value: opt1Value,
+      variant_option_two_name: opt2Name,
+      variant_option_two_value: opt2Value,
+      tags,
+      supply_price: ln.cogs != null ? ln.cogs.toFixed(2) : "",
+      retail_price: ln.rrp.toFixed(2),
+      loyalty_value_default: "TRUE",
+      tax_name: taxName,
+      tax_value: String(taxValue),
+      brand_name: ln.brand || "",       // ← #4 vendor propagated to every row
+      supplier_name: ln.brand || "",    // ← brand and supplier are normally identical for fashion
+      active: ln.status === "active" ? "TRUE" : "FALSE",
+      track_inventory: "TRUE",
+      [`inventory_${outlet.replace(/\s+/g, "_")}`]: String(ln.qty ?? 0),
+    } as Record<string, string>;
+  });
+
+  const csv = "\uFEFF" + Papa.unparse(rows, { columns: headers });
+  return { csv, rowCount: rows.length };
+}

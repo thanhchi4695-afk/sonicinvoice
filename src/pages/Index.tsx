@@ -727,8 +727,9 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           <span className="text-2xl">📷</span>
         </button>
 
-        {showCapture && <QuickCapture onClose={() => setShowCapture(false)} />}
-      </div>
+          {showCapture && <QuickCapture onClose={() => setShowCapture(false)} />}
+        </div>
+      )}
 
       {/* Global modals */}
       <KeyboardShortcutsModal open={showShortcuts} onOpenChange={setShowShortcuts} />

@@ -6,6 +6,7 @@
 import Papa from "papaparse";
 import { matchCollectionsWithBrand } from "./collection-engine";
 import { getPublishStatus, shopifyStatusValue } from "./publish-status";
+import { expandLineBySize } from "./size-run-expander";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -19,7 +20,10 @@ export interface ExportLine {
   barcode?: string;
   price: number;
   rrp: number;
+  /** Per-unit wholesale cost (supply_price). Surfaced from the invoice. */
   cogs?: number;
+  /** On-hand quantity for this variant. Surfaced from the invoice line. */
+  qty?: number;
   status: string;
   hasImage?: boolean;
   imageUrl?: string;

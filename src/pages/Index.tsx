@@ -296,10 +296,14 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   // sees the reinstall / retry UI rather than an infinite spinner.
   useEffect(() => {
     if (!isEmbedded) return;
-    if (embeddedAuthState !== "loading") return;
+    if (embeddedAuthState !== "loading") {
+      setEmbeddedAuthTimedOut(false);
+      return;
+    }
     const t = window.setTimeout(() => {
       console.warn("[embedded-auth] Hard timeout — forcing authLoading=false after 15s");
       setAuthLoading(false);
+      setEmbeddedAuthTimedOut(true);
     }, 15000);
     return () => window.clearTimeout(t);
   }, [isEmbedded, embeddedAuthState]);

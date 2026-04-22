@@ -3103,6 +3103,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             />
           )}
 
+          {/* ── Brain Mode banners (5-stage pipeline) ── */}
+          {brainRecognised && <BrainRecognitionBanner supplierName={brainRecognised} />}
+          {brainSummary && <BrainSummaryBanner summary={brainSummary} />}
+
           {/* Post-Parse Review Screen */}
           {validationDebug && validatedProducts.length > 0 && (
             <div className="mb-3">

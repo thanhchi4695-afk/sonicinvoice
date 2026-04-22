@@ -229,6 +229,8 @@ export interface BrainLearnInput {
   layout: Record<string, unknown>;
   acceptedProducts: BrainProduct[];
   correctionCount: number;
+  /** Universal classification result from Stage 0 (used for pattern + shared pool). */
+  classification?: UniversalClassification;
 }
 
 export async function saveBrainLearnings(input: BrainLearnInput): Promise<void> {

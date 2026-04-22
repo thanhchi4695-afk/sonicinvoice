@@ -185,9 +185,12 @@ async function syncXSeries(
   const pageSize = 200;
 
   while (true) {
+    // Request sku_codes inclusion — some X-Series accounts (migrated from
+    // R-Series, or using ISBN barcodes) store barcode + SKU in a sku_codes
+    // array rather than the flat product.barcode / product.sku fields.
     const url =
       `https://${domainPrefix}.retail.lightspeed.app/api/2.0/products` +
-      `?page_size=${pageSize}&after=${after}`;
+      `?page_size=${pageSize}&after=${after}&include=sku_codes`;
     const res = await lsFetch(url, token);
     if (!res.ok) {
       const txt = await res.text();

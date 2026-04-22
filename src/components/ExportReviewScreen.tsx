@@ -43,7 +43,7 @@ interface ExportReviewScreenProps {
   onStartFlow?: (flow: string) => void;
 }
 
-type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "tags_only" | "xlsx" | "summary_pdf" | "google_xml" | "google_tsv";
+type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "lightspeed_full" | "tags_only" | "xlsx" | "summary_pdf" | "google_xml" | "google_tsv";
 
 const FORMAT_CARDS: { id: ExportFormat; icon: React.ReactNode; label: string; desc: string; best: string }[] = [
   { id: "shopify_full", icon: <FileText className="w-5 h-5 text-primary" />, label: "Shopify CSV (Full)", desc: "Complete CSV with all fields for Shopify bulk import. Includes: title, description, type, vendor, tags, SEO, price, compare-at price, cost, images.", best: "New products, full product setup" },

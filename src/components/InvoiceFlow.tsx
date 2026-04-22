@@ -241,6 +241,30 @@ function saveTemplate(supplier: string, instructions: string) {
   t[supplier] = { instructions, savedAt: new Date().toISOString(), useCount: (t[supplier]?.useCount || 0) + 1 };
   localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t));
 }
+function deleteTemplate(supplier: string) {
+  const t = getTemplates();
+  delete t[supplier];
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t));
+}
+
+// Per-supplier opt-in flag for learning custom requirements as a reusable template.
+const LEARN_FLAG_KEY = "invoice_learn_supplier_template";
+export function getLearnSupplierFlag(supplier: string): boolean {
+  if (!supplier) return false;
+  try {
+    const all = JSON.parse(localStorage.getItem(LEARN_FLAG_KEY) || '{}');
+    return !!all[supplier.toLowerCase().trim()];
+  } catch { return false; }
+}
+export function setLearnSupplierFlag(supplier: string, on: boolean) {
+  if (!supplier) return;
+  try {
+    const all = JSON.parse(localStorage.getItem(LEARN_FLAG_KEY) || '{}');
+    const key = supplier.toLowerCase().trim();
+    if (on) all[key] = true; else delete all[key];
+    localStorage.setItem(LEARN_FLAG_KEY, JSON.stringify(all));
+  } catch { /* ignore */ }
+}
 
 // ── Custom Instructions Component ──────────────────────────
 import { getAllPresets, suggestPresetForSupplier, saveUserPreset, type InvoiceLogicPreset } from "@/lib/invoice-logic-presets";
@@ -265,6 +289,9 @@ const CustomInstructionsField = ({
     if (supplierName) {
       const templates = getTemplates();
       const match = templates[supplierName];
+      // If we already have a saved template for this supplier, the learning
+      // toggle should be ON by default so it stays in sync going forward.
+      setSaveForSupplier(getLearnSupplierFlag(supplierName) || !!match);
       if (match && !value) {
         onChange(match.instructions);
         setLoadedTemplate(supplierName);
@@ -274,8 +301,37 @@ const CustomInstructionsField = ({
         const preset = suggestPresetForSupplier(supplierName);
         setSuggestedPreset(preset);
       }
+    } else {
+      setSaveForSupplier(false);
     }
   }, [supplierName]);
+
+  // When the user toggles the checkbox, persist immediately so the rest of
+  // the pipeline (saveLayoutTemplate, future invoices) can honour it.
+  const handleToggleSave = (on: boolean) => {
+    setSaveForSupplier(on);
+    const sup = (templateSupplier || supplierName).trim();
+    if (!sup) {
+      if (on) toast.info("Enter a supplier name to save these requirements.");
+      return;
+    }
+    setLearnSupplierFlag(sup, on);
+    if (on) {
+      if (value.trim()) {
+        saveTemplate(sup, value);
+        toast.success(`Saved for future ${sup} invoices`, {
+          description: "We'll auto-load these requirements next time.",
+        });
+      } else {
+        toast.info(`Learning enabled for ${sup}`, {
+          description: "Your requirements will be saved when you start processing.",
+        });
+      }
+    } else {
+      deleteTemplate(sup);
+      toast(`Stopped learning for ${sup}`, { description: "Saved requirements removed." });
+    }
+  };
 
   const applyPreset = (p: InvoiceLogicPreset) => {
     onChange(p.instructions);
@@ -398,22 +454,44 @@ const CustomInstructionsField = ({
         </div>
       )}
 
-      {/* Save for supplier + Save as preset */}
-      <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <input type="checkbox" id="save-supplier" checked={saveForSupplier} onChange={e => setSaveForSupplier(e.target.checked)}
-            className="w-4 h-4 rounded border-border accent-primary" />
-          <label htmlFor="save-supplier" className="text-xs text-muted-foreground">Save for future invoices from this supplier</label>
+      {/* Save for supplier — controls supplier-brain template learning */}
+      <div className="mt-3 rounded-md border border-border bg-muted/30 p-3">
+        <label htmlFor="save-supplier" className="flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            id="save-supplier"
+            checked={saveForSupplier}
+            onChange={e => handleToggleSave(e.target.checked)}
+            className="w-4 h-4 mt-0.5 rounded border-border accent-primary cursor-pointer"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-foreground">
+              Remember these requirements for future invoices from this supplier
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              When on, the supplier brain learns these instructions and auto-applies them next time.
+              When off, no template is saved or updated.
+            </p>
+          </div>
+        </label>
+        {saveForSupplier && (
+          <input
+            value={templateSupplier}
+            onChange={e => setTemplateSupplier(e.target.value)}
+            onBlur={() => {
+              // Persist flag against the latest typed supplier name too.
+              if (templateSupplier.trim()) setLearnSupplierFlag(templateSupplier, true);
+            }}
+            placeholder="Supplier name"
+            className="w-full h-9 rounded-md bg-input border border-border px-3 text-xs mt-2"
+          />
+        )}
+        <div className="flex justify-end mt-2">
+          <button onClick={saveCurrentAsPreset} className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
+            <Save className="w-3 h-3" /> Save as reusable preset instead
+          </button>
         </div>
-        <button onClick={saveCurrentAsPreset} className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
-          <Save className="w-3 h-3" /> Save as preset
-        </button>
       </div>
-      {saveForSupplier && (
-        <input value={templateSupplier} onChange={e => setTemplateSupplier(e.target.value)}
-          placeholder="Supplier name"
-          className="w-full h-9 rounded-md bg-input border border-border px-3 text-xs mt-2" />
-      )}
     </div>
   );
 };
@@ -1313,7 +1391,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
         // Save to both template system and learning memory
         if (sup) {
-          saveLayoutTemplate(sup, data.layout_type as LayoutType, 85, ext as any, customInstructions || undefined, data.variant_method, data.detected_size_system, data.detected_fields);
+          // Only persist customInstructions to the supplier brain when the
+          // user has explicitly opted in via the "Remember these requirements"
+          // checkbox. Layout/variant/size memory is always recorded so the AI
+          // can still recognise the invoice shape next time.
+          const learnInstructions = getLearnSupplierFlag(sup);
+          saveLayoutTemplate(
+            sup,
+            data.layout_type as LayoutType,
+            85,
+            ext as any,
+            learnInstructions ? (customInstructions || undefined) : undefined,
+            data.variant_method,
+            data.detected_size_system,
+            data.detected_fields,
+          );
 
           // Record to learning memory with full fingerprint
           const fingerprint: LayoutFingerprint = {
@@ -1384,8 +1476,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const startProcessing = async (file: File) => {
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
-      const saveCheckbox = document.getElementById('save-supplier') as HTMLInputElement;
-      if (saveCheckbox?.checked && supplierName) {
+      // Honour the persisted "remember for this supplier" opt-in instead of
+      // poking at DOM state — the checkbox writes the flag on toggle.
+      if (supplierName && getLearnSupplierFlag(supplierName)) {
         saveTemplate(supplierName, customInstructions);
       }
     }

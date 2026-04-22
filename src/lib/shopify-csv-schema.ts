@@ -171,7 +171,7 @@ export function generateShopifyCSV(products: ScannedProductForExport[]): string 
       "shopify",                           // Variant Inventory Tracker
       "deny",                              // Variant Inventory Policy
       "manual",                            // Variant Fulfillment Service
-      "active",                            // Status
+      status,                              // Status
     ];
   });
 

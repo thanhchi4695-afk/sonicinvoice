@@ -277,10 +277,30 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       setAuthed(true);
       setOnboarded(true);
       setAuthLoading(false);
-    } else if (embeddedAuthState === "unauthenticated") {
+    } else if (
+      embeddedAuthState === "unauthenticated" ||
+      embeddedAuthState === "needs_install"
+    ) {
+      // Stop the loading screen so the reinstall / unauthenticated UI can render.
+      // Without this, "needs_install" left authLoading=true forever and the app
+      // got stuck on "Initialising session…".
       setAuthLoading(false);
     }
     // "loading" → keep authLoading true (default)
+  }, [isEmbedded, embeddedAuthState]);
+
+  // ── Hard timeout safety net ──
+  // If embedded auth never resolves (App Bridge CDN blocked, network stall,
+  // verify endpoint hanging), drop the loading screen after 15s so the user
+  // sees the reinstall / retry UI rather than an infinite spinner.
+  useEffect(() => {
+    if (!isEmbedded) return;
+    if (embeddedAuthState !== "loading") return;
+    const t = window.setTimeout(() => {
+      console.warn("[embedded-auth] Hard timeout — forcing authLoading=false after 15s");
+      setAuthLoading(false);
+    }, 15000);
+    return () => window.clearTimeout(t);
   }, [isEmbedded, embeddedAuthState]);
 
   // Handle Shopify OAuth callback redirect (store connection)

@@ -85,15 +85,23 @@ const ShopifyEmbeddedProvider = ({ children }: Props) => {
           return;
         }
 
-        // Step 2: Exchange session token for backend session
-        const response = await fetch(`${supabaseUrl}/functions/v1/shopify-session-verify`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ session_token: token }),
-        });
+        // Step 2: Exchange session token for backend session (12s safety timeout)
+        const verifyController = new AbortController();
+        const verifyTimer = window.setTimeout(() => verifyController.abort(), 12000);
+        let response: Response;
+        try {
+          response = await fetch(`${supabaseUrl}/functions/v1/shopify-session-verify`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ session_token: token }),
+            signal: verifyController.signal,
+          });
+        } finally {
+          window.clearTimeout(verifyTimer);
+        }
         const data = await response.json().catch(() => null);
 
         if (cancelled) return;

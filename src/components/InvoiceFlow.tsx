@@ -3136,7 +3136,18 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                   editCountRef.current += 1;
                   fieldsCorrectedRef.current.add(field);
                 }}
-                onExportAccepted={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
+                onExportAccepted={() => {
+                  if (brainContextRef.current && brainProducts && brainRecognised !== undefined) {
+                    void saveBrainLearnings({
+                      supplierName: supplierName || brainRecognised,
+                      orientation: brainContextRef.current.orientation,
+                      layout: brainContextRef.current.layout,
+                      acceptedProducts: brainProducts,
+                      correctionCount: editCountRef.current,
+                    });
+                  }
+                  finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
+                }}
                 onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
                 onPriceMatch={() => setPriceMatchActive(true)}
                 onGetDescriptions={() => setDescriptionsActive(true)}

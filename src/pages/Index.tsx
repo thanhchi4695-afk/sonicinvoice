@@ -195,6 +195,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showQuickSearch, setShowQuickSearch] = useState(false);
   const [reconciliationResult, setReconciliationResult] = useState<any>(null);
+  const [embeddedAuthTimedOut, setEmbeddedAuthTimedOut] = useState(false);
 
   const handleReconciliationExport = useCallback((_sets: unknown) => {
     // Hand-off back to invoice flow's export step

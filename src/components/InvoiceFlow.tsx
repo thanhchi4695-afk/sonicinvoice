@@ -1036,9 +1036,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }
     const [first, ...rest] = valid;
     const firstResult = safeAcceptInvoiceFile(first);
-    const firstEntry: LocalQueueItem = firstResult.ok
-      ? { file: first, status: "processing" }
-      : { file: first, status: "failed", errorMessage: firstResult.reason };
+    let firstEntry: LocalQueueItem;
+    if (firstResult.ok) {
+      firstEntry = { file: first, status: "processing" };
+    } else {
+      firstEntry = { file: first, status: "failed", errorMessage: firstResult.reason };
+    }
     setLocalQueue([
       firstEntry,
       ...rest.map<LocalQueueItem>((f) => ({ file: f, status: "queued" })),
@@ -1082,7 +1085,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const next = advanced[nextIdx];
       queueMicrotask(() => {
         const result = safeAcceptInvoiceFile(next.file);
-        if (result.ok) return;
+        if (result.ok === true) return;
         const reason = result.reason;
         // Mark this item failed and re-trigger the effect by leaving uploadedFile null.
         setLocalQueue((curr) =>

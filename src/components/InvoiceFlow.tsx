@@ -1036,10 +1036,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }
     const [first, ...rest] = valid;
     const firstResult = safeAcceptInvoiceFile(first);
+    const firstEntry: LocalQueueItem = firstResult.ok
+      ? { file: first, status: "processing" }
+      : { file: first, status: "failed", errorMessage: firstResult.reason };
     setLocalQueue([
-      firstResult.ok
-        ? { file: first, status: "processing" }
-        : { file: first, status: "failed", errorMessage: firstResult.reason },
+      firstEntry,
       ...rest.map<LocalQueueItem>((f) => ({ file: f, status: "queued" })),
     ]);
     toast(`Queued ${valid.length} invoices`, {
@@ -1081,16 +1082,16 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const next = advanced[nextIdx];
       queueMicrotask(() => {
         const result = safeAcceptInvoiceFile(next.file);
-        if (!result.ok) {
-          // Mark this item failed and re-trigger the effect by leaving uploadedFile null.
-          setLocalQueue((curr) =>
-            curr.map((q, i) =>
-              i === nextIdx
-                ? { ...q, status: "failed" as const, errorMessage: result.reason }
-                : q,
-            ),
-          );
-        }
+        if (result.ok) return;
+        const reason = result.reason;
+        // Mark this item failed and re-trigger the effect by leaving uploadedFile null.
+        setLocalQueue((curr) =>
+          curr.map((q, i) =>
+            i === nextIdx
+              ? { ...q, status: "failed" as const, errorMessage: reason }
+              : q,
+          ),
+        );
       });
       return advanced.map((q, i) => (i === nextIdx ? { ...q, status: "processing" } : q));
     });

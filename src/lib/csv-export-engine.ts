@@ -362,18 +362,58 @@ export function generateShopifyCSV(
         "Option3 Name": "",
         "Option3 Value": "",
         "Variant SKU": v.sku,
+        "Variant Grams": "",
+        "Variant Barcode": v.barcode,
+        "Variant Price": v.price,
+        "Variant Compare At Price": v.compareAtPrice,
+        "Variant Inventory Policy": "deny",
+        "Variant Inventory Tracker": "shopify",
+        "Variant Inventory Qty": v.qty || "0",
+        "Variant Fulfillment Service": "manual",
+        "Variant Requires Shipping": "TRUE",
+        "Variant Taxable": "TRUE",
+        "Variant Weight Unit": "kg",
+        "Image Src": isFirstRow ? prod.imageUrl : "",
+        Status: isFirstRow ? defaultStatus : "",
+        "SEO Title": isFirstRow ? prod.seoTitle : "",
+        "SEO Description": isFirstRow ? prod.seoDesc : "",
+        Collection: isFirstRow ? prod.collections.join(", ") : "",
+        ...(v.cogs ? { "Cost per item": v.cogs } : {}),
+      };
 
-  // #6 Only include Collection column if at least one product has assignments
+      if (isFirstRow) {
+        for (const mf of enabledMetaColumns) {
+          row[mf.shopifyColumn] = prod.metafields[mf.key] || "";
+        }
+      } else {
+        for (const mf of enabledMetaColumns) {
+          row[mf.shopifyColumn] = "";
+        }
+      }
+
+      rows.push(row);
+    });
+  }
+
+  const baseColumns = [
+    "Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags", "Published",
+    "Option1 Name", "Option1 Value", "Option2 Name", "Option2 Value",
+    "Option3 Name", "Option3 Value",
+    "Variant SKU", "Variant Grams", "Variant Barcode", "Variant Price", "Variant Compare At Price",
+    "Variant Inventory Tracker", "Variant Inventory Policy", "Variant Inventory Qty",
+    "Variant Fulfillment Service",
+    "Variant Requires Shipping", "Variant Taxable", "Variant Weight Unit",
+    "Image Src", "Status", "SEO Title", "SEO Description",
+  ];
+
   if (rows.some((r) => r.Collection?.trim())) {
     baseColumns.push("Collection");
   }
 
-  // Only include Cost if any row has it
   if (rows.some(r => r["Cost per item"])) {
     baseColumns.push("Cost per item");
   }
 
-  // Only include metafield columns that have data
   const metaCols = enabledMetaColumns
     .filter(mf => rows.some(r => r[mf.shopifyColumn]?.trim()))
     .map(mf => mf.shopifyColumn);

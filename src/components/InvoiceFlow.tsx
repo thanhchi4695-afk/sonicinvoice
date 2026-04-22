@@ -1575,6 +1575,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             hintedSupplier: supplierName,
           });
           brainContextRef.current = { orientation: result.orientation, layout: result.layout };
+          brainClassificationRef.current = result.classification;
+          setNeedsTeach(result.needsTeach);
           setBrainProducts(result.products);
           setBrainSummary(result.summary);
           if (result.recognised) setBrainRecognised(result.supplierName);
@@ -1999,6 +2001,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [brainSummary, setBrainSummary] = useState<BrainValidationSummary | null>(null);
   const [brainRecognised, setBrainRecognised] = useState<string>("");
   const brainContextRef = useRef<{ orientation: Record<string, unknown>; layout: Record<string, unknown> } | null>(null);
+  const brainClassificationRef = useRef<import("@/lib/universal-classifier").UniversalClassification | null>(null);
+  const [needsTeach, setNeedsTeach] = useState(false);
   const [invoicePageImages, setInvoicePageImages] = useState<string[]>([]);
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
@@ -3144,6 +3148,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                       layout: brainContextRef.current.layout,
                       acceptedProducts: brainProducts,
                       correctionCount: editCountRef.current,
+                      classification: brainClassificationRef.current ?? undefined,
                     });
                   }
                   finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);

@@ -889,11 +889,24 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadedFile(file);
-    toast("Invoice uploaded", { description: `Processing ${file.name}…` });
+    setFileName(file.name);
+    toast("Invoice uploaded", { description: "Add any custom requirements below, then start processing." });
     // Upload original to storage in the background so it can be re-processed later.
     void uploadOriginalToStorage(file);
-    startProcessing(file);
+    // Do NOT auto-start processing — let the user review/add custom requirements first.
     e.target.value = "";
+    // Scroll the requirements panel into view on the next paint.
+    setTimeout(() => {
+      document.getElementById("custom-requirements-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
+
+  const handleStartProcessingClick = () => {
+    if (!uploadedFile) {
+      toast.error("Please upload an invoice first");
+      return;
+    }
+    startProcessing(uploadedFile);
   };
 
   /**

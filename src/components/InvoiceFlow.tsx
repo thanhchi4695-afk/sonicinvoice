@@ -999,9 +999,61 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     e.target.value = "";
   };
 
-  // Drag-and-drop state for the upload dropzone (desktop primarily, also works on tablets)
-  const [isDragOver, setIsDragOver] = useState(false);
+  // Drag-and-drop state — split into:
+  //   isWindowDragging → any file is being dragged anywhere over the window (shows overlay)
+  //   isDragOverTarget → the cursor is currently over the highlighted drop target
+  const [isDragOver, setIsDragOver] = useState(false); // legacy, kept for the inline button highlight
+  const [isWindowDragging, setIsWindowDragging] = useState(false);
+  const [isDragOverTarget, setIsDragOverTarget] = useState(false);
   const dragDepthRef = useRef(0);
+  const windowDragDepthRef = useRef(0);
+
+  // Window-level listeners: detect when a file is dragged anywhere onto the page
+  // so we can show a full-screen overlay with a clearly highlighted drop target.
+  useEffect(() => {
+    if (step !== 1) return;
+    const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types?.includes("Files");
+
+    const onWindowDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      windowDragDepthRef.current += 1;
+      setIsWindowDragging(true);
+    };
+    const onWindowDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault(); // required for drop to fire
+    };
+    const onWindowDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      windowDragDepthRef.current = Math.max(0, windowDragDepthRef.current - 1);
+      if (windowDragDepthRef.current === 0) {
+        setIsWindowDragging(false);
+        setIsDragOverTarget(false);
+      }
+    };
+    const onWindowDrop = (e: DragEvent) => {
+      // If the user drops outside our target, swallow it so the browser doesn't navigate to the file.
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      windowDragDepthRef.current = 0;
+      setIsWindowDragging(false);
+      setIsDragOverTarget(false);
+    };
+
+    window.addEventListener("dragenter", onWindowDragEnter);
+    window.addEventListener("dragover", onWindowDragOver);
+    window.addEventListener("dragleave", onWindowDragLeave);
+    window.addEventListener("drop", onWindowDrop);
+    return () => {
+      window.removeEventListener("dragenter", onWindowDragEnter);
+      window.removeEventListener("dragover", onWindowDragOver);
+      window.removeEventListener("dragleave", onWindowDragLeave);
+      window.removeEventListener("drop", onWindowDrop);
+      windowDragDepthRef.current = 0;
+      setIsWindowDragging(false);
+      setIsDragOverTarget(false);
+    };
+  }, [step]);
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -1009,6 +1061,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     if (!e.dataTransfer?.types?.includes("Files")) return;
     dragDepthRef.current += 1;
     setIsDragOver(true);
+    setIsDragOverTarget(true);
   };
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -1019,17 +1072,22 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     e.preventDefault();
     e.stopPropagation();
     dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-    if (dragDepthRef.current === 0) setIsDragOver(false);
+    if (dragDepthRef.current === 0) {
+      setIsDragOver(false);
+      setIsDragOverTarget(false);
+    }
   };
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragDepthRef.current = 0;
+    windowDragDepthRef.current = 0;
     setIsDragOver(false);
+    setIsWindowDragging(false);
+    setIsDragOverTarget(false);
     if (!hasPickedPOS()) {
       pendingUploadKindRef.current = "file";
       setPOSPickerOpen(true);
-      // stash dropped file so POS picker can resume? simpler: ask user to drop again after picking POS.
       toast("Pick your POS first", { description: "Choose Shopify or Lightspeed, then drop the file again." });
       return;
     }

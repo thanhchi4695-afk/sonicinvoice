@@ -328,7 +328,9 @@ export default function InventoryDashboard({ onBack }: Props) {
                   <p className="text-xs text-muted-foreground">Value (Cost)</p>
                 </div>
                 <p className="text-2xl font-bold font-mono">{fmt(stats.totalValueAtCost)}</p>
-                <p className="text-[10px] text-muted-foreground">{fmt(stats.totalValueAtRetail)} retail</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {fmt(stats.totalValueAtRetail)} retail{stats.missingRetailCount > 0 ? ` · ${stats.missingRetailCount} missing RRP` : ""}
+                </p>
               </Card>
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-1">

@@ -1055,6 +1055,22 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     };
   }, [step]);
 
+  // Esc cancels an in-progress drag overlay
+  useEffect(() => {
+    if (!isWindowDragging) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        windowDragDepthRef.current = 0;
+        dragDepthRef.current = 0;
+        setIsWindowDragging(false);
+        setIsDragOverTarget(false);
+        setIsDragOver(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isWindowDragging]);
+
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();

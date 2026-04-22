@@ -241,10 +241,36 @@ export default function POSConnectionPanel() {
       return;
     }
 
+    // X-Series: collect store prefix from the user first
+    if (platform === "lightspeed_x") {
+      setLsxPrefixInput(localStorage.getItem(LS_DOMAIN_PREFIX_KEY) || "");
+      setLsxDialogOpen(true);
+      return;
+    }
+
+    await startOAuth(platform);
+  };
+
+  const handleLsxConfirm = async () => {
+    const prefix = extractDomainPrefix(lsxPrefixInput);
+    if (!prefix) {
+      toast.error("Please enter your Lightspeed store URL");
+      return;
+    }
+    localStorage.setItem(LS_DOMAIN_PREFIX_KEY, prefix);
+    setLsxDialogOpen(false);
+    await startOAuth("lightspeed_x", prefix);
+  };
+
+  const startOAuth = async (platform: string, domainPrefix?: string) => {
     setConnecting(platform);
     try {
       const { data, error } = await supabase.functions.invoke("pos-proxy", {
-        body: { action: "get_auth_url", platform },
+        body: {
+          action: "get_auth_url",
+          platform,
+          ...(domainPrefix ? { domain_prefix: domainPrefix } : {}),
+        },
       });
       if (error) throw new Error(error.message);
       if (!data?.url) throw new Error("No auth URL returned");

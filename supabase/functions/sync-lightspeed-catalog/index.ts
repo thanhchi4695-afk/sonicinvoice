@@ -185,9 +185,12 @@ async function syncXSeries(
   const pageSize = 200;
 
   while (true) {
+    // Request sku_codes inclusion — some X-Series accounts (migrated from
+    // R-Series, or using ISBN barcodes) store barcode + SKU in a sku_codes
+    // array rather than the flat product.barcode / product.sku fields.
     const url =
       `https://${domainPrefix}.retail.lightspeed.app/api/2.0/products` +
-      `?page_size=${pageSize}&after=${after}`;
+      `?page_size=${pageSize}&after=${after}&include=sku_codes`;
     const res = await lsFetch(url, token);
     if (!res.ok) {
       const txt = await res.text();
@@ -235,11 +238,34 @@ async function syncXSeries(
     const { colour, size } = parseColourSize(p.name || "", attrs);
     const qty = inventoryMap.has(p.id) ? inventoryMap.get(p.id)! : null;
 
+    // Pull custom SKU + ISBN/UPC/EAN from sku_codes if the account uses them.
+    // Shape varies — handle both array of objects and the documented
+    // { type, code } structure. Match by case-insensitive type.
+    const skuCodesRaw = p.sku_codes || p.skuCodes || [];
+    const skuCodes: any[] = Array.isArray(skuCodesRaw)
+      ? skuCodesRaw
+      : skuCodesRaw
+      ? [skuCodesRaw]
+      : [];
+    const findCode = (t: string) =>
+      skuCodes.find(
+        (c) => String(c?.type || "").toLowerCase() === t.toLowerCase(),
+      )?.code as string | undefined;
+
+    const customSkuCode = findCode("Custom");
+    const isbnCode = findCode("ISBN");
+    const upcCode = findCode("UPC");
+    const eanCode = findCode("EAN");
+
+    const resolvedSku = customSkuCode || p.sku || null;
+    const resolvedBarcode =
+      isbnCode || upcCode || eanCode || p.barcode || null;
+
     rows.push({
       platform: "lightspeed",
       platform_product_id: String(p.product_id || p.id),
       platform_variant_id: String(p.id),
-      sku: p.sku || null,
+      sku: resolvedSku,
       product_title: p.name || "",
       variant_title: p.variant_name || null,
       colour,
@@ -251,7 +277,7 @@ async function syncXSeries(
         : p.price_excluding_tax != null
         ? Number(p.price_excluding_tax)
         : null,
-      barcode: p.barcode || null,
+      barcode: resolvedBarcode,
     });
   }
 

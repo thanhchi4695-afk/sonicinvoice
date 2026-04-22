@@ -86,6 +86,7 @@ const PipelineChooser = lazy(() => import("@/components/PipelineChooser"));
 const StockyOnboarding = lazy(() => import("@/components/StockyOnboarding"));
 const SupplierProfileBuilder = lazy(() => import("@/components/SupplierProfileBuilder"));
 const SupplierIntelligencePanel = lazy(() => import("@/components/SupplierIntelligencePanel"));
+const TeachInvoiceTutorial = lazy(() => import("@/components/TeachInvoiceTutorial"));
 const ProcessingHistoryPanel = lazy(() => import("@/components/ProcessingHistoryPanel"));
 const StocktakeModule = lazy(() => import("@/components/StocktakeModule"));
 const TransferOrderPanel = lazy(() => import("@/components/TransferOrderPanel"));
@@ -164,6 +165,7 @@ const FLOW_KEYS = {
   csv_seo: true,
   stocky_dashboard: true,
   stock_reconciliation: true,
+  teach_invoice_tutorial: true,
 } as const;
 
 export type ActiveFlow = keyof typeof FLOW_KEYS;
@@ -510,6 +512,12 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       }} onExit={() => { setActiveFlow(null); setActivePipelineId(null); }} /> : null; break;
       case "pipeline_chooser": flowEl = <PipelineChooser onSelect={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }} onBack={() => setActiveFlow(null)} />; break;
       case "supplier_intelligence": flowEl = <SupplierIntelligencePanel onBack={() => setActiveFlow(null)} onOpenInvoiceFlow={() => setActiveFlow("invoice")} />; break;
+      case "teach_invoice_tutorial": flowEl = <TeachInvoiceTutorial
+        onBack={() => setActiveFlow(null)}
+        onStartInvoice={() => setActiveFlow("invoice")}
+        onOpenSupplierIntelligence={() => setActiveFlow("supplier_intelligence")}
+        onOpenCatalogMemory={() => setActiveFlow("catalog_memory")}
+      />; break;
       case "processing_history": flowEl = <ProcessingHistoryPanel onBack={() => setActiveFlow(null)} onOpenInvoiceFlow={() => setActiveFlow("invoice")} />; break;
       case "stock_reconciliation":
         flowEl = reconciliationResult ? (

@@ -398,11 +398,16 @@ const CustomInstructionsField = ({
         </div>
       )}
 
-      {/* Save for supplier */}
-      <div className="mt-3 flex items-center gap-2">
-        <input type="checkbox" id="save-supplier" checked={saveForSupplier} onChange={e => setSaveForSupplier(e.target.checked)}
-          className="w-4 h-4 rounded border-border accent-primary" />
-        <label htmlFor="save-supplier" className="text-xs text-muted-foreground">Save for future invoices from this supplier</label>
+      {/* Save for supplier + Save as preset */}
+      <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <input type="checkbox" id="save-supplier" checked={saveForSupplier} onChange={e => setSaveForSupplier(e.target.checked)}
+            className="w-4 h-4 rounded border-border accent-primary" />
+          <label htmlFor="save-supplier" className="text-xs text-muted-foreground">Save for future invoices from this supplier</label>
+        </div>
+        <button onClick={saveCurrentAsPreset} className="text-xs font-medium text-primary hover:underline flex items-center gap-1">
+          <Save className="w-3 h-3" /> Save as preset
+        </button>
       </div>
       {saveForSupplier && (
         <input value={templateSupplier} onChange={e => setTemplateSupplier(e.target.value)}

@@ -7,12 +7,22 @@
 /** Check if the app is running inside a Shopify Admin iframe or dev mode is on */
 export function isShopifyEmbedded(): boolean {
   try {
-    // Dev mode toggle overrides detection
-    if (localStorage.getItem("dev_embedded_mode") === "true") return true;
-    // Only consider embedded when Shopify's shop + host params are present
     const params = new URLSearchParams(window.location.search);
     const hasShopParam = !!params.get("shop");
     const hasHostParam = !!params.get("host");
+
+    // Dev mode toggle overrides detection — but ONLY when shop+host params
+    // are also present. Without them, App Bridge can't initialise and the
+    // app gets stuck on "Embedded auth failed". This protects against the
+    // flag being left on after testing.
+    if (localStorage.getItem("dev_embedded_mode") === "true") {
+      if (hasShopParam && hasHostParam) return true;
+      // Auto-clear stale dev flag — there's no shop context to authenticate against.
+      console.warn("[shopify-embedded] dev_embedded_mode was on but no shop/host params — clearing");
+      localStorage.removeItem("dev_embedded_mode");
+      return false;
+    }
+
     return hasShopParam && hasHostParam;
   } catch {
     return false;

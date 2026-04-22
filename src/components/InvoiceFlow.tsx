@@ -988,7 +988,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [driveImportOpen, setDriveImportOpen] = useState(false);
   const [driveImportUrl, setDriveImportUrl] = useState("");
   const [driveImporting, setDriveImporting] = useState(false);
-  const [driveQueue, setDriveQueue] = useState<{ fileName: string; base64: string; fileType: string }[]>([]);
+  // 2-step Drive flow: "link" → paste URL; "confirm" → see count + auto-process all
+  const [driveStage, setDriveStage] = useState<"link" | "confirm">("link");
+  const [drivePreview, setDrivePreview] = useState<{ fileName: string; base64: string; fileType: string }[]>([]);
+  type DriveQueueItem = { fileName: string; base64: string; fileType: string; status: "queued" | "processing" | "done" | "error" };
+  const [driveQueue, setDriveQueue] = useState<DriveQueueItem[]>([]);
 
   const base64ToFile = (base64: string, fileName: string, fileType: string): File => {
     const mime =

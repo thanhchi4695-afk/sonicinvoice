@@ -98,6 +98,10 @@ export default function POSConnectionPanel() {
     noMatch?: number;
     errors?: number;
   } | null>(null);
+  const [lsxDialogOpen, setLsxDialogOpen] = useState(false);
+  const [lsxPrefixInput, setLsxPrefixInput] = useState(
+    () => localStorage.getItem(LS_DOMAIN_PREFIX_KEY) || "",
+  );
 
   const handleBarcodeSync = async () => {
     setSyncingBarcodes(true);

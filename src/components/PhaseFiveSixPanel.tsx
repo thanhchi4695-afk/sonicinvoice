@@ -156,6 +156,40 @@ const PhaseFiveSixPanel = ({
         <Badge variant="outline" className="text-[10px]">{accepted.length} products</Badge>
       </div>
 
+      {/* ── PRIMARY NEXT-STEP CTA (sticky, bold, obvious) ── */}
+      <div className="sticky top-0 z-20 px-4 py-3 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-primary/20">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] uppercase tracking-wider text-primary font-semibold">Next step</div>
+            <div className="text-sm font-bold text-foreground">
+              {pos === "shopify" ? "Publish to Shopify" : "Export to Lightspeed"}
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                ({accepted.length} product{accepted.length === 1 ? "" : "s"} ready)
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {pos === "shopify" ? (
+              <>
+                <Button size="lg" variant="teal" onClick={onPushToShopify} disabled={accepted.length === 0} className="shadow-lg">
+                  <ShoppingBag className="w-4 h-4" />
+                  Push to Shopify
+                </Button>
+                <Button size="lg" variant="outline" onClick={onExportCSV} disabled={accepted.length === 0}>
+                  <Download className="w-4 h-4" />
+                  Export CSV
+                </Button>
+              </>
+            ) : (
+              <Button size="lg" variant="teal" onClick={onExportCSV} disabled={accepted.length === 0} className="shadow-lg">
+                <Download className="w-4 h-4" />
+                Export Lightspeed CSV
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
       <Tabs value={tab} onValueChange={setTab} className="p-3">
         <TabsList className="grid grid-cols-6 w-full h-auto">
           <TabsTrigger value="products" className="text-xs gap-1.5"><FileText className="w-3.5 h-3.5" />Products</TabsTrigger>

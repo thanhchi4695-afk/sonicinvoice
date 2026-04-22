@@ -2761,6 +2761,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               onChange={setCustomInstructions}
               supplierName={supplierName}
             />
+            <BrainModeToggle />
           </div>
 
           {/* Start processing — only once a file has been chosen */}

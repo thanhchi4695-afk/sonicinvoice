@@ -11,7 +11,9 @@ import { isShopifyEmbedded } from "./shopify-embedded";
 function getTokenFromUrl(): string | null {
   try {
     const params = new URLSearchParams(window.location.search);
-    return params.get("id_token") || params.get("session") || null;
+    const token = params.get("id_token");
+    if (!token) return null;
+    return token.split(".").length === 3 ? token : null;
   } catch {
     return null;
   }

@@ -15,7 +15,10 @@ const AuthCallbackPage = () => {
 
     // ── Lightspeed X-Series callback ──
     if (path.includes("lightspeed-x")) {
-      const domainPrefix = params.get("domain_prefix") || "";
+      const domainPrefix =
+        params.get("domain_prefix") ||
+        localStorage.getItem("ls_domain_prefix") ||
+        "";
       if (!code) {
         setStatus("error");
         setMessage("No authorization code received");

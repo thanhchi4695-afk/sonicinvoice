@@ -2,10 +2,37 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Loader2, Unplug, ExternalLink, Store, Barcode } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getConnection } from "@/lib/shopify-api";
 import { toast } from "sonner";
+
+const LS_DOMAIN_PREFIX_KEY = "ls_domain_prefix";
+
+/** Extract just the prefix from any of these inputs:
+ *   "stompshoes"
+ *   "stompshoes.retail.lightspeed.app"
+ *   "https://stompshoes.retail.lightspeed.app"
+ *   "https://stompshoes.retail.lightspeed.app/some/path"
+ */
+function extractDomainPrefix(input: string): string {
+  let s = (input || "").trim().toLowerCase();
+  if (!s) return "";
+  s = s.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  s = s.replace(/\.retail\.lightspeed\.app$/, "");
+  s = s.replace(/[^a-z0-9-]/g, "");
+  return s;
+}
 
 interface POSConnection {
   id: string;
@@ -71,6 +98,10 @@ export default function POSConnectionPanel() {
     noMatch?: number;
     errors?: number;
   } | null>(null);
+  const [lsxDialogOpen, setLsxDialogOpen] = useState(false);
+  const [lsxPrefixInput, setLsxPrefixInput] = useState(
+    () => localStorage.getItem(LS_DOMAIN_PREFIX_KEY) || "",
+  );
 
   const handleBarcodeSync = async () => {
     setSyncingBarcodes(true);
@@ -210,10 +241,36 @@ export default function POSConnectionPanel() {
       return;
     }
 
+    // X-Series: collect store prefix from the user first
+    if (platform === "lightspeed_x") {
+      setLsxPrefixInput(localStorage.getItem(LS_DOMAIN_PREFIX_KEY) || "");
+      setLsxDialogOpen(true);
+      return;
+    }
+
+    await startOAuth(platform);
+  };
+
+  const handleLsxConfirm = async () => {
+    const prefix = extractDomainPrefix(lsxPrefixInput);
+    if (!prefix) {
+      toast.error("Please enter your Lightspeed store URL");
+      return;
+    }
+    localStorage.setItem(LS_DOMAIN_PREFIX_KEY, prefix);
+    setLsxDialogOpen(false);
+    await startOAuth("lightspeed_x", prefix);
+  };
+
+  const startOAuth = async (platform: string, domainPrefix?: string) => {
     setConnecting(platform);
     try {
       const { data, error } = await supabase.functions.invoke("pos-proxy", {
-        body: { action: "get_auth_url", platform },
+        body: {
+          action: "get_auth_url",
+          platform,
+          ...(domainPrefix ? { domain_prefix: domainPrefix } : {}),
+        },
       });
       if (error) throw new Error(error.message);
       if (!data?.url) throw new Error("No auth URL returned");
@@ -443,6 +500,54 @@ export default function POSConnectionPanel() {
           </div>
         );
       })}
+
+      <Dialog open={lsxDialogOpen} onOpenChange={setLsxDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Connect Lightspeed X-Series</DialogTitle>
+            <DialogDescription>
+              Enter your Lightspeed store URL so we know which account to connect to.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="ls-prefix">Your Lightspeed store URL</Label>
+            <div className="flex items-center gap-1 rounded-md border border-input bg-background pr-3 focus-within:ring-2 focus-within:ring-ring">
+              <Input
+                id="ls-prefix"
+                value={lsxPrefixInput}
+                onChange={(e) => setLsxPrefixInput(e.target.value)}
+                placeholder="yourstore"
+                className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleLsxConfirm();
+                }}
+              />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                .retail.lightspeed.app
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              The URL you use to log into Lightspeed — just the part before
+              <code className="mx-1 px-1 rounded bg-muted">.retail.lightspeed.app</code>.
+              You can also paste the full URL.
+            </p>
+            {lsxPrefixInput && (
+              <p className="text-[11px] text-muted-foreground font-mono">
+                → {extractDomainPrefix(lsxPrefixInput) || "(invalid)"}.retail.lightspeed.app
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setLsxDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleLsxConfirm} disabled={!extractDomainPrefix(lsxPrefixInput)}>
+              Continue to Lightspeed
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

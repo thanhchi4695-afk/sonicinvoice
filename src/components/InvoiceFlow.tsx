@@ -1943,6 +1943,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
   const [validationDebug, setValidationDebug] = useState<ValidationDebugInfo | null>(null);
   const [validatedProducts, setValidatedProducts] = useState<ValidatedProduct[]>([]);
+  // ── Brain Mode (5-stage pipeline) state — only populated when toggle is ON ──
+  const [brainProducts, setBrainProducts] = useState<BrainProduct[] | null>(null);
+  const [brainSummary, setBrainSummary] = useState<BrainValidationSummary | null>(null);
+  const [brainRecognised, setBrainRecognised] = useState<string>("");
+  const brainContextRef = useRef<{ orientation: Record<string, unknown>; layout: Record<string, unknown> } | null>(null);
   const [invoicePageImages, setInvoicePageImages] = useState<string[]>([]);
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);

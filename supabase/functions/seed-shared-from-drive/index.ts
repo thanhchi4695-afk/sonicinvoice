@@ -85,11 +85,9 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(supabaseUrl, serviceRole);
-    const errors: string[] = [];
-    let seeded = 0;
 
-    // 2) For each file: classify → upsert anonymised template
-    for (const inv of invoices) {
+    // Process one invoice end-to-end (classify + upsert).
+    const processInvoice = async (inv: DriveInvoice): Promise<{ ok: boolean; msg?: string }> => {
       try {
         const classifyResp = await fetch(`${supabaseUrl}/functions/v1/classify-invoice-pattern`, {
           method: "POST",
@@ -106,8 +104,7 @@ Deno.serve(async (req) => {
 
         if (!classifyResp.ok) {
           const txt = await classifyResp.text();
-          errors.push(`${inv.fileName}: classify failed (${classifyResp.status}) ${txt.slice(0, 120)}`);
-          continue;
+          return { ok: false, msg: `${inv.fileName}: classify failed (${classifyResp.status}) ${txt.slice(0, 120)}` };
         }
 
         const cdata = await classifyResp.json();
@@ -115,8 +112,7 @@ Deno.serve(async (req) => {
         const supplierName = String(c.supplier_name || "").trim();
 
         if (!supplierName || (Number(c.confidence) || 0) < 50) {
-          errors.push(`${inv.fileName}: low-confidence classification (skipped)`);
-          continue;
+          return { ok: false, msg: `${inv.fileName}: low-confidence classification (skipped)` };
         }
 
         const normalized = normalize(supplierName);
@@ -157,16 +153,34 @@ Deno.serve(async (req) => {
           });
         }
 
-        seeded += 1;
+        console.log(`[seed] ✓ ${inv.fileName} → ${supplierName}`);
+        return { ok: true };
       } catch (e) {
-        errors.push(`${inv.fileName}: ${e instanceof Error ? e.message : "unknown error"}`);
+        return { ok: false, msg: `${inv.fileName}: ${e instanceof Error ? e.message : "unknown error"}` };
       }
+    };
+
+    // Run all invoices in parallel in the BACKGROUND so we can return immediately
+    // and avoid the HTTP gateway timeout.
+    const backgroundJob = (async () => {
+      console.log(`[seed] starting background processing of ${invoices.length} invoices`);
+      const results = await Promise.all(invoices.map(processInvoice));
+      const seeded = results.filter((r) => r.ok).length;
+      const failed = results.filter((r) => !r.ok).map((r) => r.msg).filter(Boolean);
+      console.log(`[seed] done — seeded ${seeded}/${invoices.length}`);
+      if (failed.length) console.log(`[seed] errors:`, failed);
+    })();
+
+    // @ts-ignore — EdgeRuntime is available in Supabase Edge runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(backgroundJob);
     }
 
     return new Response(JSON.stringify({
+      accepted: true,
       processed: invoices.length,
-      seeded,
-      errors: errors.length ? errors : undefined,
+      message: `Seeding ${invoices.length} invoices in the background. Check edge function logs for progress.`,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("seed-shared-from-drive error:", err);

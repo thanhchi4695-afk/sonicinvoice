@@ -10,7 +10,7 @@ import { getEnabledMetafields } from "@/lib/metafields";
 import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed";
 import ShopifyPushFlow from "@/components/ShopifyPushFlow";
 import type { PushProduct } from "@/lib/shopify-api";
-import { generateShopifyCSV, getVariantMode, setVariantMode, type VariantMode, type ValidationResult } from "@/lib/csv-export-engine";
+import { generateShopifyCSV, generateLightspeedCSV, getVariantMode, setVariantMode, type VariantMode, type ValidationResult } from "@/lib/csv-export-engine";
 import { getPublishStatus, setPublishStatus, type PublishStatus } from "@/lib/publish-status";
 
 export interface ExportProduct {
@@ -24,6 +24,9 @@ export interface ExportProduct {
   price: number;
   rrp: number;
   cogs?: number;
+  /** On-hand qty surfaced from the invoice line. Used for Shopify
+   *  Variant Inventory Qty and Lightspeed inventory_<Outlet>. */
+  qty?: number;
   status: string;
   hasImage?: boolean;
   hasSeo?: boolean;

@@ -115,6 +115,7 @@ interface GroupedProduct {
     sku: string;
     barcode: string;
     cogs?: string;
+    qty: string;
   }[];
 }
 

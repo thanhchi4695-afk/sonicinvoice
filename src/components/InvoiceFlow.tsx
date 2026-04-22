@@ -1158,12 +1158,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       toast("Pick your POS first", { description: "Choose Shopify or Lightspeed, then drop the file again." });
       return;
     }
-    const file = e.dataTransfer?.files?.[0];
-    if (!file) {
-      toast.error("No file detected", { description: "Try dragging a single PDF, Excel, CSV, or image file." });
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (files.length === 0) {
+      toast.error("No file detected", { description: "Try dragging a PDF, Excel, CSV, or image file." });
       return;
     }
-    acceptInvoiceFile(file);
+    acceptInvoiceFiles(files);
   };
 
   // Paste handler — accept clipboard images / files (Cmd/Ctrl+V on the dropzone)

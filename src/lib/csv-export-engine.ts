@@ -357,7 +357,7 @@ export function generateShopifyCSV(
         "Variant Taxable": "TRUE",
         "Variant Weight Unit": "kg",
         "Image Src": isFirstRow ? prod.imageUrl : "",
-        Status: isFirstRow ? prod.status : "",
+        Status: isFirstRow ? (prod.status || defaultStatus) : "",
         "SEO Title": isFirstRow ? prod.seoTitle : "",
         "SEO Description": isFirstRow ? prod.seoDesc : "",
         // #6 Collection assignment — comma-joined list, used by importers/Shopify push.

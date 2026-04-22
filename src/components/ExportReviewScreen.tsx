@@ -66,6 +66,7 @@ function generateFilename(supplier: string, format: ExportFormat): string {
     shopify_full: "full",
     shopify_inventory: "inventory",
     shopify_price: "price",
+    lightspeed_full: "lightspeed",
     tags_only: "tags",
     xlsx: "review",
     summary_pdf: "summary",

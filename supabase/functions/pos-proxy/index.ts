@@ -13,11 +13,11 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LS_X_CLIENT_ID = Deno.env.get("LS_X_CLIENT_ID") || "";
 const LS_X_CLIENT_SECRET = Deno.env.get("LS_X_CLIENT_SECRET") || "";
 const LS_X_REDIRECT_URI = (Deno.env.get("APP_URL") || "") + "/auth/lightspeed-x/callback";
-// X-Series OAuth (canonical Lightspeed cloud auth host)
-//   Authorize: https://cloud.lightspeedapp.com/auth/oauth/authorize
+// X-Series OAuth (X-Series / Vend uses secure.retail.lightspeed.app, NOT cloud.lightspeedapp.com)
+//   Authorize: https://secure.retail.lightspeed.app/connect
 //   Token:     https://{prefix}.retail.lightspeed.app/api/1.0/token
 //   API base:  https://{prefix}.retail.lightspeed.app/api/2.0
-const LS_X_AUTH_URL = "https://cloud.lightspeedapp.com/auth/oauth/authorize";
+const LS_X_AUTH_URL = "https://secure.retail.lightspeed.app/connect";
 const LS_X_TOKEN_URL = (domain: string) =>
   `https://${domain}.retail.lightspeed.app/api/1.0/token`;
 

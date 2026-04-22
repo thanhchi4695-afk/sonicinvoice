@@ -776,6 +776,12 @@ export default function PostParseReviewScreen({
         />
       )}
 
+      <SupplierBrainLearningTip
+        supplierName={supplierName}
+        sessionEditCount={sessionEditCount}
+        matchMethod={matchMethod}
+      />
+
       {/* Vendor / Supplier name banner — apply to all rows missing a vendor.
           Critical when the AI couldn't infer the supplier (e.g. handwritten slips
           where rows otherwise show "Unknown" in the product title). */}

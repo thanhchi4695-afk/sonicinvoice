@@ -432,17 +432,37 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete, onStartFlow }: StockChe
           {/* Location selector */}
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Location:</span>
-            <select
-              value={selectedLocation}
-              onChange={e => setSelectedLocation(e.target.value)}
-              className="bg-muted rounded px-2 py-1 text-sm border"
-            >
-              {locations.map(l => (
-                <option key={l.id} value={l.id}>{l.name}{l.active ? "" : " (inactive)"}</option>
-              ))}
-            </select>
+            {locations.length === 0 ? (
+              <span className="text-xs text-warning bg-warning/10 border border-warning/30 rounded px-2 py-1">
+                No locations found — connect a POS in Settings
+              </span>
+            ) : (
+              <select
+                value={selectedLocation}
+                onChange={e => setSelectedLocation(e.target.value)}
+                className="bg-muted rounded px-2 py-1 text-sm border"
+              >
+                <option value="">Select location…</option>
+                {locations.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}{l.active ? "" : " (inactive)"}</option>
+                ))}
+              </select>
+            )}
           </div>
-          <Button onClick={applyChanges} disabled={groups.length === 0}>
+          <Button
+            onClick={() => {
+              if (!selectedLocation) {
+                toast.error("Choose a destination location before applying changes.");
+                return;
+              }
+              if (groups.length === 0) {
+                toast.error("Nothing to apply — no items detected.");
+                return;
+              }
+              applyChanges();
+            }}
+            disabled={groups.length === 0 || !selectedLocation}
+          >
             <Check className="w-4 h-4 mr-1" /> Apply all changes
           </Button>
         </div>

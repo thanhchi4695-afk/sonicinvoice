@@ -175,11 +175,16 @@ import { exchangeShopifyToken } from "@/lib/shopify-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const Index = () => {
+interface IndexProps {
+  initialTab?: string;
+}
+
+const Index = ({ initialTab }: IndexProps = {}) => {
   const [authed, setAuthed] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  // Onboarding flag is *display-only*; we re-validate against the live session below.
   const [onboarded, setOnboarded] = useState(() => localStorage.getItem("onboarding_complete") === "true");
-  const [activeTab, setActiveTab] = useState("home");
+  const [activeTab, setActiveTab] = useState(initialTab || "home");
   const [activeFlow, setActiveFlow] = useState<ActiveFlow | null>(null);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [showCapture, setShowCapture] = useState(false);
@@ -237,13 +242,26 @@ const Index = () => {
 
     // Set up auth state listener FIRST (standalone only)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthed(!!session);
+      const hasSession = !!session;
+      setAuthed(hasSession);
+      // ── Defence in depth: clear stale onboarding flag if there is no session.
+      // This stops the in-app dashboard from rendering for signed-out users
+      // just because localStorage still has onboarding_complete=true.
+      if (!hasSession) {
+        localStorage.removeItem("onboarding_complete");
+        setOnboarded(false);
+      }
       setAuthLoading(false);
     });
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setAuthed(true);
+      if (session) {
+        setAuthed(true);
+      } else {
+        localStorage.removeItem("onboarding_complete");
+        setOnboarded(false);
+      }
       setAuthLoading(false);
     });
 

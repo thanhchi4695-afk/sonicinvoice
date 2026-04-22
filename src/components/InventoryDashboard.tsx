@@ -129,12 +129,15 @@ export default function InventoryDashboard({ onBack }: Props) {
   useEffect(() => { fetchData(); }, []);
 
   /* ─── Computed stats ─── */
-
+  // ── Bug fix: Cost / Retail / Margin must be derived from the SAME variant set,
+  // otherwise we get nonsense like "Retail < Cost with positive margin" when
+  // many variants are missing a retail price. We compute over the
+  // "priced" subset (cost > 0 AND retailPrice > 0) for retail & margin, and
+  // expose the underlying counts so the UI can flag missing data.
   const stats = useMemo(() => {
     const { variants } = data;
     const totalUnits = variants.reduce((s, v) => s + v.quantity, 0);
     const totalValueAtCost = variants.reduce((s, v) => s + v.quantity * v.cost, 0);
-    const totalValueAtRetail = variants.reduce((s, v) => s + v.quantity * v.retailPrice, 0);
     const uniqueProducts = new Set(variants.map(v => v.productId)).size;
 
     // Low stock: quantity > 0 but <= 3
@@ -142,16 +145,20 @@ export default function InventoryDashboard({ onBack }: Props) {
     // Out of stock
     const outOfStock = variants.filter(v => v.quantity <= 0);
 
-    // Margin
-    const withCost = variants.filter(v => v.cost > 0 && v.retailPrice > 0);
-    const avgMargin = withCost.length > 0
-      ? withCost.reduce((s, v) => s + ((v.retailPrice - v.cost) / v.retailPrice) * 100, 0) / withCost.length
+    // Margin & Retail derived from variants that have BOTH a cost and a retail price.
+    const priced = variants.filter(v => v.cost > 0 && v.retailPrice > 0);
+    const totalValueAtRetail = priced.reduce((s, v) => s + v.quantity * v.retailPrice, 0);
+    const totalValueAtCostPriced = priced.reduce((s, v) => s + v.quantity * v.cost, 0);
+    const avgMargin = totalValueAtRetail > 0
+      ? ((totalValueAtRetail - totalValueAtCostPriced) / totalValueAtRetail) * 100
       : 0;
+    const missingRetailCount = variants.filter(v => v.cost > 0 && v.retailPrice <= 0).length;
 
     return {
       totalUnits, totalValueAtCost, totalValueAtRetail, uniqueProducts,
       lowStockCount: lowStock.length, outOfStockCount: outOfStock.length,
       avgMargin, variantCount: variants.length,
+      missingRetailCount,
     };
   }, [data]);
 
@@ -321,7 +328,9 @@ export default function InventoryDashboard({ onBack }: Props) {
                   <p className="text-xs text-muted-foreground">Value (Cost)</p>
                 </div>
                 <p className="text-2xl font-bold font-mono">{fmt(stats.totalValueAtCost)}</p>
-                <p className="text-[10px] text-muted-foreground">{fmt(stats.totalValueAtRetail)} retail</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {fmt(stats.totalValueAtRetail)} retail{stats.missingRetailCount > 0 ? ` · ${stats.missingRetailCount} missing RRP` : ""}
+                </p>
               </Card>
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-1">

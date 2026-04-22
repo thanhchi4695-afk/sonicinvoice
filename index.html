@@ -131,9 +131,10 @@
     }
     </script>
 
-    <!-- Shopify App Bridge v4 — must be loaded synchronously per Shopify spec, but kept lean -->
+    <!-- Shopify App Bridge v4 — meta tag is always present, but the script is loaded
+         dynamically in main.tsx ONLY when running embedded (shop+host params present),
+         so non-embedded visits don't see "missing required configuration fields: shop". -->
     <meta name="shopify-api-key" content="aebbc68f4f67197beb20489d6d2987e4" id="shopify-api-key-meta" />
-    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
     <link rel="preconnect" href="https://xuaakgdkkrrsqxafffyj.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://cdn.shopify.com" />
   </head>

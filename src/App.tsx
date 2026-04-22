@@ -8,6 +8,8 @@ import EmbeddedAuthHealthCheck from "@/components/EmbeddedAuthHealthCheck";
 import InstallAppBanner from "@/components/InstallAppBanner";
 import BarcodeProvider from "@/components/BarcodeProvider";
 import Index from "./pages/Index.tsx";
+import Landing from "./pages/Landing.tsx";
+import Login from "./pages/Login.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import AuthCallbackPage from "./pages/AuthCallback.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -25,7 +27,13 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<Landing />} />
+              <Route path="/dashboard" element={<Index />} />
+              <Route path="/dashboard/*" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/settings" element={<Index initialTab="account" />} />
+              <Route path="/account" element={<Index initialTab="account" />} />
+              <Route path="/billing" element={<Index initialTab="billing" />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/auth/xero/callback" element={<AuthCallbackPage />} />
               <Route path="/auth/myob/callback" element={<AuthCallbackPage />} />

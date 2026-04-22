@@ -2699,6 +2699,70 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             Take a photo
           </button>
 
+          <button
+            onClick={() => setDriveImportOpen(true)}
+            className="w-full mt-2 h-12 rounded-lg border border-border bg-card flex items-center justify-center gap-2 text-sm active:bg-muted"
+          >
+            <CloudDownload className="w-4 h-4 text-primary" />
+            Import from Google Drive
+          </button>
+
+          {driveQueue.length > 0 && (
+            <div className="mt-3 rounded-lg border border-border bg-card p-3">
+              <p className="text-xs font-semibold mb-2">Drive queue · {driveQueue.length} remaining</p>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {driveQueue.map((q, i) => (
+                  <div key={`${q.fileName}-${i}`} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="truncate flex-1">{q.fileName}</span>
+                    <button
+                      onClick={() => {
+                        acceptDriveFile(q);
+                        setDriveQueue(prev => prev.filter((_, idx) => idx !== i));
+                      }}
+                      className="px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20"
+                    >
+                      Load next
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {driveImportOpen && (
+            <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !driveImporting && setDriveImportOpen(false)}>
+              <div className="bg-card border border-border rounded-lg p-4 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-sm font-semibold mb-1">Import invoice from Google Drive</h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Paste a folder or file link. The folder must be shared as <strong>"Anyone with the link"</strong>.
+                </p>
+                <input
+                  value={driveImportUrl}
+                  onChange={(e) => setDriveImportUrl(e.target.value)}
+                  placeholder="https://drive.google.com/drive/folders/..."
+                  className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm mb-3"
+                  disabled={driveImporting}
+                />
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => setDriveImportOpen(false)}
+                    disabled={driveImporting}
+                    className="h-9 px-3 rounded-md border border-border text-sm hover:bg-muted disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDriveImport}
+                    disabled={driveImporting}
+                    className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {driveImporting ? "Fetching…" : "Import"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* File parse mode indicator */}
           {fileParseMode && (
             <div className="mt-3 bg-card rounded-lg border border-border px-3 py-2 flex items-center gap-2">

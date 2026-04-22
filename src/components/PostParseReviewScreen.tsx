@@ -145,6 +145,74 @@ function UnderExtractionBanner({ warning, onReprocessDetailed, isReprocessing }:
   );
 }
 
+// Contextual tip that explains how the user's review-screen corrections feed
+// the Supplier Brain profile for this supplier. Dismissible per supplier
+// (persisted in localStorage). Updates live as edits accumulate.
+function SupplierBrainLearningTip({
+  supplierName,
+  sessionEditCount,
+  matchMethod,
+}: {
+  supplierName?: string;
+  sessionEditCount: number;
+  matchMethod?: "full_extraction" | "supplier_match" | "fingerprint_match";
+}) {
+  const supplierLabel = (supplierName || "").trim() || "this supplier";
+  const storageKey = `sonic_brain_tip_dismissed::${supplierLabel.toLowerCase()}`;
+  const [dismissed, setDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem(storageKey) === "1"; } catch { return false; }
+  });
+
+  if (dismissed) return null;
+
+  const isReturningSupplier = matchMethod === "supplier_match" || matchMethod === "fingerprint_match";
+  const headline = isReturningSupplier
+    ? `Refining the Supplier Brain for ${supplierLabel}`
+    : `Teaching the Supplier Brain about ${supplierLabel}`;
+  const subtext = isReturningSupplier
+    ? "We matched this invoice to a saved profile. Every correction you make here sharpens the column map, GST rules and size system for next time."
+    : "This looks like a new supplier format. Every cell you edit, reject or reclassify is logged and folded into a Supplier Brain profile so future invoices auto-extract.";
+
+  return (
+    <div className="mb-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+      <div className="flex items-start gap-2">
+        <Brain className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm font-medium text-foreground">{headline}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setDismissed(true);
+                try { localStorage.setItem(storageKey, "1"); } catch { /* ignore */ }
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground"
+              aria-label="Dismiss tip"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">{subtext}</p>
+          <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground list-disc list-inside">
+            <li><span className="text-foreground">Edit a cell</span> → saves a column-mapping correction.</li>
+            <li><span className="text-foreground">Reject a row</span> → teaches the noise/freight pattern.</li>
+            <li><span className="text-foreground">Confirm sizes / colours</span> → locks in this supplier's variant system.</li>
+          </ul>
+          <p className="text-xs text-muted-foreground mt-2">
+            {sessionEditCount > 0 ? (
+              <>
+                <span className="text-primary font-medium">{sessionEditCount}</span> correction{sessionEditCount === 1 ? "" : "s"} captured this session — visible later in <span className="text-foreground">Suppliers → {supplierLabel} → Brain</span>.
+              </>
+            ) : (
+              <>Open <span className="text-foreground">Suppliers → {supplierLabel} → Brain</span> after exporting to see the updated profile.</>
+            )}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PostParseReviewScreen({
   debug,
   products,

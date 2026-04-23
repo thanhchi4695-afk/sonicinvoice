@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Check, ChevronRight, Settings2, FileText, Search, Package, DollarSign, Upload, BarChart3 } from "lucide-react";
+import { ChevronRight, FileText, Search, Package, DollarSign, Upload, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type PhaseId = "setup" | "capture" | "review" | "catalog" | "price" | "publish" | "analyse";
@@ -15,13 +15,17 @@ export interface Phase {
   target: { type: "tab" | "flow"; id: string };
 }
 
-export const PHASES: Phase[] = [
-  { id: "capture",  num: 1, label: "Capture",       shortLabel: "Capture",  icon: FileText,  description: "Upload invoice / scan goods", target: { type: "flow", id: "invoice" } },
-  { id: "review",   num: 2, label: "Review & Sync", shortLabel: "Review",   icon: Search,    description: "Verify lines & sync to catalog", target: { type: "flow", id: "invoice" } },
-  { id: "catalog",  num: 3, label: "Enrich",        shortLabel: "Enrich",   icon: Package,   description: "Names, images, SEO, descriptions", target: { type: "flow", id: "invoice" } },
-  { id: "price",    num: 4, label: "Price",         shortLabel: "Price",    icon: DollarSign,description: "RRP, margins, markdowns", target: { type: "flow", id: "price_adjust" } },
-  { id: "publish",  num: 5, label: "Publish",       shortLabel: "Publish",  icon: Upload,    description: "Push to Shopify / Lightspeed / CSV", target: { type: "flow", id: "invoice" } },
-  { id: "analyse",  num: 6, label: "Analyse",       shortLabel: "Analyse",  icon: BarChart3, description: "Reports, restock, performance", target: { type: "tab", id: "analytics" } },
+// `implemented` flags whether navigating to that phase opens a real
+// dedicated screen. Phases without a dedicated screen yet (Review,
+// Enrich, Publish) render as disabled with a "Coming soon" tooltip
+// rather than silently dumping the user back on Capture.
+export const PHASES: (Phase & { implemented: boolean })[] = [
+  { id: "capture",  num: 1, label: "Capture",       shortLabel: "Capture",  icon: FileText,   description: "Upload invoice / scan goods", target: { type: "flow", id: "invoice" }, implemented: true  },
+  { id: "review",   num: 2, label: "Review & Sync", shortLabel: "Review",   icon: Search,     description: "Verify lines & sync to catalog (coming soon)", target: { type: "flow", id: "invoice" }, implemented: false },
+  { id: "catalog",  num: 3, label: "Enrich",        shortLabel: "Enrich",   icon: Package,    description: "Names, images, SEO, descriptions (coming soon)", target: { type: "flow", id: "invoice" }, implemented: false },
+  { id: "price",    num: 4, label: "Price",         shortLabel: "Price",    icon: DollarSign, description: "RRP, margins, markdowns", target: { type: "flow", id: "price_adjust" }, implemented: true  },
+  { id: "publish",  num: 5, label: "Publish",       shortLabel: "Publish",  icon: Upload,     description: "Push to Shopify / Lightspeed / CSV (coming soon)", target: { type: "flow", id: "invoice" }, implemented: false },
+  { id: "analyse",  num: 6, label: "Analyse",       shortLabel: "Analyse",  icon: BarChart3,  description: "Reports, restock, performance", target: { type: "tab", id: "analytics" }, implemented: true  },
 ];
 
 /** Maps tab/flow IDs → which phase they belong to */
@@ -97,31 +101,33 @@ const PhaseProgressBar = ({ activeTab, activeFlow, onNavigate }: PhaseProgressBa
           {PHASES.map((phase, idx) => {
             const Icon = phase.icon;
             const isActive = idx === currentIndex;
-            const isComplete = currentIndex >= 0 && idx < currentIndex;
-            const isUpcoming = currentIndex >= 0 && idx > currentIndex;
+            // #3 — Don't fabricate completed-state. A future iteration
+            // will wire this to a real per-user phase_progress table.
+            const isComplete = false;
+            const isUpcoming = !isActive;
+            const disabled = !phase.implemented;
 
             return (
               <div key={phase.id} className="flex items-center gap-1 shrink-0">
                 <button
-                  onClick={() => onNavigate(phase.target)}
-                  title={phase.description}
+                  onClick={() => !disabled && onNavigate(phase.target)}
+                  disabled={disabled}
+                  title={disabled ? `${phase.label} — coming soon` : phase.description}
                   className={cn(
                     "group flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all",
                     isActive && "bg-primary text-primary-foreground shadow-sm",
-                    isComplete && "text-primary hover:bg-primary/10",
-                    isUpcoming && "text-muted-foreground hover:text-foreground hover:bg-muted",
-                    currentIndex < 0 && "text-muted-foreground hover:text-foreground hover:bg-muted",
+                    !isActive && !disabled && "text-muted-foreground hover:text-foreground hover:bg-muted",
+                    disabled && "text-muted-foreground/50 cursor-not-allowed opacity-50",
                   )}
                 >
                   <span
                     className={cn(
                       "flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0",
                       isActive && "bg-primary-foreground text-primary",
-                      isComplete && "bg-primary text-primary-foreground",
-                      (isUpcoming || currentIndex < 0) && "bg-muted text-muted-foreground border border-border",
+                      !isActive && "bg-muted text-muted-foreground border border-border",
                     )}
                   >
-                    {isComplete ? <Check className="w-3 h-3" /> : phase.num}
+                    {phase.num}
                   </span>
                   <Icon className="w-3.5 h-3.5 hidden sm:inline-block shrink-0" />
                   <span className="whitespace-nowrap">{phase.shortLabel}</span>

@@ -102,34 +102,22 @@ export function searchCatalogs(query: string): (CatalogProduct & { supplier: str
   return results.slice(0, 50);
 }
 
-// Seed demo catalogs
-(function seedCatalogs() {
-  const existing = getCatalogs();
-  if (existing.length > 0) return;
-  const demos: SupplierCatalog[] = [
-    {
-      supplier: "Jantzen",
-      fileName: "jantzen_ss26_catalog.xlsx",
-      uploadedAt: "2026-03-15T10:00:00Z",
-      products: [
-        { title: "Retro Racerback", sku: "JA81520", barcode: "9351234567890", colour: "Coral", size: "8-16", type: "One Piece", rrp: 159.95 },
-        { title: "Classic High Waist Bikini Bottom", sku: "JA81530", barcode: "9351234567891", colour: "Navy", size: "8-16", type: "Bikini Bottoms", rrp: 79.95 },
-        { title: "Vintage Halter Top", sku: "JA81540", barcode: "9351234567892", colour: "Red", size: "8-14", type: "Bikini Tops", rrp: 89.95 },
-        { title: "Swim Dress", sku: "JA81550", barcode: "9351234567893", colour: "Black", size: "10-18", type: "Swim Dresses", rrp: 179.95 },
-        { title: "Boyleg One Piece", sku: "JA81560", barcode: "9351234567894", colour: "Floral", size: "8-16", type: "One Piece", rrp: 169.95 },
-      ],
-    },
-    {
-      supplier: "Seafolly",
-      fileName: "seafolly_range_2026.pdf",
-      uploadedAt: "2026-03-10T09:30:00Z",
-      products: [
-        { title: "Collective Bikini Top", sku: "SF10023", barcode: "9350987654321", colour: "Navy", size: "8-14", type: "Bikini Tops", rrp: 109.95 },
-        { title: "Active Hybrid Bralette", sku: "SF10030", barcode: "9350987654322", colour: "Black", size: "8-16", type: "Bikini Tops", rrp: 99.95 },
-        { title: "Summer Essentials One Piece", sku: "SF10040", barcode: "9350987654323", colour: "Olive", size: "8-14", type: "One Piece", rrp: 189.95 },
-        { title: "Beach Edit Sarong", sku: "SF10050", barcode: "", colour: "Stripe", size: "One Size", type: "Accessories", rrp: 69.95 },
-      ],
-    },
-  ];
-  saveCatalogs(demos);
+// One-time wipe of legacy demo seed catalogs (Jantzen / Seafolly) that
+// previously shipped pre-populated for every account. Real users never
+// uploaded these — they were marketing-screenshot data leaking into prod.
+(function purgeLegacyDemoSeed() {
+  if (typeof window === "undefined") return;
+  const PURGE_FLAG = "catalog_memory_demo_purged_v1";
+  if (localStorage.getItem(PURGE_FLAG)) return;
+  try {
+    const all = getCatalogs();
+    const cleaned = all.filter(c => {
+      const isLegacySeed =
+        (c.fileName === "jantzen_ss26_catalog.xlsx" && c.supplier === "Jantzen") ||
+        (c.fileName === "seafolly_range_2026.pdf"   && c.supplier === "Seafolly");
+      return !isLegacySeed;
+    });
+    if (cleaned.length !== all.length) saveCatalogs(cleaned);
+  } catch { /* noop */ }
+  localStorage.setItem(PURGE_FLAG, "1");
 })();

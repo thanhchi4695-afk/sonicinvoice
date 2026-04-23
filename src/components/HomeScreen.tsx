@@ -523,23 +523,16 @@ const HomeScreen = ({
       <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recent activity</h3>
       {(() => {
         const auditEntries = getRecentAuditEntries(3);
-        const fallbackActivity = [
-          { type: "invoice" as const, label: mode.isLightspeed ? "Lightspeed CSV downloaded — 18 products" : "CSV exported — Jantzen Mar26 — 18 products", time: "2 days ago" },
-          { type: "sale" as const, label: mode.isLightspeed ? "Ready to import to Lightspeed POS" : "Baku 30% off — 48 products", time: "5 days ago" },
-        ];
 
+        // Honest empty state — never fabricate "CSV exported" / "Baku 30% off" rows
+        // for users who haven't taken any action yet.
         if (auditEntries.length === 0) {
           return (
-            <div className="space-y-2">
-              {fallbackActivity.map((item, i) => (
-                <div key={i} className="flex items-center gap-3 bg-card rounded-lg border border-border px-4 py-3">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${item.type === "invoice" ? "bg-primary/15 text-primary" : "bg-secondary/15 text-secondary"}`}>
-                    {item.type === "invoice" ? "Invoice" : "Sale"}
-                  </span>
-                  <span className="text-sm flex-1 truncate">{item.label}</span>
-                  <span className="text-xs text-muted-foreground font-mono-data">{item.time}</span>
-                </div>
-              ))}
+            <div className="bg-card rounded-lg border border-dashed border-border px-4 py-6 text-center">
+              <p className="text-sm font-medium text-foreground">Nothing yet</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Process an invoice or run a stock check and your activity will appear here.
+              </p>
             </div>
           );
         }

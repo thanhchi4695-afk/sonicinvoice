@@ -3137,37 +3137,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             Import from Google Drive
           </button>
 
-          {driveQueue.length > 0 && (
-            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold">
-                  Drive batch · {driveQueue.filter(q => q.status === "done").length}/{driveQueue.length} processed
-                </p>
-                <button
-                  onClick={() => setDriveQueue([])}
-                  className="text-[10px] text-muted-foreground hover:text-foreground"
-                >
-                  Clear batch
-                </button>
-              </div>
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {driveQueue.map((q, i) => (
-                  <div key={`${q.fileName}-${i}`} className="flex items-center gap-2 text-xs">
-                    <span className="w-4 shrink-0 text-center">
-                      {q.status === "done" && "✅"}
-                      {q.status === "processing" && "⏳"}
-                      {q.status === "queued" && "•"}
-                      {q.status === "error" && "⚠️"}
-                    </span>
-                    <span className={`truncate flex-1 ${q.status === "done" ? "text-muted-foreground line-through" : ""}`}>
-                      {q.fileName}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground capitalize">{q.status}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="mt-3">
+            <DriveQueuePanel />
+          </div>
 
           {localQueue.length > 0 && (
             <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3" aria-live="polite">

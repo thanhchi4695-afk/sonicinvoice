@@ -879,8 +879,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   const runEnrichmentSim = (cancelled: { current: boolean }, names: string[]) => {
     if (names.length === 0) {
+      const startTs = processStartTime || Date.now();
+      const durationSec = Math.max(1, Math.floor((Date.now() - startTs) / 1000));
       setProcessingDone(true);
-      setFinalProcessingTime(0);
+      setFinalProcessingTime(durationSec);
       setShowCompletionSummary(true);
       return;
     }

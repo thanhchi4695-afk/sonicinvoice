@@ -216,9 +216,21 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
         updated_at: profile.updated_at,
       });
     }
-    reconciled.sort((a, b) => b.invoice_count - a.invoice_count);
+    // Final dedupe by lower(supplier_name) — keep the row with the highest
+    // invoice_count when two sources surface the same vendor.
+    const dedupeMap = new Map<string, IntelligenceRow>();
+    for (const r of reconciled) {
+      const key = (r.supplier_name || "").trim().toLowerCase();
+      if (!key) continue;
+      const existing = dedupeMap.get(key);
+      if (!existing || (r.invoice_count || 0) > (existing.invoice_count || 0)) {
+        dedupeMap.set(key, r);
+      }
+    }
+    const deduped = Array.from(dedupeMap.values());
+    deduped.sort((a, b) => b.invoice_count - a.invoice_count);
 
-    setRows(reconciled);
+    setRows(deduped);
     setLogs((lg || []) as LogRow[]);
     setLoading(false);
   }, []);

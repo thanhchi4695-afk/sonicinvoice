@@ -1169,6 +1169,66 @@ export type Database = {
         }
         Relationships: []
       }
+      processing_queue: {
+        Row: {
+          attempts: number
+          batch_id: string | null
+          created_at: string
+          drive_file_id: string | null
+          error: string | null
+          file_name: string
+          file_type: string | null
+          finished_at: string | null
+          id: string
+          position: number
+          source: string
+          source_url: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+          upload_id: string | null
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          batch_id?: string | null
+          created_at?: string
+          drive_file_id?: string | null
+          error?: string | null
+          file_name: string
+          file_type?: string | null
+          finished_at?: string | null
+          id?: string
+          position?: number
+          source?: string
+          source_url?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          upload_id?: string | null
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          batch_id?: string | null
+          created_at?: string
+          drive_file_id?: string | null
+          error?: string | null
+          file_name?: string
+          file_type?: string | null
+          finished_at?: string | null
+          id?: string
+          position?: number
+          source?: string
+          source_url?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          upload_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       product_catalog_cache: {
         Row: {
           barcode: string | null

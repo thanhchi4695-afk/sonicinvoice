@@ -214,6 +214,8 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow }: Props) => {
                 const MethodIcon = method.icon;
                 const isOpen = expanded.has(r.id);
                 const corrections = corrByPattern[r.id] ?? [];
+                // Prefer rows_added (real extraction count) and fall back to invoice_count.
+                const displayRows = r.rows_added ?? r.invoice_count ?? 0;
                 return (
                   <>
                     <tr
@@ -289,10 +291,16 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow }: Props) => {
                                 </ul>
                               )}
                               <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
-                                <div>Format: <span className="text-foreground">{r.format_type || "—"}</span></div>
-                                <div>Rows added: <span className="text-foreground">{r.rows_added ?? 0}</span></div>
-                                <div>Rows deleted: <span className="text-foreground">{r.rows_deleted ?? 0}</span></div>
-                                <div>Pattern uses: <span className="text-foreground">{r.invoice_count}</span></div>
+                                {r.format_type && (
+                                  <div>Format: <span className="text-foreground">{r.format_type}</span></div>
+                                )}
+                                <div>Lines extracted: <span className="text-foreground">{r.rows_added ?? r.invoice_count ?? 0}</span></div>
+                                {(r.rows_deleted ?? 0) > 0 && (
+                                  <div>Rows deleted: <span className="text-foreground">{r.rows_deleted}</span></div>
+                                )}
+                                <div title="How many invoices have used this learned pattern">
+                                  Pattern uses: <span className="text-foreground">{r.invoice_count}</span>
+                                </div>
                               </div>
                             </section>
                           </div>

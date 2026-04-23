@@ -237,8 +237,8 @@ const AnalyticsPanel = () => {
       <div className="grid grid-cols-2 gap-3">
         {[
           { icon: DollarSign, label: "Total spend", value: fmt(totalSpend, sym), sub: "this period" },
-          { icon: Package, label: "Products", value: totalProducts.toString(), sub: "bought" },
-          { icon: Users, label: "Brands", value: uniqueBrands.toString(), sub: "ordered from" },
+          { icon: Package, label: "Products bought", value: `${totalProducts}`, sub: `${filtered.length} line${filtered.length === 1 ? "" : "s"}` },
+          { icon: Users, label: "Brands ordered from", value: `${uniqueBrands}`, sub: `of ${new Set(data.map(r => r.brand)).size} known` },
           { icon: TrendingUp, label: "Avg cost", value: fmtDec(avgCost, sym), sub: "per product" },
         ].map((kpi, i) => (
           <Card key={i} className="p-4">

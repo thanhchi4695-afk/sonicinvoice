@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react
 import { addAuditEntry } from "@/lib/audit-log";
 import { onImageSeoTrigger } from "@/lib/image-seo-trigger";
 import NotificationBell from "@/components/NotificationBell";
+import StoreModePill from "@/components/StoreModePill";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { useKeyboardShortcuts, type ShortcutDef } from "@/hooks/use-keyboard-shortcuts";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -759,14 +760,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
                   }
                 }}
               />
-              <button
-                onClick={() => setActiveTab("account")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${mode.modeBadge.color}`}
-                title="Open account & integrations"
-              >
-                <span>{mode.modeBadge.emoji}</span>
-                {mode.modeBadge.label}
-              </button>
+              <StoreModePill mode={mode} onOpenAccount={() => setActiveTab("account")} />
             </div>
             <PhaseProgressBar
               activeTab={activeTab}
@@ -799,14 +793,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
                 }
               }}
             />
-            <button
-              onClick={() => setActiveTab("account")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-colors ${mode.modeBadge.color}`}
-              title="Open account & integrations"
-            >
-              <span>{mode.modeBadge.emoji}</span>
-              {mode.modeBadge.label}
-            </button>
+            <StoreModePill mode={mode} onOpenAccount={() => setActiveTab("account")} />
           </div>
           <PhaseProgressBar
             activeTab={activeTab}

@@ -63,8 +63,17 @@ const StockyLayout = ({
   children,
   navItems = defaultNavItems,
 }: StockyLayoutProps) => {
-  const [collapsed, setCollapsed] = useState(false);
+  // Persist collapsed state across reloads (#15)
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof localStorage === "undefined") return false;
+    return localStorage.getItem("sidebar-collapsed") === "1";
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
+  useMemo(() => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("sidebar-collapsed", collapsed ? "1" : "0");
+    }
+  }, [collapsed]);
   const { hasPermission } = useUserRole();
 
   // Filter nav items by permission
@@ -112,6 +121,7 @@ const StockyLayout = ({
           onClick={() => setCollapsed(!collapsed)}
           className="hidden lg:flex p-1 rounded-md hover:bg-muted text-muted-foreground"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>

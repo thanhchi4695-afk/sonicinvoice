@@ -25,6 +25,7 @@ interface PatternRow {
   processing_quality_score: number | null;
   edit_count: number | null;
   review_duration_seconds: number | null;
+  processing_duration_seconds: number | null;
   rows_added: number | null;
   rows_deleted: number | null;
   invoice_count: number;
@@ -86,7 +87,7 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow }: Props) => {
       const [{ data: patterns }, { data: suppliers }, { data: corrections }] = await Promise.all([
         supabase
           .from("invoice_patterns")
-          .select("id, supplier_profile_id, original_filename, format_type, match_method, processing_quality_score, edit_count, review_duration_seconds, rows_added, rows_deleted, invoice_count, fields_corrected, column_map, sample_headers, field_confidence_history, created_at, updated_at")
+          .select("id, supplier_profile_id, original_filename, format_type, match_method, processing_quality_score, edit_count, review_duration_seconds, processing_duration_seconds, rows_added, rows_deleted, invoice_count, fields_corrected, column_map, sample_headers, field_confidence_history, created_at, updated_at")
           .eq("user_id", userId)
           .order("updated_at", { ascending: false })
           .limit(200),

@@ -445,6 +445,16 @@ Return ONLY the JSON pattern object.`;
         confidence_score: confidenceScore,
         is_new_supplier: isNew,
         invoice_count: invoiceCount,
+        // ── Echo the learned pattern back so the client can persist it
+        // into supplier_intelligence (powers the Brain panel). Without
+        // these fields the Brain shows "Not learned yet" even after
+        // many invoices because column_map stays empty. ──
+        column_map: pattern.column_map || {},
+        size_system: pattern.size_system ?? null,
+        sku_prefix_pattern: pattern.sku_prefix_pattern ?? null,
+        gst_included_in_cost: pattern.gst_included_in_cost ?? null,
+        gst_included_in_rrp: pattern.gst_included_in_rrp ?? null,
+        default_markup_multiplier: pattern.default_markup_multiplier ?? null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

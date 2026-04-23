@@ -135,7 +135,31 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
     setShopifyError("");
     try {
       const installUrl = await initiateShopifyLogin(fullShop);
-      window.location.href = installUrl;
+      // ═══ Embedded-aware top-level redirect ═══
+      // Inside Shopify Admin's iframe, assigning window.location.href tries to
+      // navigate the IFRAME to admin.shopify.com/oauth, which Shopify blocks
+      // with X-Frame-Options — the click looks like a silent no-op.
+      // We must break out to the parent window. App Bridge v4 exposes this
+      // via window.open(url, "_top"), and falls back to window.top.location
+      // when App Bridge isn't loaded.
+      const inIframe = typeof window !== "undefined" && window.top !== window.self;
+      if (inIframe) {
+        try {
+          // App Bridge v4 intercepts window.open(_top) and performs a parent redirect
+          window.open(installUrl, "_top");
+          return;
+        } catch {
+          try {
+            if (window.top) {
+              window.top.location.href = installUrl;
+              return;
+            }
+          } catch {
+            // Cross-origin block — fall through to in-iframe assign as last resort
+          }
+        }
+      }
+      window.location.assign(installUrl);
     } catch (err) {
       setShopifyError(err instanceof Error ? err.message : "Failed to connect");
       setShopifyLoading(false);

@@ -27,7 +27,7 @@ const navSections = [
       { id: "purchase_orders", label: "Purchase Orders", icon: ClipboardList, type: "flow" as const },
       { id: "email_inbox", label: "Email Inbox", icon: Mail, type: "flow" as const },
       { id: "suppliers", label: "Supplier Performance", icon: Users, type: "flow" as const },
-      { id: "supplier_intelligence", label: "Supplier Intelligence", icon: Brain, type: "flow" as const },
+      { id: "supplier_intelligence", label: "Supplier Brain", icon: Brain, type: "flow" as const },
       { id: "catalog_memory", label: "Catalog Memory", icon: BookOpen, type: "flow" as const },
       { id: "restock", label: "Restock Analytics", icon: Package, type: "flow" as const },
       { id: "collab_seo", label: "Collab SEO", icon: Link, type: "flow" as const },

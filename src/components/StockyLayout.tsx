@@ -37,7 +37,7 @@ const defaultNavItems: StockyNavItem[] = [
   { id: "inventory_view", label: "Inventory", icon: Package, type: "flow" },
   { id: "transfer_orders", label: "Transfers", icon: ArrowRightLeft, type: "flow" },
   { id: "suppliers", label: "Suppliers", icon: Users, type: "flow" },
-  { id: "supplier_intelligence", label: "Supplier Intelligence", icon: Brain, type: "flow" },
+  { id: "supplier_intelligence", label: "Supplier Brain", icon: Brain, type: "flow" },
   { id: "teach_invoice_tutorial", label: "Teach Invoices Tour", icon: GraduationCap, type: "flow" },
   { id: "stocktake_module", label: "Stocktakes", icon: ClipboardCheck, type: "flow" },
   { id: "stock_adjustment", label: "Adjustments", icon: Scissors, type: "flow" },

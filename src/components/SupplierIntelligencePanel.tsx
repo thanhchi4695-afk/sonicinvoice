@@ -304,7 +304,7 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
         </button>
         <div className="flex-1">
           <h2 className="text-base font-semibold font-display flex items-center gap-2">
-            <Brain className="w-4 h-4 text-primary" /> Supplier Intelligence
+            <Brain className="w-4 h-4 text-primary" /> Supplier Brain
           </h2>
           <p className="text-[11px] text-muted-foreground">
             How the app learns your suppliers — and the rules it falls back on.

@@ -137,15 +137,15 @@ async function loadSharedProfile(supplierName: string): Promise<Partial<Universa
 export async function getContributeShared(): Promise<boolean> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return true;
+    if (!session) return false;
     const { data } = await supabase
       .from("user_brain_settings")
       .select("contribute_shared")
       .eq("user_id", session.user.id)
       .maybeSingle();
-    return data?.contribute_shared !== false; // default ON
+    return data?.contribute_shared === true; // default OFF — explicit opt-in only
   } catch {
-    return true;
+    return false;
   }
 }
 

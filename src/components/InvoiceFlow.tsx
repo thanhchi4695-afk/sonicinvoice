@@ -51,6 +51,7 @@ import { generateLayoutFingerprint, matchFingerprint } from "@/lib/layout-finger
 import { recordProcessingQuality } from "@/lib/processing-quality";
 import { formatDuration, estimateEta, recordProcessingDuration } from "@/lib/processing-timing";
 import { persistParsedInvoice } from "@/lib/invoice-persistence";
+import DriveQueuePanel from "@/components/DriveQueuePanel";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 

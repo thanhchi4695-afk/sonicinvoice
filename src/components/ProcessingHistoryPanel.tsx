@@ -209,7 +209,7 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow }: Props) => {
               {!loading && filtered.map((r) => {
                 const supplier = (r.supplier_profile_id && supplierMap[r.supplier_profile_id]) || "Unknown supplier";
                 const editCount = r.edit_count ?? (r.fields_corrected?.length ?? 0);
-                const quality = qualityFromEdits(editCount);
+                const quality = qualityBadge(r.processing_quality_score, editCount);
                 const method = matchMethodMeta(r.match_method);
                 const MethodIcon = method.icon;
                 const isOpen = expanded.has(r.id);

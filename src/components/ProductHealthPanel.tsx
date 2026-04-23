@@ -403,6 +403,7 @@ export default function ProductHealthPanel({ onBack }: Props) {
               <TabsTrigger value="green" className="flex-1 text-xs">Green</TabsTrigger>
               <TabsTrigger value="amber" className="flex-1 text-xs">Amber</TabsTrigger>
               <TabsTrigger value="red" className="flex-1 text-xs">Red</TabsTrigger>
+              <TabsTrigger value="no_data" className="flex-1 text-xs">No data</TabsTrigger>
               <TabsTrigger value="dead" className="flex-1 text-xs">Dead</TabsTrigger>
             </TabsList>
           </Tabs>

@@ -216,14 +216,34 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
         updated_at: profile.updated_at,
       });
     }
-    reconciled.sort((a, b) => b.invoice_count - a.invoice_count);
+    // Final dedupe by lower(supplier_name) — keep the row with the highest
+    // invoice_count when two sources surface the same vendor.
+    const dedupeMap = new Map<string, IntelligenceRow>();
+    for (const r of reconciled) {
+      const key = (r.supplier_name || "").trim().toLowerCase();
+      if (!key) continue;
+      const existing = dedupeMap.get(key);
+      if (!existing || (r.invoice_count || 0) > (existing.invoice_count || 0)) {
+        dedupeMap.set(key, r);
+      }
+    }
+    const deduped = Array.from(dedupeMap.values());
+    deduped.sort((a, b) => b.invoice_count - a.invoice_count);
 
-    setRows(reconciled);
+    setRows(deduped);
     setLogs((lg || []) as LogRow[]);
     setLoading(false);
   }, []);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Honest count of distinct suppliers (case-insensitive) so the header
+  // badge matches what the user sees in the list, even if the reconciliation
+  // pulled the same vendor from both supplier_intelligence and supplier_profiles.
+  const uniqueSupplierCount = useMemo(() => {
+    const keys = new Set(rows.map(r => (r.supplier_name || "").trim().toLowerCase()).filter(Boolean));
+    return keys.size;
+  }, [rows]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -311,7 +331,7 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
           </p>
         </div>
         <Badge variant="outline" className="text-[10px]">
-          {rows.length} known {rows.length === 1 ? "supplier" : "suppliers"}
+          {uniqueSupplierCount} known {uniqueSupplierCount === 1 ? "supplier" : "suppliers"}
         </Badge>
       </div>
 

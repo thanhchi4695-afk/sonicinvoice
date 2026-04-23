@@ -200,11 +200,15 @@ export default function SupplierBrainTab() {
   useEffect(() => { void load(); }, []);
 
   const totals = useMemo(() => {
+    // Dedupe by lower(supplier_name) so casing variants (e.g. "Rhythm" +
+    // "RHYTHM") aren't double-counted in the "Suppliers learned" tile.
+    const uniqueKeys = new Set(rows.map(r => (r.supplier_name || "").trim().toLowerCase()).filter(Boolean));
+    const uniqueCount = uniqueKeys.size;
     const avg = rows.length
       ? Math.round(rows.reduce((s, r) => s + (r.confidence_score || 0), 0) / rows.length)
       : 0;
     const contributions = rows.filter(r => !r.is_shared_origin).length;
-    return { suppliers: rows.length, avg, sharedAvailable: shared.length, contributions };
+    return { suppliers: uniqueCount, avg, sharedAvailable: shared.length, contributions };
   }, [rows, shared]);
 
   const resetTemplate = async (row: SupplierRow) => {

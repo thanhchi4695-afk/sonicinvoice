@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 
 /**
  * Helpers for the dedicated `supplier_intelligence` table that powers the

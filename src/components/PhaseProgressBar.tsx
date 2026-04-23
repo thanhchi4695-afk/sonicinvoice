@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Check, ChevronRight, Settings2, FileText, Search, Package, DollarSign, Upload, BarChart3 } from "lucide-react";
+import { ChevronRight, FileText, Search, Package, DollarSign, Upload, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type PhaseId = "setup" | "capture" | "review" | "catalog" | "price" | "publish" | "analyse";

@@ -2202,6 +2202,37 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const userId = sessionData.session?.user?.id;
       if (!userId) return;
 
+      // ── GUARANTEED SEED ROW (Bugs #8 & #9) ──────────────────────────
+      // Write a baseline supplier_intelligence row immediately, BEFORE the
+      // AI pattern call. This ensures every successfully-extracted invoice
+      // produces a Supplier Brain entry even if the AI pattern call later
+      // fails (rate limit / parse error). The post-AI recordSupplierUpdated
+      // call below then enriches column_map and confidence on success.
+      try {
+        const { recordSupplierLearned, recordSupplierUpdated } = await import(
+          "@/lib/supplier-intelligence"
+        );
+        const { data: existing } = await supabase
+          .from("supplier_intelligence")
+          .select("id")
+          .eq("user_id", userId)
+          .ilike("supplier_name", name)
+          .maybeSingle();
+        const seedPayload = {
+          supplierName: name,
+          confidence: null,
+          columnMap: null,
+          matchMethod: matchMethod || "full_extraction",
+        };
+        if (existing?.id) {
+          void recordSupplierUpdated(seedPayload);
+        } else {
+          void recordSupplierLearned(seedPayload);
+        }
+      } catch (seedErr) {
+        console.warn("Seed supplier row failed (non-fatal):", seedErr);
+      }
+
       // Build sample rows from the first 3 product groups (flatten one variant each)
       const sampleRows = productGroups.slice(0, 3).map((g) => {
         const v = g.variants?.[0];

@@ -69,6 +69,19 @@ const qualityFromEdits = (editCount: number) => {
   return { label: "Heavy edit", cls: "bg-destructive/15 text-destructive border-destructive/30" };
 };
 
+/**
+ * Prefer the persisted processing_quality_score (0–100, computed at export
+ * time by `processing-quality.ts`). Falls back to edit-count derivation when
+ * the score hasn't been written yet (e.g. legacy rows). Bug #12.
+ */
+const qualityBadge = (score: number | null, editCount: number) => {
+  if (score == null) return qualityFromEdits(editCount);
+  if (score >= 90) return { label: "Excellent", cls: "bg-success/15 text-success border-success/30" };
+  if (score >= 75) return { label: "Good", cls: "bg-primary/15 text-primary border-primary/30" };
+  if (score >= 50) return { label: "Manual", cls: "bg-amber-500/15 text-amber-500 border-amber-500/30" };
+  return { label: "Needs review", cls: "bg-destructive/15 text-destructive border-destructive/30" };
+};
+
 const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow }: Props) => {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PatternRow[]>([]);
@@ -196,7 +209,7 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow }: Props) => {
               {!loading && filtered.map((r) => {
                 const supplier = (r.supplier_profile_id && supplierMap[r.supplier_profile_id]) || "Unknown supplier";
                 const editCount = r.edit_count ?? (r.fields_corrected?.length ?? 0);
-                const quality = qualityFromEdits(editCount);
+                const quality = qualityBadge(r.processing_quality_score, editCount);
                 const method = matchMethodMeta(r.match_method);
                 const MethodIcon = method.icon;
                 const isOpen = expanded.has(r.id);

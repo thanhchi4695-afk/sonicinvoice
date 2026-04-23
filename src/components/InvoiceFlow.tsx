@@ -3679,8 +3679,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                       </div>
                       <span className="text-muted-foreground font-mono-data">
                         {processingDone
-                          ? `✅ Complete in ${fmtTime(finalProcessingTime)}`
-                          : `~${fmtTime(remaining)} remaining`}
+                          ? `✅ Complete in ${formatDuration(finalProcessingTime)}`
+                          : etaLabel}
                       </span>
                     </div>
                     <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
@@ -3695,7 +3695,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                     <div className="flex items-center justify-between mt-1.5">
                       <span className="text-xs font-semibold text-primary">{pct}%</span>
                       <span className="text-[10px] text-muted-foreground font-mono-data">
-                        ⏱ {fmtTime(processingElapsed)} elapsed
+                        ⏱ {formatDuration(processingElapsed)} elapsed{variantCount > 0 ? ` · ${total} ${total === 1 ? "row" : "rows"} → ${variantCount} variants` : ""}
                       </span>
                     </div>
                   </div>

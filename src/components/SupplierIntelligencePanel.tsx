@@ -225,6 +225,14 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  // Honest count of distinct suppliers (case-insensitive) so the header
+  // badge matches what the user sees in the list, even if the reconciliation
+  // pulled the same vendor from both supplier_intelligence and supplier_profiles.
+  const uniqueSupplierCount = useMemo(() => {
+    const keys = new Set(rows.map(r => (r.supplier_name || "").trim().toLowerCase()).filter(Boolean));
+    return keys.size;
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
@@ -311,7 +319,7 @@ const SupplierIntelligencePanel = ({ onBack }: SupplierIntelligencePanelProps) =
           </p>
         </div>
         <Badge variant="outline" className="text-[10px]">
-          {rows.length} known {rows.length === 1 ? "supplier" : "suppliers"}
+          {uniqueSupplierCount} known {uniqueSupplierCount === 1 ? "supplier" : "suppliers"}
         </Badge>
       </div>
 

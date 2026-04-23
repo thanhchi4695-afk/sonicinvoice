@@ -159,7 +159,7 @@ export default function DriveQueuePanel() {
               <div className="flex items-center gap-2 text-xs">
                 <span className="w-4 shrink-0 text-center">
                   {q.status === "done" ? (
-                    <CheckCircle2 className="w-3 h-3 text-emerald-500 inline" />
+                    <CheckCircle2 className="w-3 h-3 text-primary inline" />
                   ) : (
                     <AlertCircle className="w-3 h-3 text-destructive inline" />
                   )}

@@ -159,6 +159,10 @@ export default function InventoryDashboard({ onBack }: Props) {
       lowStockCount: lowStock.length, outOfStockCount: outOfStock.length,
       avgMargin, variantCount: variants.length,
       missingRetailCount,
+      pricedCount: priced.length,
+      // Cost value of the SAME priced subset that retail+margin are computed over,
+      // so users can see apples-to-apples next to the totals.
+      totalValueAtCostPriced,
     };
   }, [data]);
 
@@ -329,26 +333,75 @@ export default function InventoryDashboard({ onBack }: Props) {
                 </div>
                 <p className="text-2xl font-bold font-mono">{fmt(stats.totalValueAtCost)}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  {fmt(stats.totalValueAtRetail)} retail{stats.missingRetailCount > 0 ? ` · ${stats.missingRetailCount} missing RRP` : ""}
+                  all {stats.variantCount} variant{stats.variantCount === 1 ? "" : "s"}
                 </p>
               </Card>
-              <Card className="p-4">
+              <Card className="p-4" title={stats.pricedCount > 0
+                ? `Computed from ${stats.pricedCount} of ${stats.variantCount} variants that have a retail price set.`
+                : `0 of ${stats.variantCount} variants have a retail price set yet.`}>
                 <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp className="w-4 h-4 text-primary" />
-                  <p className="text-xs text-muted-foreground">Total Units</p>
+                  <DollarSign className="w-4 h-4 text-primary" />
+                  <p className="text-xs text-muted-foreground">Value (Retail)</p>
                 </div>
-                <p className="text-2xl font-bold font-mono">{stats.totalUnits.toLocaleString()}</p>
+                {stats.pricedCount > 0 ? (
+                  <>
+                    <p className="text-2xl font-bold font-mono">{fmt(stats.totalValueAtRetail)}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      from {stats.pricedCount} of {stats.variantCount} priced
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold font-mono text-muted-foreground">—</p>
+                    <p className="text-[10px] text-amber-600">0 of {stats.variantCount} have retail set</p>
+                  </>
+                )}
               </Card>
-              <Card className="p-4">
+              <Card className="p-4" title={stats.pricedCount > 0
+                ? `Margin computed across the ${stats.pricedCount} variants that have both cost and retail. Other ${stats.variantCount - stats.pricedCount} excluded.`
+                : "No variants have both cost and retail set yet."}>
                 <div className="flex items-center gap-2 mb-1">
                   <DollarSign className="w-4 h-4 text-primary" />
                   <p className="text-xs text-muted-foreground">Avg Margin</p>
                 </div>
-                <p className={cn("text-2xl font-bold font-mono", stats.avgMargin >= 50 ? "text-green-600" : stats.avgMargin >= 30 ? "text-yellow-600" : "text-red-600")}>
-                  {pct(stats.avgMargin)}
-                </p>
+                {stats.pricedCount > 0 ? (
+                  <>
+                    <p className={cn("text-2xl font-bold font-mono", stats.avgMargin >= 50 ? "text-green-600" : stats.avgMargin >= 30 ? "text-yellow-600" : "text-red-600")}>
+                      {pct(stats.avgMargin)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      from {stats.pricedCount} of {stats.variantCount} priced
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold font-mono text-muted-foreground">—</p>
+                    <p className="text-[10px] text-amber-600">set retail to see margin</p>
+                  </>
+                )}
               </Card>
             </div>
+
+            {/* Honest banner when no retail data is set — replaces fake numbers */}
+            {stats.pricedCount === 0 && stats.variantCount > 0 && (
+              <Card className="p-3 border-l-4 border-l-amber-500 bg-amber-50 dark:bg-amber-900/20">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">No retail prices set yet</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Set a retail price on your variants to see total stock value at retail and average margin.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
+            {/* Partial-coverage hint — totals still shown but flagged so users know */}
+            {stats.pricedCount > 0 && stats.missingRetailCount > 0 && (
+              <p className="text-[11px] text-muted-foreground -mt-2">
+                Retail value &amp; margin computed from {stats.pricedCount} of {stats.variantCount} variants. {stats.missingRetailCount} are missing a retail price and excluded from the retail/margin tiles.
+              </p>
+            )}
 
             {/* Health bar */}
             <Card className="p-4">

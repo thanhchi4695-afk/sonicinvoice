@@ -14,7 +14,8 @@ import { cn } from "@/lib/utils";
 
 /* ─── Types ─── */
 
-type HealthScore = "green" | "amber" | "red";
+// "no_data" = added recently, no sales yet — should NOT be classed as Critical.
+type HealthScore = "green" | "amber" | "red" | "no_data";
 
 interface ProductSalesData {
   variantId: string;
@@ -63,9 +64,12 @@ function scoreProduct(
   const daysInInventory = Math.floor((now - new Date(variant.createdAt).getTime()) / 86400000);
   const totalSold = sales?.totalSold || 0;
   const lastSoldAt = sales?.lastSoldAt;
-  const daysSinceLastSale = lastSoldAt
+
+  // Real number of days since last sale, or null when there has never been a sale.
+  // Never use a sentinel (e.g. 999) — that leaks into the UI as "999+ days".
+  const daysSinceLastSale: number | null = lastSoldAt
     ? Math.floor((now - new Date(lastSoldAt).getTime()) / 86400000)
-    : totalSold > 0 ? daysInInventory : 999;
+    : null;
 
   // Velocity: units sold per day over the product's lifetime (capped at 90 days)
   const velocityWindow = Math.min(daysInInventory, 90) || 1;
@@ -74,10 +78,36 @@ function scoreProduct(
   const marginPct = variant.cost > 0 && variant.retailPrice > 0
     ? ((variant.retailPrice - variant.cost) / variant.retailPrice) * 100 : -1;
   const stockValue = variant.quantity * variant.cost;
-  const isDeadStock = daysSinceLastSale >= deadStockDays && variant.quantity > 0;
+
+  // Dead-stock only counts when we have evidence: either a real "last sold" date
+  // older than the threshold, OR the product has been live > deadStockDays AND
+  // has never made a sale. Brand-new inventory (< deadStockDays old, no sales)
+  // is "no_data", never "dead".
+  const hasNeverSold = totalSold === 0 && !lastSoldAt;
+  const isLongLivedNoSales = hasNeverSold && daysInInventory >= deadStockDays;
+  const isDeadStock = variant.quantity > 0 && (
+    (daysSinceLastSale !== null && daysSinceLastSale >= deadStockDays) ||
+    isLongLivedNoSales
+  );
 
   const reasons: string[] = [];
   let score: HealthScore = "green";
+
+  // ── No-data short-circuit: brand-new variant with no sales yet ──
+  if (hasNeverSold && daysInInventory < 30) {
+    return {
+      ...variant,
+      score: "no_data",
+      reasons: [`Just added · ${daysInInventory === 0 ? "today" : `${daysInInventory}d ago`} — sales data will appear after first sale`],
+      velocity: 0,
+      daysInInventory,
+      daysSinceLastSale: 0,
+      totalSold: 0,
+      isDeadStock: false,
+      marginPct,
+      stockValue,
+    };
+  }
 
   // ── RED conditions ──
   if (variant.quantity <= 0 && velocity > 0.1) {
@@ -86,7 +116,11 @@ function scoreProduct(
   }
   if (isDeadStock) {
     score = "red";
-    reasons.push(`No sales in ${daysSinceLastSale}+ days`);
+    if (daysSinceLastSale !== null) {
+      reasons.push(`No sales in ${daysSinceLastSale} days`);
+    } else {
+      reasons.push(`No sales yet · added ${daysInInventory}d ago`);
+    }
   }
 
   // ── AMBER conditions ──
@@ -114,12 +148,13 @@ function scoreProduct(
   if (reasons.length === 0) {
     if (velocity >= 0.3) reasons.push(`Strong seller: ${(velocity * 30).toFixed(0)} units/month`);
     else if (totalSold > 0) reasons.push("Selling steadily");
-    else reasons.push("New — no sales data yet");
+    else reasons.push(`No sales yet · added ${daysInInventory}d ago`);
   }
 
   return {
     ...variant, score, reasons, velocity, daysInInventory,
-    daysSinceLastSale, totalSold, isDeadStock, marginPct, stockValue,
+    daysSinceLastSale: daysSinceLastSale ?? 0,
+    totalSold, isDeadStock, marginPct, stockValue,
   };
 }
 
@@ -211,9 +246,10 @@ export default function ProductHealthPanel({ onBack }: Props) {
     const green = products.filter(p => p.score === "green").length;
     const amber = products.filter(p => p.score === "amber").length;
     const red = products.filter(p => p.score === "red").length;
+    const noData = products.filter(p => p.score === "no_data").length;
     const dead = products.filter(p => p.isDeadStock);
     const deadValue = dead.reduce((s, p) => s + p.stockValue, 0);
-    return { green, amber, red, deadCount: dead.length, deadValue, total: products.length };
+    return { green, amber, red, noData, deadCount: dead.length, deadValue, total: products.length };
   }, [products]);
 
   const vendors = useMemo(() =>
@@ -226,6 +262,7 @@ export default function ProductHealthPanel({ onBack }: Props) {
     if (tab === "green") list = list.filter(p => p.score === "green");
     else if (tab === "amber") list = list.filter(p => p.score === "amber");
     else if (tab === "red") list = list.filter(p => p.score === "red");
+    else if (tab === "no_data") list = list.filter(p => p.score === "no_data");
     else if (tab === "dead") list = list.filter(p => p.isDeadStock);
     if (vendorFilter) list = list.filter(p => p.vendor === vendorFilter);
     if (search) {
@@ -236,8 +273,8 @@ export default function ProductHealthPanel({ onBack }: Props) {
         p.vendor?.toLowerCase().includes(q),
       );
     }
-    // Sort: red first, then amber, then green
-    const order: Record<HealthScore, number> = { red: 0, amber: 1, green: 2 };
+    // Sort: red first, then amber, then green, then no-data (least urgent)
+    const order: Record<HealthScore, number> = { red: 0, amber: 1, green: 2, no_data: 3 };
     return list.sort((a, b) => order[a.score] - order[b.score] || b.stockValue - a.stockValue);
   }, [products, tab, vendorFilter, search]);
 
@@ -246,6 +283,7 @@ export default function ProductHealthPanel({ onBack }: Props) {
       "bg-green-500": score === "green",
       "bg-yellow-500": score === "amber",
       "bg-red-500": score === "red",
+      "bg-muted-foreground/40": score === "no_data",
     })} />
   );
 
@@ -285,8 +323,8 @@ export default function ProductHealthPanel({ onBack }: Props) {
         </Card>
       ) : (
         <>
-          {/* Traffic light summary */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          {/* Traffic light summary — 4 tiles, "Awaiting data" is neutral, never alarmist */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
             <button onClick={() => setTab("green")}
               className={cn("text-center py-3 rounded-lg border transition-colors",
                 tab === "green" ? "border-green-500 bg-green-50 dark:bg-green-900/30" : "bg-card border-border")}>
@@ -305,9 +343,16 @@ export default function ProductHealthPanel({ onBack }: Props) {
               <p className="text-2xl font-bold text-red-600 dark:text-red-400 font-mono">{counts.red}</p>
               <p className="text-[10px] text-red-700 dark:text-red-400">Critical</p>
             </button>
+            <button onClick={() => setTab("no_data")}
+              className={cn("text-center py-3 rounded-lg border transition-colors",
+                tab === "no_data" ? "border-muted-foreground bg-muted/40" : "bg-card border-border")}>
+              <p className="text-2xl font-bold text-muted-foreground font-mono">{counts.noData}</p>
+              <p className="text-[10px] text-muted-foreground">Awaiting sales data</p>
+            </button>
           </div>
 
-          {/* Dead stock alert */}
+          {/* Dead stock alert — only shown when there's REAL evidence of dead stock,
+              never just because everything is brand-new with no sales yet. */}
           {counts.deadCount > 0 && (
             <Card className="p-3 border-l-4 border-l-destructive mb-4">
               <button onClick={() => setTab("dead")} className="flex items-center justify-between w-full">

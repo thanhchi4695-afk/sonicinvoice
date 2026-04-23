@@ -1262,36 +1262,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [driveImportOpen, setDriveImportOpen] = useState(false);
   const [driveImportUrl, setDriveImportUrl] = useState("");
   const [driveImporting, setDriveImporting] = useState(false);
-  // 2-step Drive flow: "link" → paste URL; "confirm" → see count + auto-process all
+  // 2-step Drive flow: "link" → paste URL; "confirm" → see file list + enqueue
   const [driveStage, setDriveStage] = useState<"link" | "confirm">("link");
-  const [drivePreview, setDrivePreview] = useState<{ fileName: string; base64: string; fileType: string }[]>([]);
-  type DriveQueueItem = { fileName: string; base64: string; fileType: string; status: "queued" | "processing" | "done" | "error" };
-  const [driveQueue, setDriveQueue] = useState<DriveQueueItem[]>([]);
+  const [drivePreview, setDrivePreview] = useState<{ id: string; name: string; mimeType: string }[]>([]);
 
-  const base64ToFile = (base64: string, fileName: string, fileType: string): File => {
-    const mime =
-      fileType === "pdf" ? "application/pdf" :
-      fileType === "png" ? "image/png" :
-      fileType === "webp" ? "image/webp" :
-      `image/${fileType === "jpg" ? "jpeg" : fileType}`;
-    const bin = atob(base64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return new File([bytes], fileName, { type: mime });
-  };
-
-  const acceptDriveFile = (item: { fileName: string; base64: string; fileType: string }) => {
-    const file = base64ToFile(item.base64, item.fileName, item.fileType);
-    setUploadedFile(file);
-    setFileName(file.name);
-    void uploadOriginalToStorage(file);
-    toast("Invoice loaded from Drive", { description: item.fileName });
-    setTimeout(() => {
-      document.getElementById("custom-requirements-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
-  };
-
-  // Step 1 — paste folder/file link, fetch file list (downloads metadata + content via gdrive-fetch).
+  // Step 1 — paste folder/file link, list files via drive-list (no download).
   const handleDriveListFiles = async () => {
     if (!driveImportUrl.trim()) {
       toast.error("Paste a Google Drive folder or file link first");
@@ -1299,16 +1274,16 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }
     setDriveImporting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("gdrive-fetch", {
+      const { data, error } = await supabase.functions.invoke("drive-list", {
         body: { url: driveImportUrl.trim() },
       });
       if (error) throw error;
-      const invoices = (data?.invoices || []) as { fileName: string; base64: string; fileType: string }[];
-      if (invoices.length === 0) {
-        toast.error("No invoices found", { description: "Make sure the folder is shared as 'Anyone with the link'." });
+      const files = (data?.files || []) as { id: string; name: string; mimeType: string }[];
+      if (files.length === 0) {
+        toast.error("No files found", { description: "Make sure the folder is shared as 'Anyone with the link'." });
         return;
       }
-      setDrivePreview(invoices);
+      setDrivePreview(files);
       setDriveStage("confirm");
     } catch (e) {
       toast.error("Drive import failed", {
@@ -1319,43 +1294,35 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }
   };
 
-  // Step 2 — confirm: load file 1 immediately and queue the rest. As the user
-  // finishes review of each invoice (uploadedFile cleared), the next is auto-loaded.
-  const handleDriveConfirmAutoProcess = () => {
+  // Step 2 — confirm: enqueue the whole batch server-side. The drive-worker
+  // (run every 30s by pg_cron) downloads each file, uploads to storage, and
+  // saves a stub invoice_patterns row marked 'pending_review'. The user sees
+  // live progress in <DriveQueuePanel /> below the upload area.
+  const handleDriveConfirmAutoProcess = async () => {
     if (drivePreview.length === 0) return;
-    const [first, ...rest] = drivePreview;
-    acceptDriveFile(first);
-    setDriveQueue([
-      { ...first, status: "processing" },
-      ...rest.map<DriveQueueItem>((r) => ({ ...r, status: "queued" })),
-    ]);
-    setDriveImportOpen(false);
-    setDriveStage("link");
-    setDrivePreview([]);
-    setDriveImportUrl("");
-    if (rest.length > 0) {
-      toast(`Auto-processing ${drivePreview.length} invoices`, {
-        description: "The next file loads automatically when you finish each review.",
+    setDriveImporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("enqueue-drive-batch", {
+        body: { url: driveImportUrl.trim() },
       });
+      if (error) throw error;
+      const queued = data?.queued ?? drivePreview.length;
+      toast.success(`Queued ${queued} invoice${queued === 1 ? "" : "s"}`, {
+        description: "Files are downloading in the background. You can navigate away — we'll keep working.",
+      });
+      setDriveImportOpen(false);
+      setDriveStage("link");
+      setDrivePreview([]);
+      setDriveImportUrl("");
+    } catch (e) {
+      toast.error("Could not queue Drive batch", {
+        description: e instanceof Error ? e.message : "Try again in a moment",
+      });
+    } finally {
+      setDriveImporting(false);
     }
   };
 
-  // When the current upload is cleared (review accepted/restarted), advance the queue.
-  useEffect(() => {
-    if (uploadedFile) return;
-    setDriveQueue((prev) => {
-      if (prev.length === 0) return prev;
-      // Mark the in-progress file as done
-      const advanced = prev.map((q) => q.status === "processing" ? { ...q, status: "done" as const } : q);
-      const nextIdx = advanced.findIndex((q) => q.status === "queued");
-      if (nextIdx === -1) return advanced;
-      const next = advanced[nextIdx];
-      // Defer the load so we don't update other state mid-render
-      queueMicrotask(() => acceptDriveFile(next));
-      return advanced.map((q, i) => i === nextIdx ? { ...q, status: "processing" } : q);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uploadedFile]);
 
   const handleStartProcessingClick = () => {
     if (!uploadedFile) {

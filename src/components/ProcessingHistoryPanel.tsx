@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { formatDuration } from "@/lib/processing-timing";
 
 interface Props {
   onBack: () => void;
@@ -228,7 +229,7 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow }: Props) => {
                         <Badge variant="outline" className={`${quality.cls} text-[10px]`}>{quality.label}</Badge>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                        {r.review_duration_seconds ? `${r.review_duration_seconds}s` : "—"}
+                        {formatDuration(r.processing_duration_seconds ?? r.review_duration_seconds)}
                       </td>
                     </tr>
                     {isOpen && (

@@ -152,8 +152,19 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
   const allTypes = useMemo(() => [...new Set(products.map(p => p.type))].sort(), [products]);
   const allTags = useMemo(() => [...new Set(products.flatMap(p => p.tags))].sort(), [products]);
 
-  const matched = useMemo(() => products.filter(p => matchesFilter(p, filter)), [products, filter]);
-  const { adjusted, summary } = useMemo(() => adjustProducts(products, filter, rule), [products, filter, rule]);
+  // #4 — exclude products with no base price by default so the preview
+  // doesn't fill with "$0.00 → $0.00" rows. The catalog query already
+  // filters retail_price IS NOT NULL but invoice-session products may
+  // arrive without a price.
+  const [includeZeroPrice, setIncludeZeroPrice] = useState(false);
+  const priceableProducts = useMemo(
+    () => includeZeroPrice ? products : products.filter(p => (p[rule.field] ?? 0) > 0),
+    [products, rule.field, includeZeroPrice],
+  );
+  const skippedZeroCount = products.length - priceableProducts.length;
+
+  const matched = useMemo(() => priceableProducts.filter(p => matchesFilter(p, filter)), [priceableProducts, filter]);
+  const { adjusted, summary } = useMemo(() => adjustProducts(priceableProducts, filter, rule), [priceableProducts, filter, rule]);
 
   // AI handler
   const handleAI = useCallback(async () => {

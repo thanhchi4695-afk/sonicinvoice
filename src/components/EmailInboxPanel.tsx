@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, Copy, Check, Upload, Mail, Paperclip, ChevronDown, Loader2, FileText, Image } from "lucide-react";
+import { ChevronLeft, Copy, Check, Upload, Mail, Paperclip, ChevronDown, Loader2, FileText, Image, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { addAuditEntry } from "@/lib/audit-log";
 
@@ -23,6 +23,12 @@ interface InboxItem {
 
 const INBOX_KEY = "email_inbox";
 
+// Demo mode is opt-in only via ?demo=1 — production never seeds fake data.
+const isDemoMode = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("demo") === "1";
+};
+
 function getInboxItems(): InboxItem[] {
   try { return JSON.parse(localStorage.getItem(INBOX_KEY) || "[]"); } catch { return []; }
 }
@@ -31,46 +37,23 @@ function saveInboxItems(items: InboxItem[]) {
   localStorage.setItem(INBOX_KEY, JSON.stringify(items));
 }
 
-// Seed demo items
-(function seedInbox() {
+// Optional demo seed — only runs when ?demo=1 is in the URL.
+(function seedInboxIfDemo() {
+  if (!isDemoMode()) return;
   const existing = getInboxItems();
   if (existing.length > 0) return;
   const seed: InboxItem[] = [
     {
-      id: "inbox-1",
-      from: "Jantzen Orders",
-      fromEmail: "orders@jantzen.com.au",
-      subject: "Invoice JAN-2847 — March delivery",
-      received: "Today 2:14 PM",
+      id: "inbox-demo-1",
+      from: "Demo Supplier",
+      fromEmail: "demo@supplier.example",
+      subject: "Demo invoice DEMO-001",
+      received: "Just now",
       receivedDate: new Date(),
-      attachmentName: "JAN-2847.pdf",
-      attachmentPages: 3,
+      attachmentName: "DEMO-001.pdf",
+      attachmentPages: 1,
       attachmentType: "pdf",
       status: "queued",
-    },
-    {
-      id: "inbox-2",
-      from: "Seafolly Wholesale",
-      fromEmail: "wholesale@seafolly.com.au",
-      subject: "SF Invoice #1190 — Restock order",
-      received: "Today 10:22 AM",
-      receivedDate: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      attachmentName: "SF-1190.xlsx",
-      attachmentPages: 1,
-      attachmentType: "xlsx",
-      status: "ready",
-    },
-    {
-      id: "inbox-3",
-      from: "Baku Australia",
-      fromEmail: "accounts@baku.com.au",
-      subject: "March Statement & Invoice BK-501",
-      received: "Yesterday 4:30 PM",
-      receivedDate: new Date(Date.now() - 22 * 60 * 60 * 1000),
-      attachmentName: "BK-501.pdf",
-      attachmentPages: 2,
-      attachmentType: "pdf",
-      status: "done",
     },
   ];
   saveInboxItems(seed);
@@ -99,30 +82,18 @@ const statusBadge = (status: InboxItem["status"]) => {
 
 const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => {
   const [items, setItems] = useState<InboxItem[]>(getInboxItems);
-  const [copied, setCopied] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
   const [simFrom, setSimFrom] = useState("");
   const [simSubject, setSimSubject] = useState("");
   const [simFile, setSimFile] = useState<string | null>(null);
 
-  const username = localStorage.getItem("sonic_invoice_username") || "splash";
-  const inboxAddress = `${username}@sonicinvoices.com`;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(inboxAddress);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const demo = isDemoMode();
 
   const handleProcess = (item: InboxItem) => {
-    // ── Don't claim "Processed" until the import flow actually completes.
-    // Mark as 'processing' here; the invoice flow will mark 'done' when finished.
     const updated = items.map(i => i.id === item.id ? { ...i, status: "processing" as const } : i);
     setItems(updated);
     saveInboxItems(updated);
     addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
-
-    // Extract supplier name from email domain
     const domain = item.fromEmail.split("@")[1] || "";
     const supplierName = domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1);
     onProcessInvoice?.(supplierName);
@@ -176,29 +147,27 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       </div>
 
       <div className="px-4 pt-4 space-y-4">
-        {/* Inbox address card */}
-        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+        {/* Honest "coming soon" notice — replaces fake address while backend is being built */}
+        <div className="bg-muted/40 border border-border rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Mail className="w-5 h-5 text-primary" />
+            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 text-muted-foreground" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-muted-foreground mb-1">Your dedicated inbox:</p>
-              <p className="text-sm font-semibold font-mono-data text-primary break-all">{inboxAddress}</p>
+              <p className="text-sm font-semibold mb-1">Email forwarding — coming soon</p>
+              <p className="text-xs text-muted-foreground">
+                We're setting up a dedicated <span className="font-mono-data">@inbox.sonicinvoices.com</span> address
+                so suppliers can email invoices straight into your queue. Until then, please use the upload
+                or Drive flow on the dashboard.
+              </p>
               <p className="text-[11px] text-muted-foreground mt-2">
-                Give this address to your suppliers. When they email an invoice, it will appear here automatically.
+                Want early access? Reply to your latest update email and we'll add you to the pilot list.
               </p>
             </div>
-            <Button variant="outline" size="sm" className="shrink-0 h-8 text-xs gap-1" onClick={handleCopy}>
-              {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
-            </Button>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-3 pt-2 border-t border-primary/10">
-            Supports PDF, Excel, CSV, and image attachments. Inbox refreshes every 30 seconds.
-          </p>
         </div>
 
-        {/* Inbox queue */}
+        {/* Inbox queue — only shows entries the user creates via the simulator */}
         <div>
           <h3 className="text-sm font-semibold mb-2">Inbox queue</h3>
           {items.length === 0 ? (
@@ -208,7 +177,8 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
               </div>
               <p className="text-sm font-medium">No invoices yet</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Share your inbox address with your suppliers and their invoices will appear here automatically.
+                Once email forwarding is live, supplier emails will appear here automatically. Use the
+                simulator below to preview the flow.
               </p>
             </div>
           ) : (
@@ -221,6 +191,9 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="text-sm font-medium truncate">{item.from}</p>
                           <span className="text-[10px] text-muted-foreground shrink-0">{item.received}</span>
+                          {demo && (
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning border border-warning/20 shrink-0">DEMO</span>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{item.subject}</p>
                         <div className="flex items-center gap-2 mt-1.5">
@@ -251,7 +224,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
           )}
         </div>
 
-        {/* Simulate incoming email */}
+        {/* Simulate incoming email — labelled clearly as a preview tool */}
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           <button
             onClick={() => setShowSimulator(!showSimulator)}
@@ -259,13 +232,15 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
           >
             <span className="text-xs font-medium flex items-center gap-2">
               <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-              📧 Simulate incoming email
+              Preview the flow — simulate an incoming email
             </span>
             <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showSimulator ? "rotate-180" : ""}`} />
           </button>
           {showSimulator && (
             <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-              <p className="text-[11px] text-muted-foreground">Test the inbox flow by simulating a supplier email.</p>
+              <p className="text-[11px] text-muted-foreground">
+                For previewing only — no real email is sent. Use this to see how a supplier email will appear once forwarding is live.
+              </p>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">From</label>
                 <input
@@ -300,7 +275,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                 </div>
               </div>
               <Button variant="teal" className="w-full h-10" onClick={handleSimulateSend} disabled={!simFrom.trim()}>
-                <Mail className="w-4 h-4 mr-2" /> Send to inbox
+                <Mail className="w-4 h-4 mr-2" /> Add to preview queue
               </Button>
             </div>
           )}

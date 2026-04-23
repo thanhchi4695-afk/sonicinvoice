@@ -122,25 +122,24 @@ const AnalyticsPanel = () => {
   const avgMargin = marginData.length > 0 ? marginData.reduce((s, r) => s + r.margin, 0) / marginData.length : 0;
 
   // ── Brand scorecard ─────────────────────────────────────
+  // Only Margin is computed from real fields (cost vs rrp). Match rate /
+  // delivery / extraction accuracy require signals we don't have today
+  // (no PO expected_at, no per-line correction count) so we surface them
+  // as "—" rather than fabricated numbers.
   const brandScores = useMemo(() => {
     const brands = [...new Set(data.map(r => r.brand))];
     return brands.map(brand => {
       const items = data.filter(r => r.brand === brand);
-      const matchRate = items.filter(r => r.matched).length / items.length;
-      const onTimeRate = items.filter(r => r.deliveryStatus === "on_time").length / items.length;
       const withRrp = items.filter(r => r.rrp && r.rrp > 0);
       const avgM = withRrp.length > 0 ? withRrp.reduce((s, r) => s + (r.rrp! - r.cost) / r.rrp!, 0) / withRrp.length : 0;
-      const accuracyRate = items.filter(r => r.invoiceAccurate).length / items.length;
-
-      const matchScore = Math.round(matchRate * 25);
-      const deliveryScore = Math.round(onTimeRate * 25);
-      const marginScore = Math.min(25, Math.round(avgM * 25 / 0.7));
-      const accuracyScore = Math.round(accuracyRate * 25);
-      const total = matchScore + deliveryScore + marginScore + accuracyScore;
-
-      const deliveryLabel = onTimeRate >= 0.9 ? "On time" : onTimeRate >= 0.5 ? "Sometimes late" : "Overdue";
-      return { brand, total, matchRate, deliveryLabel, avgMargin: avgM, accuracyRate, onTimeRate };
-    }).sort((a, b) => b.total - a.total);
+      const marginScore = withRrp.length > 0 ? Math.min(100, Math.round(avgM * 100 / 0.7)) : null;
+      return {
+        brand,
+        total: marginScore,                // null when no margin data
+        avgMargin: withRrp.length > 0 ? avgM : null,
+        hasMargin: withRrp.length > 0,
+      };
+    }).sort((a, b) => (b.total ?? -1) - (a.total ?? -1));
   }, [data]);
 
   // ── Donut chart SVG ─────────────────────────────────────

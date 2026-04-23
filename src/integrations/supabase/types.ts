@@ -2577,6 +2577,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      normalise_vendor: { Args: { raw: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "buyer" | "warehouse" | "viewer"

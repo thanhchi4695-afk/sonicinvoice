@@ -893,14 +893,24 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     const processNextLine = () => {
       if (cancelled.current || lineIdx >= lines.length) {
         if (!cancelled.current) {
+          const startTs = processStartTime || Date.now();
+          const endTs = Date.now();
+          const durationSec = Math.max(1, Math.floor((endTs - startTs) / 1000));
           setProcessingDone(true);
-          setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
+          setFinalProcessingTime(durationSec);
           setShowCompletionSummary(true);
+          // Persist real processing duration for Processing History (#5, #12)
+          recordProcessingDuration({
+            startedAt: startTs,
+            completedAt: endTs,
+            rowsSeen: lines.length,
+            variantsExtracted: lines.length,
+          });
           const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
           history.unshift({
             supplier: supplierName || "Unknown",
             lines: lines.length,
-            processingTime: Math.floor((Date.now() - (processStartTime || Date.now())) / 1000),
+            processingTime: durationSec,
             matchRate: Math.round((lines.filter(l => l.status === "done").length / lines.length) * 100),
             date: new Date().toISOString(),
           });

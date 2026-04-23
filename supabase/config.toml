@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.shopify-session-verify]
 verify_jwt = false
+
+[functions.drive-worker]
+verify_jwt = false

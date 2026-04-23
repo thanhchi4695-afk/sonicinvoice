@@ -824,6 +824,7 @@ export type Database = {
           processing_quality_score: number | null
           processing_started_at: string | null
           review_duration_seconds: number | null
+          review_status: string | null
           rows_added: number | null
           rows_deleted: number | null
           rows_seen: number | null
@@ -861,6 +862,7 @@ export type Database = {
           processing_quality_score?: number | null
           processing_started_at?: string | null
           review_duration_seconds?: number | null
+          review_status?: string | null
           rows_added?: number | null
           rows_deleted?: number | null
           rows_seen?: number | null
@@ -898,6 +900,7 @@ export type Database = {
           processing_quality_score?: number | null
           processing_started_at?: string | null
           review_duration_seconds?: number | null
+          review_status?: string | null
           rows_added?: number | null
           rows_deleted?: number | null
           rows_seen?: number | null
@@ -1233,14 +1236,17 @@ export type Database = {
           drive_file_id: string | null
           error: string | null
           file_name: string
+          file_size_bytes: number | null
           file_type: string | null
           finished_at: string | null
           id: string
+          pattern_id: string | null
           position: number
           source: string
           source_url: string | null
           started_at: string | null
           status: string
+          storage_path: string | null
           updated_at: string
           upload_id: string | null
           user_id: string
@@ -1252,14 +1258,17 @@ export type Database = {
           drive_file_id?: string | null
           error?: string | null
           file_name: string
+          file_size_bytes?: number | null
           file_type?: string | null
           finished_at?: string | null
           id?: string
+          pattern_id?: string | null
           position?: number
           source?: string
           source_url?: string | null
           started_at?: string | null
           status?: string
+          storage_path?: string | null
           updated_at?: string
           upload_id?: string | null
           user_id: string
@@ -1271,14 +1280,17 @@ export type Database = {
           drive_file_id?: string | null
           error?: string | null
           file_name?: string
+          file_size_bytes?: number | null
           file_type?: string | null
           finished_at?: string | null
           id?: string
+          pattern_id?: string | null
           position?: number
           source?: string
           source_url?: string | null
           started_at?: string | null
           status?: string
+          storage_path?: string | null
           updated_at?: string
           upload_id?: string | null
           user_id?: string

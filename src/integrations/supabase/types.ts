@@ -756,6 +756,47 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_line_edits: {
+        Row: {
+          edited_at: string
+          field: string
+          id: string
+          invoice_pattern_id: string | null
+          new_value: string | null
+          old_value: string | null
+          row_index: number | null
+          user_id: string
+        }
+        Insert: {
+          edited_at?: string
+          field: string
+          id?: string
+          invoice_pattern_id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          row_index?: number | null
+          user_id: string
+        }
+        Update: {
+          edited_at?: string
+          field?: string
+          id?: string
+          invoice_pattern_id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          row_index?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_line_edits_invoice_pattern_id_fkey"
+            columns: ["invoice_pattern_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_patterns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_patterns: {
         Row: {
           column_map: Json
@@ -778,16 +819,21 @@ export type Database = {
           pack_notation_detected: boolean | null
           price_column_cost: string | null
           price_column_rrp: string | null
+          processing_completed_at: string | null
+          processing_duration_seconds: number | null
           processing_quality_score: number | null
+          processing_started_at: string | null
           review_duration_seconds: number | null
           rows_added: number | null
           rows_deleted: number | null
+          rows_seen: number | null
           sample_headers: Json
           size_matrix_detected: boolean | null
           size_system: string | null
           supplier_profile_id: string | null
           updated_at: string
           user_id: string
+          variants_extracted: number | null
         }
         Insert: {
           column_map?: Json
@@ -810,16 +856,21 @@ export type Database = {
           pack_notation_detected?: boolean | null
           price_column_cost?: string | null
           price_column_rrp?: string | null
+          processing_completed_at?: string | null
+          processing_duration_seconds?: number | null
           processing_quality_score?: number | null
+          processing_started_at?: string | null
           review_duration_seconds?: number | null
           rows_added?: number | null
           rows_deleted?: number | null
+          rows_seen?: number | null
           sample_headers?: Json
           size_matrix_detected?: boolean | null
           size_system?: string | null
           supplier_profile_id?: string | null
           updated_at?: string
           user_id: string
+          variants_extracted?: number | null
         }
         Update: {
           column_map?: Json
@@ -842,16 +893,21 @@ export type Database = {
           pack_notation_detected?: boolean | null
           price_column_cost?: string | null
           price_column_rrp?: string | null
+          processing_completed_at?: string | null
+          processing_duration_seconds?: number | null
           processing_quality_score?: number | null
+          processing_started_at?: string | null
           review_duration_seconds?: number | null
           rows_added?: number | null
           rows_deleted?: number | null
+          rows_seen?: number | null
           sample_headers?: Json
           size_matrix_detected?: boolean | null
           size_system?: string | null
           supplier_profile_id?: string | null
           updated_at?: string
           user_id?: string
+          variants_extracted?: number | null
         }
         Relationships: [
           {

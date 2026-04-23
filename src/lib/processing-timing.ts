@@ -91,7 +91,7 @@ export function recordLineEdits(
           .eq("user_id", userId)
           .order("updated_at", { ascending: false })
           .limit(1);
-        patternId = ((latest || []) as Array<{ id: string }>)[0]?.id ?? null;
+        patternId = ((latest || []) as unknown as Array<{ id: string }>)[0]?.id ?? null;
       }
       if (!patternId) return;
 
@@ -139,7 +139,7 @@ export function recordProcessingDuration(opts: {
           .eq("layout_fingerprint", opts.layoutFingerprint)
           .order("updated_at", { ascending: false })
           .limit(1);
-        patternId = ((data || []) as Array<{ id: string }>)[0]?.id;
+        patternId = ((data || []) as unknown as Array<{ id: string }>)[0]?.id;
       }
       if (!patternId) {
         const { data } = await supabase
@@ -148,7 +148,7 @@ export function recordProcessingDuration(opts: {
           .eq("user_id", userId)
           .order("updated_at", { ascending: false })
           .limit(1);
-        patternId = ((data || []) as Array<{ id: string }>)[0]?.id;
+        patternId = ((data || []) as unknown as Array<{ id: string }>)[0]?.id;
       }
       if (!patternId) return;
 

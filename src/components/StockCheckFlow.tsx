@@ -388,6 +388,34 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete, onStartFlow }: StockChe
     a.click(); URL.revokeObjectURL(url);
   };
 
+  // ── EMPTY STATE: opened without an invoice context (#11) ──
+  if (!hasLineItems) {
+    return (
+      <div className="px-4 pt-6 pb-24 max-w-2xl mx-auto animate-fade-in">
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="w-5 h-5" /></Button>
+          <h1 className="text-xl font-semibold">Invoice stock check</h1>
+        </div>
+        <div className="bg-card rounded-lg border border-dashed border-border p-8 text-center">
+          <Search className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+          <p className="text-base font-semibold mb-1">Pick an invoice to stock-check</p>
+          <p className="text-sm text-muted-foreground mb-5 max-w-md mx-auto">
+            Stock check compares one invoice against your catalog and POS so you can see
+            refills vs new colours vs new products at a glance.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <Button variant="teal" onClick={() => onStartFlow?.("processing_history")}>
+              Open recent invoices
+            </Button>
+            <Button variant="outline" onClick={() => onStartFlow?.("invoice")}>
+              Upload a new invoice
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── SCREEN: CHECKING ──
   if (screen === "checking") {
     return (

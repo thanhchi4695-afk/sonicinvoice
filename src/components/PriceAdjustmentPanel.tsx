@@ -412,6 +412,26 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
           </div>
         )}
 
+        {/* #4 — banner explaining auto-skipped $0 rows */}
+        {skippedZeroCount > 0 && (
+          <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs flex items-start gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-foreground">
+                {skippedZeroCount} product{skippedZeroCount === 1 ? "" : "s"} excluded — no
+                <code className="mx-1 px-1 bg-muted rounded text-[10px]">{rule.field}</code>
+                on file. Set a base price first or include them anyway.
+              </p>
+            </div>
+            <button
+              onClick={() => setIncludeZeroPrice(v => !v)}
+              className="text-[11px] underline text-foreground hover:text-primary shrink-0"
+            >
+              {includeZeroPrice ? "Hide $0 rows" : "Include anyway"}
+            </button>
+          </div>
+        )}
+
         {templates.length > 0 && (
           <div>
             <p className="text-xs text-muted-foreground mb-2">📋 Saved templates</p>

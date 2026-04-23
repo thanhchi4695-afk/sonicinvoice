@@ -54,8 +54,11 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete, onStartFlow }: StockChe
   const [applySummary, setApplySummary] = useState<{ refills: number; newColours: number; newProducts: number; skipped: number; totalUnits: number }>({ refills: 0, newColours: 0, newProducts: 0, skipped: 0, totalUnits: 0 });
   const [searchProduct, setSearchProduct] = useState<{ groupKey: string; query: string; results: ShopifyVariant[]; loading: boolean } | null>(null);
 
+  const hasLineItems = lineItems.length > 0;
+
   // ── Run batch lookup on mount ──
   useEffect(() => {
+    if (!hasLineItems) return; // #11 — don't run a lookup with nothing to match
     runBatchLookup();
     loadLocations();
   }, []);

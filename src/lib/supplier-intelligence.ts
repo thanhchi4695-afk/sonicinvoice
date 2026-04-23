@@ -69,12 +69,13 @@ export async function recordSupplierLearned(payload: LearningPayload): Promise<v
     const userId = await getUserId();
     if (!userId || !payload.supplierName) return;
 
+    const supplierName = normaliseVendor(payload.supplierName);
     const confidenceAfter = clampConfidence(payload.confidence, 20);
 
     await supabase.from("supplier_intelligence").upsert(
       {
         user_id: userId,
-        supplier_name: payload.supplierName,
+        supplier_name: supplierName,
         name_variants: payload.nameVariants ?? [],
         column_map: (payload.columnMap ?? {}) as never,
         confidence_score: confidenceAfter,
@@ -92,7 +93,7 @@ export async function recordSupplierLearned(payload: LearningPayload): Promise<v
 
     await appendLog(
       userId,
-      payload.supplierName,
+      supplierName,
       "supplier_learned",
       payload.matchMethod ?? "full_extraction",
       null,
@@ -114,12 +115,15 @@ export async function recordSupplierUpdated(payload: LearningPayload): Promise<v
     const userId = await getUserId();
     if (!userId || !payload.supplierName) return;
 
+    const supplierName = normaliseVendor(payload.supplierName);
+
     // Read current row so we can compute "before" confidence + bump invoice_count.
+    // Match case-insensitively so old un-normalised rows are still picked up.
     const { data: current } = await supabase
       .from("supplier_intelligence")
       .select("id, invoice_count, confidence_score, name_variants, column_map")
       .eq("user_id", userId)
-      .eq("supplier_name", payload.supplierName)
+      .ilike("supplier_name", supplierName)
       .maybeSingle();
 
     const confidenceBefore = current?.confidence_score ?? null;
@@ -142,6 +146,7 @@ export async function recordSupplierUpdated(payload: LearningPayload): Promise<v
       await supabase
         .from("supplier_intelligence")
         .update({
+          supplier_name: supplierName,
           confidence_score: confidenceAfter,
           invoice_count: newInvoiceCount,
           column_map: mergedColumnMap as never,
@@ -163,7 +168,7 @@ export async function recordSupplierUpdated(payload: LearningPayload): Promise<v
 
     await appendLog(
       userId,
-      payload.supplierName,
+      supplierName,
       "supplier_updated",
       payload.matchMethod ?? "supplier_match",
       confidenceBefore,

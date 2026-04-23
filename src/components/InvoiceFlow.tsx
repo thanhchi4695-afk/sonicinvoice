@@ -49,6 +49,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { inferSupplierRules, computeHeaderFingerprint, type InferredRules, type SupplierProfile as InferProfile, type SharedPatternLite } from "@/lib/supplier-inference";
 import { generateLayoutFingerprint, matchFingerprint } from "@/lib/layout-fingerprint";
 import { recordProcessingQuality } from "@/lib/processing-quality";
+import { formatDuration, estimateEta, recordProcessingDuration } from "@/lib/processing-timing";
 import { persistParsedInvoice } from "@/lib/invoice-persistence";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
@@ -878,8 +879,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   const runEnrichmentSim = (cancelled: { current: boolean }, names: string[]) => {
     if (names.length === 0) {
+      const startTs = processStartTime || Date.now();
+      const durationSec = Math.max(1, Math.floor((Date.now() - startTs) / 1000));
       setProcessingDone(true);
-      setFinalProcessingTime(0);
+      setFinalProcessingTime(durationSec);
       setShowCompletionSummary(true);
       return;
     }
@@ -892,14 +895,24 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     const processNextLine = () => {
       if (cancelled.current || lineIdx >= lines.length) {
         if (!cancelled.current) {
+          const startTs = processStartTime || Date.now();
+          const endTs = Date.now();
+          const durationSec = Math.max(1, Math.floor((endTs - startTs) / 1000));
           setProcessingDone(true);
-          setFinalProcessingTime(Math.floor((Date.now() - (processStartTime || Date.now())) / 1000));
+          setFinalProcessingTime(durationSec);
           setShowCompletionSummary(true);
+          // Persist real processing duration for Processing History (#5, #12)
+          recordProcessingDuration({
+            startedAt: startTs,
+            completedAt: endTs,
+            rowsSeen: lines.length,
+            variantsExtracted: lines.length,
+          });
           const history = JSON.parse(localStorage.getItem("processing_history") || "[]");
           history.unshift({
             supplier: supplierName || "Unknown",
             lines: lines.length,
-            processingTime: Math.floor((Date.now() - (processStartTime || Date.now())) / 1000),
+            processingTime: durationSec,
             matchRate: Math.round((lines.filter(l => l.status === "done").length / lines.length) * 100),
             date: new Date().toISOString(),
           });
@@ -3544,9 +3557,26 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             const inProgress = enrichLines.filter(l => l.status === "searching" || l.status === "extracting").length;
             const waiting = enrichLines.filter(l => l.status === "waiting").length;
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-            const avgPerLine = processingElapsed > 0 && done > 0 ? processingElapsed / done : 3;
-            const remaining = Math.max(0, Math.round(avgPerLine * (total - done)));
-            const fmtTime = (s: number) => s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+
+            // Honest ETA — never claims "~3s" while elapsed > 3s.
+            // If we have completed lines, project remaining from observed pace.
+            // Otherwise show "Estimating…" rather than a fake number.
+            const etaResult = total > 0 && done > 0
+              ? estimateEta({ elapsedSeconds: processingElapsed, completedStages: done, totalStages: total })
+              : null;
+            const etaLabel: string = etaResult == null
+              ? (processingElapsed < 5 ? "Estimating…" : "Still working — large or unfamiliar invoice")
+              : etaResult.capped
+                ? "Still working — large or unfamiliar invoice"
+                : `~${formatDuration(etaResult.etaSeconds)} remaining`;
+
+            // Variants extracted from product groups so the Reading screen reports
+            // the same number the Review screen will show — no more "3 vs 22"
+            // contradictions (Bug #6).
+            const variantCount = productGroups.reduce(
+              (s, g) => s + (g.variants?.length || 0),
+              0,
+            );
 
             return (
               <>
@@ -3558,7 +3588,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                       <h3 className="text-lg font-semibold font-display">Processing complete</h3>
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">
-                      {total} lines processed in {fmtTime(finalProcessingTime)}
+                      {total} {total === 1 ? "row" : "rows"} → {variantCount || total} {variantCount === 1 ? "variant" : "variants"} processed in {formatDuration(finalProcessingTime)}
                     </p>
                     <div className="bg-muted/50 rounded-lg border border-border divide-y divide-border overflow-hidden mb-4">
                       <div className="flex items-center justify-between px-4 py-2.5">
@@ -3661,8 +3691,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                       </div>
                       <span className="text-muted-foreground font-mono-data">
                         {processingDone
-                          ? `✅ Complete in ${fmtTime(finalProcessingTime)}`
-                          : `~${fmtTime(remaining)} remaining`}
+                          ? `✅ Complete in ${formatDuration(finalProcessingTime)}`
+                          : etaLabel}
                       </span>
                     </div>
                     <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
@@ -3677,7 +3707,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                     <div className="flex items-center justify-between mt-1.5">
                       <span className="text-xs font-semibold text-primary">{pct}%</span>
                       <span className="text-[10px] text-muted-foreground font-mono-data">
-                        ⏱ {fmtTime(processingElapsed)} elapsed
+                        ⏱ {formatDuration(processingElapsed)} elapsed{variantCount > 0 ? ` · ${total} ${total === 1 ? "row" : "rows"} → ${variantCount} variants` : ""}
                       </span>
                     </div>
                   </div>

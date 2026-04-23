@@ -29,7 +29,7 @@ export function BrainSummaryBanner({ summary }: { summary: BrainValidationSummar
       <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
       <div className="text-xs">
         <p className="font-semibold text-warning">
-          {summary.flagged} of {summary.total} item{summary.total === 1 ? "" : "s"} need review
+          {summary.flagged} of {summary.total} product group{summary.total === 1 ? "" : "s"} need review
         </p>
         <p className="text-muted-foreground mt-0.5">{parts.join(" · ")}</p>
       </div>

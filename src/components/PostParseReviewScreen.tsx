@@ -15,6 +15,7 @@ import { saveCorrection, type CorrectionPattern } from "@/lib/invoice-templates"
 import { recordFieldCorrection, recordNoiseRejection, recordGroupingRule, recordReclassification } from "@/lib/invoice-learning";
 import { updateSupplierProfileWithCorrections } from "@/lib/supplier-profile-updater";
 import { logCorrection, deriveFieldCategory, registerApplyToRemainingRowsHandler, type CorrectionReason } from "@/lib/correction-tracker";
+import { recordLineEdits } from "@/lib/processing-timing";
 import CorrectionReasonPicker, { CorrectionSavedCheck } from "@/components/CorrectionReasonPicker";
 import { saveInvoiceLinesToCatalog } from "@/components/SupplierCatalog";
 import { persistParsedInvoice } from "@/lib/invoice-persistence";
@@ -481,6 +482,11 @@ export default function PostParseReviewScreen({
       autoDetected: lowConfFields.has(field),
       invoiceId: sessionInvoiceId,
     });
+    // Per-field audit row → powers Processing History "Edits" column.
+    recordLineEdits(
+      [{ field: fieldLabel, oldValue: originalValue, newValue: correctedValue, rowIndex: args.rowIndex }],
+      null,
+    );
     setSessionEditCount((c) => c + 1);
   }, [supplierName, products, detectedHeaders, detectedLayout, lowConfFields, sessionInvoiceId]);
 

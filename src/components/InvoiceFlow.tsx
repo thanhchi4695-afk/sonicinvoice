@@ -3257,10 +3257,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                     </p>
                     <div className="max-h-56 overflow-y-auto rounded-md border border-border divide-y divide-border mb-3">
                       {drivePreview.map((f, i) => (
-                        <div key={`${f.fileName}-${i}`} className="flex items-center gap-2 px-2.5 py-2 text-xs">
+                        <div key={`${f.id}-${i}`} className="flex items-center gap-2 px-2.5 py-2 text-xs">
                           <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                          <span className="truncate flex-1">{f.fileName}</span>
-                          <span className="text-[10px] text-muted-foreground uppercase">{f.fileType}</span>
+                          <span className="truncate flex-1">{f.name}</span>
                         </div>
                       ))}
                     </div>

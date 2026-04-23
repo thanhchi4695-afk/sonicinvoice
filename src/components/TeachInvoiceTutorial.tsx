@@ -15,7 +15,7 @@ interface TeachInvoiceTutorialProps {
   onOpenSupplierIntelligence?: () => void;
   /** Open the Catalog (Learning) Memory panel. */
   onOpenCatalogMemory?: () => void;
-  /** Optional supplier name to make the copy concrete (defaults to "Claude Cowork"). */
+  /** Optional supplier name to make the copy concrete. Defaults to a generic label. */
   supplierName?: string;
 }
 
@@ -47,7 +47,7 @@ const TeachInvoiceTutorial = ({
   onStartInvoice,
   onOpenSupplierIntelligence,
   onOpenCatalogMemory,
-  supplierName = "Claude Cowork",
+  supplierName = "your supplier",
 }: TeachInvoiceTutorialProps) => {
   const [stepIdx, setStepIdx] = useState(0);
   const step = STEPS[stepIdx];
@@ -65,7 +65,7 @@ const TeachInvoiceTutorial = ({
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-bold font-display truncate">
-            Teach {supplierName} invoices
+            Teach Sonic Invoice
           </h1>
           <p className="text-xs text-muted-foreground">
             A 5-step tour of where each kind of learning lives
@@ -142,10 +142,10 @@ const TeachInvoiceTutorial = ({
               <div className="rounded-md border border-border bg-muted/30 p-3 text-xs space-y-1.5">
                 <p className="font-semibold text-foreground">How to find it</p>
                 <p className="text-muted-foreground">
-                  <span className="text-foreground">Desktop:</span> sidebar → <strong>Suppliers</strong> → open <strong>{supplierName}</strong> → <strong>Brain</strong> tab.
+                  <span className="text-foreground">Desktop:</span> sidebar → <strong>Supplier Brain</strong> → pick a supplier.
                 </p>
                 <p className="text-muted-foreground">
-                  <span className="text-foreground">Mobile / embedded Shopify:</span> bottom tabs → <strong>Suppliers</strong> → tap <strong>{supplierName}</strong> → <strong>Brain</strong>.
+                  <span className="text-foreground">Mobile:</span> bottom tabs → <strong>Tools</strong> → <strong>Supplier Brain</strong>.
                 </p>
               </div>
               <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs">
@@ -179,10 +179,10 @@ const TeachInvoiceTutorial = ({
               <div className="rounded-md border border-border bg-muted/30 p-3 text-xs space-y-1.5">
                 <p className="font-semibold text-foreground">How to find it</p>
                 <p className="text-muted-foreground">
-                  <span className="text-foreground">Desktop:</span> sidebar → <strong>Insights</strong>.
+                  <span className="text-foreground">Desktop:</span> sidebar → <strong>Supplier Brain</strong> → <em>Intelligence</em> tab.
                 </p>
                 <p className="text-muted-foreground">
-                  <span className="text-foreground">Mobile / embedded Shopify:</span> bottom tabs → <strong>Tools</strong> → <strong>Supplier Intelligence</strong>.
+                  <span className="text-foreground">Mobile:</span> bottom tabs → <strong>Tools</strong> → <strong>Supplier Brain</strong> → Intelligence.
                 </p>
               </div>
               <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-xs">
@@ -205,8 +205,8 @@ const TeachInvoiceTutorial = ({
               <div className="rounded-md border border-border bg-muted/30 p-3 text-xs space-y-1.5">
                 <p className="font-semibold text-foreground">How to find it</p>
                 <p className="text-muted-foreground">
-                  Home screen → tap the <strong>Catalog</strong> stat tile, or sidebar →
-                  <strong> Catalog Memory</strong>.
+                  Sidebar → <strong>Invoices</strong> tab → tap the <strong>Catalog memory</strong>
+                  tile, or open the Home screen and tap the <strong>Catalog</strong> stat.
                 </p>
               </div>
               <div className="rounded-md border border-violet-500/30 bg-violet-500/5 p-3 text-xs">

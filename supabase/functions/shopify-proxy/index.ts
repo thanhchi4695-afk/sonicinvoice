@@ -6,6 +6,7 @@ const corsHeaders = {
 };
 // ═══ Session token verification import ═══
 import { verifyShopifySessionToken, extractShopDomain } from "../_shared/verify-session-token.ts";
+import { getValidShopifyToken, ShopifyReauthRequiredError } from "../_shared/shopify-token.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

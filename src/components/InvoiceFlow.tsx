@@ -1875,6 +1875,18 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     setStep(2);
     setInvoicePageImages([]);
     setEnrichLines([{ name: "Reading file...", status: "searching", action: "Parsing invoice data...", confidence: 0 }]);
+    // Shadow-log: start an agent_sessions row mirroring this run.
+    void (async () => {
+      const sid = await startShadowSession({ supplier: supplierName, trigger: "invoice_upload" });
+      if (sid) {
+        await logShadowStep({
+          step: "extract",
+          status: "running",
+          narrative: `Reading invoice from ${supplierName || "supplier"}…`,
+          input: { fileName: fName, mode: fileParseMode },
+        });
+      }
+    })();
 
     // Capture invoice page image(s) for source trace viewer
     const fileExt = fName.split(".").pop()?.toLowerCase() || "";

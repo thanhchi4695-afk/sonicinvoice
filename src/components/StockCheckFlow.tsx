@@ -196,19 +196,98 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete, onStartFlow }: StockChe
       try {
         if (outcome === "refill") {
           // Adjust inventory for each size
-          const changes = g.sizes
-            .filter(s => s.matchedVariant)
-            .map(s => ({
-              inventoryItemId: s.matchedVariant!.inventoryItemId,
-              locationId: locationGid,
-              delta: s.qty,
-            }));
+          const refillSizes = g.sizes.filter(s => s.matchedVariant);
+          const changes = refillSizes.map(s => ({
+            inventoryItemId: s.matchedVariant!.inventoryItemId,
+            locationId: locationGid,
+            delta: s.qty,
+          }));
 
           if (changes.length > 0) {
+            // ── Audit: record BEFORE Shopify call (with idempotency) ──
+            const { data: { user } } = await supabase.auth.getUser();
+            const locationName = locations.find(l => l.id === selectedLocation)?.name || null;
+            const beforeSnapshot = refillSizes.map(s => ({
+              inventoryItemId: s.matchedVariant!.inventoryItemId,
+              sku: s.matchedVariant!.sku,
+              size: s.size,
+              currentQty: s.matchedVariant!.inventoryQuantity ?? null,
+              delta: s.qty,
+            }));
+            const idempotencyKey = await hashIdempotency({
+              groupKey: `${g.styleNumber}::${g.colour}`,
+              location: locationGid,
+              changes,
+            });
+
+            let auditRunId: string | null = null;
+            if (user) {
+              const { data: inserted, error: insertErr } = await supabase
+                .from("inventory_import_runs")
+                .insert({
+                  user_id: user.id,
+                  run_status: "started",
+                  source: "stock_check_refill",
+                  supplier_name: g.brand || null,
+                  location_id: selectedLocation || null,
+                  location_name: locationName,
+                  group_key: `${g.styleNumber}::${g.colour}`,
+                  style_number: g.styleNumber || null,
+                  colour: g.colour || null,
+                  product_title: g.styleName || null,
+                  shopify_product_id: g.matchedProduct?.id || null,
+                  changes,
+                  before_snapshot: beforeSnapshot,
+                  units_applied: g.totalQty,
+                  idempotency_key: idempotencyKey,
+                })
+                .select("id")
+                .maybeSingle();
+
+              if (insertErr) {
+                // Duplicate idempotency key → skip the actual Shopify call
+                if (insertErr.code === "23505") {
+                  throw new Error("Already applied (idempotent skip)");
+                }
+                console.warn("audit insert failed", insertErr);
+              } else {
+                auditRunId = inserted?.id || null;
+              }
+            }
+
             const { error } = await supabase.functions.invoke("shopify-proxy", {
               body: { action: "graphql_adjust_inventory", inventory_changes: changes },
             });
-            if (error) throw new Error(error.message);
+
+            if (error) {
+              if (auditRunId) {
+                await supabase
+                  .from("inventory_import_runs")
+                  .update({
+                    run_status: "error",
+                    error_message: error.message,
+                    completed_at: new Date().toISOString(),
+                  })
+                  .eq("id", auditRunId);
+              }
+              throw new Error(error.message);
+            }
+
+            // ── Audit: record AFTER success ──
+            if (auditRunId) {
+              const afterSnapshot = beforeSnapshot.map(b => ({
+                ...b,
+                newQty: b.currentQty != null ? b.currentQty + b.delta : null,
+              }));
+              await supabase
+                .from("inventory_import_runs")
+                .update({
+                  run_status: "success",
+                  after_snapshot: afterSnapshot,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq("id", auditRunId);
+            }
           }
           refills++;
           totalUnits += g.totalQty;

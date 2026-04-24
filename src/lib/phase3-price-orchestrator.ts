@@ -72,11 +72,21 @@ async function callWebsiteRRP(item: Phase3Item): Promise<Phase3ProductResult | n
           vendor: item.vendor,
           style_name: item.product_title,
           style_number: item.sku || "",
+          // Forward colour so the registry matcher can disambiguate
+          // multi-colourway products like "Reid Leather Sandal".
+          colour: (item as Phase3Item & { colour?: string }).colour || "",
         },
       },
     );
     if (error) return null;
-    const d = data as { found?: boolean; price?: number; product_url?: string; confidence?: number };
+    const d = data as {
+      found?: boolean;
+      price?: number;
+      product_url?: string;
+      confidence?: number;
+      image_url?: string;
+      description?: string;
+    };
     if (!d?.found || !d.price || d.price <= 0) return null;
     return {
       product_title: item.product_title,
@@ -85,9 +95,35 @@ async function callWebsiteRRP(item: Phase3Item): Promise<Phase3ProductResult | n
       price_source: "website",
       confidence: d.confidence ?? 95,
       source_url: d.product_url,
+      image_url: d.image_url,
+      description: d.description,
     };
   } catch (e) {
     console.warn("[Phase3] website RRP lookup failed:", e);
+    return null;
+  }
+}
+
+// ── Per-brand markup lookup from supplier_intelligence ──
+// Falls back to the static type table if the brand isn't learned yet.
+const _brandMarkupCache = new Map<string, number | null>();
+async function getBrandMarkup(vendor?: string): Promise<number | null> {
+  if (!vendor) return null;
+  const key = vendor.toLowerCase().trim();
+  if (_brandMarkupCache.has(key)) return _brandMarkupCache.get(key) ?? null;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase
+      .from("supplier_intelligence")
+      .select("markup_multiplier")
+      .eq("user_id", user.id)
+      .ilike("supplier_name", vendor)
+      .maybeSingle();
+    const mult = data?.markup_multiplier ? Number(data.markup_multiplier) : null;
+    _brandMarkupCache.set(key, mult);
+    return mult;
+  } catch {
     return null;
   }
 }
@@ -149,16 +185,19 @@ async function callMarketWaterfall(item: Phase3Item): Promise<Phase3ProductResul
   }
 }
 
-function applyMarkupFallback(item: Phase3Item): Phase3ProductResult {
+async function applyMarkupFallback(item: Phase3Item): Promise<Phase3ProductResult> {
   const cost = Number(item.unit_cost) || 0;
-  const mult = pickMarkup(item.product_type);
+  // Per-brand multiplier from supplier_intelligence (learned over time);
+  // fall back to type-based default (2.4 swimwear, 2.5 apparel, …).
+  const brandMult = await getBrandMarkup(item.vendor);
+  const mult = brandMult ?? pickMarkup(item.product_type);
   const rrp = cost > 0 ? Math.round(cost * mult * 100) / 100 : null;
   return {
     product_title: item.product_title,
     vendor: item.vendor,
     recommended_rrp: rrp,
     price_source: rrp ? "markup_fallback" : "none",
-    confidence: rrp ? 40 : 0,
+    confidence: rrp ? (brandMult ? 55 : 40) : 0,
   };
 }
 
@@ -227,7 +266,7 @@ export async function runPhase3PriceResearch(
         if (!result) result = await callMarketWaterfall(item);
       }
       // 4. Markup fallback (always available if cost present)
-      if (!result) result = applyMarkupFallback(item);
+      if (!result) result = await applyMarkupFallback(item);
 
       if (result.recommended_rrp && result.recommended_rrp > 0) {
         summary.succeeded++;

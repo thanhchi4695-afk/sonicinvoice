@@ -462,10 +462,26 @@ export function validateAndCleanProducts(
     }
 
     // ── Rule 4: Repeated identical text ──
+    // Variant-heavy invoices legitimately repeat the same base title across many
+    // size rows (for example one product title repeated for every ordered size).
+    // Only treat repeated text as header/vendor noise when the row lacks real
+    // product signals.
     if (!rejected && name && (nameCounts[name.toLowerCase()] || 0) >= repeatedThreshold) {
-      rejected = true;
-      rejectReason = `"${name}" repeated ${nameCounts[name.toLowerCase()]} times — likely vendor/header text`;
-      name = "";
+      const hasProductSignals = Boolean(
+        p.sku?.trim() ||
+        p.barcode?.trim() ||
+        p.size?.trim() ||
+        p.colour?.trim() ||
+        p.qty > 0 ||
+        p.cost > 0 ||
+        p.rrp > 0,
+      );
+
+      if (!hasProductSignals) {
+        rejected = true;
+        rejectReason = `"${name}" repeated ${nameCounts[name.toLowerCase()]} times — likely vendor/header text`;
+        name = "";
+      }
     }
 
     // ── Rule 5: Boilerplate/header/footer text ──

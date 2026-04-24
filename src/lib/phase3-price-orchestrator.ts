@@ -178,6 +178,8 @@ async function callSupplierScrape(item: Phase3Item): Promise<Phase3ProductResult
   if (item.sku && item.sku.length >= 4) {
     const sku = await searchOnce(item, "sku");
     if (sku) return sku;
+  }
+  return null;
 }
 
 // ── Tier 1.5: AI WebSearch (enrich-via-websearch) ─────────────

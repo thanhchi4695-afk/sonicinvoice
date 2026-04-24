@@ -4,6 +4,8 @@ import { SUPPORTED_LANGUAGES } from "@/i18n/config";
 const ConnectorsMarketplace = lazy(() => import("@/components/ConnectorsMarketplace"));
 import POSConnectionPanel from "@/components/POSConnectionPanel";
 import PlatformConnectionsSection from "@/components/PlatformConnectionsSection";
+import BrandDatabaseSyncPanel from "@/components/BrandDatabaseSyncPanel";
+import { useUserRole } from "@/hooks/use-user-role";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard, Store } from "lucide-react";

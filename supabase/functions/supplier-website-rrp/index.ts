@@ -71,6 +71,24 @@ interface ShopifyProduct {
   variants: { price: string; compare_at_price: string | null }[];
 }
 
+/**
+ * Generate fuzzy-tail variants of a colour string.
+ * Invoices often append a description word (e.g. "Mosaique Green",
+ * "Jaguar Jungle Orange") that the website variant doesn't have.
+ * We try the full string first, then progressively strip the last word.
+ *   "Jaguar Jungle Orange" → ["jaguar jungle orange", "jaguar jungle", "jaguar"]
+ */
+function colourVariants(colour: string): string[] {
+  const c = (colour || "").toLowerCase().trim().replace(/\s+/g, " ");
+  if (!c) return [];
+  const parts = c.split(" ");
+  const out: string[] = [];
+  for (let i = parts.length; i >= 1; i--) {
+    out.push(parts.slice(0, i).join(" "));
+  }
+  return out;
+}
+
 function findProductByNameAndColour(
   products: ShopifyProduct[],
   name: string,
@@ -78,7 +96,6 @@ function findProductByNameAndColour(
 ): ShopifyProduct | null {
   if (!products?.length) return null;
   const nameLow = name.toLowerCase().trim();
-  const colourLow = (colour || "").toLowerCase().trim();
 
   // Step 1: title contains every meaningful token of the product name
   const STOP = new Set(["the", "a", "an", "and", "or", "of", "in", "on", "for", "with"]);
@@ -92,11 +109,14 @@ function findProductByNameAndColour(
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0];
 
-  // Step 2: narrow by colour token
-  if (colourLow) {
-    const colourTokens = colourLow.split(/\s+/).filter((t) => t.length >= 4);
+  // Step 2: narrow by colour token, with fuzzy-tail fallback
+  // (case-insensitive match; tries full colour, then strips the last
+  // word and retries — handles "Mosaique Green" → "Mosaique".)
+  for (const variant of colourVariants(colour || "")) {
+    const variantTokens = variant.split(/\s+/).filter((t) => t.length >= 3);
+    if (!variantTokens.length) continue;
     const colourMatch = candidates.find((p) =>
-      colourTokens.some((t) => p.title.toLowerCase().includes(t))
+      variantTokens.every((t) => p.title.toLowerCase().includes(t))
     );
     if (colourMatch) return colourMatch;
   }

@@ -95,6 +95,17 @@ export default function WebSearchUsageSection() {
         </div>
         <div className="flex items-center gap-2">
           <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as Provider)}
+            className="h-8 rounded-md bg-input border border-border px-2 text-xs"
+          >
+            {(Object.keys(PROVIDER_LABEL) as Provider[]).map((p) => (
+              <option key={p} value={p}>
+                {PROVIDER_LABEL[p]}
+              </option>
+            ))}
+          </select>
+          <select
             value={period}
             onChange={(e) => setPeriod(e.target.value as Period)}
             className="h-8 rounded-md bg-input border border-border px-2 text-xs"

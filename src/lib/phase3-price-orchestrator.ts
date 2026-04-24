@@ -128,7 +128,10 @@ async function getBrandMarkup(vendor?: string): Promise<number | null> {
   }
 }
 
-async function callSupplierScrape(item: Phase3Item): Promise<Phase3ProductResult | null> {
+async function searchOnce(
+  item: Phase3Item,
+  mode: "primary" | "sku",
+): Promise<Phase3ProductResult | null> {
   try {
     const { data, error } = await supabase.functions.invoke("price-lookup-search", {
       body: {
@@ -136,6 +139,7 @@ async function callSupplierScrape(item: Phase3Item): Promise<Phase3ProductResult
         supplier: item.vendor || "",
         style_number: item.sku || "",
         colour: undefined,
+        mode,
       },
     });
     if (error || !data?.results?.length) return null;
@@ -146,15 +150,29 @@ async function callSupplierScrape(item: Phase3Item): Promise<Phase3ProductResult
       vendor: item.vendor,
       recommended_rrp: Number(top.price),
       price_source: "supplier_scrape",
-      confidence: top.confidence ?? 80,
+      confidence: top.confidence ?? (mode === "sku" ? 75 : 80),
       source_url: top.url,
       description: top.description,
       image_url: top.imageUrl || top.image_url,
     };
   } catch (e) {
-    console.warn("[Phase3] supplier scrape failed:", e);
+    console.warn(`[Phase3] supplier scrape (${mode}) failed:`, e);
     return null;
   }
+}
+
+async function callSupplierScrape(item: Phase3Item): Promise<Phase3ProductResult | null> {
+  // Primary: brand-anchored product-name search with AU bias.
+  const primary = await searchOnce(item, "primary");
+  if (primary) return primary;
+  // Fallback: SKU/style-code search (e.g. "Jantzen JA84105BK site:jantzen.com.au")
+  // Critical for non-Shopify brands where the product page is only findable
+  // by its product code embedded in the URL slug.
+  if (item.sku && item.sku.length >= 4) {
+    const sku = await searchOnce(item, "sku");
+    if (sku) return sku;
+  }
+  return null;
 }
 
 async function callMarketWaterfall(item: Phase3Item): Promise<Phase3ProductResult | null> {

@@ -327,7 +327,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
             const sources = [
               { key: "website", label: "Brand website", className: "bg-success/15 text-success border-success/30", icon: "🟢" },
               { key: "supplier_scrape", label: "Supplier scrape", className: "bg-success/10 text-success border-success/20", icon: "🟢" },
-              { key: "ai_search", label: "AI web search", className: "bg-info/15 text-info border-info/30", icon: "🔷" },
+              { key: "ai_search", label: "AI web search", className: "bg-primary/10 text-primary border-primary/40 ring-1 ring-primary/30", icon: "🔷" },
               { key: "invoice_rrp", label: "Invoice RRP", className: "bg-primary/15 text-primary border-primary/30", icon: "🔵" },
               { key: "market_waterfall", label: "Google", className: "bg-warning/15 text-warning border-warning/30", icon: "🟡" },
               { key: "markup_fallback", label: "Markup formula", className: "bg-orange-500/15 text-orange-600 border-orange-500/30", icon: "🟠" },

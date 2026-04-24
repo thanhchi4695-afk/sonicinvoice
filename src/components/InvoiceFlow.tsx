@@ -687,17 +687,24 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       console.log("[Phase2] writing", accepted.length, "rows from", source);
       console.log("[InvoiceFlow] 🔄 Reached catalog sync insertion point — calling syncInvoiceItemsToCatalog with", accepted.length, "items");
       const result = await syncInvoiceItemsToCatalog(
-        accepted.map((item) => ({
-          product_title: item.name || "Untitled",
-          vendor: item.brand || supplierName || undefined,
-          sku: item.sku || undefined,
-          barcode: (item as any).barcode || undefined,
-          colour: item.colour || undefined,
-          size: item.size || undefined,
-          unit_cost: Number(item.cost) || 0,
-          rrp: Number(item.rrp) || 0,
-          qty: Number(item.qty) || 0,
-        })),
+        accepted.map((item) => {
+          // Per-line brand detection by SKU prefix (e.g. JA→Jantzen, SS→Sunseeker,
+          // OB→Olga Berg). Critical for multi-brand invoices billed under an
+          // umbrella vendor like Skye Group, where the cover-page vendor is
+          // meaningless for individual line lookups.
+          const skuBrand = detectBrandFromSku(item.sku);
+          return {
+            product_title: item.name || "Untitled",
+            vendor: skuBrand || item.brand || supplierName || undefined,
+            sku: item.sku || undefined,
+            barcode: (item as any).barcode || undefined,
+            colour: item.colour || undefined,
+            size: item.size || undefined,
+            unit_cost: Number(item.cost) || 0,
+            rrp: Number(item.rrp) || 0,
+            qty: Number(item.qty) || 0,
+          };
+        }),
       );
 
       if (result.written > 0) {

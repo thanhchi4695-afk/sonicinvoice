@@ -51,9 +51,47 @@ const AU_TRUSTED_RETAILERS = [
   'theiconic.com.au', 'myer.com.au', 'davidjones.com', 'countryroad.com.au',
   'jbhifi.com.au', 'priceline.com.au', 'chemistwarehouse.com.au',
   'kmart.com.au', 'bigw.com.au', 'target.com.au',
+  // Boutique fashion brand DTC sites (RRP source of truth)
+  'walnutmelbourne.com', 'walnut.com.au',
 ];
 
-const UNTRUSTED_SOURCES = ['ebay', 'wish', 'aliexpress', 'amazon', 'temu'];
+// Marketplaces and discount aggregators are excluded — they show sale/used/grey-market prices,
+// not the brand's true RRP, so they skew the median downwards (e.g. Walnut $148.70 vs. RRP $149.95).
+const UNTRUSTED_SOURCES = [
+  'ebay', 'wish', 'aliexpress', 'amazon', 'temu', 'catch.com', 'trademe',
+  'kogan', 'gumtree', 'mydeal', 'ozsale', 'thegrosby', 'shein',
+];
+
+/**
+ * Derive the brand's own DTC domain candidates from the brand name.
+ * "Walnut Melbourne" → ["walnutmelbourne.com", "walnutmelbourne.com.au", "walnut.com.au"]
+ * Used to pin the brand's own website as the highest-trust RRP source.
+ */
+function brandDomainCandidates(brand: string): string[] {
+  if (!brand) return [];
+  const slug = brand.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (!slug) return [];
+  // "walnut melbourne" → also try first word ("walnut") on its own
+  const firstWord = brand.toLowerCase().split(/\s+/)[0]?.replace(/[^a-z0-9]+/g, '') || '';
+  const candidates = new Set<string>([
+    `${slug}.com`,
+    `${slug}.com.au`,
+    `${slug}.co`,
+    `www.${slug}.com`,
+    `www.${slug}.com.au`,
+  ]);
+  if (firstWord && firstWord !== slug) {
+    candidates.add(`${firstWord}.com.au`);
+    candidates.add(`${firstWord}.com`);
+  }
+  return Array.from(candidates);
+}
+
+function isBrandOwnSite(source: string, brand: string): boolean {
+  if (!source || !brand) return false;
+  const lower = source.toLowerCase();
+  return brandDomainCandidates(brand).some((d) => lower.includes(d));
+}
 
 // ── Cache ──────────────────────────────────────────────────
 const CACHE_KEY = 'price_cache_sonic_invoice';
@@ -169,12 +207,24 @@ function isTrustedSource(source: string): boolean {
   return false;
 }
 
+/**
+ * Stricter fuzzy match: requires BOTH the brand AND meaningful name overlap.
+ * Prevents matching a generic product (e.g. "Marrakesh Dress") on the wrong brand.
+ * Falls back to a name-only match only when no brand is provided.
+ */
 function fuzzyMatch(title: string, product: PriceProduct): boolean {
   const t = title.toLowerCase();
-  const brandMatch = product.brand && t.includes(product.brand.toLowerCase());
-  const words = product.name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-  const wordMatch = words.filter(w => t.includes(w)).length >= Math.min(2, words.length);
-  return brandMatch || wordMatch;
+  const words = product.name.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  const wordHits = words.filter((w) => t.includes(w)).length;
+  const wordMatch = wordHits >= Math.min(2, words.length);
+  if (product.brand) {
+    const brandLower = product.brand.toLowerCase();
+    // Brand hit can be the full brand or its first word (e.g. "Walnut Melbourne" → "walnut")
+    const brandFirst = brandLower.split(/\s+/)[0];
+    const brandMatch = t.includes(brandLower) || (brandFirst.length >= 4 && t.includes(brandFirst));
+    return brandMatch && wordMatch;
+  }
+  return wordMatch;
 }
 
 // ── Edge Function Proxy Caller ─────────────────────────────
@@ -249,21 +299,32 @@ async function callGoogleShopping(
     }
     const allPrices: PriceResult['allPrices'] = [];
     const trustedPrices: number[] = [];
+    const brandSitePrices: number[] = [];
     let imageUrl: string | undefined;
     for (const r of results) {
       if (!fuzzyMatch(r.title || '', product)) continue;
-      const trusted = isTrustedSource(r.source || '');
+      const sourceStr = r.source || r.link || '';
+      const isBrand = isBrandOwnSite(sourceStr, product.brand);
+      const trusted = isBrand || isTrustedSource(sourceStr);
       // Prefer old_price (was/RRP) over sale price
       const price = r.extracted_old_price || r.extracted_price;
       if (!price || price <= 0) continue;
       allPrices.push({ price, store: r.source || 'Unknown', currency, trusted });
+      if (isBrand) brandSitePrices.push(price);
       if (trusted) trustedPrices.push(price);
       if (!imageUrl && r.thumbnail) imageUrl = r.thumbnail;
     }
     if (trustedPrices.length === 0 && allPrices.length === 0) {
       return { price: null, confidence: 0, reason: 'No matching results', allPrices: [] };
     }
-    const pricesToUse = trustedPrices.length > 0 ? trustedPrices : allPrices.map(p => p.price);
+    // Tier 1: brand's own DTC site is the source of truth for RRP — use it directly.
+    if (brandSitePrices.length > 0) {
+      const brandRrp = Math.max(...brandSitePrices); // highest = RRP, ignores any sale variants
+      return { price: brandRrp, confidence: 95, reason: 'Brand DTC site', allPrices, imageUrl };
+    }
+    // Tier 2: trusted AU retailers — median of trusted listings.
+    // Tier 3 (fallback only): mixed sources, lower confidence.
+    const pricesToUse = trustedPrices.length > 0 ? trustedPrices : allPrices.map((p) => p.price);
     const rrp = median(pricesToUse);
     const confidence = trustedPrices.length >= 3 ? 90 : trustedPrices.length >= 1 ? 75 : 55;
     return { price: rrp, confidence, reason: 'Found', allPrices, imageUrl };

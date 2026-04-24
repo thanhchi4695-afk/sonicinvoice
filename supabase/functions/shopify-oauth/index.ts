@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { tokenResponseToConnectionColumns } from "../_shared/shopify-token.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

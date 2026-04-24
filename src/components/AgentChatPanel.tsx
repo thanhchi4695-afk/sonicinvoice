@@ -244,9 +244,43 @@ export default function AgentChatPanel({ sessionId, onGateResponse, className }:
     }
   }, [session]);
 
-  const handleGate = useCallback((stepRunId: string, choice: string) => {
+  const handleGate = useCallback(async (stepRunId: string, choice: string) => {
+    // Capture feedback for the learning loop (agent_feedback)
+    try {
+      const run = runs.find((r) => r.id === stepRunId);
+      const { data: u } = await supabase.auth.getUser();
+      const userId = u.user?.id;
+      if (userId && run) {
+        const supplier =
+          ((run.input as Record<string, unknown> | null)?.supplier as string | undefined) ||
+          ((run.input as Record<string, unknown> | null)?.supplier_name as string | undefined) ||
+          ((session?.metadata as Record<string, unknown> | null)?.supplier as string | undefined) ||
+          null;
+        const lower = choice.toLowerCase();
+        const feedbackType =
+          lower.includes("approve") || lower.includes("continue") || lower.includes("accept")
+            ? "accept"
+            : lower.includes("edit")
+            ? "edit"
+            : lower.includes("cancel") || lower.includes("reject")
+            ? "reject"
+            : "override";
+        await supabase.from("agent_feedback").insert({
+          session_id: run.session_id,
+          step_run_id: stepRunId,
+          user_id: userId,
+          feedback_type: feedbackType,
+          original_value: (run.output ?? null) as never,
+          corrected_value: { choice } as never,
+          supplier,
+          delta_reason: `gate:${run.step}:${choice}`,
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to record agent feedback:", e);
+    }
     onGateResponse?.(stepRunId, choice);
-  }, [onGateResponse]);
+  }, [onGateResponse, runs, session]);
 
   if (!sessionId) {
     return (

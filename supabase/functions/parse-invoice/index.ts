@@ -1251,6 +1251,10 @@ ${ocrText}`,
       ocr_fallback_attempted: parsed.ocr_fallback_attempted || false,
       needs_manual_review: parsed.needs_manual_review || false,
       review_reason: parsed.review_reason || null,
+      // Walnut Round 2, Bug #1: surface the GST-footer detection so the UI
+      // can show a banner and the supplier-brain can persist the inference.
+      gst_footer_treatment: gstFooterTreatment,
+      gst_reconciliation_applied: gstReconciliationApplied,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

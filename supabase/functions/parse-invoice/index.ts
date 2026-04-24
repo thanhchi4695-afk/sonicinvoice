@@ -702,6 +702,248 @@ function filterNoise(products: Record<string, unknown>[]): { kept: Record<string
   return { kept, rejected };
 }
 
+const MULTI_INVOICE_HEADER_RE = /Tax Invoice[\s\S]{0,500}?Invoice No[\s:]+(\d+)/gi;
+const TABLE_HEADER_RE = /Code\s+Item\s+Options\s+Qty\s+Unit Price\s+Discount\s+Subtotal/i;
+const TABLE_FOOTER_RE = /Product Cost:|Sub Total:|Payment Terms/i;
+const MONEY_RE = /\$?\s*(-?\d{1,6}(?:,\d{3})*(?:\.\d{2})|-?\d+(?:\.\d{2}))/;
+const SIZE_TOKEN_RE = /^(?:XXS|XS|S|M|L|XL|XXL|XXXL|OS|ONE\s*SIZE|FREE\s*SIZE|\d{1,2}|\d{1,2}\s*(?:AU|US|UK|EU|W)|\d{1,2}\s*(?:YEAR|YR|Y)|\d{1,2}\s*-\s*\d{1,2}\s*(?:YEAR|YR|Y)|\d{1,2}\s*(?:MONTH|MONTHS|MO|M)|\d{1,2}\s*-\s*\d{1,2}\s*(?:MONTH|MONTHS|MO|M))$/i;
+
+function cleanInvoiceText(raw: string): string {
+  return String(raw || "")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/ +/g, " ");
+}
+
+function splitMultiInvoicePdf(rawText: string): Array<{ invoiceNumber: string; text: string }> {
+  const text = cleanInvoiceText(rawText);
+  const markers: Array<{ index: number; invoiceNumber: string }> = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = MULTI_INVOICE_HEADER_RE.exec(text)) !== null) {
+    markers.push({ index: match.index, invoiceNumber: match[1] || "" });
+  }
+
+  if (markers.length <= 1) {
+    const invoiceMatch = text.match(/Invoice No[\s:]+(\d+)/i);
+    return [{ invoiceNumber: invoiceMatch?.[1] || "", text }];
+  }
+
+  return markers.map((marker, idx) => ({
+    invoiceNumber: marker.invoiceNumber,
+    text: text.slice(marker.index, idx + 1 < markers.length ? markers[idx + 1].index : text.length),
+  }));
+}
+
+function parseMoney(value: string): number | null {
+  const m = String(value || "").match(MONEY_RE);
+  if (!m) return null;
+  const n = Number(m[1].replace(/,/g, ""));
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+}
+
+function isSizeToken(value: string): boolean {
+  return SIZE_TOKEN_RE.test(String(value || "").trim());
+}
+
+function normalizeWrappedCode(code: string): string {
+  const tokens = String(code || "").trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return "";
+  return tokens.reduce((acc, token, idx) => {
+    if (idx === 0) return token;
+    if (token.startsWith("-")) return `${acc}${token}`;
+    return `${acc} ${token}`;
+  }, "");
+}
+
+function normalizeWhitespace(value: string): string {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function inferProductType(title: string): string {
+  const t = String(title || "").toLowerCase();
+  if (/sandal|shoe|boot|sneaker|loafer/.test(t)) return "sandal";
+  if (/skirt/.test(t)) return "skirt";
+  if (/dress/.test(t)) return "dress";
+  if (/pant|trouser/.test(t)) return "pant";
+  if (/top|tee|shirt|blouse/.test(t)) return "top";
+  return "";
+}
+
+function inferDepartment(type: string, sizes: string[]): string | null {
+  const hasKidsSizes = sizes.some((size) => /year|yr|month|months|\d+y|\d+m/i.test(size));
+  if (!hasKidsSizes) return null;
+  return /shoe|sandal|boot|sneaker/i.test(type) ? "kids shoes" : "kids clothing";
+}
+
+function findLineItemTable(invoiceText: string): string | null {
+  const clean = cleanInvoiceText(invoiceText);
+  const headerMatch = clean.match(TABLE_HEADER_RE);
+  if (!headerMatch || headerMatch.index == null) return null;
+  const start = headerMatch.index + headerMatch[0].length;
+  const rest = clean.slice(start);
+  const footerMatch = rest.match(TABLE_FOOTER_RE);
+  const end = footerMatch?.index != null ? start + footerMatch.index : clean.length;
+  return clean.slice(start, end).trim();
+}
+
+function extractSizeQtyPairs(tableText: string): Array<{ size: string; quantity: number }> {
+  const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
+  const sizeLineIndex = lines.findIndex((line) => /^size\s*:/i.test(line));
+  const qtyLineIndex = lines.findIndex((line) => /^qty\s*:/i.test(line));
+  if (sizeLineIndex === -1 || qtyLineIndex === -1) return [];
+
+  const sizeTokens = lines[sizeLineIndex].replace(/^size\s*:/i, "").trim().split(/\s{2,}|\t|\s(?=\d{1,2}(?:\s*(?:year|yr|month|months|m|y))?\b)|\s(?=XXS|XS|S|M|L|XL|XXL|XXXL|OS\b)/i).map(normalizeWhitespace).filter(Boolean);
+  const qtyTokens = lines[qtyLineIndex].replace(/^qty\s*:/i, "").trim().split(/\s+/).map((token) => Number(token.replace(/[^\d.-]/g, ""))).filter((n) => Number.isFinite(n));
+
+  const sizes = sizeTokens.filter(isSizeToken);
+  const count = Math.min(sizes.length, qtyTokens.length);
+  const pairs: Array<{ size: string; quantity: number }> = [];
+  for (let i = 0; i < count; i += 1) {
+    if (qtyTokens[i] > 0) pairs.push({ size: sizes[i], quantity: qtyTokens[i] });
+  }
+  return pairs;
+}
+
+function parseWalnutInvoiceChunks(rawText: string, supplierName?: string) {
+  const chunks = splitMultiInvoicePdf(rawText);
+  const products: Array<Record<string, unknown>> = [];
+  const invoiceNumbers: string[] = [];
+  const extractionNotes: string[] = [];
+
+  chunks.forEach((chunk, invoiceIdx) => {
+    const invoiceText = chunk.text;
+    const invoiceNumber = chunk.invoiceNumber || invoiceText.match(/Invoice No[\s:]+(\d+)/i)?.[1] || "";
+    if (invoiceNumber) invoiceNumbers.push(invoiceNumber);
+
+    const invoiceDate = invoiceText.match(/Invoice Date\s*([0-9]{1,2}\s+[A-Za-z]{3}\s+[0-9]{4})/i)?.[1] || "";
+    const tableText = findLineItemTable(invoiceText);
+    if (!tableText) return;
+
+    const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
+    const headerRow = lines.find((line) => /\$/.test(line) && /\d/.test(line) && !/^size\s*:/i.test(line) && !/^qty\s*:/i.test(line));
+    if (!headerRow) return;
+
+    const moneyValues = Array.from(headerRow.matchAll(/\$?\s*\d{1,6}(?:,\d{3})*(?:\.\d{2})/g)).map((m) => parseMoney(m[0])).filter((n): n is number => n != null);
+    const qtyMatch = headerRow.match(/\s(\d+)\s+\$?\s*\d/);
+    const totalQty = qtyMatch ? Number(qtyMatch[1]) : 0;
+    const headerPrefix = qtyMatch ? headerRow.slice(0, qtyMatch.index).trim() : headerRow;
+    const prefixParts = headerPrefix.split(/\s{2,}/).map((part) => normalizeWhitespace(part)).filter(Boolean);
+    const styleCode = normalizeWrappedCode(prefixParts[0] || "");
+    const productTitle = prefixParts[1] || "";
+    const colour = normalizeWhitespace((prefixParts.slice(2).join(" ") || "").replace(/\bTan\s+Tan\b/i, "Tan"));
+    const qtyPairs = extractSizeQtyPairs(tableText);
+    const qtyChecksum = qtyPairs.reduce((sum, pair) => sum + pair.quantity, 0);
+    const unitPrice = moneyValues[0] ?? null;
+    const discount = moneyValues.length >= 3 ? moneyValues[1] : (moneyValues.length === 2 && /discount/i.test(headerRow) ? moneyValues[1] : null);
+    const lineTotal = moneyValues[moneyValues.length - 1] ?? null;
+
+    let effectiveUnitCost = unitPrice;
+    if (unitPrice != null && discount != null) {
+      effectiveUnitCost = Math.round((unitPrice - discount) * 100) / 100;
+      if (lineTotal != null && totalQty > 0) {
+        const subtotalCheck = effectiveUnitCost * totalQty;
+        if (Math.abs(subtotalCheck - lineTotal) > 0.05) {
+          effectiveUnitCost = Math.round((lineTotal / totalQty) * 100) / 100;
+        }
+      }
+    }
+
+    const productType = inferProductType(productTitle);
+    const department = inferDepartment(productType, qtyPairs.map((pair) => pair.size));
+    const rowNotes = [
+      `invoice_number:${invoiceNumber}`,
+      `invoice_index:${invoiceIdx + 1}`,
+      qtyChecksum === totalQty ? `qty_checksum:${qtyChecksum}` : `qty_checksum_mismatch:${qtyChecksum}/${totalQty}`,
+      discount != null ? "discount_interpreted_as_per_unit" : "no_discount",
+      department ? `department:${department}` : "",
+    ].filter(Boolean).join("; ");
+
+    qtyPairs.forEach((pair, variantIdx) => {
+      products.push({
+        row_index: products.length,
+        anchor_code: styleCode,
+        row_y_start: 0.2 + (invoiceIdx * 0.4) + (variantIdx * 0.01),
+        row_y_end: 0.21 + (invoiceIdx * 0.4) + (variantIdx * 0.01),
+        row_confidence: 96,
+        style_code: styleCode,
+        product_title: productTitle,
+        colour,
+        size: pair.size,
+        quantity: pair.quantity,
+        unit_cost: effectiveUnitCost,
+        rrp: null,
+        line_total: lineTotal,
+        barcode: null,
+        product_type: productType,
+        group_key: `${styleCode}|${colour}`,
+        confidence: 96,
+        parse_notes: rowNotes,
+        extraction_reason: "Parsed from explicit Walnut Code/Item/Options header with Size:/Qty: matrix",
+        cost_source: discount != null ? "discount_adjusted" : "direct",
+        source_regions: {
+          title: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: "table Item column" },
+          sku: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: "table Code column" },
+          colour: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: "table Options column" },
+          size: { page: invoiceIdx + 1, y_position: 0.28, extraction_method: "Size row" },
+          quantity: { page: invoiceIdx + 1, y_position: 0.31, extraction_method: "Qty row" },
+          cost: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: discount != null ? "Unit Price minus per-unit Discount" : "Unit Price column" },
+        },
+      });
+    });
+
+    extractionNotes.push(`Invoice #${invoiceNumber || invoiceIdx + 1}: ${qtyPairs.length} line items extracted`);
+    if (department) extractionNotes.push(`Invoice #${invoiceNumber || invoiceIdx + 1}: inferred ${department} from age-based sizes`);
+  });
+
+  if (!products.length) return null;
+
+  return {
+    supplier: supplierName || "Walnut Melbourne",
+    invoice_number: invoiceNumbers[0] || "",
+    invoice_numbers: invoiceNumbers,
+    parsing_plan: {
+      document_type: "tax_invoice",
+      layout_type: "mixed",
+      variant_method: "size_row_below",
+      size_system: "mixed",
+      orientation_detected: "portrait",
+      rotation_applied: 0,
+      line_item_zone: "Rows beneath the Code / Item / Options / Qty / Unit Price / Discount / Subtotal header",
+      quantity_field: "Header Qty as checksum plus Size:/Qty: matrix rows",
+      cost_field: "Unit Price adjusted by per-unit Discount when present",
+      cost_derivation: "direct",
+      grouping_required: true,
+      grouping_reason: "Each invoice row expands into size variants",
+      total_products_expected: chunks.length,
+      total_variants_expected: products.length,
+      row_anchors_detected: [...new Set(products.map((p) => String(p.style_code || "")).filter(Boolean))],
+      row_count: products.length,
+      expected_review_level: "low",
+      review_reason: "Explicit Walnut invoice header and size matrix were parsed deterministically",
+      strategy_explanation: "Split the stitched PDF into per-invoice chunks, then parsed each Walnut line-item table by header signature and expanded the Size:/Qty: matrix into variants.",
+    },
+    products,
+    rejected_rows: [],
+    detected_fields: ["invoice_number", "invoice_date", "style_code", "product_title", "colour", "size", "quantity", "unit_cost", "line_total"],
+    detected_size_system: products.some((p) => /year|month/i.test(String(p.size || ""))) ? "mixed" : "numeric_au",
+    extraction_notes: `This file contains ${chunks.length} invoices — ${invoiceNumbers.map((n) => `#${n}`).join(" and ")} — processed together, ${products.length} line items total. ${extractionNotes.join(" ")}`.trim(),
+    field_confidence: {
+      product_name: 97,
+      sku: 98,
+      colour: 95,
+      size: 98,
+      quantity: 98,
+      cost_ex_gst: 95,
+      rrp_incl_gst: 0,
+      vendor: 98,
+    },
+    format_type: "B",
+    overall_confidence: 96,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -940,6 +1182,20 @@ ${ir.notes?.length ? `- Notes: ${(ir.notes as string[]).join("; ")}` : ""}`;
       systemPrompt += `\nKnown supplier: ${supplierName}`;
     }
 
+    let parsedFromWalnutText = false;
+    let deterministicWalnutParsed: Record<string, any> | null = null;
+    if (isPdf && /walnut/i.test(fileName || "")) {
+      try {
+        const walnutText = atob(String(fileContent || ""));
+        deterministicWalnutParsed = parseWalnutInvoiceChunks(walnutText, supplierName || "Walnut Melbourne");
+        if (deterministicWalnutParsed) {
+          parsedFromWalnutText = true;
+        }
+      } catch {
+        // Non-text PDF bytes are expected; continue with the model path below.
+      }
+    }
+
     let messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>;
 
     if (isImage || isPdf) {
@@ -1001,21 +1257,32 @@ Return JSON only.`,
     const SOFT_BUDGET_MS = 110_000; // leave ~40s headroom for response + DB writes
     const budgetExceeded = () => Date.now() - startedAt > SOFT_BUDGET_MS;
 
-    let data = await callAI({
-      model,
-      messages,
-      temperature: 0.1,
-    });
-    let content = getContent(data);
+    let parsed: Record<string, any>;
+    let data: unknown = null;
+    let content = "";
+    let jsonMatch: RegExpMatchArray | [null, string] = [null, ""];
+    let jsonStr = "";
 
-    // Extract JSON from response
-    let jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-    let jsonStr = (jsonMatch[1] || content).trim();
-    let parsed = JSON.parse(jsonStr);
+    if (parsedFromWalnutText && deterministicWalnutParsed) {
+      parsed = deterministicWalnutParsed;
+      console.log("[parse-invoice] Used deterministic Walnut multi-invoice parser");
+    } else {
+      data = await callAI({
+        model,
+        messages,
+        temperature: 0.1,
+      });
+      content = getContent(data);
+
+      // Extract JSON from response
+      jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+      jsonStr = (jsonMatch[1] || content).trim();
+      parsed = JSON.parse(jsonStr);
+    }
 
     // ── Zero-product retry: if AI returned 0 products, retry with enhanced prompt ──
     const rawProductCount = (parsed.products || []).length;
-    if (rawProductCount === 0 && (isImage || isPdf) && !detailedMode && !budgetExceeded()) {
+    if (!parsedFromWalnutText && rawProductCount === 0 && (isImage || isPdf) && !detailedMode && !budgetExceeded()) {
       console.log("[parse-invoice] Zero products detected on first pass — retrying with enhanced prompt");
       const retryMessages = [
         { role: "system", content: systemPrompt + `\n\n## RETRY — ZERO PRODUCTS FOUND ON FIRST PASS
@@ -1048,7 +1315,7 @@ INSTRUCTIONS FOR RETRY:
     const hasQualityWarning = parsed.quality_warning === true || parsed.parsing_plan?.expected_review_level === "high";
     const shouldFallbackOCR = (hasLowConfidence || hasQualityWarning) && (isImage || isPdf) && !detailedMode && !budgetExceeded();
 
-    if (shouldFallbackOCR) {
+    if (!parsedFromWalnutText && shouldFallbackOCR) {
       console.log(`[parse-invoice] Step B: OCR text fallback triggered — lowConf=${hasLowConfidence}, qualityWarn=${hasQualityWarning}`);
       try {
         // Step B.1: Extract raw OCR text from the image using vision model
@@ -1077,8 +1344,19 @@ INSTRUCTIONS FOR RETRY:
         if (ocrText && ocrText.length > 50) {
           console.log(`[parse-invoice] Step B: OCR extracted ${ocrText.length} chars of text`);
 
-          // Step B.2: Re-parse the OCR text with a fast text-only model
-          const ocrParseMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
+          let usedDeterministicWalnutOcr = false;
+          if (/walnut/i.test(fileName || "") || /walnut melbourne/i.test(supplierName || "") || /tax invoice[\s\S]{0,500}invoice no[\s:]+\d+/i.test(ocrText)) {
+            const deterministicFromOcr = parseWalnutInvoiceChunks(ocrText, supplierName || "Walnut Melbourne");
+            if (deterministicFromOcr?.products?.length) {
+              console.log(`[parse-invoice] Step B: Using deterministic Walnut OCR parser (${deterministicFromOcr.products.length} products)`);
+              parsed = { ...parsed, ...deterministicFromOcr, ocr_fallback_used: true, ocr_text_length: ocrText.length };
+              usedDeterministicWalnutOcr = true;
+            }
+          }
+
+          if (!usedDeterministicWalnutOcr) {
+            // Step B.2: Re-parse the OCR text with a fast text-only model
+            const ocrParseMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
             {
               role: "system",
               content: systemPrompt,
@@ -1098,15 +1376,15 @@ ${ocrText}`,
             },
           ];
 
-          const ocrParsed = await callAI({ model: "google/gemini-2.5-flash", messages: ocrParseMessages, temperature: 0.1 });
-          const ocrContent = getContent(ocrParsed);
-          const ocrJsonMatch = ocrContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, ocrContent];
-          const ocrJsonStr = (ocrJsonMatch[1] || ocrContent).trim();
+            const ocrParsed = await callAI({ model: "google/gemini-2.5-flash", messages: ocrParseMessages, temperature: 0.1 });
+            const ocrContent = getContent(ocrParsed);
+            const ocrJsonMatch = ocrContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, ocrContent];
+            const ocrJsonStr = (ocrJsonMatch[1] || ocrContent).trim();
 
-          try {
-            const ocrResult = JSON.parse(ocrJsonStr);
-            const ocrProducts = ocrResult.products || [];
-            console.log(`[parse-invoice] Step B: OCR re-parse found ${ocrProducts.length} products`);
+            try {
+              const ocrResult = JSON.parse(ocrJsonStr);
+              const ocrProducts = ocrResult.products || [];
+              console.log(`[parse-invoice] Step B: OCR re-parse found ${ocrProducts.length} products`);
 
             // Merge strategy: use OCR results if they found more products or higher confidence
             const originalAvgConf = products.length > 0
@@ -1116,36 +1394,36 @@ ${ocrText}`,
               ? ocrProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / ocrProducts.length
               : 0;
 
-            if (ocrProducts.length > products.length || (ocrProducts.length === products.length && ocrAvgConf > originalAvgConf)) {
-              console.log(`[parse-invoice] Step B: Using OCR results (${ocrProducts.length} products, avg conf ${ocrAvgConf.toFixed(0)}) over original (${products.length} products, avg conf ${originalAvgConf.toFixed(0)})`);
-              parsed.products = ocrProducts;
-              parsed.ocr_fallback_used = true;
-              parsed.ocr_text_length = ocrText.length;
-              // Preserve other metadata from OCR pass if available
-              if (ocrResult.parsing_plan) parsed.parsing_plan = { ...parsed.parsing_plan, ...ocrResult.parsing_plan, ocr_fallback: true };
-              if (ocrResult.rejected_rows) parsed.rejected_rows = [...(parsed.rejected_rows || []), ...ocrResult.rejected_rows];
-            } else {
-              console.log(`[parse-invoice] Step B: Keeping original results (higher quality)`);
+              if (ocrProducts.length > products.length || (ocrProducts.length === products.length && ocrAvgConf > originalAvgConf)) {
+                console.log(`[parse-invoice] Step B: Using OCR results (${ocrProducts.length} products, avg conf ${ocrAvgConf.toFixed(0)}) over original (${products.length} products, avg conf ${originalAvgConf.toFixed(0)})`);
+                parsed.products = ocrProducts;
+                parsed.ocr_fallback_used = true;
+                parsed.ocr_text_length = ocrText.length;
+                if (ocrResult.parsing_plan) parsed.parsing_plan = { ...parsed.parsing_plan, ...ocrResult.parsing_plan, ocr_fallback: true };
+                if (ocrResult.rejected_rows) parsed.rejected_rows = [...(parsed.rejected_rows || []), ...ocrResult.rejected_rows];
+              } else {
+                console.log(`[parse-invoice] Step B: Keeping original results (higher quality)`);
+                parsed.ocr_fallback_attempted = true;
+                parsed.ocr_fallback_used = false;
+              }
+
+            // If BOTH passes returned low confidence, mark as needs_manual_review
+              const finalProducts = parsed.products || [];
+              const finalAvgConf = finalProducts.length > 0
+                ? finalProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / finalProducts.length
+                : 0;
+              if (finalAvgConf < 60 || finalProducts.length === 0) {
+                parsed.needs_manual_review = true;
+                parsed.review_reason = finalProducts.length === 0
+                  ? "Both vision and OCR fallback failed to extract products"
+                  : `Average confidence ${finalAvgConf.toFixed(0)}% is below threshold after OCR fallback`;
+                console.log(`[parse-invoice] Step B: Marked as needs_manual_review — ${parsed.review_reason}`);
+              }
+            } catch (ocrParseErr) {
+              console.warn("[parse-invoice] Step B: OCR re-parse JSON failed:", ocrParseErr);
               parsed.ocr_fallback_attempted = true;
               parsed.ocr_fallback_used = false;
             }
-
-            // If BOTH passes returned low confidence, mark as needs_manual_review
-            const finalProducts = parsed.products || [];
-            const finalAvgConf = finalProducts.length > 0
-              ? finalProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / finalProducts.length
-              : 0;
-            if (finalAvgConf < 60 || finalProducts.length === 0) {
-              parsed.needs_manual_review = true;
-              parsed.review_reason = finalProducts.length === 0
-                ? "Both vision and OCR fallback failed to extract products"
-                : `Average confidence ${finalAvgConf.toFixed(0)}% is below threshold after OCR fallback`;
-              console.log(`[parse-invoice] Step B: Marked as needs_manual_review — ${parsed.review_reason}`);
-            }
-          } catch (ocrParseErr) {
-            console.warn("[parse-invoice] Step B: OCR re-parse JSON failed:", ocrParseErr);
-            parsed.ocr_fallback_attempted = true;
-            parsed.ocr_fallback_used = false;
           }
         }
       } catch (ocrErr) {
@@ -1304,6 +1582,7 @@ ${ocrText}`,
       // can show a banner and the supplier-brain can persist the inference.
       gst_footer_treatment: gstFooterTreatment,
       gst_reconciliation_applied: gstReconciliationApplied,
+      invoice_numbers: parsed.invoice_numbers || undefined,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

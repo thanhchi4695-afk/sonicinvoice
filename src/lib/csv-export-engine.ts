@@ -53,8 +53,12 @@ function arrivalMonthFromDate(iso?: string): string {
   return `${MONTHS_ABBR[safe.getMonth()]}${String(safe.getFullYear()).slice(-2)}`;
 }
 
-function departmentForType(t: string): string {
-  const tt = (t || "").toLowerCase();
+function departmentForLine(line: Pick<ExportLine, "type" | "size">): string {
+  const tt = (line.type || "").toLowerCase();
+  const size = (line.size || "").toLowerCase();
+  const isKids = /year|yr|month|months|\d+y|\d+m/.test(size);
+  if (isKids && /shoe|sandal|boot|sneaker/.test(tt)) return "kids shoes";
+  if (isKids) return "kids clothing";
   if (/dress|top|pant|skirt|short|shirt|jumpsuit|playsuit|kimono|kaftan|sarong|blouse|tee/.test(tt)) return "womens clothing";
   if (/swim|bikini|tankini|rashie|board/.test(tt)) return "swimwear";
   if (/jewel|earring|necklace|bracelet|ring/.test(tt)) return "jewellery";
@@ -68,7 +72,7 @@ function seasonFromSku(sku?: string): string {
   if (!sku) return "";
   const parts = sku.split(/[-_/]/).map((p) => p.trim()).filter(Boolean);
   for (const part of parts) {
-    if (/^(SS|AW|S|W|FW|HO|RE)\d{2}$/i.test(part)) return part.toUpperCase();
+    if (/^(SS|AW|S|W|FW|HO|RE|HS|MS|LS)\d{2}$/i.test(part)) return part.toUpperCase();
   }
   return "";
 }
@@ -78,7 +82,7 @@ export function buildRichTags(ln: ExportLine): string {
   const tags: string[] = [];
   const brand = (ln.brand || "").trim();
   if (brand) tags.push(brand);
-  const dept = departmentForType(ln.type || "");
+  const dept = departmentForLine(ln);
   if (dept) tags.push(dept);
   const type = (ln.type || "").trim().toLowerCase();
   if (type) tags.push(type);
@@ -87,6 +91,7 @@ export function buildRichTags(ln: ExportLine): string {
   if (season) tags.push(season);
   const colour = (ln.colour || "").trim();
   if (colour) tags.push(colour);
+  if (/year|yr|month|months|\d+y|\d+m/i.test(ln.size || "")) tags.push("kids");
   // Dedupe (case-insensitive), preserve order
   const seen = new Set<string>();
   return tags

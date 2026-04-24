@@ -299,21 +299,32 @@ async function callGoogleShopping(
     }
     const allPrices: PriceResult['allPrices'] = [];
     const trustedPrices: number[] = [];
+    const brandSitePrices: number[] = [];
     let imageUrl: string | undefined;
     for (const r of results) {
       if (!fuzzyMatch(r.title || '', product)) continue;
-      const trusted = isTrustedSource(r.source || '');
+      const sourceStr = r.source || r.link || '';
+      const isBrand = isBrandOwnSite(sourceStr, product.brand);
+      const trusted = isBrand || isTrustedSource(sourceStr);
       // Prefer old_price (was/RRP) over sale price
       const price = r.extracted_old_price || r.extracted_price;
       if (!price || price <= 0) continue;
       allPrices.push({ price, store: r.source || 'Unknown', currency, trusted });
+      if (isBrand) brandSitePrices.push(price);
       if (trusted) trustedPrices.push(price);
       if (!imageUrl && r.thumbnail) imageUrl = r.thumbnail;
     }
     if (trustedPrices.length === 0 && allPrices.length === 0) {
       return { price: null, confidence: 0, reason: 'No matching results', allPrices: [] };
     }
-    const pricesToUse = trustedPrices.length > 0 ? trustedPrices : allPrices.map(p => p.price);
+    // Tier 1: brand's own DTC site is the source of truth for RRP — use it directly.
+    if (brandSitePrices.length > 0) {
+      const brandRrp = Math.max(...brandSitePrices); // highest = RRP, ignores any sale variants
+      return { price: brandRrp, confidence: 95, reason: 'Brand DTC site', allPrices, imageUrl };
+    }
+    // Tier 2: trusted AU retailers — median of trusted listings.
+    // Tier 3 (fallback only): mixed sources, lower confidence.
+    const pricesToUse = trustedPrices.length > 0 ? trustedPrices : allPrices.map((p) => p.price);
     const rrp = median(pricesToUse);
     const confidence = trustedPrices.length >= 3 ? 90 : trustedPrices.length >= 1 ? 75 : 55;
     return { price: rrp, confidence, reason: 'Found', allPrices, imageUrl };

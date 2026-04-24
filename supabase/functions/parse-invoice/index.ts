@@ -1182,6 +1182,20 @@ ${ir.notes?.length ? `- Notes: ${(ir.notes as string[]).join("; ")}` : ""}`;
       systemPrompt += `\nKnown supplier: ${supplierName}`;
     }
 
+    let parsedFromWalnutText = false;
+    if (isPdf && /walnut/i.test(fileName || "")) {
+      try {
+        const walnutText = atob(String(fileContent || ""));
+        const deterministicWalnut = parseWalnutInvoiceChunks(walnutText, supplierName || "Walnut Melbourne");
+        if (deterministicWalnut) {
+          parsed = deterministicWalnut;
+          parsedFromWalnutText = true;
+        }
+      } catch {
+        // Non-text PDF bytes are expected; continue with the model path below.
+      }
+    }
+
     let messages: Array<{ role: string; content: string | Array<Record<string, unknown>> }>;
 
     if (isImage || isPdf) {
@@ -1243,21 +1257,31 @@ Return JSON only.`,
     const SOFT_BUDGET_MS = 110_000; // leave ~40s headroom for response + DB writes
     const budgetExceeded = () => Date.now() - startedAt > SOFT_BUDGET_MS;
 
-    let data = await callAI({
-      model,
-      messages,
-      temperature: 0.1,
-    });
-    let content = getContent(data);
+    let parsed: Record<string, any>;
+    let data: unknown = null;
+    let content = "";
+    let jsonMatch: RegExpMatchArray | [null, string] = [null, ""];
+    let jsonStr = "";
 
-    // Extract JSON from response
-    let jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-    let jsonStr = (jsonMatch[1] || content).trim();
-    let parsed = JSON.parse(jsonStr);
+    if (parsedFromWalnutText) {
+      console.log("[parse-invoice] Used deterministic Walnut multi-invoice parser");
+    } else {
+      data = await callAI({
+        model,
+        messages,
+        temperature: 0.1,
+      });
+      content = getContent(data);
+
+      // Extract JSON from response
+      jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+      jsonStr = (jsonMatch[1] || content).trim();
+      parsed = JSON.parse(jsonStr);
+    }
 
     // ── Zero-product retry: if AI returned 0 products, retry with enhanced prompt ──
     const rawProductCount = (parsed.products || []).length;
-    if (rawProductCount === 0 && (isImage || isPdf) && !detailedMode && !budgetExceeded()) {
+    if (!parsedFromWalnutText && rawProductCount === 0 && (isImage || isPdf) && !detailedMode && !budgetExceeded()) {
       console.log("[parse-invoice] Zero products detected on first pass — retrying with enhanced prompt");
       const retryMessages = [
         { role: "system", content: systemPrompt + `\n\n## RETRY — ZERO PRODUCTS FOUND ON FIRST PASS
@@ -1290,7 +1314,7 @@ INSTRUCTIONS FOR RETRY:
     const hasQualityWarning = parsed.quality_warning === true || parsed.parsing_plan?.expected_review_level === "high";
     const shouldFallbackOCR = (hasLowConfidence || hasQualityWarning) && (isImage || isPdf) && !detailedMode && !budgetExceeded();
 
-    if (shouldFallbackOCR) {
+    if (!parsedFromWalnutText && shouldFallbackOCR) {
       console.log(`[parse-invoice] Step B: OCR text fallback triggered — lowConf=${hasLowConfidence}, qualityWarn=${hasQualityWarning}`);
       try {
         // Step B.1: Extract raw OCR text from the image using vision model
@@ -1546,6 +1570,7 @@ ${ocrText}`,
       // can show a banner and the supplier-brain can persist the inference.
       gst_footer_treatment: gstFooterTreatment,
       gst_reconciliation_applied: gstReconciliationApplied,
+      invoice_numbers: parsed.invoice_numbers || undefined,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -34,6 +34,16 @@ export interface ExportProduct {
   confidence?: "high" | "medium" | "low";
   isNew?: boolean;
   metafields?: Record<string, string>;
+  /** Enriched product image (from brand DTC scrape or AI image search).
+   *  Forwarded to Shopify "Image Src" and Lightspeed "image_url_1". */
+  imageUrl?: string;
+  /** Rich product description (HTML allowed for Shopify "Body (HTML)";
+   *  Lightspeed exporter strips tags for plain-text description column). */
+  bodyHtml?: string;
+  /** Comma-separated Shopify tags. If omitted, the engine generates from brand+type. */
+  tags?: string;
+  seoTitle?: string;
+  seoDesc?: string;
 }
 
 interface ExportReviewScreenProps {
@@ -191,6 +201,10 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
         name: p.name, brand: p.brand, type: p.type, colour: p.colour, size: p.size,
         sku: p.sku, barcode: p.barcode, price: p.price, rrp: p.rrp, cogs: p.cogs,
         qty: p.qty, status: p.status,
+        // Forward enriched fields so Lightspeed CSV gets image + description + tags
+        imageUrl: p.imageUrl,
+        bodyHtml: p.bodyHtml,
+        tags: p.tags,
       })));
       downloadFile(csv, filename);
     } else if (selectedFormat === "shopify_price") {

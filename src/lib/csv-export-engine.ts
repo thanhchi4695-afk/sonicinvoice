@@ -34,6 +34,69 @@ export interface ExportLine {
   seoDesc?: string;
   bodyHtml?: string;
   metafields?: Record<string, string>;
+  /** ISO date — drives the arrival-month tag (Apr26, Sept26). */
+  invoiceDate?: string;
+  /** Season string parsed from SKU/style (e.g. "W26", "S26"). */
+  season?: string;
+}
+
+// ── W-07 Tag helpers ───────────────────────────────────────
+// Builds the tag list per Walnut batch spec:
+//   Brand, Department, ProductType, ArrivalMonth, Season, Colour
+// Drops the meaningless "General" / "New Arrival" placeholders.
+
+const MONTHS_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
+
+function arrivalMonthFromDate(iso?: string): string {
+  const d = iso ? new Date(iso) : new Date();
+  const safe = isNaN(d.getTime()) ? new Date() : d;
+  return `${MONTHS_ABBR[safe.getMonth()]}${String(safe.getFullYear()).slice(-2)}`;
+}
+
+function departmentForType(t: string): string {
+  const tt = (t || "").toLowerCase();
+  if (/dress|top|pant|skirt|short|shirt|jumpsuit|playsuit|kimono|kaftan|sarong|blouse|tee/.test(tt)) return "womens clothing";
+  if (/swim|bikini|tankini|rashie|board/.test(tt)) return "swimwear";
+  if (/jewel|earring|necklace|bracelet|ring/.test(tt)) return "jewellery";
+  if (/hat|sunnies|bag|towel|accessor|wallet|belt|scarf/.test(tt)) return "accessories";
+  if (/shoe|sandal|boot|sneaker/.test(tt)) return "footwear";
+  return "";
+}
+
+/** Parse season token (e.g. "W26", "S26", "SS26", "AW26") from a SKU's middle segment. */
+function seasonFromSku(sku?: string): string {
+  if (!sku) return "";
+  const parts = sku.split(/[-_/]/).map((p) => p.trim()).filter(Boolean);
+  for (const part of parts) {
+    if (/^(SS|AW|S|W|FW|HO|RE)\d{2}$/i.test(part)) return part.toUpperCase();
+  }
+  return "";
+}
+
+/** Build the rich tag string. Used by both Shopify and Lightspeed exports. */
+export function buildRichTags(ln: ExportLine): string {
+  const tags: string[] = [];
+  const brand = (ln.brand || "").trim();
+  if (brand) tags.push(brand);
+  const dept = departmentForType(ln.type || "");
+  if (dept) tags.push(dept);
+  const type = (ln.type || "").trim().toLowerCase();
+  if (type) tags.push(type);
+  tags.push(arrivalMonthFromDate(ln.invoiceDate));
+  const season = (ln.season || seasonFromSku(ln.sku) || "").trim();
+  if (season) tags.push(season);
+  const colour = (ln.colour || "").trim();
+  if (colour) tags.push(colour);
+  // Dedupe (case-insensitive), preserve order
+  const seen = new Set<string>();
+  return tags
+    .filter((t) => {
+      const k = t.toLowerCase();
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .join(", ");
 }
 
 export type VariantMode = "simple" | "variant";
@@ -150,14 +213,14 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
         title,
         vendor: ln.brand,
         type: ln.type,
-        tags: ln.tags || `${ln.brand}, ${ln.type}, New Arrival`,
+        tags: buildRichTags(ln) || ln.tags || `${ln.brand}, ${ln.type}`,
         bodyHtml: ln.bodyHtml || `<p>${ln.name} by ${ln.brand}. Premium ${ln.type.toLowerCase()}.</p>`,
         seoTitle: ln.seoTitle || `${ln.name} | ${ln.brand}`.slice(0, 70),
         seoDesc: ln.seoDesc || `Shop ${ln.name} by ${ln.brand}. Premium ${ln.type.toLowerCase()}.`.slice(0, 160),
         imageUrl: ln.imageUrl || "",
         status: ln.status === "active" ? "active" : "draft",
         metafields: ln.metafields || {},
-        collections: deriveCollections(ln.tags || `${ln.brand}, ${ln.type}, New Arrival`, ln.brand),
+        collections: deriveCollections(buildRichTags(ln) || ln.tags || `${ln.brand}, ${ln.type}`, ln.brand),
         variants: [{
           option1Name: "Title",
           option1Value: "Default Title",
@@ -199,14 +262,14 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
         title,
         vendor: base.brand,
         type: base.type,
-        tags: base.tags || `${base.brand}, ${base.type}, New Arrival`,
+        tags: buildRichTags(base) || base.tags || `${base.brand}, ${base.type}`,
         bodyHtml: base.bodyHtml || `<p>${base.name} by ${base.brand}. Premium ${base.type.toLowerCase()}.</p>`,
         seoTitle: base.seoTitle || `${base.name} | ${base.brand}`.slice(0, 70),
         seoDesc: base.seoDesc || `Shop ${base.name} by ${base.brand}. Premium ${base.type.toLowerCase()}.`.slice(0, 160),
         imageUrl: base.imageUrl || "",
         status: base.status === "active" ? "active" : "draft",
         metafields: base.metafields || {},
-        collections: deriveCollections(base.tags || `${base.brand}, ${base.type}, New Arrival`, base.brand),
+        collections: deriveCollections(buildRichTags(base) || base.tags || `${base.brand}, ${base.type}`, base.brand),
         variants: [{
           option1Name: "Title",
           option1Value: "Default Title",
@@ -245,14 +308,14 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
       title,
       vendor: base.brand,
       type: base.type,
-      tags: base.tags || `${base.brand}, ${base.type}, New Arrival`,
+      tags: buildRichTags(base) || base.tags || `${base.brand}, ${base.type}`,
       bodyHtml: base.bodyHtml || `<p>${base.name} by ${base.brand}. Premium ${base.type.toLowerCase()}.</p>`,
       seoTitle: base.seoTitle || `${base.name} | ${base.brand}`.slice(0, 70),
       seoDesc: base.seoDesc || `Shop ${base.name} by ${base.brand}. Premium ${base.type.toLowerCase()}.`.slice(0, 160),
       imageUrl: base.imageUrl || "",
       status: base.status === "active" ? "active" : "draft",
       metafields: base.metafields || {},
-      collections: deriveCollections(base.tags || `${base.brand}, ${base.type}, New Arrival`, base.brand),
+      collections: deriveCollections(buildRichTags(base) || base.tags || `${base.brand}, ${base.type}`, base.brand),
       variants,
     };
   });
@@ -505,7 +568,12 @@ export function generateLightspeedCSV(
   const rows = lines.map((ln) => {
     const title = deduplicateTitle(ln.name, ln.brand);
     const handle = generateHandle(title, ln.brand);
-    const tags = ln.tags || [ln.brand, ln.type, ln.colour, "New Arrival"].filter(Boolean).join(", ");
+    // W-07 — rich tags: Brand, Department, Type, ArrivalMonth, Season, Colour.
+    // Always recompute so we don't inherit primitive upstream tags like
+    // "[brand, type, colour, New Arrival]". `ln.tags` is preserved only as a
+    // fallback when the rich builder produces nothing (no brand/type/date).
+    const richTags = buildRichTags(ln);
+    const tags = richTags || ln.tags || "";
 
     // Convention: Colour first, Size second (matches Shopify export + Sonic memory)
     const opt1Name = ln.colour ? "Colour" : ln.size ? "Size" : "";

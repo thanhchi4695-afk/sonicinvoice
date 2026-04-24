@@ -44,6 +44,10 @@ export interface ExportProduct {
   tags?: string;
   seoTitle?: string;
   seoDesc?: string;
+  /** ISO date — drives the arrival-month tag (Apr26 / Sept26). */
+  invoiceDate?: string;
+  /** Season token parsed from SKU (e.g. "W26"). */
+  season?: string;
 }
 
 interface ExportReviewScreenProps {
@@ -205,6 +209,10 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
         imageUrl: p.imageUrl,
         bodyHtml: p.bodyHtml,
         tags: p.tags,
+        // W-07 — forward date + season so the engine's tag builder can emit
+        // arrival-month (Apr26) and season (W26) tags.
+        invoiceDate: p.invoiceDate,
+        season: p.season,
       })));
       downloadFile(csv, filename);
     } else if (selectedFormat === "shopify_price") {

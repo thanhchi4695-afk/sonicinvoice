@@ -2740,9 +2740,22 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     if (g.origin) bodyParts.push(`<p><strong>Origin:</strong> ${g.origin}</p>`);
     const bodyHtml = bodyParts.length > 0 ? bodyParts.join("") : undefined;
 
-    const tags = [g.brand, g.type, g.colour, "New Arrival"]
-      .filter(Boolean)
-      .join(", ");
+    // W-07 — leave `tags` blank here so csv-export-engine.buildRichTags() runs
+    // downstream with full context (brand, type, colour, invoiceDate, season).
+    // Pre-building tags as "[brand, type, colour, New Arrival]" used to win the
+    // `ln.tags ||` fallback and suppress the rich builder.
+    const tags = "";
+
+    // Parse season token (e.g. "W26") from the SKU's middle segment so the
+    // engine can emit a season tag without re-parsing.
+    const seasonFromGroup = (() => {
+      const sku = g.vendorCode || g.variants?.[0]?.sku || "";
+      const parts = sku.split(/[-_/]/).filter(Boolean);
+      for (const p of parts) {
+        if (/^(SS|AW|S|W|FW|HO|RE)\d{2}$/i.test(p)) return p.toUpperCase();
+      }
+      return "";
+    })();
 
     const imageUrl = g.imageSrc || (g.imageUrls && g.imageUrls[0]) || undefined;
 
@@ -2782,6 +2795,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         imageUrl,
         bodyHtml,
         tags,
+        // W-07 — forward date + season so the engine emits Apr26 / W26 tags.
+        invoiceDate: new Date().toISOString().split("T")[0],
+        season: seasonFromGroup || undefined,
       };
     });
   });

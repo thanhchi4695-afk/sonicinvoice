@@ -1216,6 +1216,81 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_import_runs: {
+        Row: {
+          after_snapshot: Json
+          before_snapshot: Json
+          changes: Json
+          colour: string | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          group_key: string | null
+          id: string
+          idempotency_key: string | null
+          invoice_id: string | null
+          location_id: string | null
+          location_name: string | null
+          product_title: string | null
+          run_status: string
+          shopify_product_id: string | null
+          source: string
+          started_at: string
+          style_number: string | null
+          supplier_name: string | null
+          units_applied: number
+          user_id: string
+        }
+        Insert: {
+          after_snapshot?: Json
+          before_snapshot?: Json
+          changes?: Json
+          colour?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          group_key?: string | null
+          id?: string
+          idempotency_key?: string | null
+          invoice_id?: string | null
+          location_id?: string | null
+          location_name?: string | null
+          product_title?: string | null
+          run_status?: string
+          shopify_product_id?: string | null
+          source?: string
+          started_at?: string
+          style_number?: string | null
+          supplier_name?: string | null
+          units_applied?: number
+          user_id: string
+        }
+        Update: {
+          after_snapshot?: Json
+          before_snapshot?: Json
+          changes?: Json
+          colour?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          group_key?: string | null
+          id?: string
+          idempotency_key?: string | null
+          invoice_id?: string | null
+          location_id?: string | null
+          location_name?: string | null
+          product_title?: string | null
+          run_status?: string
+          shopify_product_id?: string | null
+          source?: string
+          started_at?: string
+          style_number?: string | null
+          supplier_name?: string | null
+          units_applied?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       invitations: {
         Row: {
           accepted_at: string | null

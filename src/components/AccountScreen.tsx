@@ -6,6 +6,7 @@ import POSConnectionPanel from "@/components/POSConnectionPanel";
 import PlatformConnectionsSection from "@/components/PlatformConnectionsSection";
 import BrandDatabaseSyncPanel from "@/components/BrandDatabaseSyncPanel";
 import BrandDatabaseUserSyncSection from "@/components/BrandDatabaseUserSyncSection";
+import WebSearchUsageSection from "@/components/WebSearchUsageSection";
 import { useUserRole } from "@/hooks/use-user-role";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -392,6 +393,11 @@ const AccountScreen = () => {
 
       {/* Price Intelligence API Keys */}
       <ApiKeysSection />
+
+      {/* WebSearch usage (AI enrichment) */}
+      <Section title="🔎 WebSearch usage">
+        <WebSearchUsageSection />
+      </Section>
 
       {/* Brand database sync (per-user CSV) */}
       <Section title="📦 Brand database sync">

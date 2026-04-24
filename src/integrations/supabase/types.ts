@@ -152,6 +152,57 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_database: {
+        Row: {
+          brand_name: string
+          canonical_brand_name: string | null
+          country_origin: string | null
+          created_at: string
+          enrichment_enabled: boolean
+          id: string
+          is_shopify: boolean
+          notes: string | null
+          product_categories: string | null
+          products_json_endpoint: string | null
+          updated_at: string
+          user_id: string
+          verified_date: string | null
+          website_url: string | null
+        }
+        Insert: {
+          brand_name: string
+          canonical_brand_name?: string | null
+          country_origin?: string | null
+          created_at?: string
+          enrichment_enabled?: boolean
+          id?: string
+          is_shopify?: boolean
+          notes?: string | null
+          product_categories?: string | null
+          products_json_endpoint?: string | null
+          updated_at?: string
+          user_id: string
+          verified_date?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          brand_name?: string
+          canonical_brand_name?: string | null
+          country_origin?: string | null
+          created_at?: string
+          enrichment_enabled?: boolean
+          id?: string
+          is_shopify?: boolean
+          notes?: string | null
+          product_categories?: string | null
+          products_json_endpoint?: string | null
+          updated_at?: string
+          user_id?: string
+          verified_date?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
       brand_lookup_misses: {
         Row: {
           id: string
@@ -228,6 +279,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      brand_sync_log: {
+        Row: {
+          error_details: Json
+          id: string
+          rows_errored: number
+          rows_inserted: number
+          rows_skipped: number
+          rows_updated: number
+          source_url: string | null
+          synced_at: string
+          triggered_by: string
+          user_id: string
+        }
+        Insert: {
+          error_details?: Json
+          id?: string
+          rows_errored?: number
+          rows_inserted?: number
+          rows_skipped?: number
+          rows_updated?: number
+          source_url?: string | null
+          synced_at?: string
+          triggered_by?: string
+          user_id: string
+        }
+        Update: {
+          error_details?: Json
+          id?: string
+          rows_errored?: number
+          rows_inserted?: number
+          rows_skipped?: number
+          rows_updated?: number
+          source_url?: string | null
+          synced_at?: string
+          triggered_by?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       competitor_monitored_products: {
         Row: {
@@ -2835,6 +2925,27 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          brand_sync_url: string | null
+          created_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_sync_url?: string | null
+          created_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_sync_url?: string | null
+          created_at?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

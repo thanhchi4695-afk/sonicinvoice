@@ -495,19 +495,28 @@ export function generateLightspeedCSV(
     const attr2Name = ln.colour && ln.size ? "Size" : "";
     const attr2Value = ln.colour && ln.size ? (ln.size || "") : "";
 
+    // Lightspeed SKU rules: only letters, numbers, ".", "-", "_", "/" — strip everything else (incl. spaces).
+    const cleanSku = (ln.sku || "").replace(/[^a-zA-Z0-9._\-/]/g, "");
+    // Supply Price must be numeric (blank = import error). Fall back to retail price if cogs missing.
+    const supplyPrice = ln.cogs != null && ln.cogs >= 0
+      ? ln.cogs.toFixed(2)
+      : (ln.rrp != null ? ln.rrp.toFixed(2) : "0.00");
+    // active must be 0 or 1 — Lightspeed rejects TRUE/FALSE strings.
+    const activeFlag = ln.status === "active" ? "1" : "0";
+
     return {
       handle,
       name: title,
-      sku: ln.sku || "",
+      sku: cleanSku,
       // supplier_code = vendor name; merchants can map this to their internal
       // Lightspeed supplier ID later. Propagated to every row (#4 from gap analysis).
       supplier_code: ln.brand || "",
       description: ln.bodyHtml || "",
       brand: ln.brand || "",
-      supply_price: ln.cogs != null ? ln.cogs.toFixed(2) : "",
+      supply_price: supplyPrice,
       retail_price: ln.rrp.toFixed(2),
       tax: taxName,
-      active: ln.status === "active" ? "TRUE" : "FALSE",
+      active: activeFlag,
       tags,
       attribute_1_name: attr1Name,
       attribute_1_value: attr1Value,

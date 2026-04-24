@@ -456,37 +456,50 @@ export function generateLightspeedCSV(
   rawLines: ExportLine[],
   opts?: { taxName?: string; outletName?: string }
 ): { csv: string; rowCount: number } {
-  const taxName = opts?.taxName ?? "GST";
+  const taxName = opts?.taxName ?? "Default Tax";
   const outlet = opts?.outletName ?? "Main Outlet";
-  const stockCol = `${outlet.replace(/\s+/g, "_")}_stock`;
+  const outletKey = outlet.replace(/\s+/g, "_");
+  const stockCol = `inventory_${outletKey}`;
+  const reorderPointCol = `reorder_point_${outletKey}`;
+  const restockLevelCol = `restock_level_${outletKey}`;
 
   // Expand size runs the same way the Shopify path does.
   const lines: ExportLine[] = rawLines.flatMap((ln) => expandLineBySize(ln));
 
+  // Column order MIRRORS the official Lightspeed X-Series product-export template exactly.
   const headers = [
+    "id",
     "handle",
-    "name",
     "sku",
-    "supplier_code",
+    "composite_name",
+    "composite_sku",
+    "composite_quantity",
+    "name",
     "description",
-    "brand",
+    "product_category",
+    "variant_option_one_name",
+    "variant_option_one_value",
+    "variant_option_two_name",
+    "variant_option_two_value",
+    "variant_option_three_name",
+    "variant_option_three_value",
+    "tags",
     "supply_price",
     "retail_price",
-    "tax",
+    "loyalty_value",
+    "loyalty_value_default",
+    "tax_name",
+    "tax_value",
+    "account_code",
+    "account_code_purchase",
+    "brand_name",
+    "supplier_name",
+    "supplier_code",
     "active",
-    "tags",
-    "attribute_1_name",
-    "attribute_1_value",
-    "attribute_2_name",
-    "attribute_2_value",
-    "attribute_3_name",
-    "attribute_3_value",
+    "track_inventory",
     stockCol,
-    // Image columns — Lightspeed X-Series accepts up to 6 product image URLs
-    // mapped on import via Additional Details → Product Images.
-    "image_url_1",
-    "image_url_2",
-    "image_url_3",
+    reorderPointCol,
+    restockLevelCol,
   ];
 
   const rows = lines.map((ln) => {
@@ -495,10 +508,10 @@ export function generateLightspeedCSV(
     const tags = ln.tags || [ln.brand, ln.type, ln.colour, "New Arrival"].filter(Boolean).join(", ");
 
     // Convention: Colour first, Size second (matches Shopify export + Sonic memory)
-    const attr1Name = ln.colour ? "Colour" : ln.size ? "Size" : "";
-    const attr1Value = ln.colour || ln.size || "";
-    const attr2Name = ln.colour && ln.size ? "Size" : "";
-    const attr2Value = ln.colour && ln.size ? (ln.size || "") : "";
+    const opt1Name = ln.colour ? "Colour" : ln.size ? "Size" : "";
+    const opt1Value = ln.colour || ln.size || "";
+    const opt2Name = ln.colour && ln.size ? "Size" : "";
+    const opt2Value = ln.colour && ln.size ? (ln.size || "") : "";
 
     // Lightspeed SKU rules: only letters, numbers, ".", "-", "_", "/" — strip everything else (incl. spaces).
     const cleanSku = (ln.sku || "").replace(/[^a-zA-Z0-9._\-/]/g, "");
@@ -516,34 +529,39 @@ export function generateLightspeedCSV(
       .replace(/\s+/g, " ")
       .trim();
 
-    // Up to 3 image URLs (image_url_1..3). Today we only have one main image
-    // per product but the columns are reserved so future enrichment can add more.
-    const imageUrls = ln.imageUrl ? [ln.imageUrl] : [];
-
     return {
+      id: "", // blank → Lightspeed creates new product on import
       handle,
-      name: title,
       sku: cleanSku,
-      // supplier_code = vendor name; merchants can map this to their internal
-      // Lightspeed supplier ID later. Propagated to every row (#4 from gap analysis).
-      supplier_code: ln.brand || "",
+      composite_name: "",
+      composite_sku: "",
+      composite_quantity: "",
+      name: title,
       description: descriptionText,
-      brand: ln.brand || "",
+      product_category: ln.type || "",
+      variant_option_one_name: opt1Name,
+      variant_option_one_value: opt1Value,
+      variant_option_two_name: opt2Name,
+      variant_option_two_value: opt2Value,
+      variant_option_three_name: "",
+      variant_option_three_value: "",
+      tags,
       supply_price: supplyPrice,
       retail_price: ln.rrp.toFixed(2),
-      tax: taxName,
+      loyalty_value: "",
+      loyalty_value_default: "",
+      tax_name: taxName,
+      tax_value: "",
+      account_code: "",
+      account_code_purchase: "",
+      brand_name: ln.brand || "",
+      supplier_name: ln.brand || "",
+      supplier_code: "",
       active: activeFlag,
-      tags,
-      attribute_1_name: attr1Name,
-      attribute_1_value: attr1Value,
-      attribute_2_name: attr2Name,
-      attribute_2_value: attr2Value,
-      attribute_3_name: "",
-      attribute_3_value: "",
+      track_inventory: "1",
       [stockCol]: String(ln.qty ?? 0),
-      image_url_1: imageUrls[0] || "",
-      image_url_2: imageUrls[1] || "",
-      image_url_3: imageUrls[2] || "",
+      [reorderPointCol]: "",
+      [restockLevelCol]: "",
     } as Record<string, string>;
   });
 

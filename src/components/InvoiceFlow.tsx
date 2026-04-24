@@ -2768,7 +2768,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         price: v.price ?? g.price,
         rrp: v.rrp ?? g.rrp,
         qty: v.qty ?? 0,
-        cogs: g.cogs,
+        // VariantLine.price IS the wholesale unit cost (set as `price: p.cost`
+        // upstream). Surface it as cogs so Lightspeed `supply_price` and
+        // Shopify `Cost per item` get the correct wholesale price — never RRP.
+        cogs: (v.price ?? g.cogs ?? g.price),
         status: g.status,
         metafields: g.metafields,
         imageUrl,

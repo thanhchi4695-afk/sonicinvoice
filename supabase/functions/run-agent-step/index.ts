@@ -159,6 +159,24 @@ Deno.serve(async (req) => {
       .select("id, user_id, total_cost_cents, gate_count, metadata")
       .eq("id", sessionId)
       .maybeSingle();
+
+    // Resolve supplier hint from context or session metadata, then fetch
+    // supplier hints + brand rules for the system prompt.
+    const supplierName =
+      (typeof context.supplier === "string" && context.supplier) ||
+      (typeof context.supplier_name === "string" && context.supplier_name) ||
+      ((session?.metadata as Record<string, unknown> | null)?.supplier as string | undefined) ||
+      null;
+    let supplierHints: string | null = null;
+    let brandRulesText: string | null = null;
+    if (supplierName) {
+      const [{ data: hints }, { data: rules }] = await Promise.all([
+        admin.rpc("get_supplier_hints", { _supplier: supplierName, _user_id: userId, _limit: 25 }),
+        admin.rpc("get_brand_rules_text", { _supplier: supplierName }),
+      ]);
+      supplierHints = (hints as string | null) ?? null;
+      brandRulesText = (rules as string | null) ?? null;
+    }
     if (sessionErr || !session) {
       return new Response(JSON.stringify({ error: "Session not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },

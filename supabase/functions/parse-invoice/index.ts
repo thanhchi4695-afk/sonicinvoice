@@ -113,6 +113,27 @@ If ANY row or text block contains one of these patterns, it is NOT a product —
 - Freight / Shipping / Delivery Charge / Handling
 - Discount / Less Discount / Credit
 
+### CRITICAL — GST footer detection (read this BEFORE you decide whether to divide line costs by 1.1):
+
+Inspect the totals block at the bottom of the invoice. There are TWO patterns:
+
+A) **Ex-GST footer** (line costs are ALREADY ex-GST — DO NOT divide them):
+   The footer shows three separate lines that reconcile as Subtotal + GST = Total.
+   Example (Walnut Melbourne):
+       Sub Total      $2,260.20
+       G.S.T.           $226.02
+       Total          $2,486.22   ← 2260.20 + 226.02 = 2486.22 ✓
+   In this case, set "gst_included" = false, emit cost_ex_gst = unit price as printed,
+   and emit cost_inc_gst = round(price * 1.1, 2). DO NOT divide the printed price by 1.1.
+
+B) **Inc-GST footer** (line costs INCLUDE GST — divide by 1.1 to get ex-GST):
+   The footer shows only a "Total (inc GST)" line, OR the Subtotal already equals the Total.
+   In this case, set "gst_included" = true, emit cost_inc_gst = unit price as printed,
+   and emit cost_ex_gst = round(price / 1.1, 2).
+
+If you cannot tell, default to A (ex-GST) for AU wholesale invoices — most fashion
+wholesale prints line costs ex-GST and GST is added in the footer.
+
 **Other non-product content:**
 - Payment Terms / Terms / Net 30 / EOM / COD
 - Bank Details / BSB / Account Number / Remittance
@@ -1123,6 +1144,46 @@ ${ocrText}`,
     // Server-side cross-validation
     const validated = crossValidateProducts(filtered);
 
+    // ── Walnut Round 2, Bug #1 — GST FOOTER RECONCILIATION ──
+    // Many AU wholesale invoices (Walnut Melbourne, Pops + Co, …) print line
+    // costs ALREADY ex-GST and show a separate "Sub Total / G.S.T. / Total"
+    // footer where Subtotal + GST = Total. The model sometimes still divides
+    // line costs by 1.1 a second time, leaving every cost exactly 9.09% short
+    // (ratio 0.9091). When we can prove the footer is ex-GST AND the sum of
+    // line costs matches the subtotal × 0.909, multiply costs back by 1.1.
+    const subtotal = Number(parsed.subtotal) || 0;
+    const gstFooter = Number(parsed.gst) || 0;
+    const totalFooter = Number(parsed.total) || 0;
+    let gstFooterTreatment: "ex_gst" | "inc_gst" | "unknown" = "unknown";
+    let gstReconciliationApplied = false;
+    if (subtotal > 0 && gstFooter > 0 && totalFooter > 0) {
+      const reconstructed = subtotal + gstFooter;
+      // Footer is ex-GST iff Subtotal + GST ≈ Total (within 1%).
+      if (Math.abs(reconstructed - totalFooter) / totalFooter < 0.01) {
+        gstFooterTreatment = "ex_gst";
+        const lineSum = validated.reduce((s, p) => {
+          const c = Number((p as Record<string, unknown>).unit_cost ?? (p as Record<string, unknown>).cost) || 0;
+          const q = Number((p as Record<string, unknown>).quantity ?? (p as Record<string, unknown>).qty) || 0;
+          return s + c * q;
+        }, 0);
+        if (lineSum > 0) {
+          const ratio = lineSum / subtotal;
+          // 0.9091 ≈ 1/1.1. Allow ±1% tolerance.
+          if (ratio > 0.895 && ratio < 0.92) {
+            for (const p of validated) {
+              const rec = p as Record<string, unknown>;
+              if (typeof rec.unit_cost === "number") rec.unit_cost = Math.round(rec.unit_cost * 1.1 * 100) / 100;
+              if (typeof rec.cost === "number") rec.cost = Math.round((rec.cost as number) * 1.1 * 100) / 100;
+            }
+            gstReconciliationApplied = true;
+            console.log(`[parse-invoice] GST footer reconciliation: line costs were over-stripped (ratio ${ratio.toFixed(4)}) — multiplied by 1.1.`);
+          }
+        }
+      } else if (Math.abs(subtotal - totalFooter) / totalFooter < 0.01) {
+        gstFooterTreatment = "inc_gst";
+      }
+    }
+
     if (docType === "packing_slip") {
       return new Response(JSON.stringify({
         document_type: "packing_slip",
@@ -1211,6 +1272,10 @@ ${ocrText}`,
       ocr_fallback_attempted: parsed.ocr_fallback_attempted || false,
       needs_manual_review: parsed.needs_manual_review || false,
       review_reason: parsed.review_reason || null,
+      // Walnut Round 2, Bug #1: surface the GST-footer detection so the UI
+      // can show a banner and the supplier-brain can persist the inference.
+      gst_footer_treatment: gstFooterTreatment,
+      gst_reconciliation_applied: gstReconciliationApplied,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

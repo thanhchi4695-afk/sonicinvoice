@@ -98,13 +98,39 @@ export function titleCase(raw: string | null | undefined): string {
     .join(' ');
 }
 
-/** Strip a leading brand from a product title if it's been prefixed twice. */
+/**
+ * Strip a brand from a product title if it's been prefixed (or suffixed,
+ * or wrapped in [BRACKETS]) onto the name.
+ *
+ * Walnut Round 2 evidence: AI-extracted titles arrive as
+ *   "WALNUT MELBOURNE [WALNUT MELBOURNE] MARRAKESH DRESS"
+ * which needs the brand stripped from BOTH the leading position AND
+ * the bracketed insertion. We run repeatedly until stable so even
+ * triplicate brand prefixes ("BRAND BRAND BRAND Marrakesh") collapse
+ * down to just "Marrakesh".
+ */
 export function stripBrandPrefix(name: string, brand: string): string {
   if (!name || !brand) return name || '';
-  const n = name.trim();
   const b = brand.trim();
-  const re = new RegExp(`^${b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+`, 'i');
-  return n.replace(re, '').trim();
+  if (!b) return name.trim();
+  const escaped = b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Match: leading "BRAND ", trailing " BRAND", or anywhere "[BRAND]" / "(BRAND)".
+  const leadingRe = new RegExp(`^${escaped}\\s+`, 'i');
+  const trailingRe = new RegExp(`\\s+${escaped}$`, 'i');
+  const bracketedRe = new RegExp(`\\s*[\\[\\(]\\s*${escaped}\\s*[\\]\\)]\\s*`, 'gi');
+  let prev = '';
+  let cur = name.trim();
+  // Iterate to a fixed point so repeated prefixes/brackets all collapse.
+  while (cur !== prev) {
+    prev = cur;
+    cur = cur
+      .replace(bracketedRe, ' ')
+      .replace(leadingRe, '')
+      .replace(trailingRe, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+  return cur;
 }
 
 /** Three-letter month + 2-digit year. September is the only 4-letter exception ("Sept26"). */
@@ -118,8 +144,13 @@ export function arrivalMonthTag(date: Date | string | null | undefined): string 
 }
 
 // ── Handle generation ──────────────────────────────────────
+// Walnut Round 2, Bug #7: handle was "walnut-melbourne-walnut-melbourne-…"
+// because the brand was being slugged in once from `brand` and once more
+// from a brand-prefixed `title`. Strip the brand off the title first so the
+// final slug only contains the brand once: "walnut-melbourne-marrakesh-dress".
 export function generateHandle(title: string, brand: string): string {
-  return `${title} ${brand}`
+  const cleanTitle = stripBrandPrefix(title, brand);
+  return `${brand} ${cleanTitle}`
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
@@ -314,11 +345,22 @@ export function generateXSeriesCSV(
     sorted.forEach((v, vi) => {
       const isFirst = vi === 0;
       // B1 #6 — append size to style code so each variant SKU is unique.
+      // Walnut Round 2, Bug #4: Lightspeed treats SKU as the unique variant
+      // key. The previous logic used `endsWith(size)` to skip appending — that
+      // accidentally matched style-codes already containing the size's digits
+      // (e.g. "Mosaique-26" looks like it "ends with 6"), leaving every size
+      // sharing one SKU and Lightspeed merging the rows on import.
+      // Always append "-{size}" when a size is present and not already a
+      // delimited segment of the SKU.
       const variantSku = v.sku
         ? sanitiseSku(v.sku)
         : generateVariantSku(styleCode, v.colour || '', v.size || '');
-      const variantSkuWithSize = v.size && !variantSku.toUpperCase().endsWith(v.size.toUpperCase())
-        ? sanitiseSku(`${variantSku}-${v.size}`)
+      const sizeToken = (v.size || '').replace(/[^a-zA-Z0-9]/g, '');
+      const sizeSegmentRe = sizeToken
+        ? new RegExp(`-${sizeToken}$`, 'i')
+        : null;
+      const variantSkuWithSize = sizeToken && !sizeSegmentRe!.test(variantSku)
+        ? sanitiseSku(`${variantSku}-${sizeToken}`)
         : variantSku;
 
       const attr1Val = s.attributeOrder === 'size_first' ? (titleCase(v.size || '')) : (titleCase(v.colour || ''));

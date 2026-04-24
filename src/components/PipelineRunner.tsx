@@ -1,8 +1,12 @@
-import { useState, useCallback, useMemo } from "react";
-import { ArrowLeft, Check, SkipForward, RotateCcw, AlertCircle, Clock, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { ArrowLeft, Check, SkipForward, RotateCcw, AlertCircle, Clock, ChevronDown, ChevronUp, Loader2, Bot, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getPipelineById } from "@/lib/pipeline-definitions";
+import { supabase } from "@/integrations/supabase/client";
+import { isBrainModeEnabled } from "@/lib/brain-pipeline";
+import { toAgentStep } from "@/lib/agent-step-mapping";
+import AgentChatPanel from "@/components/AgentChatPanel";
 import {
   getPipelineContext,
   setPipelineContext,
@@ -49,6 +53,26 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
 
   const [runningFlow, setRunningFlow] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
+  const [agentPanelOpen, setAgentPanelOpen] = useState(true);
+
+  // Create an agent_sessions row when this pipeline starts.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      const mode = isBrainModeEnabled() ? "auto" : "supervised";
+      const { data, error } = await supabase
+        .from("agent_sessions")
+        .insert({ user_id: user.id, agent_mode: mode, status: "running", metadata: { pipelineId } })
+        .select("id")
+        .single();
+      if (!cancelled && !error && data) setAgentSessionId(data.id);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipelineId]);
 
   const persistCtx = useCallback((next: PipelineContext) => {
     setCtxState(next);
@@ -124,8 +148,10 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
   }, [steps]);
 
   const startStep = useCallback(() => {
+    let stepIdSnap: string | undefined;
     setCtxState((prev) => {
       const stepId = steps[prev.currentStep]?.id;
+      stepIdSnap = stepId;
       const next: PipelineContext = {
         ...prev,
         stepStartedAt: { ...prev.stepStartedAt, [stepId]: Date.now() },
@@ -136,7 +162,53 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
       return next;
     });
     setRunningFlow(true);
-  }, [steps]);
+
+    // Notify the agent — fire-and-forget so the flow UI is not blocked.
+    if (agentSessionId && stepIdSnap) {
+      const agentStep = toAgentStep(stepIdSnap);
+      if (agentStep) {
+        supabase.functions.invoke("run-agent-step", {
+          body: { sessionId: agentSessionId, step: agentStep, context: { pipelineStepId: stepIdSnap } },
+        }).catch((err) => console.warn("[agent] run-agent-step failed", err));
+      }
+    }
+  }, [steps, agentSessionId]);
+
+  // Mark the agent session complete when the user finishes the pipeline.
+  const finalizeAgentSession = useCallback(async (status: "completed" | "cancelled") => {
+    if (!agentSessionId) return;
+    await supabase
+      .from("agent_sessions")
+      .update({ status, completed_at: new Date().toISOString() })
+      .eq("id", agentSessionId);
+  }, [agentSessionId]);
+
+  // ── Layout wrapper that adds the agent side panel on desktop ──
+  const withPanel = (main: React.ReactNode) => (
+    <div className="flex h-full min-h-[calc(100vh-4rem)]">
+      <div className="flex-1 min-w-0">{main}</div>
+      {agentSessionId && agentPanelOpen && (
+        <div className="hidden lg:flex w-80 xl:w-96 shrink-0 relative">
+          <button
+            onClick={() => setAgentPanelOpen(false)}
+            className="absolute top-2 right-2 z-10 p-1 rounded hover:bg-muted text-muted-foreground"
+            aria-label="Hide agent panel"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+          <AgentChatPanel sessionId={agentSessionId} className="w-full" />
+        </div>
+      )}
+      {agentSessionId && !agentPanelOpen && (
+        <button
+          onClick={() => setAgentPanelOpen(true)}
+          className="hidden lg:flex fixed right-4 bottom-4 z-20 items-center gap-1.5 px-3 py-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90 text-xs font-medium"
+        >
+          <Bot className="w-3.5 h-3.5" /> Show agent
+        </button>
+      )}
+    </div>
+  );
 
   // ── Early returns after all hooks ──
   if (!pipeline) {
@@ -161,11 +233,11 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
 
   // ── Completion screen ──
   if (isComplete) {
-    const handleFinish = () => { clearPipelineContext(); onExit(); };
+    const handleFinish = () => { void finalizeAgentSession("completed"); clearPipelineContext(); onExit(); };
     const successCount = ctx.completedSteps.length;
     const skipCount = ctx.skippedSteps.length;
 
-    return (
+    return withPanel(
       <div className="px-4 pt-6 pb-24 animate-fade-in max-w-lg mx-auto text-center">
         <div className="text-5xl mb-4">✅</div>
         <h2 className="text-xl font-bold font-display mb-2">Pipeline complete</h2>
@@ -265,13 +337,13 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
 
   // ── Running a flow inline ──
   if (runningFlow && currentStep) {
-    return <div className="animate-fade-in">{onRenderFlow(currentStep.flow, advanceStep)}</div>;
+    return withPanel(<div className="animate-fade-in">{onRenderFlow(currentStep.flow, advanceStep)}</div>);
   }
 
   // ── Step card (failed state shows retry) ──
   const isFailed = currentStepStatus === "failed";
 
-  return (
+  return withPanel(
     <div className="px-4 pt-2 pb-24 animate-fade-in max-w-lg mx-auto">
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">

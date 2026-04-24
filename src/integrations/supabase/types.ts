@@ -3477,6 +3477,7 @@ export type Database = {
         Returns: boolean
       }
       normalise_vendor: { Args: { raw: string }; Returns: string }
+      reset_agent_budgets_monthly: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "buyer" | "warehouse" | "viewer"

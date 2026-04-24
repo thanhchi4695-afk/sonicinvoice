@@ -1,8 +1,12 @@
-import { useState, useCallback, useMemo } from "react";
-import { ArrowLeft, Check, SkipForward, RotateCcw, AlertCircle, Clock, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { ArrowLeft, Check, SkipForward, RotateCcw, AlertCircle, Clock, ChevronDown, ChevronUp, Loader2, Bot, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getPipelineById } from "@/lib/pipeline-definitions";
+import { supabase } from "@/integrations/supabase/client";
+import { isBrainModeEnabled } from "@/lib/brain-pipeline";
+import { toAgentStep } from "@/lib/agent-step-mapping";
+import AgentChatPanel from "@/components/AgentChatPanel";
 import {
   getPipelineContext,
   setPipelineContext,

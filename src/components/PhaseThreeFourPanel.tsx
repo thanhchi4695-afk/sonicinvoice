@@ -398,7 +398,8 @@ async function runEnrich(c: ClassifiedItem, supplierName: string): Promise<Enric
   const [priceRes, descRes, imageRes] = await Promise.allSettled([
     supabase.functions.invoke("price-lookup-search", {
       body: {
-        product_name: c.original_line.styleName,
+        // Brand-first product_name so the search engine query leads with the brand.
+        product_name: `${c.original_line.brand || supplierName} ${c.original_line.styleName}`.trim(),
         supplier: c.original_line.brand || supplierName,
         style_number: c.original_line.sku || "",
         colour: c.original_line.colour || undefined,
@@ -413,8 +414,15 @@ async function runEnrich(c: ClassifiedItem, supplierName: string): Promise<Enric
     }),
     supabase.functions.invoke("image-search", {
       body: {
-        query: `${c.original_line.brand || supplierName} ${c.original_line.styleName} ${c.original_line.colour || ""}`.trim(),
-        limit: 1,
+        // image-search expects a `products` array, NOT a single `query` string.
+        // Brand-first so the AI anchors on the correct label.
+        products: [{
+          searchQuery: `${c.original_line.brand || supplierName} ${c.original_line.styleName} ${c.original_line.colour || ""}`.trim(),
+          brand: c.original_line.brand || supplierName,
+          styleName: c.original_line.styleName,
+          styleNumber: c.original_line.sku || "",
+          colour: c.original_line.colour || "",
+        }],
       },
     }),
   ]);

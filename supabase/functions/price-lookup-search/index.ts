@@ -164,17 +164,20 @@ serve(async (req) => {
 
     let searchQuery = "";
     if (searchMode === "primary") {
-      const parts = [cleanProductName, supplier, colour].filter(Boolean);
+      // IMPORTANT: brand/supplier MUST come FIRST so search engines anchor on the
+      // correct brand (e.g. "Walnut Melbourne Marrakesh Dress" not "Marrakesh Dress Walnut").
+      const parts = [supplier, cleanProductName, colour].filter(Boolean);
       const exclusions = "-site:instagram.com -site:facebook.com -site:tiktok.com -site:pinterest.com -site:youtube.com -site:shopltk.com -site:glamadelaide.com.au -inurl:collection -inurl:collections -inurl:category";
       // If we know the brand's AU domain, lead with site: to anchor results there.
       const brandPrefix = brandSiteOperator ? `site:${brandSiteOperator} OR ` : "";
       searchQuery = `${parts.join(" ")} buy (${brandPrefix}${AU_TLD_BIAS}) ${exclusions}`;
     } else if (searchMode === "sku") {
-      const parts = [style_number, supplier].filter(Boolean);
+      // Brand-first SKU query so suppliers like "WAL-1234" match Walnut Melbourne.
+      const parts = [supplier, style_number, cleanProductName].filter(Boolean);
       const brandPrefix = brandSiteOperator ? `site:${brandSiteOperator} OR ` : "";
       searchQuery = parts.length > 0
         ? `${parts.join(" ")} Australia (${brandPrefix}${AU_TLD_BIAS})`
-        : `${cleanProductName} ${supplier || ""} Australia ${AU_TLD_BIAS}`.trim();
+        : `${supplier || ""} ${cleanProductName} Australia ${AU_TLD_BIAS}`.trim();
     }
 
     // ── Mode: direct brand URL probe only ──

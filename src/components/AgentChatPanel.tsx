@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import BudgetPill from "@/components/BudgetPill";
 import { cn } from "@/lib/utils";
 
 type StepRunStatus = "running" | "done" | "needs_review" | "skipped" | "failed";

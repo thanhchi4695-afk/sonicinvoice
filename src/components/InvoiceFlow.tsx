@@ -1392,9 +1392,13 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const hasMultipleColours = uniqueColours.size > 1;
       const hasSize = uniqueSizes.size > 0 && !uniqueSizes.has("one size");
 
-      const displayName = first.brand && first.name && !first.name.toLowerCase().startsWith(first.brand.toLowerCase())
-        ? `${first.brand} ${first.name}`
-        : (first.name || "Unnamed Product");
+      // W-05 — Keep `name` brand-free. Brand lives in its own column (Shopify
+      // Vendor / Lightspeed brand_name) and gets recombined at export time
+      // when the user's name format demands it. Prepending the brand here
+      // caused "Walnut Melbourne MARRAKESH DRESS" to leak into the CSV's
+      // name column even after stripBrandPrefix ran downstream (the brand
+      // had already been concatenated into the AI-extracted name itself).
+      const displayName = (first.name || "Unnamed Product").trim();
 
       // Deduplicate identical variant rows (same colour + size), summing quantities
       const variantMap = new Map<string, { sku: string; colour: string; size: string; qty: number; price: number; rrp: number }>();
@@ -4648,6 +4652,8 @@ interface ExportProduct {
   variants?: { sku?: string; colour?: string; size?: string; qty?: number; price?: number; rrp?: number }[];
   vendorCode?: string;
   description?: string;
+  /** Rich HTML description from enrichment (preferred over `description`). */
+  bodyHtml?: string;
   season?: string;
   invoiceDate?: string; // ISO — used to derive arrivalMonth tag (Apr26 / Sept26)
 }
@@ -4718,7 +4724,15 @@ function LightspeedExportDownload({ exportFormat, products, supplierName, lsSett
       type: p.type,
       price: p.price, // wholesale cost ex GST (NEVER overwritten with RRP)
       rrp: p.rrp,     // retail price
-      description: p.description,
+      // W-04 — the upstream pipeline carries the description as `bodyHtml`
+      // (rich HTML enrichment output). Reading `p.description` here was always
+      // undefined, leaving Lightspeed's description column blank on every row.
+      // Strip HTML tags + collapse whitespace so Lightspeed gets clean prose.
+      description: (p.bodyHtml || "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/\s+/g, " ")
+        .trim() || undefined,
       season: p.season,
       arrivalDate: p.invoiceDate || invoiceDate,
       supplierCode: p.vendorCode,

@@ -252,6 +252,76 @@ Deno.serve(async (req) => {
         const updateData = await updateRes.json();
         return respond({ success: updateRes.ok, new_count: newCount, detail: updateData });
       }
+
+      // ── X-Series consignments (supplier orders / received POs) ──
+      if (action === "list_consignments_x") {
+        const { date_from, date_to, status, page_size = 50 } = body as {
+          date_from?: string; date_to?: string; status?: string; page_size?: number;
+        };
+        const params = new URLSearchParams();
+        params.set("page_size", String(Math.min(page_size, 200)));
+        if (status) params.set("status", status); // OPEN | SENT | RECEIVED | CANCELLED
+        if (date_from) params.set("from", date_from);
+        if (date_to) params.set("to", date_to);
+        const res = await fetch(
+          `${xBase}/api/2.0/consignments?${params.toString()}`,
+          { headers: xHeaders }
+        );
+        const data = await res.json();
+        const items = (data.data || []).map((c: Record<string, unknown>) => ({
+          id: c.id,
+          name: c.name,
+          status: c.status,
+          type: c.type,
+          supplier_id: c.supplier_id,
+          supplier_invoice: c.supplier_invoice,
+          received_at: c.received_at,
+          due_at: c.due_at,
+          created_at: c.created_at,
+          total_count: c.total_count,
+          total_cost: c.total_cost,
+        }));
+        return respond({ consignments: items });
+      }
+
+      if (action === "get_consignment_x") {
+        const { consignment_id } = body as { consignment_id: string };
+        const [headRes, prodRes, supRes] = await Promise.all([
+          fetch(`${xBase}/api/2.0/consignments/${consignment_id}`, { headers: xHeaders }),
+          fetch(`${xBase}/api/2.0/consignments/${consignment_id}/products?page_size=200`, { headers: xHeaders }),
+          fetch(`${xBase}/api/2.0/suppliers?page_size=200`, { headers: xHeaders }),
+        ]);
+        const headData = await headRes.json();
+        const prodData = await prodRes.json();
+        const supData = await supRes.json();
+        const head = headData.data || headData;
+        const supplier = (supData.data || []).find((s: Record<string, unknown>) => s.id === head.supplier_id);
+        const lines = (prodData.data || []).map((l: Record<string, unknown>) => ({
+          product_id: l.product_id,
+          sku: l.product?.sku ?? l.sku ?? "",
+          name: l.product?.name ?? l.product?.variant_name ?? "",
+          supplier_code: l.product?.supplier_code ?? null,
+          received: Number(l.received ?? 0),
+          count: Number(l.count ?? 0),
+          cost: Number(l.cost ?? 0),
+          retail_price: l.product?.price_including_tax ?? l.product?.supply_price ?? null,
+        }));
+        return respond({
+          consignment: {
+            id: head.id,
+            name: head.name,
+            status: head.status,
+            supplier_invoice: head.supplier_invoice,
+            received_at: head.received_at,
+            due_at: head.due_at,
+            supplier_name: supplier?.name ?? null,
+            supplier_id: head.supplier_id,
+            total_cost: Number(head.total_cost ?? 0),
+            total_count: Number(head.total_count ?? 0),
+          },
+          lines,
+        });
+      }
     }
 
     // ═══ LIGHTSPEED R-SERIES ═══
@@ -366,6 +436,77 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ count: new_quantity }),
         });
         return respond({ success: updateRes.ok });
+      }
+
+      // ── R-Series purchase orders ──
+      if (action === "list_purchase_orders_r") {
+        const { date_from, date_to, limit = 50 } = body as {
+          date_from?: string; date_to?: string; limit?: number;
+        };
+        const params = new URLSearchParams();
+        params.set("limit", String(Math.min(limit, 100)));
+        params.set("sort", "-orderID");
+        params.set("load_relations", '["Vendor"]');
+        if (date_from) params.set("createTime", `>=,${date_from}`);
+        if (date_to) params.set("createTime", `<=,${date_to}`);
+        const res = await fetch(
+          `${rBase}/Order.json?${params.toString()}`,
+          { headers: rHeaders }
+        );
+        const data = await res.json();
+        const orders = data.Order
+          ? (Array.isArray(data.Order) ? data.Order : [data.Order])
+          : [];
+        const items = orders.map((o: Record<string, unknown>) => ({
+          id: o.orderID,
+          order_number: o.orderID,
+          status: o.complete === "true" ? "received" : "open",
+          create_time: o.createTime,
+          arrival_date: o.arrivalDate,
+          total: Number(o.total ?? 0),
+          vendor_id: o.vendorID,
+          vendor_name: (o.Vendor as Record<string, string> | undefined)?.name ?? null,
+        }));
+        return respond({ purchase_orders: items });
+      }
+
+      if (action === "get_purchase_order_r") {
+        const { order_id } = body as { order_id: string };
+        const res = await fetch(
+          `${rBase}/Order/${order_id}.json?load_relations=["Vendor","OrderLines","OrderLines.Item"]`,
+          { headers: rHeaders }
+        );
+        const data = await res.json();
+        const order = data.Order;
+        if (!order) return respond({ error: "Order not found" }, 404);
+        const olRoot = order.OrderLines?.OrderLine;
+        const orderLines = olRoot
+          ? (Array.isArray(olRoot) ? olRoot : [olRoot])
+          : [];
+        const lines = orderLines.map((l: Record<string, unknown>) => {
+          const item = l.Item as Record<string, unknown> | undefined;
+          return {
+            item_id: l.itemID,
+            sku: item?.systemSku ?? item?.customSku ?? "",
+            name: item?.description ?? "",
+            ordered: Number(l.ordered ?? 0),
+            received: Number(l.received ?? 0),
+            cost: Number(l.cost ?? 0),
+            retail_price: item?.defaultPrice ?? null,
+          };
+        });
+        return respond({
+          purchase_order: {
+            id: order.orderID,
+            order_number: order.orderID,
+            status: order.complete === "true" ? "received" : "open",
+            create_time: order.createTime,
+            arrival_date: order.arrivalDate,
+            total: Number(order.total ?? 0),
+            vendor_name: (order.Vendor as Record<string, string> | undefined)?.name ?? null,
+          },
+          lines,
+        });
       }
     }
 

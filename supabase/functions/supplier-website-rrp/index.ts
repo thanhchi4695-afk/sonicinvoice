@@ -83,9 +83,26 @@ Deno.serve(async (req) => {
     }
 
     const handle = slugify(styleName);
-    const titleLower = styleName.toLowerCase();
+    const titleLower = styleName.toLowerCase().trim();
 
-    // Try exact handle first
+    // Tokenise the style name (e.g. "Marrakesh Dress" → ["marrakesh", "dress"]).
+    // We use these to enforce that EVERY token must appear in the matched
+    // product_title — preventing stale fuzzy matches like "Marrakesh Top"
+    // when the invoice line is "Marrakesh Dress".
+    const STOP_WORDS = new Set([
+      "the", "a", "an", "and", "or", "of", "in", "on", "for", "with",
+    ]);
+    const tokens = titleLower
+      .split(/\s+/)
+      .map((t) => t.replace(/[^a-z0-9]/g, ""))
+      .filter((t) => t.length >= 2 && !STOP_WORDS.has(t));
+
+    const allTokensMatch = (title: string): boolean => {
+      const t = (title || "").toLowerCase();
+      return tokens.every((tok) => t.includes(tok));
+    };
+
+    // 1. Try exact handle first (slugified style name → handle column)
     let { data: rows } = await supabase
       .from("supplier_website_prices")
       .select("product_title, colour, size, price, product_url, handle")
@@ -93,19 +110,27 @@ Deno.serve(async (req) => {
       .eq("user_id", userId)
       .eq("handle", handle);
 
-    // Fall back to title ilike
-    if (!rows?.length) {
+    let matchMethod: "handle" | "all_tokens" | "style_number" | "fuzzy" = "handle";
+
+    // 2. Fall back to title ilike, then re-filter so EVERY token must be present.
+    //    Without this, "Marrakesh Dress" matched "Marrakesh Top", "Madrid Dress",
+    //    etc., and reduce(max-price) picked an unrelated product's RRP.
+    if (!rows?.length && tokens.length) {
       const { data: rows2 } = await supabase
         .from("supplier_website_prices")
         .select("product_title, colour, size, price, product_url, handle")
         .eq("supplier_profile_id", profile.id)
         .eq("user_id", userId)
-        .ilike("product_title", `%${titleLower}%`)
-        .limit(50);
-      rows = rows2 || [];
+        .ilike("product_title", `%${tokens[0]}%`)
+        .limit(200);
+      const filtered = (rows2 || []).filter((r) => allTokensMatch(r.product_title));
+      if (filtered.length) {
+        rows = filtered;
+        matchMethod = "all_tokens";
+      }
     }
 
-    // Fall back to style number
+    // 3. Style number fallback (still requires the style number to appear verbatim).
     if (!rows?.length && styleNumber) {
       const { data: rows3 } = await supabase
         .from("supplier_website_prices")
@@ -115,6 +140,7 @@ Deno.serve(async (req) => {
         .ilike("product_title", `%${styleNumber}%`)
         .limit(50);
       rows = rows3 || [];
+      matchMethod = "style_number";
     }
 
     if (!rows?.length) {
@@ -123,6 +149,7 @@ Deno.serve(async (req) => {
           found: false,
           reason: "No matching product on website",
           last_scraped_at: profile.website_last_scraped_at,
+          searched_tokens: tokens,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );

@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { tokenResponseToConnectionColumns } from "../_shared/shopify-token.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -143,7 +144,7 @@ Deno.serve(async (req) => {
         return new Response("Invalid or expired state", { status: 403 });
       }
 
-      // Exchange code for access token
+      // Exchange code for access token (request expiring offline token)
       const tokenResp = await fetch(`https://${shop}/admin/oauth/access_token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -151,6 +152,7 @@ Deno.serve(async (req) => {
           client_id: SHOPIFY_API_KEY,
           client_secret: SHOPIFY_API_SECRET,
           code,
+          expiring: true,
         }),
       });
 
@@ -166,6 +168,8 @@ Deno.serve(async (req) => {
       if (!accessToken) {
         return new Response("No access token in response", { status: 500 });
       }
+
+      const tokenCols = tokenResponseToConnectionColumns(tokenData);
 
       // Fetch shop info
       const shopResp = await fetch(`https://${shop}/admin/api/${API_VERSION}/shop.json`, {
@@ -183,7 +187,28 @@ Deno.serve(async (req) => {
         api_version: API_VERSION,
         shop_name: shopName,
         updated_at: new Date().toISOString(),
+        refresh_token: tokenCols.refresh_token,
+        token_expires_at: tokenCols.token_expires_at,
+        refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+        needs_reauth: false,
       }, { onConflict: "user_id" });
+
+      // Mirror into platform_connections so unified consumers see the new tokens
+      await supabaseAdmin.from("platform_connections").delete()
+        .eq("user_id", userId)
+        .eq("platform", "shopify");
+
+      await supabaseAdmin.from("platform_connections").insert({
+        user_id: userId,
+        platform: "shopify",
+        shop_domain: cleanUrl,
+        access_token: accessToken,
+        refresh_token: tokenCols.refresh_token,
+        token_expires_at: tokenCols.token_expires_at,
+        refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+        needs_reauth: false,
+        is_active: true,
+      });
 
       // Clean up nonce
       await supabaseAdmin.from("shopify_oauth_states").delete().eq("user_id", userId);

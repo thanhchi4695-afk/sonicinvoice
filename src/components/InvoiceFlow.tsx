@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { setSessionProducts as setInvoiceSessionProducts } from "@/stores/invoice-session-store";
+import { startShadowSession, logShadowStep, logShadowFeedback, completeShadowSession } from "@/lib/agent-shadow";
 import { syncInvoiceItemsToCatalog } from "@/lib/invoice-catalog-sync";
 import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orchestrator";
 import { detectBrandFromSku } from "@/lib/sku-brand-prefix";
@@ -1874,6 +1875,18 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     setStep(2);
     setInvoicePageImages([]);
     setEnrichLines([{ name: "Reading file...", status: "searching", action: "Parsing invoice data...", confidence: 0 }]);
+    // Shadow-log: start an agent_sessions row mirroring this run.
+    void (async () => {
+      const sid = await startShadowSession({ supplier: supplierName, trigger: "invoice_upload" });
+      if (sid) {
+        await logShadowStep({
+          step: "extract",
+          status: "running",
+          narrative: `Reading invoice from ${supplierName || "supplier"}…`,
+          input: { fileName: fName, mode: fileParseMode },
+        });
+      }
+    })();
 
     // Capture invoice page image(s) for source trace viewer
     const fileExt = fName.split(".").pop()?.toLowerCase() || "";
@@ -2205,6 +2218,23 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     setShowCompletionSummary(false);
     setStep(3);
     beginReviewTimer();
+    // Shadow-log: extract complete, stock-check gate awaiting review.
+    void (async () => {
+      await logShadowStep({
+        step: "extract",
+        status: "done",
+        narrative: `Extracted ${validatedProducts.length} products from ${supplierName || "supplier"}.`,
+        confidence: validatedProducts.length > 0
+          ? validatedProducts.reduce((s, p) => s + (p._confidence ?? 0), 0) / validatedProducts.length
+          : null as unknown as number,
+        output: { productCount: validatedProducts.length },
+      });
+      await logShadowStep({
+        step: "stock_check",
+        status: "needs_review",
+        narrative: `Stock check ready — ${validatedProducts.length} lines awaiting review.`,
+      });
+    })();
     // Write extracted products to Supabase products + variants tables so
     // pricing tools (Price Adjustment, Margin Protection, Markdown Ladder)
     // can see them immediately — no need to wait for Export.
@@ -3938,6 +3968,36 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                   else if (next < prev) rowsDeletedRef.current += prev - next;
                   lastRowCountRef.current = next;
 
+                  // Shadow-log: diff each row's title/sku/cost/qty against the prior
+                  // snapshot. Value-based classification — anything that actually
+                  // changed is logged as feedback_type='edit' regardless of which
+                  // button the user clicked (catches the Marrakesh case).
+                  try {
+                    const prevById = new Map(validatedProducts.map(p => [p._rowIndex, p]));
+                    for (const p of updated) {
+                      const before = prevById.get(p._rowIndex);
+                      if (!before) continue;
+                      const fields: { field: string; o: unknown; c: unknown }[] = [
+                        { field: "title", o: before.name, c: p.name },
+                        { field: "sku", o: before.sku, c: p.sku },
+                        { field: "cost", o: before.cost, c: p.cost },
+                        { field: "qty", o: before.qty, c: p.qty },
+                        { field: "brand", o: before.brand, c: p.brand },
+                      ];
+                      for (const { field, o, c } of fields) {
+                        if (JSON.stringify(o ?? null) !== JSON.stringify(c ?? null)) {
+                          void logShadowFeedback({
+                            feedbackType: "edit",
+                            field,
+                            original: o,
+                            corrected: c,
+                            supplier: supplierName,
+                          });
+                        }
+                      }
+                    }
+                  } catch { /* ignore */ }
+
                   setValidatedProducts(updated);
                   // Rebuild product groups from accepted products
                   const acceptedOnly = updated.filter(p => !p._rejected);
@@ -3960,9 +4020,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                       classification: brainClassificationRef.current ?? undefined,
                     });
                   }
+                  void (async () => {
+                    await logShadowStep({ step: "stock_check", status: "done", narrative: `Accepted ${validatedProducts.filter(p => !p._rejected).length} products.` });
+                    await logShadowStep({ step: "price", status: "needs_review", narrative: "Price review awaiting approval." });
+                    await logShadowStep({ step: "publish", status: "needs_review", narrative: "Export / push gate ready." });
+                  })();
                   finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
                 }}
-                onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
+                onPushToShopify={() => {
+                  void (async () => {
+                    await logShadowStep({ step: "stock_check", status: "done", narrative: "Stock check approved." });
+                    await logShadowStep({ step: "publish", status: "done", narrative: "Pushed to Shopify." });
+                    await completeShadowSession("Run complete — pushed to Shopify.");
+                  })();
+                  finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
+                }}
                 onPriceMatch={() => setPriceMatchActive(true)}
                 onGetDescriptions={() => setDescriptionsActive(true)}
                 onBack={() => setStep(2)}
@@ -3981,8 +4053,20 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             <PhaseFiveSixPanel
               products={validatedProducts}
               supplierName={supplierName}
-              onExportCSV={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
-              onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
+              onExportCSV={() => {
+                void (async () => {
+                  await logShadowStep({ step: "publish", status: "done", narrative: "Exported CSV." });
+                  await completeShadowSession("Run complete — CSV exported.");
+                })();
+                finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
+              }}
+              onPushToShopify={() => {
+                void (async () => {
+                  await logShadowStep({ step: "publish", status: "done", narrative: "Pushed to Shopify." });
+                  await completeShadowSession("Run complete — pushed to Shopify.");
+                })();
+                finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
+              }}
               onProcessAnother={() => { setStep(1); }}
             />
           )}

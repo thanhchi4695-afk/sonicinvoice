@@ -399,6 +399,11 @@ const AccountScreen = () => {
         <WebSearchUsageSection />
       </Section>
 
+      {/* Agent budget (AI orchestration spend) */}
+      <Section title="🧠 Agent budget">
+        <BudgetPill variant="full" />
+      </Section>
+
       {/* Brand database sync (per-user CSV) */}
       <Section title="📦 Brand database sync">
         <BrandDatabaseUserSyncSection />

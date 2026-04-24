@@ -25,11 +25,18 @@ export interface Phase3ProductResult {
   product_title: string;
   vendor?: string;
   recommended_rrp: number | null;
-  price_source: "website" | "supplier_scrape" | "market_waterfall" | "markup_fallback" | "none";
+  price_source: "website" | "supplier_scrape" | "ai_search" | "market_waterfall" | "markup_fallback" | "none";
   confidence: number;
   source_url?: string;
   description?: string;
   image_url?: string;
+  /** Provider/cache info for the new ai_search tier — surfaced on hover. */
+  source_meta?: {
+    provider?: "anthropic-websearch" | "brave-search";
+    query?: string;
+    cacheHit?: boolean;
+    costAud?: number;
+  };
   error?: string;
 }
 

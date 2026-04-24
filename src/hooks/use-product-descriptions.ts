@@ -58,6 +58,25 @@ export function useProductDescriptions() {
     ): Promise<DescriptionResult> => {
       const key = cacheKey(item);
 
+      // Skip items missing required fields — edge function rejects empty strings
+      if (!item.style_name?.trim() || !item.brand?.trim()) {
+        const result: DescriptionResult = {
+          description: null,
+          source_url: "",
+          source_name: "",
+          source_type: "retailer",
+          word_count: 0,
+          raw_word_count: 0,
+          confidence: "low",
+          status: "not_found",
+          fetched_at: new Date().toISOString(),
+          edited: false,
+          error_message: "Missing style name or brand",
+        };
+        setRes(key, result);
+        return result;
+      }
+
       // Cache hit
       if (!opts.forceRefresh) {
         const cached = sessionCache.get(key);

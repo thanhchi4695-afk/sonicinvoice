@@ -1355,8 +1355,8 @@ INSTRUCTIONS FOR RETRY:
           }
 
           if (!usedDeterministicWalnutOcr) {
-          // Step B.2: Re-parse the OCR text with a fast text-only model
-          const ocrParseMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
+            // Step B.2: Re-parse the OCR text with a fast text-only model
+            const ocrParseMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
             {
               role: "system",
               content: systemPrompt,
@@ -1376,15 +1376,15 @@ ${ocrText}`,
             },
           ];
 
-          const ocrParsed = await callAI({ model: "google/gemini-2.5-flash", messages: ocrParseMessages, temperature: 0.1 });
-          const ocrContent = getContent(ocrParsed);
-          const ocrJsonMatch = ocrContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, ocrContent];
-          const ocrJsonStr = (ocrJsonMatch[1] || ocrContent).trim();
+            const ocrParsed = await callAI({ model: "google/gemini-2.5-flash", messages: ocrParseMessages, temperature: 0.1 });
+            const ocrContent = getContent(ocrParsed);
+            const ocrJsonMatch = ocrContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, ocrContent];
+            const ocrJsonStr = (ocrJsonMatch[1] || ocrContent).trim();
 
-          try {
-            const ocrResult = JSON.parse(ocrJsonStr);
-            const ocrProducts = ocrResult.products || [];
-            console.log(`[parse-invoice] Step B: OCR re-parse found ${ocrProducts.length} products`);
+            try {
+              const ocrResult = JSON.parse(ocrJsonStr);
+              const ocrProducts = ocrResult.products || [];
+              console.log(`[parse-invoice] Step B: OCR re-parse found ${ocrProducts.length} products`);
 
             // Merge strategy: use OCR results if they found more products or higher confidence
             const originalAvgConf = products.length > 0
@@ -1394,37 +1394,36 @@ ${ocrText}`,
               ? ocrProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / ocrProducts.length
               : 0;
 
-            if (ocrProducts.length > products.length || (ocrProducts.length === products.length && ocrAvgConf > originalAvgConf)) {
-              console.log(`[parse-invoice] Step B: Using OCR results (${ocrProducts.length} products, avg conf ${ocrAvgConf.toFixed(0)}) over original (${products.length} products, avg conf ${originalAvgConf.toFixed(0)})`);
-              parsed.products = ocrProducts;
-              parsed.ocr_fallback_used = true;
-              parsed.ocr_text_length = ocrText.length;
-              // Preserve other metadata from OCR pass if available
-              if (ocrResult.parsing_plan) parsed.parsing_plan = { ...parsed.parsing_plan, ...ocrResult.parsing_plan, ocr_fallback: true };
-              if (ocrResult.rejected_rows) parsed.rejected_rows = [...(parsed.rejected_rows || []), ...ocrResult.rejected_rows];
-            } else {
-              console.log(`[parse-invoice] Step B: Keeping original results (higher quality)`);
+              if (ocrProducts.length > products.length || (ocrProducts.length === products.length && ocrAvgConf > originalAvgConf)) {
+                console.log(`[parse-invoice] Step B: Using OCR results (${ocrProducts.length} products, avg conf ${ocrAvgConf.toFixed(0)}) over original (${products.length} products, avg conf ${originalAvgConf.toFixed(0)})`);
+                parsed.products = ocrProducts;
+                parsed.ocr_fallback_used = true;
+                parsed.ocr_text_length = ocrText.length;
+                if (ocrResult.parsing_plan) parsed.parsing_plan = { ...parsed.parsing_plan, ...ocrResult.parsing_plan, ocr_fallback: true };
+                if (ocrResult.rejected_rows) parsed.rejected_rows = [...(parsed.rejected_rows || []), ...ocrResult.rejected_rows];
+              } else {
+                console.log(`[parse-invoice] Step B: Keeping original results (higher quality)`);
+                parsed.ocr_fallback_attempted = true;
+                parsed.ocr_fallback_used = false;
+              }
+
+            // If BOTH passes returned low confidence, mark as needs_manual_review
+              const finalProducts = parsed.products || [];
+              const finalAvgConf = finalProducts.length > 0
+                ? finalProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / finalProducts.length
+                : 0;
+              if (finalAvgConf < 60 || finalProducts.length === 0) {
+                parsed.needs_manual_review = true;
+                parsed.review_reason = finalProducts.length === 0
+                  ? "Both vision and OCR fallback failed to extract products"
+                  : `Average confidence ${finalAvgConf.toFixed(0)}% is below threshold after OCR fallback`;
+                console.log(`[parse-invoice] Step B: Marked as needs_manual_review — ${parsed.review_reason}`);
+              }
+            } catch (ocrParseErr) {
+              console.warn("[parse-invoice] Step B: OCR re-parse JSON failed:", ocrParseErr);
               parsed.ocr_fallback_attempted = true;
               parsed.ocr_fallback_used = false;
             }
-
-            // If BOTH passes returned low confidence, mark as needs_manual_review
-            const finalProducts = parsed.products || [];
-            const finalAvgConf = finalProducts.length > 0
-              ? finalProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / finalProducts.length
-              : 0;
-            if (finalAvgConf < 60 || finalProducts.length === 0) {
-              parsed.needs_manual_review = true;
-              parsed.review_reason = finalProducts.length === 0
-                ? "Both vision and OCR fallback failed to extract products"
-                : `Average confidence ${finalAvgConf.toFixed(0)}% is below threshold after OCR fallback`;
-              console.log(`[parse-invoice] Step B: Marked as needs_manual_review — ${parsed.review_reason}`);
-            }
-          } catch (ocrParseErr) {
-            console.warn("[parse-invoice] Step B: OCR re-parse JSON failed:", ocrParseErr);
-            parsed.ocr_fallback_attempted = true;
-            parsed.ocr_fallback_used = false;
-          }
           }
         }
       } catch (ocrErr) {

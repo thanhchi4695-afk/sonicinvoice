@@ -139,6 +139,10 @@ Deno.serve(async (req) => {
       await supabase.from("shopify_connections").upsert({
         user_id: userId, store_url: cleanShop, access_token: accessToken,
         api_version: API_VERSION, shop_name: shopName, updated_at: new Date().toISOString(),
+        refresh_token: tokenCols.refresh_token,
+        token_expires_at: tokenCols.token_expires_at,
+        refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+        needs_reauth: false,
       }, { onConflict: "user_id" });
 
       await supabase.from("platform_connections").delete()
@@ -150,6 +154,10 @@ Deno.serve(async (req) => {
         platform: "shopify",
         shop_domain: cleanShop,
         access_token: accessToken,
+        refresh_token: tokenCols.refresh_token,
+        token_expires_at: tokenCols.token_expires_at,
+        refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+        needs_reauth: false,
         is_active: true,
       });
 

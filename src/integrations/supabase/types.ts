@@ -3465,6 +3465,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_brand_rules_text: { Args: { _supplier: string }; Returns: string }
+      get_supplier_hints: {
+        Args: { _limit?: number; _supplier: string; _user_id: string }
+        Returns: string
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

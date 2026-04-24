@@ -3981,8 +3981,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                         { field: "title", o: before.name, c: p.name },
                         { field: "sku", o: before.sku, c: p.sku },
                         { field: "cost", o: before.cost, c: p.cost },
-                        { field: "quantity", o: before.quantity, c: p.quantity },
-                        { field: "vendor", o: before.vendor, c: p.vendor },
+                        { field: "qty", o: before.qty, c: p.qty },
+                        { field: "brand", o: before.brand, c: p.brand },
                       ];
                       for (const { field, o, c } of fields) {
                         if (JSON.stringify(o ?? null) !== JSON.stringify(c ?? null)) {

@@ -3968,6 +3968,36 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                   else if (next < prev) rowsDeletedRef.current += prev - next;
                   lastRowCountRef.current = next;
 
+                  // Shadow-log: diff each row's title/sku/cost/qty against the prior
+                  // snapshot. Value-based classification — anything that actually
+                  // changed is logged as feedback_type='edit' regardless of which
+                  // button the user clicked (catches the Marrakesh case).
+                  try {
+                    const prevById = new Map(validatedProducts.map(p => [p._rowIndex, p]));
+                    for (const p of updated) {
+                      const before = prevById.get(p._rowIndex);
+                      if (!before) continue;
+                      const fields: { field: string; o: unknown; c: unknown }[] = [
+                        { field: "title", o: before.name, c: p.name },
+                        { field: "sku", o: before.sku, c: p.sku },
+                        { field: "cost", o: before.cost, c: p.cost },
+                        { field: "quantity", o: before.quantity, c: p.quantity },
+                        { field: "vendor", o: before.vendor, c: p.vendor },
+                      ];
+                      for (const { field, o, c } of fields) {
+                        if (JSON.stringify(o ?? null) !== JSON.stringify(c ?? null)) {
+                          void logShadowFeedback({
+                            feedbackType: "edit",
+                            field,
+                            original: o,
+                            corrected: c,
+                            supplier: supplierName,
+                          });
+                        }
+                      }
+                    }
+                  } catch { /* ignore */ }
+
                   setValidatedProducts(updated);
                   // Rebuild product groups from accepted products
                   const acceptedOnly = updated.filter(p => !p._rejected);
@@ -3990,9 +4020,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                       classification: brainClassificationRef.current ?? undefined,
                     });
                   }
+                  void (async () => {
+                    await logShadowStep({ step: "stock_check", status: "done", narrative: `Accepted ${validatedProducts.filter(p => !p._rejected).length} products.` });
+                    await logShadowStep({ step: "price", status: "needs_review", narrative: "Price review awaiting approval." });
+                    await logShadowStep({ step: "publish", status: "needs_review", narrative: "Export / push gate ready." });
+                  })();
                   finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
                 }}
-                onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
+                onPushToShopify={() => {
+                  void (async () => {
+                    await logShadowStep({ step: "stock_check", status: "done", narrative: "Stock check approved." });
+                    await logShadowStep({ step: "publish", status: "done", narrative: "Pushed to Shopify." });
+                    await completeShadowSession("Run complete — pushed to Shopify.");
+                  })();
+                  finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
+                }}
                 onPriceMatch={() => setPriceMatchActive(true)}
                 onGetDescriptions={() => setDescriptionsActive(true)}
                 onBack={() => setStep(2)}
@@ -4011,8 +4053,20 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             <PhaseFiveSixPanel
               products={validatedProducts}
               supplierName={supplierName}
-              onExportCSV={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
-              onPushToShopify={() => { finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4); }}
+              onExportCSV={() => {
+                void (async () => {
+                  await logShadowStep({ step: "publish", status: "done", narrative: "Exported CSV." });
+                  await completeShadowSession("Run complete — CSV exported.");
+                })();
+                finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
+              }}
+              onPushToShopify={() => {
+                void (async () => {
+                  await logShadowStep({ step: "publish", status: "done", narrative: "Pushed to Shopify." });
+                  await completeShadowSession("Run complete — pushed to Shopify.");
+                })();
+                finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
+              }}
               onProcessAnother={() => { setStep(1); }}
             />
           )}

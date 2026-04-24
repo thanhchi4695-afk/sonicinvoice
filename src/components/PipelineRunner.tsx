@@ -237,7 +237,7 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
     const successCount = ctx.completedSteps.length;
     const skipCount = ctx.skippedSteps.length;
 
-    return (
+    return withPanel(
       <div className="px-4 pt-6 pb-24 animate-fade-in max-w-lg mx-auto text-center">
         <div className="text-5xl mb-4">✅</div>
         <h2 className="text-xl font-bold font-display mb-2">Pipeline complete</h2>
@@ -337,13 +337,13 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
 
   // ── Running a flow inline ──
   if (runningFlow && currentStep) {
-    return <div className="animate-fade-in">{onRenderFlow(currentStep.flow, advanceStep)}</div>;
+    return withPanel(<div className="animate-fade-in">{onRenderFlow(currentStep.flow, advanceStep)}</div>);
   }
 
   // ── Step card (failed state shows retry) ──
   const isFailed = currentStepStatus === "failed";
 
-  return (
+  return withPanel(
     <div className="px-4 pt-2 pb-24 animate-fade-in max-w-lg mx-auto">
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">

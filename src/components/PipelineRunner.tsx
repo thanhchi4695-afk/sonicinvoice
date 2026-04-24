@@ -206,7 +206,7 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
 
   // ── Completion screen ──
   if (isComplete) {
-    const handleFinish = () => { clearPipelineContext(); onExit(); };
+    const handleFinish = () => { void finalizeAgentSession("completed"); clearPipelineContext(); onExit(); };
     const successCount = ctx.completedSteps.length;
     const skipCount = ctx.skippedSteps.length;
 

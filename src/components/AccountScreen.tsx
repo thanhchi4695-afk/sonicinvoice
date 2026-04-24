@@ -392,6 +392,11 @@ const AccountScreen = () => {
       {/* Price Intelligence API Keys */}
       <ApiKeysSection />
 
+      {/* Brand database sync (per-user CSV) */}
+      <Section title="📦 Brand database sync">
+        <BrandDatabaseUserSyncSection />
+      </Section>
+
       {/* SEO Templates */}
       <SeoTemplateSection />
 

@@ -122,21 +122,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get user's Shopify connection
-    const { data: conn, error: connError } = await supabaseAdmin
-      .from("shopify_connections")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
-
-    if (connError || !conn) {
-      return new Response(JSON.stringify({ error: "No Shopify connection found" }), {
+    // Get user's Shopify connection — and refresh / migrate the access token if needed.
+    let validToken;
+    try {
+      validToken = await getValidShopifyToken(supabaseAdmin, userId);
+    } catch (err) {
+      if (err instanceof ShopifyReauthRequiredError) {
+        return new Response(JSON.stringify({
+          error: "Shopify re-authentication required",
+          needs_reauth: true,
+          shop: err.shop,
+        }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const msg = err instanceof Error ? err.message : "No Shopify connection found";
+      return new Response(JSON.stringify({ error: msg }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    const conn = validToken.conn;
     const body: ShopifyRequestBody = await req.json();
-    const { store_url, access_token, api_version } = conn;
+    const { storeUrl: store_url, accessToken: access_token, apiVersion: api_version } = validToken;
     const baseUrl = `https://${store_url}/admin/api/${api_version}`;
 
     const shopifyFetch = async (path: string, options: RequestInit = {}) => {

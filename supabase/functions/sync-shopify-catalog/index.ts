@@ -216,10 +216,10 @@ Deno.serve(async (req) => {
       location_id,
     } = body || {};
 
-    if (!user_id || !shop_domain || !access_token) {
+    if (!user_id) {
       return new Response(
         JSON.stringify({
-          error: "Missing required fields: user_id, shop_domain, access_token",
+          error: "Missing required field: user_id",
         }),
         {
           status: 400,
@@ -233,29 +233,60 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Determine updated_at_min for incremental mode
-    let updatedAtMin: string | undefined;
-    if (mode === "incremental") {
-      const { data: conn } = await supabase
-        .from("platform_connections")
-        .select("last_synced_at")
-        .eq("user_id", user_id)
-        .eq("platform", "shopify")
-        .eq("shop_domain", shop_domain)
-        .maybeSingle();
-      if (conn?.last_synced_at) {
-        updatedAtMin = conn.last_synced_at as string;
-      }
+    let resolvedShopDomain = shop_domain as string | undefined;
+    let resolvedAccessToken = access_token as string | undefined;
+    let resolvedLocationId = location_id as string | undefined;
+    let lastSyncedAt: string | undefined;
+
+    const { data: platformConn } = await supabase
+      .from("platform_connections")
+      .select("shop_domain, access_token, location_id, last_synced_at")
+      .eq("user_id", user_id)
+      .eq("platform", "shopify")
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (platformConn) {
+      resolvedShopDomain ??= platformConn.shop_domain ?? undefined;
+      resolvedAccessToken ??= platformConn.access_token ?? undefined;
+      resolvedLocationId ??= platformConn.location_id ?? undefined;
+      lastSyncedAt = platformConn.last_synced_at ?? undefined;
     }
 
-    // 1. Fetch products
+    if (!resolvedShopDomain || !resolvedAccessToken) {
+      const { data: legacyConn } = await supabase
+        .from("shopify_connections")
+        .select("store_url, access_token")
+        .eq("user_id", user_id)
+        .maybeSingle();
+
+      resolvedShopDomain ??= legacyConn?.store_url ?? undefined;
+      resolvedAccessToken ??= legacyConn?.access_token ?? undefined;
+    }
+
+    if (!resolvedShopDomain || !resolvedAccessToken) {
+      return new Response(
+        JSON.stringify({
+          error: "Missing required Shopify connection for this user",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    let updatedAtMin: string | undefined;
+    if (mode === "incremental" && lastSyncedAt) {
+      updatedAtMin = lastSyncedAt;
+    }
+
     const products = await fetchAllProducts(
-      shop_domain,
-      access_token,
+      resolvedShopDomain,
+      resolvedAccessToken,
       updatedAtMin,
     );
 
-    // 2. Collect inventory item ids (only if we want fresh inventory)
     const inventoryItemIds: number[] = [];
     for (const p of products) {
       for (const v of p.variants || []) {
@@ -264,13 +295,12 @@ Deno.serve(async (req) => {
     }
 
     const inventoryMap = await fetchInventoryLevels(
-      shop_domain,
-      access_token,
+      resolvedShopDomain,
+      resolvedAccessToken,
       inventoryItemIds,
-      location_id,
+      resolvedLocationId,
     );
 
-    // 3. Build cache rows
     const rows: any[] = [];
     let variantsSynced = 0;
 
@@ -300,7 +330,7 @@ Deno.serve(async (req) => {
           colour,
           size,
           current_qty: qty,
-          current_cost: null, // cost requires a separate inventory_items call (scope-gated)
+          current_cost: null,
           current_price: variant.price ? Number(variant.price) : null,
           barcode: variant.barcode || null,
           cached_at: new Date().toISOString(),
@@ -309,7 +339,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. Upsert in chunks (Postgres parameter limits)
     const CHUNK = 500;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const chunk = rows.slice(i, i + CHUNK);
@@ -323,14 +352,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 5. Update last_synced_at
     const nowIso = new Date().toISOString();
     await supabase
       .from("platform_connections")
       .update({ last_synced_at: nowIso })
       .eq("user_id", user_id)
       .eq("platform", "shopify")
-      .eq("shop_domain", shop_domain);
+      .eq("shop_domain", resolvedShopDomain);
 
     return new Response(
       JSON.stringify({

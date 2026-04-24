@@ -281,24 +281,60 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 2. Registry fallback: live products.json fetch ──────────────
+    // ── 2a. User's own brand_database takes priority over global registry ──
     const norm = normaliseBrand(vendor);
-    let { data: registry } = await supabase
-      .from("supplier_websites")
-      .select("id, brand_name_display, website_url, is_shopify, products_json_endpoint, enrichment_enabled")
-      .eq("brand_name_normalised", norm)
+    let registry:
+      | {
+          id: string;
+          brand_name_display: string;
+          website_url: string | null;
+          is_shopify: boolean;
+          products_json_endpoint: string | null;
+          enrichment_enabled: boolean;
+          scrape_failure_count?: number;
+          source?: "user" | "global";
+        }
+      | null = null;
+
+    const { data: userBrand } = await supabase
+      .from("brand_database")
+      .select("id, canonical_brand_name, brand_name, website_url, is_shopify, products_json_endpoint, enrichment_enabled")
+      .eq("user_id", userId)
+      .or(`brand_name.ilike.${vendor},canonical_brand_name.ilike.${vendor}`)
       .maybeSingle();
 
-    // Token fallback (e.g. "Walnut" → "walnut melbourne")
-    if (!registry && norm) {
-      const firstToken = norm.split(" ")[0];
-      if (firstToken.length >= 3) {
-        const { data: fuzzy } = await supabase
-          .from("supplier_websites")
-          .select("id, brand_name_display, website_url, is_shopify, products_json_endpoint, enrichment_enabled")
-          .ilike("brand_name_normalised", `%${firstToken}%`)
-          .limit(1);
-        if (fuzzy?.length) registry = fuzzy[0];
+    if (userBrand) {
+      registry = {
+        id: userBrand.id,
+        brand_name_display: userBrand.canonical_brand_name || userBrand.brand_name,
+        website_url: userBrand.website_url,
+        is_shopify: userBrand.is_shopify,
+        products_json_endpoint: userBrand.products_json_endpoint,
+        enrichment_enabled: userBrand.enrichment_enabled,
+        source: "user",
+      };
+    }
+
+    // ── 2b. Global supplier_websites registry fallback ──────────────
+    if (!registry) {
+      const { data: globalReg } = await supabase
+        .from("supplier_websites")
+        .select("id, brand_name_display, website_url, is_shopify, products_json_endpoint, enrichment_enabled, scrape_failure_count")
+        .eq("brand_name_normalised", norm)
+        .maybeSingle();
+      if (globalReg) registry = { ...globalReg, source: "global" };
+
+      // Token fallback (e.g. "Walnut" → "walnut melbourne")
+      if (!registry && norm) {
+        const firstToken = norm.split(" ")[0];
+        if (firstToken.length >= 3) {
+          const { data: fuzzy } = await supabase
+            .from("supplier_websites")
+            .select("id, brand_name_display, website_url, is_shopify, products_json_endpoint, enrichment_enabled, scrape_failure_count")
+            .ilike("brand_name_normalised", `%${firstToken}%`)
+            .limit(1);
+          if (fuzzy?.length) registry = { ...fuzzy[0], source: "global" };
+        }
       }
     }
 

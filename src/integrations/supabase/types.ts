@@ -119,6 +119,33 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_lookup_misses: {
+        Row: {
+          id: string
+          normalised: string
+          occurred_at: string
+          occurrence_count: number
+          raw_brand: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          normalised: string
+          occurred_at?: string
+          occurrence_count?: number
+          raw_brand: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          normalised?: string
+          occurred_at?: string
+          occurrence_count?: number
+          raw_brand?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       brand_patterns: {
         Row: {
           brand_name: string | null
@@ -2473,6 +2500,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      supplier_websites: {
+        Row: {
+          brand_name_display: string
+          brand_name_normalised: string
+          cache_ttl_hours: number
+          created_at: string
+          enrichment_enabled: boolean
+          id: string
+          is_shopify: boolean
+          last_scraped_at: string | null
+          notes: string | null
+          products_json_endpoint: string | null
+          scrape_failure_count: number
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          brand_name_display: string
+          brand_name_normalised: string
+          cache_ttl_hours?: number
+          created_at?: string
+          enrichment_enabled?: boolean
+          id?: string
+          is_shopify?: boolean
+          last_scraped_at?: string | null
+          notes?: string | null
+          products_json_endpoint?: string | null
+          scrape_failure_count?: number
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          brand_name_display?: string
+          brand_name_normalised?: string
+          cache_ttl_hours?: number
+          created_at?: string
+          enrichment_enabled?: boolean
+          id?: string
+          is_shopify?: boolean
+          last_scraped_at?: string | null
+          notes?: string | null
+          products_json_endpoint?: string | null
+          scrape_failure_count?: number
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: []
       }
       suppliers: {
         Row: {

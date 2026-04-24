@@ -195,7 +195,11 @@ interface InvoiceFlowProps {
 
 type Step = 1 | 2 | 3 | 4;
 
-const stepLabels = ["Upload", "Reading", "Review", "Download"];
+// B4 #2 — Sub-step labels nest under the top phase bar. The first three
+// steps (Upload → Read → Review) are sub-stages of Phase 1: Capture; the
+// final step (Export) is the hand-off to Phase 5: Publish. Keeping the
+// vocabulary aligned avoids the "6 vs 4 step labels" mismatch.
+const stepLabels = ["1a · Upload", "1b · Read", "1c · Review", "5 · Export"];
 
 // ── Instruction snippets ───────────────────────────────────
 const quickInserts = [

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
 type Period = "7d" | "30d" | "month";
+type Provider = "all" | "anthropic" | "brave";
 type Row = {
   id: number;
   query: string;
@@ -18,6 +19,12 @@ const PERIOD_LABEL: Record<Period, string> = {
   "7d": "Last 7 days",
   "30d": "Last 30 days",
   month: "This month",
+};
+
+const PROVIDER_LABEL: Record<Provider, string> = {
+  all: "All providers",
+  anthropic: "Anthropic",
+  brave: "Brave",
 };
 
 function periodStart(p: Period): Date {

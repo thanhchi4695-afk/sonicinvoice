@@ -287,6 +287,30 @@ Product data on one row, then a following row with patterns like "XS (1) S (2) M
 - Parse the size labels and quantities from the breakdown row
 - Create one output row per size
 
+**Method 4b: Two-row Size:/Qty: matrix (Walnut, Stomp, Elka, etc.)**
+The product appears as a single header row showing TOTAL qty in the Qty column
+(e.g. "Reid Leather Sandal — Coconut Tan — Qty 11 — $68.16"), immediately
+followed by TWO sub-rows whose first cell is a label:
+  Row A: "Size:"  36   37   38   39   40   41   42
+  Row B: "Qty:"    1    1    2    2    2    2    1
+- The total qty on the header row MUST equal the sum of Row B (use it as a checksum).
+- Create one variant per (size, qty) pair where qty > 0.
+- All other fields (style_code, product_title, colour, unit_cost, rrp) come from
+  the header row. Do NOT discard the header row's qty — it's the checksum.
+- Sizes in Row A may be numeric (36, 37…), alpha (XS, S, M…), OR age-based
+  ("1 Year", "2 Year", "3 Year"… up to "16 Year") for kids/baby items.
+- Treat "<N> Year", "<N>Y", "<N>yr", "<N>m" (months) as VALID size tokens.
+
+**Method 4c: Multi-invoice PDF (Pattern F)**
+A single PDF may contain MULTIPLE separate "Tax Invoice" pages — each with its
+own invoice number, customer ref, and total. Detect this when you see the words
+"Tax Invoice" (case-insensitive) appearing 2+ times with different invoice
+numbers. In that case:
+- Extract products from EVERY invoice page, not just the first.
+- Tag each product with its source invoice_number in parse_notes.
+- The top-level invoice_number/total fields should reflect the FIRST invoice;
+  list additional invoices in extraction_notes.
+
 **Method 5: Variants embedded in description**
 The product description contains colour and size: "LISA DRESS NAVY XS"
 - Split into: base product name, colour token, size token
@@ -309,6 +333,10 @@ Detect which size system(s) appear in the document:
 - One size: O/S, OS, One Size, OSFA, FREE
 - Cup sizes (swimwear): 8C, 10D, 12DD, 14E
 - Denim waist: 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36
+- Kids footwear (EU): 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35
+- Adult footwear (EU): 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45
+- Kids/baby age-based: "0-3 Months", "3-6 Months", "6-12 Months", "1 Year",
+  "2 Year", "3 Year", … "16 Year" (also "1Y", "2Y", "1yr", "0-3m", "3-6m")
 
 ## STAGE F — COLOUR VOCABULARY
 

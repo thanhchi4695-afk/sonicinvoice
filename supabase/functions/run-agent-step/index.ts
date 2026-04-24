@@ -160,12 +160,23 @@ Deno.serve(async (req) => {
       .eq("id", sessionId)
       .maybeSingle();
 
+    if (sessionErr || !session) {
+      return new Response(JSON.stringify({ error: "Session not found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (session.user_id !== userId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Resolve supplier hint from context or session metadata, then fetch
     // supplier hints + brand rules for the system prompt.
     const supplierName =
       (typeof context.supplier === "string" && context.supplier) ||
       (typeof context.supplier_name === "string" && context.supplier_name) ||
-      ((session?.metadata as Record<string, unknown> | null)?.supplier as string | undefined) ||
+      ((session.metadata as Record<string, unknown> | null)?.supplier as string | undefined) ||
       null;
     let supplierHints: string | null = null;
     let brandRulesText: string | null = null;
@@ -176,16 +187,6 @@ Deno.serve(async (req) => {
       ]);
       supplierHints = (hints as string | null) ?? null;
       brandRulesText = (rules as string | null) ?? null;
-    }
-    if (sessionErr || !session) {
-      return new Response(JSON.stringify({ error: "Session not found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (session.user_id !== userId) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
     // ── Insert running step run ──

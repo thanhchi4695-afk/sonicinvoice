@@ -41,6 +41,15 @@ interface ApplyStatus {
   error?: string;
 }
 
+// SHA-256 hash for idempotency keys (prevents the same refill from being applied twice)
+async function hashIdempotency(payload: unknown): Promise<string> {
+  const json = JSON.stringify(payload);
+  const buf = new TextEncoder().encode(json);
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(digest))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+
 const StockCheckFlow = ({ lineItems, onBack, onComplete, onStartFlow }: StockCheckFlowProps) => {
   const [screen, setScreen] = useState<Screen>("checking");
   const [checkProgress, setCheckProgress] = useState<{ done: number; total: number }>({ done: 0, total: lineItems.length });

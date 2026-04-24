@@ -34,6 +34,7 @@ import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
 const TeamManagement = lazy(() => import("@/components/TeamManagement"));
 
 const AccountScreen = () => {
+  const { isAdmin } = useUserRole();
   const [storeName, setStoreName] = useState("");
   const [currency, setCurrency] = useState("AUD");
   const [storeType, setStoreType] = useState<StoreType>("shopify");

@@ -42,6 +42,7 @@ function providerLabel(s: string): string {
 
 export default function WebSearchUsageSection() {
   const [period, setPeriod] = useState<Period>("30d");
+  const [provider, setProvider] = useState<Provider>("all");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,12 +52,19 @@ export default function WebSearchUsageSection() {
     setError(null);
     try {
       const since = periodStart(period).toISOString();
-      const { data, error } = await supabase
+      let query = supabase
         .from("websearch_usage_log" as never)
         .select("id, query, source, matched_url, cost_aud, cache_hit, created_at")
         .gte("created_at", since)
         .order("created_at", { ascending: false })
         .limit(100);
+
+      if (provider !== "all") {
+        const sourceFilter = provider === "anthropic" ? "anthropic-websearch" : "brave-search";
+        query = query.eq("source", sourceFilter);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setRows((data as unknown as Row[]) ?? []);
     } catch (e) {
@@ -69,7 +77,7 @@ export default function WebSearchUsageSection() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
+  }, [period, provider]);
 
   const totalCost = rows.reduce((s, r) => s + Number(r.cost_aud || 0), 0);
   const cacheHits = rows.filter((r) => r.cache_hit).length;

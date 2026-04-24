@@ -952,6 +952,68 @@ export default function PostParseReviewScreen({
         );
       })()}
 
+      {/* Add 10% GST on top of cost — sibling to the strip toggle above.
+          Lets users whose supplier cost is genuinely ex-GST store it inc-GST. */}
+      {(() => {
+        const sampleCost = products.find(p => (p.cost || 0) > 0)?.cost || 0;
+        const factor = 1 + gstRate;
+        const withGst = sampleCost > 0
+          ? (addGstOnTop ? sampleCost : sampleCost * factor)
+          : 0;
+        return (
+          <div className="mb-3 flex flex-wrap items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/20">
+            <Percent className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium">
+              Add {(gstRate * 100).toFixed(0)}% GST on top of cost?
+            </span>
+            <div className="flex bg-card rounded-md border border-border overflow-hidden ml-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!addGstOnTop) return;
+                  // Reverse: divide cost back by the factor
+                  const updated = products.map(p => ({
+                    ...p,
+                    cost: +(((p.cost || 0) / factor)).toFixed(4),
+                  }));
+                  onUpdateProducts(updated);
+                  setAddGstOnTop(false);
+                  toast.success(`GST removed — costs divided by ${factor.toFixed(2)}`);
+                }}
+                className={`px-3 py-1 text-[11px] font-medium transition-colors ${
+                  !addGstOnTop ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                No — keep as-is
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (addGstOnTop) return;
+                  const updated = products.map(p => ({
+                    ...p,
+                    cost: +(((p.cost || 0) * factor)).toFixed(4),
+                  }));
+                  onUpdateProducts(updated);
+                  setAddGstOnTop(true);
+                  toast.success(`Added ${(gstRate * 100).toFixed(0)}% GST on top (×${factor.toFixed(2)})`);
+                }}
+                className={`px-3 py-1 text-[11px] font-medium transition-colors ${
+                  addGstOnTop ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"
+                }`}
+              >
+                Yes — add {(gstRate * 100).toFixed(0)}% GST
+              </button>
+            </div>
+            {sampleCost > 0 && (
+              <span className="text-[10px] text-muted-foreground ml-auto font-mono">
+                e.g. ${sampleCost.toFixed(2)} → ${withGst.toFixed(2)} inc-GST
+              </span>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Colour grouping mode — controls how multi-colour styles are exported */}
       {(() => {
         const colourCount = new Set(

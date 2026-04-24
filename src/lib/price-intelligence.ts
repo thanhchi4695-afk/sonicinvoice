@@ -382,7 +382,12 @@ async function callClaudeFallback(
         method: 'POST',
         headers: baseHeaders,
         body: JSON.stringify({
-          product_name: product.name,
+          // Brand/supplier is sent separately AND prepended to product_name so the
+          // server-side query construction always leads with the brand name —
+          // dramatically improves match accuracy (e.g. "Walnut Melbourne Marrakesh Dress").
+          product_name: product.brand && !product.name.toLowerCase().includes(product.brand.toLowerCase())
+            ? `${product.brand} ${product.name}`.trim()
+            : product.name,
           supplier: product.brand,
           style_number: '',
           colour: '',

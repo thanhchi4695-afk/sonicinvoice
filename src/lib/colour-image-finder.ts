@@ -22,14 +22,23 @@ export async function findColourImage(
     return { url: invoiceImageUrl, source: "invoice" };
   }
 
-  // 2. AI image search via edge function
+  // 2. AI image search via edge function — uses the `products` array contract
+  // expected by supabase/functions/image-search. Brand goes FIRST in the query
+  // so the AI anchors on the correct label (e.g. "Walnut Melbourne Marrakesh Dress Mosaique").
   try {
-    const query = `${brand} ${styleName} ${colour}`.trim();
     const { data, error } = await supabase.functions.invoke("image-search", {
-      body: { query, limit: 1 },
+      body: {
+        products: [{
+          searchQuery: `${brand} ${styleName} ${colour}`.trim(),
+          brand,
+          styleName,
+          colour,
+        }],
+      },
     });
-    if (!error && data?.results?.[0]?.url) {
-      return { url: data.results[0].url, source: "web_search" };
+    const hit = data?.results?.[0];
+    if (!error && hit?.imageUrl) {
+      return { url: hit.imageUrl, source: "web_search" };
     }
   } catch {
     // Fall through to next option

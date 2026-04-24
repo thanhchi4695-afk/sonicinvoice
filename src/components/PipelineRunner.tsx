@@ -183,6 +183,33 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
       .eq("id", agentSessionId);
   }, [agentSessionId]);
 
+  // ── Layout wrapper that adds the agent side panel on desktop ──
+  const withPanel = (main: React.ReactNode) => (
+    <div className="flex h-full min-h-[calc(100vh-4rem)]">
+      <div className="flex-1 min-w-0">{main}</div>
+      {agentSessionId && agentPanelOpen && (
+        <div className="hidden lg:flex w-80 xl:w-96 shrink-0 relative">
+          <button
+            onClick={() => setAgentPanelOpen(false)}
+            className="absolute top-2 right-2 z-10 p-1 rounded hover:bg-muted text-muted-foreground"
+            aria-label="Hide agent panel"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+          <AgentChatPanel sessionId={agentSessionId} className="w-full" />
+        </div>
+      )}
+      {agentSessionId && !agentPanelOpen && (
+        <button
+          onClick={() => setAgentPanelOpen(true)}
+          className="hidden lg:flex fixed right-4 bottom-4 z-20 items-center gap-1.5 px-3 py-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90 text-xs font-medium"
+        >
+          <Bot className="w-3.5 h-3.5" /> Show agent
+        </button>
+      )}
+    </div>
+  );
+
   // ── Early returns after all hooks ──
   if (!pipeline) {
     return (

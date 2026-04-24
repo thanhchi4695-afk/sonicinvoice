@@ -343,16 +343,74 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
                   Where each retail price came from. Brand-website prices are most reliable; markup-formula rows are estimates worth reviewing.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {visible.map((s) => (
-                    <span
-                      key={s.key}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${s.className}`}
-                    >
-                      <span>{s.icon}</span>
-                      <span>{s.label}</span>
-                      <span className="font-mono-data">{counts[s.key]}</span>
-                    </span>
-                  ))}
+                  {visible.map((s) => {
+                    const pill = (
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${s.className} ${s.key === "ai_search" ? "cursor-help" : ""}`}
+                      >
+                        <span>{s.icon}</span>
+                        <span>{s.label}</span>
+                        <span className="font-mono-data">{counts[s.key]}</span>
+                      </span>
+                    );
+                    if (s.key !== "ai_search") {
+                      return <span key={s.key}>{pill}</span>;
+                    }
+                    const aiRows = filtered.filter((p) => p.priceSource === "ai_search");
+                    const totalCost = aiRows.reduce((sum, p) => sum + (p.priceSourceMeta?.costAud ?? 0), 0);
+                    const cacheHits = aiRows.filter((p) => p.priceSourceMeta?.cacheHit).length;
+                    return (
+                      <HoverCard key={s.key} openDelay={120} closeDelay={80}>
+                        <HoverCardTrigger asChild>{pill}</HoverCardTrigger>
+                        <HoverCardContent className="w-96 p-0" align="start">
+                          <div className="p-3 border-b border-border">
+                            <p className="text-xs font-semibold">AI web search lookups</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {aiRows.length} row{aiRows.length === 1 ? "" : "s"} · {cacheHits} cached ·{" "}
+                              <span className="font-mono-data">${totalCost.toFixed(4)} AUD</span>
+                            </p>
+                          </div>
+                          <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                            {aiRows.slice(0, 12).map((p, i) => {
+                              const m = p.priceSourceMeta || {};
+                              return (
+                                <div key={i} className="p-2.5 text-[11px] space-y-0.5">
+                                  <p className="font-medium truncate">{p.name}</p>
+                                  {m.query && (
+                                    <p className="text-muted-foreground">
+                                      <span className="text-foreground/70">Query:</span> {m.query}
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <span>{m.provider === "brave-search" ? "Brave" : m.provider === "anthropic-websearch" ? "Anthropic" : "—"}</span>
+                                    <span>·</span>
+                                    <span className="font-mono-data">
+                                      {m.cacheHit ? "$0.0000 cached" : `$${(m.costAud ?? 0).toFixed(4)}`}
+                                    </span>
+                                  </div>
+                                  {p.priceSourceUrl && (
+                                    <a
+                                      href={p.priceSourceUrl}
+                                      target="_blank"
+                                      rel="noreferrer noopener"
+                                      className="text-primary hover:underline truncate block"
+                                    >
+                                      {p.priceSourceUrl}
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {aiRows.length > 12 && (
+                              <p className="p-2 text-[11px] text-muted-foreground text-center">
+                                +{aiRows.length - 12} more
+                              </p>
+                            )}
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
+                    );
+                  })}
                 </div>
               </div>
             );

@@ -680,9 +680,10 @@ function DirectStoresSection() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!testResult || testStatus !== "success") return;
     const url = normalizeStoreUrl(storeUrl);
+    // Local cache (legacy fast path used by some client-side flows)
     saveDirectStore({
       storeUrl: url,
       token,
@@ -690,6 +691,17 @@ function DirectStoresSection() {
       productCount: testResult.productCount,
       isActive: true,
     });
+    // Persist to DB so server-side features (catalog sync, stock matcher,
+    // refill detection, agent stock_check) can also use this connection.
+    try {
+      await saveConnection(url, token);
+    } catch (err) {
+      // Surface but don't block local save — token still works for client-side calls
+      console.error("Failed to persist Custom App token to DB:", err);
+      setTestStatus("error");
+      setTestMessage(err instanceof Error ? err.message : "Saved locally but failed to sync to backend");
+      return;
+    }
     refresh();
     setShowModal(false);
     setStoreUrl("");

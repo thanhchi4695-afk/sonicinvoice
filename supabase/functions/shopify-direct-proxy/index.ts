@@ -29,25 +29,51 @@ Deno.serve(async (req) => {
       "Content-Type": "application/json",
     };
 
-    // ── TEST CONNECTION ──
+    // ── TEST CONNECTION (verifies token + scopes) ──
     if (action === "test") {
       const res = await fetch(`${baseUrl}/shop.json`, { headers });
       if (!res.ok) {
         const text = await res.text();
-        return new Response(JSON.stringify({ error: `Shopify returned ${res.status}: ${text.slice(0, 200)}` }), {
+        let msg = `Shopify returned ${res.status}: ${text.slice(0, 200)}`;
+        if (res.status === 401) msg = "Invalid token — check that you copied the Admin API access token (starts with shpat_).";
+        else if (res.status === 404) msg = "Store not found — check the store domain (e.g. yourstore.myshopify.com).";
+        return new Response(JSON.stringify({ error: msg }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const data = await res.json();
       const shop = data.shop;
-      // Get product count
+
+      // Verify granted scopes
+      const REQUIRED_SCOPES = ["read_products", "write_products", "read_inventory", "write_inventory", "read_locations"];
+      let grantedScopes: string[] = [];
+      let missingScopes: string[] = [];
+      try {
+        const scopesRes = await fetch(`https://${store_url}/admin/oauth/access_scopes.json`, { headers });
+        if (scopesRes.ok) {
+          const scopesData = await scopesRes.json();
+          grantedScopes = (scopesData.access_scopes || []).map((s: { handle: string }) => s.handle);
+          missingScopes = REQUIRED_SCOPES.filter((s) => !grantedScopes.includes(s));
+        }
+      } catch (_e) {
+        // Non-fatal — older Custom Apps may not expose this endpoint
+      }
+      if (missingScopes.length > 0) {
+        return new Response(JSON.stringify({
+          error: `Missing required Admin API scopes: ${missingScopes.join(", ")}. Update the Custom App in your Shopify admin and reinstall.`,
+          granted_scopes: grantedScopes,
+          missing_scopes: missingScopes,
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       const countRes = await fetch(`${baseUrl}/products/count.json`, { headers });
       const countData = countRes.ok ? await countRes.json() : { count: 0 };
       return new Response(JSON.stringify({
         shop_name: shop?.name || "Unknown",
         domain: shop?.myshopify_domain || store_url,
         product_count: countData.count || 0,
+        granted_scopes: grantedScopes,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

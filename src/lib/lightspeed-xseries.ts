@@ -3,19 +3,32 @@
 // (see user-uploads://product-export-12.csv for the canonical header).
 import Papa from 'papaparse';
 import { getPublishStatus, lightspeedActiveValue } from './publish-status';
+import { normaliseVendor } from './normalise-vendor';
+import { expandLineBySize } from './size-run-expander';
 
 // ── Types ──────────────────────────────────────────────────
+export interface XSeriesVariant {
+  size?: string;
+  colour?: string;
+  sku?: string;        // variant SKU (will be made unique per size if collisions)
+  quantity?: number;   // extracted_qty from invoice (NOT received_qty)
+  supplyPrice?: number; // per-variant cost ex GST (overrides product.price)
+  retailPrice?: number; // per-variant RRP (overrides product.rrp)
+}
+
 export interface XSeriesProduct {
   title: string;
   brand: string;
   type: string;          // → product_category
-  price: number;         // supply/cost price
-  rrp: number;           // retail price
+  price: number;         // supply/cost price (ex GST) — fallback when variant has none
+  rrp: number;           // retail price — fallback when variant has none
   description?: string;
   tags?: string;
-  supplierCode?: string;
+  supplierCode?: string; // style-level code, lives in supplier_code column
   supplierName?: string;
-  variants?: { size?: string; colour?: string; sku?: string; quantity?: number }[];
+  season?: string;       // e.g. "W26" — used in description fallback + tags
+  arrivalDate?: string;  // ISO date — used to derive arrival month tag (Apr26)
+  variants?: XSeriesVariant[];
 }
 
 export interface XSeriesSettings {
@@ -42,7 +55,7 @@ const DEFAULT_SETTINGS: XSeriesSettings = {
   useReorderPoints: false,
   reorderPoint: 2,
   reorderAmount: 6,
-  nameFormat: 'brand_first',
+  nameFormat: 'product_only', // B1 #5 — never prefix the brand into the name column
   attributeOrder: 'colour_first', // matches real export (Colour, Size)
   trackInventory: true,
 };
@@ -60,6 +73,48 @@ export function getXSeriesSettings(): XSeriesSettings {
 export function saveXSeriesSettings(s: Partial<XSeriesSettings>) {
   const current = getXSeriesSettings();
   localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify({ ...current, ...s }));
+}
+
+// ── Title-case helpers (B1 #5) ─────────────────────────────
+const ACRONYM_RE = /^[A-Z0-9&]{2,}$/;
+
+/** Title-case a product/colour name while preserving intentional acronyms (G2M, UPF). */
+export function titleCase(raw: string | null | undefined): string {
+  if (!raw) return '';
+  return String(raw)
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .map(word => {
+      if (ACRONYM_RE.test(word) && word.length <= 4) return word; // G2M, UPF, ABC
+      // Handle hyphenated words: "tie-side" -> "Tie-Side"
+      if (word.includes('-')) {
+        return word.split('-').map(p =>
+          p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : p,
+        ).join('-');
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+/** Strip a leading brand from a product title if it's been prefixed twice. */
+export function stripBrandPrefix(name: string, brand: string): string {
+  if (!name || !brand) return name || '';
+  const n = name.trim();
+  const b = brand.trim();
+  const re = new RegExp(`^${b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+`, 'i');
+  return n.replace(re, '').trim();
+}
+
+/** Three-letter month + 2-digit year. September is the only 4-letter exception ("Sept26"). */
+export function arrivalMonthTag(date: Date | string | null | undefined): string {
+  const d = date ? new Date(date) : new Date();
+  if (isNaN(d.getTime())) return arrivalMonthTag(new Date());
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+  const m = months[d.getMonth()];
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${m}${yy}`;
 }
 
 // ── Handle generation ──────────────────────────────────────
@@ -81,10 +136,14 @@ function ensureUniqueHandles(handles: string[]): string[] {
 }
 
 // ── SKU generation ─────────────────────────────────────────
+function sanitiseSku(s: string): string {
+  return s.replace(/[^a-zA-Z0-9-]/g, '');
+}
+
 function generateVariantSku(baseCode: string, colour: string, size: string): string {
   const c = colour.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 3);
   const s = size.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  return `${baseCode}${c}${s}`.replace(/[^a-zA-Z0-9]/g, '');
+  return sanitiseSku(`${baseCode}${c}${s}`);
 }
 
 // ── Size sort ──────────────────────────────────────────────
@@ -92,6 +151,18 @@ const SIZE_ORDER = ['6', '8', '10', '12', '14', '16', '18', '20', '22', '24', 'X
 function sizeRank(s: string): number {
   const idx = SIZE_ORDER.indexOf(s.toUpperCase());
   return idx >= 0 ? idx : 999;
+}
+
+// ── Description fallback (B1 #4) ───────────────────────────
+function buildDescription(p: XSeriesProduct, colour: string): string {
+  if (p.description && p.description.trim()) return p.description.replace(/[\r\n]+/g, ' ');
+  const parts: string[] = [];
+  const name = titleCase(stripBrandPrefix(p.title, p.brand));
+  const col = titleCase(colour);
+  const brand = normaliseVendor(p.brand);
+  parts.push(col ? `${name} in ${col}.` : `${name}.`);
+  if (brand) parts.push(`${brand}${p.season ? ` ${p.season}` : ''} collection.`);
+  return parts.join(' ').trim();
 }
 
 // ── CSV Row builder ────────────────────────────────────────
@@ -149,11 +220,36 @@ export function generateXSeriesCSV(
 
   products.forEach((product, pi) => {
     const handle = uniqueHandles[pi];
+
+    // B1 #5 — clean name and brand. Strip duplicate brand prefix, title-case.
+    const cleanBrand = normaliseVendor(product.brand);
+    const cleanTitle = titleCase(stripBrandPrefix(product.title, product.brand));
     const displayName = s.nameFormat === 'brand_first'
-      ? `${product.brand} ${product.title}`
-      : product.title;
-    const baseCode = product.supplierCode || product.brand.replace(/\s/g, '').toUpperCase().slice(0, 3) + String(pi + 1).padStart(3, '0');
-    const hasVariants = product.variants && product.variants.length > 0;
+      ? `${cleanBrand} ${cleanTitle}`.trim()
+      : cleanTitle;
+
+    // B1 #6 — supplier_code is style-level (parent). Variant SKUs are per-variant.
+    const styleCode = product.supplierCode
+      || sanitiseSku(`${cleanBrand.replace(/\s/g, '').toUpperCase().slice(0, 3)}${String(pi + 1).padStart(3, '0')}`);
+
+    // B1 #1 — fan out any "8-16" range survivors into N variants with per-cell qty.
+    // (The parse-invoice prompt already aims for one row per Size:/Qty: cell,
+    //  but this is a belt-and-braces guard for ranges that slip through.)
+    const expandedVariants: XSeriesVariant[] = (product.variants || []).flatMap(v => {
+      const expanded = expandLineBySize({
+        sku: v.sku,
+        size: v.size,
+        qty: v.quantity ?? 0,
+      });
+      return expanded.map(e => ({
+        ...v,
+        sku: e.sku,
+        size: e.size,
+        quantity: e.qty,
+      }));
+    }).filter(v => (v.quantity ?? 0) > 0); // B1 #1 — skip zero-qty cells (no row for empty matrix slots)
+
+    const hasVariants = expandedVariants.length > 0;
 
     const baseRow = (): CsvRow => ({
       id: '', // blank → Lightspeed creates new
@@ -172,17 +268,18 @@ export function generateXSeriesCSV(
       variant_option_three_name: '',
       variant_option_three_value: '',
       tags: '',
-      supply_price: product.price.toFixed(2),
-      retail_price: product.rrp.toFixed(2),
+      // B1 #2 — supply_price = cost ex GST, retail_price = RRP. NEVER the same number.
+      supply_price: (product.price || 0).toFixed(2),
+      retail_price: (product.rrp || 0).toFixed(2),
       loyalty_value: '',
       loyalty_value_default: '',
       tax_name: s.taxName,
       tax_value: '',
       account_code: '',
       account_code_purchase: '',
-      brand_name: product.brand,
+      brand_name: cleanBrand,
       supplier_name: product.supplierName || '',
-      supplier_code: product.supplierCode || '',
+      supplier_code: styleCode, // style-level
       active: activeFlag,
       track_inventory: s.trackInventory ? '1' : '0',
       [stockCol]: '0',
@@ -192,16 +289,16 @@ export function generateXSeriesCSV(
 
     if (!hasVariants) {
       const row = baseRow();
-      row.sku = baseCode.replace(/[^a-zA-Z0-9]/g, '');
-      row.description = (product.description || '').replace(/[\r\n]+/g, ' ');
+      row.sku = sanitiseSku(styleCode);
+      row.description = buildDescription(product, '');
       row.tags = product.tags || '';
-      row[stockCol] = '1';
+      row[stockCol] = '0';
       allRows.push(row);
       return;
     }
 
     // Sort variants
-    const sorted = [...product.variants!].sort((a, b) => {
+    const sorted = [...expandedVariants].sort((a, b) => {
       if (s.attributeOrder === 'size_first') {
         const sd = sizeRank(a.size || '') - sizeRank(b.size || '');
         return sd !== 0 ? sd : (a.colour || '').localeCompare(b.colour || '');
@@ -216,30 +313,40 @@ export function generateXSeriesCSV(
 
     sorted.forEach((v, vi) => {
       const isFirst = vi === 0;
-      const sku = v.sku
-        ? v.sku.replace(/[^a-zA-Z0-9]/g, '')
-        : generateVariantSku(baseCode, v.colour || '', v.size || '');
+      // B1 #6 — append size to style code so each variant SKU is unique.
+      const variantSku = v.sku
+        ? sanitiseSku(v.sku)
+        : generateVariantSku(styleCode, v.colour || '', v.size || '');
+      const variantSkuWithSize = v.size && !variantSku.toUpperCase().endsWith(v.size.toUpperCase())
+        ? sanitiseSku(`${variantSku}-${v.size}`)
+        : variantSku;
 
-      const attr1Val = s.attributeOrder === 'size_first' ? (v.size || '') : (v.colour || '');
-      const attr2Val = s.attributeOrder === 'size_first' ? (v.colour || '') : (v.size || '');
+      const attr1Val = s.attributeOrder === 'size_first' ? (titleCase(v.size || '')) : (titleCase(v.colour || ''));
+      const attr2Val = s.attributeOrder === 'size_first' ? (titleCase(v.colour || '')) : (titleCase(v.size || ''));
+
+      // B1 #2 — per-variant cost/retail with safe fallback to product-level.
+      const supply = v.supplyPrice ?? product.price ?? 0;
+      const retail = v.retailPrice ?? product.rrp ?? 0;
 
       const row = baseRow();
-      row.sku = sku;
-      // Description on every variant row matches Lightspeed's own export style
-      row.description = (product.description || '').replace(/[\r\n]+/g, ' ');
+      row.sku = variantSkuWithSize;
+      row.description = buildDescription(product, v.colour || '');
       row.tags = isFirst ? (product.tags || '') : '';
-      // Lightspeed export repeats option NAME on every row, not just the first
       row.variant_option_one_name = attr1Name;
       row.variant_option_one_value = attr1Val;
       row.variant_option_two_name = attr2Name;
       row.variant_option_two_value = attr2Val;
-      row[stockCol] = String(v.quantity || 1);
+      row.supply_price = supply.toFixed(2);
+      row.retail_price = retail.toFixed(2);
+      // B1 #3 — extracted_qty (from the invoice/matrix), NOT received_qty.
+      row[stockCol] = String(v.quantity ?? 0);
       allRows.push(row);
     });
   });
 
   // Validation
   const seenSkus = new Set<string>();
+  let totalStock = 0;
   allRows.forEach((r, i) => {
     if (/[^a-z0-9-]/.test(r.handle)) {
       errors.push({ row: i, field: 'handle', message: `Handle contains invalid characters: "${r.handle}"`, severity: 'error' });
@@ -247,10 +354,24 @@ export function generateXSeriesCSV(
     if (r.sku && seenSkus.has(r.sku)) {
       errors.push({ row: i, field: 'sku', message: `Duplicate SKU: "${r.sku}"`, severity: 'error' });
     }
-    if (r.sku && /[^a-zA-Z0-9]/.test(r.sku)) {
+    if (r.sku && /[^a-zA-Z0-9-]/.test(r.sku)) {
       errors.push({ row: i, field: 'sku', message: `SKU contains invalid characters: "${r.sku}"`, severity: 'error' });
     }
     if (r.sku) seenSkus.add(r.sku);
+
+    // B1 #2 — runtime margin assertion: warn if supply >= retail (zero/negative margin).
+    const supply = parseFloat(r.supply_price) || 0;
+    const retail = parseFloat(r.retail_price) || 0;
+    if (supply > 0 && retail > 0 && supply >= retail) {
+      errors.push({
+        row: i,
+        field: 'supply_price',
+        message: `Suspicious margin on "${r.name}" (${r.variant_option_two_value || r.variant_option_one_value}): supply $${supply.toFixed(2)} >= retail $${retail.toFixed(2)}. Cost may have been overwritten with RRP.`,
+        severity: 'warning',
+      });
+    }
+
+    totalStock += parseInt(r[stockCol] || '0', 10) || 0;
   });
 
   // Column order matches the official Lightspeed product-export header exactly
@@ -272,4 +393,15 @@ export function generateXSeriesCSV(
 
   const csv = Papa.unparse(allRows, { columns });
   return { csv, errors, rowCount: allRows.length };
+}
+
+/**
+ * Sum of Main_Outlet_stock across the produced CSV — used by the Review screen
+ * to compare against the invoice's total unit count and surface a mismatch banner.
+ */
+export function totalStockForProducts(products: XSeriesProduct[]): number {
+  return products.reduce((sum, p) => {
+    if (!p.variants || p.variants.length === 0) return sum;
+    return sum + p.variants.reduce((s, v) => s + (v.quantity ?? 0), 0);
+  }, 0);
 }

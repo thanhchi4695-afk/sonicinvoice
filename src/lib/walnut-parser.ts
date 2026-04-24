@@ -1,0 +1,234 @@
+// ══════════════════════════════════════════════════════════
+// Walnut Melbourne deterministic invoice parser.
+//
+// The Supabase Edge Function (`parse-invoice`) imports the same helpers
+// to handle stitched multi-invoice PDFs from Walnut. They live here so
+// they can be regression-tested with vitest without spinning up Deno.
+// ══════════════════════════════════════════════════════════
+
+export const MULTI_INVOICE_HEADER_RE = /Tax Invoice[\s\S]{0,500}?Invoice No[\s:]+(\d+)/gi;
+export const TABLE_HEADER_RE = /Code\s+Item\s+Options\s+Qty\s+Unit Price\s+Discount\s+Subtotal/i;
+export const TABLE_FOOTER_RE = /Product Cost:|Sub Total:|Payment Terms/i;
+export const SEASON_RE = /^(SS|AW|S|W|FW|HO|RE|HS|MS|LS)\d{2}$/i;
+
+const MONEY_RE = /\$?\s*(-?\d{1,6}(?:,\d{3})*(?:\.\d{2})|-?\d+(?:\.\d{2}))/;
+const SIZE_TOKEN_RE = /^(?:XXS|XS|S|M|L|XL|XXL|XXXL|OS|ONE\s*SIZE|FREE\s*SIZE|\d{1,2}|\d{1,2}\s*(?:AU|US|UK|EU|W)|\d{1,2}\s*(?:YEAR|YR|Y)|\d{1,2}\s*-\s*\d{1,2}\s*(?:YEAR|YR|Y)|\d{1,2}\s*(?:MONTH|MONTHS|MO|M)|\d{1,2}\s*-\s*\d{1,2}\s*(?:MONTH|MONTHS|MO|M))$/i;
+
+export interface WalnutInvoiceChunk {
+  invoiceNumber: string;
+  text: string;
+}
+
+export function cleanInvoiceText(raw: string): string {
+  return String(raw || "")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/ +/g, " ");
+}
+
+export function splitMultiInvoicePdf(rawText: string): WalnutInvoiceChunk[] {
+  const text = cleanInvoiceText(rawText);
+  const markers: Array<{ index: number; invoiceNumber: string }> = [];
+  const re = new RegExp(MULTI_INVOICE_HEADER_RE.source, MULTI_INVOICE_HEADER_RE.flags);
+  let match: RegExpExecArray | null;
+
+  while ((match = re.exec(text)) !== null) {
+    markers.push({ index: match.index, invoiceNumber: match[1] || "" });
+  }
+
+  if (markers.length <= 1) {
+    const invoiceMatch = text.match(/Invoice No[\s:]+(\d+)/i);
+    return [{ invoiceNumber: invoiceMatch?.[1] || "", text }];
+  }
+
+  return markers.map((marker, idx) => ({
+    invoiceNumber: marker.invoiceNumber,
+    text: text.slice(marker.index, idx + 1 < markers.length ? markers[idx + 1].index : text.length),
+  }));
+}
+
+export function parseMoney(value: string): number | null {
+  const m = String(value || "").match(MONEY_RE);
+  if (!m) return null;
+  const n = Number(m[1].replace(/,/g, ""));
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+}
+
+export function isSizeToken(value: string): boolean {
+  return SIZE_TOKEN_RE.test(String(value || "").trim());
+}
+
+export function normalizeWrappedCode(code: string): string {
+  const tokens = String(code || "").trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return "";
+  return tokens.reduce((acc, token, idx) => {
+    if (idx === 0) return token;
+    if (token.startsWith("-")) return `${acc}${token}`;
+    return `${acc} ${token}`;
+  }, "");
+}
+
+export function normalizeWhitespace(value: string): string {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+export function inferProductType(title: string): string {
+  const t = String(title || "").toLowerCase();
+  if (/sandal|shoe|boot|sneaker|loafer/.test(t)) return "sandal";
+  if (/skirt/.test(t)) return "skirt";
+  if (/dress/.test(t)) return "dress";
+  if (/pant|trouser/.test(t)) return "pant";
+  if (/top|tee|shirt|blouse/.test(t)) return "top";
+  return "";
+}
+
+export function inferDepartment(type: string, sizes: string[]): string | null {
+  const hasKidsSizes = sizes.some((size) => /year|yr|month|months|\d+y|\d+m/i.test(size));
+  if (!hasKidsSizes) return null;
+  return /shoe|sandal|boot|sneaker/i.test(type) ? "kids shoes" : "kids clothing";
+}
+
+export function findLineItemTable(invoiceText: string): string | null {
+  const clean = cleanInvoiceText(invoiceText);
+  const headerMatch = clean.match(TABLE_HEADER_RE);
+  if (!headerMatch || headerMatch.index == null) return null;
+  const start = headerMatch.index + headerMatch[0].length;
+  const rest = clean.slice(start);
+  const footerMatch = rest.match(TABLE_FOOTER_RE);
+  const end = footerMatch?.index != null ? start + footerMatch.index : clean.length;
+  return clean.slice(start, end).trim();
+}
+
+export function extractSizeQtyPairs(tableText: string): Array<{ size: string; quantity: number }> {
+  const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
+  const sizeLineIndex = lines.findIndex((line) => /^size\s*:/i.test(line));
+  const qtyLineIndex = lines.findIndex((line) => /^qty\s*:/i.test(line));
+  if (sizeLineIndex === -1 || qtyLineIndex === -1) return [];
+
+  const sizeTokens = lines[sizeLineIndex]
+    .replace(/^size\s*:/i, "")
+    .trim()
+    .split(/\s{2,}|\t|\s(?=\d{1,2}(?:\s*(?:year|yr|month|months|m|y))?\b)|\s(?=XXS|XS|S|M|L|XL|XXL|XXXL|OS\b)/i)
+    .map(normalizeWhitespace)
+    .filter(Boolean);
+  const qtyTokens = lines[qtyLineIndex]
+    .replace(/^qty\s*:/i, "")
+    .trim()
+    .split(/\s+/)
+    .map((token) => Number(token.replace(/[^\d.-]/g, "")))
+    .filter((n) => Number.isFinite(n));
+
+  const sizes = sizeTokens.filter(isSizeToken);
+  const count = Math.min(sizes.length, qtyTokens.length);
+  const pairs: Array<{ size: string; quantity: number }> = [];
+  for (let i = 0; i < count; i += 1) {
+    if (qtyTokens[i] > 0) pairs.push({ size: sizes[i], quantity: qtyTokens[i] });
+  }
+  return pairs;
+}
+
+export interface WalnutVariantRow {
+  invoiceNumber: string;
+  styleCode: string;
+  productTitle: string;
+  colour: string;
+  size: string;
+  quantity: number;
+  unitPrice: number | null;
+  discount: number | null;
+  effectiveUnitCost: number | null;
+  lineTotal: number | null;
+  productType: string;
+  department: string | null;
+  costSource: "direct" | "discount_adjusted" | "derived_from_line_total";
+  qtyChecksumOk: boolean;
+}
+
+export interface WalnutParseResult {
+  invoiceCount: number;
+  invoiceNumbers: string[];
+  rows: WalnutVariantRow[];
+}
+
+export function seasonFromSku(sku?: string): string {
+  if (!sku) return "";
+  const parts = sku.split(/[-_/]/).map((p) => p.trim()).filter(Boolean);
+  for (const part of parts) {
+    if (SEASON_RE.test(part)) return part.toUpperCase();
+  }
+  return "";
+}
+
+export function parseWalnutInvoiceText(rawText: string): WalnutParseResult {
+  const chunks = splitMultiInvoicePdf(rawText);
+  const invoiceNumbers: string[] = [];
+  const rows: WalnutVariantRow[] = [];
+
+  chunks.forEach((chunk) => {
+    const invoiceNumber = chunk.invoiceNumber || chunk.text.match(/Invoice No[\s:]+(\d+)/i)?.[1] || "";
+    if (invoiceNumber) invoiceNumbers.push(invoiceNumber);
+
+    const tableText = findLineItemTable(chunk.text);
+    if (!tableText) return;
+
+    const lines = tableText.split("\n").map(normalizeWhitespace).filter(Boolean);
+    const headerRow = lines.find((line) => /\$/.test(line) && /\d/.test(line) && !/^size\s*:/i.test(line) && !/^qty\s*:/i.test(line));
+    if (!headerRow) return;
+
+    const moneyValues = Array.from(headerRow.matchAll(/\$?\s*\d{1,6}(?:,\d{3})*(?:\.\d{2})/g))
+      .map((m) => parseMoney(m[0]))
+      .filter((n): n is number => n != null);
+    const qtyMatch = headerRow.match(/\s(\d+)\s+\$?\s*\d/);
+    const totalQty = qtyMatch ? Number(qtyMatch[1]) : 0;
+    const headerPrefix = qtyMatch ? headerRow.slice(0, qtyMatch.index).trim() : headerRow;
+    const prefixParts = headerPrefix.split(/\s{2,}/).map(normalizeWhitespace).filter(Boolean);
+    const styleCode = normalizeWrappedCode(prefixParts[0] || "");
+    const productTitle = prefixParts[1] || "";
+    const colour = normalizeWhitespace((prefixParts.slice(2).join(" ") || "").replace(/\bTan\s+Tan\b/i, "Tan"));
+
+    const qtyPairs = extractSizeQtyPairs(tableText);
+    const qtyChecksum = qtyPairs.reduce((sum, pair) => sum + pair.quantity, 0);
+    const unitPrice = moneyValues[0] ?? null;
+    const discount = moneyValues.length >= 3 ? moneyValues[1] : null;
+    const lineTotal = moneyValues[moneyValues.length - 1] ?? null;
+
+    let costSource: WalnutVariantRow["costSource"] = "direct";
+    let effectiveUnitCost = unitPrice;
+    if (unitPrice != null && discount != null) {
+      effectiveUnitCost = Math.round((unitPrice - discount) * 100) / 100;
+      costSource = "discount_adjusted";
+      if (lineTotal != null && totalQty > 0) {
+        const subtotalCheck = effectiveUnitCost * totalQty;
+        if (Math.abs(subtotalCheck - lineTotal) > 0.05) {
+          effectiveUnitCost = Math.round((lineTotal / totalQty) * 100) / 100;
+          costSource = "derived_from_line_total";
+        }
+      }
+    }
+
+    const productType = inferProductType(productTitle);
+    const department = inferDepartment(productType, qtyPairs.map((p) => p.size));
+
+    qtyPairs.forEach((pair) => {
+      rows.push({
+        invoiceNumber,
+        styleCode,
+        productTitle,
+        colour,
+        size: pair.size,
+        quantity: pair.quantity,
+        unitPrice,
+        discount,
+        effectiveUnitCost,
+        lineTotal,
+        productType,
+        department,
+        costSource,
+        qtyChecksumOk: qtyChecksum === totalQty,
+      });
+    });
+  });
+
+  return { invoiceCount: chunks.length, invoiceNumbers, rows };
+}

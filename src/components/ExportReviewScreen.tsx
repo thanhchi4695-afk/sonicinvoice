@@ -12,6 +12,7 @@ import ShopifyPushFlow from "@/components/ShopifyPushFlow";
 import type { PushProduct } from "@/lib/shopify-api";
 import { generateShopifyCSV, generateLightspeedCSV, getVariantMode, setVariantMode, type VariantMode, type ValidationResult } from "@/lib/csv-export-engine";
 import { getPublishStatus, setPublishStatus, type PublishStatus } from "@/lib/publish-status";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 export interface ExportProduct {
   name: string;

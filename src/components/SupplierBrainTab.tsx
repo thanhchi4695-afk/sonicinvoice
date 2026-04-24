@@ -24,6 +24,7 @@ import {
   getContributeShared,
   setContributeShared,
 } from "@/lib/universal-classifier";
+import SupplierWebsiteRRPPanel from "@/components/SupplierWebsiteRRPPanel";
 
 interface SupplierRow {
   id: string;
@@ -267,6 +268,9 @@ export default function SupplierBrainTab() {
         </div>
         <Switch checked={contribute} onCheckedChange={toggleContribute} />
       </Card>
+
+      {/* Website RRP source manager */}
+      <SupplierWebsiteRRPPanel />
 
       {/* Import from Google Drive — paste link → pick files → seed with live progress */}
       <Card className="p-4">

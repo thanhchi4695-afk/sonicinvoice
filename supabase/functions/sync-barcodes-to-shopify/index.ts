@@ -11,6 +11,7 @@
 //   { type: "error", message }
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { ensureValidToken, ShopifyReauthRequiredError, type ShopifyConnectionRow } from "../_shared/shopify-token.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,7 +61,7 @@ Deno.serve(async (req) => {
         // 1. Shopify connection
         const { data: shopifyConn } = await supabase
           .from("shopify_connections")
-          .select("store_url, access_token, api_version")
+          .select("*")
           .eq("user_id", userId)
           .maybeSingle();
 
@@ -70,13 +71,26 @@ Deno.serve(async (req) => {
           return;
         }
 
-        const shop = shopifyConn.store_url
+        let valid;
+        try {
+          valid = await ensureValidToken(supabase, shopifyConn as ShopifyConnectionRow);
+        } catch (err) {
+          if (err instanceof ShopifyReauthRequiredError) {
+            send({ type: "error", message: "Shopify re-authentication required", needs_reauth: true });
+          } else {
+            send({ type: "error", message: err instanceof Error ? err.message : "Token error" });
+          }
+          controller.close();
+          return;
+        }
+
+        const shop = valid.storeUrl
           .replace(/^https?:\/\//, "")
           .replace(/\/$/, "");
-        const apiVersion = shopifyConn.api_version || "2024-10";
+        const apiVersion = valid.apiVersion || "2024-10";
         const shopifyBase = `https://${shop}/admin/api/${apiVersion}`;
         const shopifyHeaders = {
-          "X-Shopify-Access-Token": shopifyConn.access_token,
+          "X-Shopify-Access-Token": valid.accessToken,
           "Content-Type": "application/json",
         };
 

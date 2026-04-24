@@ -2,6 +2,7 @@
 // POST { user_id, shop_domain, access_token, mode?: "full" | "incremental", location_id? }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { ensureValidToken, ShopifyReauthRequiredError, type ShopifyConnectionRow } from "../_shared/shopify-token.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -256,12 +257,29 @@ Deno.serve(async (req) => {
     if (!resolvedShopDomain || !resolvedAccessToken) {
       const { data: legacyConn } = await supabase
         .from("shopify_connections")
-        .select("store_url, access_token")
+        .select("*")
         .eq("user_id", user_id)
         .maybeSingle();
 
-      resolvedShopDomain ??= legacyConn?.store_url ?? undefined;
-      resolvedAccessToken ??= legacyConn?.access_token ?? undefined;
+      if (legacyConn) {
+        try {
+          const valid = await ensureValidToken(supabase, legacyConn as ShopifyConnectionRow);
+          resolvedShopDomain ??= valid.storeUrl;
+          resolvedAccessToken ??= valid.accessToken;
+        } catch (err) {
+          if (err instanceof ShopifyReauthRequiredError) {
+            return new Response(JSON.stringify({
+              error: "Shopify re-authentication required",
+              needs_reauth: true,
+              shop: err.shop,
+            }), {
+              status: 409,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          throw err;
+        }
+      }
     }
 
     if (!resolvedShopDomain || !resolvedAccessToken) {

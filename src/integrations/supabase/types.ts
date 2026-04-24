@@ -1657,8 +1657,12 @@ export type Database = {
           is_active: boolean
           last_synced_at: string | null
           location_id: string | null
+          needs_reauth: boolean
           platform: string
+          refresh_token: string | null
+          refresh_token_expires_at: string | null
           shop_domain: string | null
+          token_expires_at: string | null
           user_id: string
         }
         Insert: {
@@ -1668,8 +1672,12 @@ export type Database = {
           is_active?: boolean
           last_synced_at?: string | null
           location_id?: string | null
+          needs_reauth?: boolean
           platform: string
+          refresh_token?: string | null
+          refresh_token_expires_at?: string | null
           shop_domain?: string | null
+          token_expires_at?: string | null
           user_id: string
         }
         Update: {
@@ -1679,8 +1687,12 @@ export type Database = {
           is_active?: boolean
           last_synced_at?: string | null
           location_id?: string | null
+          needs_reauth?: boolean
           platform?: string
+          refresh_token?: string | null
+          refresh_token_expires_at?: string | null
           shop_domain?: string | null
+          token_expires_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -2521,9 +2533,13 @@ export type Database = {
           created_at: string
           default_location_id: string | null
           id: string
+          needs_reauth: boolean
           product_status: string
+          refresh_token: string | null
+          refresh_token_expires_at: string | null
           shop_name: string | null
           store_url: string
+          token_expires_at: string | null
           updated_at: string
           user_id: string
         }
@@ -2533,9 +2549,13 @@ export type Database = {
           created_at?: string
           default_location_id?: string | null
           id?: string
+          needs_reauth?: boolean
           product_status?: string
+          refresh_token?: string | null
+          refresh_token_expires_at?: string | null
           shop_name?: string | null
           store_url: string
+          token_expires_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -2545,9 +2565,13 @@ export type Database = {
           created_at?: string
           default_location_id?: string | null
           id?: string
+          needs_reauth?: boolean
           product_status?: string
+          refresh_token?: string | null
+          refresh_token_expires_at?: string | null
           shop_name?: string | null
           store_url?: string
+          token_expires_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -2672,6 +2696,36 @@ export type Database = {
           status?: string
           trial_ends_at?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      shopify_token_migration_log: {
+        Row: {
+          attempted_at: string
+          error_message: string | null
+          id: string
+          shop_domain: string
+          status: string
+          trigger_source: string
+          user_id: string
+        }
+        Insert: {
+          attempted_at?: string
+          error_message?: string | null
+          id?: string
+          shop_domain: string
+          status: string
+          trigger_source?: string
+          user_id: string
+        }
+        Update: {
+          attempted_at?: string
+          error_message?: string | null
+          id?: string
+          shop_domain?: string
+          status?: string
+          trigger_source?: string
           user_id?: string
         }
         Relationships: []

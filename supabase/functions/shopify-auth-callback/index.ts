@@ -12,6 +12,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { tokenResponseToConnectionColumns } from "../_shared/shopify-token.ts";
 
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -96,14 +97,16 @@ Deno.serve(async (req) => {
     const tokenResp = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_id: SHOPIFY_API_KEY, client_secret: SHOPIFY_API_SECRET, code }),
+      body: JSON.stringify({ client_id: SHOPIFY_API_KEY, client_secret: SHOPIFY_API_SECRET, code, expiring: true }),
     });
     if (!tokenResp.ok) {
       console.error("Token exchange failed:", await tokenResp.text());
       return new Response("Failed to get access token", { status: 500 });
     }
-    const { access_token: accessToken } = await tokenResp.json();
+    const tokenJson = await tokenResp.json();
+    const { access_token: accessToken } = tokenJson;
     if (!accessToken) return new Response("No access token in response", { status: 500 });
+    const tokenCols = tokenResponseToConnectionColumns(tokenJson);
 
     const shopResp = await fetch(`https://${shop}/admin/api/${API_VERSION}/shop.json`, {
       headers: { "X-Shopify-Access-Token": accessToken },
@@ -136,6 +139,10 @@ Deno.serve(async (req) => {
       await supabase.from("shopify_connections").upsert({
         user_id: userId, store_url: cleanShop, access_token: accessToken,
         api_version: API_VERSION, shop_name: shopName, updated_at: new Date().toISOString(),
+        refresh_token: tokenCols.refresh_token,
+        token_expires_at: tokenCols.token_expires_at,
+        refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+        needs_reauth: false,
       }, { onConflict: "user_id" });
 
       await supabase.from("platform_connections").delete()
@@ -147,6 +154,10 @@ Deno.serve(async (req) => {
         platform: "shopify",
         shop_domain: cleanShop,
         access_token: accessToken,
+        refresh_token: tokenCols.refresh_token,
+        token_expires_at: tokenCols.token_expires_at,
+        refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+        needs_reauth: false,
         is_active: true,
       });
 
@@ -176,6 +187,10 @@ Deno.serve(async (req) => {
       await supabase.from("shopify_connections").upsert({
         user_id: userId, store_url: cleanShop, access_token: accessToken,
         api_version: API_VERSION, shop_name: shopName, updated_at: new Date().toISOString(),
+        refresh_token: tokenCols.refresh_token,
+        token_expires_at: tokenCols.token_expires_at,
+        refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+        needs_reauth: false,
       }, { onConflict: "user_id" });
       await supabase.from("platform_connections").delete()
         .eq("user_id", userId)
@@ -185,6 +200,10 @@ Deno.serve(async (req) => {
         platform: "shopify",
         shop_domain: cleanShop,
         access_token: accessToken,
+        refresh_token: tokenCols.refresh_token,
+        token_expires_at: tokenCols.token_expires_at,
+        refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+        needs_reauth: false,
         is_active: true,
       });
       await supabase.from("shopify_oauth_states").delete().eq("user_id", userId);

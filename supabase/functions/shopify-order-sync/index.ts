@@ -6,6 +6,7 @@ const corsHeaders = {
 };
 
 import { verifyShopifySessionToken, extractShopDomain } from "../_shared/verify-session-token.ts";
+import { ensureValidToken, ShopifyReauthRequiredError, type ShopifyConnectionRow } from "../_shared/shopify-token.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -176,7 +177,28 @@ Deno.serve(async (req) => {
         });
       }
 
-      const result = await syncOrdersForUser(supabaseAdmin, userId, conn, sinceDate);
+      let valid;
+      try {
+        valid = await ensureValidToken(supabaseAdmin, conn as ShopifyConnectionRow);
+      } catch (err) {
+        if (err instanceof ShopifyReauthRequiredError) {
+          return new Response(JSON.stringify({
+            error: "Shopify re-authentication required",
+            needs_reauth: true,
+            shop: err.shop,
+          }), {
+            status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        throw err;
+      }
+
+      const result = await syncOrdersForUser(supabaseAdmin, userId, {
+        store_url: valid.storeUrl,
+        access_token: valid.accessToken,
+        api_version: valid.apiVersion,
+        shop_name: (valid.conn as { shop_name?: string | null }).shop_name ?? null,
+      }, sinceDate);
       return new Response(JSON.stringify({
         success: true,
         synced: result.synced,
@@ -190,7 +212,7 @@ Deno.serve(async (req) => {
 
     // Cron mode: sync all users with Shopify connections
     const { data: connections } = await supabaseAdmin
-      .from("shopify_connections").select("user_id, store_url, access_token, api_version, shop_name");
+      .from("shopify_connections").select("*");
 
     if (!connections || connections.length === 0) {
       return new Response(JSON.stringify({ success: true, message: "No Shopify connections to sync", results: [] }), {
@@ -202,14 +224,31 @@ Deno.serve(async (req) => {
     const cronSince = sinceDate || new Date(Date.now() - 2 * 86400000).toISOString();
     const results: SyncResult[] = [];
 
-    for (const conn of connections) {
+    for (const rawConn of connections) {
+      let valid;
       try {
-        const result = await syncOrdersForUser(supabaseAdmin, conn.user_id, conn, cronSince);
+        valid = await ensureValidToken(supabaseAdmin, rawConn as ShopifyConnectionRow);
+      } catch (err) {
+        const message = err instanceof ShopifyReauthRequiredError
+          ? "needs_reauth"
+          : (err instanceof Error ? err.message : "token error");
+        results.push({ user_id: rawConn.user_id, shop: rawConn.store_url, synced: 0, skipped: 0, total: 0, error: message });
+        console.warn(`Order sync skipped for ${rawConn.store_url}: ${message}`);
+        continue;
+      }
+
+      try {
+        const result = await syncOrdersForUser(supabaseAdmin, rawConn.user_id, {
+          store_url: valid.storeUrl,
+          access_token: valid.accessToken,
+          api_version: valid.apiVersion,
+          shop_name: (valid.conn as { shop_name?: string | null }).shop_name ?? null,
+        }, cronSince);
         results.push(result);
-        console.log(`Order sync for ${conn.store_url}: ${result.synced} new, ${result.skipped} skipped`);
+        console.log(`Order sync for ${valid.storeUrl}: ${result.synced} new, ${result.skipped} skipped`);
       } catch (err: any) {
-        results.push({ user_id: conn.user_id, shop: conn.store_url, synced: 0, skipped: 0, total: 0, error: err.message });
-        console.error(`Order sync failed for ${conn.store_url}:`, err.message);
+        results.push({ user_id: rawConn.user_id, shop: valid.storeUrl, synced: 0, skipped: 0, total: 0, error: err.message });
+        console.error(`Order sync failed for ${valid.storeUrl}:`, err.message);
       }
       // Rate limit between stores
       await new Promise((r) => setTimeout(r, 500));

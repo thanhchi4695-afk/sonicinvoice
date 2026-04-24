@@ -119,6 +119,39 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          brand_sync_last_run_at: string | null
+          brand_sync_last_status: string | null
+          brand_sync_schedule: string
+          brand_sync_sheet_url: string | null
+          created_at: string
+          id: string
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          brand_sync_last_run_at?: string | null
+          brand_sync_last_status?: string | null
+          brand_sync_schedule?: string
+          brand_sync_sheet_url?: string | null
+          created_at?: string
+          id?: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          brand_sync_last_run_at?: string | null
+          brand_sync_last_status?: string | null
+          brand_sync_schedule?: string
+          brand_sync_sheet_url?: string | null
+          created_at?: string
+          id?: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       brand_lookup_misses: {
         Row: {
           id: string
@@ -2506,14 +2539,19 @@ export type Database = {
           brand_name_display: string
           brand_name_normalised: string
           cache_ttl_hours: number
+          canonical_brand_name: string | null
+          country_origin: string | null
           created_at: string
           enrichment_enabled: boolean
           id: string
           is_shopify: boolean
+          last_modified_by: string
           last_scraped_at: string | null
           notes: string | null
+          product_categories: string | null
           products_json_endpoint: string | null
           scrape_failure_count: number
+          source_sheet_row_id: string | null
           updated_at: string
           website_url: string | null
         }
@@ -2521,14 +2559,19 @@ export type Database = {
           brand_name_display: string
           brand_name_normalised: string
           cache_ttl_hours?: number
+          canonical_brand_name?: string | null
+          country_origin?: string | null
           created_at?: string
           enrichment_enabled?: boolean
           id?: string
           is_shopify?: boolean
+          last_modified_by?: string
           last_scraped_at?: string | null
           notes?: string | null
+          product_categories?: string | null
           products_json_endpoint?: string | null
           scrape_failure_count?: number
+          source_sheet_row_id?: string | null
           updated_at?: string
           website_url?: string | null
         }
@@ -2536,16 +2579,66 @@ export type Database = {
           brand_name_display?: string
           brand_name_normalised?: string
           cache_ttl_hours?: number
+          canonical_brand_name?: string | null
+          country_origin?: string | null
           created_at?: string
           enrichment_enabled?: boolean
           id?: string
           is_shopify?: boolean
+          last_modified_by?: string
           last_scraped_at?: string | null
           notes?: string | null
+          product_categories?: string | null
           products_json_endpoint?: string | null
           scrape_failure_count?: number
+          source_sheet_row_id?: string | null
           updated_at?: string
           website_url?: string | null
+        }
+        Relationships: []
+      }
+      supplier_websites_sync_log: {
+        Row: {
+          duration_ms: number | null
+          error_text: string | null
+          id: string
+          rows_failed: number | null
+          rows_in_sheet: number | null
+          rows_skipped_db_newer: number | null
+          rows_skipped_no_change: number | null
+          rows_upserted: number | null
+          run_at: string
+          sheet_url: string | null
+          source: string
+          status: string
+        }
+        Insert: {
+          duration_ms?: number | null
+          error_text?: string | null
+          id?: string
+          rows_failed?: number | null
+          rows_in_sheet?: number | null
+          rows_skipped_db_newer?: number | null
+          rows_skipped_no_change?: number | null
+          rows_upserted?: number | null
+          run_at?: string
+          sheet_url?: string | null
+          source: string
+          status?: string
+        }
+        Update: {
+          duration_ms?: number | null
+          error_text?: string | null
+          id?: string
+          rows_failed?: number | null
+          rows_in_sheet?: number | null
+          rows_skipped_db_newer?: number | null
+          rows_skipped_no_change?: number | null
+          rows_upserted?: number | null
+          run_at?: string
+          sheet_url?: string | null
+          source?: string
+          status?: string
         }
         Relationships: []
       }

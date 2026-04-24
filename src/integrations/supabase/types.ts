@@ -1889,6 +1889,54 @@ export type Database = {
           },
         ]
       }
+      search_results_cache: {
+        Row: {
+          cache_key: string
+          cost_aud: number
+          created_at: string
+          description: string | null
+          expires_at: string
+          found: boolean
+          hit_count: number
+          image_url: string | null
+          matched_url: string | null
+          price: number | null
+          query_used: string | null
+          raw_snippet: string | null
+          source: string
+        }
+        Insert: {
+          cache_key: string
+          cost_aud?: number
+          created_at?: string
+          description?: string | null
+          expires_at: string
+          found: boolean
+          hit_count?: number
+          image_url?: string | null
+          matched_url?: string | null
+          price?: number | null
+          query_used?: string | null
+          raw_snippet?: string | null
+          source: string
+        }
+        Update: {
+          cache_key?: string
+          cost_aud?: number
+          created_at?: string
+          description?: string | null
+          expires_at?: string
+          found?: boolean
+          hit_count?: number
+          image_url?: string | null
+          matched_url?: string | null
+          price?: number | null
+          query_used?: string | null
+          raw_snippet?: string | null
+          source?: string
+        }
+        Relationships: []
+      }
       shared_fingerprint_index: {
         Row: {
           column_map: Json
@@ -3005,6 +3053,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      websearch_usage_log: {
+        Row: {
+          cache_hit: boolean
+          cost_aud: number
+          created_at: string
+          id: number
+          matched_url: string | null
+          query: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          cache_hit?: boolean
+          cost_aud?: number
+          created_at?: string
+          id?: number
+          matched_url?: string | null
+          query: string
+          source: string
+          user_id: string
+        }
+        Update: {
+          cache_hit?: boolean
+          cost_aud?: number
+          created_at?: string
+          id?: number
+          matched_url?: string | null
+          query?: string
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       wholesale_connections: {
         Row: {

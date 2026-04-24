@@ -1132,6 +1132,10 @@ const ToolsScreen = () => {
     const ImageOptimisePanel = lazy(() => import("@/components/ImageOptimisePanel"));
     return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><ImageOptimisePanel onBack={() => setActiveTool(null)} /></Suspense>;
   }
+  if (activeTool === "lightspeed_import") {
+    const LightspeedInvoiceImport = lazy(() => import("@/components/LightspeedInvoiceImport"));
+    return <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}><LightspeedInvoiceImport onBack={() => setActiveTool(null)} /></Suspense>;
+  }
 
   if (activeTool === "ai") {
     return (

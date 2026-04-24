@@ -13,6 +13,7 @@ import {
   Download, Upload, MoreHorizontal, Loader2, AlertTriangle, Check, FileSpreadsheet,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 import { toast } from "sonner";
 import { addAuditEntry } from "@/lib/audit-log";
 
@@ -258,18 +259,19 @@ export default function BulkInventoryActions({ mode, onComplete }: BulkInventory
 
     let poCount = 0;
     for (const [supplierName, lines] of groups) {
-      // Find or create supplier
+      const canonicalSupplier = normaliseVendor(supplierName);
+      // Find or create supplier (case-insensitive on canonical form)
       let { data: supplier } = await supabase
         .from("suppliers")
         .select("id")
         .eq("user_id", user.id)
-        .eq("name", supplierName)
+        .ilike("name", canonicalSupplier)
         .maybeSingle();
 
       if (!supplier) {
         const { data: created } = await supabase
           .from("suppliers")
-          .insert({ user_id: user.id, name: supplierName })
+          .insert({ user_id: user.id, name: canonicalSupplier })
           .select("id")
           .single();
         supplier = created;
@@ -284,7 +286,7 @@ export default function BulkInventoryActions({ mode, onComplete }: BulkInventory
           user_id: user.id,
           po_number: poNumber,
           supplier_id: supplier?.id || null,
-          supplier_name: supplierName,
+          supplier_name: canonicalSupplier,
           status: "draft",
           total_cost: totalCost,
         })

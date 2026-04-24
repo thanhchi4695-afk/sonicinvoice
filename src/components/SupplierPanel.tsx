@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { DbSupplier } from "@/lib/db-schema-types";
 import { isFuzzySupplierMatch } from "@/lib/invoice-persistence";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 import { getCostHistory } from "@/components/InvoiceFlow";
 import SupplierCatalog from "@/components/SupplierCatalog";
 
@@ -192,16 +193,17 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
     );
     const markup = markupMultiplier ? parseFloat(markupMultiplier) : null;
 
+    const canonicalSupplier = normaliseVendor(supplierName);
     const { data: existing } = await supabase
       .from("supplier_intelligence")
       .select("id, confidence_score")
       .eq("user_id", session.user.id)
-      .eq("supplier_name", supplierName)
+      .ilike("supplier_name", canonicalSupplier)
       .maybeSingle();
 
     const payload: Record<string, unknown> = {
       user_id: session.user.id,
-      supplier_name: supplierName,
+      supplier_name: canonicalSupplier,
       name_variants: nameVariants,
       column_map: cleanedColMap,
       gst_on_cost: gstOnCost,

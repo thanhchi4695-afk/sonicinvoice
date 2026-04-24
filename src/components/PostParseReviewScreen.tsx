@@ -753,17 +753,18 @@ export default function PostParseReviewScreen({
       if (!session?.session) { toast.error("Please sign in first"); return; }
       const userId = session.session.user.id;
 
-      // Find or create supplier
+      // Find or create supplier (case-insensitive on canonical form)
+      const canonicalSupplier = normaliseVendor(supplierName);
       let { data: supplier } = await supabase
         .from("suppliers")
         .select("id")
-        .eq("name", supplierName)
+        .ilike("name", canonicalSupplier)
         .maybeSingle();
 
       if (!supplier) {
         const { data: newSup } = await supabase
           .from("suppliers")
-          .insert({ user_id: userId, name: supplierName })
+          .insert({ user_id: userId, name: canonicalSupplier })
           .select("id")
           .single();
         supplier = newSup;

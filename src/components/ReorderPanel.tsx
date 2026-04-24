@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { addAuditEntry } from "@/lib/audit-log";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 import DataGrid from "@/components/ui/data-grid";
 import { type ColumnDef } from "@tanstack/react-table";
 import Papa from "papaparse";
@@ -245,7 +246,7 @@ const ReorderPanel = ({ onBack, onViewOrders }: ReorderPanelProps) => {
           .insert({
             user_id: user.user.id,
             po_number: poNumber,
-            supplier_name: supplierName,
+            supplier_name: normaliseVendor(supplierName),
             supplier_id: items[0].supplierId,
             status: "draft",
             total_cost: totalCost,

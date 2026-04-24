@@ -15,6 +15,7 @@ import {
   RadioGroupItem,
 } from "@/components/ui/radio-group";
 import type { InvoicePattern } from "@/lib/universal-classifier";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 
 interface Props {
   initialSupplier?: string;
@@ -51,7 +52,7 @@ export default function TeachSonicWizard({ initialSupplier = "", onCancel, onCom
 
   const finish = () => {
     onComplete({
-      supplier_name: supplier.trim(),
+      supplier_name: normaliseVendor(supplier),
       detected_pattern: "A",
       column_map: {
         [productCol.trim()]: "product_name",

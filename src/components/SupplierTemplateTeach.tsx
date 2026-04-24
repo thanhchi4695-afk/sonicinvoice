@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Settings, Save, Zap } from "lucide-react";
 import { autoDetectMappings, type ColumnMappings, type RegexPatterns } from "@/lib/rule-based-extractor";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 
 interface SupplierTemplateTeachProps {
   open: boolean;
@@ -53,7 +54,7 @@ const SupplierTemplateTeach = ({ open, onClose, supplierName, detectedHeaders, s
 
       const { error } = await supabase.from("supplier_templates" as any).upsert({
         user_id: session.session.user.id,
-        supplier_name: supplierName.trim(),
+        supplier_name: normaliseVendor(supplierName),
         column_mappings: mappings,
         regex_patterns: regexPatterns,
         header_row: headerRow,

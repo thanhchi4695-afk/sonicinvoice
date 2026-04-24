@@ -320,9 +320,10 @@ export function generateXSeriesCSV(
       composite_name: '',
       composite_sku: '',
       composite_quantity: '',
-      name: displayName,
+      // Lightspeed's own export uses UPPERCASE for the name column.
+      name: lsCase(displayName),
       description: '',
-      product_category: product.type || '',
+      product_category: lsCase(product.type || ''),
       variant_option_one_name: '',
       variant_option_one_value: '',
       variant_option_two_name: '',
@@ -334,13 +335,13 @@ export function generateXSeriesCSV(
       supply_price: (product.price || 0).toFixed(2),
       retail_price: (product.rrp || 0).toFixed(2),
       loyalty_value: '',
-      loyalty_value_default: '',
+      loyalty_value_default: loyaltyDefault(product.rrp || 0),
       tax_name: s.taxName,
-      tax_value: '',
+      tax_value: taxValue(product.rrp || 0),
       account_code: '',
       account_code_purchase: '',
-      brand_name: cleanBrand,
-      supplier_name: product.supplierName || '',
+      brand_name: lsCase(cleanBrand),
+      supplier_name: lsCase(product.supplierName || cleanBrand),
       supplier_code: styleCode, // style-level
       active: activeFlag,
       track_inventory: s.trackInventory ? '1' : '0',
@@ -353,7 +354,7 @@ export function generateXSeriesCSV(
       const row = baseRow();
       row.sku = sanitiseSku(styleCode);
       row.description = buildDescription(product, '');
-      row.tags = product.tags || '';
+      row.tags = joinTagsLs(product.tags);
       row[stockCol] = '0';
       allRows.push(row);
       return;

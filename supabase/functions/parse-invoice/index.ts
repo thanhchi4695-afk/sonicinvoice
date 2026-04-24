@@ -113,6 +113,27 @@ If ANY row or text block contains one of these patterns, it is NOT a product —
 - Freight / Shipping / Delivery Charge / Handling
 - Discount / Less Discount / Credit
 
+### CRITICAL — GST footer detection (read this BEFORE you decide whether to divide line costs by 1.1):
+
+Inspect the totals block at the bottom of the invoice. There are TWO patterns:
+
+A) **Ex-GST footer** (line costs are ALREADY ex-GST — DO NOT divide them):
+   The footer shows three separate lines that reconcile as Subtotal + GST = Total.
+   Example (Walnut Melbourne):
+       Sub Total      $2,260.20
+       G.S.T.           $226.02
+       Total          $2,486.22   ← 2260.20 + 226.02 = 2486.22 ✓
+   In this case, set "gst_included" = false, emit cost_ex_gst = unit price as printed,
+   and emit cost_inc_gst = round(price * 1.1, 2). DO NOT divide the printed price by 1.1.
+
+B) **Inc-GST footer** (line costs INCLUDE GST — divide by 1.1 to get ex-GST):
+   The footer shows only a "Total (inc GST)" line, OR the Subtotal already equals the Total.
+   In this case, set "gst_included" = true, emit cost_inc_gst = unit price as printed,
+   and emit cost_ex_gst = round(price / 1.1, 2).
+
+If you cannot tell, default to A (ex-GST) for AU wholesale invoices — most fashion
+wholesale prints line costs ex-GST and GST is added in the footer.
+
 **Other non-product content:**
 - Payment Terms / Terms / Net 30 / EOM / COD
 - Bank Details / BSB / Account Number / Remittance

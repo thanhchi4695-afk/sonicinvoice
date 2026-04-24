@@ -5,6 +5,7 @@ const ConnectorsMarketplace = lazy(() => import("@/components/ConnectorsMarketpl
 import POSConnectionPanel from "@/components/POSConnectionPanel";
 import PlatformConnectionsSection from "@/components/PlatformConnectionsSection";
 import BrandDatabaseSyncPanel from "@/components/BrandDatabaseSyncPanel";
+import BrandDatabaseUserSyncSection from "@/components/BrandDatabaseUserSyncSection";
 import { useUserRole } from "@/hooks/use-user-role";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -391,6 +392,11 @@ const AccountScreen = () => {
 
       {/* Price Intelligence API Keys */}
       <ApiKeysSection />
+
+      {/* Brand database sync (per-user CSV) */}
+      <Section title="📦 Brand database sync">
+        <BrandDatabaseUserSyncSection />
+      </Section>
 
       {/* SEO Templates */}
       <SeoTemplateSection />

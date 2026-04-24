@@ -1344,15 +1344,17 @@ INSTRUCTIONS FOR RETRY:
         if (ocrText && ocrText.length > 50) {
           console.log(`[parse-invoice] Step B: OCR extracted ${ocrText.length} chars of text`);
 
+          let usedDeterministicWalnutOcr = false;
           if (/walnut/i.test(fileName || "") || /walnut melbourne/i.test(supplierName || "") || /tax invoice[\s\S]{0,500}invoice no[\s:]+\d+/i.test(ocrText)) {
             const deterministicFromOcr = parseWalnutInvoiceChunks(ocrText, supplierName || "Walnut Melbourne");
             if (deterministicFromOcr?.products?.length) {
               console.log(`[parse-invoice] Step B: Using deterministic Walnut OCR parser (${deterministicFromOcr.products.length} products)`);
               parsed = { ...parsed, ...deterministicFromOcr, ocr_fallback_used: true, ocr_text_length: ocrText.length };
-              continue;
+              usedDeterministicWalnutOcr = true;
             }
           }
 
+          if (!usedDeterministicWalnutOcr) {
           // Step B.2: Re-parse the OCR text with a fast text-only model
           const ocrParseMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
             {
@@ -1422,6 +1424,7 @@ ${ocrText}`,
             console.warn("[parse-invoice] Step B: OCR re-parse JSON failed:", ocrParseErr);
             parsed.ocr_fallback_attempted = true;
             parsed.ocr_fallback_used = false;
+          }
           }
         }
       } catch (ocrErr) {

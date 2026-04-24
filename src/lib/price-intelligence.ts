@@ -521,18 +521,24 @@ export async function matchPrice(
       (!keys.goUpc ? '(no API key)' : '(no barcode)'));
   }
 
-  // Source 4: Claude fallback
-  result.debugLog.push('→ Source 4 (Claude AI): searching...');
-  const claude = await callClaudeFallback(product, currency);
-  result.price = claude.price;
-  result.source = 'Claude AI Search';
-  result.confidence = claude.confidence || 45;
-  result.method = 'claude_web_search';
-  result.debugLog.push(claude.price
-    ? '✓ Source 4 (Claude AI): found'
-    : '✗ Source 4 (Claude AI): not found');
-
-  if (result.price) setCache(product, result, currency);
+  // Source 4: Server-side Firecrawl fallback (brand-DTC scrape)
+  result.debugLog.push('→ Source 4 (Brand site scrape): searching...');
+  const fb = await callClaudeFallback(product, currency);
+  if (fb.price) {
+    result.price = fb.price;
+    result.source = fb.source || 'Brand site';
+    result.confidence = fb.confidence;
+    result.method = 'brand_site_scrape';
+    if (fb.imageUrl) result.imageUrl = fb.imageUrl;
+    if (fb.description) result.description = fb.description;
+    result.debugLog.push(`✓ Source 4: found via ${result.source}`);
+    setCache(product, result, currency);
+  } else {
+    result.source = '';
+    result.confidence = 0;
+    result.method = 'not_found';
+    result.debugLog.push('✗ Source 4 (Brand site scrape): no price found');
+  }
   return result;
 }
 

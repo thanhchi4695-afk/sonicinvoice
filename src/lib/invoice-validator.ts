@@ -412,12 +412,20 @@ export function validateAndCleanProducts(
   // Sanitiser: replace literal "[BRAND NAME]" placeholders with the detected vendor.
   // This catches cases where AI echoed the user's custom-instruction template
   // verbatim instead of substituting the real brand.
-  const PLACEHOLDER_RE = /\[\s*BRAND\s*NAME\s*\]/gi;
+  // Sanitiser: replace literal "[BRAND NAME]" / "[VENDOR]" / "[SUPPLIER]" placeholders
+  // with the detected vendor. Note: do NOT use a single shared /g regex with .test() —
+  // RegExp state (lastIndex) leaks across calls and causes intermittent misses. Build
+  // a fresh regex per invocation.
   const substituteBrand = (s: string | undefined | null): string => {
     if (!s) return s as string;
-    if (!PLACEHOLDER_RE.test(s)) return s;
     const replacement = detectedVendor && detectedVendor.trim() ? detectedVendor.trim() : "";
-    return s.replace(PLACEHOLDER_RE, replacement).replace(/\s{2,}/g, " ").trim();
+    let out = s.replace(/\[\s*(?:BRAND\s*NAME|VENDOR|SUPPLIER|BRAND)\s*\]/gi, replacement);
+    // If vendor already appears in the string and we just inserted it again, dedupe.
+    if (replacement) {
+      const dupRe = new RegExp(`(${replacement.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})(\\s+\\1)+`, "gi");
+      out = out.replace(dupRe, "$1");
+    }
+    return out.replace(/\s{2,}/g, " ").trim();
   };
 
   for (let i = 0; i < merged.length; i++) {

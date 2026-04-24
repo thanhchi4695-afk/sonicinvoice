@@ -135,16 +135,23 @@ export function generateHandle(title: string, brand: string): string {
 // ── Title Deduplication ────────────────────────────────────
 
 export function deduplicateTitle(name: string, vendor: string): string {
+  // Final-stage placeholder strip: never let "[BRAND NAME]", "[VENDOR]" etc.
+  // reach a downstream POS / Shopify CSV. Substitute the real vendor when known,
+  // otherwise just remove the literal token.
+  const PLACEHOLDER_RE = /\[\s*(?:BRAND\s*NAME|VENDOR|SUPPLIER|BRAND)\s*\]/gi;
+  if (name && PLACEHOLDER_RE.test(name)) {
+    name = name.replace(PLACEHOLDER_RE, vendor || "").replace(/\s{2,}/g, " ").trim();
+  }
   if (!vendor || !name) return name;
   const vendorLower = vendor.toLowerCase().trim();
   const nameLower = name.toLowerCase().trim();
-  
+
   // Check if title starts with vendor name duplicated: "Brand Brand Product"
   const doubleVendor = `${vendorLower} ${vendorLower}`;
   if (nameLower.startsWith(doubleVendor)) {
     return vendor + name.slice(vendor.length + 1 + vendor.length);
   }
-  
+
   // Build full title: "Brand Name" — check if Name already starts with Brand
   const fullTitle = `${vendor} ${name}`;
   const fullLower = fullTitle.toLowerCase();

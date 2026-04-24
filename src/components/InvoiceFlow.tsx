@@ -4619,7 +4619,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 // ── Lightspeed Export Download Section ─────────────────────
 import type { StoreMode } from '@/hooks/use-store-mode';
 import { arrivalMonthTag, titleCase, stripBrandPrefix } from '@/lib/lightspeed-xseries';
-import { normaliseVendor } from '@/lib/normalise-vendor';
+// normaliseVendor already imported at top of file
 
 interface ExportProduct {
   name: string;

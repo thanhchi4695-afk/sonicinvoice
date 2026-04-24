@@ -4,6 +4,8 @@ import { SUPPORTED_LANGUAGES } from "@/i18n/config";
 const ConnectorsMarketplace = lazy(() => import("@/components/ConnectorsMarketplace"));
 import POSConnectionPanel from "@/components/POSConnectionPanel";
 import PlatformConnectionsSection from "@/components/PlatformConnectionsSection";
+import BrandDatabaseSyncPanel from "@/components/BrandDatabaseSyncPanel";
+import { useUserRole } from "@/hooks/use-user-role";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard, Store } from "lucide-react";
@@ -32,6 +34,7 @@ import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
 const TeamManagement = lazy(() => import("@/components/TeamManagement"));
 
 const AccountScreen = () => {
+  const { isAdmin } = useUserRole();
   const [storeName, setStoreName] = useState("");
   const [currency, setCurrency] = useState("AUD");
   const [storeType, setStoreType] = useState<StoreType>("shopify");
@@ -281,6 +284,13 @@ const AccountScreen = () => {
       <Section title="Platform connections">
         <PlatformConnectionsSection />
       </Section>
+
+      {/* Brand Database Sync — admins only */}
+      {isAdmin && (
+        <Section title="Brand database sync">
+          <BrandDatabaseSyncPanel />
+        </Section>
+      )}
 
       {/* Shopify Connection */}
       <Section title="Shopify connection">

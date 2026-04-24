@@ -437,6 +437,77 @@ Deno.serve(async (req) => {
         });
         return respond({ success: updateRes.ok });
       }
+
+      // ── R-Series purchase orders ──
+      if (action === "list_purchase_orders_r") {
+        const { date_from, date_to, limit = 50 } = body as {
+          date_from?: string; date_to?: string; limit?: number;
+        };
+        const params = new URLSearchParams();
+        params.set("limit", String(Math.min(limit, 100)));
+        params.set("sort", "-orderID");
+        params.set("load_relations", '["Vendor"]');
+        if (date_from) params.set("createTime", `>=,${date_from}`);
+        if (date_to) params.set("createTime", `<=,${date_to}`);
+        const res = await fetch(
+          `${rBase}/Order.json?${params.toString()}`,
+          { headers: rHeaders }
+        );
+        const data = await res.json();
+        const orders = data.Order
+          ? (Array.isArray(data.Order) ? data.Order : [data.Order])
+          : [];
+        const items = orders.map((o: Record<string, unknown>) => ({
+          id: o.orderID,
+          order_number: o.orderID,
+          status: o.complete === "true" ? "received" : "open",
+          create_time: o.createTime,
+          arrival_date: o.arrivalDate,
+          total: Number(o.total ?? 0),
+          vendor_id: o.vendorID,
+          vendor_name: (o.Vendor as Record<string, string> | undefined)?.name ?? null,
+        }));
+        return respond({ purchase_orders: items });
+      }
+
+      if (action === "get_purchase_order_r") {
+        const { order_id } = body as { order_id: string };
+        const res = await fetch(
+          `${rBase}/Order/${order_id}.json?load_relations=["Vendor","OrderLines","OrderLines.Item"]`,
+          { headers: rHeaders }
+        );
+        const data = await res.json();
+        const order = data.Order;
+        if (!order) return respond({ error: "Order not found" }, 404);
+        const olRoot = order.OrderLines?.OrderLine;
+        const orderLines = olRoot
+          ? (Array.isArray(olRoot) ? olRoot : [olRoot])
+          : [];
+        const lines = orderLines.map((l: Record<string, unknown>) => {
+          const item = l.Item as Record<string, unknown> | undefined;
+          return {
+            item_id: l.itemID,
+            sku: item?.systemSku ?? item?.customSku ?? "",
+            name: item?.description ?? "",
+            ordered: Number(l.ordered ?? 0),
+            received: Number(l.received ?? 0),
+            cost: Number(l.cost ?? 0),
+            retail_price: item?.defaultPrice ?? null,
+          };
+        });
+        return respond({
+          purchase_order: {
+            id: order.orderID,
+            order_number: order.orderID,
+            status: order.complete === "true" ? "received" : "open",
+            create_time: order.createTime,
+            arrival_date: order.arrivalDate,
+            total: Number(order.total ?? 0),
+            vendor_name: (order.Vendor as Record<string, string> | undefined)?.name ?? null,
+          },
+          lines,
+        });
+      }
     }
 
     // ═══ SHOPIFY ═══

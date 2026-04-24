@@ -1177,6 +1177,7 @@ ${ir.notes?.length ? `- Notes: ${(ir.notes as string[]).join("; ")}` : ""}`;
 
     if (customInstructions) {
       systemPrompt += `\n\n## USER CUSTOM INSTRUCTIONS (follow these exactly):\n${customInstructions}`;
+      systemPrompt += `\n\nIMPORTANT: If user instructions contain bracketed placeholders like [BRAND NAME], [COLUMN NAME], [ABBREVIATION], or [FULL WORD], you MUST substitute them with the actual detected value from the invoice (e.g. the real supplier/brand name). NEVER output the literal placeholder text in product titles or fields.`;
     }
     if (supplierName) {
       systemPrompt += `\nKnown supplier: ${supplierName}`;

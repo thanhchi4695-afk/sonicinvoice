@@ -60,7 +60,7 @@ const tools = [
 ];
 
 const quickInserts = [
-  { label: "+ Brand prefix", text: "Add [BRAND NAME] at the start of every product name." },
+  { label: "+ Brand prefix", text: "Add the actual supplier/brand name (the real vendor) at the start of every product name. Do not insert the literal text '[BRAND NAME]' — substitute the detected brand." },
   { label: "+ Title case", text: "Title case all product names (capitalise each word)." },
   { label: "+ Map price cols", text: "QTY column means quantity. First price = cost, second = retail." },
   { label: "+ Abbreviation", text: "Replace '[ABBR]' with '[FULL WORD]' in all names." },

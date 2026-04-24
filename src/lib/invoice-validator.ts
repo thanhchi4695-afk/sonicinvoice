@@ -409,8 +409,20 @@ export function validateAndCleanProducts(
   const rejectedRows: ValidationDebugInfo["rejectedRows"] = [];
   const results: ValidatedProduct[] = [];
 
+  // Sanitiser: replace literal "[BRAND NAME]" placeholders with the detected vendor.
+  // This catches cases where AI echoed the user's custom-instruction template
+  // verbatim instead of substituting the real brand.
+  const PLACEHOLDER_RE = /\[\s*BRAND\s*NAME\s*\]/gi;
+  const substituteBrand = (s: string | undefined | null): string => {
+    if (!s) return s as string;
+    if (!PLACEHOLDER_RE.test(s)) return s;
+    const replacement = detectedVendor && detectedVendor.trim() ? detectedVendor.trim() : "";
+    return s.replace(PLACEHOLDER_RE, replacement).replace(/\s{2,}/g, " ").trim();
+  };
+
   for (let i = 0; i < merged.length; i++) {
     const p = { ...merged[i] };
+    if (p.name) p.name = substituteBrand(p.name);
     const rawName = (p.name || "").trim();
     const rawCost = p.cost;
     const issues: string[] = [];

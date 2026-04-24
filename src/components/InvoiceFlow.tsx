@@ -203,7 +203,7 @@ const stepLabels = ["1a · Upload", "1b · Read", "1c · Review", "5 · Export"]
 
 // ── Instruction snippets ───────────────────────────────────
 const quickInserts = [
-  { label: "+ Brand prefix", text: "Add '[BRAND NAME]' at the start of every product name." },
+  { label: "+ Brand prefix", text: "Add the actual supplier/brand name (the real vendor, e.g. 'Walnut Melbourne') at the start of every product name. Do not insert the literal text '[BRAND NAME]' — substitute the detected brand." },
   { label: "+ Title case", text: "Capitalise only the first letter of each word in product names (title case)." },
   { label: "+ ALL CAPS", text: "Convert all product names to ALL CAPITALS." },
   { label: "+ Remove brand", text: "Remove the brand name from the start of each product name." },

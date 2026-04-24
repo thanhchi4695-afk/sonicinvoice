@@ -355,13 +355,80 @@ async function callGoUpc(
   }
 }
 
-// ── Source 4: Claude Fallback (existing edge function) ──────
+// ── Source 4: Server-side Firecrawl fallback ──────────────
+// Uses the same edge functions as Phase 3 / Price Lookup so users without
+// SerpApi/Barcode keys still get real RRP from the brand's own website.
+//   1. price-lookup-search → resolve the brand product URL (DTC site preferred)
+//   2. price-lookup-extract → scrape the page and pull retail_price_aud
 async function callClaudeFallback(
-  product: PriceProduct, currency: string
-): Promise<{ price: number | null; confidence: number }> {
-  // This would call the existing enrichment flow. For now, return null as placeholder.
-  // In real implementation, this calls the existing Claude edge function.
-  return { price: null, confidence: 0 };
+  product: PriceProduct,
+  _currency: string,
+): Promise<{ price: number | null; confidence: number; source?: string; imageUrl?: string; description?: string }> {
+  try {
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    if (!projectId || !anonKey) return { price: null, confidence: 0 };
+
+    const baseHeaders = {
+      'Content-Type': 'application/json',
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
+    };
+
+    // Step 1 — find a product URL (prefer brand DTC site).
+    const searchResp = await fetch(
+      `https://${projectId}.supabase.co/functions/v1/price-lookup-search`,
+      {
+        method: 'POST',
+        headers: baseHeaders,
+        body: JSON.stringify({
+          product_name: product.name,
+          supplier: product.brand,
+          style_number: '',
+          colour: '',
+        }),
+      },
+    );
+    if (!searchResp.ok) return { price: null, confidence: 0 };
+    const searchData = await searchResp.json();
+    const results: any[] = searchData?.results || [];
+    if (results.length === 0) return { price: null, confidence: 0 };
+
+    // Pick the top-ranked URL — search already sorted brand DTC first.
+    const top = results.find((r) => r.url) || results[0];
+    if (!top?.url) return { price: null, confidence: 0 };
+
+    // Step 2 — scrape that URL and extract the AUD retail price.
+    const extractResp = await fetch(
+      `https://${projectId}.supabase.co/functions/v1/price-lookup-extract`,
+      {
+        method: 'POST',
+        headers: baseHeaders,
+        body: JSON.stringify({
+          url: top.url,
+          product_name: product.name,
+          supplier: product.brand,
+          supplier_cost: product.costPrice,
+        }),
+      },
+    );
+    if (!extractResp.ok) return { price: null, confidence: 0 };
+    const extracted = await extractResp.json();
+    const price = extracted?.retail_price_aud ?? extracted?.compare_at_price_aud ?? null;
+    if (!price || price <= 0) return { price: null, confidence: 0 };
+
+    const conf = Math.min(95, Math.max(60, extracted?.currency_confidence ?? 80));
+    return {
+      price: Number(price),
+      confidence: conf,
+      source: top.domain || extracted?.retailer_name || 'Brand site',
+      imageUrl: extracted?.image_urls?.[0],
+      description: extracted?.description,
+    };
+  } catch (err) {
+    console.warn('[price-intelligence] fallback search failed:', err);
+    return { price: null, confidence: 0 };
+  }
 }
 
 // ── Main Waterfall Engine ──────────────────────────────────
@@ -454,18 +521,24 @@ export async function matchPrice(
       (!keys.goUpc ? '(no API key)' : '(no barcode)'));
   }
 
-  // Source 4: Claude fallback
-  result.debugLog.push('→ Source 4 (Claude AI): searching...');
-  const claude = await callClaudeFallback(product, currency);
-  result.price = claude.price;
-  result.source = 'Claude AI Search';
-  result.confidence = claude.confidence || 45;
-  result.method = 'claude_web_search';
-  result.debugLog.push(claude.price
-    ? '✓ Source 4 (Claude AI): found'
-    : '✗ Source 4 (Claude AI): not found');
-
-  if (result.price) setCache(product, result, currency);
+  // Source 4: Server-side Firecrawl fallback (brand-DTC scrape)
+  result.debugLog.push('→ Source 4 (Brand site scrape): searching...');
+  const fb = await callClaudeFallback(product, currency);
+  if (fb.price) {
+    result.price = fb.price;
+    result.source = fb.source || 'Brand site';
+    result.confidence = fb.confidence;
+    result.method = 'brand_site_scrape';
+    if (fb.imageUrl) result.imageUrl = fb.imageUrl;
+    if (fb.description) result.description = fb.description;
+    result.debugLog.push(`✓ Source 4: found via ${result.source}`);
+    setCache(product, result, currency);
+  } else {
+    result.source = '';
+    result.confidence = 0;
+    result.method = 'not_found';
+    result.debugLog.push('✗ Source 4 (Brand site scrape): no price found');
+  }
   return result;
 }
 
@@ -490,8 +563,10 @@ export function getSourceBadge(method: string): { color: string; label: string }
     case 'barcode_api': return { color: 'bg-success/15 text-success', label: '🟢 Barcode Lookup' };
     case 'google_shopping': return { color: 'bg-primary/15 text-primary', label: '🔵 Google Shopping' };
     case 'go_upc': return { color: 'bg-warning/15 text-warning', label: '🟡 Go-UPC' };
-    case 'claude_web_search': return { color: 'bg-muted text-muted-foreground', label: '⚪ Claude AI' };
+    case 'claude_web_search': return { color: 'bg-muted text-muted-foreground', label: '⚪ Brand site' };
+    case 'brand_site_scrape': return { color: 'bg-success/15 text-success', label: '🟢 Brand site' };
     case 'cache': return { color: 'bg-muted text-muted-foreground', label: '💾 Cached' };
+    case 'not_found': return { color: 'bg-muted text-muted-foreground', label: '— Not found' };
     default: return { color: 'bg-muted text-muted-foreground', label: 'Unknown' };
   }
 }

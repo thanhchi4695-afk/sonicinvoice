@@ -53,6 +53,26 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
 
   const [runningFlow, setRunningFlow] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [agentSessionId, setAgentSessionId] = useState<string | null>(null);
+  const [agentPanelOpen, setAgentPanelOpen] = useState(true);
+
+  // Create an agent_sessions row when this pipeline starts.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      const mode = isBrainModeEnabled() ? "auto" : "supervised";
+      const { data, error } = await supabase
+        .from("agent_sessions")
+        .insert({ user_id: user.id, agent_mode: mode, status: "running", metadata: { pipelineId } })
+        .select("id")
+        .single();
+      if (!cancelled && !error && data) setAgentSessionId(data.id);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipelineId]);
 
   const persistCtx = useCallback((next: PipelineContext) => {
     setCtxState(next);

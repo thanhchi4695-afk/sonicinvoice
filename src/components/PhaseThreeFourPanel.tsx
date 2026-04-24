@@ -447,7 +447,8 @@ async function runEnrich(c: ClassifiedItem, supplierName: string): Promise<Enric
   // Image
   let imageUrl: string | null = null;
   if (imageRes.status === "fulfilled" && !imageRes.value.error) {
-    imageUrl = imageRes.value.data?.results?.[0]?.url || null;
+    // image-search returns `{ results: [{ idx, imageUrl, source }] }`
+    imageUrl = imageRes.value.data?.results?.[0]?.imageUrl || imageRes.value.data?.results?.[0]?.url || null;
   } else if (imageRes.status === "rejected") {
     errors.push("image");
   }

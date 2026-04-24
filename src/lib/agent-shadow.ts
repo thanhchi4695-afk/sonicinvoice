@@ -51,7 +51,7 @@ export async function startShadowSession(opts: {
           trigger: opts.trigger ?? "invoice_upload",
           shadow: true,
         },
-      })
+      } as never)
       .select("id")
       .single();
     if (error || !data) return null;
@@ -97,7 +97,7 @@ export async function logShadowStep(opts: {
         duration_ms: opts.durationMs ?? null,
         ended_at: opts.status !== "running" ? now : null,
         edge_function: "shadow",
-      })
+      } as never)
       .select("id")
       .single();
     if (error || !data) return null;
@@ -174,6 +174,6 @@ export async function logShadowFeedback(opts: {
       delta_reason:
         opts.deltaReason ??
         (valuesDiffer && opts.field ? `edited ${opts.field}` : null),
-    });
+    } as never);
   } catch { /* ignore */ }
 }

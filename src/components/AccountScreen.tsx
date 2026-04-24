@@ -7,6 +7,7 @@ import PlatformConnectionsSection from "@/components/PlatformConnectionsSection"
 import BrandDatabaseSyncPanel from "@/components/BrandDatabaseSyncPanel";
 import BrandDatabaseUserSyncSection from "@/components/BrandDatabaseUserSyncSection";
 import WebSearchUsageSection from "@/components/WebSearchUsageSection";
+import BudgetPill from "@/components/BudgetPill";
 import { useUserRole } from "@/hooks/use-user-role";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -397,6 +398,11 @@ const AccountScreen = () => {
       {/* WebSearch usage (AI enrichment) */}
       <Section title="🔎 WebSearch usage">
         <WebSearchUsageSection />
+      </Section>
+
+      {/* Agent budget (AI orchestration spend) */}
+      <Section title="🧠 Agent budget">
+        <BudgetPill variant="full" />
       </Section>
 
       {/* Brand database sync (per-user CSV) */}

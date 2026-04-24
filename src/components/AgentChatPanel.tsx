@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import BudgetPill from "@/components/BudgetPill";
 import { cn } from "@/lib/utils";
 
 type StepRunStatus = "running" | "done" | "needs_review" | "skipped" | "failed";
@@ -264,6 +265,7 @@ export default function AgentChatPanel({ sessionId, onGateResponse, className }:
         <div className="flex items-center gap-2 mb-1">
           <Zap className="w-4 h-4 text-primary" />
           <h3 className="text-sm font-semibold flex-1">Agent</h3>
+          <BudgetPill variant="compact" />
           {headerStatus && (
             <span className={cn("text-[10px] font-medium", headerStatus.tone)}>
               {headerStatus.label}

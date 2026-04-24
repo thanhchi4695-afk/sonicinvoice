@@ -252,6 +252,76 @@ Deno.serve(async (req) => {
         const updateData = await updateRes.json();
         return respond({ success: updateRes.ok, new_count: newCount, detail: updateData });
       }
+
+      // ── X-Series consignments (supplier orders / received POs) ──
+      if (action === "list_consignments_x") {
+        const { date_from, date_to, status, page_size = 50 } = body as {
+          date_from?: string; date_to?: string; status?: string; page_size?: number;
+        };
+        const params = new URLSearchParams();
+        params.set("page_size", String(Math.min(page_size, 200)));
+        if (status) params.set("status", status); // OPEN | SENT | RECEIVED | CANCELLED
+        if (date_from) params.set("from", date_from);
+        if (date_to) params.set("to", date_to);
+        const res = await fetch(
+          `${xBase}/api/2.0/consignments?${params.toString()}`,
+          { headers: xHeaders }
+        );
+        const data = await res.json();
+        const items = (data.data || []).map((c: Record<string, unknown>) => ({
+          id: c.id,
+          name: c.name,
+          status: c.status,
+          type: c.type,
+          supplier_id: c.supplier_id,
+          supplier_invoice: c.supplier_invoice,
+          received_at: c.received_at,
+          due_at: c.due_at,
+          created_at: c.created_at,
+          total_count: c.total_count,
+          total_cost: c.total_cost,
+        }));
+        return respond({ consignments: items });
+      }
+
+      if (action === "get_consignment_x") {
+        const { consignment_id } = body as { consignment_id: string };
+        const [headRes, prodRes, supRes] = await Promise.all([
+          fetch(`${xBase}/api/2.0/consignments/${consignment_id}`, { headers: xHeaders }),
+          fetch(`${xBase}/api/2.0/consignments/${consignment_id}/products?page_size=200`, { headers: xHeaders }),
+          fetch(`${xBase}/api/2.0/suppliers?page_size=200`, { headers: xHeaders }),
+        ]);
+        const headData = await headRes.json();
+        const prodData = await prodRes.json();
+        const supData = await supRes.json();
+        const head = headData.data || headData;
+        const supplier = (supData.data || []).find((s: Record<string, unknown>) => s.id === head.supplier_id);
+        const lines = (prodData.data || []).map((l: Record<string, unknown>) => ({
+          product_id: l.product_id,
+          sku: l.product?.sku ?? l.sku ?? "",
+          name: l.product?.name ?? l.product?.variant_name ?? "",
+          supplier_code: l.product?.supplier_code ?? null,
+          received: Number(l.received ?? 0),
+          count: Number(l.count ?? 0),
+          cost: Number(l.cost ?? 0),
+          retail_price: l.product?.price_including_tax ?? l.product?.supply_price ?? null,
+        }));
+        return respond({
+          consignment: {
+            id: head.id,
+            name: head.name,
+            status: head.status,
+            supplier_invoice: head.supplier_invoice,
+            received_at: head.received_at,
+            due_at: head.due_at,
+            supplier_name: supplier?.name ?? null,
+            supplier_id: head.supplier_id,
+            total_cost: Number(head.total_cost ?? 0),
+            total_count: Number(head.total_count ?? 0),
+          },
+          lines,
+        });
+      }
     }
 
     // ═══ LIGHTSPEED R-SERIES ═══

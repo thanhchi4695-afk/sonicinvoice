@@ -2720,10 +2720,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const setProductImage = (idx: number, url: string) => {
     setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, imageSrc: url } : g));
   };
-  const mockProducts = productGroups.map(g => {
+  // Explode each ProductGroup into one ExportProduct per VariantLine, so the
+  // CSV engine sees true per-(colour × size) rows. Colour/Size are derived
+  // from the variant's option labels (case-insensitive) — falling back to
+  // group-level colour/size when the variant only carries one axis.
+  const mockProducts = productGroups.flatMap(g => {
     // Build a rich Body (HTML) from enrichment outputs (description, fabric, care).
-    // This single string is forwarded to BOTH Shopify "Body (HTML)" and Lightspeed
-    // "description" (the Lightspeed exporter strips tags for plain-text).
+    // Forwarded to BOTH Shopify "Body (HTML)" and Lightspeed "description"
+    // (the Lightspeed exporter strips tags for plain-text).
     const bodyParts: string[] = [];
     if (g.desc) bodyParts.push(`<p>${g.desc}</p>`);
     if (g.fabric) bodyParts.push(`<p><strong>Fabric:</strong> ${g.fabric}</p>`);
@@ -2735,23 +2739,43 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       .filter(Boolean)
       .join(", ");
 
-    return {
-      name: g.name,
-      sku: g.variants[0]?.sku || g.vendorCode || "",
-      barcode: g.barcode || "",
-      brand: g.brand,
-      type: g.type,
-      colour: g.colour || "",
-      size: g.size || "",
-      price: g.price,
-      rrp: g.rrp,
-      status: g.status,
-      metafields: g.metafields,
-      // Enriched/researched data forwarded to ALL exports (Shopify + Lightspeed)
-      imageUrl: g.imageSrc || (g.imageUrls && g.imageUrls[0]) || undefined,
-      bodyHtml,
-      tags,
-    };
+    const imageUrl = g.imageSrc || (g.imageUrls && g.imageUrls[0]) || undefined;
+
+    const variants = g.variants && g.variants.length > 0
+      ? g.variants
+      : [{ sku: g.vendorCode || "", option1Name: "", option1Value: "", option2Name: "", option2Value: "", qty: 0, price: g.price, rrp: g.rrp } as VariantLine];
+
+    return variants.map(v => {
+      const o1n = (v.option1Name || "").toLowerCase();
+      const o2n = (v.option2Name || "").toLowerCase();
+      let colour = g.colour || "";
+      let size = g.size || "";
+      if (o1n.startsWith("colour") || o1n.startsWith("color")) colour = v.option1Value || colour;
+      else if (o1n === "size") size = v.option1Value || size;
+      if (o2n.startsWith("colour") || o2n.startsWith("color")) colour = v.option2Value || colour;
+      else if (o2n === "size") size = v.option2Value || size;
+      // Single-axis variants without explicit option name: assume value is the size.
+      if (!o1n && !o2n && v.option1Value && !size) size = v.option1Value;
+
+      return {
+        name: g.name,
+        sku: v.sku || g.vendorCode || "",
+        barcode: g.barcode || "",
+        brand: g.brand,
+        type: g.type,
+        colour,
+        size,
+        price: v.price ?? g.price,
+        rrp: v.rrp ?? g.rrp,
+        qty: v.qty ?? 0,
+        cogs: g.cogs,
+        status: g.status,
+        metafields: g.metafields,
+        imageUrl,
+        bodyHtml,
+        tags,
+      };
+    });
   });
 
   // Confidence scoring per product group

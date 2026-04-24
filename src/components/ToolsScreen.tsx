@@ -36,6 +36,7 @@ const tools = [
   { id: "google_feed", icon: ShoppingCart, label: "Google feed preview", desc: "Preview & download Google Shopping feed", color: "text-success" },
   { id: "collab_seo", icon: Globe, label: "Collab SEO", desc: "View all campaigns and manage partner list", color: "text-primary" },
   { id: "lightspeed_convert", icon: Download, label: "Lightspeed converter", desc: "Convert Lightspeed product exports to Shopify-ready CSV format", color: "text-primary" },
+  { id: "lightspeed_import", icon: Download, label: "Import from Lightspeed", desc: "Pull supplier consignments / POs from Lightspeed as draft invoices", color: "text-success" },
   { id: "image_helper", icon: Image, label: "Image download helper", desc: "View and save enriched product images", color: "text-secondary" },
   { id: "export_collections", icon: Download, label: "Export collections", desc: "Export all Shopify collections to CSV", color: "text-success" },
   { id: "import_collections", icon: Upload, label: "Import collections", desc: "Create or update collections from CSV", color: "text-success" },

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Upload, FileText, CheckCircle2, AlertCircle, Loader2, Trash2, Eye, Save, Layers, Link2, FolderOpen, Brain } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 import { toast } from "sonner";
 
 interface SupplierProfileBuilderProps {
@@ -172,7 +173,7 @@ const SupplierProfileBuilder = ({ onBack, onViewLearnedRules }: SupplierProfileB
         .from("supplier_profiles" as any)
         .upsert({
           user_id: user.id,
-          supplier_name: profile.supplier,
+          supplier_name: normaliseVendor(profile.supplier),
           profile_data: profile as unknown as Record<string, unknown>,
           invoices_analysed: invoices.length,
           is_active: true,

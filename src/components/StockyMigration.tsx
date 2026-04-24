@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { addAuditEntry } from "@/lib/audit-log";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 import Papa from "papaparse";
 
 /* ─── Types ─── */
@@ -293,7 +294,7 @@ export default function StockyMigration({ onBack, onComplete }: StockyMigrationP
             .insert({
               user_id: user.id,
               po_number: poNum,
-              supplier_name: group.supplier,
+              supplier_name: normaliseVendor(group.supplier),
               expected_date: group.expectedDate || null,
               status: "migrated",
               total_cost: totalCost,

@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { addAuditEntry } from "@/lib/audit-log";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 import { adjustInventory, findVariantBySKU, getConnection, getLocations } from "@/lib/shopify-api";
 import { CatalogPicker, type CatalogItem } from "@/components/SupplierCatalog";
 import BulkInventoryActions from "@/components/BulkInventoryActions";
@@ -274,7 +275,7 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
       const { error } = await supabase.from("purchase_orders").update({
         po_number: poNumber,
         supplier_id: supplierId,
-        supplier_name: supplier,
+        supplier_name: normaliseVendor(supplier),
         expected_date: expectedDate || null,
         notes: poNotes || null,
         status: asDraft ? "draft" : "sent",
@@ -308,7 +309,7 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
         user_id: session.user.id,
         po_number: poNumber,
         supplier_id: supplierId,
-        supplier_name: supplier,
+        supplier_name: normaliseVendor(supplier),
         expected_date: expectedDate || null,
         notes: poNotes || null,
         status: asDraft ? "draft" : "sent",

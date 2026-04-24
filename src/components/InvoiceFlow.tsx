@@ -19,6 +19,7 @@ import { buildMemoryHint, recordParseSuccess, recordFieldCorrection, recordNoise
 import { getStoreLocations } from "@/components/AccountScreen";
 import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCount, type InventoryItem } from "@/lib/inventory-sim";
 import { addAuditEntry } from "@/lib/audit-log";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 import { calculateConfidence, type ConfidenceBreakdown, type ConfidenceLevel, getConfidenceLabel } from "@/lib/confidence";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource } from "@/lib/barcode-catalog";
@@ -2198,7 +2199,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   const trainSupplierPattern = async () => {
     try {
-      const name = supplierName.trim();
+      const name = normaliseVendor(supplierName);
       if (!name || productGroups.length === 0) return;
 
       const { data: sessionData } = await supabase.auth.getSession();
@@ -2607,7 +2608,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           body: {
             user_id: uid,
             invoice_id: null,
-            supplier_name: supplierName || null,
+            supplier_name: supplierName ? normaliseVendor(supplierName) : null,
             platform,
             invoice_lines,
           },

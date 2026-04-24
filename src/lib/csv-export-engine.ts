@@ -482,6 +482,11 @@ export function generateLightspeedCSV(
     "attribute_3_name",
     "attribute_3_value",
     stockCol,
+    // Image columns — Lightspeed X-Series accepts up to 6 product image URLs
+    // mapped on import via Additional Details → Product Images.
+    "image_url_1",
+    "image_url_2",
+    "image_url_3",
   ];
 
   const rows = lines.map((ln) => {
@@ -504,6 +509,17 @@ export function generateLightspeedCSV(
     // active must be 0 or 1 — Lightspeed rejects TRUE/FALSE strings.
     const activeFlag = ln.status === "active" ? "1" : "0";
 
+    // Description: prefer rich bodyHtml; strip HTML tags so Lightspeed gets
+    // clean prose (the storefront renders plain text in product detail pages).
+    const descriptionText = (ln.bodyHtml || "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    // Up to 3 image URLs (image_url_1..3). Today we only have one main image
+    // per product but the columns are reserved so future enrichment can add more.
+    const imageUrls = ln.imageUrl ? [ln.imageUrl] : [];
+
     return {
       handle,
       name: title,
@@ -511,7 +527,7 @@ export function generateLightspeedCSV(
       // supplier_code = vendor name; merchants can map this to their internal
       // Lightspeed supplier ID later. Propagated to every row (#4 from gap analysis).
       supplier_code: ln.brand || "",
-      description: ln.bodyHtml || "",
+      description: descriptionText,
       brand: ln.brand || "",
       supply_price: supplyPrice,
       retail_price: ln.rrp.toFixed(2),
@@ -525,6 +541,9 @@ export function generateLightspeedCSV(
       attribute_3_name: "",
       attribute_3_value: "",
       [stockCol]: String(ln.qty ?? 0),
+      image_url_1: imageUrls[0] || "",
+      image_url_2: imageUrls[1] || "",
+      image_url_3: imageUrls[2] || "",
     } as Record<string, string>;
   });
 

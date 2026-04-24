@@ -758,10 +758,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             return undefined;
           };
           if (rrpByTitle.size > 0 || rrpBySku.size > 0) {
+            // IMPORTANT: the researched RRP is the BRAND'S OWN DTC PRICE — it is
+            // higher-trust than whatever the invoice happened to carry (which is
+            // often a wholesale list price, an old promo, or a stale snapshot).
+            // Always overwrite when we have a confident match — otherwise stale
+            // invoice prices like $148.70 stick instead of the real RRP $149.95.
             setValidatedProducts((prev) =>
               prev.map((p) => {
                 const newRrp = lookupRrp(p.name, p.sku);
-                if (!newRrp || Number(p.rrp) > 0) return p;
+                if (!newRrp) return p;
                 return { ...p, rrp: newRrp } as ValidatedProduct;
               }),
             );
@@ -771,10 +776,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 if (!newRrp) return g;
                 return {
                   ...g,
-                  rrp: Number(g.rrp) > 0 ? g.rrp : newRrp,
-                  variants: g.variants?.map((v) =>
-                    Number(v.rrp) > 0 ? v : { ...v, rrp: newRrp },
-                  ),
+                  rrp: newRrp,
+                  variants: g.variants?.map((v) => ({ ...v, rrp: newRrp })),
                 } as typeof g;
               }),
             );
@@ -2717,19 +2720,39 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const setProductImage = (idx: number, url: string) => {
     setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, imageSrc: url } : g));
   };
-  const mockProducts = productGroups.map(g => ({
-    name: g.name,
-    sku: g.variants[0]?.sku || g.vendorCode || "",
-    barcode: g.barcode || "",
-    brand: g.brand,
-    type: g.type,
-    colour: g.colour || "",
-    size: g.size || "",
-    price: g.price,
-    rrp: g.rrp,
-    status: g.status,
-    metafields: g.metafields,
-  }));
+  const mockProducts = productGroups.map(g => {
+    // Build a rich Body (HTML) from enrichment outputs (description, fabric, care).
+    // This single string is forwarded to BOTH Shopify "Body (HTML)" and Lightspeed
+    // "description" (the Lightspeed exporter strips tags for plain-text).
+    const bodyParts: string[] = [];
+    if (g.desc) bodyParts.push(`<p>${g.desc}</p>`);
+    if (g.fabric) bodyParts.push(`<p><strong>Fabric:</strong> ${g.fabric}</p>`);
+    if (g.care) bodyParts.push(`<p><strong>Care:</strong> ${g.care}</p>`);
+    if (g.origin) bodyParts.push(`<p><strong>Origin:</strong> ${g.origin}</p>`);
+    const bodyHtml = bodyParts.length > 0 ? bodyParts.join("") : undefined;
+
+    const tags = [g.brand, g.type, g.colour, "New Arrival"]
+      .filter(Boolean)
+      .join(", ");
+
+    return {
+      name: g.name,
+      sku: g.variants[0]?.sku || g.vendorCode || "",
+      barcode: g.barcode || "",
+      brand: g.brand,
+      type: g.type,
+      colour: g.colour || "",
+      size: g.size || "",
+      price: g.price,
+      rrp: g.rrp,
+      status: g.status,
+      metafields: g.metafields,
+      // Enriched/researched data forwarded to ALL exports (Shopify + Lightspeed)
+      imageUrl: g.imageSrc || (g.imageUrls && g.imageUrls[0]) || undefined,
+      bodyHtml,
+      tags,
+    };
+  });
 
   // Confidence scoring per product group
   const groupConfidences: ConfidenceBreakdown[] = productGroups.map(g => {

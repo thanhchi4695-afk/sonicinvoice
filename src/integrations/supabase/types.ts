@@ -119,6 +119,319 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_budgets: {
+        Row: {
+          degraded: boolean
+          last_reset_at: string
+          month_start: string
+          monthly_cap_cents: number
+          spent_cents: number
+          user_id: string
+        }
+        Insert: {
+          degraded?: boolean
+          last_reset_at?: string
+          month_start?: string
+          monthly_cap_cents?: number
+          spent_cents?: number
+          user_id: string
+        }
+        Update: {
+          degraded?: boolean
+          last_reset_at?: string
+          month_start?: string
+          monthly_cap_cents?: number
+          spent_cents?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      agent_calibration_log: {
+        Row: {
+          created_at: string
+          id: string
+          predicted_confidence: number | null
+          session_id: string | null
+          step: string | null
+          user_accepted: boolean | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          predicted_confidence?: number | null
+          session_id?: string | null
+          step?: string | null
+          user_accepted?: boolean | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          predicted_confidence?: number | null
+          session_id?: string | null
+          step?: string | null
+          user_accepted?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_calibration_log_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_decisions: {
+        Row: {
+          completion_tokens: number | null
+          confidence: number | null
+          cost_cents: number
+          created_at: string
+          decision_type: string
+          id: string
+          model: string | null
+          prompt_tokens: number | null
+          reasoning: string | null
+          session_id: string | null
+          step_run_id: string | null
+          user_id: string
+        }
+        Insert: {
+          completion_tokens?: number | null
+          confidence?: number | null
+          cost_cents?: number
+          created_at?: string
+          decision_type: string
+          id?: string
+          model?: string | null
+          prompt_tokens?: number | null
+          reasoning?: string | null
+          session_id?: string | null
+          step_run_id?: string | null
+          user_id: string
+        }
+        Update: {
+          completion_tokens?: number | null
+          confidence?: number | null
+          cost_cents?: number
+          created_at?: string
+          decision_type?: string
+          id?: string
+          model?: string | null
+          prompt_tokens?: number | null
+          reasoning?: string | null
+          session_id?: string | null
+          step_run_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_decisions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_decisions_step_run_id_fkey"
+            columns: ["step_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_step_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_feedback: {
+        Row: {
+          corrected_value: Json | null
+          created_at: string
+          delta_reason: string | null
+          feedback_type: string
+          id: string
+          original_value: Json | null
+          session_id: string | null
+          step_run_id: string | null
+          supplier: string | null
+          user_id: string
+        }
+        Insert: {
+          corrected_value?: Json | null
+          created_at?: string
+          delta_reason?: string | null
+          feedback_type: string
+          id?: string
+          original_value?: Json | null
+          session_id?: string | null
+          step_run_id?: string | null
+          supplier?: string | null
+          user_id: string
+        }
+        Update: {
+          corrected_value?: Json | null
+          created_at?: string
+          delta_reason?: string | null
+          feedback_type?: string
+          id?: string
+          original_value?: Json | null
+          session_id?: string | null
+          step_run_id?: string | null
+          supplier?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_feedback_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_feedback_step_run_id_fkey"
+            columns: ["step_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_step_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_global_budget: {
+        Row: {
+          id: number
+          month_start: string
+          monthly_cap_cents: number
+          spent_cents: number
+        }
+        Insert: {
+          id?: number
+          month_start?: string
+          monthly_cap_cents?: number
+          spent_cents?: number
+        }
+        Update: {
+          id?: number
+          month_start?: string
+          monthly_cap_cents?: number
+          spent_cents?: number
+        }
+        Relationships: []
+      }
+      agent_sessions: {
+        Row: {
+          agent_mode: string
+          completed_at: string | null
+          current_step: string | null
+          delivery_id: string | null
+          error: Json | null
+          gate_count: number
+          id: string
+          invoice_id: string | null
+          last_narrative: string | null
+          metadata: Json
+          started_at: string
+          status: string
+          total_cost_cents: number
+          user_id: string
+        }
+        Insert: {
+          agent_mode?: string
+          completed_at?: string | null
+          current_step?: string | null
+          delivery_id?: string | null
+          error?: Json | null
+          gate_count?: number
+          id?: string
+          invoice_id?: string | null
+          last_narrative?: string | null
+          metadata?: Json
+          started_at?: string
+          status?: string
+          total_cost_cents?: number
+          user_id: string
+        }
+        Update: {
+          agent_mode?: string
+          completed_at?: string | null
+          current_step?: string | null
+          delivery_id?: string | null
+          error?: Json | null
+          gate_count?: number
+          id?: string
+          invoice_id?: string | null
+          last_narrative?: string | null
+          metadata?: Json
+          started_at?: string
+          status?: string
+          total_cost_cents?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      agent_step_runs: {
+        Row: {
+          attempt: number
+          confidence: number | null
+          cost_cents: number
+          duration_ms: number | null
+          edge_function: string | null
+          ended_at: string | null
+          id: string
+          input: Json | null
+          narrative: string | null
+          output: Json | null
+          session_id: string
+          started_at: string
+          status: string
+          step: string
+          user_id: string
+        }
+        Insert: {
+          attempt?: number
+          confidence?: number | null
+          cost_cents?: number
+          duration_ms?: number | null
+          edge_function?: string | null
+          ended_at?: string | null
+          id?: string
+          input?: Json | null
+          narrative?: string | null
+          output?: Json | null
+          session_id: string
+          started_at?: string
+          status: string
+          step: string
+          user_id: string
+        }
+        Update: {
+          attempt?: number
+          confidence?: number | null
+          cost_cents?: number
+          duration_ms?: number | null
+          edge_function?: string | null
+          ended_at?: string | null
+          id?: string
+          input?: Json | null
+          narrative?: string | null
+          output?: Json | null
+          session_id?: string
+          started_at?: string
+          status?: string
+          step?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_step_runs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           brand_sync_last_run_at: string | null
@@ -279,6 +592,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      brand_rules: {
+        Row: {
+          brand: string
+          created_at: string
+          id: string
+          notes: string | null
+          rule_data: Json
+          rule_type: string
+          updated_at: string
+        }
+        Insert: {
+          brand: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          rule_data?: Json
+          rule_type: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          rule_data?: Json
+          rule_type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       brand_sync_log: {
         Row: {

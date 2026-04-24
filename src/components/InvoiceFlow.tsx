@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { setSessionProducts as setInvoiceSessionProducts } from "@/stores/invoice-session-store";
 import { syncInvoiceItemsToCatalog } from "@/lib/invoice-catalog-sync";
 import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orchestrator";
+import { detectBrandFromSku } from "@/lib/sku-brand-prefix";
 import POSPickerDialog, { hasPickedPOS } from "@/components/POSPickerDialog";
 import { toast } from "sonner";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag, CloudDownload } from "lucide-react";
@@ -686,17 +687,24 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       console.log("[Phase2] writing", accepted.length, "rows from", source);
       console.log("[InvoiceFlow] 🔄 Reached catalog sync insertion point — calling syncInvoiceItemsToCatalog with", accepted.length, "items");
       const result = await syncInvoiceItemsToCatalog(
-        accepted.map((item) => ({
-          product_title: item.name || "Untitled",
-          vendor: item.brand || supplierName || undefined,
-          sku: item.sku || undefined,
-          barcode: (item as any).barcode || undefined,
-          colour: item.colour || undefined,
-          size: item.size || undefined,
-          unit_cost: Number(item.cost) || 0,
-          rrp: Number(item.rrp) || 0,
-          qty: Number(item.qty) || 0,
-        })),
+        accepted.map((item) => {
+          // Per-line brand detection by SKU prefix (e.g. JA→Jantzen, SS→Sunseeker,
+          // OB→Olga Berg). Critical for multi-brand invoices billed under an
+          // umbrella vendor like Skye Group, where the cover-page vendor is
+          // meaningless for individual line lookups.
+          const skuBrand = detectBrandFromSku(item.sku);
+          return {
+            product_title: item.name || "Untitled",
+            vendor: skuBrand || item.brand || supplierName || undefined,
+            sku: item.sku || undefined,
+            barcode: (item as any).barcode || undefined,
+            colour: item.colour || undefined,
+            size: item.size || undefined,
+            unit_cost: Number(item.cost) || 0,
+            rrp: Number(item.rrp) || 0,
+            qty: Number(item.qty) || 0,
+          };
+        }),
       );
 
       if (result.written > 0) {
@@ -719,15 +727,18 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
       // ── Phase 3 — auto price research ──────────────────────
       if (accepted.length > 0) {
-        const phase3Items: Phase3Item[] = accepted.map((item) => ({
-          product_title: item.name || "Untitled",
-          vendor: item.brand || supplierName || undefined,
-          sku: item.sku || undefined,
-          barcode: (item as any).barcode || undefined,
-          unit_cost: Number(item.cost) || 0,
-          rrp: Number(item.rrp) || 0,
-          product_type: (item as any).product_type || (item as any).type || undefined,
-        }));
+        const phase3Items: Phase3Item[] = accepted.map((item) => {
+          const skuBrand = detectBrandFromSku(item.sku);
+          return {
+            product_title: item.name || "Untitled",
+            vendor: skuBrand || item.brand || supplierName || undefined,
+            sku: item.sku || undefined,
+            barcode: (item as any).barcode || undefined,
+            unit_cost: Number(item.cost) || 0,
+            rrp: Number(item.rrp) || 0,
+            product_type: (item as any).product_type || (item as any).type || undefined,
+          };
+        });
         const phase3Toast = toast.loading(`🔍 Researching prices for ${phase3Items.length} products…`, {
           description: "Checking supplier sites, retailers, and applying markup rules.",
         });

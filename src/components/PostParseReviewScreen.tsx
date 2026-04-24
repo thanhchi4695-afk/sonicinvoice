@@ -259,6 +259,11 @@ export default function PostParseReviewScreen({
    *  "inclusive" = cost was entered GST-inclusive and we divide by (1 + rate) to
    *  derive the true ex-GST cost. Toggling is fully reversible. */
   const [costGstMode, setCostGstMode] = useState<"exclusive" | "inclusive">("exclusive");
+  /** Add-GST-on-top toggle. Independent of the strip toggle above — this one
+   *  is for users whose supplier cost is genuinely ex-GST and they want to
+   *  store / export it inc-GST. Multiplies every cost by (1 + gstRate).
+   *  Fully reversible: turning it off divides cost back by the same factor. */
+  const [addGstOnTop, setAddGstOnTop] = useState<boolean>(false);
   /** How multi-colour products should be exported:
    *  - "variants" (default) → one Shopify product, colours become variants
    *  - "separate" → one Shopify product per colour, name becomes "Product - Colour"

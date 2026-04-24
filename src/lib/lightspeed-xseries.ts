@@ -217,7 +217,9 @@ function sizeRank(s: string): number {
 
 // ── Description fallback (B1 #4) ───────────────────────────
 function buildDescription(p: XSeriesProduct, colour: string): string {
-  if (p.description && p.description.trim()) return p.description.replace(/[\r\n]+/g, ' ');
+  // Preserve HTML / multi-line descriptions verbatim — Lightspeed's own export
+  // emits <p>, <h4>, <ul> blocks and those round-trip on re-import.
+  if (p.description && p.description.trim()) return p.description;
   const parts: string[] = [];
   const name = titleCase(stripBrandPrefix(p.title, p.brand));
   const col = titleCase(colour);

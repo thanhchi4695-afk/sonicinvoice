@@ -148,8 +148,10 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
   }, [steps]);
 
   const startStep = useCallback(() => {
+    let stepIdSnap: string | undefined;
     setCtxState((prev) => {
       const stepId = steps[prev.currentStep]?.id;
+      stepIdSnap = stepId;
       const next: PipelineContext = {
         ...prev,
         stepStartedAt: { ...prev.stepStartedAt, [stepId]: Date.now() },
@@ -160,7 +162,26 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
       return next;
     });
     setRunningFlow(true);
-  }, [steps]);
+
+    // Notify the agent — fire-and-forget so the flow UI is not blocked.
+    if (agentSessionId && stepIdSnap) {
+      const agentStep = toAgentStep(stepIdSnap);
+      if (agentStep) {
+        supabase.functions.invoke("run-agent-step", {
+          body: { sessionId: agentSessionId, step: agentStep, context: { pipelineStepId: stepIdSnap } },
+        }).catch((err) => console.warn("[agent] run-agent-step failed", err));
+      }
+    }
+  }, [steps, agentSessionId]);
+
+  // Mark the agent session complete when the user finishes the pipeline.
+  const finalizeAgentSession = useCallback(async (status: "completed" | "cancelled") => {
+    if (!agentSessionId) return;
+    await supabase
+      .from("agent_sessions")
+      .update({ status, completed_at: new Date().toISOString() })
+      .eq("id", agentSessionId);
+  }, [agentSessionId]);
 
   // ── Early returns after all hooks ──
   if (!pipeline) {

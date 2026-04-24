@@ -16,7 +16,7 @@ const corsHeaders = {
 };
 
 const SIZE_RE =
-  /^(xxs|xs|s|m|l|xl|xxl|xxxl|os|one\s?size|au\d{1,2}|us\d{1,2}|uk\d{1,2}|eu\d{2}|\d{1,2}(\.\d)?)$/i;
+  /^(xxs|xs|s|m|l|xl|xxl|xxxl|os|one\s?size|au\d{1,2}|us\d{1,2}|uk\d{1,2}|eu\d{2}|\d{1,2}(\.\d)?|\d{1,2}\s*(year|yr|y|month|months|m)|\d{1,2}\s*-\s*\d{1,2}\s*(month|months|m))$/i;
 
 function isSizeToken(s: string): boolean {
   return SIZE_RE.test(s.trim());

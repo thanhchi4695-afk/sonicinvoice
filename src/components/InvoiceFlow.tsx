@@ -2199,7 +2199,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   const trainSupplierPattern = async () => {
     try {
-      const name = supplierName.trim();
+      const name = normaliseVendor(supplierName);
       if (!name || productGroups.length === 0) return;
 
       const { data: sessionData } = await supabase.auth.getSession();

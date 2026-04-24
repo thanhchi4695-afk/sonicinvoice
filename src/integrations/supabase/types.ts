@@ -2326,6 +2326,11 @@ export type Database = {
           supplier_name_variants: string[] | null
           updated_at: string
           user_id: string
+          website_last_scraped_at: string | null
+          website_pricing_enabled: boolean
+          website_products_cached: number
+          website_scraper_type: string
+          website_url: string | null
         }
         Insert: {
           confidence_score?: number | null
@@ -2342,6 +2347,11 @@ export type Database = {
           supplier_name_variants?: string[] | null
           updated_at?: string
           user_id: string
+          website_last_scraped_at?: string | null
+          website_pricing_enabled?: boolean
+          website_products_cached?: number
+          website_scraper_type?: string
+          website_url?: string | null
         }
         Update: {
           confidence_score?: number | null
@@ -2358,6 +2368,11 @@ export type Database = {
           supplier_name_variants?: string[] | null
           updated_at?: string
           user_id?: string
+          website_last_scraped_at?: string | null
+          website_pricing_enabled?: boolean
+          website_products_cached?: number
+          website_scraper_type?: string
+          website_url?: string | null
         }
         Relationships: []
       }
@@ -2405,6 +2420,59 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      supplier_website_prices: {
+        Row: {
+          colour: string | null
+          compare_at_price: number | null
+          currency: string
+          handle: string | null
+          id: string
+          price: number
+          product_title: string | null
+          product_url: string | null
+          scraped_at: string
+          size: string | null
+          supplier_profile_id: string
+          user_id: string
+        }
+        Insert: {
+          colour?: string | null
+          compare_at_price?: number | null
+          currency?: string
+          handle?: string | null
+          id?: string
+          price: number
+          product_title?: string | null
+          product_url?: string | null
+          scraped_at?: string
+          size?: string | null
+          supplier_profile_id: string
+          user_id: string
+        }
+        Update: {
+          colour?: string | null
+          compare_at_price?: number | null
+          currency?: string
+          handle?: string | null
+          id?: string
+          price?: number
+          product_title?: string | null
+          product_url?: string | null
+          scraped_at?: string
+          size?: string | null
+          supplier_profile_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_website_prices_supplier_profile_id_fkey"
+            columns: ["supplier_profile_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       suppliers: {
         Row: {

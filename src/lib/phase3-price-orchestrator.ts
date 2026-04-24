@@ -25,7 +25,7 @@ export interface Phase3ProductResult {
   product_title: string;
   vendor?: string;
   recommended_rrp: number | null;
-  price_source: "supplier_scrape" | "market_waterfall" | "markup_fallback" | "none";
+  price_source: "website" | "supplier_scrape" | "market_waterfall" | "markup_fallback" | "none";
   confidence: number;
   source_url?: string;
   description?: string;
@@ -60,6 +60,36 @@ function pickMarkup(productType?: string): number {
     if (lower.includes(key)) return mult;
   }
   return DEFAULT_MARKUP_BY_TYPE.default;
+}
+
+async function callWebsiteRRP(item: Phase3Item): Promise<Phase3ProductResult | null> {
+  if (!item.vendor || !item.product_title) return null;
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      "supplier-website-rrp",
+      {
+        body: {
+          vendor: item.vendor,
+          style_name: item.product_title,
+          style_number: item.sku || "",
+        },
+      },
+    );
+    if (error) return null;
+    const d = data as { found?: boolean; price?: number; product_url?: string; confidence?: number };
+    if (!d?.found || !d.price || d.price <= 0) return null;
+    return {
+      product_title: item.product_title,
+      vendor: item.vendor,
+      recommended_rrp: Number(d.price),
+      price_source: "website",
+      confidence: d.confidence ?? 95,
+      source_url: d.product_url,
+    };
+  } catch (e) {
+    console.warn("[Phase3] website RRP lookup failed:", e);
+    return null;
+  }
 }
 
 async function callSupplierScrape(item: Phase3Item): Promise<Phase3ProductResult | null> {
@@ -189,12 +219,14 @@ export async function runPhase3PriceResearch(
       let result: Phase3ProductResult | null = null;
 
       if (!opts.markupOnly) {
-        // 1. Supplier/retailer scrape via Firecrawl
-        result = await callSupplierScrape(item);
-        // 2. Market waterfall (Google Shopping / barcode)
+        // 1. Supplier's own website (cached) — highest authority for RRP
+        result = await callWebsiteRRP(item);
+        // 2. Supplier/retailer scrape via Firecrawl
+        if (!result) result = await callSupplierScrape(item);
+        // 3. Market waterfall (Google Shopping / barcode)
         if (!result) result = await callMarketWaterfall(item);
       }
-      // 3. Markup fallback (always available if cost present)
+      // 4. Markup fallback (always available if cost present)
       if (!result) result = applyMarkupFallback(item);
 
       if (result.recommended_rrp && result.recommended_rrp > 0) {

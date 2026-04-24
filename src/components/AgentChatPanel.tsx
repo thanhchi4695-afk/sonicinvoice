@@ -275,6 +275,15 @@ export default function AgentChatPanel({ sessionId, onGateResponse, className }:
           supplier,
           delta_reason: `gate:${run.step}:${choice}`,
         });
+
+        // Calibration: predicted confidence vs whether the user accepted as-is
+        await supabase.from("agent_calibration_log").insert({
+          user_id: userId,
+          session_id: run.session_id,
+          step: run.step,
+          predicted_confidence: run.confidence ?? null,
+          user_accepted: feedbackType === "accept",
+        });
       }
     } catch (e) {
       console.warn("Failed to record agent feedback:", e);

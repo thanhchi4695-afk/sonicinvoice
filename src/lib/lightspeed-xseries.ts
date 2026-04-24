@@ -395,8 +395,9 @@ export function generateXSeriesCSV(
         ? sanitiseSku(`${variantSku}-${sizeToken}`)
         : variantSku;
 
-      const attr1Val = s.attributeOrder === 'size_first' ? (titleCase(v.size || '')) : (titleCase(v.colour || ''));
-      const attr2Val = s.attributeOrder === 'size_first' ? (titleCase(v.colour || '')) : (titleCase(v.size || ''));
+      // Lightspeed exports variant values in UPPERCASE (e.g. "VALENTINE", "1 YEAR").
+      const attr1Val = s.attributeOrder === 'size_first' ? lsCase(v.size || '') : lsCase(v.colour || '');
+      const attr2Val = s.attributeOrder === 'size_first' ? lsCase(v.colour || '') : lsCase(v.size || '');
 
       // B1 #2 — per-variant cost/retail with safe fallback to product-level.
       const supply = v.supplyPrice ?? product.price ?? 0;
@@ -405,13 +406,16 @@ export function generateXSeriesCSV(
       const row = baseRow();
       row.sku = variantSkuWithSize;
       row.description = buildDescription(product, v.colour || '');
-      row.tags = isFirst ? (product.tags || '') : '';
+      row.tags = isFirst ? joinTagsLs(product.tags) : '';
       row.variant_option_one_name = attr1Name;
       row.variant_option_one_value = attr1Val;
       row.variant_option_two_name = attr2Name;
       row.variant_option_two_value = attr2Val;
       row.supply_price = supply.toFixed(2);
       row.retail_price = retail.toFixed(2);
+      // Per-variant loyalty + tax recompute against the variant's own retail.
+      row.loyalty_value_default = loyaltyDefault(retail);
+      row.tax_value = taxValue(retail);
       // B1 #3 — extracted_qty (from the invoice/matrix), NOT received_qty.
       row[stockCol] = String(v.quantity ?? 0);
       allRows.push(row);

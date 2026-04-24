@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
       let grantedScopes: string[] = [];
       let missingScopes: string[] = [];
       try {
-        const scopesRes = await fetch(`https://${cleanDomain}/admin/oauth/access_scopes.json`, { headers });
+        const scopesRes = await fetch(`https://${store_url}/admin/oauth/access_scopes.json`, { headers });
         if (scopesRes.ok) {
           const scopesData = await scopesRes.json();
           grantedScopes = (scopesData.access_scopes || []).map((s: { handle: string }) => s.handle);

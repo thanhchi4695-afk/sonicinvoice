@@ -60,6 +60,37 @@ const DEFAULT_SETTINGS: XSeriesSettings = {
   trackInventory: true,
 };
 
+// ── Lightspeed export conventions (from canonical product-export_4.csv) ──
+// Lightspeed's own X-Series exports emit:
+//   • brand_name / supplier_name in UPPERCASE
+//   • name, product_category and variant values in UPPERCASE
+//   • tags joined with ";" (semicolons), not commas
+//   • loyalty_value_default = retail × 0.055 (3 dp)
+//   • tax_value = retail / 11 (5 dp)  // 10% GST component, ex-GST share
+// We mirror those so re-imports round-trip cleanly.
+const LOYALTY_RATE = 0.055;
+function lsCase(s: string | null | undefined): string {
+  return (s || '').toString().trim().toUpperCase();
+}
+function joinTagsLs(tags: string | string[] | null | undefined): string {
+  if (!tags) return '';
+  const arr = Array.isArray(tags)
+    ? tags
+    : String(tags).split(/[,;]/);
+  return arr
+    .map(t => t.trim())
+    .filter(Boolean)
+    .join(';');
+}
+function loyaltyDefault(retail: number): string {
+  if (!retail || retail <= 0) return '';
+  return (retail * LOYALTY_RATE).toFixed(3);
+}
+function taxValue(retail: number): string {
+  if (!retail || retail <= 0) return '';
+  return (retail / 11).toFixed(5);
+}
+
 const LS_SETTINGS_KEY = 'ls_xseries_settings';
 
 export function getXSeriesSettings(): XSeriesSettings {

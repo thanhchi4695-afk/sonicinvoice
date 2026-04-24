@@ -2795,6 +2795,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         imageUrl,
         bodyHtml,
         tags,
+        // W-07 — forward date + season so the engine emits Apr26 / W26 tags.
+        invoiceDate: invoiceDate || undefined,
+        season: seasonFromGroup || undefined,
       };
     });
   });

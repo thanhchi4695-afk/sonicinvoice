@@ -568,7 +568,12 @@ export function generateLightspeedCSV(
   const rows = lines.map((ln) => {
     const title = deduplicateTitle(ln.name, ln.brand);
     const handle = generateHandle(title, ln.brand);
-    const tags = ln.tags || [ln.brand, ln.type, ln.colour, "New Arrival"].filter(Boolean).join(", ");
+    // W-07 — rich tags: Brand, Department, Type, ArrivalMonth, Season, Colour.
+    // Always recompute so we don't inherit primitive upstream tags like
+    // "[brand, type, colour, New Arrival]". `ln.tags` is preserved only as a
+    // fallback when the rich builder produces nothing (no brand/type/date).
+    const richTags = buildRichTags(ln);
+    const tags = richTags || ln.tags || "";
 
     // Convention: Colour first, Size second (matches Shopify export + Sonic memory)
     const opt1Name = ln.colour ? "Colour" : ln.size ? "Size" : "";

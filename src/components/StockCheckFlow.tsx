@@ -211,7 +211,7 @@ const StockCheckFlow = ({ lineItems, onBack, onComplete, onStartFlow }: StockChe
               inventoryItemId: s.matchedVariant!.inventoryItemId,
               sku: s.matchedVariant!.sku,
               size: s.size,
-              currentQty: s.matchedVariant!.inventoryQuantity ?? null,
+              currentQty: s.matchedVariant!.inventoryQty ?? null,
               delta: s.qty,
             }));
             const idempotencyKey = await hashIdempotency({

@@ -48,6 +48,12 @@ export interface ExportProduct {
   invoiceDate?: string;
   /** Season token parsed from SKU (e.g. "W26"). */
   season?: string;
+  /** Where the recommended RRP came from. Drives the source pill in
+   *  the export review UI so the user can spot website-vs-markup-vs-Google
+   *  rows before exporting. Set by Phase 3 price orchestrator. */
+  priceSource?: "website" | "supplier_scrape" | "market_waterfall" | "markup_fallback" | "invoice_rrp" | "none";
+  /** Where the website match was found (Shopify product URL or scrape source). */
+  priceSourceUrl?: string;
 }
 
 interface ExportReviewScreenProps {

@@ -2533,9 +2533,13 @@ export type Database = {
           created_at: string
           default_location_id: string | null
           id: string
+          needs_reauth: boolean
           product_status: string
+          refresh_token: string | null
+          refresh_token_expires_at: string | null
           shop_name: string | null
           store_url: string
+          token_expires_at: string | null
           updated_at: string
           user_id: string
         }
@@ -2545,9 +2549,13 @@ export type Database = {
           created_at?: string
           default_location_id?: string | null
           id?: string
+          needs_reauth?: boolean
           product_status?: string
+          refresh_token?: string | null
+          refresh_token_expires_at?: string | null
           shop_name?: string | null
           store_url: string
+          token_expires_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -2557,9 +2565,13 @@ export type Database = {
           created_at?: string
           default_location_id?: string | null
           id?: string
+          needs_reauth?: boolean
           product_status?: string
+          refresh_token?: string | null
+          refresh_token_expires_at?: string | null
           shop_name?: string | null
           store_url?: string
+          token_expires_at?: string | null
           updated_at?: string
           user_id?: string
         }

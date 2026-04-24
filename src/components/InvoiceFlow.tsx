@@ -2218,6 +2218,23 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     setShowCompletionSummary(false);
     setStep(3);
     beginReviewTimer();
+    // Shadow-log: extract complete, stock-check gate awaiting review.
+    void (async () => {
+      await logShadowStep({
+        step: "extract",
+        status: "done",
+        narrative: `Extracted ${validatedProducts.length} products from ${supplierName || "supplier"}.`,
+        confidence: validatedProducts.length > 0
+          ? validatedProducts.reduce((s, p) => s + (p._confidence ?? 0), 0) / validatedProducts.length
+          : null as unknown as number,
+        output: { productCount: validatedProducts.length },
+      });
+      await logShadowStep({
+        step: "stock_check",
+        status: "needs_review",
+        narrative: `Stock check ready — ${validatedProducts.length} lines awaiting review.`,
+      });
+    })();
     // Write extracted products to Supabase products + variants tables so
     // pricing tools (Price Adjustment, Margin Protection, Markdown Ladder)
     // can see them immediately — no need to wait for Export.

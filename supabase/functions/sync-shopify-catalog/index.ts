@@ -2,6 +2,7 @@
 // POST { user_id, shop_domain, access_token, mode?: "full" | "incremental", location_id? }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { ensureValidToken, ShopifyReauthRequiredError, type ShopifyConnectionRow } from "../_shared/shopify-token.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

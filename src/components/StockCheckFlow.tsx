@@ -49,6 +49,7 @@ async function hashIdempotency(payload: unknown): Promise<string> {
   return Array.from(new Uint8Array(digest))
     .map(b => b.toString(16).padStart(2, "0"))
     .join("");
+}
 
 const StockCheckFlow = ({ lineItems, onBack, onComplete, onStartFlow }: StockCheckFlowProps) => {
   const [screen, setScreen] = useState<Screen>("checking");

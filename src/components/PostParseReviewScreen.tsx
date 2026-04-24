@@ -20,6 +20,7 @@ import CorrectionReasonPicker, { CorrectionSavedCheck } from "@/components/Corre
 import { saveInvoiceLinesToCatalog } from "@/components/SupplierCatalog";
 import { persistParsedInvoice } from "@/lib/invoice-persistence";
 import { supabase } from "@/integrations/supabase/client";
+import { normaliseVendor } from "@/lib/normalise-vendor";
 import { toast } from "sonner";
 import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTraceViewer";
 import SizeGridEditor from "@/components/SizeGridEditor";

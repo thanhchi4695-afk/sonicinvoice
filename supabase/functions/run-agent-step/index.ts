@@ -229,7 +229,7 @@ Deno.serve(async (req) => {
     } else {
       // ── Call Claude via AI gateway ──
       try {
-        const userMsg = buildUserMessage(step, context, attempt, budget.remainingCents);
+        const userMsg = buildUserMessage(step, context, attempt, budget.remainingCents, supplierHints ?? undefined, brandRulesText ?? undefined);
         const aiResponse = await callAI({
           model: "google/gemini-3-flash-preview",
           messages: [

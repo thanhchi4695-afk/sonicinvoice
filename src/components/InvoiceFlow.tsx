@@ -4618,13 +4618,31 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
 // ── Lightspeed Export Download Section ─────────────────────
 import type { StoreMode } from '@/hooks/use-store-mode';
+import { arrivalMonthTag, titleCase, stripBrandPrefix } from '@/lib/lightspeed-xseries';
+import { normaliseVendor } from '@/lib/normalise-vendor';
 
-function LightspeedExportDownload({ exportFormat, products, supplierName, lsSettings, mode }: {
+interface ExportProduct {
+  name: string;
+  brand: string;
+  type: string;
+  price: number;       // wholesale cost ex GST
+  rrp: number;         // retail price
+  status: string;
+  // Optional rich data — when present, drives variant fan-out + correct stock totals.
+  variants?: { sku?: string; colour?: string; size?: string; qty?: number; price?: number; rrp?: number }[];
+  vendorCode?: string;
+  description?: string;
+  season?: string;
+  invoiceDate?: string; // ISO — used to derive arrivalMonth tag (Apr26 / Sept26)
+}
+
+function LightspeedExportDownload({ exportFormat, products, supplierName, lsSettings, mode, invoiceDate }: {
   exportFormat: 'shopify' | 'lightspeed_x' | 'xlsx';
-  products: { name: string; brand: string; type: string; price: number; rrp: number; status: string }[];
+  products: ExportProduct[];
   supplierName: string;
   lsSettings: XSeriesSettings;
   mode: StoreMode;
+  invoiceDate?: string;
 }) {
   const downloadFile = (content: string, filename: string, mime = 'text/csv') => {
     const blob = new Blob([content], { type: mime });
@@ -4638,12 +4656,75 @@ function LightspeedExportDownload({ exportFormat, products, supplierName, lsSett
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const tag = (supplierName || 'products').toLowerCase().replace(/\s+/g, '-');
 
+  // B1 #7 — Tag builder: Brand, Department, Type, ArrivalMonth, Season, Colour.
+  // Drops the meaningless "General" / "New Arrival" placeholders.
+  const buildTagsFor = (p: ExportProduct, dateIso?: string): string => {
+    const departmentForType = (t: string): string => {
+      const tt = (t || '').toLowerCase();
+      if (/dress|top|pant|skirt|short|shirt|jumpsuit|playsuit|kimono|kaftan|sarong/.test(tt)) return 'womens clothing';
+      if (/swim|bikini|tankini|rashie|board/.test(tt)) return 'swimwear';
+      if (/jewel|earring|necklace|bracelet/.test(tt)) return 'jewellery';
+      if (/hat|sunnies|bag|towel|accessor|wallet/.test(tt)) return 'accessories';
+      return '';
+    };
+    const tags: string[] = [];
+    const brand = normaliseVendor(p.brand);
+    if (brand) tags.push(brand);
+    const dept = departmentForType(p.type);
+    if (dept) tags.push(dept);
+    if (p.type) tags.push(p.type.toLowerCase());
+    tags.push(arrivalMonthTag(dateIso || p.invoiceDate || invoiceDate));
+    if (p.season) tags.push(p.season);
+    // Add colour only when single-colour product (multi-colour groups put colour at variant level).
+    const colours = new Set((p.variants || []).map(v => (v.colour || '').toLowerCase()).filter(Boolean));
+    if (colours.size === 1) {
+      const c = titleCase([...colours][0]);
+      if (c) tags.push(c);
+    } else if (!p.variants || p.variants.length === 0) {
+      // single-row product — no colour info available
+    }
+    // Dedupe, preserve order
+    const seen = new Set<string>();
+    return tags.filter(t => {
+      const k = t.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    }).join(', ');
+  };
+
   if (exportFormat === 'lightspeed_x') {
+    // B1 #1, #2, #3, #6 — thread per-variant qty/cost/retail/SKU through to the builder
+    // so the Size matrix fans out, supply_price stays at wholesale, retail_price stays
+    // at RRP, Main_Outlet_stock = extracted_qty, and each variant gets a unique SKU.
     const xProducts: XSeriesProduct[] = products.map(p => ({
-      title: p.name, brand: p.brand, type: p.type, price: p.price, rrp: p.rrp,
-      tags: `${p.brand}, ${p.type}, New Arrival`,
+      title: titleCase(stripBrandPrefix(p.name, p.brand)),
+      brand: normaliseVendor(p.brand),
+      type: p.type,
+      price: p.price, // wholesale cost ex GST (NEVER overwritten with RRP)
+      rrp: p.rrp,     // retail price
+      description: p.description,
+      season: p.season,
+      arrivalDate: p.invoiceDate || invoiceDate,
+      supplierCode: p.vendorCode,
+      supplierName: supplierName,
+      tags: buildTagsFor(p),
+      variants: (p.variants || []).map(v => ({
+        sku: v.sku,
+        colour: v.colour,
+        size: v.size,
+        quantity: v.qty,        // → Main_Outlet_stock (extracted_qty)
+        supplyPrice: v.price,   // per-variant cost ex GST
+        retailPrice: v.rrp,     // per-variant RRP
+      })),
     }));
     const { csv, errors, rowCount } = generateXSeriesCSV(xProducts, lsSettings);
+
+    // B1 #3 — stock-total reconciliation banner
+    const totalStock = xProducts.reduce((s, x) =>
+      s + (x.variants?.reduce((a, v) => a + (v.quantity || 0), 0) || 0), 0);
+    const expectedTotal = products.reduce((s, p) =>
+      s + ((p.variants || []).reduce((a, v) => a + (v.qty || 0), 0)), 0);
+    const stockMismatch = totalStock !== expectedTotal && expectedTotal > 0;
     const hasErrors = errors.filter(e => e.severity === 'error').length > 0;
     const warnings = errors.filter(e => e.severity === 'warning');
 

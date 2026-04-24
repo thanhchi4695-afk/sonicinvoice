@@ -305,7 +305,49 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
               <span className={`font-mono-data font-semibold ${avgConfidence >= 80 ? "text-success" : avgConfidence >= 60 ? "text-warning" : "text-destructive"}`}>
                 {avgConfidence}% ({avgConfidence >= 80 ? "High" : avgConfidence >= 60 ? "Medium" : "Low"})
               </span>
-            </div>
+          </div>
+
+          {/* Price source breakdown — shows where each RRP came from
+              (brand website / Google fallback / markup formula / invoice RRP).
+              Helps the user spot rows that fell through to the markup
+              formula and re-fetch them before export. */}
+          {(() => {
+            const counts: Record<string, number> = {};
+            filtered.forEach((p) => {
+              const s = p.priceSource || "none";
+              counts[s] = (counts[s] || 0) + 1;
+            });
+            const sources = [
+              { key: "website", label: "Brand website", className: "bg-success/15 text-success border-success/30", icon: "🟢" },
+              { key: "supplier_scrape", label: "Supplier scrape", className: "bg-success/10 text-success border-success/20", icon: "🟢" },
+              { key: "invoice_rrp", label: "Invoice RRP", className: "bg-primary/15 text-primary border-primary/30", icon: "🔵" },
+              { key: "market_waterfall", label: "Google", className: "bg-warning/15 text-warning border-warning/30", icon: "🟡" },
+              { key: "markup_fallback", label: "Markup formula", className: "bg-orange-500/15 text-orange-600 border-orange-500/30", icon: "🟠" },
+              { key: "none", label: "No price", className: "bg-destructive/15 text-destructive border-destructive/30", icon: "⚪" },
+            ];
+            const visible = sources.filter((s) => counts[s.key]);
+            if (visible.length === 0) return null;
+            return (
+              <div className="bg-card rounded-lg border border-border p-4">
+                <h3 className="text-sm font-semibold mb-2">Price source</h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Where each retail price came from. Brand-website prices are most reliable; markup-formula rows are estimates worth reviewing.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {visible.map((s) => (
+                    <span
+                      key={s.key}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${s.className}`}
+                    >
+                      <span>{s.icon}</span>
+                      <span>{s.label}</span>
+                      <span className="font-mono-data">{counts[s.key]}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           </div>
 
           {/* Warnings */}

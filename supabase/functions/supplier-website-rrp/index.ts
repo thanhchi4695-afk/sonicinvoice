@@ -362,13 +362,15 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
-      // Live fetch returned nothing — increment failure counter
-      await supabase
-        .from("supplier_websites")
-        .update({ scrape_failure_count: (registry as { scrape_failure_count?: number }).scrape_failure_count
-          ? (registry as { scrape_failure_count: number }).scrape_failure_count + 1
-          : 1 })
-        .eq("id", registry.id);
+      // Live fetch returned nothing — increment failure counter (only for global registry rows)
+      if (registry.source !== "user") {
+        await supabase
+          .from("supplier_websites")
+          .update({ scrape_failure_count: (registry as { scrape_failure_count?: number }).scrape_failure_count
+            ? (registry as { scrape_failure_count: number }).scrape_failure_count + 1
+            : 1 })
+          .eq("id", registry.id);
+      }
     }
 
     // ── 3. Not in registry — log the miss so the user can add it ──

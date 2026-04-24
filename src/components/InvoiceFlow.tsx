@@ -2608,7 +2608,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           body: {
             user_id: uid,
             invoice_id: null,
-            supplier_name: supplierName || null,
+            supplier_name: supplierName ? normaliseVendor(supplierName) : null,
             platform,
             invoice_lines,
           },

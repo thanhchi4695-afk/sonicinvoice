@@ -178,7 +178,48 @@ async function callSupplierScrape(item: Phase3Item): Promise<Phase3ProductResult
   if (item.sku && item.sku.length >= 4) {
     const sku = await searchOnce(item, "sku");
     if (sku) return sku;
+}
+
+// ── Tier 1.5: AI WebSearch (enrich-via-websearch) ─────────────
+async function callWebsearchTier(item: Phase3Item): Promise<Phase3ProductResult | null> {
+  if (!item.product_title) return null;
+  try {
+    const { data, error } = await supabase.functions.invoke("enrich-via-websearch", {
+      body: {
+        brand_name: item.vendor || "",
+        product_name: item.product_title,
+        colour: (item as Phase3Item & { colour?: string }).colour || "",
+        product_code: item.sku || "",
+      },
+    });
+    if (error) return null;
+    const d = data as {
+      found?: boolean; price?: number | null; matched_url?: string | null;
+      image_url?: string | null; description?: string | null;
+      source?: string; query_used?: string; cache_hit?: boolean; cost_aud?: number;
+    };
+    if (!d?.found || !d.price || d.price <= 0) return null;
+    return {
+      product_title: item.product_title,
+      vendor: item.vendor,
+      recommended_rrp: Number(d.price),
+      price_source: "ai_search",
+      confidence: d.cache_hit ? 75 : 70,
+      source_url: d.matched_url || undefined,
+      image_url: d.image_url || undefined,
+      description: d.description || undefined,
+      source_meta: {
+        provider: d.source as "anthropic-websearch" | "brave-search",
+        query: d.query_used,
+        cacheHit: d.cache_hit,
+        costAud: d.cost_aud,
+      },
+    };
+  } catch (e) {
+    console.warn("[Phase3] websearch tier failed:", e);
+    return null;
   }
+}
   return null;
 }
 
@@ -285,6 +326,9 @@ export async function runPhase3PriceResearch(
       if (!opts.markupOnly) {
         // 1. Supplier's own website (cached) — highest authority for RRP
         result = await callWebsiteRRP(item);
+        // 1.5 NEW — AI WebSearch (Anthropic web_search / Brave). Fills the
+        // gap for non-Shopify brands and ambiguous product names.
+        if (!result) result = await callWebsearchTier(item);
         // 2. Supplier/retailer scrape via Firecrawl
         if (!result) result = await callSupplierScrape(item);
         // 3. Market waterfall (Google Shopping / barcode)

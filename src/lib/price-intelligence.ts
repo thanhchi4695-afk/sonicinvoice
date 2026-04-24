@@ -563,8 +563,10 @@ export function getSourceBadge(method: string): { color: string; label: string }
     case 'barcode_api': return { color: 'bg-success/15 text-success', label: '🟢 Barcode Lookup' };
     case 'google_shopping': return { color: 'bg-primary/15 text-primary', label: '🔵 Google Shopping' };
     case 'go_upc': return { color: 'bg-warning/15 text-warning', label: '🟡 Go-UPC' };
-    case 'claude_web_search': return { color: 'bg-muted text-muted-foreground', label: '⚪ Claude AI' };
+    case 'claude_web_search': return { color: 'bg-muted text-muted-foreground', label: '⚪ Brand site' };
+    case 'brand_site_scrape': return { color: 'bg-success/15 text-success', label: '🟢 Brand site' };
     case 'cache': return { color: 'bg-muted text-muted-foreground', label: '💾 Cached' };
+    case 'not_found': return { color: 'bg-muted text-muted-foreground', label: '— Not found' };
     default: return { color: 'bg-muted text-muted-foreground', label: 'Unknown' };
   }
 }

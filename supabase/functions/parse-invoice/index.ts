@@ -1183,12 +1183,12 @@ ${ir.notes?.length ? `- Notes: ${(ir.notes as string[]).join("; ")}` : ""}`;
     }
 
     let parsedFromWalnutText = false;
+    let deterministicWalnutParsed: Record<string, any> | null = null;
     if (isPdf && /walnut/i.test(fileName || "")) {
       try {
         const walnutText = atob(String(fileContent || ""));
-        const deterministicWalnut = parseWalnutInvoiceChunks(walnutText, supplierName || "Walnut Melbourne");
-        if (deterministicWalnut) {
-          parsed = deterministicWalnut;
+        deterministicWalnutParsed = parseWalnutInvoiceChunks(walnutText, supplierName || "Walnut Melbourne");
+        if (deterministicWalnutParsed) {
           parsedFromWalnutText = true;
         }
       } catch {
@@ -1263,7 +1263,8 @@ Return JSON only.`,
     let jsonMatch: RegExpMatchArray | [null, string] = [null, ""];
     let jsonStr = "";
 
-    if (parsedFromWalnutText) {
+    if (parsedFromWalnutText && deterministicWalnutParsed) {
+      parsed = deterministicWalnutParsed;
       console.log("[parse-invoice] Used deterministic Walnut multi-invoice parser");
     } else {
       data = await callAI({
@@ -1342,6 +1343,15 @@ INSTRUCTIONS FOR RETRY:
 
         if (ocrText && ocrText.length > 50) {
           console.log(`[parse-invoice] Step B: OCR extracted ${ocrText.length} chars of text`);
+
+          if (/walnut/i.test(fileName || "") || /walnut melbourne/i.test(supplierName || "") || /tax invoice[\s\S]{0,500}invoice no[\s:]+\d+/i.test(ocrText)) {
+            const deterministicFromOcr = parseWalnutInvoiceChunks(ocrText, supplierName || "Walnut Melbourne");
+            if (deterministicFromOcr?.products?.length) {
+              console.log(`[parse-invoice] Step B: Using deterministic Walnut OCR parser (${deterministicFromOcr.products.length} products)`);
+              parsed = { ...parsed, ...deterministicFromOcr, ocr_fallback_used: true, ocr_text_length: ocrText.length };
+              continue;
+            }
+          }
 
           // Step B.2: Re-parse the OCR text with a fast text-only model
           const ocrParseMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [

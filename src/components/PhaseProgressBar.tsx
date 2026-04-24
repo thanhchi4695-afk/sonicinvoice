@@ -101,36 +101,47 @@ const PhaseProgressBar = ({ activeTab, activeFlow, onNavigate }: PhaseProgressBa
           {PHASES.map((phase, idx) => {
             const Icon = phase.icon;
             const isActive = idx === currentIndex;
-            // #3 — Don't fabricate completed-state. A future iteration
-            // will wire this to a real per-user phase_progress table.
-            const isComplete = false;
-            const isUpcoming = !isActive;
+            // B4 #3 — Never fabricate "complete" state. There is no per-user
+            // phase_progress source of truth yet, so no checkmarks ever render.
             const disabled = !phase.implemented;
 
             return (
               <div key={phase.id} className="flex items-center gap-1 shrink-0">
                 <button
-                  onClick={() => !disabled && onNavigate(phase.target)}
+                  onClick={() => {
+                    // B4 #1 — Disabled phases must never silently route to
+                    // Import invoice. They are inert until the dedicated
+                    // screen is built.
+                    if (disabled) return;
+                    onNavigate(phase.target);
+                  }}
                   disabled={disabled}
+                  aria-disabled={disabled}
                   title={disabled ? `${phase.label} — coming soon` : phase.description}
                   className={cn(
                     "group flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all",
                     isActive && "bg-primary text-primary-foreground shadow-sm",
                     !isActive && !disabled && "text-muted-foreground hover:text-foreground hover:bg-muted",
-                    disabled && "text-muted-foreground/50 cursor-not-allowed opacity-50",
+                    disabled && "text-muted-foreground/50 cursor-not-allowed",
                   )}
                 >
                   <span
                     className={cn(
                       "flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold shrink-0",
                       isActive && "bg-primary-foreground text-primary",
-                      !isActive && "bg-muted text-muted-foreground border border-border",
+                      !isActive && !disabled && "bg-muted text-muted-foreground border border-border",
+                      disabled && "bg-transparent text-muted-foreground/60 border border-dashed border-muted-foreground/30",
                     )}
                   >
                     {phase.num}
                   </span>
                   <Icon className="w-3.5 h-3.5 hidden sm:inline-block shrink-0" />
                   <span className="whitespace-nowrap">{phase.shortLabel}</span>
+                  {disabled && (
+                    <span className="ml-1 text-[9px] uppercase tracking-wider px-1 py-px rounded bg-muted text-muted-foreground/70 font-semibold">
+                      Soon
+                    </span>
+                  )}
                 </button>
                 {idx < PHASES.length - 1 && (
                   <ChevronRight className="w-3 h-3 text-muted-foreground/40 shrink-0" />

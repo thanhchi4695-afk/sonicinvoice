@@ -222,8 +222,6 @@ async function callWebsearchTier(item: Phase3Item): Promise<Phase3ProductResult 
     return null;
   }
 }
-  return null;
-}
 
 async function callMarketWaterfall(item: Phase3Item): Promise<Phase3ProductResult | null> {
   try {

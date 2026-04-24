@@ -4652,6 +4652,8 @@ interface ExportProduct {
   variants?: { sku?: string; colour?: string; size?: string; qty?: number; price?: number; rrp?: number }[];
   vendorCode?: string;
   description?: string;
+  /** Rich HTML description from enrichment (preferred over `description`). */
+  bodyHtml?: string;
   season?: string;
   invoiceDate?: string; // ISO — used to derive arrivalMonth tag (Apr26 / Sept26)
 }

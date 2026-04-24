@@ -2542,23 +2542,52 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   }, []);
 
   useEffect(() => {
-    (async () => {
+    const refreshPlatformConnections = async () => {
       try {
         const { data: userRes } = await supabase.auth.getUser();
         const uid = userRes?.user?.id;
-        if (!uid) { setPlatformsChecked(true); return; }
-        const { data } = await supabase
-          .from("platform_connections")
-          .select("platform, shop_domain")
-          .eq("user_id", uid)
-          .eq("is_active", true);
-        setPlatformConnections((data ?? []) as any);
+        if (!uid) {
+          setPlatformConnections([]);
+          return;
+        }
+
+        const [{ data: platformData }, { data: shopifyConnection }] = await Promise.all([
+          supabase
+            .from("platform_connections")
+            .select("platform, shop_domain")
+            .eq("user_id", uid)
+            .eq("is_active", true),
+          supabase
+            .from("shopify_connections")
+            .select("store_url")
+            .eq("user_id", uid)
+            .maybeSingle(),
+        ]);
+
+        const nextConnections = [...(platformData ?? [])] as Array<{ platform: string; shop_domain?: string | null }>;
+        if (shopifyConnection?.store_url && !nextConnections.some((conn) => conn.platform === "shopify")) {
+          nextConnections.push({ platform: "shopify", shop_domain: shopifyConnection.store_url });
+        }
+
+        setPlatformConnections(nextConnections);
       } catch {
         // non-fatal
       } finally {
         setPlatformsChecked(true);
       }
-    })();
+    };
+
+    void refreshPlatformConnections();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
+        setPlatformConnections([]);
+        setPlatformsChecked(true);
+        return;
+      }
+      void refreshPlatformConnections();
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const connectedPlatformLabel = (() => {

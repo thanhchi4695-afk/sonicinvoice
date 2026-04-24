@@ -76,7 +76,7 @@ interface QueueRow {
   source_url: string | null;
 }
 
-async function processOne(admin: ReturnType<typeof createClient>, row: QueueRow): Promise<void> {
+async function processOne(admin: any, row: QueueRow): Promise<void> {
   if (!row.drive_file_id) {
     await admin.from("processing_queue").update({
       status: "failed",

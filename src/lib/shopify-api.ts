@@ -103,17 +103,38 @@ export async function saveConnection(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { error } = await supabase
-    .from("shopify_connections")
-    .upsert({
-      user_id: user.id,
-      store_url: storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, ""),
-      access_token: accessToken,
-      api_version: apiVersion,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "user_id" });
+  const cleanStoreUrl = storeUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const updatedAt = new Date().toISOString();
 
-  if (error) throw new Error(error.message);
+  const [{ error: shopifyError }, { error: platformDeleteError }, { error: platformInsertError }] = await Promise.all([
+    supabase
+      .from("shopify_connections")
+      .upsert({
+        user_id: user.id,
+        store_url: cleanStoreUrl,
+        access_token: accessToken,
+        api_version: apiVersion,
+        updated_at: updatedAt,
+      }, { onConflict: "user_id" }),
+    supabase
+      .from("platform_connections")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("platform", "shopify"),
+    supabase
+      .from("platform_connections")
+      .insert({
+        user_id: user.id,
+        platform: "shopify",
+        shop_domain: cleanStoreUrl,
+        access_token: accessToken,
+        is_active: true,
+      }),
+  ]);
+
+  if (shopifyError) throw new Error(shopifyError.message);
+  if (platformDeleteError) throw new Error(platformDeleteError.message);
+  if (platformInsertError) throw new Error(platformInsertError.message);
 }
 
 export async function updateConnectionSettings(
@@ -134,12 +155,20 @@ export async function deleteConnection(): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { error } = await supabase
-    .from("shopify_connections")
-    .delete()
-    .eq("user_id", user.id);
+  const [{ error: shopifyError }, { error: platformError }] = await Promise.all([
+    supabase
+      .from("shopify_connections")
+      .delete()
+      .eq("user_id", user.id),
+    supabase
+      .from("platform_connections")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("platform", "shopify"),
+  ]);
 
-  if (error) throw new Error(error.message);
+  if (shopifyError) throw new Error(shopifyError.message);
+  if (platformError) throw new Error(platformError.message);
 }
 
 export async function recordPush(

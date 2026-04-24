@@ -138,6 +138,18 @@ Deno.serve(async (req) => {
         api_version: API_VERSION, shop_name: shopName, updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
 
+      await supabase.from("platform_connections").delete()
+        .eq("user_id", userId)
+        .eq("platform", "shopify");
+
+      await supabase.from("platform_connections").insert({
+        user_id: userId,
+        platform: "shopify",
+        shop_domain: cleanShop,
+        access_token: accessToken,
+        is_active: true,
+      });
+
       const loginToken = generateToken();
       await supabase.from("shopify_login_tokens").insert({
         token: loginToken, user_id: userId, shop: cleanShop, access_token: accessToken,
@@ -165,6 +177,16 @@ Deno.serve(async (req) => {
         user_id: userId, store_url: cleanShop, access_token: accessToken,
         api_version: API_VERSION, shop_name: shopName, updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
+      await supabase.from("platform_connections").delete()
+        .eq("user_id", userId)
+        .eq("platform", "shopify");
+      await supabase.from("platform_connections").insert({
+        user_id: userId,
+        platform: "shopify",
+        shop_domain: cleanShop,
+        access_token: accessToken,
+        is_active: true,
+      });
       await supabase.from("shopify_oauth_states").delete().eq("user_id", userId);
 
       return new Response(null, {

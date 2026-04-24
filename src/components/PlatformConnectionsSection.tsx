@@ -100,7 +100,15 @@ export default function PlatformConnectionsSection() {
   }, [stats.lastSyncedAt, stats.total]);
 
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      void loadAll();
+    });
+
     void loadAll();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Auto-sync interval
@@ -122,17 +130,33 @@ export default function PlatformConnectionsSection() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [shopify, ls, counts] = await Promise.all([
+      const [{ data: { user } }, shopify, ls, counts] = await Promise.all([
+        supabase.auth.getUser(),
         getConnection().catch(() => null),
         loadLightspeedConn(),
         loadCatalogCounts(),
       ]);
+
+      let shopifySyncMeta: { shop_domain: string | null; last_synced_at: string | null } | null = null;
+      if (user) {
+        const { data } = await supabase
+          .from("platform_connections")
+          .select("shop_domain, last_synced_at")
+          .eq("user_id", user.id)
+          .eq("platform", "shopify")
+          .eq("is_active", true)
+          .maybeSingle();
+        shopifySyncMeta = data;
+      }
+
       if (shopify) {
         setShopifyConnected(true);
-        setShopifyDomain(shopify.store_url);
-        setShopifyLastSynced((shopify as unknown as { last_synced_at?: string }).last_synced_at ?? null);
+        setShopifyDomain(shopifySyncMeta?.shop_domain || shopify.store_url);
+        setShopifyLastSynced(shopifySyncMeta?.last_synced_at ?? null);
       } else {
         setShopifyConnected(false);
+        setShopifyDomain("");
+        setShopifyLastSynced(null);
       }
       setLsConn(ls);
       setShopifyCount(counts.shopify);

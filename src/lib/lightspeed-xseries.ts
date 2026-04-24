@@ -60,6 +60,37 @@ const DEFAULT_SETTINGS: XSeriesSettings = {
   trackInventory: true,
 };
 
+// ── Lightspeed export conventions (from canonical product-export_4.csv) ──
+// Lightspeed's own X-Series exports emit:
+//   • brand_name / supplier_name in UPPERCASE
+//   • name, product_category and variant values in UPPERCASE
+//   • tags joined with ";" (semicolons), not commas
+//   • loyalty_value_default = retail × 0.055 (3 dp)
+//   • tax_value = retail / 11 (5 dp)  // 10% GST component, ex-GST share
+// We mirror those so re-imports round-trip cleanly.
+const LOYALTY_RATE = 0.055;
+function lsCase(s: string | null | undefined): string {
+  return (s || '').toString().trim().toUpperCase();
+}
+function joinTagsLs(tags: string | string[] | null | undefined): string {
+  if (!tags) return '';
+  const arr = Array.isArray(tags)
+    ? tags
+    : String(tags).split(/[,;]/);
+  return arr
+    .map(t => t.trim())
+    .filter(Boolean)
+    .join(';');
+}
+function loyaltyDefault(retail: number): string {
+  if (!retail || retail <= 0) return '';
+  return (retail * LOYALTY_RATE).toFixed(3);
+}
+function taxValue(retail: number): string {
+  if (!retail || retail <= 0) return '';
+  return (retail / 11).toFixed(5);
+}
+
 const LS_SETTINGS_KEY = 'ls_xseries_settings';
 
 export function getXSeriesSettings(): XSeriesSettings {
@@ -186,7 +217,9 @@ function sizeRank(s: string): number {
 
 // ── Description fallback (B1 #4) ───────────────────────────
 function buildDescription(p: XSeriesProduct, colour: string): string {
-  if (p.description && p.description.trim()) return p.description.replace(/[\r\n]+/g, ' ');
+  // Preserve HTML / multi-line descriptions verbatim — Lightspeed's own export
+  // emits <p>, <h4>, <ul> blocks and those round-trip on re-import.
+  if (p.description && p.description.trim()) return p.description;
   const parts: string[] = [];
   const name = titleCase(stripBrandPrefix(p.title, p.brand));
   const col = titleCase(colour);
@@ -289,9 +322,10 @@ export function generateXSeriesCSV(
       composite_name: '',
       composite_sku: '',
       composite_quantity: '',
-      name: displayName,
+      // Lightspeed's own export uses UPPERCASE for the name column.
+      name: lsCase(displayName),
       description: '',
-      product_category: product.type || '',
+      product_category: lsCase(product.type || ''),
       variant_option_one_name: '',
       variant_option_one_value: '',
       variant_option_two_name: '',
@@ -303,13 +337,13 @@ export function generateXSeriesCSV(
       supply_price: (product.price || 0).toFixed(2),
       retail_price: (product.rrp || 0).toFixed(2),
       loyalty_value: '',
-      loyalty_value_default: '',
+      loyalty_value_default: loyaltyDefault(product.rrp || 0),
       tax_name: s.taxName,
-      tax_value: '',
+      tax_value: taxValue(product.rrp || 0),
       account_code: '',
       account_code_purchase: '',
-      brand_name: cleanBrand,
-      supplier_name: product.supplierName || '',
+      brand_name: lsCase(cleanBrand),
+      supplier_name: lsCase(product.supplierName || cleanBrand),
       supplier_code: styleCode, // style-level
       active: activeFlag,
       track_inventory: s.trackInventory ? '1' : '0',
@@ -322,7 +356,7 @@ export function generateXSeriesCSV(
       const row = baseRow();
       row.sku = sanitiseSku(styleCode);
       row.description = buildDescription(product, '');
-      row.tags = product.tags || '';
+      row.tags = joinTagsLs(product.tags);
       row[stockCol] = '0';
       allRows.push(row);
       return;
@@ -363,8 +397,9 @@ export function generateXSeriesCSV(
         ? sanitiseSku(`${variantSku}-${sizeToken}`)
         : variantSku;
 
-      const attr1Val = s.attributeOrder === 'size_first' ? (titleCase(v.size || '')) : (titleCase(v.colour || ''));
-      const attr2Val = s.attributeOrder === 'size_first' ? (titleCase(v.colour || '')) : (titleCase(v.size || ''));
+      // Lightspeed exports variant values in UPPERCASE (e.g. "VALENTINE", "1 YEAR").
+      const attr1Val = s.attributeOrder === 'size_first' ? lsCase(v.size || '') : lsCase(v.colour || '');
+      const attr2Val = s.attributeOrder === 'size_first' ? lsCase(v.colour || '') : lsCase(v.size || '');
 
       // B1 #2 — per-variant cost/retail with safe fallback to product-level.
       const supply = v.supplyPrice ?? product.price ?? 0;
@@ -373,13 +408,16 @@ export function generateXSeriesCSV(
       const row = baseRow();
       row.sku = variantSkuWithSize;
       row.description = buildDescription(product, v.colour || '');
-      row.tags = isFirst ? (product.tags || '') : '';
+      row.tags = isFirst ? joinTagsLs(product.tags) : '';
       row.variant_option_one_name = attr1Name;
       row.variant_option_one_value = attr1Val;
       row.variant_option_two_name = attr2Name;
       row.variant_option_two_value = attr2Val;
       row.supply_price = supply.toFixed(2);
       row.retail_price = retail.toFixed(2);
+      // Per-variant loyalty + tax recompute against the variant's own retail.
+      row.loyalty_value_default = loyaltyDefault(retail);
+      row.tax_value = taxValue(retail);
       // B1 #3 — extracted_qty (from the invoice/matrix), NOT received_qty.
       row[stockCol] = String(v.quantity ?? 0);
       allRows.push(row);

@@ -51,9 +51,16 @@ export interface ExportProduct {
   /** Where the recommended RRP came from. Drives the source pill in
    *  the export review UI so the user can spot website-vs-markup-vs-Google
    *  rows before exporting. Set by Phase 3 price orchestrator. */
-  priceSource?: "website" | "supplier_scrape" | "market_waterfall" | "markup_fallback" | "invoice_rrp" | "none";
+  priceSource?: "website" | "supplier_scrape" | "ai_search" | "market_waterfall" | "markup_fallback" | "invoice_rrp" | "none";
   /** Where the website match was found (Shopify product URL or scrape source). */
   priceSourceUrl?: string;
+  /** Provider/cache info for ai_search rows — surfaced on hover for transparency. */
+  priceSourceMeta?: {
+    provider?: "anthropic-websearch" | "brave-search";
+    query?: string;
+    cacheHit?: boolean;
+    costAud?: number;
+  };
 }
 
 interface ExportReviewScreenProps {
@@ -320,6 +327,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
             const sources = [
               { key: "website", label: "Brand website", className: "bg-success/15 text-success border-success/30", icon: "🟢" },
               { key: "supplier_scrape", label: "Supplier scrape", className: "bg-success/10 text-success border-success/20", icon: "🟢" },
+              { key: "ai_search", label: "AI web search", className: "bg-primary/10 text-primary border-primary/40 ring-1 ring-primary/30", icon: "🔷" },
               { key: "invoice_rrp", label: "Invoice RRP", className: "bg-primary/15 text-primary border-primary/30", icon: "🔵" },
               { key: "market_waterfall", label: "Google", className: "bg-warning/15 text-warning border-warning/30", icon: "🟡" },
               { key: "markup_fallback", label: "Markup formula", className: "bg-orange-500/15 text-orange-600 border-orange-500/30", icon: "🟠" },

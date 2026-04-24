@@ -285,6 +285,13 @@ const AccountScreen = () => {
         <PlatformConnectionsSection />
       </Section>
 
+      {/* Brand Database Sync — admins only */}
+      {isAdmin && (
+        <Section title="Brand database sync">
+          <BrandDatabaseSyncPanel />
+        </Section>
+      )}
+
       {/* Shopify Connection */}
       <Section title="Shopify connection">
         {shopifyConnected && (

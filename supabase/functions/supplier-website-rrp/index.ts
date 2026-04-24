@@ -181,7 +181,8 @@ Deno.serve(async (req) => {
         size: best.size,
         last_scraped_at: profile.website_last_scraped_at,
         supplier_profile_id: profile.id,
-        confidence: 95,
+        match_method: matchMethod,
+        confidence: matchMethod === "handle" ? 99 : matchMethod === "all_tokens" ? 90 : 75,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

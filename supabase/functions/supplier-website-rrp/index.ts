@@ -272,12 +272,19 @@ Deno.serve(async (req) => {
       if (rows?.length) {
         let candidates = rows;
         if (colour) {
-          const c = colour.toLowerCase();
-          const colourMatches = rows.filter((r) =>
-            (r.colour || "").toLowerCase().includes(c) ||
-            (r.product_title || "").toLowerCase().includes(c)
-          );
-          if (colourMatches.length) candidates = colourMatches;
+          // Fuzzy-tail colour matching: try the full colour first, then strip
+          // the trailing word and retry. Handles invoice noise like
+          // "Mosaique Green" → website variant "Mosaique".
+          for (const variant of colourVariants(colour)) {
+            const colourMatches = rows.filter((r) =>
+              (r.colour || "").toLowerCase().includes(variant) ||
+              (r.product_title || "").toLowerCase().includes(variant)
+            );
+            if (colourMatches.length) {
+              candidates = colourMatches;
+              break;
+            }
+          }
         }
         const best = candidates.reduce((a, b) =>
           Number(a.price) >= Number(b.price) ? a : b,

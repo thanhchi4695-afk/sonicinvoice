@@ -4746,12 +4746,20 @@ function LightspeedExportDownload({ exportFormat, products, supplierName, lsSett
           </div>
         )}
         {warnings.length > 0 && (
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-            {warnings.map((w, i) => (
-              <p key={i} className="text-xs text-amber-400 flex items-start gap-1">
+          <div className="bg-warning/10 border border-warning/20 rounded-lg p-3">
+            {warnings.slice(0, 5).map((w, i) => (
+              <p key={i} className="text-xs text-warning flex items-start gap-1">
                 <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" /> {w.message}
               </p>
             ))}
+          </div>
+        )}
+        {stockMismatch && (
+          <div className="bg-warning/10 border border-warning/20 rounded-lg p-3 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+            <span className="text-xs text-warning">
+              Stock count doesn't match invoice total — CSV has {totalStock} units, invoice expected {expectedTotal}. Review before importing.
+            </span>
           </div>
         )}
 

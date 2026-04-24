@@ -25,10 +25,16 @@ interface SheetRow {
 }
 
 function toCsvExportUrl(shareUrl: string): string {
-  const m = shareUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  const url = shareUrl.trim();
+  // Already a published-to-web CSV URL — use as-is
+  // e.g. https://docs.google.com/spreadsheets/d/e/{PUB_ID}/pub?output=csv
+  if (/\/spreadsheets\/d\/e\/[^/]+\/pub/i.test(url) && /output=csv/i.test(url)) {
+    return url;
+  }
+  // Standard share URL — convert to export?format=csv
+  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
   if (!m) throw new Error("Invalid Google Sheets URL");
-  // honour an explicit gid if present, else default to gid=0
-  const gidMatch = shareUrl.match(/[?#&]gid=(\d+)/);
+  const gidMatch = url.match(/[?#&]gid=(\d+)/);
   const gid = gidMatch ? gidMatch[1] : "0";
   return `https://docs.google.com/spreadsheets/d/${m[1]}/export?format=csv&gid=${gid}`;
 }

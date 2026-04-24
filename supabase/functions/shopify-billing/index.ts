@@ -113,7 +113,24 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const action = body.action || "status";
-    const { store_url, access_token, api_version } = conn;
+
+    let valid;
+    try {
+      valid = await ensureValidToken(supabaseAdmin, conn as ShopifyConnectionRow);
+    } catch (err) {
+      if (err instanceof ShopifyReauthRequiredError) {
+        return new Response(JSON.stringify({
+          error: "Shopify re-authentication required",
+          needs_reauth: true,
+          shop: err.shop,
+        }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw err;
+    }
+
+    const { storeUrl: store_url, accessToken: access_token, apiVersion: api_version } = valid;
     const graphqlUrl = `https://${store_url}/admin/api/${api_version}/graphql.json`;
 
     const shopifyGraphQL = async (query: string, variables?: Record<string, unknown>) => {

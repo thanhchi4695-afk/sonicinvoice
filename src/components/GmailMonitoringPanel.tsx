@@ -4,7 +4,7 @@
 // the inbox scanner has discovered. The user manually triggers the watchdog
 // from each row (Phase 3 will auto-trigger).
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Mail,
   Loader2,

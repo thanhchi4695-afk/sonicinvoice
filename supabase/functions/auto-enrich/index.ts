@@ -205,7 +205,8 @@ Deno.serve(async (req) => {
               styleName: p.title || "",
               styleNumber: firstVariant?.sku || "",
               colour: firstVariant?.color || "",
-              searchQuery: `${p.vendor || ""} ${p.title || ""}`.trim(),
+              // Broader query — the full title rarely indexes; brand + product type does.
+              searchQuery: `${p.vendor || ""} ${productType} swimwear`.trim().replace(/\s+/g, " "),
             }],
           }),
         }).then(async res => {

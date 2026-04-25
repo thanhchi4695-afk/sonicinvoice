@@ -232,17 +232,12 @@ Deno.serve(async (req) => {
     // Task C — image search (only if websearch didn't supply one)
     if (!p.image_url && !updates.image_url) {
       try {
-        // Simpler category-based query — full product titles rarely index in image search
-        const t = (p.title || "").toLowerCase();
-        let category = "swimwear";
-        if (t.includes("one piece") || t.includes("maillot") || t.includes("swimsuit")) category = "one piece swimwear";
-        else if (t.includes("bikini top") || t.includes("bralette") || t.includes("bandeau")) category = "bikini top";
-        else if (t.includes("bikini bottom") || t.includes("brief") || t.includes("boyleg") || t.includes("hipster")) category = "bikini bottom";
-        else if (t.includes("boardshort") || t.includes("trunk")) category = "boardshorts";
-        else if (t.includes("rashie") || t.includes("rash guard") || t.includes("rash")) category = "rash guard";
-        else if (t.includes("tankini")) category = "tankini";
-        const searchQuery = `${p.vendor || ""} ${category}`.trim().replace(/\s+/g, " ");
-        console.log("[auto-enrich] image-search query for:", p.id, "→", searchQuery);
+        // Simplest possible query — brand + "swimwear women" — full product titles rarely index
+        const brand = (p.vendor || "").trim();
+        const searchQuery = brand
+          ? `${brand} swimwear women`
+          : "one piece swimwear Australian brand";
+        console.log("[auto-enrich] image query:", searchQuery, "| id:", p.id);
 
         const r = await withTimeout(fetch(`${supabaseUrl}/functions/v1/image-search`, {
           method: "POST",

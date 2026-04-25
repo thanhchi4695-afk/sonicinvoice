@@ -269,17 +269,30 @@ export default function AutomationSettings() {
     setLastRun(null);
     try {
       const base64 = await fileToBase64(file);
-      const { data, error } = await supabase.functions.invoke("agent-watchdog", {
+      const { data, error } = await supabase.functions.invoke("agent-orchestrator", {
         body: {
           trigger_type: "manual",
           file_base64: base64,
-          file_name: file.name,
+          filename: file.name,
           mime_type: file.type || "application/pdf",
         },
       });
       if (error) throw new Error(error.message);
-      if (!data?.success) throw new Error(data?.error || "Watchdog failed");
-      const summary = data as AgentRunSummary;
+      if (!data?.run_id) throw new Error(data?.error || "Orchestrator failed");
+      // Re-fetch the full run to render the summary card
+      const { data: runData } = await supabase
+        .from("agent_runs")
+        .select("*")
+        .eq("id", data.run_id)
+        .maybeSingle();
+      const summary: AgentRunSummary = {
+        run_id: data.run_id,
+        supplier_name: runData?.supplier_name ?? null,
+        products_extracted: runData?.products_extracted ?? data.products_extracted ?? 0,
+        products_auto_approved: runData?.products_auto_approved ?? 0,
+        products_flagged: runData?.products_flagged ?? data.products_flagged ?? 0,
+        auto_publish_available: !!data.auto_published,
+      };
       setLastRun(summary);
       // In-app notification (NotificationBell uses localStorage). Link → account so the
       // user lands on Automation Settings where the Run History "Review →" button

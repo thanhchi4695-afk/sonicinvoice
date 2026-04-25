@@ -1207,6 +1207,101 @@ export type Database = {
           },
         ]
       }
+      gmail_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          email_address: string
+          expires_at: string
+          id: string
+          is_active: boolean
+          last_checked_at: string | null
+          last_email_id: string | null
+          refresh_token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          email_address: string
+          expires_at: string
+          id?: string
+          is_active?: boolean
+          last_checked_at?: string | null
+          last_email_id?: string | null
+          refresh_token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          email_address?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          last_checked_at?: string | null
+          last_email_id?: string | null
+          refresh_token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      gmail_found_invoices: {
+        Row: {
+          agent_run_id: string | null
+          attachments: Json
+          created_at: string
+          from_email: string | null
+          id: string
+          known_supplier: boolean
+          message_id: string
+          processed: boolean
+          received_at: string | null
+          subject: string | null
+          supplier_name: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_run_id?: string | null
+          attachments?: Json
+          created_at?: string
+          from_email?: string | null
+          id?: string
+          known_supplier?: boolean
+          message_id: string
+          processed?: boolean
+          received_at?: string | null
+          subject?: string | null
+          supplier_name?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_run_id?: string | null
+          attachments?: Json
+          created_at?: string
+          from_email?: string | null
+          id?: string
+          known_supplier?: boolean
+          message_id?: string
+          processed?: boolean
+          received_at?: string | null
+          subject?: string | null
+          supplier_name?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gmail_found_invoices_agent_run_id_fkey"
+            columns: ["agent_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory: {
         Row: {
           id: string

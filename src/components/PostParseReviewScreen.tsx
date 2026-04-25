@@ -1481,6 +1481,18 @@ export default function PostParseReviewScreen({
           <Button variant="teal" size="sm" onClick={() => { triggerProfileUpdate(); if (needsReview.length > 0) setShowExportWarning(true); else onPushToShopify(); }} className="gap-1">
             <ArrowUpRight className="w-3.5 h-3.5" /> Push to Shopify ({accepted.length})
           </Button>
+          {watchdogRun && watchdogRun.autoPublishEligible && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              title="Publishing Agent coming soon. Use Export CSV or Push to Shopify manually for now."
+              className="gap-1 cursor-not-allowed text-muted-foreground"
+            >
+              <Zap className="w-3.5 h-3.5" /> Auto-publish to Shopify
+              <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground/80">Coming soon</span>
+            </Button>
+          )}
         </div>
       </div>
     </div>

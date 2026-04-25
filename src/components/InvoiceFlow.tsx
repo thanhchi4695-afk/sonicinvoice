@@ -1925,27 +1925,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
     let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = [];
 
-    // ── Rule-based extraction if DB template exists for this supplier ──
-    if (dbTemplate && ["csv", "xlsx", "xls"].includes(ext)) {
-      setEnrichLines([{ name: "Using saved template…", status: "searching", action: `Rule-based extraction for ${supplierName}`, confidence: 0 }]);
-      try {
-        const rows = await parseFileToRows(file, dbTemplate.header_row);
-        if (rows.length > 0) {
-          // Save detected headers for teach modal
-          setDetectedHeaders(Object.keys(rows[0]));
-          const extracted = extractWithTemplate(rows, dbTemplate as any);
-          products = extracted;
-          // Increment success count in background
-          supabase.from("supplier_templates" as any)
-            .update({ success_count: (dbTemplate.success_count || 0) + 1 } as any)
-            .eq("id", dbTemplate.id)
-            .then(() => {});
-          toast.success(`⚡ Rule-based extraction: ${products.length} products`, { description: "No AI needed — using saved template" });
-        }
-      } catch (err) {
-        console.warn("Rule-based extraction failed, falling back to standard:", err);
-      }
-    }
+    // ── Rule-based extraction (DB template) — DISABLED ──
+    // Previously short-circuited CSV/xlsx with a saved supplier_templates row,
+    // bypassing the 3-stage classify-extract-validate edge pipeline. All files
+    // now route through parseWithAI → classify-extract-validate so Stage 1
+    // classification + supplier_profiles caching can apply uniformly.
 
     // Detect headers for CSV/Excel for potential teach later
     if (products.length === 0 && ["csv", "xlsx", "xls"].includes(ext)) {

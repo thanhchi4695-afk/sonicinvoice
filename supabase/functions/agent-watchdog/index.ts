@@ -50,14 +50,23 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return json({ error: "Missing Authorization" }, 401);
 
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) {
-      return json({ error: "Not authenticated" }, 401);
+    // Two auth modes:
+    //   (a) User JWT  → resolve userId via auth.getUser() (manual UI calls)
+    //   (b) Service-role + X-User-Id header → trusted cron / scan-gmail-inbox
+    let userId: string | null = null;
+    const sidecarUser = req.headers.get("X-User-Id");
+    if (sidecarUser && authHeader === `Bearer ${serviceKey}`) {
+      userId = sidecarUser;
+    } else {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: userData, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !userData?.user) {
+        return json({ error: "Not authenticated" }, 401);
+      }
+      userId = userData.user.id;
     }
-    const userId = userData.user.id;
 
     const body = await req.json().catch(() => ({}));
     const {

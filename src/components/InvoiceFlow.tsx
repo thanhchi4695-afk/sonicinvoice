@@ -2480,7 +2480,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       setStep(3);
       return;
     }
-    const groups: ProductGroup[] = products.map((p: any, i: number) => {
+    const normalized = products.map((p: any, i: number) => {
       const sku = p.sku ?? p.style_code ?? p.style_number ?? "";
       const colour = p.colour ?? p.color ?? "";
       const size = p.size ?? "";
@@ -2489,6 +2489,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const rrp = Number(p.rrp ?? p.retail_price ?? 0);
       const title = p.title ?? p.product_title ?? p.name ?? `Product ${i + 1}`;
       const brand = p.brand ?? p.vendor ?? p.supplier ?? payload.supplierName ?? "";
+      return { p, i, sku, colour, size, qty, cost, rrp, title, brand };
+    });
+    const groups: ProductGroup[] = normalized.map(({ p, i, sku, colour, size, qty, cost, rrp, title, brand }) => {
       return {
         styleGroup: sku || `${title}-${i}`,
         name: title,
@@ -2519,7 +2522,43 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         vendorCode: p.vendor_code ?? sku,
       } as ProductGroup;
     });
+    const validated = normalized.map(({ p, i, sku, colour, size, qty, cost, rrp, title, brand }) => ({
+      name: title,
+      brand,
+      sku,
+      barcode: p.barcode ?? p.gtin ?? "",
+      type: p.product_type ?? p.type ?? "",
+      colour,
+      size,
+      qty,
+      cost,
+      rrp,
+      group_key: p.group_key ?? sku,
+      _rowIndex: i,
+      _rawName: title,
+      _rawCost: cost,
+      _confidence: Number(p.confidence ?? p.overall_confidence ?? 50),
+      _confidenceLevel: "medium",
+      _confidenceReasons: [],
+      _issues: [],
+      _corrections: [],
+      _rejected: false,
+      _classification: "product_title",
+      _suggestedTitle: title,
+      _suggestedPrice: cost,
+      _suggestedVendor: brand,
+    } as ValidatedProduct));
     console.log(`[Watchdog] Hydrated ${groups.length} ProductGroups for run ${watchdogRun.runId}`);
+    setValidatedProducts(validated);
+    setValidationDebug({
+      totalRaw: validated.length,
+      accepted: validated.length,
+      needsReview: validated.length,
+      rejected: 0,
+      rejectedRows: [],
+      detectedVendor: payload.supplierName ?? "",
+      corrections: [],
+    });
     setProductGroups(groups);
     setStep(3);
     // eslint-disable-next-line react-hooks/exhaustive-deps

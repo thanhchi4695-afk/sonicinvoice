@@ -49,6 +49,7 @@ interface AgentRunRow {
   human_review_required: boolean;
   status: string;
   error_message: string | null;
+  metadata?: any;
 }
 
 const DEFAULTS: AutomationSettings = {
@@ -122,7 +123,7 @@ export default function AutomationSettings() {
     if (!userId) { setLoadingRuns(false); return; }
     const { data } = await supabase
       .from("agent_runs")
-      .select("id, started_at, supplier_name, supplier_profile_id, invoice_filename, products_extracted, products_auto_approved, products_flagged, auto_published, human_review_required, status, error_message")
+      .select("id, started_at, supplier_name, supplier_profile_id, invoice_filename, products_extracted, products_auto_approved, products_flagged, auto_published, human_review_required, status, error_message, metadata")
       .eq("user_id", userId)
       .order("started_at", { ascending: false })
       .limit(20);
@@ -131,10 +132,17 @@ export default function AutomationSettings() {
   }
 
   async function openRunForReview(run: AgentRunRow, productsFromMemory?: any[]) {
-    // Prefer in-memory products (stashed when this run completed in this tab),
-    // otherwise look in per-run sessionStorage cache, otherwise leave empty
-    // and let the InvoiceFlow show the empty Review screen for that run.
-    let products: any[] = productsFromMemory ?? [];
+    let freshRun = run;
+    let products: any[] = productsFromMemory ?? extractProductsFromRun(run);
+    const { data: runData, error: runError } = await supabase
+      .from("agent_runs")
+      .select("*")
+      .eq("id", run.id)
+      .maybeSingle();
+    if (!runError && runData) {
+      freshRun = runData as AgentRunRow;
+      products = extractProductsFromRun(freshRun);
+    }
     if (products.length === 0) {
       try {
         const cached = sessionStorage.getItem(`sonic_watchdog_run_${run.id}`);
@@ -143,12 +151,12 @@ export default function AutomationSettings() {
     }
 
     const payload = {
-      run_id: run.id,
-      supplier_name: run.supplier_name,
-      supplier_profile_id: run.supplier_profile_id,
-      products_extracted: run.products_extracted,
-      products_flagged: run.products_flagged,
-      auto_publish_eligible: !run.human_review_required,
+      run_id: freshRun.id,
+      supplier_name: freshRun.supplier_name?.trim() || "Unknown supplier",
+      supplier_profile_id: freshRun.supplier_profile_id,
+      products_extracted: freshRun.products_extracted,
+      products_flagged: freshRun.products_flagged,
+      auto_publish_eligible: !freshRun.human_review_required,
       products,
     };
 
@@ -578,6 +586,20 @@ function RunRow({
       </div>
     </div>
   );
+}
+
+function extractProductsFromRun(run: AgentRunRow): any[] {
+  const metadata = run.metadata ?? {};
+  const candidates = [
+    metadata?.products,
+    metadata?.extracted_products,
+    metadata?.parse_result?.products,
+    metadata?.parse_summary?.products,
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) return candidate;
+  }
+  return [];
 }
 
 function RunStatusBadge({ status }: { status: string }) {

@@ -2467,6 +2467,52 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
   const [isReprocessing, setIsReprocessing] = useState(false);
 
+  // Watchdog Agent — hydrate Review screen on mount when a stashed run had products.
+  // Maps the agent_runs / parse-invoice product shape into the ProductGroup shape
+  // the Review UI expects, then jumps straight to Step 3 (Review).
+  useEffect(() => {
+    const payload = watchdogPayloadRef.current;
+    if (!watchdogRun || !payload) return;
+    if (payload.supplierName) setSupplierName(payload.supplierName);
+    const products = payload.products ?? [];
+    if (products.length === 0) {
+      console.warn("[Watchdog] No products in payload — opening empty Review for run", watchdogRun.runId);
+      setStep(3);
+      return;
+    }
+    const groups: ProductGroup[] = products.map((p: any, i: number) => {
+      const sku = p.sku ?? p.style_code ?? p.style_number ?? "";
+      const colour = p.colour ?? p.color ?? "";
+      const size = p.size ?? "";
+      const qty = Number(p.quantity ?? p.qty ?? 1);
+      const cost = Number(p.unit_cost ?? p.cost ?? p.price ?? 0);
+      const rrp = Number(p.rrp ?? p.retail_price ?? 0);
+      const title = p.title ?? p.product_title ?? p.name ?? `Product ${i + 1}`;
+      const brand = p.brand ?? p.vendor ?? p.supplier ?? payload.supplierName ?? "";
+      return {
+        styleGroup: sku || `${title}-${i}`,
+        name: title,
+        brand,
+        type: p.product_type ?? p.type ?? "",
+        colour,
+        size,
+        price: cost,
+        rrp,
+        cogs: cost,
+        status: "pending",
+        metafields: {},
+        variants: [{ sku, colour, size, qty, cost, rrp } as VariantLine],
+        isGrouped: false,
+        barcode: p.barcode ?? p.gtin ?? undefined,
+        vendorCode: p.vendor_code ?? sku,
+      } as ProductGroup;
+    });
+    console.log(`[Watchdog] Hydrated ${groups.length} ProductGroups for run ${watchdogRun.runId}`);
+    setProductGroups(groups);
+    setStep(3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── Stock reconciliation (auto-runs when reaching export step) ───────────
   const [platformConnections, setPlatformConnections] = useState<Array<{ platform: string; shop_domain?: string | null }>>([]);
   const [platformsChecked, setPlatformsChecked] = useState(false);

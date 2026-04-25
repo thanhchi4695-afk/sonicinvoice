@@ -130,10 +130,7 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
     };
   }, [load]);
 
-  const projectRef = useMemo(
-    () => import.meta.env.VITE_SUPABASE_PROJECT_ID as string,
-    [],
-  );
+
 
   async function startConnect() {
     const {

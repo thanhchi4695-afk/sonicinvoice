@@ -216,11 +216,23 @@ export default function AutomationSettings() {
       if (!data?.success) throw new Error(data?.error || "Watchdog failed");
       const summary = data as AgentRunSummary;
       setLastRun(summary);
-      // In-app notification (NotificationBell uses localStorage)
+      // In-app notification (NotificationBell uses localStorage). Link → account so the
+      // user lands on Automation Settings where the Run History "Review →" button
+      // pre-loads the run's products into the Invoice review screen.
       pushNotification({
-        title: `New ${summary.supplier_name ?? "supplier"} invoice detected`,
-        message: `${summary.products_extracted} products extracted. ${summary.products_auto_approved} auto-approved, ${summary.products_flagged} need review.`,
+        title: "Invoice processed — review needed",
+        message: `${summary.products_extracted} products extracted from ${summary.supplier_name ?? "Unknown supplier"}. ${summary.products_flagged} need your review.`,
+        severity: summary.products_flagged === 0 ? "success" : "info",
+        runId: summary.run_id,
       });
+      // Stash products so a quick click straight from the toast/recent-run card works
+      try {
+        sessionStorage.setItem(
+          `sonic_watchdog_run_${summary.run_id}`,
+          JSON.stringify(summary.products ?? []),
+        );
+      } catch { /* ignore */ }
+      void loadRuns();
       toast.success("Watchdog run complete");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));

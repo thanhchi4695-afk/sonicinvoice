@@ -46,6 +46,16 @@ interface AgentRunSummary {
   products?: any[];
 }
 
+interface PipelineStepRecord {
+  step: string;
+  status: "pending" | "running" | "complete" | "failed" | "skipped";
+  retry_count: number;
+  error: string | null;
+  started_at?: string;
+  updated_at?: string;
+  completed_at?: string;
+}
+
 interface AgentRunRow {
   id: string;
   started_at: string;
@@ -60,6 +70,8 @@ interface AgentRunRow {
   status: string;
   error_message: string | null;
   metadata?: any;
+  current_step?: string | null;
+  pipeline_steps?: PipelineStepRecord[] | null;
 }
 
 const DEFAULTS: AutomationSettings = {

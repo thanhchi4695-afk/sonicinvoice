@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import GmailMonitoringPanel from "@/components/GmailMonitoringPanel";
 
 interface SupplierRow {
   id: string;
@@ -392,6 +393,9 @@ export default function AutomationSettings() {
           </div>
         )}
       </div>
+
+      {/* Phase 2 — Gmail monitoring + found invoices */}
+      <GmailMonitoringPanel onRunComplete={() => void loadRuns()} />
 
       {/* Supplier table */}
       <div className="rounded-lg border border-border bg-card">

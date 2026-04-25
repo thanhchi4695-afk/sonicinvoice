@@ -4086,6 +4086,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 underExtractionWarning={underExtractionWarning}
                 fieldConfidence={aiFieldConfidence}
                 extractionNotes={aiExtractionNotes}
+                watchdogRun={watchdogRun}
               />
             </div>
           )}

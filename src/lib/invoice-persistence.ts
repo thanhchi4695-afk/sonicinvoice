@@ -286,7 +286,7 @@ export async function persistParsedInvoice(
       body: {
         user_id: userId,
         product_ids: writtenProductIds,
-        run_id: null,
+        run_id: runId ?? null,
       },
     }).then((r) => {
       console.log("[auto-enrich] complete", r?.data);

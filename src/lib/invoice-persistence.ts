@@ -162,8 +162,9 @@ export async function persistParsedInvoice(
         productId = existingProduct.id as string;
         await supabase.from("products").update({
           vendor: meta.supplier || null,
+          source: "invoice_unreviewed",
           updated_at: new Date().toISOString(),
-        }).eq("id", productId);
+        } as any).eq("id", productId);
       } else {
         const { data: newProduct, error: prodErr } = await supabase
           .from("products")
@@ -171,7 +172,8 @@ export async function persistParsedInvoice(
             user_id: userId,
             title,
             vendor: meta.supplier || null,
-          })
+            source: "invoice_unreviewed",
+          } as any)
           .select("id")
           .single();
         if (prodErr) {

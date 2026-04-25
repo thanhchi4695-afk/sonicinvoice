@@ -1944,14 +1944,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       }
     }
 
+    // Detect headers for CSV/Excel for potential teach later
     if (products.length === 0 && ["csv", "xlsx", "xls"].includes(ext)) {
-      // Detect headers for potential teach later
       try {
         const rows = await parseFileToRows(file, 1);
         if (rows.length > 0) setDetectedHeaders(Object.keys(rows[0]));
       } catch {}
-      products = await parseSpreadsheet(file);
-    } else if (products.length === 0) {
+    }
+
+    if (products.length === 0) {
       // ── Brain Mode branch (5-stage pipeline) ──
       if (isBrainModeEnabled() && ["jpg", "jpeg", "png", "webp", "pdf"].includes(ext)) {
         try {

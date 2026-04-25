@@ -216,6 +216,7 @@ Deno.serve(async (req) => {
             document_type: parseJson?.document_type ?? null,
             layout: parseJson?.layout_type ?? null,
           },
+          products,
         },
       })
       .eq("id", runId);

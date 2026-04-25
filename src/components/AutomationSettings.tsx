@@ -21,6 +21,14 @@ interface SupplierRow {
   last_invoice_date: string | null;
 }
 
+interface SharedProfileRow {
+  supplier_name: string;
+  contributing_users: number;
+  total_invoices_processed: number;
+  avg_correction_rate: number | null;
+  is_verified: boolean;
+}
+
 interface AutomationSettings {
   automation_email_monitoring: boolean;
   automation_auto_extract: boolean;
@@ -64,6 +72,7 @@ const DEFAULTS: AutomationSettings = {
 export default function AutomationSettings() {
   const [settings, setSettings] = useState<AutomationSettings>(DEFAULTS);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [sharedProfiles, setSharedProfiles] = useState<Record<string, SharedProfileRow>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -115,6 +124,18 @@ export default function AutomationSettings() {
 
     if (settingsRes.data) setSettings({ ...DEFAULTS, ...(settingsRes.data as any) });
     if (suppliersRes.data) setSuppliers(suppliersRes.data as SupplierRow[]);
+
+    // Load shared supplier profiles (network intelligence) — read-only for all users
+    const { data: sharedRows } = await supabase
+      .from("shared_supplier_profiles")
+      .select("supplier_name, contributing_users, total_invoices_processed, avg_correction_rate, is_verified");
+    if (sharedRows) {
+      const map: Record<string, SharedProfileRow> = {};
+      for (const r of sharedRows as SharedProfileRow[]) {
+        map[r.supplier_name.toLowerCase().trim()] = r;
+      }
+      setSharedProfiles(map);
+    }
     setLoading(false);
   }
 
@@ -406,8 +427,27 @@ export default function AutomationSettings() {
 
       {/* Supplier table */}
       <div className="rounded-lg border border-border bg-card">
-        <div className="px-4 py-2 border-b border-border">
+        <div className="px-4 py-2 border-b border-border space-y-1">
           <p className="text-sm font-medium">Supplier confidence</p>
+          {(() => {
+            const sharedList = Object.values(sharedProfiles);
+            if (sharedList.length === 0) return null;
+            const totalSuppliers = sharedList.length;
+            const totalRetailers = new Set(
+              sharedList.flatMap((p) => Array(p.contributing_users).fill(p.supplier_name + "::" + p.contributing_users)),
+            ).size;
+            const verifiedCount = sharedList.filter((p) => p.is_verified).length;
+            // Better: sum of contributing_users across all suppliers gives retailer-touchpoints
+            const retailerSum = sharedList.reduce((n, p) => n + (p.contributing_users || 0), 0);
+            void totalRetailers;
+            return (
+              <p className="text-[11px] text-muted-foreground">
+                Sonic Invoice has learned from <span className="font-medium text-foreground">{totalSuppliers}</span>{" "}
+                suppliers across <span className="font-medium text-foreground">{retailerSum}</span> retailers.{" "}
+                <span className="font-medium text-foreground">{verifiedCount}</span> suppliers are community-verified.
+              </p>
+            );
+          })()}
         </div>
         {suppliers.length === 0 ? (
           <p className="p-4 text-xs text-muted-foreground">
@@ -420,6 +460,7 @@ export default function AutomationSettings() {
               const corr = s.correction_rate ?? 0;
               const eligible =
                 conf >= settings.automation_min_confidence && corr <= 0.05;
+              const shared = sharedProfiles[(s.supplier_name || "").toLowerCase().trim()];
               return (
                 <div key={s.id} className="p-3 space-y-2">
                   <div className="flex items-center justify-between gap-3">
@@ -428,6 +469,23 @@ export default function AutomationSettings() {
                       <p className="text-[11px] text-muted-foreground">
                         {s.invoice_count ?? 0} invoices ·{" "}
                         <span className={correctionClass(corr)}>{correctionLabel(corr)}</span>
+                      </p>
+                      {/* Network */}
+                      <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                        <span
+                          className={`inline-block w-1.5 h-1.5 rounded-full ${
+                            shared?.is_verified
+                              ? "bg-success"
+                              : shared
+                              ? "bg-muted-foreground/50"
+                              : "bg-muted"
+                          }`}
+                        />
+                        {shared
+                          ? `${shared.contributing_users} retailer${shared.contributing_users === 1 ? "" : "s"} · ${
+                              Math.round((1 - (shared.avg_correction_rate ?? 0)) * 100)
+                            }% avg accuracy`
+                          : "Only you"}
                       </p>
                     </div>
                     <div className="text-right">

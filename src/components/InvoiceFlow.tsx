@@ -551,6 +551,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   // Watchdog Agent hand-off — picks up a stashed run so the review screen can
   // render the (currently disabled) "Auto-publish to Shopify" button.
+  // Also captures any products that were extracted by the agent so we can
+  // pre-load them into the Review screen and skip the Upload step.
+  const watchdogPayloadRef = useRef<{ products: any[]; supplierName: string | null } | null>(null);
   const [watchdogRun] = useState<{ runId: string; autoPublishEligible: boolean } | null>(() => {
     try {
       const raw = sessionStorage.getItem("sonic_watchdog_run");
@@ -558,6 +561,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       sessionStorage.removeItem("sonic_watchdog_run");
       const parsed = JSON.parse(raw);
       if (!parsed?.run_id) return null;
+      watchdogPayloadRef.current = {
+        products: Array.isArray(parsed.products) ? parsed.products : [],
+        supplierName: parsed.supplier_name ?? null,
+      };
+      console.log("[Watchdog] InvoiceFlow loaded run:", parsed.run_id, `products=${watchdogPayloadRef.current.products.length}`);
       return { runId: parsed.run_id, autoPublishEligible: !!parsed.auto_publish_eligible };
     } catch { return null; }
   });

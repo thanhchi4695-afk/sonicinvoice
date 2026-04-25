@@ -275,5 +275,22 @@ export async function persistParsedInvoice(
     }
   }
 
+  // ── 6. Fire Agent 3 (Enrichment) in the background — do NOT await.
+  //        The Review screen subscribes to products UPDATE events and
+  //        renders descriptions/images live as they arrive.
+  if (writtenProductIds.length > 0) {
+    supabase.functions.invoke("auto-enrich", {
+      body: {
+        user_id: userId,
+        product_ids: writtenProductIds,
+        run_id: null,
+      },
+    }).then((r) => {
+      console.log("[auto-enrich] complete", r?.data);
+    }).catch((e) => {
+      console.warn("[auto-enrich] failed", e?.message);
+    });
+  }
+
   return { documentId: doc.id, supplierId: matchedSupplierId, error: null };
 }

@@ -664,6 +664,9 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
           onStartLookbookImport={() => setActiveFlow("lookbook_import")}
           onStartScanMode={() => setActiveFlow("scan_mode")}
+          onOpenAgentGuide={() => setActiveTab("agent_guide")}
+          onOpenAutomation={() => setActiveTab("account")}
+          onOpenIntegrations={() => setActiveTab("account")}
         />
       )}
       {activeTab === "start" && (

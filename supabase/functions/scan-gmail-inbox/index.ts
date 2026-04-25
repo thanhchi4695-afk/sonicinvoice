@@ -345,6 +345,57 @@ async function refreshAccessToken(
   return tokens.access_token;
 }
 
+// Auto-process helper: download an attachment from Gmail with the user's
+// access token, then call agent-watchdog with the service-role key (since
+// there's no user JWT available inside a cron-triggered context).
+async function runWatchdogForAttachment(args: {
+  supabaseUrl: string;
+  serviceKey: string;
+  userId: string;
+  accessToken: string;
+  messageId: string;
+  attachment: { filename: string; mime_type: string; attachment_id: string };
+  supplierName: string | null;
+}): Promise<string | null> {
+  // 1. Download attachment bytes (URL-safe base64 → standard base64)
+  const attResp = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${args.messageId}/attachments/${args.attachment.attachment_id}`,
+    { headers: { Authorization: `Bearer ${args.accessToken}` } },
+  );
+  if (!attResp.ok) {
+    console.error("[scan-gmail-inbox] attachment fetch failed", attResp.status);
+    return null;
+  }
+  const attJson = await attResp.json() as { data?: string };
+  if (!attJson.data) return null;
+  const base64 = attJson.data.replace(/-/g, "+").replace(/_/g, "/");
+
+  // 2. Call watchdog with X-User-Id header so it can attribute the run
+  // (agent-watchdog reads Authorization for user JWT in normal flow; we use
+  // the service role with a sidecar header for the cron path)
+  const resp = await fetch(`${args.supabaseUrl}/functions/v1/agent-watchdog`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${args.serviceKey}`,
+      "X-User-Id": args.userId,
+    },
+    body: JSON.stringify({
+      trigger_type: "email",
+      file_base64: base64,
+      file_name: args.attachment.filename,
+      mime_type: args.attachment.mime_type,
+      supplier_name: args.supplierName ?? undefined,
+    }),
+  });
+  if (!resp.ok) {
+    console.error("[scan-gmail-inbox] watchdog call failed", resp.status, await resp.text().catch(() => ""));
+    return null;
+  }
+  const data = await resp.json().catch(() => ({}));
+  return (data?.run_id as string) ?? null;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,

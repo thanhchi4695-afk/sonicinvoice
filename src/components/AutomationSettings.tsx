@@ -335,7 +335,7 @@ export default function AutomationSettings() {
           <input
             ref={fileInput}
             type="file"
-            accept="application/pdf,image/*"
+            accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.heic,.webp,application/pdf,image/*,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];

@@ -304,6 +304,8 @@ const AccountScreen = () => {
           </div>
         )}
 
+        {shopifyConnected && <ShopifyTokenMigrationButton />}
+
         {!shopifyConnected && (
           <>
             <Field
@@ -890,6 +892,78 @@ const LanguageSelector = () => {
 };
 
 export default AccountScreen;
+
+// ── Shopify Token Auto-Migration Button ────────────────────
+function ShopifyTokenMigrationButton() {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<
+    | { kind: "success"; message: string }
+    | { kind: "error"; message: string }
+    | null
+  >(null);
+
+  const handleMigrate = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "shopify-token-migrate-self",
+        { body: {} },
+      );
+      if (error) throw new Error(error.message);
+      if (data?.success) {
+        const expiry = data.token_expires_at
+          ? ` New token expires ${new Date(data.token_expires_at).toLocaleString()}.`
+          : "";
+        const note = data.already_migrated
+          ? "Already on expiring tokens — refreshed where needed."
+          : "Migrated to expiring tokens.";
+        setResult({ kind: "success", message: `${note}${expiry}` });
+      } else if (data?.needs_reauth) {
+        setResult({ kind: "error", message: data.error || "Reconnect required." });
+      } else {
+        setResult({ kind: "error", message: data?.error || "Migration failed." });
+      }
+    } catch (err) {
+      setResult({
+        kind: "error",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mb-3 space-y-2">
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={handleMigrate}
+        disabled={loading}
+      >
+        {loading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+        Run Shopify token auto-migration
+      </Button>
+      {result?.kind === "success" && (
+        <p className="text-xs text-success flex items-start gap-1">
+          <Check className="w-3 h-3 mt-0.5 shrink-0" />
+          <span>{result.message}</span>
+        </p>
+      )}
+      {result?.kind === "error" && (
+        <p className="text-xs text-destructive flex items-start gap-1">
+          <X className="w-3 h-3 mt-0.5 shrink-0" />
+          <span>{result.message}</span>
+        </p>
+      )}
+      <p className="text-[11px] text-muted-foreground">
+        Upgrades this store's non-expiring offline token to Shopify's new expiring token format. Safe to run anytime.
+      </p>
+    </div>
+  );
+}
 
 // ── API Keys Section ───────────────────────────────────────
 const apiProviders = [

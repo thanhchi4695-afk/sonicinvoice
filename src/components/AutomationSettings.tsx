@@ -541,19 +541,27 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function pushNotification(opts: { title: string; message: string }) {
+function pushNotification(opts: {
+  title: string;
+  message: string;
+  severity?: "urgent" | "warning" | "info" | "success";
+  runId?: string;
+}) {
   try {
     const STORAGE_KEY = "notifications_suppliersync";
     const raw = localStorage.getItem(STORAGE_KEY);
     const list = raw ? JSON.parse(raw) : [];
     list.unshift({
       id: crypto.randomUUID(),
-      severity: "info",
+      severity: opts.severity ?? "info",
       title: opts.title,
       message: opts.message,
       timestamp: new Date().toISOString(),
       read: false,
-      link: "invoices",
+      // Land on Account → Automation Settings, where the Run History table has
+      // the "Review →" button to open the specific run in the Invoice flow.
+      link: "account",
+      ...(opts.runId ? { runId: opts.runId } : {}),
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 100)));
   } catch {

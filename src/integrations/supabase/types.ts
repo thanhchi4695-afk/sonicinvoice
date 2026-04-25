@@ -323,6 +323,8 @@ export type Database = {
         Row: {
           auto_published: boolean
           completed_at: string | null
+          enrichment_complete: boolean
+          enrichment_completed_at: string | null
           error_message: string | null
           human_review_required: boolean
           id: string
@@ -342,6 +344,8 @@ export type Database = {
         Insert: {
           auto_published?: boolean
           completed_at?: string | null
+          enrichment_complete?: boolean
+          enrichment_completed_at?: string | null
           error_message?: string | null
           human_review_required?: boolean
           id?: string
@@ -361,6 +365,8 @@ export type Database = {
         Update: {
           auto_published?: boolean
           completed_at?: string | null
+          enrichment_complete?: boolean
+          enrichment_completed_at?: string | null
           error_message?: string | null
           human_review_required?: boolean
           id?: string

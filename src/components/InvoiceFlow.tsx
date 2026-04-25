@@ -551,6 +551,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   // Watchdog Agent hand-off — picks up a stashed run so the review screen can
   // render the (currently disabled) "Auto-publish to Shopify" button.
+  // Also captures any products that were extracted by the agent so we can
+  // pre-load them into the Review screen and skip the Upload step.
+  const watchdogPayloadRef = useRef<{ products: any[]; supplierName: string | null } | null>(null);
   const [watchdogRun] = useState<{ runId: string; autoPublishEligible: boolean } | null>(() => {
     try {
       const raw = sessionStorage.getItem("sonic_watchdog_run");
@@ -558,6 +561,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       sessionStorage.removeItem("sonic_watchdog_run");
       const parsed = JSON.parse(raw);
       if (!parsed?.run_id) return null;
+      watchdogPayloadRef.current = {
+        products: Array.isArray(parsed.products) ? parsed.products : [],
+        supplierName: parsed.supplier_name ?? null,
+      };
+      console.log("[Watchdog] InvoiceFlow loaded run:", parsed.run_id, `products=${watchdogPayloadRef.current.products.length}`);
       return { runId: parsed.run_id, autoPublishEligible: !!parsed.auto_publish_eligible };
     } catch { return null; }
   });
@@ -2458,6 +2466,64 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [collectionSeoActive, setCollectionSeoActive] = useState(false);
   const [underExtractionWarning, setUnderExtractionWarning] = useState<{ extractedCount: number; estimatedRows: number } | null>(null);
   const [isReprocessing, setIsReprocessing] = useState(false);
+
+  // Watchdog Agent — hydrate Review screen on mount when a stashed run had products.
+  // Maps the agent_runs / parse-invoice product shape into the ProductGroup shape
+  // the Review UI expects, then jumps straight to Step 3 (Review).
+  useEffect(() => {
+    const payload = watchdogPayloadRef.current;
+    if (!watchdogRun || !payload) return;
+    if (payload.supplierName) setSupplierName(payload.supplierName);
+    const products = payload.products ?? [];
+    if (products.length === 0) {
+      console.warn("[Watchdog] No products in payload — opening empty Review for run", watchdogRun.runId);
+      setStep(3);
+      return;
+    }
+    const groups: ProductGroup[] = products.map((p: any, i: number) => {
+      const sku = p.sku ?? p.style_code ?? p.style_number ?? "";
+      const colour = p.colour ?? p.color ?? "";
+      const size = p.size ?? "";
+      const qty = Number(p.quantity ?? p.qty ?? 1);
+      const cost = Number(p.unit_cost ?? p.cost ?? p.price ?? 0);
+      const rrp = Number(p.rrp ?? p.retail_price ?? 0);
+      const title = p.title ?? p.product_title ?? p.name ?? `Product ${i + 1}`;
+      const brand = p.brand ?? p.vendor ?? p.supplier ?? payload.supplierName ?? "";
+      return {
+        styleGroup: sku || `${title}-${i}`,
+        name: title,
+        brand,
+        type: p.product_type ?? p.type ?? "",
+        colour,
+        size,
+        price: cost,
+        rrp,
+        cogs: cost,
+        status: "pending",
+        metafields: {},
+        variants: [{
+          sku,
+          colour,
+          size,
+          qty,
+          cost,
+          rrp,
+          price: rrp || cost,
+          option1Name: "Colour",
+          option1Value: colour,
+          option2Name: "Size",
+          option2Value: size,
+        } as unknown as VariantLine],
+        isGrouped: false,
+        barcode: p.barcode ?? p.gtin ?? undefined,
+        vendorCode: p.vendor_code ?? sku,
+      } as ProductGroup;
+    });
+    console.log(`[Watchdog] Hydrated ${groups.length} ProductGroups for run ${watchdogRun.runId}`);
+    setProductGroups(groups);
+    setStep(3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Stock reconciliation (auto-runs when reaching export step) ───────────
   const [platformConnections, setPlatformConnections] = useState<Array<{ platform: string; shop_domain?: string | null }>>([]);

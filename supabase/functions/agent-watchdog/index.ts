@@ -151,6 +151,15 @@ Deno.serve(async (req) => {
         ? parseJson.data.products
         : [];
 
+    // Debug — what shape did parse-invoice actually return?
+    console.log("[agent-watchdog] parse keys:", Object.keys(parseJson || {}));
+    if (products[0]) {
+      console.log("[agent-watchdog] product[0] keys:", Object.keys(products[0]));
+      console.log("[agent-watchdog] product[0].vendor:", products[0]?.vendor);
+      console.log("[agent-watchdog] product[0].supplier:", products[0]?.supplier);
+      console.log("[agent-watchdog] product[0].brand:", products[0]?.brand);
+    }
+
     // Classify products
     let autoApproved = 0;
     let flagged = 0;
@@ -163,7 +172,7 @@ Deno.serve(async (req) => {
 
     // Resolve supplier name from parse output if it wasn't provided up-front.
     // Falls back through the common fields parse-invoice + product rows expose.
-    const resolvedSupplierName: string | null =
+    const candidate: string | null =
       profile?.supplier_name ??
       parseJson?.supplier ??
       parseJson?.supplier_name ??
@@ -175,6 +184,13 @@ Deno.serve(async (req) => {
       products[0]?.brand ??
       supplier_name ??
       null;
+    // Normalise empty strings to null so the UI shows "Unknown supplier"
+    // rather than a blank, and the agent_runs row stores a real value.
+    const resolvedSupplierName: string | null =
+      typeof candidate === "string" && candidate.trim().length > 0
+        ? candidate.trim()
+        : null;
+    console.log("[agent-watchdog] resolved supplier_name:", resolvedSupplierName);
 
     // Determine final status
     const supplierEligible = !!profile?.auto_publish_eligible;

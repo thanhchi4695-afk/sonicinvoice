@@ -58,6 +58,9 @@ interface PostParseReviewScreenProps {
   extractionNotes?: string | null;
   /** Which extraction path was taken: full_extraction | supplier_match | fingerprint_match. */
   matchMethod?: "full_extraction" | "supplier_match" | "fingerprint_match";
+  /** Set when the review screen was opened from a Watchdog Agent run. Renders the
+   *  (currently disabled) "Auto-publish to Shopify" button in the action bar. */
+  watchdogRun?: { runId: string; autoPublishEligible: boolean } | null;
 }
 
 type ReviewTab = "accepted" | "review" | "rejected";

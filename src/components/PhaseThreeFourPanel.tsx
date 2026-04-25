@@ -191,13 +191,28 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
   // ─── Phase 4 — parallel enrichment for new products only ────
   useEffect(() => {
     if (!classified || startedRef.current) return;
-    const newOnes = classified.filter(c => c.classification === "new_product" || c.classification === "new_colour");
+    const newOnesAll = classified.filter(c => c.classification === "new_product" || c.classification === "new_colour");
+    if (newOnesAll.length === 0) return;
+
+    // Deduplicate: one enrichment call per unique brand+styleName combination.
+    // Without this, every variant (size/colour) of the same product triggers a
+    // separate fetch-product-description / image-search / websearch call.
+    const seen = new Set<string>();
+    const newOnes = newOnesAll.filter(c => {
+      const key = [
+        (c.original_line.brand || supplierName || ""),
+        (c.original_line.styleName || ""),
+      ].join("|").toLowerCase().trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     if (newOnes.length === 0) return;
 
     startedRef.current = true;
     setEnrichRunning(true);
 
-    // Init pending state
+    // Init pending state — keyed off the same dedup list so UI reflects 1 row per product.
     const initial: Record<string, EnrichState> = {};
     newOnes.forEach(c => {
       initial[keyFor(c)] = { status: "pending", errors: [] };

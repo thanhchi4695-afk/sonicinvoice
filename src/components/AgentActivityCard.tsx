@@ -80,13 +80,23 @@ export default function AgentActivityCard({ hasGmail, monitoringOn, eligibleSupp
 
   useEffect(() => { void load(); }, []);
 
-  // Realtime: refresh on any agent_runs change
+  // Realtime: refresh on any agent_runs OR gmail_found_invoices change for this user.
+  // Both stats (4 numbers) and the activity feed share load(), so a single refresh
+  // updates both within ~1s of a watchdog run completing.
   useEffect(() => {
-    const ch = supabase
-      .channel("agent_runs_dashboard")
-      .on("postgres_changes", { event: "*", schema: "public", table: "agent_runs" }, () => void load())
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    let userId: string | null = null;
+    let cancelled = false;
+    const ch = supabase.channel("agent_activity_card");
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      userId = data.user?.id ?? null;
+      if (cancelled || !userId) return;
+      ch
+        .on("postgres_changes", { event: "*", schema: "public", table: "agent_runs", filter: `user_id=eq.${userId}` }, () => void load())
+        .on("postgres_changes", { event: "*", schema: "public", table: "gmail_found_invoices", filter: `user_id=eq.${userId}` }, () => void load())
+        .subscribe();
+    })();
+    return () => { cancelled = true; void supabase.removeChannel(ch); };
   }, []);
 
   return (

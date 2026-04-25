@@ -21,6 +21,14 @@ interface SupplierRow {
   last_invoice_date: string | null;
 }
 
+interface SharedProfileRow {
+  supplier_name: string;
+  contributing_users: number;
+  total_invoices_processed: number;
+  avg_correction_rate: number | null;
+  is_verified: boolean;
+}
+
 interface AutomationSettings {
   automation_email_monitoring: boolean;
   automation_auto_extract: boolean;

@@ -800,26 +800,37 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             return undefined;
           };
           if (rrpByTitle.size > 0 || rrpBySku.size > 0) {
-            // IMPORTANT: the researched RRP is the BRAND'S OWN DTC PRICE — it is
-            // higher-trust than whatever the invoice happened to carry (which is
-            // often a wholesale list price, an old promo, or a stale snapshot).
-            // Always overwrite when we have a confident match — otherwise stale
-            // invoice prices like $148.70 stick instead of the real RRP $149.95.
+            // PRICE PRIORITY: the CSV/invoice RRP is the source of truth — it is
+            // what the retailer agreed to pay. The researched "market price" is
+            // supplementary info only. Only overwrite when the CSV had no RRP.
+            // The market price is always carried as _marketPrice so the UI can
+            // show it as a "Market: $X" badge below the main price.
             setValidatedProducts((prev) =>
               prev.map((p) => {
-                const newRrp = lookupRrp(p.name, p.sku);
-                if (!newRrp) return p;
-                return { ...p, rrp: newRrp } as ValidatedProduct;
+                const marketRrp = lookupRrp(p.name, p.sku);
+                if (!marketRrp) return p;
+                const hasCsvRrp = (p.rrp || 0) > 0;
+                return {
+                  ...p,
+                  rrp: hasCsvRrp ? p.rrp : marketRrp,
+                  _marketPrice: marketRrp,
+                } as ValidatedProduct;
               }),
             );
             setProductGroups((prev) =>
               prev.map((g) => {
-                const newRrp = lookupRrp(g.name, g.variants?.[0]?.sku || g.vendorCode);
-                if (!newRrp) return g;
+                const marketRrp = lookupRrp(g.name, g.variants?.[0]?.sku || g.vendorCode);
+                if (!marketRrp) return g;
+                const hasCsvRrp = (g.rrp || 0) > 0;
+                const finalRrp = hasCsvRrp ? g.rrp : marketRrp;
                 return {
                   ...g,
-                  rrp: newRrp,
-                  variants: g.variants?.map((v) => ({ ...v, rrp: newRrp })),
+                  rrp: finalRrp,
+                  _marketPrice: marketRrp,
+                  variants: g.variants?.map((v) => ({
+                    ...v,
+                    rrp: (v.rrp || 0) > 0 ? v.rrp : marketRrp,
+                  })),
                 } as typeof g;
               }),
             );

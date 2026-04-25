@@ -180,7 +180,12 @@ Deno.serve(async (req) => {
     const total = products.length;
 
     // Resolve supplier name from parse output if it wasn't provided up-front.
-    // Falls back through the common fields parse-invoice + product rows expose.
+    // Falls back through the common fields parse-invoice + product rows expose,
+    // and finally tries to derive a supplier from the filename (e.g. "jantzen-ss25.pdf").
+    const filenameSupplier = guessSupplierFromFilename(file_name);
+    console.log("[agent-watchdog] product[0] sample:", JSON.stringify(products[0] ?? {}, null, 2)?.slice(0, 400));
+    console.log("[agent-watchdog] parse supplier field:", parseJson?.supplier, "| filename guess:", filenameSupplier);
+
     const candidate: string | null =
       profile?.supplier_name ??
       parseJson?.supplier ??
@@ -191,6 +196,7 @@ Deno.serve(async (req) => {
       products[0]?.supplier ??
       products[0]?.supplier_name ??
       products[0]?.brand ??
+      filenameSupplier ??
       supplier_name ??
       null;
     // Normalise empty strings to null so the UI shows "Unknown supplier"

@@ -256,6 +256,14 @@ const HomeWizard = ({
           </div>
         </section>
       )}
+
+      {/* ── AI Agents pipeline showcase (always visible) ───── */}
+      <AgentPipelineShowcase
+        onOpenGuide={onOpenAgentGuide}
+        onOpenAutomation={onOpenAutomation}
+        onStartInvoice={onStartInvoice}
+        onOpenIntegrations={onOpenIntegrations}
+      />
     </div>
   );
 };

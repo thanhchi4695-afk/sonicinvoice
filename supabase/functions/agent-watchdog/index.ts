@@ -230,6 +230,40 @@ Deno.serve(async (req) => {
       })
       .eq("id", runId);
 
+    // Phase 3 — Optionally auto-publish to Shopify when ALL of the following hold:
+    //   - user.automation_auto_publish = true
+    //   - supplier.auto_publish_eligible = true
+    //   - products_flagged === 0 (clean extraction)
+    let autoPublishedNow = false;
+    let publishingResult: any = null;
+    if (supplierEligible && flagged === 0 && total > 0) {
+      const { data: settingsRow } = await admin
+        .from("user_settings")
+        .select("automation_auto_publish")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (settingsRow?.automation_auto_publish) {
+        try {
+          const pubResp = await fetch(
+            `${supabaseUrl}/functions/v1/publishing-agent`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${serviceKey}`,
+                "X-User-Id": userId,
+              },
+              body: JSON.stringify({ run_id: runId, user_id: userId }),
+            },
+          );
+          publishingResult = await pubResp.json().catch(() => ({}));
+          autoPublishedNow = !!publishingResult?.published;
+        } catch (e) {
+          console.error("[agent-watchdog] auto-publish failed", e);
+        }
+      }
+    }
+
     return json({
       success: true,
       run_id: runId,
@@ -238,6 +272,8 @@ Deno.serve(async (req) => {
       products_auto_approved: autoApproved,
       products_flagged: flagged,
       auto_publish_available: supplierEligible && flagged === 0 && total > 0,
+      auto_published: autoPublishedNow,
+      publishing_result: publishingResult,
       supplier_confidence: profile?.confidence_score ?? null,
       products,
     });

@@ -138,6 +138,7 @@ export async function persistParsedInvoice(
   //        Adjustment, Margin Protection, Markdown Ladder) can see
   //        the newly-processed invoice products. Without this, those
   //        tools only ever show demo rows.
+  const writtenProductIds: string[] = [];
   try {
     // Group accepted lines by product title (variants share a product)
     const byTitle = new Map<string, ValidatedProduct[]>();

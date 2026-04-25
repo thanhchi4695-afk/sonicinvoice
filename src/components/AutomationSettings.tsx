@@ -67,11 +67,21 @@ export default function AutomationSettings() {
   const [domainDraft, setDomainDraft] = useState("");
   const [running, setRunning] = useState(false);
   const [lastRun, setLastRun] = useState<AgentRunSummary | null>(null);
+  const [runs, setRuns] = useState<AgentRunRow[]>([]);
+  const [loadingRuns, setLoadingRuns] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void load();
+    void loadRuns();
   }, []);
+
+  // Live polling while any run is "running"
+  useEffect(() => {
+    if (!runs.some((r) => r.status === "running")) return;
+    const t = setInterval(() => { void loadRuns(); }, 10000);
+    return () => clearInterval(t);
+  }, [runs]);
 
   async function load() {
     setLoading(true);

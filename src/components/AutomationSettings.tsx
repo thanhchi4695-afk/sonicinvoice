@@ -115,6 +115,37 @@ export default function AutomationSettings() {
     setLoading(false);
   }
 
+  async function loadRuns() {
+    setLoadingRuns(true);
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) { setLoadingRuns(false); return; }
+    const { data } = await supabase
+      .from("agent_runs")
+      .select("id, started_at, supplier_name, supplier_profile_id, invoice_filename, products_extracted, products_auto_approved, products_flagged, auto_published, human_review_required, status, error_message")
+      .eq("user_id", userId)
+      .order("started_at", { ascending: false })
+      .limit(20);
+    setRuns((data ?? []) as AgentRunRow[]);
+    setLoadingRuns(false);
+  }
+
+  function openRunForReview(run: AgentRunRow, productsFromMemory?: any[]) {
+    try {
+      sessionStorage.setItem(
+        "sonic_watchdog_run",
+        JSON.stringify({
+          run_id: run.id,
+          supplier_name: run.supplier_name,
+          supplier_profile_id: run.supplier_profile_id,
+          auto_publish_eligible: !run.human_review_required,
+          products: productsFromMemory ?? [],
+        }),
+      );
+    } catch { /* ignore quota */ }
+    window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "invoice" }));
+  }
+
   async function persist(next: AutomationSettings) {
     setSaving(true);
     const { data: userData } = await supabase.auth.getUser();

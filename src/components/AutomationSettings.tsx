@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import GmailMonitoringPanel from "@/components/GmailMonitoringPanel";
 
 interface SupplierRow {
   id: string;

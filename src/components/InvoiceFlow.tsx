@@ -291,19 +291,6 @@ const CustomInstructionsField = ({
   value: string; onChange: (v: string) => void; supplierName: string;
 }) => {
   const [showHistory, setShowHistory] = useState(false);
-  // Watchdog Agent hand-off: when a Run History "Review →" button stashes a
-  // payload in sessionStorage, we surface it to PostParseReviewScreen so the
-  // (currently disabled) Auto-publish to Shopify button appears for eligible runs.
-  const [watchdogRun] = useState<{ runId: string; autoPublishEligible: boolean } | null>(() => {
-    try {
-      const raw = sessionStorage.getItem("sonic_watchdog_run");
-      if (!raw) return null;
-      sessionStorage.removeItem("sonic_watchdog_run");
-      const parsed = JSON.parse(raw);
-      if (!parsed?.run_id) return null;
-      return { runId: parsed.run_id, autoPublishEligible: !!parsed.auto_publish_eligible };
-    } catch { return null; }
-  });
   const [showLibrary, setShowLibrary] = useState(false);
   const [saveForSupplier, setSaveForSupplier] = useState(false);
   const [templateSupplier, setTemplateSupplier] = useState(supplierName);

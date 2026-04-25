@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import GmailMonitoringPanel from "@/components/GmailMonitoringPanel";
+import AgentActivityCard from "@/components/AgentActivityCard";
 
 interface SupplierRow {
   id: string;
@@ -294,6 +295,8 @@ export default function AutomationSettings() {
 
   return (
     <div className="space-y-5">
+      <AgentActivityCard />
+
       {/* Toggles */}
       <div className="space-y-3">
         <ToggleRow

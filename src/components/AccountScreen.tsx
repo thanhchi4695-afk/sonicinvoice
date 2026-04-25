@@ -304,6 +304,8 @@ const AccountScreen = () => {
           </div>
         )}
 
+        {shopifyConnected && <ShopifyTokenMigrationButton />}
+
         {!shopifyConnected && (
           <>
             <Field

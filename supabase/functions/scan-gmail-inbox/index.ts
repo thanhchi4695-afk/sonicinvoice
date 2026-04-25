@@ -37,6 +37,7 @@ interface GmailConnection {
   access_token: string;
   refresh_token: string;
   expires_at: string;
+  last_email_id?: string | null;
 }
 
 Deno.serve(async (req) => {

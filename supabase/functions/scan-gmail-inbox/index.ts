@@ -388,7 +388,7 @@ async function runWatchdogForAttachment(args: {
     }),
   });
   if (!resp.ok) {
-    console.error("[scan-gmail-inbox] watchdog call failed", resp.status, await resp.text().catch(() => ""));
+    console.error("[scan-gmail-inbox] orchestrator call failed", resp.status, await resp.text().catch(() => ""));
     return null;
   }
   const data = await resp.json().catch(() => ({}));

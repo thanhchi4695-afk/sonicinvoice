@@ -181,6 +181,7 @@ export async function persistParsedInvoice(
         productId = newProduct?.id as string;
       }
       if (!productId) continue;
+      writtenProductIds.push(productId);
 
       // 2. Upsert each variant. variants_user_sku_unique covers (user_id, sku)
       //    where sku is non-empty — fall back to insert when sku is blank.

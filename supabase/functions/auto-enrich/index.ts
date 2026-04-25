@@ -127,8 +127,12 @@ Deno.serve(async (req) => {
           updates.description = r.description;
           sources.push("gemini-description");
           descriptionsFound++;
+          console.log("[auto-enrich] description FOUND for:", p.id, "length:", r.description.length, "source:", r.source_url || "unknown");
+        } else {
+          console.log("[auto-enrich] description NOT FOUND for:", p.id, "raw response:", JSON.stringify(r)?.slice(0, 200));
         }
       } catch (e) {
+        console.warn("[auto-enrich] description error for:", p.id, String((e as Error).message));
         errors.push({ product_id: p.id, task: "description", message: String((e as Error).message) });
       }
     }

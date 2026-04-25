@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
 
     // ─────── Persist classification to supplier_profiles ───────
     const supplierFinal = classification?.supplier_name || extraction?.supplier || supplierName || null;
-    if (userId && classification && !usedSavedProfile && supplierFinal && (classification.confidence ?? 0) >= 60) {
+    if (userId && classification && !usedSavedProfile && supplierFinal) {
       try {
         // Read existing profile_data so we don't clobber it
         const { data: existing } = await admin

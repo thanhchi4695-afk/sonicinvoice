@@ -2164,6 +2164,7 @@ export type Database = {
           image_url: string | null
           product_type: string | null
           shopify_product_id: string | null
+          source: string | null
           title: string
           updated_at: string
           user_id: string
@@ -2178,6 +2179,7 @@ export type Database = {
           image_url?: string | null
           product_type?: string | null
           shopify_product_id?: string | null
+          source?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -2192,6 +2194,7 @@ export type Database = {
           image_url?: string | null
           product_type?: string | null
           shopify_product_id?: string | null
+          source?: string | null
           title?: string
           updated_at?: string
           user_id?: string

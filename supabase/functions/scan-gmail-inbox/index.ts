@@ -209,6 +209,44 @@ async function scanInbox(
       .upsert(row, { onConflict: "user_id,message_id", ignoreDuplicates: false });
     if (upErr) console.error("[scan-gmail-inbox] upsert failed", upErr);
 
+    // Auto-process: download attachment(s) and run watchdog if all conditions met.
+    // - automation_email_monitoring AND automation_auto_extract for this user
+    // - sender domain matches a known supplier OR filename looks invoice-like
+    let processedHere = false;
+    let agentRunIds: string[] = [];
+    if (canAutoExtract && opts.autoProcess) {
+      for (const att of attachments) {
+        const looksInvoice =
+          supplierName !== null ||
+          /invoice|inv[\s_-]|order|po[\s_-]|purchase|packing|slip/i.test(att.filename);
+        if (!looksInvoice) continue;
+        try {
+          const runId = await runWatchdogForAttachment({
+            supabaseUrl: opts.supabaseUrl,
+            serviceKey: opts.serviceKey,
+            userId: conn.user_id,
+            accessToken,
+            messageId,
+            attachment: att,
+            supplierName,
+          });
+          if (runId) {
+            agentRunIds.push(runId);
+            processedHere = true;
+          }
+        } catch (err) {
+          console.error("[scan-gmail-inbox] auto-process failed", messageId, err);
+        }
+      }
+      if (processedHere) {
+        await admin
+          .from("gmail_found_invoices")
+          .update({ processed: true, agent_run_id: agentRunIds[0] })
+          .eq("user_id", conn.user_id)
+          .eq("message_id", messageId);
+      }
+    }
+
     invoicesFound.push({
       message_id: messageId,
       from: fromEmail,
@@ -218,6 +256,8 @@ async function scanInbox(
       known_supplier: supplierName !== null,
       attachment_count: attachments.length,
       attachments,
+      auto_processed: processedHere,
+      agent_run_ids: agentRunIds,
     });
 
     if (!mostRecentId) mostRecentId = messageId;

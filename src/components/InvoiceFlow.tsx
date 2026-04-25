@@ -1566,8 +1566,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
       let base64: string;
 
+      // Non-image file types (PDF, CSV, Excel, Word) skip image preprocessing.
+      const isNonImage = isPdfFile(file) || ["csv", "xlsx", "xls", "doc", "docx"].includes(ext);
+
       // ── Client-side image preprocessing (resize, grayscale, contrast, sharpen) ──
-      if (!isPdfFile(file)) {
+      if (!isNonImage) {
         setEnrichLines([{ name: "Preprocessing image…", status: "searching", action: "Resize, grayscale, contrast & sharpen…", confidence: 0 }]);
 
         try {

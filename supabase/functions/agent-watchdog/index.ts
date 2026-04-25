@@ -125,8 +125,9 @@ Deno.serve(async (req) => {
     }
     runId = runRow.id;
 
-    // Call parse-invoice
-    const parseResp = await fetch(`${supabaseUrl}/functions/v1/parse-invoice`, {
+    // Call the 3-stage pipeline (classify → extract → validate).
+    // Falls back to plain parse-invoice automatically if Stage 1/3 fail.
+    const parseResp = await fetch(`${supabaseUrl}/functions/v1/classify-extract-validate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

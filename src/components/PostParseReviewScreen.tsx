@@ -320,6 +320,54 @@ export default function PostParseReviewScreen({
   /** Stable session id used as invoice_id when persisting corrections. */
   const sessionInvoiceId = useMemo(() => `session_${Date.now().toString(36)}`, []);
 
+  // ── Agent 3 (Enrichment) — live updates ──────────────────────────
+  // Subscribe to products UPDATE events so the Review screen renders
+  // descriptions and image URLs as the auto-enrich edge function fills
+  // them in. Matches DB rows back to in-memory products by title.
+  const [enrichmentMap, setEnrichmentMap] = useState<Record<string, { description?: string; image_url?: string }>>({});
+  const [enrichmentTotal, setEnrichmentTotal] = useState(0);
+  useEffect(() => {
+    let mounted = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !mounted) return;
+      const userId = session.user.id;
+      // Count distinct titles we expect to be enriched
+      const titles = Array.from(new Set(products.filter(p => !p._rejected).map(p => (p.name || "").trim()).filter(Boolean)));
+      setEnrichmentTotal(titles.length);
+      channel = supabase
+        .channel(`enrich-${sessionInvoiceId}`)
+        .on("postgres_changes", {
+          event: "UPDATE",
+          schema: "public",
+          table: "products",
+          filter: `user_id=eq.${userId}`,
+        }, (payload: any) => {
+          const row = payload?.new;
+          if (!row?.title) return;
+          const key = String(row.title).trim().toLowerCase();
+          setEnrichmentMap(prev => ({
+            ...prev,
+            [key]: {
+              description: row.description ?? prev[key]?.description,
+              image_url: row.image_url ?? prev[key]?.image_url,
+            },
+          }));
+        })
+        .subscribe();
+    })();
+    return () => {
+      mounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionInvoiceId]);
+
+  const enrichmentDoneCount = useMemo(() => {
+    return Object.values(enrichmentMap).filter(e => e.description || e.image_url).length;
+  }, [enrichmentMap]);
+
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
   const needsReview = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel !== "high"), [products]);

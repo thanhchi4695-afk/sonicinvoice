@@ -381,6 +381,13 @@ const AccountScreen = () => {
         )}
       </Section>
 
+      {/* Automation — AI Watchdog Agent */}
+      <Section title="Automation">
+        <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+          <AutomationSettings />
+        </Suspense>
+      </Section>
+
       {/* POS Connections (Stock Checking) */}
       <Section title="🔌 POS integration">
         <POSConnectionPanel />

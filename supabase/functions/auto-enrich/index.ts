@@ -41,6 +41,15 @@ function deriveProductType(title: string): string {
   return "Swimwear";
 }
 
+function simplifyTitle(title: string): string {
+  return (title || "")
+    .replace(/\b(1Pc|2Pc|3Pc|1PC|2PC|3PC|One Piece|OnePiece)\b/gi, "")
+    .replace(/\b(Classic|Classics|Heritage|Premium|Essential|Original|Iconic|Signature)\b/gi, "")
+    .replace(/\s+[A-Z]{2,3}$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getAuDomain(vendor: string | null | undefined): string | null {
   const domains: Record<string, string> = {
     "seafolly": "seafolly.com.au",

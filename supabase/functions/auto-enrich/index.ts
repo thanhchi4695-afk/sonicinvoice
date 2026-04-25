@@ -41,6 +41,15 @@ function deriveProductType(title: string): string {
   return "Swimwear";
 }
 
+function simplifyTitle(title: string): string {
+  return (title || "")
+    .replace(/\b(1Pc|2Pc|3Pc|1PC|2PC|3PC|One Piece|OnePiece)\b/gi, "")
+    .replace(/\b(Classic|Classics|Heritage|Premium|Essential|Original|Iconic|Signature)\b/gi, "")
+    .replace(/\s+[A-Z]{2,3}$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getAuDomain(vendor: string | null | undefined): string | null {
   const domains: Record<string, string> = {
     "seafolly": "seafolly.com.au",
@@ -72,10 +81,13 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch {
     return json({ error: "invalid JSON" }, 400);
   }
-  const { user_id, product_ids, run_id } = body;
-  if (!user_id || !Array.isArray(product_ids) || product_ids.length === 0) {
+  const { user_id, product_ids: rawIds, run_id } = body;
+  if (!user_id || !Array.isArray(rawIds) || rawIds.length === 0) {
     return json({ error: "user_id and product_ids[] required" }, 400);
   }
+  // Deduplicate product_ids before loading — caller may send duplicates
+  const product_ids = Array.from(new Set(rawIds.filter(Boolean)));
+  console.log("[auto-enrich] received", rawIds.length, "ids,", product_ids.length, "unique");
 
   // Load products + a representative variant per product so we can pass
   // colour/SKU/style hints into websearch.
@@ -103,25 +115,47 @@ Deno.serve(async (req) => {
     const descTitle = (p.title || "").trim();
     const descBrand = (p.vendor || "").trim();
     console.log("[auto-enrich] processing product:", p.id, "title:", descTitle, "brand:", descBrand, "has_existing_desc:", !!p.description);
+
+    async function callFetchDesc(styleName: string) {
+      return await withTimeout(fetch(`${supabaseUrl}/functions/v1/fetch-product-description`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({
+          style_name: styleName,
+          brand: descBrand,
+          style_number: firstVariant?.sku || undefined,
+          product_type: productType,
+        }),
+      }).then(async res => {
+        const txt = await res.text();
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
+        try { return JSON.parse(txt); } catch { return null; }
+      }), TASK_TIMEOUT_MS, "fetch-product-description");
+    }
+
     if (!p.description && descTitle && descBrand) {
       try {
-        const r = await withTimeout(fetch(`${supabaseUrl}/functions/v1/fetch-product-description`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${serviceKey}`,
-          },
-          body: JSON.stringify({
-            style_name: descTitle,
-            brand: descBrand,
-            style_number: firstVariant?.sku || undefined,
-            product_type: productType,
-          }),
-        }).then(async res => {
-          const txt = await res.text();
-          if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
-          try { return JSON.parse(txt); } catch { return null; }
-        }), TASK_TIMEOUT_MS, "fetch-product-description");
+        console.log("[enrich] fetching desc for:", descTitle, "|", descBrand, "| id:", p.id);
+        let r = await callFetchDesc(descTitle);
+
+        // Fallback: retry with a simplified title if the first attempt returned nothing usable
+        if (!(r?.description && typeof r.description === "string" && r.description.trim().length > 20)) {
+          const simple = simplifyTitle(descTitle);
+          if (simple && simple.toLowerCase() !== descTitle.toLowerCase()) {
+            console.log("[enrich] retry with simplified title:", simple, "| id:", p.id);
+            try {
+              const r2 = await callFetchDesc(simple);
+              if (r2?.description && typeof r2.description === "string" && r2.description.trim().length > 20) {
+                r = r2;
+              }
+            } catch (e2) {
+              console.warn("[auto-enrich] simplified-title retry failed:", String((e2 as Error).message));
+            }
+          }
+        }
 
         if (r?.description && typeof r.description === "string" && r.description.trim().length > 20) {
           updates.description = r.description;
@@ -198,17 +232,12 @@ Deno.serve(async (req) => {
     // Task C — image search (only if websearch didn't supply one)
     if (!p.image_url && !updates.image_url) {
       try {
-        // Simpler category-based query — full product titles rarely index in image search
-        const t = (p.title || "").toLowerCase();
-        let category = "swimwear";
-        if (t.includes("one piece") || t.includes("maillot") || t.includes("swimsuit")) category = "one piece swimwear";
-        else if (t.includes("bikini top") || t.includes("bralette") || t.includes("bandeau")) category = "bikini top";
-        else if (t.includes("bikini bottom") || t.includes("brief") || t.includes("boyleg") || t.includes("hipster")) category = "bikini bottom";
-        else if (t.includes("boardshort") || t.includes("trunk")) category = "boardshorts";
-        else if (t.includes("rashie") || t.includes("rash guard") || t.includes("rash")) category = "rash guard";
-        else if (t.includes("tankini")) category = "tankini";
-        const searchQuery = `${p.vendor || ""} ${category}`.trim().replace(/\s+/g, " ");
-        console.log("[auto-enrich] image-search query for:", p.id, "→", searchQuery);
+        // Simplest possible query — brand + "swimwear women" — full product titles rarely index
+        const brand = (p.vendor || "").trim();
+        const searchQuery = brand
+          ? `${brand} swimwear women`
+          : "one piece swimwear Australian brand";
+        console.log("[auto-enrich] image query:", searchQuery, "| id:", p.id);
 
         const r = await withTimeout(fetch(`${supabaseUrl}/functions/v1/image-search`, {
           method: "POST",

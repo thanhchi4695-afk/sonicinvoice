@@ -271,6 +271,28 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Agent 3 — fire-and-forget enrichment for any products written to the
+    // catalog during this run (auto-publish path or supplier-managed inserts).
+    try {
+      const { data: writtenProducts } = await admin
+        .from("products")
+        .select("id")
+        .eq("user_id", userId)
+        .gte("updated_at", runRow ? new Date(Date.now() - 5 * 60_000).toISOString() : new Date().toISOString())
+        .order("updated_at", { ascending: false })
+        .limit(Math.max(total, 1));
+      const productIds = (writtenProducts || []).map((p: any) => p.id);
+      if (productIds.length > 0) {
+        fetch(`${supabaseUrl}/functions/v1/auto-enrich`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({ user_id: userId, product_ids: productIds, run_id: runId }),
+        }).catch((e) => console.warn("[watchdog] enrich fire failed:", e?.message));
+      }
+    } catch (e) {
+      console.warn("[watchdog] enrich query failed:", (e as Error)?.message);
+    }
+
     return json({
       success: true,
       run_id: runId,

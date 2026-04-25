@@ -161,6 +161,21 @@ Deno.serve(async (req) => {
     }
     const total = products.length;
 
+    // Resolve supplier name from parse output if it wasn't provided up-front.
+    // Falls back through the common fields parse-invoice + product rows expose.
+    const resolvedSupplierName: string | null =
+      profile?.supplier_name ??
+      parseJson?.supplier ??
+      parseJson?.supplier_name ??
+      parseJson?.data?.supplier ??
+      parseJson?.data?.supplier_name ??
+      products[0]?.vendor ??
+      products[0]?.supplier ??
+      products[0]?.supplier_name ??
+      products[0]?.brand ??
+      supplier_name ??
+      null;
+
     // Determine final status
     const supplierEligible = !!profile?.auto_publish_eligible;
     const allAutoApproved = total > 0 && autoApproved === total;
@@ -173,6 +188,7 @@ Deno.serve(async (req) => {
     await admin
       .from("agent_runs")
       .update({
+        supplier_name: resolvedSupplierName,
         products_extracted: total,
         products_auto_approved: autoApproved,
         products_flagged: flagged,
@@ -191,7 +207,7 @@ Deno.serve(async (req) => {
     return json({
       success: true,
       run_id: runId,
-      supplier_name: profile?.supplier_name ?? supplier_name ?? null,
+      supplier_name: resolvedSupplierName,
       products_extracted: total,
       products_auto_approved: autoApproved,
       products_flagged: flagged,

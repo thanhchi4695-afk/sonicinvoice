@@ -69,10 +69,24 @@ export function savePreferences(prefs: NotificationPreferences) {
   localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
 }
 
+export const NOTIFICATIONS_UPDATED_EVENT = "sonic:notifications-updated";
+
 export function useNotifications() {
   const [notifications, setNotifications] = useState<AppNotification[]>(loadNotifications);
 
   useEffect(() => { saveNotifications(notifications); }, [notifications]);
+
+  // Re-read from localStorage when other components push notifications
+  // (same-tab writes don't trigger the native `storage` event).
+  useEffect(() => {
+    const refresh = () => setNotifications(loadNotifications());
+    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
 
   const addNotification = useCallback((n: Omit<AppNotification, "id" | "timestamp" | "read">) => {
     const item: AppNotification = {

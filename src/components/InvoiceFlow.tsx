@@ -1721,7 +1721,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         console.warn("[Sonic Invoice] Pre-extraction inference failed:", e);
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({
@@ -1894,7 +1894,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     cancelledRef.current = false;
     setStep(2);
     setInvoicePageImages([]);
-    setEnrichLines([{ name: "Reading file...", status: "searching", action: "Parsing invoice data...", confidence: 0 }]);
+    setEnrichLines([{ name: "Identifying supplier and layout…", status: "searching", action: "Stage 1 — orientation agent", confidence: 0 }]);
     // Shadow-log: start an agent_sessions row mirroring this run.
     void (async () => {
       const sid = await startShadowSession({ supplier: supplierName, trigger: "invoice_upload" });
@@ -2131,7 +2131,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         inferredRules = await buildInferredRules(supplierName || "", headersForFingerprintRe, sampleSheetRows);
       } catch { /* ignore */ }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-invoice`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
         body: JSON.stringify({

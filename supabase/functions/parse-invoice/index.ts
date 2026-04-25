@@ -950,7 +950,7 @@ serve(async (req) => {
   }
 
   try {
-    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode, expectedProductCount, supplierProfile, inferredRules } = await req.json();
+    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode, expectedProductCount, supplierProfile, inferredRules, invoice_classification } = await req.json();
 
     if (!fileContent) {
       return new Response(JSON.stringify({ error: "No file content provided" }), {
@@ -963,6 +963,22 @@ serve(async (req) => {
     const isPdf = fileType === "pdf";
 
     let systemPrompt = SYSTEM_PROMPT;
+
+    // Stage-1 (Orientation Agent) hint — when present, tells the extractor exactly
+    // which supplier/layout/columns to expect so it doesn't have to re-derive them.
+    if (invoice_classification && typeof invoice_classification === "object") {
+      const cls = invoice_classification as Record<string, unknown>;
+      systemPrompt += `\n\n## STAGE-1 CLASSIFICATION (use this — do NOT re-derive column structure)
+Supplier: ${cls.supplier_name ?? "unknown"}
+Document type: ${cls.document_type ?? "unknown"}
+Layout pattern: ${cls.layout_pattern ?? "unknown"}
+Column mapping: ${JSON.stringify(cls.column_headers ?? [])}
+GST treatment: ${cls.gst_treatment ?? "unknown"}
+Currency: ${cls.currency ?? "AUD"}
+Has RRP: ${cls.has_rrp ? "yes" : "no"}
+
+Use this classification to guide your extraction. The column mapping tells you exactly which column in this invoice corresponds to which field. Do not re-derive the column structure — use the mapping provided.`;
+    }
 
     // Detailed mode: stronger extraction for under-extracted invoices
     if (detailedMode) {

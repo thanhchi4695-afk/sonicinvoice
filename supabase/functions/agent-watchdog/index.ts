@@ -315,6 +315,30 @@ function pickConfidence(p: any): number {
   return 0.5;
 }
 
+// Best-effort supplier guess from filename. Returns Title-cased brand name or null.
+// Matches against a small list of common AU boutique brands; extend as needed.
+function guessSupplierFromFilename(fileName: string | null | undefined): string | null {
+  if (!fileName) return null;
+  const lower = fileName.toLowerCase();
+  const known: Array<[RegExp, string]> = [
+    [/\bjantzen\b/, "Jantzen"],
+    [/\bsea\s*level\b/, "Sea Level"],
+    [/\btigerlily\b/, "Tigerlily"],
+    [/\bseafolly\b/, "Seafolly"],
+    [/\bbillabong\b/, "Billabong"],
+    [/\brip\s*curl\b/, "Rip Curl"],
+    [/\broxy\b/, "Roxy"],
+    [/\bquiksilver\b/, "Quiksilver"],
+    [/\bzimmermann\b/, "Zimmermann"],
+    [/\bcamilla\b/, "Camilla"],
+    [/\bspell\b/, "Spell"],
+  ];
+  for (const [rx, name] of known) {
+    if (rx.test(lower)) return name;
+  }
+  return null;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,

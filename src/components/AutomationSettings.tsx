@@ -175,7 +175,7 @@ export default function AutomationSettings() {
       .eq("id", run.id)
       .maybeSingle();
     if (!runError && runData) {
-      freshRun = runData as AgentRunRow;
+      freshRun = runData as unknown as AgentRunRow;
       products = extractProductsFromRun(freshRun);
     }
     if (products.length === 0) {

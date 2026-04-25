@@ -46,6 +46,16 @@ interface AgentRunSummary {
   products?: any[];
 }
 
+interface PipelineStepRecord {
+  step: string;
+  status: "pending" | "running" | "complete" | "failed" | "skipped";
+  retry_count: number;
+  error: string | null;
+  started_at?: string;
+  updated_at?: string;
+  completed_at?: string;
+}
+
 interface AgentRunRow {
   id: string;
   started_at: string;
@@ -60,6 +70,8 @@ interface AgentRunRow {
   status: string;
   error_message: string | null;
   metadata?: any;
+  current_step?: string | null;
+  pipeline_steps?: PipelineStepRecord[] | null;
 }
 
 const DEFAULTS: AutomationSettings = {
@@ -146,11 +158,11 @@ export default function AutomationSettings() {
     if (!userId) { setLoadingRuns(false); return; }
     const { data } = await supabase
       .from("agent_runs")
-      .select("id, started_at, supplier_name, supplier_profile_id, invoice_filename, products_extracted, products_auto_approved, products_flagged, auto_published, human_review_required, status, error_message, metadata")
+      .select("id, started_at, supplier_name, supplier_profile_id, invoice_filename, products_extracted, products_auto_approved, products_flagged, auto_published, human_review_required, status, error_message, metadata, current_step, pipeline_steps")
       .eq("user_id", userId)
       .order("started_at", { ascending: false })
       .limit(20);
-    setRuns((data ?? []) as AgentRunRow[]);
+    setRuns((data ?? []) as unknown as AgentRunRow[]);
     setLoadingRuns(false);
   }
 
@@ -163,7 +175,7 @@ export default function AutomationSettings() {
       .eq("id", run.id)
       .maybeSingle();
     if (!runError && runData) {
-      freshRun = runData as AgentRunRow;
+      freshRun = runData as unknown as AgentRunRow;
       products = extractProductsFromRun(freshRun);
     }
     if (products.length === 0) {
@@ -257,17 +269,30 @@ export default function AutomationSettings() {
     setLastRun(null);
     try {
       const base64 = await fileToBase64(file);
-      const { data, error } = await supabase.functions.invoke("agent-watchdog", {
+      const { data, error } = await supabase.functions.invoke("agent-orchestrator", {
         body: {
           trigger_type: "manual",
           file_base64: base64,
-          file_name: file.name,
+          filename: file.name,
           mime_type: file.type || "application/pdf",
         },
       });
       if (error) throw new Error(error.message);
-      if (!data?.success) throw new Error(data?.error || "Watchdog failed");
-      const summary = data as AgentRunSummary;
+      if (!data?.run_id) throw new Error(data?.error || "Orchestrator failed");
+      // Re-fetch the full run to render the summary card
+      const { data: runData } = await supabase
+        .from("agent_runs")
+        .select("*")
+        .eq("id", data.run_id)
+        .maybeSingle();
+      const summary: AgentRunSummary = {
+        run_id: data.run_id,
+        supplier_name: runData?.supplier_name ?? null,
+        products_extracted: runData?.products_extracted ?? data.products_extracted ?? 0,
+        products_auto_approved: runData?.products_auto_approved ?? 0,
+        products_flagged: runData?.products_flagged ?? data.products_flagged ?? 0,
+        auto_publish_available: !!data.auto_published,
+      };
       setLastRun(summary);
       // In-app notification (NotificationBell uses localStorage). Link → account so the
       // user lands on Automation Settings where the Run History "Review →" button
@@ -604,6 +629,7 @@ function RunRow({
   onReview: (r: AgentRunRow, products?: any[]) => void;
   onRetry: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const date = new Date(run.started_at).toLocaleString(undefined, {
     day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit",
   });
@@ -619,42 +645,96 @@ function RunRow({
     } catch { return undefined; }
   })();
 
+  const steps = Array.isArray(run.pipeline_steps) ? run.pipeline_steps : [];
+  const hasTimeline = steps.length > 0;
+  const runningLabel =
+    run.status === "running" && run.current_step
+      ? `Processing… (${run.current_step})`
+      : null;
+
   return (
-    <div className="grid grid-cols-[1fr_auto] gap-3 p-3 items-center">
-      <div className="min-w-0">
-        <p className="text-xs text-muted-foreground">{date}</p>
-        <p className="text-sm font-medium truncate">
-          {run.supplier_name ?? "Unknown supplier"}
-          <span className="text-muted-foreground font-normal"> · {file}</span>
-        </p>
-        <p className="text-[11px] text-muted-foreground">
-          {run.products_extracted} extracted · {run.products_flagged} flagged
-        </p>
-        {run.status === "failed" && run.error_message && (
-          <p className="text-[11px] text-destructive mt-1 flex items-start gap-1">
-            <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
-            <span className="truncate">{run.error_message.slice(0, 50)}</span>
+    <div className="p-3">
+      <div className="grid grid-cols-[auto_1fr_auto] gap-3 items-center">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          disabled={!hasTimeline}
+          className="text-muted-foreground hover:text-foreground disabled:opacity-30 w-5 h-5 flex items-center justify-center"
+          aria-label={expanded ? "Collapse" : "Expand"}
+        >
+          <span className={`inline-block transition-transform ${expanded ? "rotate-90" : ""}`}>▸</span>
+        </button>
+        <div className="min-w-0">
+          <p className="text-xs text-muted-foreground">{date}</p>
+          <p className="text-sm font-medium truncate">
+            {run.supplier_name ?? "Unknown supplier"}
+            <span className="text-muted-foreground font-normal"> · {file}</span>
           </p>
-        )}
+          <p className="text-[11px] text-muted-foreground">
+            {runningLabel ?? `${run.products_extracted} extracted · ${run.products_flagged} flagged`}
+          </p>
+          {run.status === "failed" && run.error_message && (
+            <p className="text-[11px] text-destructive mt-1 flex items-start gap-1">
+              <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+              <span className="truncate">{run.error_message.slice(0, 50)}</span>
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <RunStatusBadge status={run.status} />
+          {run.status === "awaiting_review" && (
+            <Button size="sm" variant="teal" onClick={() => onReview(run, stored)} className="h-7 text-[11px] px-2 gap-1">
+              Review <ArrowRight className="w-3 h-3" />
+            </Button>
+          )}
+          {run.status === "published" && (
+            <span className="text-[11px] text-muted-foreground">View history</span>
+          )}
+          {run.status === "failed" && (
+            <Button size="sm" variant="outline" onClick={() => onReview(run, stored)} className="h-7 text-[11px] px-2">
+              Retry
+            </Button>
+          )}
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <RunStatusBadge status={run.status} />
-        {run.status === "awaiting_review" && (
-          <Button size="sm" variant="teal" onClick={() => onReview(run, stored)} className="h-7 text-[11px] px-2 gap-1">
-            Review <ArrowRight className="w-3 h-3" />
-          </Button>
-        )}
-        {run.status === "published" && (
-          <span className="text-[11px] text-muted-foreground">View history</span>
-        )}
-        {run.status === "failed" && (
-          <Button size="sm" variant="outline" onClick={() => onReview(run, stored)} className="h-7 text-[11px] px-2">
-            Retry
-          </Button>
+      {expanded && hasTimeline && (
+        <div className="mt-2 ml-8 border-l-2 border-border pl-3 space-y-1">
+          {steps.map((s) => (
+            <PipelineStepLine key={s.step} step={s} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PipelineStepLine({ step }: { step: PipelineStepRecord }) {
+  const { icon, color } = stepBadge(step);
+  return (
+    <div className="flex items-start gap-2 text-[11px]">
+      <span className={`font-mono ${color}`}>{icon}</span>
+      <div className="flex-1 min-w-0">
+        <span className="font-medium">{step.step}</span>
+        <span className="text-muted-foreground">
+          {" → "}
+          {step.status}
+          {step.retry_count > 0 ? ` (${step.retry_count} ${step.retry_count === 1 ? "retry" : "retries"})` : ""}
+        </span>
+        {step.error && (
+          <p className="text-destructive truncate">Error: "{step.error.slice(0, 80)}"</p>
         )}
       </div>
     </div>
   );
+}
+
+function stepBadge(s: PipelineStepRecord): { icon: string; color: string } {
+  if (s.status === "complete" && s.retry_count > 0) return { icon: "⚠", color: "text-amber-500" };
+  if (s.status === "complete") return { icon: "✓", color: "text-success" };
+  if (s.status === "failed") return { icon: "✗", color: "text-destructive" };
+  if (s.status === "running") return { icon: "⏳", color: "text-primary" };
+  if (s.status === "skipped") return { icon: "—", color: "text-muted-foreground" };
+  return { icon: "·", color: "text-muted-foreground" };
 }
 
 function extractProductsFromRun(run: AgentRunRow): any[] {

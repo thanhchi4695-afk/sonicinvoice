@@ -323,6 +323,7 @@ export type Database = {
         Row: {
           auto_published: boolean
           completed_at: string | null
+          current_step: string | null
           enrichment_complete: boolean
           enrichment_completed_at: string | null
           error_message: string | null
@@ -331,9 +332,11 @@ export type Database = {
           invoice_filename: string | null
           invoice_id: string | null
           metadata: Json
+          pipeline_steps: Json
           products_auto_approved: number
           products_extracted: number
           products_flagged: number
+          retry_count: number
           started_at: string
           status: string
           supplier_name: string | null
@@ -344,6 +347,7 @@ export type Database = {
         Insert: {
           auto_published?: boolean
           completed_at?: string | null
+          current_step?: string | null
           enrichment_complete?: boolean
           enrichment_completed_at?: string | null
           error_message?: string | null
@@ -352,9 +356,11 @@ export type Database = {
           invoice_filename?: string | null
           invoice_id?: string | null
           metadata?: Json
+          pipeline_steps?: Json
           products_auto_approved?: number
           products_extracted?: number
           products_flagged?: number
+          retry_count?: number
           started_at?: string
           status?: string
           supplier_name?: string | null
@@ -365,6 +371,7 @@ export type Database = {
         Update: {
           auto_published?: boolean
           completed_at?: string | null
+          current_step?: string | null
           enrichment_complete?: boolean
           enrichment_completed_at?: string | null
           error_message?: string | null
@@ -373,9 +380,11 @@ export type Database = {
           invoice_filename?: string | null
           invoice_id?: string | null
           metadata?: Json
+          pipeline_steps?: Json
           products_auto_approved?: number
           products_extracted?: number
           products_flagged?: number
+          retry_count?: number
           started_at?: string
           status?: string
           supplier_name?: string | null

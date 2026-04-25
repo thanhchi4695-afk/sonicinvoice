@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.sync-supplier-websites]
 verify_jwt = false
+
+[functions.gmail-oauth-callback]
+verify_jwt = false
+
+[functions.scan-gmail-inbox]
+verify_jwt = false

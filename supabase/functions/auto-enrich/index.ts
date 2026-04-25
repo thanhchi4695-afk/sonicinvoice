@@ -102,6 +102,7 @@ Deno.serve(async (req) => {
     // Task A — description (requires non-empty title + brand; the function 400s otherwise)
     const descTitle = (p.title || "").trim();
     const descBrand = (p.vendor || "").trim();
+    console.log("[auto-enrich] processing product:", p.id, "title:", descTitle, "brand:", descBrand, "has_existing_desc:", !!p.description);
     if (!p.description && descTitle && descBrand) {
       try {
         const r = await withTimeout(fetch(`${supabaseUrl}/functions/v1/fetch-product-description`, {

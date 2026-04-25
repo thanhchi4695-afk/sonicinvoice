@@ -321,5 +321,24 @@ export async function persistParsedInvoice(
     });
   }
 
+  // ── 7. Fire Agent 5 (Learning) — also background, never await.
+  //        Reads correction_log + document_lines server-side to compute
+  //        the per-invoice correction rate, then updates user + shared
+  //        supplier profiles for cross-client intelligence.
+  if (meta.supplier && doc.id) {
+    console.log("[persistence] calling learning-agent for", meta.supplier);
+    supabase.functions.invoke("learning-agent", {
+      body: {
+        user_id: userId,
+        supplier_name: meta.supplier,
+        document_id: doc.id,
+      },
+    }).then((r) => {
+      console.log("[learning] complete:", JSON.stringify(r?.data), "error:", r?.error?.message);
+    }).catch((e) => {
+      console.warn("[learning] invoke threw:", e?.message);
+    });
+  }
+
   return { documentId: doc.id, supplierId: matchedSupplierId, error: null };
 }

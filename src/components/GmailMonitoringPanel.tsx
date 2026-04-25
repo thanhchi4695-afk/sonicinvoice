@@ -143,31 +143,17 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
       toast.error("Sign in first");
       return;
     }
-    const clientId = "<set in Supabase Vault>"; // not needed client-side; auth URL is built server-side via redirect below
-    // We don't have GOOGLE_CLIENT_ID on the client. Instead the server builds the
-    // auth URL: hit gmail-oauth-start? — to keep the diff small we build it here
-    // using a public hint on the redirect URL instead.
-    void clientId;
-    // Construct the URL inline — Google's client_id is technically public for
-    // installed/web OAuth flows so it's safe to expose. Read from a Vite env if
-    // present, otherwise direct user to backend-driven flow.
-    const envClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
-    const callbackUrl = `https://${projectRef}.supabase.co/functions/v1/gmail-oauth-callback`;
-    if (!envClientId) {
-      toast.error(
-        "VITE_GOOGLE_CLIENT_ID not configured — add it as a build secret to enable Connect",
-      );
-      return;
+    try {
+      const { data, error } = await supabase.functions.invoke("gmail-oauth-start", {
+        body: {},
+      });
+      if (error) throw new Error(error.message);
+      const url = (data as { url?: string })?.url;
+      if (!url) throw new Error("No auth URL returned");
+      window.location.href = url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
     }
-    const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-    authUrl.searchParams.set("client_id", envClientId);
-    authUrl.searchParams.set("redirect_uri", callbackUrl);
-    authUrl.searchParams.set("response_type", "code");
-    authUrl.searchParams.set("scope", "https://www.googleapis.com/auth/gmail.readonly");
-    authUrl.searchParams.set("access_type", "offline");
-    authUrl.searchParams.set("prompt", "consent");
-    authUrl.searchParams.set("state", user.id);
-    window.location.href = authUrl.toString();
   }
 
   async function disconnect() {

@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const scanAll = body?.scan_all_users === true;
+    const autoProcess = body?.auto_process === true;
 
     // Resolve which connection(s) to scan
     let connections: GmailConnection[] = [];
@@ -88,7 +89,7 @@ Deno.serve(async (req) => {
     const results = [];
     for (const conn of connections) {
       try {
-        const r = await scanInbox(admin, conn);
+        const r = await scanInbox(admin, conn, { autoProcess, supabaseUrl, serviceKey });
         results.push({ user_id: conn.user_id, ...r });
       } catch (err) {
         console.error("[scan-gmail-inbox] user failed", conn.user_id, err);
@@ -110,7 +111,25 @@ Deno.serve(async (req) => {
   }
 });
 
-async function scanInbox(admin: any, conn: GmailConnection) {
+async function scanInbox(
+  admin: any,
+  conn: GmailConnection,
+  opts: { autoProcess: boolean; supabaseUrl: string; serviceKey: string },
+) {
+  // Look up the user's automation settings to decide whether to auto-trigger
+  // the watchdog after upserting found invoices.
+  let canAutoExtract = false;
+  if (opts.autoProcess) {
+    const { data: settingsRow } = await admin
+      .from("user_settings")
+      .select("automation_email_monitoring, automation_auto_extract")
+      .eq("user_id", conn.user_id)
+      .maybeSingle();
+    canAutoExtract =
+      !!settingsRow?.automation_email_monitoring &&
+      !!settingsRow?.automation_auto_extract;
+  }
+
   // 1. Refresh token if it's about to expire (or already has)
   let accessToken = conn.access_token;
   const expiresMs = new Date(conn.expires_at).getTime();

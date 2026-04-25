@@ -158,11 +158,11 @@ export default function AutomationSettings() {
     if (!userId) { setLoadingRuns(false); return; }
     const { data } = await supabase
       .from("agent_runs")
-      .select("id, started_at, supplier_name, supplier_profile_id, invoice_filename, products_extracted, products_auto_approved, products_flagged, auto_published, human_review_required, status, error_message, metadata")
+      .select("id, started_at, supplier_name, supplier_profile_id, invoice_filename, products_extracted, products_auto_approved, products_flagged, auto_published, human_review_required, status, error_message, metadata, current_step, pipeline_steps")
       .eq("user_id", userId)
       .order("started_at", { ascending: false })
       .limit(20);
-    setRuns((data ?? []) as AgentRunRow[]);
+    setRuns((data ?? []) as unknown as AgentRunRow[]);
     setLoadingRuns(false);
   }
 

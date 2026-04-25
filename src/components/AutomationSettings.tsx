@@ -72,6 +72,7 @@ const DEFAULTS: AutomationSettings = {
 export default function AutomationSettings() {
   const [settings, setSettings] = useState<AutomationSettings>(DEFAULTS);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [sharedProfiles, setSharedProfiles] = useState<Record<string, SharedProfileRow>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

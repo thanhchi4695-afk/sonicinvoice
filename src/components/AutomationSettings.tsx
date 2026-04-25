@@ -463,8 +463,105 @@ export default function AutomationSettings() {
           </div>
         )}
       </div>
+
+      {/* Agent Run History */}
+      <div className="rounded-lg border border-border bg-card">
+        <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+          <p className="text-sm font-medium">Agent Run History</p>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void loadRuns()}
+            disabled={loadingRuns}
+            className="h-7 px-2"
+            aria-label="Refresh agent runs"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingRuns ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+        {runs.length === 0 ? (
+          <p className="p-4 text-xs text-muted-foreground">
+            No agent runs yet. Use 'Run watchdog now' above to test the agent.
+          </p>
+        ) : (
+          <div className="divide-y divide-border">
+            {runs.map((r) => (
+              <RunRow key={r.id} run={r} onReview={openRunForReview} onRetry={() => void loadRuns()} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+function RunRow({
+  run,
+  onReview,
+}: {
+  run: AgentRunRow;
+  onReview: (r: AgentRunRow, products?: any[]) => void;
+  onRetry: () => void;
+}) {
+  const date = new Date(run.started_at).toLocaleString(undefined, {
+    day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit",
+  });
+  const file = run.invoice_filename
+    ? run.invoice_filename.length > 25
+      ? run.invoice_filename.slice(0, 22) + "…"
+      : run.invoice_filename
+    : "—";
+  const stored = (() => {
+    try {
+      const raw = sessionStorage.getItem(`sonic_watchdog_run_${run.id}`);
+      return raw ? JSON.parse(raw) : undefined;
+    } catch { return undefined; }
+  })();
+
+  return (
+    <div className="grid grid-cols-[1fr_auto] gap-3 p-3 items-center">
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground">{date}</p>
+        <p className="text-sm font-medium truncate">
+          {run.supplier_name ?? "Unknown supplier"}
+          <span className="text-muted-foreground font-normal"> · {file}</span>
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          {run.products_extracted} extracted · {run.products_flagged} flagged
+        </p>
+        {run.status === "failed" && run.error_message && (
+          <p className="text-[11px] text-destructive mt-1 flex items-start gap-1">
+            <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+            <span className="truncate">{run.error_message.slice(0, 50)}</span>
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <RunStatusBadge status={run.status} />
+        {run.status === "awaiting_review" && (
+          <Button size="sm" variant="teal" onClick={() => onReview(run, stored)} className="h-7 text-[11px] px-2 gap-1">
+            Review <ArrowRight className="w-3 h-3" />
+          </Button>
+        )}
+        {run.status === "published" && (
+          <span className="text-[11px] text-muted-foreground">View history</span>
+        )}
+        {run.status === "failed" && (
+          <Button size="sm" variant="outline" onClick={() => onReview(run, stored)} className="h-7 text-[11px] px-2">
+            Retry
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RunStatusBadge({ status }: { status: string }) {
+  if (status === "awaiting_review") return <Badge className="bg-secondary text-secondary-foreground">Needs review</Badge>;
+  if (status === "published") return <Badge className="bg-success text-success-foreground">Published</Badge>;
+  if (status === "failed") return <Badge className="bg-destructive text-destructive-foreground">Failed</Badge>;
+  if (status === "running") return <Badge className="bg-primary text-primary-foreground">Processing…</Badge>;
+  return <Badge variant="secondary">{status}</Badge>;
 }
 
 // ── Helpers ────────────────────────────────────────────────

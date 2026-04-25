@@ -2158,6 +2158,8 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          enriched_at: string | null
+          enrichment_source: string | null
           id: string
           image_url: string | null
           product_type: string | null
@@ -2170,6 +2172,8 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          enriched_at?: string | null
+          enrichment_source?: string | null
           id?: string
           image_url?: string | null
           product_type?: string | null
@@ -2182,6 +2186,8 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          enriched_at?: string | null
+          enrichment_source?: string | null
           id?: string
           image_url?: string | null
           product_type?: string | null

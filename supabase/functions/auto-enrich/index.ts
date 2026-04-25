@@ -99,8 +99,10 @@ Deno.serve(async (req) => {
     const sources: string[] = [];
     const firstVariant = Array.isArray(p.variants) ? p.variants[0] : null;
 
-    // Task A — description
-    if (!p.description) {
+    // Task A — description (requires non-empty title + brand; the function 400s otherwise)
+    const descTitle = (p.title || "").trim();
+    const descBrand = (p.vendor || "").trim();
+    if (!p.description && descTitle && descBrand) {
       try {
         const r = await withTimeout(fetch(`${supabaseUrl}/functions/v1/fetch-product-description`, {
           method: "POST",
@@ -109,8 +111,9 @@ Deno.serve(async (req) => {
             Authorization: `Bearer ${serviceKey}`,
           },
           body: JSON.stringify({
-            style_name: p.title,
-            brand: p.vendor || "",
+            style_name: descTitle,
+            brand: descBrand,
+            style_number: firstVariant?.sku || undefined,
             product_type: productType,
           }),
         }).then(async res => {

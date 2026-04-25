@@ -130,19 +130,41 @@ export default function AutomationSettings() {
     setLoadingRuns(false);
   }
 
-  function openRunForReview(run: AgentRunRow, productsFromMemory?: any[]) {
+  async function openRunForReview(run: AgentRunRow, productsFromMemory?: any[]) {
+    // Prefer in-memory products (stashed when this run completed in this tab),
+    // otherwise look in per-run sessionStorage cache, otherwise leave empty
+    // and let the InvoiceFlow show the empty Review screen for that run.
+    let products: any[] = productsFromMemory ?? [];
+    if (products.length === 0) {
+      try {
+        const cached = sessionStorage.getItem(`sonic_watchdog_run_${run.id}`);
+        if (cached) products = JSON.parse(cached) ?? [];
+      } catch { /* ignore */ }
+    }
+
+    const payload = {
+      run_id: run.id,
+      supplier_name: run.supplier_name,
+      supplier_profile_id: run.supplier_profile_id,
+      products_extracted: run.products_extracted,
+      products_flagged: run.products_flagged,
+      auto_publish_eligible: !run.human_review_required,
+      products,
+    };
+
     try {
-      sessionStorage.setItem(
-        "sonic_watchdog_run",
-        JSON.stringify({
-          run_id: run.id,
-          supplier_name: run.supplier_name,
-          supplier_profile_id: run.supplier_profile_id,
-          auto_publish_eligible: !run.human_review_required,
-          products: productsFromMemory ?? [],
-        }),
-      );
+      sessionStorage.setItem("sonic_watchdog_run", JSON.stringify(payload));
     } catch { /* ignore quota */ }
+
+    // Verify the write
+    const verify = sessionStorage.getItem("sonic_watchdog_run");
+    if (!verify) {
+      console.error("[Watchdog] sessionStorage write failed");
+      toast.error("Could not stash run for review");
+      return;
+    }
+    console.log("[Watchdog] sonic_watchdog_run set:", verify.slice(0, 120), `· products=${products.length}`);
+
     window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "invoice" }));
   }
 
@@ -221,7 +243,9 @@ export default function AutomationSettings() {
       // pre-loads the run's products into the Invoice review screen.
       pushNotification({
         title: "Invoice processed — review needed",
-        message: `${summary.products_extracted} products extracted from ${summary.supplier_name ?? "Unknown supplier"}. ${summary.products_flagged} need your review.`,
+        message: `${summary.products_extracted} products extracted${
+          summary.supplier_name ? ` from ${summary.supplier_name}` : ""
+        }. ${summary.products_flagged} need your review.`,
         severity: summary.products_flagged === 0 ? "success" : "info",
         runId: summary.run_id,
       });

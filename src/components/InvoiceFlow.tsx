@@ -1940,60 +1940,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }
 
     if (products.length === 0) {
-      // ── Brain Mode branch (5-stage pipeline) ──
-      if (isBrainModeEnabled() && ["jpg", "jpeg", "png", "webp", "pdf"].includes(ext)) {
-        try {
-          const reader = new FileReader();
-          const base64: string = await new Promise((resolve, reject) => {
-            reader.onload = () => {
-              const r = reader.result as string;
-              resolve(r.includes(",") ? r.split(",")[1] : r);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-          setEnrichLines([{ name: "🧠 Brain Mode", status: "searching", action: "Stage 1/5 — Orientation pass…", confidence: 0 }]);
-          const result = await runBrainPipeline({
-            fileContent: base64,
-            fileType: ext,
-            fileName: file.name,
-            customInstructions,
-            hintedSupplier: supplierName,
-          });
-          brainContextRef.current = { orientation: result.orientation, layout: result.layout };
-          brainClassificationRef.current = result.classification;
-          setNeedsTeach(result.needsTeach);
-          setBrainProducts(result.products);
-          setBrainSummary(result.summary);
-          if (result.recognised) setBrainRecognised(result.supplierName);
-          if (result.supplierName && !supplierName) setSupplierName(result.supplierName);
-          // Flatten BrainProduct[] → existing RawProduct shape so the rest of the
-          // pipeline (validator, review, export) keeps working unchanged.
-          products = result.products.flatMap(p =>
-            (p.variants?.length ? p.variants : [{ size: "", quantity: 0, sku: "", barcode: "" }]).map(v => ({
-              name: p.product_name,
-              brand: result.supplierName || supplierName || "",
-              sku: v.sku || p.style_code || "",
-              barcode: v.barcode || p.barcode || "",
-              type: "",
-              colour: p.colour,
-              size: v.size,
-              qty: Number(v.quantity) || 0,
-              cost: Number(p.cost_ex_gst) || 0,
-              rrp: Number(p.rrp_inc_gst) || 0,
-            })),
-          );
-          toast.success(`🧠 Brain Mode: ${products.length} variants extracted`, {
-            description: `${result.summary.flagged} flagged for review · ${Math.round(Object.values(result.timings).reduce((a,b)=>a+b,0))}ms`,
-          });
-        } catch (err) {
-          console.warn("Brain Mode failed, falling back to standard parser:", err);
-          toast.warning("Brain Mode failed — falling back to standard extraction");
-          products = await parseWithAI(file);
-        }
-      } else {
-        products = await parseWithAI(file);
-      }
+      // ── Brain Mode branch — DISABLED ──
+      // Previously used a client-side 5-stage pipeline (runBrainPipeline) for
+      // images/PDF that never called classify-extract-validate. All files now
+      // route through parseWithAI so the 3-stage edge pipeline runs uniformly.
+      products = await parseWithAI(file);
     }
 
     console.log('[Phase2 trace] startProcessing got products:', products?.length, 'first:', products?.[0]);

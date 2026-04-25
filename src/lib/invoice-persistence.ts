@@ -138,6 +138,7 @@ export async function persistParsedInvoice(
   //        Adjustment, Margin Protection, Markdown Ladder) can see
   //        the newly-processed invoice products. Without this, those
   //        tools only ever show demo rows.
+  const writtenProductIds: string[] = [];
   try {
     // Group accepted lines by product title (variants share a product)
     const byTitle = new Map<string, ValidatedProduct[]>();
@@ -180,6 +181,7 @@ export async function persistParsedInvoice(
         productId = newProduct?.id as string;
       }
       if (!productId) continue;
+      writtenProductIds.push(productId);
 
       // 2. Upsert each variant. variants_user_sku_unique covers (user_id, sku)
       //    where sku is non-empty — fall back to insert when sku is blank.
@@ -271,6 +273,23 @@ export async function persistParsedInvoice(
       // Backfill supplier_id on the document we just inserted
       await supabase.from("documents").update({ supplier_id: matchedSupplierId }).eq("id", doc.id);
     }
+  }
+
+  // ── 6. Fire Agent 3 (Enrichment) in the background — do NOT await.
+  //        The Review screen subscribes to products UPDATE events and
+  //        renders descriptions/images live as they arrive.
+  if (writtenProductIds.length > 0) {
+    supabase.functions.invoke("auto-enrich", {
+      body: {
+        user_id: userId,
+        product_ids: writtenProductIds,
+        run_id: null,
+      },
+    }).then((r) => {
+      console.log("[auto-enrich] complete", r?.data);
+    }).catch((e) => {
+      console.warn("[auto-enrich] failed", e?.message);
+    });
   }
 
   return { documentId: doc.id, supplierId: matchedSupplierId, error: null };

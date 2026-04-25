@@ -320,6 +320,54 @@ export default function PostParseReviewScreen({
   /** Stable session id used as invoice_id when persisting corrections. */
   const sessionInvoiceId = useMemo(() => `session_${Date.now().toString(36)}`, []);
 
+  // ── Agent 3 (Enrichment) — live updates ──────────────────────────
+  // Subscribe to products UPDATE events so the Review screen renders
+  // descriptions and image URLs as the auto-enrich edge function fills
+  // them in. Matches DB rows back to in-memory products by title.
+  const [enrichmentMap, setEnrichmentMap] = useState<Record<string, { description?: string; image_url?: string }>>({});
+  const [enrichmentTotal, setEnrichmentTotal] = useState(0);
+  useEffect(() => {
+    let mounted = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !mounted) return;
+      const userId = session.user.id;
+      // Count distinct titles we expect to be enriched
+      const titles = Array.from(new Set(products.filter(p => !p._rejected).map(p => (p.name || "").trim()).filter(Boolean)));
+      setEnrichmentTotal(titles.length);
+      channel = supabase
+        .channel(`enrich-${sessionInvoiceId}`)
+        .on("postgres_changes", {
+          event: "UPDATE",
+          schema: "public",
+          table: "products",
+          filter: `user_id=eq.${userId}`,
+        }, (payload: any) => {
+          const row = payload?.new;
+          if (!row?.title) return;
+          const key = String(row.title).trim().toLowerCase();
+          setEnrichmentMap(prev => ({
+            ...prev,
+            [key]: {
+              description: row.description ?? prev[key]?.description,
+              image_url: row.image_url ?? prev[key]?.image_url,
+            },
+          }));
+        })
+        .subscribe();
+    })();
+    return () => {
+      mounted = false;
+      if (channel) supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionInvoiceId]);
+
+  const enrichmentDoneCount = useMemo(() => {
+    return Object.values(enrichmentMap).filter(e => e.description || e.image_url).length;
+  }, [enrichmentMap]);
+
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
   const needsReview = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel !== "high"), [products]);
@@ -878,6 +926,18 @@ export default function PostParseReviewScreen({
         <StatCard label="Est. Cost" value={`$${totalEstimatedCost.toFixed(0)}`} icon={<DollarSign className="w-3.5 h-3.5" />} colorClass="text-primary bg-primary/10 border-primary/20" />
         <StatCard label="Missing Cost" value={missingCostCount} icon={<AlertTriangle className="w-3.5 h-3.5" />} colorClass={missingCostCount > 0 ? "text-secondary bg-secondary/10 border-secondary/20" : "text-success bg-success/10 border-success/20"} />
       </div>
+
+      {enrichmentTotal > 0 && (
+        <div className="mb-3 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground flex items-center gap-2">
+          {enrichmentDoneCount >= enrichmentTotal ? (
+            <span className="text-success">✓ Enrichment complete — descriptions and images fetched.</span>
+          ) : (
+            <span className="text-muted-foreground">
+              Enriching products in the background… {enrichmentDoneCount} of {enrichmentTotal} complete
+            </span>
+          )}
+        </div>
+      )}
 
       {underExtractionWarning && (
         <UnderExtractionBanner

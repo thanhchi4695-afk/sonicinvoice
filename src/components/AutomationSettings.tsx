@@ -124,6 +124,18 @@ export default function AutomationSettings() {
 
     if (settingsRes.data) setSettings({ ...DEFAULTS, ...(settingsRes.data as any) });
     if (suppliersRes.data) setSuppliers(suppliersRes.data as SupplierRow[]);
+
+    // Load shared supplier profiles (network intelligence) — read-only for all users
+    const { data: sharedRows } = await supabase
+      .from("shared_supplier_profiles")
+      .select("supplier_name, contributing_users, total_invoices_processed, avg_correction_rate, is_verified");
+    if (sharedRows) {
+      const map: Record<string, SharedProfileRow> = {};
+      for (const r of sharedRows as SharedProfileRow[]) {
+        map[r.supplier_name.toLowerCase().trim()] = r;
+      }
+      setSharedProfiles(map);
+    }
     setLoading(false);
   }
 

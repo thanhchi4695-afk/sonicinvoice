@@ -588,6 +588,20 @@ function RunRow({
   );
 }
 
+function extractProductsFromRun(run: AgentRunRow): any[] {
+  const metadata = run.metadata ?? {};
+  const candidates = [
+    metadata?.products,
+    metadata?.extracted_products,
+    metadata?.parse_result?.products,
+    metadata?.parse_summary?.products,
+  ];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) return candidate;
+  }
+  return [];
+}
+
 function RunStatusBadge({ status }: { status: string }) {
   if (status === "awaiting_review") return <Badge className="bg-secondary text-secondary-foreground">Needs review</Badge>;
   if (status === "published") return <Badge className="bg-success text-success-foreground">Published</Badge>;

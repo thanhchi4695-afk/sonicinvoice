@@ -295,7 +295,11 @@ export default function AutomationSettings() {
 
   return (
     <div className="space-y-5">
-      <AgentActivityCard />
+      <AgentActivityCard
+        hasGmail={suppliers.some(s => (s.email_domains?.length ?? 0) > 0)}
+        monitoringOn={settings.automation_email_monitoring}
+        eligibleSuppliers={eligibleSuppliers}
+      />
 
       {/* Toggles */}
       <div className="space-y-3">

@@ -282,6 +282,12 @@ export async function persistParsedInvoice(
   //        The Review screen subscribes to products UPDATE events and
   //        renders descriptions/images live as they arrive.
   if (writtenProductIds.length > 0) {
+    console.log(
+      "[persistence] calling auto-enrich with",
+      writtenProductIds.length,
+      "ids:",
+      writtenProductIds,
+    );
     supabase.functions.invoke("auto-enrich", {
       body: {
         user_id: userId,
@@ -289,9 +295,14 @@ export async function persistParsedInvoice(
         run_id: runId ?? null,
       },
     }).then((r) => {
-      console.log("[auto-enrich] complete", r?.data);
+      console.log(
+        "[auto-enrich] invoke response:",
+        JSON.stringify(r?.data),
+        "error:",
+        r?.error?.message,
+      );
     }).catch((e) => {
-      console.warn("[auto-enrich] failed", e?.message);
+      console.warn("[auto-enrich] invoke threw:", e?.message);
     });
   }
 

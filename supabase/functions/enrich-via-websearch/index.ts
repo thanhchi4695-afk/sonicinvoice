@@ -203,27 +203,36 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // Auth
+    // Auth — accept either a user JWT, OR a service-role call with X-User-Id
+    // (used by auto-enrich when running server-side background enrichment).
     const authHeader = req.headers.get("Authorization");
+    const xUserId = req.headers.get("X-User-Id");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ found: false, error: "unauthorized" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const supabaseUser = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
-    const { data: claims, error: authErr } = await supabaseUser.auth.getClaims(
-      authHeader.replace("Bearer ", ""),
-    );
-    if (authErr || !claims?.claims?.sub) {
-      return new Response(JSON.stringify({ found: false, error: "unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const bearer = authHeader.replace("Bearer ", "");
+    let userId: string | null = null;
+
+    if (bearer === serviceKey && xUserId) {
+      // Trusted server-to-server call from another edge function.
+      userId = xUserId;
+    } else {
+      const supabaseUser = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data: claims, error: authErr } = await supabaseUser.auth.getClaims(bearer);
+      if (authErr || !claims?.claims?.sub) {
+        return new Response(JSON.stringify({ found: false, error: "unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = claims.claims.sub as string;
     }
-    const userId = claims.claims.sub as string;
 
     // Service-role client for cache + log writes
     const supabaseAdmin = createClient(

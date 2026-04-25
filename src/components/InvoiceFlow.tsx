@@ -549,6 +549,18 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  // Watchdog Agent hand-off — picks up a stashed run so the review screen can
+  // render the (currently disabled) "Auto-publish to Shopify" button.
+  const [watchdogRun] = useState<{ runId: string; autoPublishEligible: boolean } | null>(() => {
+    try {
+      const raw = sessionStorage.getItem("sonic_watchdog_run");
+      if (!raw) return null;
+      sessionStorage.removeItem("sonic_watchdog_run");
+      const parsed = JSON.parse(raw);
+      if (!parsed?.run_id) return null;
+      return { runId: parsed.run_id, autoPublishEligible: !!parsed.auto_publish_eligible };
+    } catch { return null; }
+  });
 
   // OCR / file type detection state
   type FileParseMode = "pdf_text" | "pdf_scan" | "photo" | "spreadsheet" | "email";
@@ -4073,6 +4085,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 underExtractionWarning={underExtractionWarning}
                 fieldConfidence={aiFieldConfidence}
                 extractionNotes={aiExtractionNotes}
+                watchdogRun={watchdogRun}
               />
             </div>
           )}

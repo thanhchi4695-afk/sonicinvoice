@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Bot, Mail, Zap, Check, X, Edit2, FileUp, Upload } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Loader2, Bot, Mail, Zap, Check, X, Edit2, FileUp, Upload, RefreshCw, ArrowRight, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -33,6 +33,22 @@ interface AgentRunSummary {
   products_auto_approved: number;
   products_flagged: number;
   auto_publish_available: boolean;
+  products?: any[];
+}
+
+interface AgentRunRow {
+  id: string;
+  started_at: string;
+  supplier_name: string | null;
+  supplier_profile_id: string | null;
+  invoice_filename: string | null;
+  products_extracted: number;
+  products_auto_approved: number;
+  products_flagged: number;
+  auto_published: boolean;
+  human_review_required: boolean;
+  status: string;
+  error_message: string | null;
 }
 
 const DEFAULTS: AutomationSettings = {
@@ -51,11 +67,21 @@ export default function AutomationSettings() {
   const [domainDraft, setDomainDraft] = useState("");
   const [running, setRunning] = useState(false);
   const [lastRun, setLastRun] = useState<AgentRunSummary | null>(null);
+  const [runs, setRuns] = useState<AgentRunRow[]>([]);
+  const [loadingRuns, setLoadingRuns] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void load();
+    void loadRuns();
   }, []);
+
+  // Live polling while any run is "running"
+  useEffect(() => {
+    if (!runs.some((r) => r.status === "running")) return;
+    const t = setInterval(() => { void loadRuns(); }, 10000);
+    return () => clearInterval(t);
+  }, [runs]);
 
   async function load() {
     setLoading(true);
@@ -87,6 +113,37 @@ export default function AutomationSettings() {
     if (settingsRes.data) setSettings({ ...DEFAULTS, ...(settingsRes.data as any) });
     if (suppliersRes.data) setSuppliers(suppliersRes.data as SupplierRow[]);
     setLoading(false);
+  }
+
+  async function loadRuns() {
+    setLoadingRuns(true);
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) { setLoadingRuns(false); return; }
+    const { data } = await supabase
+      .from("agent_runs")
+      .select("id, started_at, supplier_name, supplier_profile_id, invoice_filename, products_extracted, products_auto_approved, products_flagged, auto_published, human_review_required, status, error_message")
+      .eq("user_id", userId)
+      .order("started_at", { ascending: false })
+      .limit(20);
+    setRuns((data ?? []) as AgentRunRow[]);
+    setLoadingRuns(false);
+  }
+
+  function openRunForReview(run: AgentRunRow, productsFromMemory?: any[]) {
+    try {
+      sessionStorage.setItem(
+        "sonic_watchdog_run",
+        JSON.stringify({
+          run_id: run.id,
+          supplier_name: run.supplier_name,
+          supplier_profile_id: run.supplier_profile_id,
+          auto_publish_eligible: !run.human_review_required,
+          products: productsFromMemory ?? [],
+        }),
+      );
+    } catch { /* ignore quota */ }
+    window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "invoice" }));
   }
 
   async function persist(next: AutomationSettings) {
@@ -159,11 +216,23 @@ export default function AutomationSettings() {
       if (!data?.success) throw new Error(data?.error || "Watchdog failed");
       const summary = data as AgentRunSummary;
       setLastRun(summary);
-      // In-app notification (NotificationBell uses localStorage)
+      // In-app notification (NotificationBell uses localStorage). Link → account so the
+      // user lands on Automation Settings where the Run History "Review →" button
+      // pre-loads the run's products into the Invoice review screen.
       pushNotification({
-        title: `New ${summary.supplier_name ?? "supplier"} invoice detected`,
-        message: `${summary.products_extracted} products extracted. ${summary.products_auto_approved} auto-approved, ${summary.products_flagged} need review.`,
+        title: "Invoice processed — review needed",
+        message: `${summary.products_extracted} products extracted from ${summary.supplier_name ?? "Unknown supplier"}. ${summary.products_flagged} need your review.`,
+        severity: summary.products_flagged === 0 ? "success" : "info",
+        runId: summary.run_id,
       });
+      // Stash products so a quick click straight from the toast/recent-run card works
+      try {
+        sessionStorage.setItem(
+          `sonic_watchdog_run_${summary.run_id}`,
+          JSON.stringify(summary.products ?? []),
+        );
+      } catch { /* ignore */ }
+      void loadRuns();
       toast.success("Watchdog run complete");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -266,7 +335,7 @@ export default function AutomationSettings() {
           <input
             ref={fileInput}
             type="file"
-            accept="application/pdf,image/*"
+            accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.heic,.webp,application/pdf,image/*,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -394,8 +463,105 @@ export default function AutomationSettings() {
           </div>
         )}
       </div>
+
+      {/* Agent Run History */}
+      <div className="rounded-lg border border-border bg-card">
+        <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+          <p className="text-sm font-medium">Agent Run History</p>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void loadRuns()}
+            disabled={loadingRuns}
+            className="h-7 px-2"
+            aria-label="Refresh agent runs"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingRuns ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+        {runs.length === 0 ? (
+          <p className="p-4 text-xs text-muted-foreground">
+            No agent runs yet. Use 'Run watchdog now' above to test the agent.
+          </p>
+        ) : (
+          <div className="divide-y divide-border">
+            {runs.map((r) => (
+              <RunRow key={r.id} run={r} onReview={openRunForReview} onRetry={() => void loadRuns()} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+function RunRow({
+  run,
+  onReview,
+}: {
+  run: AgentRunRow;
+  onReview: (r: AgentRunRow, products?: any[]) => void;
+  onRetry: () => void;
+}) {
+  const date = new Date(run.started_at).toLocaleString(undefined, {
+    day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit",
+  });
+  const file = run.invoice_filename
+    ? run.invoice_filename.length > 25
+      ? run.invoice_filename.slice(0, 22) + "…"
+      : run.invoice_filename
+    : "—";
+  const stored = (() => {
+    try {
+      const raw = sessionStorage.getItem(`sonic_watchdog_run_${run.id}`);
+      return raw ? JSON.parse(raw) : undefined;
+    } catch { return undefined; }
+  })();
+
+  return (
+    <div className="grid grid-cols-[1fr_auto] gap-3 p-3 items-center">
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground">{date}</p>
+        <p className="text-sm font-medium truncate">
+          {run.supplier_name ?? "Unknown supplier"}
+          <span className="text-muted-foreground font-normal"> · {file}</span>
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          {run.products_extracted} extracted · {run.products_flagged} flagged
+        </p>
+        {run.status === "failed" && run.error_message && (
+          <p className="text-[11px] text-destructive mt-1 flex items-start gap-1">
+            <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+            <span className="truncate">{run.error_message.slice(0, 50)}</span>
+          </p>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <RunStatusBadge status={run.status} />
+        {run.status === "awaiting_review" && (
+          <Button size="sm" variant="teal" onClick={() => onReview(run, stored)} className="h-7 text-[11px] px-2 gap-1">
+            Review <ArrowRight className="w-3 h-3" />
+          </Button>
+        )}
+        {run.status === "published" && (
+          <span className="text-[11px] text-muted-foreground">View history</span>
+        )}
+        {run.status === "failed" && (
+          <Button size="sm" variant="outline" onClick={() => onReview(run, stored)} className="h-7 text-[11px] px-2">
+            Retry
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RunStatusBadge({ status }: { status: string }) {
+  if (status === "awaiting_review") return <Badge className="bg-secondary text-secondary-foreground">Needs review</Badge>;
+  if (status === "published") return <Badge className="bg-success text-success-foreground">Published</Badge>;
+  if (status === "failed") return <Badge className="bg-destructive text-destructive-foreground">Failed</Badge>;
+  if (status === "running") return <Badge className="bg-primary text-primary-foreground">Processing…</Badge>;
+  return <Badge variant="secondary">{status}</Badge>;
 }
 
 // ── Helpers ────────────────────────────────────────────────
@@ -472,19 +638,27 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function pushNotification(opts: { title: string; message: string }) {
+function pushNotification(opts: {
+  title: string;
+  message: string;
+  severity?: "urgent" | "warning" | "info" | "success";
+  runId?: string;
+}) {
   try {
     const STORAGE_KEY = "notifications_suppliersync";
     const raw = localStorage.getItem(STORAGE_KEY);
     const list = raw ? JSON.parse(raw) : [];
     list.unshift({
       id: crypto.randomUUID(),
-      severity: "info",
+      severity: opts.severity ?? "info",
       title: opts.title,
       message: opts.message,
       timestamp: new Date().toISOString(),
       read: false,
-      link: "invoices",
+      // Land on Account → Automation Settings, where the Run History table has
+      // the "Review →" button to open the specific run in the Invoice flow.
+      link: "account",
+      ...(opts.runId ? { runId: opts.runId } : {}),
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 100)));
   } catch {

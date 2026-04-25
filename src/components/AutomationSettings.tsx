@@ -33,6 +33,22 @@ interface AgentRunSummary {
   products_auto_approved: number;
   products_flagged: number;
   auto_publish_available: boolean;
+  products?: any[];
+}
+
+interface AgentRunRow {
+  id: string;
+  started_at: string;
+  supplier_name: string | null;
+  supplier_profile_id: string | null;
+  invoice_filename: string | null;
+  products_extracted: number;
+  products_auto_approved: number;
+  products_flagged: number;
+  auto_published: boolean;
+  human_review_required: boolean;
+  status: string;
+  error_message: string | null;
 }
 
 const DEFAULTS: AutomationSettings = {

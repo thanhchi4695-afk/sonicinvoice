@@ -1632,7 +1632,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           base64 = btoa(binary);
         }
       } else {
-        // PDF — skip all image preprocessing
+        // Non-image (PDF / CSV / Excel / Word) — skip all image preprocessing
         const arrayBuffer = await file.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
         let binary = "";

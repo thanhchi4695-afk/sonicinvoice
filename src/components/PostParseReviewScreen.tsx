@@ -927,6 +927,18 @@ export default function PostParseReviewScreen({
         <StatCard label="Missing Cost" value={missingCostCount} icon={<AlertTriangle className="w-3.5 h-3.5" />} colorClass={missingCostCount > 0 ? "text-secondary bg-secondary/10 border-secondary/20" : "text-success bg-success/10 border-success/20"} />
       </div>
 
+      {enrichmentTotal > 0 && (
+        <div className="mb-3 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground flex items-center gap-2">
+          {enrichmentDoneCount >= enrichmentTotal ? (
+            <span className="text-success">✓ Enrichment complete — descriptions and images fetched.</span>
+          ) : (
+            <span className="text-muted-foreground">
+              Enriching products in the background… {enrichmentDoneCount} of {enrichmentTotal} complete
+            </span>
+          )}
+        </div>
+      )}
+
       {underExtractionWarning && (
         <UnderExtractionBanner
           warning={underExtractionWarning}

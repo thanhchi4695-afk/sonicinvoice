@@ -1566,8 +1566,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
       let base64: string;
 
+      // Non-image file types (PDF, CSV, Excel, Word) skip image preprocessing.
+      const isNonImage = isPdfFile(file) || ["csv", "xlsx", "xls", "doc", "docx"].includes(ext);
+
       // ── Client-side image preprocessing (resize, grayscale, contrast, sharpen) ──
-      if (!isPdfFile(file)) {
+      if (!isNonImage) {
         setEnrichLines([{ name: "Preprocessing image…", status: "searching", action: "Resize, grayscale, contrast & sharpen…", confidence: 0 }]);
 
         try {
@@ -1629,7 +1632,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           base64 = btoa(binary);
         }
       } else {
-        // PDF — skip all image preprocessing
+        // Non-image (PDF / CSV / Excel / Word) — skip all image preprocessing
         const arrayBuffer = await file.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
         let binary = "";
@@ -1944,14 +1947,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       }
     }
 
+    // Detect headers for CSV/Excel for potential teach later
     if (products.length === 0 && ["csv", "xlsx", "xls"].includes(ext)) {
-      // Detect headers for potential teach later
       try {
         const rows = await parseFileToRows(file, 1);
         if (rows.length > 0) setDetectedHeaders(Object.keys(rows[0]));
       } catch {}
-      products = await parseSpreadsheet(file);
-    } else if (products.length === 0) {
+    }
+
+    if (products.length === 0) {
       // ── Brain Mode branch (5-stage pipeline) ──
       if (isBrainModeEnabled() && ["jpg", "jpeg", "png", "webp", "pdf"].includes(ext)) {
         try {

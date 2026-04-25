@@ -183,19 +183,43 @@ async function callSupplierScrape(item: Phase3Item): Promise<Phase3ProductResult
 }
 
 // ── Tier 1.5: AI WebSearch (enrich-via-websearch) ─────────────
+// Wraps the call in a 30-second timeout and retries up to 3× on 503 cold-starts.
+// Always returns null on failure so the cascade continues without blocking the Review screen.
 async function callWebsearchTier(item: Phase3Item): Promise<Phase3ProductResult | null> {
   if (!item.product_title) return null;
+
+  const invokeOnce = async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const result = await supabase.functions.invoke("enrich-via-websearch", {
+        body: {
+          brand_name: item.vendor || "",
+          product_name: item.product_title,
+          colour: (item as Phase3Item & { colour?: string }).colour || "",
+          product_code: item.sku || "",
+        },
+      });
+      return result;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
   try {
-    const { data, error } = await supabase.functions.invoke("enrich-via-websearch", {
-      body: {
-        brand_name: item.vendor || "",
-        product_name: item.product_title,
-        colour: (item as Phase3Item & { colour?: string }).colour || "",
-        product_code: item.sku || "",
-      },
-    });
-    if (error) return null;
-    const d = data as {
+    let resp: Awaited<ReturnType<typeof invokeOnce>> | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        resp = await invokeOnce();
+        const status = (resp?.error as { status?: number } | null)?.status;
+        if (status !== 503) break;
+      } catch (e) {
+        if (attempt === 2) throw e;
+      }
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    }
+    if (!resp || resp.error) return null;
+    const d = resp.data as {
       found?: boolean; price?: number | null; matched_url?: string | null;
       image_url?: string | null; description?: string | null;
       source?: string; query_used?: string; cache_hit?: boolean; cost_aud?: number;

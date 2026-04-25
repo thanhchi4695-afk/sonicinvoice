@@ -407,9 +407,10 @@ async function runEnrich(c: ClassifiedItem, supplierName: string): Promise<Enric
     }),
     supabase.functions.invoke("fetch-product-description", {
       body: {
-        productName: c.original_line.styleName,
+        style_name: c.original_line.styleName,
         brand: c.original_line.brand || supplierName,
-        sku: c.original_line.sku || "",
+        style_number: c.original_line.sku || "",
+        product_type: (c.original_line as { type?: string }).type || undefined,
       },
     }),
     supabase.functions.invoke("image-search", {

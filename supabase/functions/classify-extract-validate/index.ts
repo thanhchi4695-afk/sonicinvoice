@@ -66,22 +66,36 @@ Deno.serve(async (req) => {
     // ─────── STAGE 1 — orientation ───────
     let classification: Classification | null = null;
     let usedSavedProfile = false;
+    const SAVED_PROFILE_MIN_CONFIDENCE = 20; // lowered from 70 — raise to 70 once 7+ invoices/supplier
 
-    // First try: saved profile if we know the supplier
+    // First try: saved profile by supplier hint OR filename token match
     const hintSupplier = (supplierName || "").trim();
-    if (userId && hintSupplier) {
+    if (userId) {
       try {
-        const { data: prof } = await admin
+        // Pull all candidate profiles meeting the confidence floor (cap 50 to be safe)
+        const { data: profiles } = await admin
           .from("supplier_profiles")
           .select("supplier_name, profile_data, confidence_score, currency")
           .eq("user_id", userId)
-          .ilike("supplier_name", hintSupplier)
-          .maybeSingle();
-        const saved = prof?.profile_data?.classification as Classification | undefined;
-        if (saved && (prof?.confidence_score ?? 0) > 70) {
-          classification = { ...saved, _source: "saved", supplier_name: prof!.supplier_name };
+          .gte("confidence_score", SAVED_PROFILE_MIN_CONFIDENCE)
+          .limit(50);
+
+        const fileLower = (fileName || "").toLowerCase();
+        const matched = (profiles || []).find((p) => {
+          const sName = (p.supplier_name || "").toLowerCase().trim();
+          if (!sName) return false;
+          if (hintSupplier && sName === hintSupplier.toLowerCase()) return true;
+          if (hintSupplier && (sName.includes(hintSupplier.toLowerCase()) || hintSupplier.toLowerCase().includes(sName))) return true;
+          // Filename hint: e.g. "jantzen_classifier_test.csv" matches "Jantzen"
+          if (fileLower.includes(sName)) return true;
+          return false;
+        });
+
+        const saved = matched?.profile_data?.classification as Classification | undefined;
+        if (matched && saved) {
+          classification = { ...saved, _source: "saved", supplier_name: matched.supplier_name };
           usedSavedProfile = true;
-          console.log(`[classify-extract-validate] Reusing saved classification for ${prof!.supplier_name}`);
+          console.log(`[classify-extract-validate] Reusing saved classification for ${matched.supplier_name} (confidence ${matched.confidence_score})`);
         }
       } catch (e) {
         console.warn("[classify-extract-validate] saved-profile lookup failed:", e);
@@ -156,7 +170,7 @@ Deno.serve(async (req) => {
 
     // ─────── Persist classification to supplier_profiles ───────
     const supplierFinal = classification?.supplier_name || extraction?.supplier || supplierName || null;
-    if (userId && classification && !usedSavedProfile && supplierFinal && (classification.confidence ?? 0) >= 60) {
+    if (userId && classification && !usedSavedProfile && supplierFinal) {
       try {
         // Read existing profile_data so we don't clobber it
         const { data: existing } = await admin

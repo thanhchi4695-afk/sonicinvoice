@@ -770,17 +770,22 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             },
           });
           // Write researched RRPs back into in-memory products so the Shopify
-          // Preview / export step pick them up. Match by lowercased title OR sku
-          // (productGroups prefixes the brand into name, so title-only misses).
+          // Preview / export step pick them up. Phase3 runs with worker
+          // concurrency — summary.results is in COMPLETION order, NOT input
+          // order. Match each result back to its input item by carried
+          // product_title + vendor; index-based mapping causes price swaps.
           const rrpByTitle = new Map<string, number>();
           const rrpBySku = new Map<string, number>();
           const norm = (s: string) => (s || "").toLowerCase().trim();
-          accepted.forEach((item, idx) => {
-            const r = summary.results[idx];
+          summary.results.forEach((r) => {
             if (!r?.recommended_rrp || r.recommended_rrp <= 0) return;
-            const title = norm(item.name || "");
-            const sku = norm(item.sku || "");
+            const title = norm(r.product_title || "");
             if (title) rrpByTitle.set(title, r.recommended_rrp);
+            const matchedItem =
+              phase3Items.find(
+                (it) => norm(it.product_title) === title && norm(it.vendor || "") === norm(r.vendor || ""),
+              ) || phase3Items.find((it) => norm(it.product_title) === title);
+            const sku = norm(matchedItem?.sku || "");
             if (sku) rrpBySku.set(sku, r.recommended_rrp);
           });
           const lookupRrp = (name?: string, sku?: string): number | undefined => {

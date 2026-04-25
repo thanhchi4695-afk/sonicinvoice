@@ -45,6 +45,7 @@ const ReorderPanel = lazy(() => import("@/components/ReorderPanel"));
 const SupplierPanel = lazy(() => import("@/components/SupplierPanel"));
 const HelpCentre = lazy(() => import("@/components/HelpCentre"));
 const HowToCatalog = lazy(() => import("@/components/HowToCatalog"));
+const AgentGuide = lazy(() => import("@/components/AgentGuide"));
 const AuditLogPanel = lazy(() => import("@/components/AuditLogPanel"));
 const CatalogMemoryPanel = lazy(() => import("@/components/CatalogMemoryPanel"));
 const EmailInboxPanel = lazy(() => import("@/components/EmailInboxPanel"));
@@ -663,6 +664,9 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
           onStartLookbookImport={() => setActiveFlow("lookbook_import")}
           onStartScanMode={() => setActiveFlow("scan_mode")}
+          onOpenAgentGuide={() => setActiveTab("agent_guide")}
+          onOpenAutomation={() => setActiveTab("account")}
+          onOpenIntegrations={() => setActiveTab("account")}
         />
       )}
       {activeTab === "start" && (
@@ -704,6 +708,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         {activeTab === "billing" && <BillingScreen />}
         {activeTab === "help" && <HelpCentre />}
         {activeTab === "howto" && <HowToCatalog onNavigateToFeature={(f) => setActiveFlow(f as any)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
+        {activeTab === "agent_guide" && <AgentGuide onBack={() => setActiveTab("home")} onOpenAutomation={() => setActiveTab("account")} />}
         {activeTab === "account" && <AccountScreen />}
       </Suspense>
     </>

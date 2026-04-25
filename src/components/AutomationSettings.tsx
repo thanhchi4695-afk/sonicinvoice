@@ -341,6 +341,15 @@ export default function AutomationSettings() {
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => window.dispatchEvent(new CustomEvent("sonic:navigate-tab", { detail: "agent_guide" }))}
+        >
+          How it works →
+        </Button>
+      </div>
       <AgentActivityCard
         hasGmail={suppliers.some(s => (s.email_domains?.length ?? 0) > 0)}
         monitoringOn={settings.automation_email_monitoring}

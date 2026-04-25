@@ -24,6 +24,7 @@ import { useState, useEffect } from "react";
 import { FileText, Package, ShoppingBag, Store, Mail, Upload, Briefcase, Camera, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import AgentPipelineShowcase from "@/components/AgentPipelineShowcase";
 
 export type DocType = "invoice" | "packing_slip";
 export type PosChoice = "shopify" | "lightspeed";
@@ -36,6 +37,9 @@ interface HomeWizardProps {
   onStartWholesaleImport?: () => void;
   onStartLookbookImport?: () => void;
   onStartScanMode?: () => void;
+  onOpenAgentGuide?: () => void;
+  onOpenAutomation?: () => void;
+  onOpenIntegrations?: () => void;
 }
 
 const DOC_KEY = "preferred_doc_type";
@@ -49,6 +53,9 @@ const HomeWizard = ({
   onStartWholesaleImport,
   onStartLookbookImport,
   onStartScanMode,
+  onOpenAgentGuide,
+  onOpenAutomation,
+  onOpenIntegrations,
 }: HomeWizardProps) => {
   const [docType, setDocType] = useState<DocType | null>(() =>
     (localStorage.getItem(DOC_KEY) as DocType) || null
@@ -249,6 +256,14 @@ const HomeWizard = ({
           </div>
         </section>
       )}
+
+      {/* ── AI Agents pipeline showcase (always visible) ───── */}
+      <AgentPipelineShowcase
+        onOpenGuide={onOpenAgentGuide}
+        onOpenAutomation={onOpenAutomation}
+        onStartInvoice={onStartInvoice}
+        onOpenIntegrations={onOpenIntegrations}
+      />
     </div>
   );
 };

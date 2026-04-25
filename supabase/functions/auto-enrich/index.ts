@@ -102,6 +102,7 @@ Deno.serve(async (req) => {
     // Task A — description (requires non-empty title + brand; the function 400s otherwise)
     const descTitle = (p.title || "").trim();
     const descBrand = (p.vendor || "").trim();
+    console.log("[auto-enrich] processing product:", p.id, "title:", descTitle, "brand:", descBrand, "has_existing_desc:", !!p.description);
     if (!p.description && descTitle && descBrand) {
       try {
         const r = await withTimeout(fetch(`${supabaseUrl}/functions/v1/fetch-product-description`, {
@@ -126,8 +127,12 @@ Deno.serve(async (req) => {
           updates.description = r.description;
           sources.push("gemini-description");
           descriptionsFound++;
+          console.log("[auto-enrich] description FOUND for:", p.id, "length:", r.description.length, "source:", r.source_url || "unknown");
+        } else {
+          console.log("[auto-enrich] description NOT FOUND for:", p.id, "raw response:", JSON.stringify(r)?.slice(0, 200));
         }
       } catch (e) {
+        console.warn("[auto-enrich] description error for:", p.id, String((e as Error).message));
         errors.push({ product_id: p.id, task: "description", message: String((e as Error).message) });
       }
     }
@@ -193,6 +198,18 @@ Deno.serve(async (req) => {
     // Task C — image search (only if websearch didn't supply one)
     if (!p.image_url && !updates.image_url) {
       try {
+        // Simpler category-based query — full product titles rarely index in image search
+        const t = (p.title || "").toLowerCase();
+        let category = "swimwear";
+        if (t.includes("one piece") || t.includes("maillot") || t.includes("swimsuit")) category = "one piece swimwear";
+        else if (t.includes("bikini top") || t.includes("bralette") || t.includes("bandeau")) category = "bikini top";
+        else if (t.includes("bikini bottom") || t.includes("brief") || t.includes("boyleg") || t.includes("hipster")) category = "bikini bottom";
+        else if (t.includes("boardshort") || t.includes("trunk")) category = "boardshorts";
+        else if (t.includes("rashie") || t.includes("rash guard") || t.includes("rash")) category = "rash guard";
+        else if (t.includes("tankini")) category = "tankini";
+        const searchQuery = `${p.vendor || ""} ${category}`.trim().replace(/\s+/g, " ");
+        console.log("[auto-enrich] image-search query for:", p.id, "→", searchQuery);
+
         const r = await withTimeout(fetch(`${supabaseUrl}/functions/v1/image-search`, {
           method: "POST",
           headers: {
@@ -205,8 +222,7 @@ Deno.serve(async (req) => {
               styleName: p.title || "",
               styleNumber: firstVariant?.sku || "",
               colour: firstVariant?.color || "",
-              // Broader query — the full title rarely indexes; brand + product type does.
-              searchQuery: `${p.vendor || ""} ${productType} swimwear`.trim().replace(/\s+/g, " "),
+              searchQuery,
             }],
           }),
         }).then(async res => {
@@ -220,8 +236,12 @@ Deno.serve(async (req) => {
           updates.image_url = url;
           sources.push("image-search");
           imagesFound++;
+          console.log("[auto-enrich] image FOUND for:", p.id, "→", url.slice(0, 100));
+        } else {
+          console.log("[auto-enrich] image NOT FOUND for:", p.id, "results count:", r?.results?.length || 0);
         }
       } catch (e) {
+        console.warn("[auto-enrich] image error for:", p.id, String((e as Error).message));
         errors.push({ product_id: p.id, task: "image", message: String((e as Error).message) });
       }
     }
@@ -230,20 +250,37 @@ Deno.serve(async (req) => {
       updates.updated_at = new Date().toISOString();
       updates.enriched_at = new Date().toISOString();
       updates.enrichment_source = sources.join(",");
+      console.log("[auto-enrich] saving updates for:", p.id, p.title, "fields:", Object.keys(updates).join(","), "desc_len:", updates.description?.length || 0);
       const { error: upErr } = await admin
         .from("products")
         .update(updates)
         .eq("id", p.id)
         .eq("user_id", user_id);
-      if (upErr) errors.push({ product_id: p.id, task: "update", message: upErr.message });
+      if (upErr) {
+        console.warn("[auto-enrich] DB update FAILED for:", p.id, upErr.message);
+        errors.push({ product_id: p.id, task: "update", message: upErr.message });
+      } else {
+        console.log("[auto-enrich] DB update OK for:", p.id);
+      }
+    } else {
+      console.log("[auto-enrich] nothing to save for:", p.id, "(no enrichment data found)");
     }
   }));
 
+  console.log("[auto-enrich] all products processed. descriptions:", descriptionsFound, "images:", imagesFound, "prices:", pricesFound, "errors:", errors.length);
+
   if (run_id) {
-    await admin.from("agent_runs").update({
+    const { error: runErr } = await admin.from("agent_runs").update({
       enrichment_complete: true,
       enrichment_completed_at: new Date().toISOString(),
     }).eq("id", run_id).eq("user_id", user_id);
+    if (runErr) {
+      console.warn("[auto-enrich] enrichment_complete update failed:", runErr.message);
+    } else {
+      console.log("[auto-enrich] enrichment_complete=true set for run:", run_id);
+    }
+  } else {
+    console.log("[auto-enrich] no run_id provided — skipping agent_runs update");
   }
 
   return json({

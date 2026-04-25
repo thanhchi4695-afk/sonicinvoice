@@ -394,6 +394,9 @@ export default function AutomationSettings() {
         )}
       </div>
 
+      {/* Phase 2 — Gmail monitoring + found invoices */}
+      <GmailMonitoringPanel onRunComplete={() => void loadRuns()} />
+
       {/* Supplier table */}
       <div className="rounded-lg border border-border bg-card">
         <div className="px-4 py-2 border-b border-border">

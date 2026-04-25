@@ -252,7 +252,7 @@ function extractEmail(raw: string): string {
 }
 
 async function refreshAccessToken(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
   conn: GmailConnection,
 ): Promise<string> {
   const clientId = Deno.env.get("GOOGLE_CLIENT_ID");

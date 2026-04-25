@@ -207,7 +207,7 @@ Deno.serve(async (req) => {
     return json({
       success: true,
       run_id: runId,
-      supplier_name: profile?.supplier_name ?? supplier_name ?? null,
+      supplier_name: resolvedSupplierName,
       products_extracted: total,
       products_auto_approved: autoApproved,
       products_flagged: flagged,

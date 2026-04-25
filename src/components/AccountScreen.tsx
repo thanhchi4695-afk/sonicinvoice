@@ -35,6 +35,7 @@ import { getFormatTemplates, deleteFormatTemplate, getTemplateQuality, getTempla
 import { getMetafieldConfig, saveMetafieldConfig, type MetafieldDefinition } from "@/lib/metafields";
 import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
 const TeamManagement = lazy(() => import("@/components/TeamManagement"));
+const AutomationSettings = lazy(() => import("@/components/AutomationSettings"));
 
 const AccountScreen = () => {
   const { isAdmin } = useUserRole();
@@ -378,6 +379,13 @@ const AccountScreen = () => {
             </button>
           </div>
         )}
+      </Section>
+
+      {/* Automation — AI Watchdog Agent */}
+      <Section title="Automation">
+        <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+          <AutomationSettings />
+        </Suspense>
       </Section>
 
       {/* POS Connections (Stock Checking) */}

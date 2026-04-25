@@ -319,6 +319,74 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_runs: {
+        Row: {
+          auto_published: boolean
+          completed_at: string | null
+          error_message: string | null
+          human_review_required: boolean
+          id: string
+          invoice_filename: string | null
+          invoice_id: string | null
+          metadata: Json
+          products_auto_approved: number
+          products_extracted: number
+          products_flagged: number
+          started_at: string
+          status: string
+          supplier_name: string | null
+          supplier_profile_id: string | null
+          trigger_type: string
+          user_id: string
+        }
+        Insert: {
+          auto_published?: boolean
+          completed_at?: string | null
+          error_message?: string | null
+          human_review_required?: boolean
+          id?: string
+          invoice_filename?: string | null
+          invoice_id?: string | null
+          metadata?: Json
+          products_auto_approved?: number
+          products_extracted?: number
+          products_flagged?: number
+          started_at?: string
+          status?: string
+          supplier_name?: string | null
+          supplier_profile_id?: string | null
+          trigger_type?: string
+          user_id: string
+        }
+        Update: {
+          auto_published?: boolean
+          completed_at?: string | null
+          error_message?: string | null
+          human_review_required?: boolean
+          id?: string
+          invoice_filename?: string | null
+          invoice_id?: string | null
+          metadata?: Json
+          products_auto_approved?: number
+          products_extracted?: number
+          products_flagged?: number
+          started_at?: string
+          status?: string
+          supplier_name?: string | null
+          supplier_profile_id?: string | null
+          trigger_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_runs_supplier_profile_id_fkey"
+            columns: ["supplier_profile_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_sessions: {
         Row: {
           agent_mode: string
@@ -2982,15 +3050,19 @@ export type Database = {
       }
       supplier_profiles: {
         Row: {
+          auto_publish_eligible: boolean | null
           confidence_score: number | null
+          correction_rate: number | null
           country: string | null
           created_at: string
           currency: string | null
+          email_domains: string[] | null
           id: string
           invoice_count: number | null
           invoices_analysed: number
           is_active: boolean
           is_known_brand: boolean | null
+          last_invoice_date: string | null
           profile_data: Json
           supplier_name: string
           supplier_name_variants: string[] | null
@@ -3003,15 +3075,19 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          auto_publish_eligible?: boolean | null
           confidence_score?: number | null
+          correction_rate?: number | null
           country?: string | null
           created_at?: string
           currency?: string | null
+          email_domains?: string[] | null
           id?: string
           invoice_count?: number | null
           invoices_analysed?: number
           is_active?: boolean
           is_known_brand?: boolean | null
+          last_invoice_date?: string | null
           profile_data?: Json
           supplier_name: string
           supplier_name_variants?: string[] | null
@@ -3024,15 +3100,19 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          auto_publish_eligible?: boolean | null
           confidence_score?: number | null
+          correction_rate?: number | null
           country?: string | null
           created_at?: string
           currency?: string | null
+          email_domains?: string[] | null
           id?: string
           invoice_count?: number | null
           invoices_analysed?: number
           is_active?: boolean
           is_known_brand?: boolean | null
+          last_invoice_date?: string | null
           profile_data?: Json
           supplier_name?: string
           supplier_name_variants?: string[] | null
@@ -3451,18 +3531,30 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          automation_auto_extract: boolean
+          automation_auto_publish: boolean
+          automation_email_monitoring: boolean
+          automation_min_confidence: number
           brand_sync_url: string | null
           created_at: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          automation_auto_extract?: boolean
+          automation_auto_publish?: boolean
+          automation_email_monitoring?: boolean
+          automation_min_confidence?: number
           brand_sync_url?: string | null
           created_at?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          automation_auto_extract?: boolean
+          automation_auto_publish?: boolean
+          automation_email_monitoring?: boolean
+          automation_min_confidence?: number
           brand_sync_url?: string | null
           created_at?: string
           updated_at?: string

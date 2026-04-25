@@ -115,25 +115,47 @@ Deno.serve(async (req) => {
     const descTitle = (p.title || "").trim();
     const descBrand = (p.vendor || "").trim();
     console.log("[auto-enrich] processing product:", p.id, "title:", descTitle, "brand:", descBrand, "has_existing_desc:", !!p.description);
+
+    async function callFetchDesc(styleName: string) {
+      return await withTimeout(fetch(`${supabaseUrl}/functions/v1/fetch-product-description`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({
+          style_name: styleName,
+          brand: descBrand,
+          style_number: firstVariant?.sku || undefined,
+          product_type: productType,
+        }),
+      }).then(async res => {
+        const txt = await res.text();
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
+        try { return JSON.parse(txt); } catch { return null; }
+      }), TASK_TIMEOUT_MS, "fetch-product-description");
+    }
+
     if (!p.description && descTitle && descBrand) {
       try {
-        const r = await withTimeout(fetch(`${supabaseUrl}/functions/v1/fetch-product-description`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${serviceKey}`,
-          },
-          body: JSON.stringify({
-            style_name: descTitle,
-            brand: descBrand,
-            style_number: firstVariant?.sku || undefined,
-            product_type: productType,
-          }),
-        }).then(async res => {
-          const txt = await res.text();
-          if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
-          try { return JSON.parse(txt); } catch { return null; }
-        }), TASK_TIMEOUT_MS, "fetch-product-description");
+        console.log("[enrich] fetching desc for:", descTitle, "|", descBrand, "| id:", p.id);
+        let r = await callFetchDesc(descTitle);
+
+        // Fallback: retry with a simplified title if the first attempt returned nothing usable
+        if (!(r?.description && typeof r.description === "string" && r.description.trim().length > 20)) {
+          const simple = simplifyTitle(descTitle);
+          if (simple && simple.toLowerCase() !== descTitle.toLowerCase()) {
+            console.log("[enrich] retry with simplified title:", simple, "| id:", p.id);
+            try {
+              const r2 = await callFetchDesc(simple);
+              if (r2?.description && typeof r2.description === "string" && r2.description.trim().length > 20) {
+                r = r2;
+              }
+            } catch (e2) {
+              console.warn("[auto-enrich] simplified-title retry failed:", String((e2 as Error).message));
+            }
+          }
+        }
 
         if (r?.description && typeof r.description === "string" && r.description.trim().length > 20) {
           updates.description = r.description;

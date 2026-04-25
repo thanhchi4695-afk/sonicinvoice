@@ -345,7 +345,7 @@ export default function AutomationSettings() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => window.dispatchEvent(new CustomEvent("sonic:navigate", { detail: "agent_guide" }))}
+          onClick={() => window.dispatchEvent(new CustomEvent("sonic:navigate-tab", { detail: "agent_guide" }))}
         >
           How it works →
         </Button>

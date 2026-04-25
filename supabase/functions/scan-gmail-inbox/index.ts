@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
   }
 });
 
-async function scanInbox(admin: ReturnType<typeof createClient>, conn: GmailConnection) {
+async function scanInbox(admin: any, conn: GmailConnection) {
   // 1. Refresh token if it's about to expire (or already has)
   let accessToken = conn.access_token;
   const expiresMs = new Date(conn.expires_at).getTime();

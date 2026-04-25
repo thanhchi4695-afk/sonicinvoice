@@ -56,7 +56,8 @@ export function isFuzzySupplierMatch(extracted: string, stored: string): boolean
 
 export async function persistParsedInvoice(
   meta: InvoiceMeta,
-  products: ValidatedProduct[]
+  products: ValidatedProduct[],
+  runId?: string | null,
 ): Promise<{ documentId: string | null; supplierId: string | null; error: string | null }> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { documentId: null, supplierId: null, error: "Not authenticated" };
@@ -285,7 +286,7 @@ export async function persistParsedInvoice(
       body: {
         user_id: userId,
         product_ids: writtenProductIds,
-        run_id: null,
+        run_id: runId ?? null,
       },
     }).then((r) => {
       console.log("[auto-enrich] complete", r?.data);

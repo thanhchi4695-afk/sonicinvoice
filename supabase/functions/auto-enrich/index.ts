@@ -72,10 +72,13 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch {
     return json({ error: "invalid JSON" }, 400);
   }
-  const { user_id, product_ids, run_id } = body;
-  if (!user_id || !Array.isArray(product_ids) || product_ids.length === 0) {
+  const { user_id, product_ids: rawIds, run_id } = body;
+  if (!user_id || !Array.isArray(rawIds) || rawIds.length === 0) {
     return json({ error: "user_id and product_ids[] required" }, 400);
   }
+  // Deduplicate product_ids before loading — caller may send duplicates
+  const product_ids = Array.from(new Set(rawIds.filter(Boolean)));
+  console.log("[auto-enrich] received", rawIds.length, "ids,", product_ids.length, "unique");
 
   // Load products + a representative variant per product so we can pass
   // colour/SKU/style hints into websearch.

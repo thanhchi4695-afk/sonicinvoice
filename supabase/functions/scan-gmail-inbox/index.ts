@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const scanAll = body?.scan_all_users === true;
+    const autoProcess = body?.auto_process === true;
 
     // Resolve which connection(s) to scan
     let connections: GmailConnection[] = [];
@@ -88,7 +89,7 @@ Deno.serve(async (req) => {
     const results = [];
     for (const conn of connections) {
       try {
-        const r = await scanInbox(admin, conn);
+        const r = await scanInbox(admin, conn, { autoProcess, supabaseUrl, serviceKey });
         results.push({ user_id: conn.user_id, ...r });
       } catch (err) {
         console.error("[scan-gmail-inbox] user failed", conn.user_id, err);
@@ -110,7 +111,25 @@ Deno.serve(async (req) => {
   }
 });
 
-async function scanInbox(admin: any, conn: GmailConnection) {
+async function scanInbox(
+  admin: any,
+  conn: GmailConnection,
+  opts: { autoProcess: boolean; supabaseUrl: string; serviceKey: string },
+) {
+  // Look up the user's automation settings to decide whether to auto-trigger
+  // the watchdog after upserting found invoices.
+  let canAutoExtract = false;
+  if (opts.autoProcess) {
+    const { data: settingsRow } = await admin
+      .from("user_settings")
+      .select("automation_email_monitoring, automation_auto_extract")
+      .eq("user_id", conn.user_id)
+      .maybeSingle();
+    canAutoExtract =
+      !!settingsRow?.automation_email_monitoring &&
+      !!settingsRow?.automation_auto_extract;
+  }
+
   // 1. Refresh token if it's about to expire (or already has)
   let accessToken = conn.access_token;
   const expiresMs = new Date(conn.expires_at).getTime();
@@ -190,6 +209,44 @@ async function scanInbox(admin: any, conn: GmailConnection) {
       .upsert(row, { onConflict: "user_id,message_id", ignoreDuplicates: false });
     if (upErr) console.error("[scan-gmail-inbox] upsert failed", upErr);
 
+    // Auto-process: download attachment(s) and run watchdog if all conditions met.
+    // - automation_email_monitoring AND automation_auto_extract for this user
+    // - sender domain matches a known supplier OR filename looks invoice-like
+    let processedHere = false;
+    let agentRunIds: string[] = [];
+    if (canAutoExtract && opts.autoProcess) {
+      for (const att of attachments) {
+        const looksInvoice =
+          supplierName !== null ||
+          /invoice|inv[\s_-]|order|po[\s_-]|purchase|packing|slip/i.test(att.filename);
+        if (!looksInvoice) continue;
+        try {
+          const runId = await runWatchdogForAttachment({
+            supabaseUrl: opts.supabaseUrl,
+            serviceKey: opts.serviceKey,
+            userId: conn.user_id,
+            accessToken,
+            messageId,
+            attachment: att,
+            supplierName,
+          });
+          if (runId) {
+            agentRunIds.push(runId);
+            processedHere = true;
+          }
+        } catch (err) {
+          console.error("[scan-gmail-inbox] auto-process failed", messageId, err);
+        }
+      }
+      if (processedHere) {
+        await admin
+          .from("gmail_found_invoices")
+          .update({ processed: true, agent_run_id: agentRunIds[0] })
+          .eq("user_id", conn.user_id)
+          .eq("message_id", messageId);
+      }
+    }
+
     invoicesFound.push({
       message_id: messageId,
       from: fromEmail,
@@ -199,6 +256,8 @@ async function scanInbox(admin: any, conn: GmailConnection) {
       known_supplier: supplierName !== null,
       attachment_count: attachments.length,
       attachments,
+      auto_processed: processedHere,
+      agent_run_ids: agentRunIds,
     });
 
     if (!mostRecentId) mostRecentId = messageId;
@@ -284,6 +343,57 @@ async function refreshAccessToken(
     .eq("user_id", conn.user_id);
 
   return tokens.access_token;
+}
+
+// Auto-process helper: download an attachment from Gmail with the user's
+// access token, then call agent-watchdog with the service-role key (since
+// there's no user JWT available inside a cron-triggered context).
+async function runWatchdogForAttachment(args: {
+  supabaseUrl: string;
+  serviceKey: string;
+  userId: string;
+  accessToken: string;
+  messageId: string;
+  attachment: { filename: string; mime_type: string; attachment_id: string };
+  supplierName: string | null;
+}): Promise<string | null> {
+  // 1. Download attachment bytes (URL-safe base64 → standard base64)
+  const attResp = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${args.messageId}/attachments/${args.attachment.attachment_id}`,
+    { headers: { Authorization: `Bearer ${args.accessToken}` } },
+  );
+  if (!attResp.ok) {
+    console.error("[scan-gmail-inbox] attachment fetch failed", attResp.status);
+    return null;
+  }
+  const attJson = await attResp.json() as { data?: string };
+  if (!attJson.data) return null;
+  const base64 = attJson.data.replace(/-/g, "+").replace(/_/g, "/");
+
+  // 2. Call watchdog with X-User-Id header so it can attribute the run
+  // (agent-watchdog reads Authorization for user JWT in normal flow; we use
+  // the service role with a sidecar header for the cron path)
+  const resp = await fetch(`${args.supabaseUrl}/functions/v1/agent-watchdog`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${args.serviceKey}`,
+      "X-User-Id": args.userId,
+    },
+    body: JSON.stringify({
+      trigger_type: "email",
+      file_base64: base64,
+      file_name: args.attachment.filename,
+      mime_type: args.attachment.mime_type,
+      supplier_name: args.supplierName ?? undefined,
+    }),
+  });
+  if (!resp.ok) {
+    console.error("[scan-gmail-inbox] watchdog call failed", resp.status, await resp.text().catch(() => ""));
+    return null;
+  }
+  const data = await resp.json().catch(() => ({}));
+  return (data?.run_id as string) ?? null;
 }
 
 function json(body: unknown, status = 200) {

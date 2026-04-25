@@ -259,6 +259,32 @@ export default function PostParseReviewScreen({
   const [autoRefineProfile, setAutoRefineProfile] = useState(() => {
     try { return localStorage.getItem("sonic_auto_refine_profile") !== "false"; } catch { return true; }
   });
+  const [autoPublishing, setAutoPublishing] = useState(false);
+
+  async function handleAutoPublish() {
+    if (!watchdogRun?.runId) return;
+    setAutoPublishing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("publishing-agent", {
+        body: { run_id: watchdogRun.runId },
+      });
+      if (error) throw new Error(error.message);
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const published = (data as any)?.published ?? 0;
+      const failed = ((data as any)?.failed ?? []).length;
+      if (failed > 0) {
+        toast.warning(`${published} published · ${failed} failed`);
+      } else {
+        toast.success(`${published} products published to Shopify`);
+      }
+      window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "account" }));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAutoPublishing(false);
+    }
+  }
+
   /** GST mode for the cost-per-item column. "exclusive" (default) = cost is ex-GST.
    *  "inclusive" = cost was entered GST-inclusive and we divide by (1 + rate) to
    *  derive the true ex-GST cost. Toggling is fully reversible. */
@@ -1483,14 +1509,14 @@ export default function PostParseReviewScreen({
           </Button>
           {watchdogRun && watchdogRun.autoPublishEligible && (
             <Button
-              variant="outline"
+              variant="teal"
               size="sm"
-              disabled
-              title="Publishing Agent coming soon. Use Export CSV or Push to Shopify manually for now."
-              className="gap-1 cursor-not-allowed text-muted-foreground"
+              onClick={handleAutoPublish}
+              disabled={autoPublishing}
+              className="gap-1"
             >
-              <Zap className="w-3.5 h-3.5" /> Auto-publish to Shopify
-              <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground/80">Coming soon</span>
+              <Zap className="w-3.5 h-3.5" />
+              {autoPublishing ? "Publishing…" : "Auto-publish to Shopify"}
             </Button>
           )}
         </div>

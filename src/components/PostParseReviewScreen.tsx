@@ -238,6 +238,7 @@ export default function PostParseReviewScreen({
   underExtractionWarning = null,
   fieldConfidence = null,
   extractionNotes = null,
+  watchdogRun = null,
 }: PostParseReviewScreenProps) {
   const [activeTab, setActiveTab] = useState<ReviewTab>("accepted");
   const [searchQuery, setSearchQuery] = useState("");

@@ -150,19 +150,28 @@ export async function persistParsedInvoice(
     }
 
     for (const [title, lines] of byTitle.entries()) {
-      // 1. Upsert product (keyed by user_id + title)
+      // 1. Find-or-create product. The unique index is
+      //    (user_id, lower(title), COALESCE(vendor, '')) so we must
+      //    match case-insensitively on title AND filter by vendor.
       let productId: string | null = null;
-      const { data: existingProduct } = await supabase
-        .from("products")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("title", title)
-        .maybeSingle();
+      const vendorVal = meta.supplier || null;
 
-      if (existingProduct?.id) {
-        productId = existingProduct.id as string;
+      const findExisting = async (): Promise<string | null> => {
+        let q = supabase
+          .from("products")
+          .select("id")
+          .eq("user_id", userId)
+          .ilike("title", title);
+        q = vendorVal ? q.eq("vendor", vendorVal) : q.is("vendor", null);
+        const { data } = await q.maybeSingle();
+        return (data?.id as string) || null;
+      };
+
+      productId = await findExisting();
+
+      if (productId) {
         await supabase.from("products").update({
-          vendor: meta.supplier || null,
+          vendor: vendorVal,
           source: "invoice_unreviewed",
           updated_at: new Date().toISOString(),
         } as any).eq("id", productId);
@@ -172,16 +181,22 @@ export async function persistParsedInvoice(
           .insert({
             user_id: userId,
             title,
-            vendor: meta.supplier || null,
+            vendor: vendorVal,
             source: "invoice_unreviewed",
           } as any)
           .select("id")
           .single();
         if (prodErr) {
-          console.warn("[invoice-persistence] product insert failed:", prodErr.message);
-          continue;
+          // Race / casing mismatch — re-query and reuse existing row.
+          console.warn("[invoice-persistence] product insert failed, re-querying:", prodErr.message);
+          productId = await findExisting();
+          if (!productId) {
+            console.warn("[invoice-persistence] could not resolve product after conflict, skipping:", title);
+            continue;
+          }
+        } else {
+          productId = newProduct?.id as string;
         }
-        productId = newProduct?.id as string;
       }
       if (!productId) continue;
       writtenProductIds.push(productId);

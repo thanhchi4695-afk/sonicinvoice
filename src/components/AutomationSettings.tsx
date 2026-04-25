@@ -661,6 +661,8 @@ function pushNotification(opts: {
       ...(opts.runId ? { runId: opts.runId } : {}),
     });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 100)));
+    // Notify any mounted NotificationBell to re-read (same-tab writes don't fire `storage`).
+    window.dispatchEvent(new CustomEvent("sonic:notifications-updated"));
   } catch {
     /* ignore */
   }

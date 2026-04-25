@@ -370,10 +370,9 @@ async function runWatchdogForAttachment(args: {
   if (!attJson.data) return null;
   const base64 = attJson.data.replace(/-/g, "+").replace(/_/g, "/");
 
-  // 2. Call watchdog with X-User-Id header so it can attribute the run
-  // (agent-watchdog reads Authorization for user JWT in normal flow; we use
-  // the service role with a sidecar header for the cron path)
-  const resp = await fetch(`${args.supabaseUrl}/functions/v1/agent-watchdog`, {
+  // 2. Call orchestrator (which wraps watchdog + classify + enrich + publish + learn)
+  // with X-User-Id header so it can attribute the run from the cron path.
+  const resp = await fetch(`${args.supabaseUrl}/functions/v1/agent-orchestrator`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -383,9 +382,9 @@ async function runWatchdogForAttachment(args: {
     body: JSON.stringify({
       trigger_type: "email",
       file_base64: base64,
-      file_name: args.attachment.filename,
+      filename: args.attachment.filename,
       mime_type: args.attachment.mime_type,
-      supplier_name: args.supplierName ?? undefined,
+      supplier_hint: args.supplierName ?? undefined,
     }),
   });
   if (!resp.ok) {

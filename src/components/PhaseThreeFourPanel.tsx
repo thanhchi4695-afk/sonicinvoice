@@ -199,14 +199,23 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
     // separate fetch-product-description / image-search / websearch call.
     const seen = new Set<string>();
     const newOnes = newOnesAll.filter(c => {
+      const ol = c.original_line as Record<string, unknown>;
       const key = [
-        (c.original_line.brand || supplierName || ""),
-        (c.original_line.styleName || ""),
+        String(ol.vendor || ol.brand || supplierName || ""),
+        String(ol.product_title || ol.title || ol.styleName || ol.name || ""),
       ].join("|").toLowerCase().trim();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
+    console.log(
+      "[PhaseThreeFour] dedup:",
+      newOnesAll.length,
+      "→",
+      newOnes.length,
+      "items. Keys:",
+      Array.from(seen).join(", "),
+    );
     if (newOnes.length === 0) return;
 
     startedRef.current = true;

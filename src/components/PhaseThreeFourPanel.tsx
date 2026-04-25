@@ -199,7 +199,7 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
     // separate fetch-product-description / image-search / websearch call.
     const seen = new Set<string>();
     const newOnes = newOnesAll.filter(c => {
-      const ol = c.original_line as Record<string, unknown>;
+      const ol = c.original_line as unknown as Record<string, unknown>;
       const key = [
         String(ol.vendor || ol.brand || supplierName || ""),
         String(ol.product_title || ol.title || ol.styleName || ol.name || ""),

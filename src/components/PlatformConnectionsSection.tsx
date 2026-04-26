@@ -13,6 +13,7 @@ import {
   Zap,
   AlertTriangle,
   CheckCircle2,
+  KeyRound,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -62,6 +63,10 @@ export default function PlatformConnectionsSection() {
   const [shopifyInput, setShopifyInput] = useState("");
   const [shopifyOAuthLoading, setShopifyOAuthLoading] = useState(false);
   const [shopifySyncing, setShopifySyncing] = useState(false);
+  const [showCustomApp, setShowCustomApp] = useState(false);
+  const [customAppDomain, setCustomAppDomain] = useState("");
+  const [customAppToken, setCustomAppToken] = useState("");
+  const [customAppSaving, setCustomAppSaving] = useState(false);
 
   // Lightspeed
   const [lsConn, setLsConn] = useState<LightspeedConn | null>(null);
@@ -224,6 +229,47 @@ export default function PlatformConnectionsSection() {
     setShopifyLastSynced(null);
     setShopifyCount(0);
     toast.success("Shopify disconnected");
+  };
+
+  const handleCustomAppSave = async () => {
+    const domain = customAppDomain.trim();
+    const token = customAppToken.trim();
+    if (!domain || !token) {
+      toast.error("Enter both store domain and access token");
+      return;
+    }
+    setCustomAppSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "shopify-custom-app-verify",
+        { body: { shop_domain: domain, access_token: token } },
+      );
+      if (error) {
+        // Try to surface the function's JSON error body
+        const msg =
+          (error as { context?: { body?: string } })?.context?.body ||
+          error.message ||
+          "Verification failed";
+        let parsed = msg;
+        try {
+          const j = JSON.parse(msg);
+          if (j?.error) parsed = j.error;
+        } catch { /* ignore */ }
+        throw new Error(parsed);
+      }
+      if (!data?.success) {
+        throw new Error(data?.error || "Verification failed");
+      }
+      toast.success(`Connected to ${data.shop_name}`);
+      setCustomAppDomain("");
+      setCustomAppToken("");
+      setShowCustomApp(false);
+      void loadAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to verify token");
+    } finally {
+      setCustomAppSaving(false);
+    }
   };
 
   const handleShopifySync = async () => {
@@ -459,6 +505,51 @@ export default function PlatformConnectionsSection() {
                 )}
                 Connect Shopify
               </Button>
+
+              <div className="pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomApp((v) => !v)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground hover:underline w-full text-left flex items-center gap-1"
+                >
+                  <KeyRound className="w-3 h-3" />
+                  {showCustomApp ? "Hide" : "Connect via Custom App Token (for testing)"}
+                </button>
+                {showCustomApp && (
+                  <div className="space-y-2 mt-2">
+                    <Input
+                      placeholder="yourstore.myshopify.com"
+                      value={customAppDomain}
+                      onChange={(e) => setCustomAppDomain(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      placeholder="shpat_..."
+                      type="password"
+                      value={customAppToken}
+                      onChange={(e) => setCustomAppToken(e.target.value)}
+                      className="h-8 text-xs font-mono"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleCustomAppSave}
+                      disabled={customAppSaving || !customAppDomain.trim() || !customAppToken.trim()}
+                    >
+                      {customAppSaving ? (
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                      )}
+                      Verify & Save
+                    </Button>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      Required scopes: <span className="font-mono">read_products, write_products, read_inventory, write_inventory, read_locations</span>
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </Card>

@@ -140,6 +140,10 @@ Deno.serve(async (req) => {
       : [];
     const documentId: string | null = watchdogResult.invoice_id ?? null;
 
+    // Initial supplier name from watchdog (may be refined after classify)
+    let supplierName: string | null =
+      watchdogResult.supplier_name ?? supplier_hint ?? null;
+
     // ─────────── STEP 2 — Classify (optional) ───────────
     await runStep(runId!, "classify", 2, async () => {
       if (!file_base64 || !filename) {
@@ -175,7 +179,7 @@ Deno.serve(async (req) => {
       .select("supplier_name")
       .eq("id", runId)
       .maybeSingle();
-    const supplierName: string | null =
+    supplierName =
       updatedRun?.supplier_name ??
       watchdogResult.supplier_name ??
       supplier_hint ??

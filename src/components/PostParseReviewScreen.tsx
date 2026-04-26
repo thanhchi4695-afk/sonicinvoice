@@ -61,6 +61,18 @@ interface PostParseReviewScreenProps {
   /** Set when the review screen was opened from a Watchdog Agent run. Renders the
    *  (currently disabled) "Auto-publish to Shopify" button in the action bar. */
   watchdogRun?: { runId: string; autoPublishEligible: boolean } | null;
+  /** Per-product Qty header validator warnings raised by parse-invoice when
+   *  the extracted size-row count for a product doesn't match the invoice
+   *  header `Qty:` field. Drives the yellow review banner + per-row flag.
+   *  (Round 4 Walnut fix — Vermont Pant phantom-size-16 canary.) */
+  qtyHeaderWarnings?: Array<{
+    invoice_number: string;
+    product_title: string;
+    colour: string;
+    extracted_rows: number;
+    header_qty: number;
+    message: string;
+  }>;
 }
 
 type ReviewTab = "accepted" | "review" | "rejected";
@@ -239,6 +251,7 @@ export default function PostParseReviewScreen({
   fieldConfidence = null,
   extractionNotes = null,
   watchdogRun = null,
+  qtyHeaderWarnings = [],
 }: PostParseReviewScreenProps) {
   const [activeTab, setActiveTab] = useState<ReviewTab>("accepted");
   const [searchQuery, setSearchQuery] = useState("");

@@ -709,11 +709,15 @@ const MONEY_RE = /\$?\s*(-?\d{1,6}(?:,\d{3})*(?:\.\d{2})|-?\d+(?:\.\d{2}))/;
 const SIZE_TOKEN_RE = /^(?:XXS|XS|S|M|L|XL|XXL|XXXL|OS|ONE\s*SIZE|FREE\s*SIZE|\d{1,2}|\d{1,2}\s*(?:AU|US|UK|EU|W)|\d{1,2}\s*(?:YEAR|YR|Y)|\d{1,2}\s*-\s*\d{1,2}\s*(?:YEAR|YR|Y)|\d{1,2}\s*(?:MONTH|MONTHS|MO|M)|\d{1,2}\s*-\s*\d{1,2}\s*(?:MONTH|MONTHS|MO|M))$/i;
 
 function cleanInvoiceText(raw: string): string {
+  // Preserve column-spacing — runs of spaces encode column separators in
+  // PDF-extracted text. Collapsing them destroys our ability to split header
+  // rows into [code, title, colour, qty, …] columns. Collapse 4+ to a stable
+  // 3-space marker (still unambiguous as a column boundary).
   return String(raw || "")
     .replace(/\r/g, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\u00a0/g, " ")
-    .replace(/ +/g, " ");
+    .replace(/ {4,}/g, "   ");
 }
 
 function splitMultiInvoicePdf(rawText: string): Array<{ invoiceNumber: string; text: string }> {

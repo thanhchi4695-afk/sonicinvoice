@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
         .from("supplier_profiles")
         .select("auto_publish_eligible, confidence_score")
         .eq("id", runRow.supplier_profile_id)
+        .eq("user_id", userId)
         .maybeSingle();
       auto_publish_eligible = !!sp?.auto_publish_eligible;
       confidence_score = sp?.confidence_score ?? null;
@@ -175,7 +176,8 @@ Deno.serve(async (req) => {
           },
         },
       })
-      .eq("id", runId);
+      .eq("id", runId)
+      .eq("user_id", userId);
 
     return json({
       published: published.length,

@@ -150,7 +150,8 @@ Deno.serve(async (req) => {
           error_message: `parse-invoice ${parseResp.status}: ${text.slice(0, 500)}`,
           completed_at: new Date().toISOString(),
         })
-        .eq("id", runId);
+        .eq("id", runId)
+        .eq("user_id", userId);
       return json({ error: "Parse failed", details: text }, 502);
     }
 
@@ -235,7 +236,8 @@ Deno.serve(async (req) => {
           products,
         },
       })
-      .eq("id", runId);
+      .eq("id", runId)
+      .eq("user_id", userId);
 
     // Phase 3 — Optionally auto-publish to Shopify when ALL of the following hold:
     //   - user.automation_auto_publish = true
@@ -319,7 +321,8 @@ Deno.serve(async (req) => {
             error_message: String(err?.message ?? err).slice(0, 500),
             completed_at: new Date().toISOString(),
           })
-          .eq("id", runId);
+          .eq("id", runId)
+          .eq("user_id", userId);
       } catch (_) { /* swallow */ }
     }
     return json({ error: String(err?.message ?? err) }, 500);

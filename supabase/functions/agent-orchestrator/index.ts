@@ -119,7 +119,8 @@ Deno.serve(async (req) => {
           completed_at: new Date().toISOString(),
           error_message: "Watchdog failed after retries",
         })
-        .eq("id", runId);
+        .eq("id", runId)
+        .eq("user_id", userId);
       return json({ run_id: runId, status: "awaiting_review", reason: "watchdog_failed" });
     }
 
@@ -133,7 +134,8 @@ Deno.serve(async (req) => {
         products_flagged: watchdogResult.products_flagged ?? 0,
         invoice_id: watchdogResult.invoice_id ?? null,
       })
-      .eq("id", runId);
+      .eq("id", runId)
+      .eq("user_id", userId);
 
     let productIds: string[] = Array.isArray(watchdogResult.product_ids)
       ? watchdogResult.product_ids
@@ -178,6 +180,7 @@ Deno.serve(async (req) => {
       .from("agent_runs")
       .select("supplier_name")
       .eq("id", runId)
+      .eq("user_id", userId)
       .maybeSingle();
     supplierName =
       updatedRun?.supplier_name ??
@@ -255,7 +258,8 @@ Deno.serve(async (req) => {
         completed_at: new Date().toISOString(),
         current_step: null,
       })
-      .eq("id", runId);
+      .eq("id", runId)
+      .eq("user_id", userId);
 
     return json({
       run_id: runId,

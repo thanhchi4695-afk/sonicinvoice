@@ -133,7 +133,9 @@ export function findLineItemTable(invoiceText: string): string | null {
  * It contains `$` and a numeric qty, and is NOT a `Size:` / `Qty:` line.
  */
 export function splitProductBlocks(tableText: string): string[] {
-  const lines = tableText.split("\n").map(normalizeWhitespace).filter(Boolean);
+  // Use column-spaced normalisation so header rows keep their multi-space
+  // column separators intact for downstream parseProductBlock().
+  const lines = tableText.split("\n").map(normalizeColumnSpaced).filter(Boolean);
   const headerIndices: number[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];

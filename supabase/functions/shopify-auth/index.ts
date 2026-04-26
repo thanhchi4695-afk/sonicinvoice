@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { tokenResponseToConnectionColumns } from "../_shared/shopify-token.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -111,7 +112,8 @@ Deno.serve(async (req) => {
         return new Response("Invalid or expired state", { status: 403 });
       }
 
-      // Exchange code for access token
+      // Exchange code for access token (request expiring offline token — Shopify
+      // is deprecating non-expiring offline tokens).
       const tokenResp = await fetch(`https://${shop}/admin/oauth/access_token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -119,6 +121,7 @@ Deno.serve(async (req) => {
           client_id: SHOPIFY_API_KEY,
           client_secret: SHOPIFY_API_SECRET,
           code,
+          expiring: true,
         }),
       });
 
@@ -130,6 +133,7 @@ Deno.serve(async (req) => {
       const tokenData = await tokenResp.json();
       const accessToken = tokenData.access_token;
       if (!accessToken) return new Response("No access token in response", { status: 500 });
+      const tokenCols = tokenResponseToConnectionColumns(tokenData);
 
       // Fetch shop info for email/name
       const shopResp = await fetch(`https://${shop}/admin/api/${API_VERSION}/shop.json`, {
@@ -170,6 +174,10 @@ Deno.serve(async (req) => {
         api_version: API_VERSION,
         shop_name: shopName,
         updated_at: new Date().toISOString(),
+        refresh_token: tokenCols.refresh_token,
+        token_expires_at: tokenCols.token_expires_at,
+        refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+        needs_reauth: false,
       }, { onConflict: "user_id" });
 
       // Create one-time login token

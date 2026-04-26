@@ -63,6 +63,10 @@ export default function PlatformConnectionsSection() {
   const [shopifyInput, setShopifyInput] = useState("");
   const [shopifyOAuthLoading, setShopifyOAuthLoading] = useState(false);
   const [shopifySyncing, setShopifySyncing] = useState(false);
+  const [showCustomApp, setShowCustomApp] = useState(false);
+  const [customAppDomain, setCustomAppDomain] = useState("");
+  const [customAppToken, setCustomAppToken] = useState("");
+  const [customAppSaving, setCustomAppSaving] = useState(false);
 
   // Lightspeed
   const [lsConn, setLsConn] = useState<LightspeedConn | null>(null);

@@ -116,47 +116,31 @@ async function shopifyFetch(
   return res;
 }
 
-async function fetchAllProducts(
+async function fetchProductsPage(
   shop: string,
   token: string,
-  updatedAtMin?: string,
-): Promise<ShopifyProduct[]> {
-  const products: ShopifyProduct[] = [];
-  const baseFields = "id,title,variants,options,updated_at";
-  let pageInfo: string | null = null;
-  let isFirstPage = true;
-
-  while (true) {
-    let path: string;
-    if (pageInfo) {
-      // When using page_info, only limit + fields are allowed
-      path = `/products.json?limit=250&fields=${baseFields}&page_info=${encodeURIComponent(pageInfo)}`;
-    } else {
-      const params = new URLSearchParams({
-        limit: "250",
-        fields: baseFields,
-      });
-      if (updatedAtMin && isFirstPage) {
-        params.set("updated_at_min", updatedAtMin);
-      }
-      path = `/products.json?${params.toString()}`;
-    }
-
-    const res = await shopifyFetch(shop, token, path);
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`Shopify products fetch failed (${res.status}): ${txt}`);
-    }
-
-    const json = await res.json();
-    products.push(...(json.products as ShopifyProduct[]));
-
-    pageInfo = parseLinkHeader(res.headers.get("link"));
-    isFirstPage = false;
-    if (!pageInfo) break;
+  pageInfo: string | null,
+  updatedAtMin: string | undefined,
+): Promise<{ products: ShopifyProduct[]; nextPageInfo: string | null }> {
+  const baseFields = "id,title,vendor,variants,options,updated_at";
+  let path: string;
+  if (pageInfo) {
+    path = `/products.json?limit=250&fields=${baseFields}&page_info=${encodeURIComponent(pageInfo)}`;
+  } else {
+    const params = new URLSearchParams({ limit: "250", fields: baseFields });
+    if (updatedAtMin) params.set("updated_at_min", updatedAtMin);
+    path = `/products.json?${params.toString()}`;
   }
-
-  return products;
+  const res = await shopifyFetch(shop, token, path);
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Shopify products fetch failed (${res.status}): ${txt}`);
+  }
+  const json = await res.json();
+  return {
+    products: (json.products as ShopifyProduct[]) || [],
+    nextPageInfo: parseLinkHeader(res.headers.get("link")),
+  };
 }
 
 async function fetchInventoryLevels(
@@ -299,90 +283,106 @@ Deno.serve(async (req) => {
       updatedAtMin = lastSyncedAt;
     }
 
-    const products = await fetchAllProducts(
-      resolvedShopDomain,
-      resolvedAccessToken,
-      updatedAtMin,
-    );
-
-    const inventoryItemIds: number[] = [];
-    for (const p of products) {
-      for (const v of p.variants || []) {
-        if (v.inventory_item_id) inventoryItemIds.push(v.inventory_item_id);
-      }
-    }
-
-    const inventoryMap = await fetchInventoryLevels(
-      resolvedShopDomain,
-      resolvedAccessToken,
-      inventoryItemIds,
-      resolvedLocationId,
-    );
-
-    const rows: any[] = [];
+    let pageInfo: string | null = null;
+    let pageNum = 0;
+    let productsSynced = 0;
     let variantsSynced = 0;
 
-    for (const product of products) {
-      const optionNames = (product.options || []).map((o) => o.name);
-      for (const variant of product.variants || []) {
-        const { colour, size } = parseVariantTitle(
-          variant.title,
-          optionNames,
-          variant,
-        );
+    while (true) {
+      pageNum++;
+      const { products, nextPageInfo } = await fetchProductsPage(
+        resolvedShopDomain,
+        resolvedAccessToken,
+        pageInfo,
+        pageNum === 1 ? updatedAtMin : undefined,
+      );
 
-        const liveQty = inventoryMap.get(variant.inventory_item_id);
-        const qty =
-          liveQty !== undefined
-            ? liveQty
-            : variant.inventory_quantity ?? null;
+      if (products.length === 0 && pageNum === 1) break;
 
-        rows.push({
-          user_id,
-          platform: "shopify",
-          platform_product_id: String(product.id),
-          platform_variant_id: String(variant.id),
-          sku: variant.sku || null,
-          product_title: product.title,
-          variant_title: variant.title,
-          vendor: product.vendor || null,
-          colour,
-          size,
-          current_qty: qty,
-          current_cost: null,
-          current_price: variant.price ? Number(variant.price) : null,
-          barcode: variant.barcode || null,
-          cached_at: new Date().toISOString(),
-        });
-        variantsSynced++;
+      // Inventory levels for this page only
+      const pageInventoryItemIds: number[] = [];
+      for (const p of products) {
+        for (const v of p.variants || []) {
+          if (v.inventory_item_id) pageInventoryItemIds.push(v.inventory_item_id);
+        }
       }
+      const inventoryMap = await fetchInventoryLevels(
+        resolvedShopDomain,
+        resolvedAccessToken,
+        pageInventoryItemIds,
+        resolvedLocationId,
+      );
+
+      const rows: any[] = [];
+      const nowIso = new Date().toISOString();
+      for (const product of products) {
+        const optionNames = (product.options || []).map((o) => o.name);
+        for (const variant of product.variants || []) {
+          const { colour, size } = parseVariantTitle(
+            variant.title,
+            optionNames,
+            variant,
+          );
+          const liveQty = inventoryMap.get(variant.inventory_item_id);
+          const qty =
+            liveQty !== undefined ? liveQty : variant.inventory_quantity ?? null;
+
+          rows.push({
+            user_id,
+            platform: "shopify",
+            platform_product_id: String(product.id),
+            platform_variant_id: String(variant.id),
+            sku: variant.sku || null,
+            product_title: product.title,
+            variant_title: variant.title,
+            vendor: (product as any).vendor || null,
+            colour,
+            size,
+            current_qty: qty,
+            current_cost: null,
+            current_price: variant.price ? Number(variant.price) : null,
+            barcode: variant.barcode || null,
+            cached_at: nowIso,
+          });
+          variantsSynced++;
+        }
+      }
+
+      if (rows.length > 0) {
+        const CHUNK = 500;
+        for (let i = 0; i < rows.length; i += CHUNK) {
+          const { error } = await supabase
+            .from("product_catalog_cache")
+            .upsert(rows.slice(i, i + CHUNK), {
+              onConflict: "user_id,platform,platform_variant_id",
+            });
+          if (error) throw new Error(`Cache upsert failed: ${error.message}`);
+        }
+      }
+
+      productsSynced += products.length;
+      console.log(
+        `[sync-shopify-catalog] page=${pageNum} products=${products.length} variants_total=${variantsSynced} elapsed_ms=${Date.now() - startedAt}`,
+      );
+
+      pageInfo = nextPageInfo;
+      if (!pageInfo) break;
     }
 
-    const CHUNK = 500;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const chunk = rows.slice(i, i + CHUNK);
-      const { error } = await supabase
-        .from("product_catalog_cache")
-        .upsert(chunk, {
-          onConflict: "user_id,platform,platform_variant_id",
-        });
-      if (error) {
-        throw new Error(`Cache upsert failed: ${error.message}`);
-      }
-    }
-
-    const nowIso = new Date().toISOString();
+    const finishedAt = new Date().toISOString();
     await supabase
       .from("platform_connections")
-      .update({ last_synced_at: nowIso })
+      .update({ last_synced_at: finishedAt })
       .eq("user_id", user_id)
       .eq("platform", "shopify")
       .eq("shop_domain", resolvedShopDomain);
 
     return new Response(
       JSON.stringify({
-        products_synced: products.length,
+        success: true,
+        products_synced: productsSynced,
         variants_synced: variantsSynced,
+        pages: pageNum,
         duration_ms: Date.now() - startedAt,
         mode,
         incremental_since: updatedAtMin || null,

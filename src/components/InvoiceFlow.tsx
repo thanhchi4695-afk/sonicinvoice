@@ -2150,6 +2150,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       if (typeof data.extraction_notes === "string") {
         setAiExtractionNotes(data.extraction_notes);
       }
+      if (Array.isArray(data.qty_header_warnings)) {
+        setQtyHeaderWarnings(data.qty_header_warnings);
+      } else {
+        setQtyHeaderWarnings([]);
+      }
 
       if (products.length === 0) {
         toast.error("No products found in detailed mode");

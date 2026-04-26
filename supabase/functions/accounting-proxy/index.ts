@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
         const tokens = await tokenRes.json();
         if (!tokens.access_token) return respond({ error: "Token exchange failed", detail: tokens }, 400);
 
-        const tenantsRes = await fetch("https://api.xero.com/connections", {
+        const tenantsRes = await fetch(XERO_CONNECTIONS_URL, {
           headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
         const tenants = await tenantsRes.json();

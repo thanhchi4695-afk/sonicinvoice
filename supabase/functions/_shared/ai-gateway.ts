@@ -3,7 +3,7 @@
  * Import from edge functions: import { callAI } from "../_shared/ai-gateway.ts";
  */
 
-const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const AI_GATEWAY_URL = Deno.env.get("AI_GATEWAY_URL") || "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 // Model tiers with fallbacks
 const MODEL_FALLBACKS: Record<string, string[]> = {

@@ -379,8 +379,10 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        products_synced: products.length,
+        success: true,
+        products_synced: productsSynced,
         variants_synced: variantsSynced,
+        pages: pageNum,
         duration_ms: Date.now() - startedAt,
         mode,
         incremental_since: updatedAtMin || null,

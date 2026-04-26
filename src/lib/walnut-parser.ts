@@ -20,11 +20,16 @@ export interface WalnutInvoiceChunk {
 }
 
 export function cleanInvoiceText(raw: string): string {
+  // NOTE: we deliberately preserve runs of spaces — they encode column
+  // separators in PDF-extracted invoice text. Collapsing them to single
+  // spaces destroys our ability to split header rows into [code, title,
+  // colour, qty, …] columns. We only collapse runs of 4+ to a normalised
+  // 3-space gap (still unambiguous as a column separator).
   return String(raw || "")
     .replace(/\r/g, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\u00a0/g, " ")
-    .replace(/ +/g, " ");
+    .replace(/ {4,}/g, "   ");
 }
 
 export function splitMultiInvoicePdf(rawText: string): WalnutInvoiceChunk[] {
@@ -71,6 +76,18 @@ export function normalizeWrappedCode(code: string): string {
 
 export function normalizeWhitespace(value: string): string {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Like normalizeWhitespace but preserves runs of 2+ spaces (encoded as a
+ * triple-space marker) so callers can still detect column separators after
+ * trimming. Used for header-row parsing where column boundaries matter.
+ */
+export function normalizeColumnSpaced(value: string): string {
+  return String(value || "")
+    .replace(/\t/g, "   ")
+    .replace(/ {2,}/g, "   ")
+    .trim();
 }
 
 export function inferProductType(title: string): string {

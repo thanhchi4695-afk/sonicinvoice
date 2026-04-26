@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     console.log(`[orchestrator] run=${runId} trigger=${trigger_type}`);
 
     // ─────────── STEP 1 — Watchdog (extract) ───────────
-    const watchdogResult = await runStep(runId!, "watchdog", 3, async () => {
+    const watchdogResult = await runStep(runId!, userId!, "watchdog", 3, async () => {
       const r = await callFunction("agent-watchdog", userId!, {
         trigger_type,
         file_base64,
@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
       watchdogResult.supplier_name ?? supplier_hint ?? null;
 
     // ─────────── STEP 2 — Classify (optional) ───────────
-    await runStep(runId!, "classify", 2, async () => {
+    await runStep(runId!, userId!, "classify", 2, async () => {
       if (!file_base64 || !filename) {
         return { skipped: true, reason: "no file content available" };
       }
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
 
     // ─────────── STEP 3 — Enrich ───────────
     if (productIds.length > 0) {
-      await runStep(runId!, "enrich", 2, async () => {
+      await runStep(runId!, userId!, "enrich", 2, async () => {
         const r = await callFunction("auto-enrich", userId!, {
           user_id: userId,
           product_ids: productIds,
@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
         return r;
       });
     } else {
-      await markStep(runId!, "enrich", "skipped", 0, "no products");
+      await markStep(runId!, userId!, "enrich", "skipped", 0, "no products");
     }
 
     // ─────────── STEP 4 — Publish (if eligible, no retry) ───────────
@@ -213,7 +213,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (prof?.auto_publish_eligible) {
-        const result = await runStep(runId!, "publish", 1, async () => {
+        const result = await runStep(runId!, userId!, "publish", 1, async () => {
           const r = await callFunction("publishing-agent", userId!, {
             user_id: userId,
             invoice_id: documentId,
@@ -224,14 +224,14 @@ Deno.serve(async (req) => {
         });
         autoPublished = !!result;
       } else {
-        await markStep(runId!, "publish", "skipped", 0, "supplier not auto-publish eligible");
+        await markStep(runId!, userId!, "publish", "skipped", 0, "supplier not auto-publish eligible");
       }
     } else {
-      await markStep(runId!, "publish", "skipped", 0, "no supplier");
+      await markStep(runId!, userId!, "publish", "skipped", 0, "no supplier");
     }
 
     // ─────────── STEP 5 — Learn (never blocks) ───────────
-    await runStep(runId!, "learn", 1, async () => {
+    await runStep(runId!, userId!, "learn", 1, async () => {
       const r = await callFunction("learning-agent", userId!, {
         user_id: userId,
         supplier_name: supplierName ?? "Unknown",

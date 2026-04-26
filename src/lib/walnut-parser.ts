@@ -180,12 +180,33 @@ export interface WalnutVariantRow {
   department: string | null;
   costSource: "direct" | "discount_adjusted" | "derived_from_line_total";
   qtyChecksumOk: boolean;
+  /** Header `Qty:` field for this product. */
+  headerQty: number;
+  /**
+   * True when the count of size rows extracted for this product matches the
+   * header `Qty:` field. Defence-in-depth against parsers that invent or drop
+   * sizes (Walnut 219077 Vermont Pant phantom-size-16 bug).
+   */
+  qtyHeaderMatch: boolean;
 }
 
 export interface WalnutParseResult {
   invoiceCount: number;
   invoiceNumbers: string[];
   rows: WalnutVariantRow[];
+  /**
+   * Per-product warnings raised by the Qty header validator. Empty when every
+   * product's extracted size-row count equals its header Qty. Surfaced on the
+   * review screen so users can confirm or correct before downstream steps run.
+   */
+  warnings: Array<{
+    invoiceNumber: string;
+    productTitle: string;
+    colour: string;
+    extractedRows: number;
+    headerQty: number;
+    message: string;
+  }>;
 }
 
 export function seasonFromSku(sku?: string): string {
@@ -197,10 +218,52 @@ export function seasonFromSku(sku?: string): string {
   return "";
 }
 
+interface ParsedProductBlock {
+  styleCode: string;
+  productTitle: string;
+  colour: string;
+  totalQty: number;
+  unitPrice: number | null;
+  discount: number | null;
+  lineTotal: number | null;
+  qtyPairs: Array<{ size: string; quantity: number }>;
+}
+
+/**
+ * Parse a single product block (one header row + its own Size:/Qty: lines).
+ * The block is sovereign — never reads sizes/qtys outside its own slice.
+ */
+function parseProductBlock(blockText: string): ParsedProductBlock | null {
+  const lines = blockText.split("\n").map(normalizeWhitespace).filter(Boolean);
+  const headerRow = lines.find((line) => /\$/.test(line) && /\d/.test(line) && !/^size\s*:/i.test(line) && !/^qty\s*:/i.test(line));
+  if (!headerRow) return null;
+
+  const moneyValues = Array.from(headerRow.matchAll(/\$?\s*\d{1,6}(?:,\d{3})*(?:\.\d{2})/g))
+    .map((m) => parseMoney(m[0]))
+    .filter((n): n is number => n != null);
+  const qtyMatch = headerRow.match(/\s(\d+)\s+\$?\s*\d/);
+  const totalQty = qtyMatch ? Number(qtyMatch[1]) : 0;
+  const headerPrefix = qtyMatch ? headerRow.slice(0, qtyMatch.index).trim() : headerRow;
+  const prefixParts = headerPrefix.split(/\s{2,}/).map(normalizeWhitespace).filter(Boolean);
+  const styleCode = normalizeWrappedCode(prefixParts[0] || "");
+  const productTitle = prefixParts[1] || "";
+  const colour = normalizeWhitespace((prefixParts.slice(2).join(" ") || "").replace(/\bTan\s+Tan\b/i, "Tan"));
+
+  // CRITICAL: extractSizeQtyPairs is called with this block's text only —
+  // never the full invoice table — so each product's size header is sovereign.
+  const qtyPairs = extractSizeQtyPairs(blockText);
+  const unitPrice = moneyValues[0] ?? null;
+  const discount = moneyValues.length >= 3 ? moneyValues[1] : null;
+  const lineTotal = moneyValues[moneyValues.length - 1] ?? null;
+
+  return { styleCode, productTitle, colour, totalQty, unitPrice, discount, lineTotal, qtyPairs };
+}
+
 export function parseWalnutInvoiceText(rawText: string): WalnutParseResult {
   const chunks = splitMultiInvoicePdf(rawText);
   const invoiceNumbers: string[] = [];
   const rows: WalnutVariantRow[] = [];
+  const warnings: WalnutParseResult["warnings"] = [];
 
   chunks.forEach((chunk) => {
     const invoiceNumber = chunk.invoiceNumber || chunk.text.match(/Invoice No[\s:]+(\d+)/i)?.[1] || "";
@@ -209,63 +272,70 @@ export function parseWalnutInvoiceText(rawText: string): WalnutParseResult {
     const tableText = findLineItemTable(chunk.text);
     if (!tableText) return;
 
-    const lines = tableText.split("\n").map(normalizeWhitespace).filter(Boolean);
-    const headerRow = lines.find((line) => /\$/.test(line) && /\d/.test(line) && !/^size\s*:/i.test(line) && !/^qty\s*:/i.test(line));
-    if (!headerRow) return;
+    const blocks = splitProductBlocks(tableText);
+    // Telemetry: emit one log per product so we can audit literal header reads.
+    blocks.forEach((blockText) => {
+      const parsed = parseProductBlock(blockText);
+      if (!parsed) return;
+      const { styleCode, productTitle, colour, totalQty, unitPrice, discount, lineTotal, qtyPairs } = parsed;
 
-    const moneyValues = Array.from(headerRow.matchAll(/\$?\s*\d{1,6}(?:,\d{3})*(?:\.\d{2})/g))
-      .map((m) => parseMoney(m[0]))
-      .filter((n): n is number => n != null);
-    const qtyMatch = headerRow.match(/\s(\d+)\s+\$?\s*\d/);
-    const totalQty = qtyMatch ? Number(qtyMatch[1]) : 0;
-    const headerPrefix = qtyMatch ? headerRow.slice(0, qtyMatch.index).trim() : headerRow;
-    const prefixParts = headerPrefix.split(/\s{2,}/).map(normalizeWhitespace).filter(Boolean);
-    const styleCode = normalizeWrappedCode(prefixParts[0] || "");
-    const productTitle = prefixParts[1] || "";
-    const colour = normalizeWhitespace((prefixParts.slice(2).join(" ") || "").replace(/\bTan\s+Tan\b/i, "Tan"));
+      const headerSizes = qtyPairs.map((p) => p.size);
+      // eslint-disable-next-line no-console
+      console.log(`[size-matrix] invoice=${invoiceNumber} product="${productTitle}" colour="${colour}" header_sizes=[${headerSizes.join(",")}] extracted_rows=${qtyPairs.length} header_qty=${totalQty}`);
 
-    const qtyPairs = extractSizeQtyPairs(tableText);
-    const qtyChecksum = qtyPairs.reduce((sum, pair) => sum + pair.quantity, 0);
-    const unitPrice = moneyValues[0] ?? null;
-    const discount = moneyValues.length >= 3 ? moneyValues[1] : null;
-    const lineTotal = moneyValues[moneyValues.length - 1] ?? null;
+      const qtyChecksum = qtyPairs.reduce((sum, pair) => sum + pair.quantity, 0);
+      const qtyHeaderMatch = qtyPairs.length === totalQty || qtyChecksum === totalQty;
 
-    let costSource: WalnutVariantRow["costSource"] = "direct";
-    let effectiveUnitCost = unitPrice;
-    if (unitPrice != null && discount != null) {
-      effectiveUnitCost = Math.round((unitPrice - discount) * 100) / 100;
-      costSource = "discount_adjusted";
-      if (lineTotal != null && totalQty > 0) {
-        const subtotalCheck = effectiveUnitCost * totalQty;
-        if (Math.abs(subtotalCheck - lineTotal) > 0.05) {
-          effectiveUnitCost = Math.round((lineTotal / totalQty) * 100) / 100;
-          costSource = "derived_from_line_total";
+      if (!qtyHeaderMatch && totalQty > 0) {
+        warnings.push({
+          invoiceNumber,
+          productTitle,
+          colour,
+          extractedRows: qtyPairs.length,
+          headerQty: totalQty,
+          message: `Extracted ${qtyPairs.length} size rows but invoice header says Qty: ${totalQty} — please review`,
+        });
+      }
+
+      let costSource: WalnutVariantRow["costSource"] = "direct";
+      let effectiveUnitCost = unitPrice;
+      if (unitPrice != null && discount != null) {
+        effectiveUnitCost = Math.round((unitPrice - discount) * 100) / 100;
+        costSource = "discount_adjusted";
+        if (lineTotal != null && totalQty > 0) {
+          const subtotalCheck = effectiveUnitCost * totalQty;
+          if (Math.abs(subtotalCheck - lineTotal) > 0.05) {
+            effectiveUnitCost = Math.round((lineTotal / totalQty) * 100) / 100;
+            costSource = "derived_from_line_total";
+          }
         }
       }
-    }
 
-    const productType = inferProductType(productTitle);
-    const department = inferDepartment(productType, qtyPairs.map((p) => p.size));
+      const productType = inferProductType(productTitle);
+      const department = inferDepartment(productType, qtyPairs.map((p) => p.size));
 
-    qtyPairs.forEach((pair) => {
-      rows.push({
-        invoiceNumber,
-        styleCode,
-        productTitle,
-        colour,
-        size: pair.size,
-        quantity: pair.quantity,
-        unitPrice,
-        discount,
-        effectiveUnitCost,
-        lineTotal,
-        productType,
-        department,
-        costSource,
-        qtyChecksumOk: qtyChecksum === totalQty,
+      qtyPairs.forEach((pair) => {
+        rows.push({
+          invoiceNumber,
+          styleCode,
+          productTitle,
+          colour,
+          size: pair.size,
+          quantity: pair.quantity,
+          unitPrice,
+          discount,
+          effectiveUnitCost,
+          lineTotal,
+          productType,
+          department,
+          costSource,
+          qtyChecksumOk: qtyChecksum === totalQty,
+          headerQty: totalQty,
+          qtyHeaderMatch,
+        });
       });
     });
   });
 
-  return { invoiceCount: chunks.length, invoiceNumbers, rows };
+  return { invoiceCount: chunks.length, invoiceNumbers, rows, warnings };
 }

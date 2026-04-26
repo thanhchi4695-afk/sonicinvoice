@@ -231,6 +231,47 @@ export default function PlatformConnectionsSection() {
     toast.success("Shopify disconnected");
   };
 
+  const handleCustomAppSave = async () => {
+    const domain = customAppDomain.trim();
+    const token = customAppToken.trim();
+    if (!domain || !token) {
+      toast.error("Enter both store domain and access token");
+      return;
+    }
+    setCustomAppSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "shopify-custom-app-verify",
+        { body: { shop_domain: domain, access_token: token } },
+      );
+      if (error) {
+        // Try to surface the function's JSON error body
+        const msg =
+          (error as { context?: { body?: string } })?.context?.body ||
+          error.message ||
+          "Verification failed";
+        let parsed = msg;
+        try {
+          const j = JSON.parse(msg);
+          if (j?.error) parsed = j.error;
+        } catch { /* ignore */ }
+        throw new Error(parsed);
+      }
+      if (!data?.success) {
+        throw new Error(data?.error || "Verification failed");
+      }
+      toast.success(`Connected to ${data.shop_name}`);
+      setCustomAppDomain("");
+      setCustomAppToken("");
+      setShowCustomApp(false);
+      void loadAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to verify token");
+    } finally {
+      setCustomAppSaving(false);
+    }
+  };
+
   const handleShopifySync = async () => {
     setShopifySyncing(true);
     try {

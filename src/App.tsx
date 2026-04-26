@@ -15,6 +15,7 @@ import AuthCallbackPage from "./pages/AuthCallback.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Support from "./pages/Support.tsx";
 import Privacy from "./pages/Privacy.tsx";
+import Health from "./pages/Health.tsx";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/auth/lightspeed-r/callback" element={<AuthCallbackPage />} />
               <Route path="/support" element={<Support />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/health" element={<Health />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

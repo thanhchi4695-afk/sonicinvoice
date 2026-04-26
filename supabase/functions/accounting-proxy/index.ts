@@ -13,16 +13,17 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const XERO_CLIENT_ID = Deno.env.get("XERO_CLIENT_ID") || "";
 const XERO_CLIENT_SECRET = Deno.env.get("XERO_CLIENT_SECRET") || "";
 const XERO_REDIRECT_URI = (Deno.env.get("APP_URL") || "") + "/auth/xero/callback";
-const XERO_BASE = "https://api.xero.com/api.xro/2.0";
-const XERO_TOKEN_URL = "https://identity.xero.com/connect/token";
-const XERO_AUTH_URL = "https://login.xero.com/identity/connect/authorize";
+const XERO_BASE = Deno.env.get("XERO_BASE_URL") || "https://api.xero.com/api.xro/2.0";
+const XERO_CONNECTIONS_URL = Deno.env.get("XERO_CONNECTIONS_URL") || "https://api.xero.com/connections";
+const XERO_TOKEN_URL = Deno.env.get("XERO_TOKEN_URL") || "https://identity.xero.com/connect/token";
+const XERO_AUTH_URL = Deno.env.get("XERO_AUTH_URL") || "https://login.xero.com/identity/connect/authorize";
 
 const MYOB_CLIENT_ID = Deno.env.get("MYOB_CLIENT_ID") || "";
 const MYOB_CLIENT_SECRET = Deno.env.get("MYOB_CLIENT_SECRET") || "";
 const MYOB_REDIRECT_URI = (Deno.env.get("APP_URL") || "") + "/auth/myob/callback";
-const MYOB_BASE = "https://api.myob.com/accountright";
-const MYOB_TOKEN_URL = "https://secure.myob.com/oauth2/v1/token";
-const MYOB_AUTH_URL = "https://secure.myob.com/oauth2/account/authorize";
+const MYOB_BASE = Deno.env.get("MYOB_BASE_URL") || "https://api.myob.com/accountright";
+const MYOB_TOKEN_URL = Deno.env.get("MYOB_TOKEN_URL") || "https://secure.myob.com/oauth2/v1/token";
+const MYOB_AUTH_URL = Deno.env.get("MYOB_AUTH_URL") || "https://secure.myob.com/oauth2/account/authorize";
 
 const respond = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {

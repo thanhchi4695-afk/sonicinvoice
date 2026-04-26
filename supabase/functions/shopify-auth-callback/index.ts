@@ -117,23 +117,40 @@ Deno.serve(async (req) => {
     const cleanShop = shop.replace(/^https?:\/\//, "").replace(/\/$/, "");
 
     if (isLoginFlow || isShopifyInitiated) {
-      // Login flow or Shopify-initiated install: find/create user by shop email
-      const { data: existingUsers } = await supabase.auth.admin.listUsers();
-      const existing = existingUsers?.users?.find((u: { email?: string }) => u.email === shopEmail);
+      // Prefer the currently logged-in user (if a Supabase session JWT was
+      // forwarded with the OAuth callback). This avoids forking a shadow
+      // account when an existing merchant installs the app while logged in.
+      let userId: string | null = null;
 
-      let userId: string;
-      if (existing) {
-        userId = existing.id;
-      } else {
-        const { data: newUser, error } = await supabase.auth.admin.createUser({
-          email: shopEmail, password: generateToken(), email_confirm: true,
-          user_metadata: { shop, shop_name: shopName, auth_provider: "shopify" },
-        });
-        if (error || !newUser?.user) {
-          console.error("Failed to create user:", error);
-          return new Response("Failed to create user", { status: 500 });
+      const authHeader = req.headers.get("Authorization") || "";
+      const bearer = authHeader.replace(/^Bearer\s+/i, "");
+      if (bearer) {
+        try {
+          const { data: { user: sessionUser } } = await supabase.auth.getUser(bearer);
+          if (sessionUser?.id) userId = sessionUser.id;
+        } catch (e) {
+          console.warn("Bearer present but getUser failed:", e);
         }
-        userId = newUser.user.id;
+      }
+
+      // Fall back to find/create-by-shop-email (headless install path)
+      if (!userId) {
+        const { data: existingUsers } = await supabase.auth.admin.listUsers();
+        const existing = existingUsers?.users?.find((u: { email?: string }) => u.email === shopEmail);
+
+        if (existing) {
+          userId = existing.id;
+        } else {
+          const { data: newUser, error } = await supabase.auth.admin.createUser({
+            email: shopEmail, password: generateToken(), email_confirm: true,
+            user_metadata: { shop, shop_name: shopName, auth_provider: "shopify" },
+          });
+          if (error || !newUser?.user) {
+            console.error("Failed to create user:", error);
+            return new Response("Failed to create user", { status: 500 });
+          }
+          userId = newUser.user.id;
+        }
       }
 
       await supabase.from("shopify_connections").upsert({

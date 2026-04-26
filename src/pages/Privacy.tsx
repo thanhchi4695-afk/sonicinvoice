@@ -34,8 +34,11 @@ const Privacy = () => (
           <p className="mb-4">
             Invoice attachment files are processed to extract product information and then discarded. We store only the extracted product data in your account on our secure database.
           </p>
-          <p>
+          <p className="mb-4">
             Your supplier invoice history is used to train the Supplier Brain — an AI system that learns your suppliers' invoice formats to improve extraction accuracy over time. This data is scoped to your account only.
+          </p>
+          <p>
+            <strong className="text-foreground">AI Processing:</strong> Sonic Invoices uses an AI inference service to extract and classify invoice data. Prompts sent to this service may include product names, quantities, supplier names, and invoice totals. These prompts are currently routed through Lovable's AI gateway (<code className="text-xs">ai.gateway.lovable.dev</code>) and processed by a third-party AI provider. Prompts are not stored beyond the duration of the request.
           </p>
         </section>
 

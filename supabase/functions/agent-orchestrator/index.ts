@@ -156,6 +156,31 @@ Deno.serve(async (req) => {
       return r;
     });
 
+    // ── Resolve product_ids + supplier_name from DB after classify/watchdog ──
+    // Guarantees enrich/publish/learn use the freshest values regardless of
+    // which step wrote them.
+    if (productIds.length === 0) {
+      const { data: freshProducts } = await admin
+        .from("products")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("source", "invoice_unreviewed")
+        .order("updated_at", { ascending: false })
+        .limit(50);
+      productIds = (freshProducts ?? []).map((p) => p.id as string);
+    }
+
+    const { data: updatedRun } = await admin
+      .from("agent_runs")
+      .select("supplier_name")
+      .eq("id", runId)
+      .maybeSingle();
+    const supplierName: string | null =
+      updatedRun?.supplier_name ??
+      watchdogResult.supplier_name ??
+      supplier_hint ??
+      null;
+
     // ─────────── STEP 3 — Enrich ───────────
     if (productIds.length > 0) {
       await runStep(runId!, "enrich", 2, async () => {

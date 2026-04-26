@@ -345,6 +345,7 @@ Deno.serve(async (req) => {
           sku: variant.sku || null,
           product_title: product.title,
           variant_title: variant.title,
+          vendor: product.vendor || null,
           colour,
           size,
           current_qty: qty,

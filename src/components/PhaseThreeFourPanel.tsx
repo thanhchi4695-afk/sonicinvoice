@@ -41,6 +41,7 @@ interface CatalogRow {
   barcode: string | null;
   product_title: string | null;
   variant_title: string | null;
+  vendor: string | null;
   colour: string | null;
   size: string | null;
   current_qty: number | null;
@@ -88,16 +89,31 @@ function toLineItem(p: ValidatedProduct, idx: number): InvoiceLineItem {
 // Convert a flat catalog cache row → minimal ShopifyVariant the
 // legacy classifier understands. One product per platform_product_id;
 // variants grouped under it.
-function catalogToVariants(rows: CatalogRow[]): ShopifyVariant[] {
+//
+// `vendorHint` is the supplier we're currently importing from. When the
+// cache row has no `vendor` (legacy rows synced before the column existed),
+// we fall back to detecting the vendor by checking whether the supplier
+// name appears as a prefix in the product title — this is how Shopify
+// stores Walnut Melbourne / similar brands when vendor is empty.
+function catalogToVariants(
+  rows: CatalogRow[],
+  vendorHint?: string | null,
+): ShopifyVariant[] {
   const productMap = new Map<string, ShopifyVariant["product"]>();
   const variants: ShopifyVariant[] = [];
+  const hint = (vendorHint || "").trim().toLowerCase();
 
   for (const r of rows) {
     if (!productMap.has(r.platform_product_id)) {
+      let vendor = (r as CatalogRow & { vendor?: string | null }).vendor || "";
+      if (!vendor && hint) {
+        const title = (r.product_title || "").toLowerCase();
+        if (title.startsWith(hint)) vendor = vendorHint as string;
+      }
       productMap.set(r.platform_product_id, {
         id: r.platform_product_id,
         title: r.product_title || "",
-        vendor: "",
+        vendor,
         productType: "",
         tags: [],
         options: [],
@@ -164,7 +180,7 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
 
         const { data, error } = await supabase
           .from("product_catalog_cache")
-          .select("platform_product_id, platform_variant_id, sku, barcode, product_title, variant_title, colour, size, current_qty, current_cost, current_price")
+          .select("platform_product_id, platform_variant_id, sku, barcode, product_title, variant_title, vendor, colour, size, current_qty, current_cost, current_price")
           .eq("user_id", user.id)
           .eq("platform", pos)
           .limit(5000);
@@ -174,7 +190,7 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
         const rows = (data ?? []) as CatalogRow[];
         setCatalogConnected(rows.length > 0);
 
-        const variants = catalogToVariants(rows);
+        const variants = catalogToVariants(rows, supplierName);
         const items = acceptedItems.map(toLineItem);
         const result = classifyAllItems(items, variants);
         setClassified(result.classified_items);
@@ -186,7 +202,7 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
       }
     })();
     return () => { cancelled = true; };
-  }, [acceptedItems, pos]);
+  }, [acceptedItems, pos, supplierName]);
 
   // ─── Phase 4 — parallel enrichment for new products only ────
   useEffect(() => {

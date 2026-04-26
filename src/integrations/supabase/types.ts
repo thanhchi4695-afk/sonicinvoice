@@ -2072,6 +2072,7 @@ export type Database = {
           sku: string | null
           user_id: string
           variant_title: string | null
+          vendor: string | null
         }
         Insert: {
           barcode?: string | null
@@ -2089,6 +2090,7 @@ export type Database = {
           sku?: string | null
           user_id: string
           variant_title?: string | null
+          vendor?: string | null
         }
         Update: {
           barcode?: string | null
@@ -2106,6 +2108,7 @@ export type Database = {
           sku?: string | null
           user_id?: string
           variant_title?: string | null
+          vendor?: string | null
         }
         Relationships: []
       }

@@ -100,6 +100,43 @@ export function findLineItemTable(invoiceText: string): string | null {
   return clean.slice(start, end).trim();
 }
 
+/**
+ * Split the line-item table text into per-product blocks.
+ *
+ * A Walnut invoice with N products produces N (header-row, Size:, Qty:) triples,
+ * back-to-back. Each block must be parsed independently — the size header for
+ * one product MUST NOT bleed into the next. This was the root cause of the
+ * Walnut 219077 phantom "Vermont Pant size 16" bug: the original parser called
+ * `lines.find(headerRow)` once and only ever emitted the first product, OR
+ * (when the deterministic path was bypassed) the LLM fell back to a cached
+ * Walnut size template and back-filled missing sizes.
+ *
+ * A header row looks like:
+ *   `<style code>  <title>  <colour>  <total_qty>  $unit_price  [$discount]  $line_total`
+ * It contains `$` and a numeric qty, and is NOT a `Size:` / `Qty:` line.
+ */
+export function splitProductBlocks(tableText: string): string[] {
+  const lines = tableText.split("\n").map(normalizeWhitespace).filter(Boolean);
+  const headerIndices: number[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^size\s*:/i.test(line) || /^qty\s*:/i.test(line)) continue;
+    if (!/\$/.test(line) || !/\d/.test(line)) continue;
+    // Header rows have `<digits> $<money>` somewhere — the total qty just before
+    // the unit price. Reject lines that are pure "$X.XX $Y.YY" totals.
+    if (!/\s\d+\s+\$?\s*\d/.test(line)) continue;
+    headerIndices.push(i);
+  }
+  if (headerIndices.length === 0) return [];
+  const blocks: string[] = [];
+  for (let i = 0; i < headerIndices.length; i += 1) {
+    const start = headerIndices[i];
+    const end = i + 1 < headerIndices.length ? headerIndices[i + 1] : lines.length;
+    blocks.push(lines.slice(start, end).join("\n"));
+  }
+  return blocks;
+}
+
 export function extractSizeQtyPairs(tableText: string): Array<{ size: string; quantity: number }> {
   const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
   const sizeLineIndex = lines.findIndex((line) => /^size\s*:/i.test(line));

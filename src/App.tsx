@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound.tsx";
 import Support from "./pages/Support.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import Health from "./pages/Health.tsx";
+import AdminSecrets from "./pages/AdminSecrets.tsx";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const App = () => (
               <Route path="/support" element={<Support />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/health" element={<Health />} />
+              <Route path="/admin/secrets" element={<AdminSecrets />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

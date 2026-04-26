@@ -135,11 +135,9 @@ Deno.serve(async (req) => {
       })
       .eq("id", runId);
 
-    const productIds: string[] = Array.isArray(watchdogResult.product_ids)
+    let productIds: string[] = Array.isArray(watchdogResult.product_ids)
       ? watchdogResult.product_ids
       : [];
-    const supplierName: string | null =
-      watchdogResult.supplier_name ?? supplier_hint ?? null;
     const documentId: string | null = watchdogResult.invoice_id ?? null;
 
     // ─────────── STEP 2 — Classify (optional) ───────────

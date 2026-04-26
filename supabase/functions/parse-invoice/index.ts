@@ -788,6 +788,32 @@ function findLineItemTable(invoiceText: string): string | null {
   return clean.slice(start, end).trim();
 }
 
+/**
+ * Split the line-item table text into per-product blocks. Each block is one
+ * (header-row, Size:, Qty:) triple. Sovereign — never reads sizes outside its
+ * own slice. Mirror of src/lib/walnut-parser.ts splitProductBlocks (kept in
+ * sync; covered by walnut-parser.test.ts regression).
+ */
+function splitProductBlocks(tableText: string): string[] {
+  const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
+  const headerIndices: number[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^size\s*:/i.test(line) || /^qty\s*:/i.test(line)) continue;
+    if (!/\$/.test(line) || !/\d/.test(line)) continue;
+    if (!/\s\d+\s+\$?\s*\d/.test(line)) continue;
+    headerIndices.push(i);
+  }
+  if (headerIndices.length === 0) return [];
+  const blocks: string[] = [];
+  for (let i = 0; i < headerIndices.length; i += 1) {
+    const start = headerIndices[i];
+    const end = i + 1 < headerIndices.length ? headerIndices[i + 1] : lines.length;
+    blocks.push(lines.slice(start, end).join("\n"));
+  }
+  return blocks;
+}
+
 function extractSizeQtyPairs(tableText: string): Array<{ size: string; quantity: number }> {
   const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
   const sizeLineIndex = lines.findIndex((line) => /^size\s*:/i.test(line));
@@ -811,93 +837,156 @@ function parseWalnutInvoiceChunks(rawText: string, supplierName?: string) {
   const products: Array<Record<string, unknown>> = [];
   const invoiceNumbers: string[] = [];
   const extractionNotes: string[] = [];
+  /**
+   * Per-product Qty header validator warnings. Surfaces "extracted N rows
+   * but invoice header says Qty: M" mismatches on the review screen so users
+   * can confirm or correct before downstream steps run. Catches phantom-row
+   * bugs (Walnut 219077 Vermont Pant size 16) AND dropped-row bugs.
+   */
+  const qtyHeaderWarnings: Array<{
+    invoice_number: string;
+    product_title: string;
+    colour: string;
+    extracted_rows: number;
+    header_qty: number;
+    message: string;
+  }> = [];
 
   chunks.forEach((chunk, invoiceIdx) => {
     const invoiceText = chunk.text;
     const invoiceNumber = chunk.invoiceNumber || invoiceText.match(/Invoice No[\s:]+(\d+)/i)?.[1] || "";
     if (invoiceNumber) invoiceNumbers.push(invoiceNumber);
 
-    const invoiceDate = invoiceText.match(/Invoice Date\s*([0-9]{1,2}\s+[A-Za-z]{3}\s+[0-9]{4})/i)?.[1] || "";
     const tableText = findLineItemTable(invoiceText);
     if (!tableText) return;
 
-    const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
-    const headerRow = lines.find((line) => /\$/.test(line) && /\d/.test(line) && !/^size\s*:/i.test(line) && !/^qty\s*:/i.test(line));
-    if (!headerRow) return;
+    // ── Per-product block parsing (Round 4 Walnut fix) ──────────
+    // Each product is parsed in isolation. Its Size:/Qty: rows are read from
+    // its own block only — no cross-product bleed, no cached size template.
+    // This is what fixes the Vermont Pant phantom size 16 bug on 219077.
+    const productBlocks = splitProductBlocks(tableText);
+    let productsBeforeChunk = products.length;
 
-    const moneyValues = Array.from(headerRow.matchAll(/\$?\s*\d{1,6}(?:,\d{3})*(?:\.\d{2})/g)).map((m) => parseMoney(m[0])).filter((n): n is number => n != null);
-    const qtyMatch = headerRow.match(/\s(\d+)\s+\$?\s*\d/);
-    const totalQty = qtyMatch ? Number(qtyMatch[1]) : 0;
-    const headerPrefix = qtyMatch ? headerRow.slice(0, qtyMatch.index).trim() : headerRow;
-    const prefixParts = headerPrefix.split(/\s{2,}/).map((part) => normalizeWhitespace(part)).filter(Boolean);
-    const styleCode = normalizeWrappedCode(prefixParts[0] || "");
-    const productTitle = prefixParts[1] || "";
-    const colour = normalizeWhitespace((prefixParts.slice(2).join(" ") || "").replace(/\bTan\s+Tan\b/i, "Tan"));
-    const qtyPairs = extractSizeQtyPairs(tableText);
-    const qtyChecksum = qtyPairs.reduce((sum, pair) => sum + pair.quantity, 0);
-    const unitPrice = moneyValues[0] ?? null;
-    const discount = moneyValues.length >= 3 ? moneyValues[1] : (moneyValues.length === 2 && /discount/i.test(headerRow) ? moneyValues[1] : null);
-    const lineTotal = moneyValues[moneyValues.length - 1] ?? null;
+    productBlocks.forEach((blockText, blockIdx) => {
+      const blockLines = blockText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
+      const headerRow = blockLines.find((line) => /\$/.test(line) && /\d/.test(line) && !/^size\s*:/i.test(line) && !/^qty\s*:/i.test(line));
+      if (!headerRow) return;
 
-    let effectiveUnitCost = unitPrice;
-    if (unitPrice != null && discount != null) {
-      effectiveUnitCost = Math.round((unitPrice - discount) * 100) / 100;
-      if (lineTotal != null && totalQty > 0) {
-        const subtotalCheck = effectiveUnitCost * totalQty;
-        if (Math.abs(subtotalCheck - lineTotal) > 0.05) {
-          effectiveUnitCost = Math.round((lineTotal / totalQty) * 100) / 100;
+      const moneyValues = Array.from(headerRow.matchAll(/\$?\s*\d{1,6}(?:,\d{3})*(?:\.\d{2})/g)).map((m) => parseMoney(m[0])).filter((n): n is number => n != null);
+      const qtyMatch = headerRow.match(/\s(\d+)\s+\$?\s*\d/);
+      const totalQty = qtyMatch ? Number(qtyMatch[1]) : 0;
+      const headerPrefix = qtyMatch ? headerRow.slice(0, qtyMatch.index).trim() : headerRow;
+      const prefixParts = headerPrefix.split(/\s{2,}/).map((part) => normalizeWhitespace(part)).filter(Boolean);
+      const styleCode = normalizeWrappedCode(prefixParts[0] || "");
+      const productTitle = prefixParts[1] || "";
+      const colour = normalizeWhitespace((prefixParts.slice(2).join(" ") || "").replace(/\bTan\s+Tan\b/i, "Tan"));
+
+      // Sovereign size/qty extraction — block text only.
+      const qtyPairs = extractSizeQtyPairs(blockText);
+      const headerSizes = qtyPairs.map((p) => p.size);
+      const qtyChecksum = qtyPairs.reduce((sum, pair) => sum + pair.quantity, 0);
+
+      // [size-matrix] telemetry — one log line per product so the literal
+      // header read is auditable in production logs.
+      console.log(`[size-matrix] invoice=${invoiceNumber} product="${productTitle}" colour="${colour}" header_sizes=[${headerSizes.join(",")}] extracted_rows=${qtyPairs.length} header_qty=${totalQty}`);
+
+      // Qty header validator (defence-in-depth).
+      const qtyHeaderMatch = qtyPairs.length === totalQty || qtyChecksum === totalQty;
+      if (!qtyHeaderMatch && totalQty > 0) {
+        const warning = {
+          invoice_number: invoiceNumber,
+          product_title: productTitle,
+          colour,
+          extracted_rows: qtyPairs.length,
+          header_qty: totalQty,
+          message: `⚠️ Extracted ${qtyPairs.length} size rows but invoice header says Qty: ${totalQty} — please review`,
+        };
+        qtyHeaderWarnings.push(warning);
+        console.warn(`[qty-validator] MISMATCH invoice=${invoiceNumber} product="${productTitle}" extracted=${qtyPairs.length} header=${totalQty}`);
+      }
+
+      const unitPrice = moneyValues[0] ?? null;
+      const discount = moneyValues.length >= 3 ? moneyValues[1] : (moneyValues.length === 2 && /discount/i.test(headerRow) ? moneyValues[1] : null);
+      const lineTotal = moneyValues[moneyValues.length - 1] ?? null;
+
+      let effectiveUnitCost = unitPrice;
+      if (unitPrice != null && discount != null) {
+        effectiveUnitCost = Math.round((unitPrice - discount) * 100) / 100;
+        if (lineTotal != null && totalQty > 0) {
+          const subtotalCheck = effectiveUnitCost * totalQty;
+          if (Math.abs(subtotalCheck - lineTotal) > 0.05) {
+            effectiveUnitCost = Math.round((lineTotal / totalQty) * 100) / 100;
+          }
         }
       }
-    }
 
-    const productType = inferProductType(productTitle);
-    const department = inferDepartment(productType, qtyPairs.map((pair) => pair.size));
-    const rowNotes = [
-      `invoice_number:${invoiceNumber}`,
-      `invoice_index:${invoiceIdx + 1}`,
-      qtyChecksum === totalQty ? `qty_checksum:${qtyChecksum}` : `qty_checksum_mismatch:${qtyChecksum}/${totalQty}`,
-      discount != null ? "discount_interpreted_as_per_unit" : "no_discount",
-      department ? `department:${department}` : "",
-    ].filter(Boolean).join("; ");
+      const productType = inferProductType(productTitle);
+      const department = inferDepartment(productType, qtyPairs.map((pair) => pair.size));
+      const rowNotes = [
+        `invoice_number:${invoiceNumber}`,
+        `invoice_index:${invoiceIdx + 1}`,
+        `product_block:${blockIdx + 1}/${productBlocks.length}`,
+        qtyChecksum === totalQty ? `qty_checksum:${qtyChecksum}` : `qty_checksum_mismatch:${qtyChecksum}/${totalQty}`,
+        qtyHeaderMatch ? `qty_header_match:${qtyPairs.length}=${totalQty}` : `qty_header_MISMATCH:${qtyPairs.length}/${totalQty}`,
+        discount != null ? "discount_interpreted_as_per_unit" : "no_discount",
+        department ? `department:${department}` : "",
+      ].filter(Boolean).join("; ");
 
-    qtyPairs.forEach((pair, variantIdx) => {
-      products.push({
-        row_index: products.length,
-        anchor_code: styleCode,
-        row_y_start: 0.2 + (invoiceIdx * 0.4) + (variantIdx * 0.01),
-        row_y_end: 0.21 + (invoiceIdx * 0.4) + (variantIdx * 0.01),
-        row_confidence: 96,
-        style_code: styleCode,
-        product_title: productTitle,
-        colour,
-        size: pair.size,
-        quantity: pair.quantity,
-        unit_cost: effectiveUnitCost,
-        rrp: null,
-        line_total: lineTotal,
-        barcode: null,
-        product_type: productType,
-        group_key: `${styleCode}|${colour}`,
-        confidence: 96,
-        parse_notes: rowNotes,
-        extraction_reason: "Parsed from explicit Walnut Code/Item/Options header with Size:/Qty: matrix",
-        cost_source: discount != null ? "discount_adjusted" : "direct",
-        source_regions: {
-          title: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: "table Item column" },
-          sku: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: "table Code column" },
-          colour: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: "table Options column" },
-          size: { page: invoiceIdx + 1, y_position: 0.28, extraction_method: "Size row" },
-          quantity: { page: invoiceIdx + 1, y_position: 0.31, extraction_method: "Qty row" },
-          cost: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: discount != null ? "Unit Price minus per-unit Discount" : "Unit Price column" },
-        },
+      // Lower confidence on Qty-validator failures so the review screen flags them.
+      const rowConfidence = qtyHeaderMatch ? 96 : 65;
+
+      qtyPairs.forEach((pair, variantIdx) => {
+        products.push({
+          row_index: products.length,
+          anchor_code: styleCode,
+          row_y_start: 0.2 + (invoiceIdx * 0.4) + (blockIdx * 0.05) + (variantIdx * 0.005),
+          row_y_end: 0.21 + (invoiceIdx * 0.4) + (blockIdx * 0.05) + (variantIdx * 0.005),
+          row_confidence: rowConfidence,
+          style_code: styleCode,
+          product_title: productTitle,
+          colour,
+          size: pair.size,
+          quantity: pair.quantity,
+          unit_cost: effectiveUnitCost,
+          rrp: null,
+          line_total: lineTotal,
+          barcode: null,
+          product_type: productType,
+          group_key: `${styleCode}|${colour}`,
+          confidence: rowConfidence,
+          parse_notes: rowNotes,
+          extraction_reason: qtyHeaderMatch
+            ? "Parsed from explicit Walnut Code/Item/Options header with Size:/Qty: matrix (per-product block)"
+            : `⚠️ Qty validator: extracted ${qtyPairs.length} sizes but invoice header says Qty: ${totalQty}. Please confirm before pushing.`,
+          cost_source: discount != null ? "discount_adjusted" : "direct",
+          source_regions: {
+            title: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: "table Item column" },
+            sku: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: "table Code column" },
+            colour: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: "table Options column" },
+            size: { page: invoiceIdx + 1, y_position: 0.28, extraction_method: "Size row (per-product block)" },
+            quantity: { page: invoiceIdx + 1, y_position: 0.31, extraction_method: "Qty row (per-product block)" },
+            cost: { page: invoiceIdx + 1, y_position: 0.24, extraction_method: discount != null ? "Unit Price minus per-unit Discount" : "Unit Price column" },
+          },
+          // Surface the warning at the row level too so the review-screen
+          // FieldConfidenceHeader can flag it without re-running the validator.
+          qty_header_warning: qtyHeaderMatch ? null : warning_message_for(productTitle, qtyPairs.length, totalQty),
+        });
       });
+
+      extractionNotes.push(`Invoice #${invoiceNumber || invoiceIdx + 1} / "${productTitle}" (${colour}): ${qtyPairs.length} size rows extracted, header Qty: ${totalQty}${qtyHeaderMatch ? "" : " ⚠️ MISMATCH"}`);
+      if (department) extractionNotes.push(`Invoice #${invoiceNumber || invoiceIdx + 1} / "${productTitle}": inferred ${department} from age-based sizes`);
     });
 
-    extractionNotes.push(`Invoice #${invoiceNumber || invoiceIdx + 1}: ${qtyPairs.length} line items extracted`);
-    if (department) extractionNotes.push(`Invoice #${invoiceNumber || invoiceIdx + 1}: inferred ${department} from age-based sizes`);
+    if (products.length === productsBeforeChunk) {
+      console.warn(`[parse-invoice] Walnut chunk #${invoiceIdx + 1} produced 0 products — header detection may have failed`);
+    }
   });
 
   if (!products.length) return null;
+
+  const validatorSummary = qtyHeaderWarnings.length === 0
+    ? "Qty validator: all products passed."
+    : `⚠️ Qty validator flagged ${qtyHeaderWarnings.length} product${qtyHeaderWarnings.length === 1 ? "" : "s"}: ${qtyHeaderWarnings.map((w) => `${w.product_title} (${w.extracted_rows}/${w.header_qty})`).join(", ")}`;
 
   return {
     supplier: supplierName || "Walnut Melbourne",
@@ -911,7 +1000,7 @@ function parseWalnutInvoiceChunks(rawText: string, supplierName?: string) {
       orientation_detected: "portrait",
       rotation_applied: 0,
       line_item_zone: "Rows beneath the Code / Item / Options / Qty / Unit Price / Discount / Subtotal header",
-      quantity_field: "Header Qty as checksum plus Size:/Qty: matrix rows",
+      quantity_field: "Header Qty as checksum plus Size:/Qty: matrix rows (per-product block)",
       cost_field: "Unit Price adjusted by per-unit Discount when present",
       cost_derivation: "direct",
       grouping_required: true,
@@ -920,28 +1009,35 @@ function parseWalnutInvoiceChunks(rawText: string, supplierName?: string) {
       total_variants_expected: products.length,
       row_anchors_detected: [...new Set(products.map((p) => String(p.style_code || "")).filter(Boolean))],
       row_count: products.length,
-      expected_review_level: "low",
-      review_reason: "Explicit Walnut invoice header and size matrix were parsed deterministically",
-      strategy_explanation: "Split the stitched PDF into per-invoice chunks, then parsed each Walnut line-item table by header signature and expanded the Size:/Qty: matrix into variants.",
+      expected_review_level: qtyHeaderWarnings.length > 0 ? "high" : "low",
+      review_reason: qtyHeaderWarnings.length > 0
+        ? `Qty header validator flagged ${qtyHeaderWarnings.length} product(s) — please confirm size rows match invoice.`
+        : "Explicit Walnut invoice header and size matrix were parsed deterministically with per-product block isolation.",
+      strategy_explanation: "Split the stitched PDF into per-invoice chunks, then split each invoice into per-product blocks (one block = one header-row + its own Size:/Qty: rows). Each block is sovereign — no cross-product size bleed. Qty header validator runs per product as defence-in-depth.",
     },
     products,
     rejected_rows: [],
     detected_fields: ["invoice_number", "invoice_date", "style_code", "product_title", "colour", "size", "quantity", "unit_cost", "line_total"],
     detected_size_system: products.some((p) => /year|month/i.test(String(p.size || ""))) ? "mixed" : "numeric_au",
-    extraction_notes: `This file contains ${chunks.length} invoices — ${invoiceNumbers.map((n) => `#${n}`).join(" and ")} — processed together, ${products.length} line items total. ${extractionNotes.join(" ")}`.trim(),
+    extraction_notes: `This file contains ${chunks.length} invoices — ${invoiceNumbers.map((n) => `#${n}`).join(" and ")} — processed together, ${products.length} line items total. ${validatorSummary} ${extractionNotes.join(" ")}`.trim(),
+    qty_header_warnings: qtyHeaderWarnings,
     field_confidence: {
       product_name: 97,
       sku: 98,
       colour: 95,
-      size: 98,
-      quantity: 98,
+      size: qtyHeaderWarnings.length > 0 ? 70 : 98,
+      quantity: qtyHeaderWarnings.length > 0 ? 70 : 98,
       cost_ex_gst: 95,
       rrp_incl_gst: 0,
       vendor: 98,
     },
     format_type: "B",
-    overall_confidence: 96,
+    overall_confidence: qtyHeaderWarnings.length > 0 ? 75 : 96,
   };
+}
+
+function warning_message_for(productTitle: string, extracted: number, headerQty: number): string {
+  return `⚠️ ${productTitle}: extracted ${extracted} sizes but invoice says Qty: ${headerQty}`;
 }
 
 serve(async (req) => {

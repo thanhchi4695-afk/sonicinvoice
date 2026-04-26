@@ -254,6 +254,23 @@ export default function PostParseReviewScreen({
   qtyHeaderWarnings = [],
 }: PostParseReviewScreenProps) {
   const [activeTab, setActiveTab] = useState<ReviewTab>("accepted");
+  // Lookup: "title|colour" (lowercased) -> warning message. Used to flag matching rows.
+  const qtyWarningByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const w of qtyHeaderWarnings) {
+      const titleKey = (w.product_title || "").trim().toLowerCase();
+      const colourKey = (w.colour || "").trim().toLowerCase();
+      map.set(`${titleKey}|${colourKey}`, w.message);
+      map.set(`${titleKey}|`, w.message); // colour-agnostic fallback
+    }
+    return map;
+  }, [qtyHeaderWarnings]);
+  const lookupQtyWarning = useCallback((p: ReviewProduct): string | null => {
+    if (qtyWarningByKey.size === 0) return null;
+    const title = ((p as any).name || (p as any).product_title || "").trim().toLowerCase();
+    const colour = ((p as any).colour || (p as any).color || "").trim().toLowerCase();
+    return qtyWarningByKey.get(`${title}|${colour}`) || qtyWarningByKey.get(`${title}|`) || null;
+  }, [qtyWarningByKey]);
   const [searchQuery, setSearchQuery] = useState("");
   const [vendorFilter, setVendorFilter] = useState<string>("all");
   const [confFilter, setConfFilter] = useState<ConfFilter>("all");

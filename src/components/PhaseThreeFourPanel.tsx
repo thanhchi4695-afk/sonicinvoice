@@ -178,12 +178,22 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
           return;
         }
 
-        const { data, error } = await supabase
+        // CRITICAL: Filter by vendor BEFORE the limit so we don't fetch a
+        // random 1000-row slice of a 14k+ catalog and miss the brand entirely.
+        // Vendor in cache may be uppercase (Shopify) while the invoice supplier
+        // is mixed case — use ILIKE for case-insensitive match.
+        let query = supabase
           .from("product_catalog_cache")
           .select("platform_product_id, platform_variant_id, sku, barcode, product_title, variant_title, vendor, colour, size, current_qty, current_cost, current_price")
           .eq("user_id", user.id)
-          .eq("platform", pos)
-          .limit(5000);
+          .eq("platform", pos);
+
+        const vendorFilter = (supplierName || "").trim();
+        if (vendorFilter) {
+          query = query.ilike("vendor", `%${vendorFilter}%`);
+        }
+
+        const { data, error } = await query.limit(5000);
 
         if (cancelled) return;
 

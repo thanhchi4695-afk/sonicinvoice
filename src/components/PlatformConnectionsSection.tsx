@@ -13,6 +13,7 @@ import {
   Zap,
   AlertTriangle,
   CheckCircle2,
+  KeyRound,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {

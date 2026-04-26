@@ -116,47 +116,31 @@ async function shopifyFetch(
   return res;
 }
 
-async function fetchAllProducts(
+async function fetchProductsPage(
   shop: string,
   token: string,
-  updatedAtMin?: string,
-): Promise<ShopifyProduct[]> {
-  const products: ShopifyProduct[] = [];
-  const baseFields = "id,title,variants,options,updated_at";
-  let pageInfo: string | null = null;
-  let isFirstPage = true;
-
-  while (true) {
-    let path: string;
-    if (pageInfo) {
-      // When using page_info, only limit + fields are allowed
-      path = `/products.json?limit=250&fields=${baseFields}&page_info=${encodeURIComponent(pageInfo)}`;
-    } else {
-      const params = new URLSearchParams({
-        limit: "250",
-        fields: baseFields,
-      });
-      if (updatedAtMin && isFirstPage) {
-        params.set("updated_at_min", updatedAtMin);
-      }
-      path = `/products.json?${params.toString()}`;
-    }
-
-    const res = await shopifyFetch(shop, token, path);
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`Shopify products fetch failed (${res.status}): ${txt}`);
-    }
-
-    const json = await res.json();
-    products.push(...(json.products as ShopifyProduct[]));
-
-    pageInfo = parseLinkHeader(res.headers.get("link"));
-    isFirstPage = false;
-    if (!pageInfo) break;
+  pageInfo: string | null,
+  updatedAtMin: string | undefined,
+): Promise<{ products: ShopifyProduct[]; nextPageInfo: string | null }> {
+  const baseFields = "id,title,vendor,variants,options,updated_at";
+  let path: string;
+  if (pageInfo) {
+    path = `/products.json?limit=250&fields=${baseFields}&page_info=${encodeURIComponent(pageInfo)}`;
+  } else {
+    const params = new URLSearchParams({ limit: "250", fields: baseFields });
+    if (updatedAtMin) params.set("updated_at_min", updatedAtMin);
+    path = `/products.json?${params.toString()}`;
   }
-
-  return products;
+  const res = await shopifyFetch(shop, token, path);
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Shopify products fetch failed (${res.status}): ${txt}`);
+  }
+  const json = await res.json();
+  return {
+    products: (json.products as ShopifyProduct[]) || [],
+    nextPageInfo: parseLinkHeader(res.headers.get("link")),
+  };
 }
 
 async function fetchInventoryLevels(

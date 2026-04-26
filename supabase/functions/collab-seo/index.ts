@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const AI_GATEWAY_URL = Deno.env.get("AI_GATEWAY_URL") || "https://ai.gateway.lovable.dev/v1/chat/completions";
+const AI_GATEWAY_URL = Deno.env.get("AI_GATEWAY_URL") || AI_GATEWAY_URL;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -37,7 +37,7 @@ WRITING RULES:
 
 Return only the blog post text. No title, no headings, no metadata.`;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch(AI_GATEWAY_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -63,7 +63,7 @@ Return only the blog post text. No title, no headings, no metadata.`;
       const month = new Date().toLocaleString("en-AU", { month: "long" });
       const prompt = `Suggest exactly 4 blog post topics for a collaborative local SEO blog post about Darwin, Australia fashion boutiques. The participating stores are: ${partnerNames}. The current month is ${month}. Each topic should be specific and seasonally relevant. Return as a JSON array of 4 strings, nothing else.`;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch(AI_GATEWAY_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -127,7 +127,7 @@ Return as JSON: {"subject": "...", "body": "..."}`);
 
       const allEmails: any[] = [];
       for (const [i, prompt] of emailPrompts.entries()) {
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const response = await fetch(AI_GATEWAY_URL, {
           method: "POST",
           headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
           body: JSON.stringify({

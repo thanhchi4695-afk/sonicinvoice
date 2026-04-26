@@ -144,10 +144,16 @@ Deno.serve(async (req) => {
 
     // ─────────── STEP 2 — Classify (optional) ───────────
     await runStep(runId!, "classify", 2, async () => {
-      // classify-extract-validate is best-effort context; non-blocking
+      if (!file_base64 || !filename) {
+        return { skipped: true, reason: "no file content available" };
+      }
       const r = await callFunction("classify-extract-validate", userId!, {
-        supplier_name: supplierName,
+        fileContent: file_base64,
+        fileName: filename,
+        fileType: mime_type,
+        supplierName: supplierName,
         invoice_id: documentId,
+        user_id: userId,
       });
       return r;
     });

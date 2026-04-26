@@ -807,7 +807,9 @@ function findLineItemTable(invoiceText: string): string | null {
  * sync; covered by walnut-parser.test.ts regression).
  */
 function splitProductBlocks(tableText: string): string[] {
-  const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
+  // Use column-spaced normalisation so header rows keep their multi-space
+  // column separators intact for downstream prefix splitting.
+  const lines = tableText.split("\n").map((line) => normalizeColumnSpaced(line)).filter(Boolean);
   const headerIndices: number[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];

@@ -253,7 +253,9 @@ interface ParsedProductBlock {
  * The block is sovereign — never reads sizes/qtys outside its own slice.
  */
 function parseProductBlock(blockText: string): ParsedProductBlock | null {
-  const lines = blockText.split("\n").map(normalizeWhitespace).filter(Boolean);
+  // Preserve column-spacing on the header row so we can split on multi-space
+  // boundaries; size/qty lines don't need it.
+  const lines = blockText.split("\n").map(normalizeColumnSpaced).filter(Boolean);
   const headerRow = lines.find((line) => /\$/.test(line) && /\d/.test(line) && !/^size\s*:/i.test(line) && !/^qty\s*:/i.test(line));
   if (!headerRow) return null;
 
@@ -263,7 +265,34 @@ function parseProductBlock(blockText: string): ParsedProductBlock | null {
   const qtyMatch = headerRow.match(/\s(\d+)\s+\$?\s*\d/);
   const totalQty = qtyMatch ? Number(qtyMatch[1]) : 0;
   const headerPrefix = qtyMatch ? headerRow.slice(0, qtyMatch.index).trim() : headerRow;
-  const prefixParts = headerPrefix.split(/\s{2,}/).map(normalizeWhitespace).filter(Boolean);
+
+  // Primary split: column separators (2+ spaces). This is the well-formed
+  // PDF-text path and produces clean [code, title, colour] tuples.
+  let prefixParts = headerPrefix.split(/\s{2,}/).map(normalizeWhitespace).filter(Boolean);
+
+  // Lenient fallback for OCR / single-space text: if column separators were
+  // lost, derive title + colour from the style code itself (Walnut style
+  // codes are `<Title>-<Season>-<Colour>` e.g. `Vermont Pant-W26-Jaguar Jungle Orange`).
+  if (prefixParts.length < 3) {
+    const wholeCodePlusRest = normalizeWhitespace(headerPrefix);
+    // Style code is the first whitespace-separated token cluster ending before
+    // the duplicated title (Walnut prints `<code> <title> <colour>` with the
+    // title and colour repeated outside the code). Take everything as the
+    // raw style code, then derive title + colour from its hyphen segments.
+    const rawCode = wholeCodePlusRest.split(/\s{2,}|\s(?=[A-Z][a-z]+\s+[A-Z])/)[0] || wholeCodePlusRest;
+    const codeNorm = normalizeWrappedCode(rawCode);
+    const segments = codeNorm.split("-").map((s) => s.trim()).filter(Boolean);
+    const seasonIdx = segments.findIndex((s) => SEASON_RE.test(s));
+    if (seasonIdx > 0) {
+      const titleFromCode = segments.slice(0, seasonIdx).join(" ").trim();
+      const colourFromCode = segments.slice(seasonIdx + 1).join(" ").trim();
+      prefixParts = [codeNorm, titleFromCode, colourFromCode].filter(Boolean);
+    } else if (segments.length >= 2) {
+      // No season marker — assume `<title>-<colour>`.
+      prefixParts = [codeNorm, segments[0], segments.slice(1).join(" ")];
+    }
+  }
+
   const styleCode = normalizeWrappedCode(prefixParts[0] || "");
   const productTitle = prefixParts[1] || "";
   const colour = normalizeWhitespace((prefixParts.slice(2).join(" ") || "").replace(/\bTan\s+Tan\b/i, "Tan"));

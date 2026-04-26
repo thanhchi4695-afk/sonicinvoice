@@ -278,6 +278,7 @@ Deno.serve(async (req) => {
 
 async function runStep<T>(
   runId: string,
+  userId: string,
   stepName: string,
   maxRetries: number,
   fn: () => Promise<T>,
@@ -287,9 +288,9 @@ async function runStep<T>(
 
   while (attempt < maxRetries) {
     try {
-      await markStep(runId, stepName, "running", attempt, null);
+      await markStep(runId, userId, stepName, "running", attempt, null);
       const result = await fn();
-      await markStep(runId, stepName, "complete", attempt, null);
+      await markStep(runId, userId, stepName, "complete", attempt, null);
       return result;
     } catch (e) {
       lastError = e;
@@ -303,21 +304,24 @@ async function runStep<T>(
   }
 
   const errMsg = lastError instanceof Error ? lastError.message : String(lastError);
-  await markStep(runId, stepName, "failed", attempt, errMsg);
+  await markStep(runId, userId, stepName, "failed", attempt, errMsg);
   return null;
 }
 
 async function markStep(
   runId: string,
+  userId: string,
   step: string,
   status: StepStatus,
   retryCount: number,
   error: string | null,
 ) {
+  // Tenant-scoped read: never fetch another user's pipeline state.
   const { data: run } = await admin
     .from("agent_runs")
     .select("pipeline_steps")
     .eq("id", runId)
+    .eq("user_id", userId)
     .maybeSingle();
 
   const steps: StepRecord[] = (run?.pipeline_steps as StepRecord[]) ?? [];
@@ -348,7 +352,8 @@ async function markStep(
       pipeline_steps: steps,
       retry_count: retryCount,
     })
-    .eq("id", runId);
+    .eq("id", runId)
+    .eq("user_id", userId);
 }
 
 async function callFunction(

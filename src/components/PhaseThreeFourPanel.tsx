@@ -179,7 +179,7 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
 
         const { data, error } = await supabase
           .from("product_catalog_cache")
-          .select("platform_product_id, platform_variant_id, sku, barcode, product_title, variant_title, colour, size, current_qty, current_cost, current_price")
+          .select("platform_product_id, platform_variant_id, sku, barcode, product_title, variant_title, vendor, colour, size, current_qty, current_cost, current_price")
           .eq("user_id", user.id)
           .eq("platform", pos)
           .limit(5000);
@@ -189,7 +189,7 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
         const rows = (data ?? []) as CatalogRow[];
         setCatalogConnected(rows.length > 0);
 
-        const variants = catalogToVariants(rows);
+        const variants = catalogToVariants(rows, supplierName);
         const items = acceptedItems.map(toLineItem);
         const result = classifyAllItems(items, variants);
         setClassified(result.classified_items);

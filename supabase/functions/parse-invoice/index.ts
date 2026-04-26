@@ -765,6 +765,14 @@ function normalizeWhitespace(value: string): string {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+// Preserves runs of 2+ spaces (encoded as triple-space) so column separators
+// survive trimming. Used for header-row parsing where column boundaries matter.
+function normalizeColumnSpaced(value: string): string {
+  return String(value || "").replace(/\t/g, "   ").replace(/ {2,}/g, "   ").trim();
+}
+
+const SEASON_RE = /^(SS|AW|S|W|FW|HO|RE|HS|MS|LS)\d{2}$/i;
+
 function inferProductType(title: string): string {
   const t = String(title || "").toLowerCase();
   if (/sandal|shoe|boot|sneaker|loafer/.test(t)) return "sandal";

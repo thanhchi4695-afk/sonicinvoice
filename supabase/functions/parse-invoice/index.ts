@@ -788,6 +788,32 @@ function findLineItemTable(invoiceText: string): string | null {
   return clean.slice(start, end).trim();
 }
 
+/**
+ * Split the line-item table text into per-product blocks. Each block is one
+ * (header-row, Size:, Qty:) triple. Sovereign — never reads sizes outside its
+ * own slice. Mirror of src/lib/walnut-parser.ts splitProductBlocks (kept in
+ * sync; covered by walnut-parser.test.ts regression).
+ */
+function splitProductBlocks(tableText: string): string[] {
+  const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
+  const headerIndices: number[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (/^size\s*:/i.test(line) || /^qty\s*:/i.test(line)) continue;
+    if (!/\$/.test(line) || !/\d/.test(line)) continue;
+    if (!/\s\d+\s+\$?\s*\d/.test(line)) continue;
+    headerIndices.push(i);
+  }
+  if (headerIndices.length === 0) return [];
+  const blocks: string[] = [];
+  for (let i = 0; i < headerIndices.length; i += 1) {
+    const start = headerIndices[i];
+    const end = i + 1 < headerIndices.length ? headerIndices[i + 1] : lines.length;
+    blocks.push(lines.slice(start, end).join("\n"));
+  }
+  return blocks;
+}
+
 function extractSizeQtyPairs(tableText: string): Array<{ size: string; quantity: number }> {
   const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
   const sizeLineIndex = lines.findIndex((line) => /^size\s*:/i.test(line));

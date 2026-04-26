@@ -709,11 +709,15 @@ const MONEY_RE = /\$?\s*(-?\d{1,6}(?:,\d{3})*(?:\.\d{2})|-?\d+(?:\.\d{2}))/;
 const SIZE_TOKEN_RE = /^(?:XXS|XS|S|M|L|XL|XXL|XXXL|OS|ONE\s*SIZE|FREE\s*SIZE|\d{1,2}|\d{1,2}\s*(?:AU|US|UK|EU|W)|\d{1,2}\s*(?:YEAR|YR|Y)|\d{1,2}\s*-\s*\d{1,2}\s*(?:YEAR|YR|Y)|\d{1,2}\s*(?:MONTH|MONTHS|MO|M)|\d{1,2}\s*-\s*\d{1,2}\s*(?:MONTH|MONTHS|MO|M))$/i;
 
 function cleanInvoiceText(raw: string): string {
+  // Preserve column-spacing — runs of spaces encode column separators in
+  // PDF-extracted text. Collapsing them destroys our ability to split header
+  // rows into [code, title, colour, qty, …] columns. Collapse 4+ to a stable
+  // 3-space marker (still unambiguous as a column boundary).
   return String(raw || "")
     .replace(/\r/g, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\u00a0/g, " ")
-    .replace(/ +/g, " ");
+    .replace(/ {4,}/g, "   ");
 }
 
 function splitMultiInvoicePdf(rawText: string): Array<{ invoiceNumber: string; text: string }> {
@@ -761,6 +765,14 @@ function normalizeWhitespace(value: string): string {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+// Preserves runs of 2+ spaces (encoded as triple-space) so column separators
+// survive trimming. Used for header-row parsing where column boundaries matter.
+function normalizeColumnSpaced(value: string): string {
+  return String(value || "").replace(/\t/g, "   ").replace(/ {2,}/g, "   ").trim();
+}
+
+const SEASON_RE = /^(SS|AW|S|W|FW|HO|RE|HS|MS|LS)\d{2}$/i;
+
 function inferProductType(title: string): string {
   const t = String(title || "").toLowerCase();
   if (/sandal|shoe|boot|sneaker|loafer/.test(t)) return "sandal";
@@ -795,7 +807,9 @@ function findLineItemTable(invoiceText: string): string | null {
  * sync; covered by walnut-parser.test.ts regression).
  */
 function splitProductBlocks(tableText: string): string[] {
-  const lines = tableText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
+  // Use column-spaced normalisation so header rows keep their multi-space
+  // column separators intact for downstream prefix splitting.
+  const lines = tableText.split("\n").map((line) => normalizeColumnSpaced(line)).filter(Boolean);
   const headerIndices: number[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
@@ -868,7 +882,8 @@ function parseWalnutInvoiceChunks(rawText: string, supplierName?: string) {
     let productsBeforeChunk = products.length;
 
     productBlocks.forEach((blockText, blockIdx) => {
-      const blockLines = blockText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
+      // Preserve column spacing on header line; size/qty lines are normalised separately.
+      const blockLines = blockText.split("\n").map((line) => normalizeColumnSpaced(line)).filter(Boolean);
       const headerRow = blockLines.find((line) => /\$/.test(line) && /\d/.test(line) && !/^size\s*:/i.test(line) && !/^qty\s*:/i.test(line));
       if (!headerRow) return;
 
@@ -876,7 +891,27 @@ function parseWalnutInvoiceChunks(rawText: string, supplierName?: string) {
       const qtyMatch = headerRow.match(/\s(\d+)\s+\$?\s*\d/);
       const totalQty = qtyMatch ? Number(qtyMatch[1]) : 0;
       const headerPrefix = qtyMatch ? headerRow.slice(0, qtyMatch.index).trim() : headerRow;
-      const prefixParts = headerPrefix.split(/\s{2,}/).map((part) => normalizeWhitespace(part)).filter(Boolean);
+
+      // Primary split: column separators (2+ spaces).
+      let prefixParts = headerPrefix.split(/\s{2,}/).map((part) => normalizeWhitespace(part)).filter(Boolean);
+
+      // Lenient fallback for OCR / single-space text: derive title + colour
+      // from the style code itself (`<Title>-<Season>-<Colour>`).
+      if (prefixParts.length < 3) {
+        const wholeCodePlusRest = normalizeWhitespace(headerPrefix);
+        const rawCode = wholeCodePlusRest.split(/\s{2,}|\s(?=[A-Z][a-z]+\s+[A-Z])/)[0] || wholeCodePlusRest;
+        const codeNorm = normalizeWrappedCode(rawCode);
+        const segments = codeNorm.split("-").map((s) => s.trim()).filter(Boolean);
+        const seasonIdx = segments.findIndex((s) => SEASON_RE.test(s));
+        if (seasonIdx > 0) {
+          const titleFromCode = segments.slice(0, seasonIdx).join(" ").trim();
+          const colourFromCode = segments.slice(seasonIdx + 1).join(" ").trim();
+          prefixParts = [codeNorm, titleFromCode, colourFromCode].filter(Boolean);
+        } else if (segments.length >= 2) {
+          prefixParts = [codeNorm, segments[0], segments.slice(1).join(" ")];
+        }
+      }
+
       const styleCode = normalizeWrappedCode(prefixParts[0] || "");
       const productTitle = prefixParts[1] || "";
       const colour = normalizeWhitespace((prefixParts.slice(2).join(" ") || "").replace(/\bTan\s+Tan\b/i, "Tan"));

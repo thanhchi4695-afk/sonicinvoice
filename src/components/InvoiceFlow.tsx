@@ -597,6 +597,16 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
   const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
   const [aiExtractionNotes, setAiExtractionNotes] = useState<string | null>(null);
+  // Per-product Qty header validator warnings from parse-invoice. Drives the
+  // yellow banner + per-row flag on the review screen (Round 4 Walnut fix).
+  const [qtyHeaderWarnings, setQtyHeaderWarnings] = useState<Array<{
+    invoice_number: string;
+    product_title: string;
+    colour: string;
+    extracted_rows: number;
+    header_qty: number;
+    message: string;
+  }>>([]);
   const [layoutFingerprint, setLayoutFingerprint] = useState<string | null>(null);
   const [fingerprintHit, setFingerprintHit] = useState<FingerprintHit | null>(null);
   const [matchMethod, setMatchMethod] = useState<InvoiceMatchMethod>("full_extraction");
@@ -1787,6 +1797,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       if (typeof data.extraction_notes === "string") {
         setAiExtractionNotes(data.extraction_notes);
       }
+      if (Array.isArray(data.qty_header_warnings)) {
+        setQtyHeaderWarnings(data.qty_header_warnings);
+      } else {
+        setQtyHeaderWarnings([]);
+      }
       if (data.layout_type) {
         setDetectedLayout(data.layout_type as LayoutType);
         const plan = data.parsing_plan || {};
@@ -2134,6 +2149,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       }
       if (typeof data.extraction_notes === "string") {
         setAiExtractionNotes(data.extraction_notes);
+      }
+      if (Array.isArray(data.qty_header_warnings)) {
+        setQtyHeaderWarnings(data.qty_header_warnings);
+      } else {
+        setQtyHeaderWarnings([]);
       }
 
       if (products.length === 0) {
@@ -4145,6 +4165,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 underExtractionWarning={underExtractionWarning}
                 fieldConfidence={aiFieldConfidence}
                 extractionNotes={aiExtractionNotes}
+                qtyHeaderWarnings={qtyHeaderWarnings}
                 watchdogRun={watchdogRun}
               />
             </div>

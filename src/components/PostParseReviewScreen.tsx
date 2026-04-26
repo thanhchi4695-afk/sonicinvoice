@@ -61,6 +61,18 @@ interface PostParseReviewScreenProps {
   /** Set when the review screen was opened from a Watchdog Agent run. Renders the
    *  (currently disabled) "Auto-publish to Shopify" button in the action bar. */
   watchdogRun?: { runId: string; autoPublishEligible: boolean } | null;
+  /** Per-product Qty header validator warnings raised by parse-invoice when
+   *  the extracted size-row count for a product doesn't match the invoice
+   *  header `Qty:` field. Drives the yellow review banner + per-row flag.
+   *  (Round 4 Walnut fix — Vermont Pant phantom-size-16 canary.) */
+  qtyHeaderWarnings?: Array<{
+    invoice_number: string;
+    product_title: string;
+    colour: string;
+    extracted_rows: number;
+    header_qty: number;
+    message: string;
+  }>;
 }
 
 type ReviewTab = "accepted" | "review" | "rejected";
@@ -239,8 +251,26 @@ export default function PostParseReviewScreen({
   fieldConfidence = null,
   extractionNotes = null,
   watchdogRun = null,
+  qtyHeaderWarnings = [],
 }: PostParseReviewScreenProps) {
   const [activeTab, setActiveTab] = useState<ReviewTab>("accepted");
+  // Lookup: "title|colour" (lowercased) -> warning message. Used to flag matching rows.
+  const qtyWarningByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const w of qtyHeaderWarnings) {
+      const titleKey = (w.product_title || "").trim().toLowerCase();
+      const colourKey = (w.colour || "").trim().toLowerCase();
+      map.set(`${titleKey}|${colourKey}`, w.message);
+      map.set(`${titleKey}|`, w.message); // colour-agnostic fallback
+    }
+    return map;
+  }, [qtyHeaderWarnings]);
+  const lookupQtyWarning = useCallback((p: ReviewProduct): string | null => {
+    if (qtyWarningByKey.size === 0) return null;
+    const title = ((p as any).name || (p as any).product_title || "").trim().toLowerCase();
+    const colour = ((p as any).colour || (p as any).color || "").trim().toLowerCase();
+    return qtyWarningByKey.get(`${title}|${colour}`) || qtyWarningByKey.get(`${title}|`) || null;
+  }, [qtyWarningByKey]);
   const [searchQuery, setSearchQuery] = useState("");
   const [vendorFilter, setVendorFilter] = useState<string>("all");
   const [confFilter, setConfFilter] = useState<ConfFilter>("all");
@@ -939,6 +969,28 @@ export default function PostParseReviewScreen({
         </div>
       )}
 
+      {qtyHeaderWarnings.length > 0 && (
+        <div className="bg-secondary/10 border border-secondary/40 rounded-lg p-3 mb-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-secondary mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-secondary">
+                Some products extracted with a different size count than the invoice header — please review highlighted rows.
+              </p>
+              <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                {qtyHeaderWarnings.map((w, i) => (
+                  <li key={i}>
+                    ⚠️ <span className="text-foreground font-medium">{w.product_title}</span>
+                    {w.colour ? <span className="text-muted-foreground"> · {w.colour}</span> : null}
+                    <span className="text-muted-foreground"> — extracted {w.extracted_rows} sizes, invoice says Qty: {w.header_qty}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {underExtractionWarning && (
         <UnderExtractionBanner
           warning={underExtractionWarning}
@@ -1390,6 +1442,7 @@ export default function PostParseReviewScreen({
                   invoicePages={invoicePages}
                   onShowSourceTrace={(prod) => setSourceTraceProduct(prod)}
                   lowConfFields={lowConfFields}
+                  qtyHeaderWarning={lookupQtyWarning(p as ReviewProduct)}
                 />
               ))}
             </div>
@@ -1706,6 +1759,7 @@ function ReviewRow({
   pendingRowCorrections, savedReasonFields,
   awaitingRowReason, onConfirmRowReason, onSkipRowReason,
   lowConfFields,
+  qtyHeaderWarning = null,
 }: {
   product: ReviewProduct;
   tab: ReviewTab;
@@ -1737,6 +1791,9 @@ function ReviewRow({
   /** Dismissed the bar without picking — record everything as "unspecified". */
   onSkipRowReason?: () => void;
   lowConfFields?: Set<string>;
+  /** Set when this row's product was flagged by the Qty header validator —
+   *  drives a yellow border + ⚠️ pill so users know exactly which row to check. */
+  qtyHeaderWarning?: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showWhyAI, setShowWhyAI] = useState(false);
@@ -1747,8 +1804,13 @@ function ReviewRow({
     `text-[10px] mb-0.5 block ${lowConfFields?.has(field) ? "text-secondary font-medium" : "text-muted-foreground"}`;
 
   return (
-    <div className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""}`}>
-      {/* Main row */}
+    <div className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""} ${qtyHeaderWarning ? "border-l-4 border-l-secondary bg-secondary/5" : ""}`}>
+      {qtyHeaderWarning && (
+        <div className="px-4 pt-2 flex items-center gap-1.5 text-[10px] text-secondary">
+          <Badge variant="outline" className="border-secondary/50 text-secondary text-[9px] px-1.5 py-0 h-4">⚠️ Qty mismatch</Badge>
+          <span className="text-muted-foreground">{qtyHeaderWarning}</span>
+        </div>
+      )}
       <div className="px-4 py-3 flex items-center gap-2">
         {/* Select checkbox */}
         <input

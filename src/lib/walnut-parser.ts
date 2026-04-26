@@ -20,11 +20,16 @@ export interface WalnutInvoiceChunk {
 }
 
 export function cleanInvoiceText(raw: string): string {
+  // NOTE: we deliberately preserve runs of spaces — they encode column
+  // separators in PDF-extracted invoice text. Collapsing them to single
+  // spaces destroys our ability to split header rows into [code, title,
+  // colour, qty, …] columns. We only collapse runs of 4+ to a normalised
+  // 3-space gap (still unambiguous as a column separator).
   return String(raw || "")
     .replace(/\r/g, "")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\u00a0/g, " ")
-    .replace(/ +/g, " ");
+    .replace(/ {4,}/g, "   ");
 }
 
 export function splitMultiInvoicePdf(rawText: string): WalnutInvoiceChunk[] {
@@ -73,6 +78,18 @@ export function normalizeWhitespace(value: string): string {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Like normalizeWhitespace but preserves runs of 2+ spaces (encoded as a
+ * triple-space marker) so callers can still detect column separators after
+ * trimming. Used for header-row parsing where column boundaries matter.
+ */
+export function normalizeColumnSpaced(value: string): string {
+  return String(value || "")
+    .replace(/\t/g, "   ")
+    .replace(/ {2,}/g, "   ")
+    .trim();
+}
+
 export function inferProductType(title: string): string {
   const t = String(title || "").toLowerCase();
   if (/sandal|shoe|boot|sneaker|loafer/.test(t)) return "sandal";
@@ -116,7 +133,9 @@ export function findLineItemTable(invoiceText: string): string | null {
  * It contains `$` and a numeric qty, and is NOT a `Size:` / `Qty:` line.
  */
 export function splitProductBlocks(tableText: string): string[] {
-  const lines = tableText.split("\n").map(normalizeWhitespace).filter(Boolean);
+  // Use column-spaced normalisation so header rows keep their multi-space
+  // column separators intact for downstream parseProductBlock().
+  const lines = tableText.split("\n").map(normalizeColumnSpaced).filter(Boolean);
   const headerIndices: number[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
@@ -234,7 +253,9 @@ interface ParsedProductBlock {
  * The block is sovereign — never reads sizes/qtys outside its own slice.
  */
 function parseProductBlock(blockText: string): ParsedProductBlock | null {
-  const lines = blockText.split("\n").map(normalizeWhitespace).filter(Boolean);
+  // Preserve column-spacing on the header row so we can split on multi-space
+  // boundaries; size/qty lines don't need it.
+  const lines = blockText.split("\n").map(normalizeColumnSpaced).filter(Boolean);
   const headerRow = lines.find((line) => /\$/.test(line) && /\d/.test(line) && !/^size\s*:/i.test(line) && !/^qty\s*:/i.test(line));
   if (!headerRow) return null;
 
@@ -244,7 +265,34 @@ function parseProductBlock(blockText: string): ParsedProductBlock | null {
   const qtyMatch = headerRow.match(/\s(\d+)\s+\$?\s*\d/);
   const totalQty = qtyMatch ? Number(qtyMatch[1]) : 0;
   const headerPrefix = qtyMatch ? headerRow.slice(0, qtyMatch.index).trim() : headerRow;
-  const prefixParts = headerPrefix.split(/\s{2,}/).map(normalizeWhitespace).filter(Boolean);
+
+  // Primary split: column separators (2+ spaces). This is the well-formed
+  // PDF-text path and produces clean [code, title, colour] tuples.
+  let prefixParts = headerPrefix.split(/\s{2,}/).map(normalizeWhitespace).filter(Boolean);
+
+  // Lenient fallback for OCR / single-space text: if column separators were
+  // lost, derive title + colour from the style code itself (Walnut style
+  // codes are `<Title>-<Season>-<Colour>` e.g. `Vermont Pant-W26-Jaguar Jungle Orange`).
+  if (prefixParts.length < 3) {
+    const wholeCodePlusRest = normalizeWhitespace(headerPrefix);
+    // Style code is the first whitespace-separated token cluster ending before
+    // the duplicated title (Walnut prints `<code> <title> <colour>` with the
+    // title and colour repeated outside the code). Take everything as the
+    // raw style code, then derive title + colour from its hyphen segments.
+    const rawCode = wholeCodePlusRest.split(/\s{2,}|\s(?=[A-Z][a-z]+\s+[A-Z])/)[0] || wholeCodePlusRest;
+    const codeNorm = normalizeWrappedCode(rawCode);
+    const segments = codeNorm.split("-").map((s) => s.trim()).filter(Boolean);
+    const seasonIdx = segments.findIndex((s) => SEASON_RE.test(s));
+    if (seasonIdx > 0) {
+      const titleFromCode = segments.slice(0, seasonIdx).join(" ").trim();
+      const colourFromCode = segments.slice(seasonIdx + 1).join(" ").trim();
+      prefixParts = [codeNorm, titleFromCode, colourFromCode].filter(Boolean);
+    } else if (segments.length >= 2) {
+      // No season marker — assume `<title>-<colour>`.
+      prefixParts = [codeNorm, segments[0], segments.slice(1).join(" ")];
+    }
+  }
+
   const styleCode = normalizeWrappedCode(prefixParts[0] || "");
   const productTitle = prefixParts[1] || "";
   const colour = normalizeWhitespace((prefixParts.slice(2).join(" ") || "").replace(/\bTan\s+Tan\b/i, "Tan"));

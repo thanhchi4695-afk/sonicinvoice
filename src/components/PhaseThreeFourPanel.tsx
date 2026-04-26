@@ -88,16 +88,31 @@ function toLineItem(p: ValidatedProduct, idx: number): InvoiceLineItem {
 // Convert a flat catalog cache row → minimal ShopifyVariant the
 // legacy classifier understands. One product per platform_product_id;
 // variants grouped under it.
-function catalogToVariants(rows: CatalogRow[]): ShopifyVariant[] {
+//
+// `vendorHint` is the supplier we're currently importing from. When the
+// cache row has no `vendor` (legacy rows synced before the column existed),
+// we fall back to detecting the vendor by checking whether the supplier
+// name appears as a prefix in the product title — this is how Shopify
+// stores Walnut Melbourne / similar brands when vendor is empty.
+function catalogToVariants(
+  rows: CatalogRow[],
+  vendorHint?: string | null,
+): ShopifyVariant[] {
   const productMap = new Map<string, ShopifyVariant["product"]>();
   const variants: ShopifyVariant[] = [];
+  const hint = (vendorHint || "").trim().toLowerCase();
 
   for (const r of rows) {
     if (!productMap.has(r.platform_product_id)) {
+      let vendor = (r as CatalogRow & { vendor?: string | null }).vendor || "";
+      if (!vendor && hint) {
+        const title = (r.product_title || "").toLowerCase();
+        if (title.startsWith(hint)) vendor = vendorHint as string;
+      }
       productMap.set(r.platform_product_id, {
         id: r.platform_product_id,
         title: r.product_title || "",
-        vendor: "",
+        vendor,
         productType: "",
         tags: [],
         options: [],

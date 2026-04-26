@@ -41,6 +41,7 @@ interface CatalogRow {
   barcode: string | null;
   product_title: string | null;
   variant_title: string | null;
+  vendor: string | null;
   colour: string | null;
   size: string | null;
   current_qty: number | null;

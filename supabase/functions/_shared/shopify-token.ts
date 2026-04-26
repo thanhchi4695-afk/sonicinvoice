@@ -106,6 +106,18 @@ export async function ensureValidToken(
 
   const now = Date.now();
 
+  // Custom App (Admin API) tokens always start with `shpat_` and never expire.
+  // Never run token-exchange or refresh against them — there is no refresh
+  // endpoint for Custom App tokens, and any expiry value on the row is bogus.
+  if (conn.access_token?.startsWith("shpat_")) {
+    return {
+      accessToken: conn.access_token,
+      storeUrl: conn.store_url,
+      apiVersion: conn.api_version,
+      conn,
+    };
+  }
+
   // Case 1: legacy non-expiring token — attempt one-time exchange to expiring token.
   if (!conn.token_expires_at && conn.access_token) {
     const upgraded = await tryExchangeLegacyToken(supabase, conn);

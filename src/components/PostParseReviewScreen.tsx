@@ -1442,6 +1442,7 @@ export default function PostParseReviewScreen({
                   invoicePages={invoicePages}
                   onShowSourceTrace={(prod) => setSourceTraceProduct(prod)}
                   lowConfFields={lowConfFields}
+                  qtyHeaderWarning={lookupQtyWarning(p as ReviewProduct)}
                 />
               ))}
             </div>

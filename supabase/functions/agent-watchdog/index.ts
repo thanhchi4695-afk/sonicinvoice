@@ -281,7 +281,7 @@ Deno.serve(async (req) => {
         .gte("updated_at", runRow ? new Date(Date.now() - 5 * 60_000).toISOString() : new Date().toISOString())
         .order("updated_at", { ascending: false })
         .limit(Math.max(total, 1));
-      const productIds = (writtenProducts || []).map((p: any) => p.id);
+      var productIds: string[] = (writtenProducts || []).map((p: any) => p.id);
       if (productIds.length > 0) {
         fetch(`${supabaseUrl}/functions/v1/auto-enrich`, {
           method: "POST",
@@ -305,6 +305,8 @@ Deno.serve(async (req) => {
       publishing_result: publishingResult,
       supplier_confidence: profile?.confidence_score ?? null,
       products,
+      product_ids: typeof productIds !== "undefined" ? productIds : [],
+      invoice_id: null,
     });
   } catch (err) {
     console.error("[agent-watchdog] error", err);

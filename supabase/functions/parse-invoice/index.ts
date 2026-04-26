@@ -882,7 +882,8 @@ function parseWalnutInvoiceChunks(rawText: string, supplierName?: string) {
     let productsBeforeChunk = products.length;
 
     productBlocks.forEach((blockText, blockIdx) => {
-      const blockLines = blockText.split("\n").map((line) => normalizeWhitespace(line)).filter(Boolean);
+      // Preserve column spacing on header line; size/qty lines are normalised separately.
+      const blockLines = blockText.split("\n").map((line) => normalizeColumnSpaced(line)).filter(Boolean);
       const headerRow = blockLines.find((line) => /\$/.test(line) && /\d/.test(line) && !/^size\s*:/i.test(line) && !/^qty\s*:/i.test(line));
       if (!headerRow) return;
 
@@ -890,7 +891,27 @@ function parseWalnutInvoiceChunks(rawText: string, supplierName?: string) {
       const qtyMatch = headerRow.match(/\s(\d+)\s+\$?\s*\d/);
       const totalQty = qtyMatch ? Number(qtyMatch[1]) : 0;
       const headerPrefix = qtyMatch ? headerRow.slice(0, qtyMatch.index).trim() : headerRow;
-      const prefixParts = headerPrefix.split(/\s{2,}/).map((part) => normalizeWhitespace(part)).filter(Boolean);
+
+      // Primary split: column separators (2+ spaces).
+      let prefixParts = headerPrefix.split(/\s{2,}/).map((part) => normalizeWhitespace(part)).filter(Boolean);
+
+      // Lenient fallback for OCR / single-space text: derive title + colour
+      // from the style code itself (`<Title>-<Season>-<Colour>`).
+      if (prefixParts.length < 3) {
+        const wholeCodePlusRest = normalizeWhitespace(headerPrefix);
+        const rawCode = wholeCodePlusRest.split(/\s{2,}|\s(?=[A-Z][a-z]+\s+[A-Z])/)[0] || wholeCodePlusRest;
+        const codeNorm = normalizeWrappedCode(rawCode);
+        const segments = codeNorm.split("-").map((s) => s.trim()).filter(Boolean);
+        const seasonIdx = segments.findIndex((s) => SEASON_RE.test(s));
+        if (seasonIdx > 0) {
+          const titleFromCode = segments.slice(0, seasonIdx).join(" ").trim();
+          const colourFromCode = segments.slice(seasonIdx + 1).join(" ").trim();
+          prefixParts = [codeNorm, titleFromCode, colourFromCode].filter(Boolean);
+        } else if (segments.length >= 2) {
+          prefixParts = [codeNorm, segments[0], segments.slice(1).join(" ")];
+        }
+      }
+
       const styleCode = normalizeWrappedCode(prefixParts[0] || "");
       const productTitle = prefixParts[1] || "";
       const colour = normalizeWhitespace((prefixParts.slice(2).join(" ") || "").replace(/\bTan\s+Tan\b/i, "Tan"));

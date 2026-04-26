@@ -952,6 +952,28 @@ export default function PostParseReviewScreen({
         </div>
       )}
 
+      {qtyHeaderWarnings.length > 0 && (
+        <div className="bg-secondary/10 border border-secondary/40 rounded-lg p-3 mb-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-secondary mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-secondary">
+                Some products extracted with a different size count than the invoice header — please review highlighted rows.
+              </p>
+              <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                {qtyHeaderWarnings.map((w, i) => (
+                  <li key={i}>
+                    ⚠️ <span className="text-foreground font-medium">{w.product_title}</span>
+                    {w.colour ? <span className="text-muted-foreground"> · {w.colour}</span> : null}
+                    <span className="text-muted-foreground"> — extracted {w.extracted_rows} sizes, invoice says Qty: {w.header_qty}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {underExtractionWarning && (
         <UnderExtractionBanner
           warning={underExtractionWarning}

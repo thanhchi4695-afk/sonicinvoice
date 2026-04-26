@@ -201,7 +201,7 @@ const PhaseThreeFourPanel = ({ products, supplierName, onProceed }: PhaseThreeFo
       }
     })();
     return () => { cancelled = true; };
-  }, [acceptedItems, pos]);
+  }, [acceptedItems, pos, supplierName]);
 
   // ─── Phase 4 — parallel enrichment for new products only ────
   useEffect(() => {

@@ -825,6 +825,19 @@ export default function PostParseReviewScreen({
     setBulkVendor("");
   };
 
+  const applyBulkCollection = () => {
+    const v = bulkCollection.trim();
+    if (!v || selectedRows.size === 0) return;
+    onUpdateProducts(products.map(p =>
+      selectedRows.has(p._rowIndex)
+        ? ({ ...p, collection: v, _manuallyEdited: true } as any)
+        : p
+    ));
+    toast.success(`Tagged ${selectedRows.size} item${selectedRows.size === 1 ? "" : "s"} as "${v}"`);
+    setSelectedRows(new Set());
+    setBulkCollection("");
+  };
+
   const markSelectedAsFreight = () => {
     selectedRows.forEach(idx => markRowAs(idx, "freight"));
     setSelectedRows(new Set());

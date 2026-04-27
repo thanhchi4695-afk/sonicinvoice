@@ -16,6 +16,8 @@ import { format, subDays, formatDistanceToNow } from "date-fns";
 import { addAuditEntry } from "@/lib/audit-log";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import LocationFilter from "@/components/LocationFilter";
+import { useShopifyLocations } from "@/hooks/use-shopify-locations";
 
 const CACHE_KEY = "stock_on_hand_cache_v1";
 const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
@@ -64,6 +66,7 @@ const StockOnHandReport = () => {
 
   // Filters
   const [locationFilter, setLocationFilter] = useState<string>("all");
+  const { selected: globalLocSelected, selectedLocation: globalLocObj } = useShopifyLocations();
   const [vendorFilter, setVendorFilter] = useState<string[]>([]);
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [hideZero, setHideZero] = useState<boolean>(true);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ArrowLeft, Loader2, Sparkles, ShoppingCart, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, Loader2, Sparkles, ShoppingCart, RefreshCw, Search, Ban } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,17 @@ import LocationFilter from "@/components/LocationFilter";
 import { useShopifyLocations } from "@/hooks/use-shopify-locations";
 import { toast } from "sonner";
 import { addAuditEntry } from "@/lib/audit-log";
+import {
+  buildSupplierDefaultMap,
+  loadRestockOverrides,
+  REFILL_ROW_BG,
+  RESTOCK_STATUS_BADGE,
+  RESTOCK_STATUS_EMOJI,
+  RESTOCK_STATUS_LABEL,
+  resolveRestockStatus,
+  setRestockStatusBulk,
+  type RestockStatus,
+} from "@/lib/restock-status";
 
 interface Props {
   onBack: () => void;

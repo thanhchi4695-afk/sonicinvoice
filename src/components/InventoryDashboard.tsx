@@ -252,10 +252,10 @@ export default function InventoryDashboard({ onBack }: Props) {
       .sort((a, b) => b.units - a.units);
   }, [data]);
 
-  // Top vendors by inventory value
+  // Top vendors by inventory value (respects location filter)
   const vendorBreakdown = useMemo(() => {
     const map = new Map<string, { units: number; value: number; count: number }>();
-    for (const v of data.variants) {
+    for (const v of viewData.variants) {
       const vendor = v.vendor || "Unknown";
       const existing = map.get(vendor) || { units: 0, value: 0, count: 0 };
       existing.units += v.quantity;
@@ -267,7 +267,7 @@ export default function InventoryDashboard({ onBack }: Props) {
       .map(([vendor, d]) => ({ vendor, ...d }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [data.variants]);
+  }, [viewData.variants]);
 
   if (loading) {
     return (

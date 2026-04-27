@@ -452,7 +452,6 @@ export function generateShopifyCSV(
         Status: isFirstRow ? defaultStatus : "",
         "SEO Title": isFirstRow ? prod.seoTitle : "",
         "SEO Description": isFirstRow ? prod.seoDesc : "",
-        Collection: isFirstRow ? prod.collections.join(", ") : "",
         ...(v.cogs ? { "Cost per item": v.cogs } : {}),
       };
 

@@ -5045,6 +5045,45 @@ function LightspeedExportDownload({ exportFormat, products, supplierName, lsSett
   }
 
   // Shopify / XLSX mode
+  const handleShopifyDownload = () => {
+    const shopifyProducts = products.map(p => ({
+      title: titleCase(stripBrandPrefix(p.name, p.brand)),
+      vendor: normaliseVendor(p.brand),
+      type: p.type,
+      price: p.rrp,
+      cost: p.price,
+      tags: buildTagsFor(p),
+      bodyHtml: p.bodyHtml || p.description || '',
+      variants: p.variants || [],
+    }));
+    const headers = ['Handle','Title','Body (HTML)','Vendor','Type','Tags','Variant SKU','Variant Price','Cost per item','Variant Inventory Qty','Option1 Name','Option1 Value','Option2 Name','Option2 Value'];
+    const rows: string[][] = [headers];
+    for (const p of shopifyProducts) {
+      const handle = `${p.vendor}-${p.title}`.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+      const variants = p.variants.length > 0 ? p.variants : [{ sku: '', colour: '', size: '', qty: 0, price: p.price, rrp: p.price }];
+      variants.forEach((v, i) => {
+        rows.push([
+          handle,
+          i === 0 ? p.title : '',
+          i === 0 ? p.bodyHtml : '',
+          i === 0 ? p.vendor : '',
+          i === 0 ? p.type : '',
+          i === 0 ? p.tags : '',
+          v.sku || '',
+          String(v.rrp ?? p.price),
+          String(v.price ?? p.cost),
+          String(v.qty ?? 0),
+          v.colour ? 'Colour' : '',
+          v.colour || '',
+          v.size ? 'Size' : '',
+          v.size || '',
+        ]);
+      });
+    }
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    downloadFile(csv, `${tag}_${month}_shopify_${date}.csv`);
+  };
+
   return (
     <div className="flex flex-col items-center">
       <div className="w-20 h-20 rounded-full bg-success/15 flex items-center justify-center mb-6">
@@ -5052,7 +5091,7 @@ function LightspeedExportDownload({ exportFormat, products, supplierName, lsSett
       </div>
       <h3 className="text-xl font-bold font-display mb-2">Your file is ready</h3>
       <p className="text-sm text-muted-foreground mb-6">{products.length} products, {exportFormat === 'xlsx' ? 'Excel' : 'Shopify'}-ready format</p>
-      <Button variant="success" className="w-full max-w-xs h-14 text-base">
+      <Button variant="success" className="w-full max-w-xs h-14 text-base" onClick={handleShopifyDownload}>
         <Download className="w-5 h-5 mr-2" /> Download {exportFormat === 'xlsx' ? 'Excel file' : mode.exportLabel}
       </Button>
     </div>

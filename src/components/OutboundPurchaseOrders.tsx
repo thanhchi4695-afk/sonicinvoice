@@ -790,9 +790,22 @@ function EditView({ po, onBack, onReceive }: { po: PO; onBack: () => void; onRec
                       onChange={e => updateLine(l.id, { cost_price: Number(e.target.value) })} />
                   </td>
                   <td className="py-1 text-right">
-                    <Input type="number" className="w-20 h-8 text-right ml-auto"
-                      value={l.qty_ordered}
-                      onChange={e => updateLine(l.id, { qty_ordered: Number(e.target.value) })} />
+                    {suggestionMeta[l.id] ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input type="number" className="w-20 h-8 text-right ml-auto"
+                              value={l.qty_ordered}
+                              onChange={e => updateLine(l.id, { qty_ordered: Number(e.target.value) })} />
+                          </TooltipTrigger>
+                          <TooltipContent><span className="text-xs">{suggestionMeta[l.id]}</span></TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <Input type="number" className="w-20 h-8 text-right ml-auto"
+                        value={l.qty_ordered}
+                        onChange={e => updateLine(l.id, { qty_ordered: Number(e.target.value) })} />
+                    )}
                   </td>
                   <td className="py-1 text-right">{fmtCurrency(l.cost_price * l.qty_ordered)}</td>
                   <td className="py-1 text-right">

@@ -480,9 +480,10 @@ export function generateShopifyCSV(
     "Image Src", "Status", "SEO Title", "SEO Description",
   ];
 
-  if (rows.some((r) => r.Collection?.trim())) {
-    baseColumns.push("Collection");
-  }
+  // NOTE: Shopify product CSV does not support a "Collection" column.
+  // Smart collections auto-include products by tag rules; manual collections
+  // can only be assigned in the Shopify admin. Collection names are merged
+  // into the Tags column upstream so smart-collection rules can pick them up.
 
   if (rows.some(r => r["Cost per item"])) {
     baseColumns.push("Cost per item");

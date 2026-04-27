@@ -39,6 +39,8 @@ import { addAuditEntry } from "@/lib/audit-log";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format, subDays } from "date-fns";
+import LocationFilter from "@/components/LocationFilter";
+import { useShopifyLocations } from "@/hooks/use-shopify-locations";
 
 interface Row {
   variantId: string;

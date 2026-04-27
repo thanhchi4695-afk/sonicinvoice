@@ -1071,7 +1071,24 @@ function LearningMemoryPanel({ onBack }: { onBack: () => void }) {
 
 const ToolsScreen = () => {
   const [activeTool, setActiveTool] = useState<string | null>(null);
-  const [instructions, setInstructions] = useState("");
+  const [instructions, setInstructions] = useState(() => {
+    try { return localStorage.getItem("ai_instructions_global") || ""; } catch { return ""; }
+  });
+  const [saveForAll, setSaveForAll] = useState(false);
+
+  const handleSaveInstructions = () => {
+    try {
+      localStorage.setItem("ai_instructions_global", instructions);
+      if (saveForAll) localStorage.setItem("ai_instructions_apply_to_all", "1");
+      else localStorage.removeItem("ai_instructions_apply_to_all");
+      // dynamic import keeps Sonner happy without restructuring imports
+      import("sonner").then(({ toast }) => toast.success("Instructions saved", {
+        description: saveForAll ? "Will apply to all future invoices from any supplier." : "Saved as your default AI instructions.",
+      }));
+    } catch {
+      import("sonner").then(({ toast }) => toast.error("Could not save — browser storage blocked"));
+    }
+  };
 
   if (activeTool === "price_lookup") return <PriceLookup onBack={() => setActiveTool(null)} />;
   if (activeTool === "supplier_emails") return <SupplierEmails onBack={() => setActiveTool(null)} />;

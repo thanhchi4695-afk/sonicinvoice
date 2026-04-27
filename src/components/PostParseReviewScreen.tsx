@@ -1343,18 +1343,30 @@ export default function PostParseReviewScreen({
           ))}
         </div>
         {activeTab !== "rejected" && (
-          <div className="flex bg-muted/30 rounded-lg p-1">
+          <div className="flex bg-muted/30 rounded-lg p-1" role="tablist" aria-label="Review view mode">
             <button
               onClick={() => setViewMode("flat")}
+              title="Flat list — every row in invoice order"
+              aria-pressed={viewMode === "flat"}
               className={`px-2.5 py-2 rounded-md text-[10px] font-medium transition-colors ${viewMode === "flat" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
             >
               <FileText className="w-3 h-3" />
             </button>
             <button
               onClick={() => setViewMode("grouped")}
+              title="Group by style — variants of the same product collapsed"
+              aria-pressed={viewMode === "grouped"}
               className={`px-2.5 py-2 rounded-md text-[10px] font-medium transition-colors ${viewMode === "grouped" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
             >
               <Layers className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => { setViewMode("by-collection"); setFocusedCollection(null); }}
+              title="Group by collection / story — review one collection at a time"
+              aria-pressed={viewMode === "by-collection"}
+              className={`px-2.5 py-2 rounded-md text-[10px] font-medium transition-colors ${viewMode === "by-collection" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+            >
+              <FolderTree className="w-3 h-3" />
             </button>
           </div>
         )}

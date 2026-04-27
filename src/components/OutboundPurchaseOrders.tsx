@@ -6,6 +6,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Plus, Trash2, Search, FileText, Send, ChevronLeft, Eye, Sparkles, Archive,
   Copy as CopyIcon, ArrowDownToLine, Settings as SettingsIcon, Loader2,
 } from "lucide-react";

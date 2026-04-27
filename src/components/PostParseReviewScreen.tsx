@@ -1476,6 +1476,106 @@ export default function PostParseReviewScreen({
               ))}
             </div>
           )
+        ) : viewMode === "by-collection" && activeTab !== "rejected" ? (
+          /* ── Group by Collection / Story view ──
+             Renders one collapsible section per collection (in invoice
+             order). Lets the merchant work through "Summer Chintz" then
+             "Beach Bound" without losing place between them. */
+          collectionGroups.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              {activeTab === "review"
+                ? "✓ No rows need review — all clean!"
+                : "No products in this tab"}
+            </div>
+          ) : (
+            <div className="divide-y divide-border/70">
+              {collectionGroups.map((group, gi) => {
+                const isUnassigned = group.name === UNASSIGNED_COLLECTION;
+                const isFocused = focusedCollection === group.name;
+                const isHidden = focusedCollection !== null && !isFocused;
+                const isDone = doneCollections.has(group.name);
+                if (isHidden) return null;
+                const headerColor = isUnassigned
+                  ? "bg-muted/30 border-l-4 border-muted-foreground/30"
+                  : "bg-primary/5 border-l-4 border-primary";
+                return (
+                  <section key={group.name} aria-label={`Collection ${group.name}`}>
+                    <header className={`sticky top-0 z-10 flex flex-wrap items-center gap-2 px-3 py-2 ${headerColor} backdrop-blur-sm`}>
+                      <FolderTree className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <span className="text-xs font-semibold text-foreground truncate">
+                        {isUnassigned ? "Unassigned (no collection)" : group.name}
+                      </span>
+                      <Badge variant="outline" className="text-[9px] h-5">
+                        {group.items.length} row{group.items.length === 1 ? "" : "s"}
+                      </Badge>
+                      <Badge variant="outline" className="text-[9px] h-5">
+                        {group.totalUnits} units
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground">
+                        Step {gi + 1} of {collectionGroups.length}
+                      </span>
+                      <div className="ml-auto flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-[10px] gap-1"
+                          onClick={() => {
+                            const next = new Set(selectedRows);
+                            group.items.forEach(i => next.add(i._rowIndex));
+                            setSelectedRows(next);
+                          }}
+                        >
+                          Select all
+                        </Button>
+                        {isFocused ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-[10px] gap-1"
+                            onClick={() => setFocusedCollection(null)}
+                          >
+                            Show all collections
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-[10px] gap-1"
+                            onClick={() => setFocusedCollection(group.name)}
+                          >
+                            Focus this collection
+                          </Button>
+                        )}
+                        <Button
+                          variant={isDone ? "secondary" : "outline"}
+                          size="sm"
+                          className="h-6 text-[10px] gap-1"
+                          onClick={() => {
+                            const next = new Set(doneCollections);
+                            if (isDone) next.delete(group.name); else next.add(group.name);
+                            setDoneCollections(next);
+                          }}
+                        >
+                          <Check className="w-3 h-3" />
+                          {isDone ? "Done" : "Mark done"}
+                        </Button>
+                      </div>
+                    </header>
+                    {!isDone && (
+                      <div className="divide-y divide-border/50">
+                        {group.items.map(p => renderReviewRow(p))}
+                      </div>
+                    )}
+                    {isDone && (
+                      <div className="px-3 py-2 text-[10px] text-muted-foreground italic bg-success/5">
+                        Collection collapsed — click "Done" again to re-open.
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          )
         ) : (
           /* ── Flat Row View ── */
           currentList.length === 0 ? (
@@ -1488,46 +1588,7 @@ export default function PostParseReviewScreen({
             </div>
           ) : (
             <div className="divide-y divide-border/50">
-              {currentList.map(p => (
-                <ReviewRow
-                  key={p._rowIndex}
-                  product={p as ReviewProduct}
-                  tab={activeTab}
-                  isEditing={editingRow === p._rowIndex}
-                  isSelected={selectedRows.has(p._rowIndex)}
-                  onToggleSelect={() => toggleSelectRow(p._rowIndex)}
-                  onStartEdit={() => setEditingRow(p._rowIndex)}
-                  onStopEdit={() => {
-                    const pendingForRow = pendingFieldsForRow(p._rowIndex);
-                    if (pendingForRow.length > 0) {
-                      // Surface the row-level reason picker; row stays in edit mode.
-                      setAwaitingReasonRows(prev => new Set(prev).add(p._rowIndex));
-                    } else {
-                      setEditingRow(null);
-                    }
-                  }}
-                  onApprove={() => approveRow(p._rowIndex)}
-                  onReject={() => rejectRow(p._rowIndex)}
-                  onMoveToReview={() => moveToReview(p._rowIndex)}
-                  onRestore={() => restoreToReview(p._rowIndex)}
-                  onUpdateField={(field, value) => updateField(p._rowIndex, field, value)}
-                  pendingRowCorrections={pendingFieldsForRow(p._rowIndex)}
-                  savedReasonFields={new Set(Object.keys(savedReasonFlash).filter(k => k.startsWith(`${p._rowIndex}::`)).map(k => k.split("::")[1]))}
-                  awaitingRowReason={awaitingReasonRows.has(p._rowIndex)}
-                  onConfirmRowReason={(reason, detail) => confirmRowReason(p._rowIndex, reason, detail)}
-                  onSkipRowReason={() => skipRowReason(p._rowIndex)}
-                  onMarkAs={(markAs) => markRowAs(p._rowIndex, markAs)}
-                  onSplit={() => splitRow(p._rowIndex)}
-                  showTeachAI={showTeachAI === p._rowIndex}
-                  onToggleTeachAI={() => setShowTeachAI(showTeachAI === p._rowIndex ? null : p._rowIndex)}
-                  supplierName={supplierName}
-                  parsingPlan={debug.parsingPlan}
-                  invoicePages={invoicePages}
-                  onShowSourceTrace={(prod) => setSourceTraceProduct(prod)}
-                  lowConfFields={lowConfFields}
-                  qtyHeaderWarning={lookupQtyWarning(p as ReviewProduct)}
-                />
-              ))}
+              {currentList.map(p => renderReviewRow(p as ReviewProduct))}
             </div>
           )
         )}

@@ -417,13 +417,20 @@ export function generateShopifyCSV(
   for (const prod of grouped) {
     prod.variants.forEach((v, vi) => {
       const isFirstRow = vi === 0;
+      const isFirstRow = vIdx === 0;
+      // Merge collection names into Tags so Shopify smart collections (which
+      // typically match on tag = "Collection Name") auto-include the product.
+      // This replaces the old non-standard "Collection" column that broke imports.
+      const tagsWithCollections = isFirstRow
+        ? mergeTagsAndCollections(prod.tags, prod.collections)
+        : "";
       const row: Record<string, string> = {
         Handle: prod.handle,
         Title: isFirstRow ? prod.title : "",
         "Body (HTML)": isFirstRow ? prod.bodyHtml : "",
         Vendor: isFirstRow ? prod.vendor : "",
         Type: isFirstRow ? prod.type : "",
-        Tags: isFirstRow ? prod.tags : "",
+        Tags: tagsWithCollections,
         Published: isFirstRow ? "TRUE" : "",
         "Option1 Name": v.option1Name,
         "Option1 Value": v.option1Value,

@@ -1176,10 +1176,10 @@ const ToolsScreen = () => {
           ))}
         </div>
         <div className="flex items-center gap-2 mt-4">
-          <input type="checkbox" id="save-all" className="w-4 h-4 rounded border-border" />
+          <input type="checkbox" id="save-all" checked={saveForAll} onChange={(e) => setSaveForAll(e.target.checked)} className="w-4 h-4 rounded border-border" />
           <label htmlFor="save-all" className="text-sm text-muted-foreground">Save for all future invoices from this supplier</label>
         </div>
-        <Button variant="teal" className="w-full mt-6 h-12 text-base">Save instructions</Button>
+        <Button variant="teal" className="w-full mt-6 h-12 text-base" onClick={handleSaveInstructions}>Save instructions</Button>
       </div>
     );
   }

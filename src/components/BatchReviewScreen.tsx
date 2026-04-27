@@ -165,6 +165,8 @@ const BulkBar = ({
 const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
   const config = getStoreConfig();
   const sym = config.currencySymbol || "$";
+  const confirmDialog = useConfirmDialog();
+  const promptDialog = usePromptDialog();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showPipeline, setShowPipeline] = useState(false);
@@ -235,16 +237,24 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
     onSetProducts(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
   }, [onSetProducts]);
 
-  const promptBulk = (label: string, field: string) => {
-    const val = prompt(`Enter ${label} for ${selected.size} items:`);
+  const promptBulk = async (label: string, field: string) => {
+    const val = await promptDialog({
+      title: `Set ${label}`,
+      label: `${label} for ${selected.size} items`,
+      placeholder: `New ${label.toLowerCase()}`,
+    });
     if (val === null) return;
     onSetProducts(prev => prev.map(p => selected.has(p.id) ? { ...p, [field]: val } : p));
     toast.success(`Set ${label} for ${selected.size} items`);
     setSelected(new Set());
   };
 
-  const bulkAddTag = () => {
-    const tag = prompt("Enter tag to add:");
+  const bulkAddTag = async () => {
+    const tag = await promptDialog({
+      title: "Add tag",
+      label: `Tag to add to ${selected.size} items`,
+      placeholder: "e.g. summer-2026",
+    });
     if (!tag) return;
     onSetProducts(prev => prev.map(p => {
       if (!selected.has(p.id)) return p;
@@ -256,8 +266,14 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
     setSelected(new Set());
   };
 
-  const bulkDelete = () => {
-    if (!confirm(`Delete ${selected.size} items?`)) return;
+  const bulkDelete = async () => {
+    const ok = await confirmDialog({
+      title: `Delete ${selected.size} items?`,
+      description: "These products will be removed from this batch. You can re-scan to add them back.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     onSetProducts(prev => prev.filter(p => !selected.has(p.id)));
     toast.success(`Deleted ${selected.size} items`);
     setSelected(new Set());

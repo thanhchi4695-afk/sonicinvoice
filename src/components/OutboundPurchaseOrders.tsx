@@ -209,7 +209,7 @@ export default function OutboundPurchaseOrders({ onBack }: Props) {
       .eq("id", po.id);
     if (error) return toast.error(error.message);
     toast.success(`Archived ${po.po_number}`);
-    addAuditEntry({ action: "po_archive", entity: "purchase_order", entityId: po.id, details: { po_number: po.po_number } });
+    addAuditEntry("po_archive", `Archived ${po.po_number}`);
     loadPOs();
   };
 
@@ -544,7 +544,7 @@ function EditView({ po, onBack, onReceive }: { po: PO; onBack: () => void; onRec
         const { error } = await supabase.from("purchase_order_lines").insert(lineRows);
         if (error) throw error;
       }
-      addAuditEntry({ action: newStatus === "sent" ? "po_sent" : "po_save", entity: "purchase_order", entityId: poId, details: { lines: lines.length, total: grandTotal } });
+      addAuditEntry(newStatus === "sent" ? "po_sent" : "po_save", `PO ${form.po_number || "new"} — ${lines.length} lines, total ${fmtCurrency(grandTotal)}`);
       toast.success(newStatus === "sent" ? "Saved & sent" : "Saved");
       return poId;
     } catch (e: any) {
@@ -937,7 +937,7 @@ function ReceiveView({ po, onBack }: { po: PO; onBack: () => void }) {
       const newStatus: POStatus = allReceived ? "received" : anyReceived ? "partial" : po.status;
       await supabase.from("purchase_orders").update({ status: newStatus }).eq("id", po.id);
 
-      addAuditEntry({ action: "po_receive", entity: "purchase_order", entityId: po.id, details: { lines: receiptLines.length, status: newStatus } });
+      addAuditEntry("po_receive", `Received ${receiptLines.length} line(s) on ${po.po_number} — status ${newStatus}`);
       if (pushErrors.length) toast.warning(`Receipt saved. Some Shopify pushes failed: ${pushErrors.length}`);
       else toast.success(`Received — status now ${newStatus}`);
       onBack();

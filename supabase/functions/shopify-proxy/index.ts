@@ -278,6 +278,30 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "set_inventory": {
+        if (!body.location_id || !body.inventory_item_id) {
+          return new Response(JSON.stringify({ error: "Missing inventory parameters" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const resp = await shopifyFetch("/inventory_levels/set.json", {
+          method: "POST",
+          body: JSON.stringify({
+            location_id: body.location_id,
+            inventory_item_id: body.inventory_item_id,
+            available: typeof body.available === "number" ? body.available : 0,
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to set inventory", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { inventory_level: data.inventory_level };
+        break;
+      }
+
       case "update_seo": {
         if (!body.product_id) {
           return new Response(JSON.stringify({ error: "Missing product ID" }), {

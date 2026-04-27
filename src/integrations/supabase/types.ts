@@ -2904,6 +2904,42 @@ export type Database = {
         }
         Relationships: []
       }
+      shopify_locations: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          is_primary: boolean
+          location_id: string
+          location_name: string
+          shop_domain: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          location_id: string
+          location_name: string
+          shop_domain?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          location_id?: string
+          location_name?: string
+          shop_domain?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       shopify_login_tokens: {
         Row: {
           access_token: string

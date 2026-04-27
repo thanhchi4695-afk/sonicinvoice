@@ -39,6 +39,8 @@ import { addAuditEntry } from "@/lib/audit-log";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format, subDays } from "date-fns";
+import LocationFilter from "@/components/LocationFilter";
+import { useShopifyLocations } from "@/hooks/use-shopify-locations";
 
 interface Row {
   variantId: string;
@@ -178,6 +180,9 @@ const LowStockReport = () => {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+
+  // Global Shopify location filter (shared with Inventory + Stock on Hand)
+  const { selected: globalLocSelected, selectedLocation: globalLocObj } = useShopifyLocations();
 
   // filters
   const [locationFilter, setLocationFilter] = useState<string>("all");
@@ -340,6 +345,9 @@ const LowStockReport = () => {
 
   const filtered = useMemo(() => {
     let list = rows;
+    // Global location filter (Shopify-wide) takes precedence
+    if (globalLocSelected !== "all" && globalLocObj)
+      list = list.filter((r) => r.location === globalLocObj.name);
     if (locationFilter !== "all")
       list = list.filter((r) => r.location === locationFilter);
     if (vendorFilter.length > 0)
@@ -373,7 +381,7 @@ const LowStockReport = () => {
       return sortAsc ? cmp : -cmp;
     });
     return sorted;
-  }, [rows, locationFilter, vendorFilter, flagFilter, maxDays, zeroOnly, sortKey, sortAsc]);
+  }, [rows, locationFilter, vendorFilter, flagFilter, maxDays, zeroOnly, sortKey, sortAsc, globalLocSelected, globalLocObj]);
 
   const kpis = useMemo(() => {
     let critical = 0;
@@ -422,6 +430,7 @@ const LowStockReport = () => {
             : "No data yet"}
         </div>
         <div className="flex items-center gap-2">
+          <LocationFilter showLabel={false} size="sm" />
           <Button
             size="sm"
             variant="outline"

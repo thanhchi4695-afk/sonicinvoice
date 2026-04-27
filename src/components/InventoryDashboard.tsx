@@ -14,6 +14,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import LocationFilter from "@/components/LocationFilter";
+import { useShopifyLocations } from "@/hooks/use-shopify-locations";
 
 /* ─── Types ─── */
 
@@ -28,7 +30,10 @@ interface ProductVariant {
   size: string | null;
   cost: number;
   retailPrice: number;
+  /** Quantity for the currently selected location (or sum across all locations). */
   quantity: number;
+  /** Per-location breakdown: location name → qty (only includes locations with inventory rows). */
+  byLocation: Record<string, number>;
 }
 
 interface InventoryLocation {
@@ -60,6 +65,7 @@ export default function InventoryDashboard({ onBack }: Props) {
   const [data, setData] = useState<DashboardData>({ variants: [], locations: [] });
   const [tab, setTab] = useState("overview");
   const [highlightedSku, setHighlightedSku] = useState<string | null>(null);
+  const { selected: selectedLocation, selectedLocation: selectedLocationObj } = useShopifyLocations();
 
   // Global barcode scanner integration
   const { registerHandler } = useBarcode();
@@ -95,8 +101,20 @@ export default function InventoryDashboard({ onBack }: Props) {
 
       const productMap = new Map((productsRaw || []).map(p => [p.id, p]));
 
+      // Build per-variant location → qty breakdown.
+      const byVariantLocation = new Map<string, Record<string, number>>();
+      (inventoryRaw || []).forEach(i => {
+        const m = byVariantLocation.get(i.variant_id) || {};
+        m[i.location] = (m[i.location] || 0) + (i.quantity || 0);
+        byVariantLocation.set(i.variant_id, m);
+      });
+
       const variants: ProductVariant[] = (variantsRaw || []).map(v => {
         const prod = productMap.get(v.product_id);
+        const byLocation = byVariantLocation.get(v.id) || {};
+        // If we have inventory rows, use them; otherwise fall back to variants.quantity
+        const sumFromInventory = Object.values(byLocation).reduce((a, b) => a + b, 0);
+        const baseQty = Object.keys(byLocation).length > 0 ? sumFromInventory : (v.quantity || 0);
         return {
           variantId: v.id,
           productId: v.product_id,
@@ -108,7 +126,8 @@ export default function InventoryDashboard({ onBack }: Props) {
           size: v.size,
           cost: Number(v.cost) || 0,
           retailPrice: Number(v.retail_price) || 0,
-          quantity: v.quantity || 0,
+          quantity: baseQty,
+          byLocation,
         };
       });
 
@@ -128,6 +147,26 @@ export default function InventoryDashboard({ onBack }: Props) {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Apply the global location filter. When "all" is selected we keep the
+  // variant's full quantity; when a specific location is picked we replace
+  // `quantity` with that location's qty (defaulting to 0).
+  const viewVariants = useMemo<ProductVariant[]>(() => {
+    if (selectedLocation === "all" || !selectedLocationObj) return data.variants;
+    const locName = selectedLocationObj.name;
+    return data.variants.map(v => ({
+      ...v,
+      quantity: v.byLocation[locName] ?? 0,
+    }));
+  }, [data.variants, selectedLocation, selectedLocationObj]);
+
+  const viewData = useMemo<DashboardData>(() => ({
+    variants: viewVariants,
+    locations:
+      selectedLocation === "all" || !selectedLocationObj
+        ? data.locations
+        : data.locations.filter(l => l.location === selectedLocationObj.name),
+  }), [viewVariants, data.locations, selectedLocation, selectedLocationObj]);
+
   /* ─── Computed stats ─── */
   // ── Bug fix: Cost / Retail / Margin must be derived from the SAME variant set,
   // otherwise we get nonsense like "Retail < Cost with positive margin" when
@@ -135,7 +174,7 @@ export default function InventoryDashboard({ onBack }: Props) {
   // "priced" subset (cost > 0 AND retailPrice > 0) for retail & margin, and
   // expose the underlying counts so the UI can flag missing data.
   const stats = useMemo(() => {
-    const { variants } = data;
+    const variants = viewData.variants;
     const totalUnits = variants.reduce((s, v) => s + v.quantity, 0);
     const totalValueAtCost = variants.reduce((s, v) => s + v.quantity * v.cost, 0);
     const uniqueProducts = new Set(variants.map(v => v.productId)).size;
@@ -160,44 +199,38 @@ export default function InventoryDashboard({ onBack }: Props) {
       avgMargin, variantCount: variants.length,
       missingRetailCount,
       pricedCount: priced.length,
-      // Cost value of the SAME priced subset that retail+margin are computed over,
-      // so users can see apples-to-apples next to the totals.
       totalValueAtCostPriced,
     };
-  }, [data]);
+  }, [viewData]);
 
-  // Best sellers = highest quantity (proxy for popular items stocked heavily)
-  // Slow movers = lowest quantity > 0 with high cost (capital tied up)
   const bestSellers = useMemo(() => {
-    return [...data.variants]
+    return [...viewData.variants]
       .filter(v => v.quantity > 0)
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 10);
-  }, [data.variants]);
+  }, [viewData.variants]);
 
   const slowMovers = useMemo(() => {
-    return [...data.variants]
+    return [...viewData.variants]
       .filter(v => v.quantity > 0)
       .sort((a, b) => {
-        // Sort by days-of-stock value (quantity * cost) ascending — least capital efficiency
         const aVal = a.quantity * a.cost;
         const bVal = b.quantity * b.cost;
-        // Highest value with lowest quantity ratio = slow mover
         return (a.quantity > 0 ? aVal / a.quantity : 0) - (b.quantity > 0 ? bVal / b.quantity : 0);
       })
       .sort((a, b) => a.quantity - b.quantity)
       .slice(0, 10);
-  }, [data.variants]);
+  }, [viewData.variants]);
 
   const lowStockItems = useMemo(() => {
-    return [...data.variants]
+    return [...viewData.variants]
       .filter(v => v.quantity > 0 && v.quantity <= 3)
       .sort((a, b) => a.quantity - b.quantity);
-  }, [data.variants]);
+  }, [viewData.variants]);
 
   const outOfStockItems = useMemo(() => {
-    return data.variants.filter(v => v.quantity <= 0);
-  }, [data.variants]);
+    return viewData.variants.filter(v => v.quantity <= 0);
+  }, [viewData.variants]);
 
   // Stock by location
   const locationSummary = useMemo(() => {
@@ -219,10 +252,10 @@ export default function InventoryDashboard({ onBack }: Props) {
       .sort((a, b) => b.units - a.units);
   }, [data]);
 
-  // Top vendors by inventory value
+  // Top vendors by inventory value (respects location filter)
   const vendorBreakdown = useMemo(() => {
     const map = new Map<string, { units: number; value: number; count: number }>();
-    for (const v of data.variants) {
+    for (const v of viewData.variants) {
       const vendor = v.vendor || "Unknown";
       const existing = map.get(vendor) || { units: 0, value: 0, count: 0 };
       existing.units += v.quantity;
@@ -234,7 +267,7 @@ export default function InventoryDashboard({ onBack }: Props) {
       .map(([vendor, d]) => ({ vendor, ...d }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
-  }, [data.variants]);
+  }, [viewData.variants]);
 
   if (loading) {
     return (
@@ -278,16 +311,22 @@ export default function InventoryDashboard({ onBack }: Props) {
   return (
     <div className="px-4 pt-4 pb-24 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
         <button onClick={onBack} className="text-muted-foreground">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-[200px]">
           <h2 className="text-lg font-semibold font-display flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" /> Inventory Dashboard
           </h2>
-          <p className="text-xs text-muted-foreground">Real-time inventory health overview</p>
+          <p className="text-xs text-muted-foreground">
+            Real-time inventory health overview
+            {selectedLocation !== "all" && selectedLocationObj && (
+              <span className="ml-1">· filtered to <span className="font-medium text-foreground">{selectedLocationObj.name}</span></span>
+            )}
+          </p>
         </div>
+        <LocationFilter showLabel={false} size="sm" />
         <BulkInventoryActions mode="inventory" onComplete={fetchData} />
         <Button variant="ghost" size="sm" onClick={fetchData}>
           <RefreshCw className="w-4 h-4" />
@@ -456,19 +495,31 @@ export default function InventoryDashboard({ onBack }: Props) {
           {/* ─── Products DataGrid ─── */}
           <TabsContent value="products">
             <DataGrid
-              data={data.variants}
-              storageKey="inv_products"
+              data={viewData.variants}
+              storageKey={`inv_products_${selectedLocation}`}
               enableSelection
               pageSize={50}
               exportFilename="inventory-products.csv"
               columns={[
-                { accessorKey: "sku", header: "SKU", size: 100, cell: ({ getValue, row }) => (
+                { accessorKey: "sku", header: "SKU", size: 100, cell: ({ getValue }) => (
                   <span className={cn("font-mono", highlightedSku && (getValue() as string)?.toLowerCase() === highlightedSku && "text-primary font-bold")}>{(getValue() as string) || "—"}</span>
                 )},
                 { accessorKey: "productTitle", header: "Product", size: 200, cell: ({ getValue }) => <span className="font-medium truncate block max-w-[200px]">{getValue() as string}</span> },
                 { accessorKey: "color", header: "Color", size: 70 },
                 { accessorKey: "size", header: "Size", size: 60 },
-                { accessorKey: "quantity", header: "On Hand", size: 70, cell: ({ getValue }) => <span className={cn("font-mono font-medium", (getValue() as number) === 0 && "text-destructive")}>{getValue() as number}</span> },
+                { accessorKey: "quantity", header: selectedLocation === "all" ? "On Hand (All)" : "On Hand", size: 90, cell: ({ getValue }) => <span className={cn("font-mono font-medium", (getValue() as number) === 0 && "text-destructive")}>{getValue() as number}</span> },
+                ...(selectedLocation === "all" ? [{
+                  id: "locationBreakdown",
+                  header: "Location breakdown",
+                  size: 220,
+                  accessorFn: (r: ProductVariant) =>
+                    Object.entries(r.byLocation)
+                      .map(([loc, q]) => `${loc}: ${q}`)
+                      .join(" / ") || "—",
+                  cell: ({ getValue }: { getValue: () => unknown }) => (
+                    <span className="text-[11px] text-muted-foreground">{(getValue() as string) || "—"}</span>
+                  ),
+                }] : []),
                 { accessorKey: "cost", header: "Cost", size: 70, cell: ({ getValue }) => `$${(getValue() as number).toFixed(2)}` },
                 { accessorKey: "retailPrice", header: "Retail", size: 70, cell: ({ getValue }) => `$${(getValue() as number).toFixed(2)}` },
                 { id: "margin", header: "Margin", size: 70, accessorFn: (r) => r.cost > 0 && r.retailPrice > 0 ? ((r.retailPrice - r.cost) / r.retailPrice) * 100 : -1, cell: ({ getValue }) => { const m = getValue() as number; return m >= 0 ? <Badge variant={m >= 50 ? "default" : m >= 30 ? "secondary" : "destructive"} className="text-[10px]">{m.toFixed(0)}%</Badge> : "—"; }},

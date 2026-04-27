@@ -212,6 +212,36 @@ const HistoryScreen = () => {
     }
   };
 
+  const handleReExport = (inv: InvoiceHistoryRow) => {
+    const match = exports.find((e) => e.supplier.toLowerCase() === inv.supplier_name.toLowerCase());
+    if (!match) {
+      toast.error("No export found", { description: "Run this invoice through the export step first." });
+      return;
+    }
+    toast.info("Re-export queued", {
+      description: `Open ${match.supplier} from the Invoices tab and re-run export to get the latest CSV.`,
+    });
+  };
+
+  const handleDownloadOriginal = async (inv: InvoiceHistoryRow) => {
+    if (!inv.original_file_path) {
+      toast.error("Original file not available");
+      return;
+    }
+    try {
+      const { data, error } = await supabase.storage
+        .from("invoices")
+        .createSignedUrl(inv.original_file_path, 60);
+      if (error || !data?.signedUrl) {
+        toast.error("Download failed", { description: error?.message || "Could not generate download link." });
+        return;
+      }
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } catch (err: any) {
+      toast.error("Download failed", { description: err?.message || "Please try again." });
+    }
+  };
+
   return (
     <TooltipProvider delayDuration={150}>
       <div className="px-4 pt-6 pb-24 animate-fade-in">

@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, Unplug, ExternalLink, Store, Barcode } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { getConnection } from "@/lib/shopify-api";
 import { toast } from "sonner";
 
 const LS_DOMAIN_PREFIX_KEY = "ls_domain_prefix";
@@ -209,11 +208,19 @@ export default function POSConnectionPanel() {
   const loadConnections = async () => {
     setLoading(true);
     try {
-      // Check Shopify connection (existing table)
-      const shopifyConn = await getConnection();
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: shopifyConn } = user ? await supabase
+        .from("platform_connections")
+        .select("shop_domain")
+        .eq("user_id", user.id)
+        .eq("platform", "shopify")
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle() : { data: null };
       if (shopifyConn) {
         setShopifyConnected(true);
-        setShopifyDomain(shopifyConn.store_url);
+        setShopifyDomain(shopifyConn.shop_domain || "");
         // Auto-enable for stock check
         if (stockCheckPrefs.shopify === undefined) {
           const updated = { ...stockCheckPrefs, shopify: true };
@@ -236,8 +243,7 @@ export default function POSConnectionPanel() {
 
   const handleConnect = async (platform: string) => {
     if (platform === "shopify") {
-      // Shopify connection is handled in Account Settings
-      toast.info("Use the Shopify Connection section above to connect your store.");
+      toast.info("Use the Platform connections card above to connect your store.");
       return;
     }
 
@@ -308,7 +314,7 @@ export default function POSConnectionPanel() {
 
   const handleDisconnect = async (platform: string) => {
     if (platform === "shopify") {
-      toast.info("Disconnect Shopify from the Shopify Connection section above.");
+      toast.info("Disconnect Shopify from the Platform connections card above.");
       return;
     }
     try {

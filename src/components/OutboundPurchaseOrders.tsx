@@ -6,6 +6,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Plus, Trash2, Search, FileText, Send, ChevronLeft, Eye, Sparkles, Archive,
   Copy as CopyIcon, ArrowDownToLine, Settings as SettingsIcon, Loader2,
 } from "lucide-react";
@@ -126,6 +129,52 @@ export default function OutboundPurchaseOrders({ onBack }: Props) {
   useEffect(() => {
     loadPOs();
   }, [loadPOs]);
+
+  // Honor a "restock_po_seed" handoff from RestockSuggestionsPanel
+  useEffect(() => {
+    if (view !== "list") return;
+    try {
+      const raw = sessionStorage.getItem("restock_po_seed");
+      if (!raw) return;
+      const seed = JSON.parse(raw);
+      if (!seed?.lines?.length) return;
+      sessionStorage.removeItem("restock_po_seed");
+      const today = new Date().toISOString().slice(0, 10);
+      setActivePO({
+        id: "",
+        po_number: "",
+        supplier_id: null,
+        supplier_name: seed.vendor || "",
+        supplier_email: "",
+        ship_to_location: LOCATIONS[0],
+        po_date: today,
+        expected_date: "",
+        invoice_number: "",
+        notes_supplier: "",
+        notes_internal: `Seeded from Restock Suggestions on ${today}`,
+        status: "draft",
+        subtotal: 0, shipping: 0, tax: 0, grand_total: 0, total_cost: 0,
+        created_at: "", sent_at: null, archived_at: null,
+        lines: seed.lines.map((l: any) => ({
+          id: crypto.randomUUID(),
+          product_title: l.product_title || "",
+          variant_title: l.variant_title ?? null,
+          sku: l.sku ?? null,
+          barcode: l.barcode ?? null,
+          shopify_product_id: l.shopify_product_id ?? null,
+          shopify_variant_id: l.shopify_variant_id ?? null,
+          cost_price: Number(l.cost_price ?? 0),
+          qty_ordered: Number(l.qty_ordered ?? 0),
+          qty_received: 0,
+          current_stock: Number(l.current_stock ?? 0),
+        })),
+      });
+      setView("edit");
+      toast.success(`Loaded ${seed.lines.length} restock line${seed.lines.length === 1 ? "" : "s"} for ${seed.vendor || "vendor"}`);
+    } catch {
+      /* ignore malformed seeds */
+    }
+  }, [view]);
 
   const filteredPOs = useMemo(() => {
     return pos.filter(p => {
@@ -462,31 +511,53 @@ function EditView({ po, onBack, onReceive }: { po: PO; onBack: () => void; onRec
     setSearch("");
   };
 
+  const [suggestionMeta, setSuggestionMeta] = useState<Record<string, string>>({});
+
   const suggestQuantities = async () => {
     if (!lines.length) return toast.info("Add products first, then suggest quantities");
-    const leadTime = settings.default_lead_time_days || 14;
-    // Get last 30d sales by SKU
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
     const skus = lines.map(l => l.sku).filter(Boolean) as string[];
     if (!skus.length) return toast.info("Lines need SKUs to forecast");
-    const { data: sales } = await (supabase as any)
+
+    // Per-supplier lead/restock from supplier_profiles.profile_data
+    let leadDays = settings.default_lead_time_days || 14;
+    let restockDays = 28;
+    if (form.supplier_name) {
+      const { data: prof } = await supabase
+        .from("supplier_profiles")
+        .select("profile_data")
+        .ilike("supplier_name", form.supplier_name)
+        .maybeSingle();
+      const pd = (prof?.profile_data || {}) as Record<string, any>;
+      if (Number(pd.lead_time_days) > 0) leadDays = Number(pd.lead_time_days);
+      if (Number(pd.restock_period_days) > 0) restockDays = Number(pd.restock_period_days);
+    }
+
+    // Sales last 30d by SKU (via variants join)
+    const { data: sales } = await supabase
       .from("sales_data")
-      .select("sku, quantity")
-      .in("sku", skus)
-      .gte("sold_at", since);
+      .select("quantity_sold, variants!inner(sku)")
+      .gte("sold_at", since)
+      .in("variants.sku", skus);
     const salesMap = new Map<string, number>();
     (sales || []).forEach((r: any) => {
-      salesMap.set(r.sku, (salesMap.get(r.sku) || 0) + Number(r.quantity || 0));
+      const sku = r.variants?.sku;
+      if (!sku) return;
+      salesMap.set(sku, (salesMap.get(sku) || 0) + Number(r.quantity_sold || 0));
     });
+
+    const meta: Record<string, string> = {};
     setLines(prev => prev.map(l => {
       if (!l.sku) return l;
       const sold = salesMap.get(l.sku) || 0;
       const perDay = sold / 30;
       const current = l.current_stock || 0;
-      const suggested = Math.max(0, Math.ceil(perDay * leadTime - current));
+      const suggested = Math.max(0, Math.ceil(perDay * (leadDays + restockDays) - current));
+      meta[l.id] = `Suggested ${suggested} = ceil(${perDay.toFixed(2)}/day × (${leadDays}+${restockDays} days) − ${current} available)`;
       return { ...l, qty_ordered: suggested };
     }));
-    toast.success("Suggested quantities filled in");
+    setSuggestionMeta(meta);
+    toast.success(`Suggested quantities filled (lead ${leadDays}d + restock ${restockDays}d)`);
   };
 
   const save = async (newStatus?: POStatus): Promise<string | null> => {
@@ -719,9 +790,22 @@ function EditView({ po, onBack, onReceive }: { po: PO; onBack: () => void; onRec
                       onChange={e => updateLine(l.id, { cost_price: Number(e.target.value) })} />
                   </td>
                   <td className="py-1 text-right">
-                    <Input type="number" className="w-20 h-8 text-right ml-auto"
-                      value={l.qty_ordered}
-                      onChange={e => updateLine(l.id, { qty_ordered: Number(e.target.value) })} />
+                    {suggestionMeta[l.id] ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Input type="number" className="w-20 h-8 text-right ml-auto"
+                              value={l.qty_ordered}
+                              onChange={e => updateLine(l.id, { qty_ordered: Number(e.target.value) })} />
+                          </TooltipTrigger>
+                          <TooltipContent><span className="text-xs">{suggestionMeta[l.id]}</span></TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <Input type="number" className="w-20 h-8 text-right ml-auto"
+                        value={l.qty_ordered}
+                        onChange={e => updateLine(l.id, { qty_ordered: Number(e.target.value) })} />
+                    )}
                   </td>
                   <td className="py-1 text-right">{fmtCurrency(l.cost_price * l.qty_ordered)}</td>
                   <td className="py-1 text-right">

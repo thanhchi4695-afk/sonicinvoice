@@ -347,9 +347,9 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
         </section>
 
         <section>
-          <h2 className="text-xl font-semibold mb-3">Link Orders from JOOR, Faire &amp; NuOrder to Shopify</h2>
+          <h2 className="text-xl font-semibold mb-3">Connect Your Retail Back Office</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Connect to the wholesale platforms your suppliers use: JOOR (live API), Faire, NuOrder, Brandscope, and Brandboom. Pull orders directly from any platform and push products to Shopify in one click with intelligent column mapping. No more switching between tabs to copy product data.
+            Sonic Invoices connects to Shopify for direct inventory push, Lightspeed for CSV export, and Xero or MYOB for accounting workflows. Keep product, stock, and invoice data moving without copy-pasting between systems.
           </p>
         </section>
 

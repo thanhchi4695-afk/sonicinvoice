@@ -157,7 +157,13 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
 
   async function disconnect() {
     if (!conn) return;
-    if (!confirm("Disconnect Gmail? Sonic will stop monitoring this inbox.")) return;
+    const ok = await confirmDialog({
+      title: "Disconnect Gmail?",
+      description: "Sonic will stop monitoring this inbox for new supplier invoices. You can reconnect at any time.",
+      confirmLabel: "Disconnect",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase
       .from("gmail_connections")
       .delete()

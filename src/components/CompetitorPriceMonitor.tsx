@@ -297,7 +297,12 @@ export default function CompetitorPriceMonitor({ onBack }: { onBack: () => void 
     if (product.product_id) {
       const { data: variant } = await supabase.from("variants").select("cost").eq("product_id", product.product_id).maybeSingle();
       if (variant?.cost && newPrice < variant.cost) {
-        const proceed = confirm(`⚠️ Warning: New price $${newPrice.toFixed(2)} is below cost $${variant.cost.toFixed(2)}. Proceed anyway?`);
+        const proceed = await confirmDialog({
+          title: "Price below cost",
+          description: `New price $${newPrice.toFixed(2)} is below cost $${variant.cost.toFixed(2)}. You'll lose money on every sale. Proceed anyway?`,
+          confirmLabel: "Proceed anyway",
+          destructive: true,
+        });
         if (!proceed) { setUpdatingPrice(false); return; }
       }
     }

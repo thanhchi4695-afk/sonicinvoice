@@ -359,9 +359,13 @@ const CustomInstructionsField = ({
     toast.success(`Loaded "${p.name}"`, { description: "AI will follow these rules for this invoice." });
   };
 
-  const saveCurrentAsPreset = () => {
+  const saveCurrentAsPreset = async () => {
     if (!value.trim()) { toast.error("Write some instructions first"); return; }
-    const name = window.prompt("Name this logic preset:", supplierName || "My custom logic");
+    const name = await promptDialog({
+      title: "Name this logic preset",
+      label: "Preset name",
+      defaultValue: supplierName || "My custom logic",
+    });
     if (!name) return;
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
     saveUserPreset({

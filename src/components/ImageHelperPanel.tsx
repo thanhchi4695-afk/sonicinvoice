@@ -301,10 +301,17 @@ export default function ImageHelperPanel({ onBack, products: overrideProducts, s
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const openAllTabs = () => {
+  const openAllTabs = async () => {
     const urls = withImage.map((p) => p.imageSrc || (p.imageUrls && p.imageUrls[0]) || "").filter(Boolean);
     if (urls.length === 0) return;
-    if (urls.length > 20 && !confirm(`Open ${urls.length} tabs? Your browser may block this.`)) return;
+    if (urls.length > 20) {
+      const ok = await confirmDialog({
+        title: `Open ${urls.length} tabs?`,
+        description: "Your browser may block this many pop-ups. Continue anyway?",
+        confirmLabel: "Open all",
+      });
+      if (!ok) return;
+    }
     urls.forEach((url) => window.open(url, "_blank"));
   };
 

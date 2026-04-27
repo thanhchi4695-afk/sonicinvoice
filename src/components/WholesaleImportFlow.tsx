@@ -688,10 +688,13 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
           </Button>
           <Button
             variant="outline"
-            onClick={() => {
-              if (confirm(`Push ${activeOrder.lineItems.length} items from this order to Shopify?`)) {
-                pushToShopify([activeOrder]);
-              }
+            onClick={async () => {
+              const ok = await confirmDialog({
+                title: `Push ${activeOrder.lineItems.length} items to Shopify?`,
+                description: "Items from this order will be pushed as new products. Run a stock check first if you want to refill existing inventory instead.",
+                confirmLabel: "Push as new",
+              });
+              if (ok) pushToShopify([activeOrder]);
             }}
             disabled={pushing}
           >
@@ -838,11 +841,15 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
               }} disabled={pushing}>
                 <PackageCheck className="w-3 h-3 mr-1.5" /> Check stock & push
               </Button>
-              <Button size="sm" variant="outline" onClick={() => {
+              <Button size="sm" variant="outline" onClick={async () => {
                 const sel = orders.filter((o) => selectedOrders.has(o.orderId));
-                if (confirm(`Push ${sel.reduce((s, o) => s + o.lineItems.length, 0)} items as new to Shopify?`)) {
-                  pushToShopify(sel);
-                }
+                const total = sel.reduce((s, o) => s + o.lineItems.length, 0);
+                const ok = await confirmDialog({
+                  title: `Push ${total} items to Shopify?`,
+                  description: `${sel.length} order(s) will be pushed as new products.`,
+                  confirmLabel: "Push as new",
+                });
+                if (ok) pushToShopify(sel);
               }} disabled={pushing}>
                 <Upload className="w-3 h-3 mr-1.5" /> Push as new
               </Button>

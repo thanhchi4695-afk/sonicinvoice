@@ -200,8 +200,12 @@ const SupplierEmails = ({ onBack }: { onBack: () => void }) => {
     a.click();
   };
 
-  const handleSaveCustom = () => {
-    const name = prompt("Template name:");
+  const handleSaveCustom = async () => {
+    const name = await promptDialog({
+      title: "Save custom template",
+      label: "Template name",
+      placeholder: "e.g. Reorder follow-up",
+    });
     if (!name) return;
     const updated = [...customTemplates, { name, subject, body }];
     setCustomTemplates(updated);

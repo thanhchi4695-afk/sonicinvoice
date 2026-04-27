@@ -185,9 +185,11 @@ const HistoryScreen = () => {
       });
       return;
     }
-    const confirmed = window.confirm(
-      "Re-process this invoice using updated supplier rules? The original extraction will be replaced.",
-    );
+    const confirmed = await confirmDialog({
+      title: "Re-process this invoice?",
+      description: "Sonic will use your latest supplier rules to re-extract data. The original extraction will be replaced.",
+      confirmLabel: "Re-process",
+    });
     if (!confirmed) return;
 
     setReprocessingId(inv.id);

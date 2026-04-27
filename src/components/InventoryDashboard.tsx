@@ -12,10 +12,30 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import LocationFilter from "@/components/LocationFilter";
 import { useShopifyLocations } from "@/hooks/use-shopify-locations";
+import {
+  type RestockStatus,
+  RESTOCK_STATUS_LABEL,
+  RESTOCK_STATUS_EMOJI,
+  RESTOCK_STATUS_OPTIONS,
+  RESTOCK_STATUS_BADGE,
+  loadRestockOverrides,
+  buildSupplierDefaultMap,
+  resolveRestockStatus,
+} from "@/lib/restock-status";
+import RestockStatusCell, { setRestockBulk } from "@/components/RestockStatusCell";
+import { toast } from "sonner";
 
 /* ─── Types ─── */
 

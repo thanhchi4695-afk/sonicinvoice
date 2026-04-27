@@ -488,6 +488,41 @@ export default function PostParseReviewScreen({
     return list;
   }, [activeTab, accepted, needsReview, rejected, searchQuery, vendorFilter, confFilter, showEditedOnly, showCorrectedOnly]);
 
+  /** Group the current (already filtered) list by collection / story.
+   *  Preserves invoice order — the first collection seen is rendered first.
+   *  Items without a collection fall into an "Unassigned" bucket so the
+   *  merchant can drag a value in from the bulk-tag input.
+   *  Powers the "Group by Collection" view mode. */
+  const collectionGroups = useMemo(() => {
+    const order: string[] = [];
+    const buckets = new Map<string, ReviewProduct[]>();
+    for (const p of currentList as ReviewProduct[]) {
+      const key = (p.collection || "").trim() || UNASSIGNED_COLLECTION;
+      if (!buckets.has(key)) {
+        buckets.set(key, []);
+        order.push(key);
+      }
+      buckets.get(key)!.push(p);
+    }
+    return order.map(name => ({
+      name,
+      items: buckets.get(name)!,
+      totalUnits: buckets.get(name)!.reduce((s, i) => s + (i.qty || 0), 0),
+    }));
+  }, [currentList]);
+
+  /** All distinct collection names across the entire invoice (not just the
+   *  active tab) — feeds the bulk-tag dropdown so users can re-use existing
+   *  story labels with one click. */
+  const allCollectionNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of products) {
+      const v = (p.collection || "").trim();
+      if (v) set.add(v);
+    }
+    return Array.from(set).sort();
+  }, [products]);
+
   // ── Actions ──
   const approveRow = (rowIndex: number) => {
     const product = products.find(p => p._rowIndex === rowIndex);

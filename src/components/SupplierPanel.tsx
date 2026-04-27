@@ -13,6 +13,7 @@ import { isFuzzySupplierMatch } from "@/lib/invoice-persistence";
 import { normaliseVendor } from "@/lib/normalise-vendor";
 import { getCostHistory } from "@/components/InvoiceFlow";
 import SupplierCatalog from "@/components/SupplierCatalog";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 // ── Confidence helpers ─────────────────────────────────────
 const confidenceTone = (v: number) => {
@@ -91,6 +92,7 @@ const DEMO_SUPPLIERS: Omit<SupplierRow, "id" | "user_id" | "created_at" | "updat
 ];
 
 const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
+  const confirmDialog = useConfirmDialog();
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -511,7 +513,13 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
+    const ok = await confirmDialog({
+      title: `Delete ${name}?`,
+      description: "This permanently removes the supplier and disconnects associated history. This cannot be undone.",
+      confirmLabel: "Delete supplier",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from("suppliers").delete().eq("id", id);
     if (error) { toast.error("Failed to delete"); return; }
     toast.success(`${name} deleted`);

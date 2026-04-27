@@ -379,14 +379,21 @@ const CollabSEOFlow = ({ onBack }: CollabSEOFlowProps) => {
                     {s.name}
                   </button>
                 ))}
-                <button onClick={() => {}} className="px-3 py-1.5 rounded-full border border-border text-xs font-medium text-muted-foreground">
+                <button
+                  onClick={() => {
+                    const el = document.getElementById("collab-add-partner-form");
+                    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    el?.querySelector<HTMLInputElement>("input")?.focus();
+                  }}
+                  className="px-3 py-1.5 rounded-full border border-border text-xs font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
+                >
                   + Add your own
                 </button>
               </div>
             )}
 
             {/* Add form */}
-            <div className="bg-card rounded-lg border border-border p-3 space-y-2">
+            <div id="collab-add-partner-form" className="bg-card rounded-lg border border-border p-3 space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Add partner</p>
               <Input placeholder="Business name" value={formName} onChange={e => setFormName(e.target.value)} className="h-9 text-sm" />
               <Input placeholder="Website URL (e.g. pinkhill.com.au)" value={formUrl} onChange={e => setFormUrl(e.target.value)} className="h-9 text-sm" />

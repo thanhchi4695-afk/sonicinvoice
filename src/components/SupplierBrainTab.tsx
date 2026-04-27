@@ -25,6 +25,7 @@ import {
   setContributeShared,
 } from "@/lib/universal-classifier";
 import SupplierWebsiteRRPPanel from "@/components/SupplierWebsiteRRPPanel";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface SupplierRow {
   id: string;
@@ -53,6 +54,7 @@ function confidenceTone(score: number) {
 }
 
 export default function SupplierBrainTab() {
+  const confirmDialog = useConfirmDialog();
   const [rows, setRows] = useState<SupplierRow[]>([]);
   const [shared, setShared] = useState<SharedRow[]>([]);
   const [contribute, setContribute] = useState(true);
@@ -213,7 +215,13 @@ export default function SupplierBrainTab() {
   }, [rows, shared]);
 
   const resetTemplate = async (row: SupplierRow) => {
-    if (!confirm(`Reset learned template for "${row.supplier_name}"? The next invoice will be re-learned from scratch.`)) return;
+    const ok = await confirmDialog({
+      title: `Reset learned template for "${row.supplier_name}"?`,
+      description: "The next invoice will be re-learned from scratch. Existing extracted data is unaffected.",
+      confirmLabel: "Reset template",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase
       .from("supplier_intelligence")
       .update({

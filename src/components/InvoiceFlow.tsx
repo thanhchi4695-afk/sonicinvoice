@@ -2428,6 +2428,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [aiParsingPlan, setAiParsingPlan] = useState<Record<string, unknown> | null>(null);
   const [aiRejectedRows, setAiRejectedRows] = useState<Array<{ raw_text: string; rejection_reason: string }>>([]);
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
+  const [stockCheckPromptDismissed, setStockCheckPromptDismissed] = useState(false);
   const [priceLookupActive, setPriceLookupActive] = useState(false);
   const [bulkPriceLookupActive, setBulkPriceLookupActive] = useState(false);
   const [priceMatchActive, setPriceMatchActive] = useState(false);
@@ -4692,27 +4693,34 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           )}
 
           {/* Stock check prompt */}
-          <div className="bg-card border border-primary/20 rounded-lg p-4 mb-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
-                <PackageCheck className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold">Before pushing to Shopify, check stock levels?</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  The stock check compares every item against your live Shopify catalog and classifies each as a refill, new colour, or new product — so you don't accidentally create duplicates.
-                </p>
-                <div className="flex gap-2 mt-3">
-                  <Button size="sm" variant="teal" onClick={() => setStockCheckItems(convertToStockCheckItems())}>
-                    <PackageCheck className="w-3.5 h-3.5 mr-1.5" /> Yes, check Shopify first
-                  </Button>
-                  <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => {}}>
-                    Skip — push as new products
-                  </Button>
+          {!stockCheckPromptDismissed && (
+            <div className="bg-card border border-primary/20 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                  <PackageCheck className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">Before pushing to Shopify, check stock levels?</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The stock check compares every item against your live Shopify catalog and classifies each as a refill, new colour, or new product — so you don't accidentally create duplicates.
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <Button size="sm" variant="teal" onClick={() => setStockCheckItems(convertToStockCheckItems())}>
+                      <PackageCheck className="w-3.5 h-3.5 mr-1.5" /> Yes, check Shopify first
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground"
+                      onClick={() => setStockCheckPromptDismissed(true)}
+                    >
+                      Skip — push as new products
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Price Lookup, Price Match & Collection SEO tools */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">

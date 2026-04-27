@@ -33,6 +33,7 @@ interface Props {
 }
 
 export default function SupplierCatalog({ supplierId, supplierName }: Props) {
+  const confirmDialog = useConfirmDialog();
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

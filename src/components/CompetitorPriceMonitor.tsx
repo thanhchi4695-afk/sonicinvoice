@@ -63,6 +63,7 @@ type MatchMethod = "match" | "beat_dollar" | "beat_percent";
 /* ─── Component ─── */
 
 export default function CompetitorPriceMonitor({ onBack }: { onBack: () => void }) {
+  const confirmDialog = useConfirmDialog();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [products, setProducts] = useState<MonitoredProduct[]>([]);

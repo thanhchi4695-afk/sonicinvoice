@@ -52,6 +52,7 @@ const PLATFORMS: {
 ];
 
 const WholesaleImportFlow = ({ onBack }: Props) => {
+  const confirmDialog = useConfirmDialog();
   const [screen, setScreen] = useState<Screen>("select");
   const [activePlatform, setActivePlatform] = useState<Platform | null>(null);
   const [connections, setConnections] = useState<Record<string, { label: string; lastSynced: string | null }>>({});

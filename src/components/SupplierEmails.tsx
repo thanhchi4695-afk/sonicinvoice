@@ -147,6 +147,7 @@ ${c.storeName}`,
 
 // ── Component ─────────────────────────────────────────────
 const SupplierEmails = ({ onBack }: { onBack: () => void }) => {
+  const promptDialog = usePromptDialog();
   const config = getStoreConfig();
   const storeName = config.name || "My Store";
   const storeCity = config.city || "";

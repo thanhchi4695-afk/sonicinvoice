@@ -119,6 +119,7 @@ const FILTER_TABS: { key: QualityBucket; label: string }[] = [
 ];
 
 const HistoryScreen = () => {
+  const confirmDialog = useConfirmDialog();
   const [invoices, setInvoices] = useState<InvoiceHistoryRow[]>([]);
   const [exports, setExports] = useState<ExportEntry[]>([]);
   const [loading, setLoading] = useState(true);

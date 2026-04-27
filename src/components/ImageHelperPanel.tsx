@@ -231,6 +231,7 @@ interface ImageHelperPanelProps {
 }
 
 export default function ImageHelperPanel({ onBack, products: overrideProducts, scopeLabel }: ImageHelperPanelProps) {
+  const confirmDialog = useConfirmDialog();
   const [copied, setCopied] = useState(false);
 
   const initial = (() => {

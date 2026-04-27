@@ -42,6 +42,7 @@ interface JoorOrder {
 type Step = "connect" | "orders" | "detail" | "file_import" | "file_review";
 
 const JoorFlow = ({ onBack }: JoorFlowProps) => {
+  const confirmDialog = useConfirmDialog();
   const [step, setStep] = useState<Step>("connect");
   const [connected, setConnected] = useState(false);
   const [tokenLabel, setTokenLabel] = useState("");

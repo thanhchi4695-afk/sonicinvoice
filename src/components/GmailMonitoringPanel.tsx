@@ -52,6 +52,7 @@ interface Props {
 }
 
 export default function GmailMonitoringPanel({ onRunComplete }: Props) {
+  const confirmDialog = useConfirmDialog();
   const [conn, setConn] = useState<GmailConnection | null>(null);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);

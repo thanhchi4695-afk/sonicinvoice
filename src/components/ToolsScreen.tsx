@@ -1067,6 +1067,7 @@ function LearningMemoryPanel({ onBack }: { onBack: () => void }) {
 }
 
 const ToolsScreen = () => {
+  const promptDialog = usePromptDialog();
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");
 

@@ -12,6 +12,8 @@ import { SmartNamingButton, runBulkSmartNaming } from "@/components/SmartNamingP
 import { SEOButton, runBulkSEO } from "@/components/SEOPanel";
 import { PricingButton, calculateBulkPrices } from "@/components/PricingStrategyPanel";
 import PublishAdsPipeline from "@/components/PublishAdsPipeline";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 import {
   validateForExport, generateShopifyCSV, inferCategory, generateHandles,
   type ScannedProductForExport,

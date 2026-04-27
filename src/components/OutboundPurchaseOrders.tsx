@@ -511,31 +511,53 @@ function EditView({ po, onBack, onReceive }: { po: PO; onBack: () => void; onRec
     setSearch("");
   };
 
+  const [suggestionMeta, setSuggestionMeta] = useState<Record<string, string>>({});
+
   const suggestQuantities = async () => {
     if (!lines.length) return toast.info("Add products first, then suggest quantities");
-    const leadTime = settings.default_lead_time_days || 14;
-    // Get last 30d sales by SKU
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
     const skus = lines.map(l => l.sku).filter(Boolean) as string[];
     if (!skus.length) return toast.info("Lines need SKUs to forecast");
-    const { data: sales } = await (supabase as any)
+
+    // Per-supplier lead/restock from supplier_profiles.profile_data
+    let leadDays = settings.default_lead_time_days || 14;
+    let restockDays = 28;
+    if (form.supplier_name) {
+      const { data: prof } = await supabase
+        .from("supplier_profiles")
+        .select("profile_data")
+        .ilike("supplier_name", form.supplier_name)
+        .maybeSingle();
+      const pd = (prof?.profile_data || {}) as Record<string, any>;
+      if (Number(pd.lead_time_days) > 0) leadDays = Number(pd.lead_time_days);
+      if (Number(pd.restock_period_days) > 0) restockDays = Number(pd.restock_period_days);
+    }
+
+    // Sales last 30d by SKU (via variants join)
+    const { data: sales } = await supabase
       .from("sales_data")
-      .select("sku, quantity")
-      .in("sku", skus)
-      .gte("sold_at", since);
+      .select("quantity_sold, variants!inner(sku)")
+      .gte("sold_at", since)
+      .in("variants.sku", skus);
     const salesMap = new Map<string, number>();
     (sales || []).forEach((r: any) => {
-      salesMap.set(r.sku, (salesMap.get(r.sku) || 0) + Number(r.quantity || 0));
+      const sku = r.variants?.sku;
+      if (!sku) return;
+      salesMap.set(sku, (salesMap.get(sku) || 0) + Number(r.quantity_sold || 0));
     });
+
+    const meta: Record<string, string> = {};
     setLines(prev => prev.map(l => {
       if (!l.sku) return l;
       const sold = salesMap.get(l.sku) || 0;
       const perDay = sold / 30;
       const current = l.current_stock || 0;
-      const suggested = Math.max(0, Math.ceil(perDay * leadTime - current));
+      const suggested = Math.max(0, Math.ceil(perDay * (leadDays + restockDays) - current));
+      meta[l.id] = `Suggested ${suggested} = ceil(${perDay.toFixed(2)}/day × (${leadDays}+${restockDays} days) − ${current} available)`;
       return { ...l, qty_ordered: suggested };
     }));
-    toast.success("Suggested quantities filled in");
+    setSuggestionMeta(meta);
+    toast.success(`Suggested quantities filled (lead ${leadDays}d + restock ${restockDays}d)`);
   };
 
   const save = async (newStatus?: POStatus): Promise<string | null> => {

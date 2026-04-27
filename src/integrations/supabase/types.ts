@@ -2920,6 +2920,54 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_adjustments: {
+        Row: {
+          adjusted_by: string | null
+          adjustment_date: string
+          adjustment_number: string
+          applied_at: string | null
+          created_at: string
+          id: string
+          line_items: Json
+          location: string
+          notes: string | null
+          reason: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          adjusted_by?: string | null
+          adjustment_date?: string
+          adjustment_number: string
+          applied_at?: string | null
+          created_at?: string
+          id?: string
+          line_items?: Json
+          location: string
+          notes?: string | null
+          reason: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          adjusted_by?: string | null
+          adjustment_date?: string
+          adjustment_number?: string
+          applied_at?: string | null
+          created_at?: string
+          id?: string
+          line_items?: Json
+          location?: string
+          notes?: string | null
+          reason?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       stocktake_lines: {
         Row: {
           barcode: string | null

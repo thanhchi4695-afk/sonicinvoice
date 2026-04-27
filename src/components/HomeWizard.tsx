@@ -243,12 +243,6 @@ const HomeWizard = ({
               {onStartEmailInbox && (
                 <AltEntry icon={Mail} label="Email inbox" onClick={onStartEmailInbox} />
               )}
-              {onStartJoor && (
-                <AltEntry icon={Briefcase} label="JOOR" onClick={onStartJoor} />
-              )}
-              {onStartWholesaleImport && (
-                <AltEntry icon={FileText} label="Wholesale" onClick={onStartWholesaleImport} />
-              )}
               {onStartScanMode && (
                 <AltEntry icon={Camera} label="Scan mode" onClick={onStartScanMode} />
               )}

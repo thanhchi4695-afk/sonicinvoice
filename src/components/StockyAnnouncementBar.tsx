@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { X } from "lucide-react";
+import { X, Sparkles, ArrowRight, Check, Clock } from "lucide-react";
 import {
   Dialog,
   DialogContent,

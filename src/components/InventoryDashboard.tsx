@@ -54,6 +54,10 @@ interface ProductVariant {
   quantity: number;
   /** Per-location breakdown: location name → qty (only includes locations with inventory rows). */
   byLocation: Record<string, number>;
+  /** Shopify variant ID for restock-override lookup. */
+  shopifyVariantId: string | null;
+  /** Effective restock status (override → cache → supplier default → ongoing). */
+  restockStatus: RestockStatus;
 }
 
 interface InventoryLocation {

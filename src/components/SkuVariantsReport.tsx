@@ -396,6 +396,16 @@ const SkuVariantsReport = () => {
       const poLines = poLinesRes.data || [];
       const imports = importsRes.data || [];
 
+      // ── Prefer cached ABC grades from the dedicated ABC report when available ──
+      const { data: cachedAbc } = await supabase
+        .from("product_abc_grades")
+        .select("variant_id, grade")
+        .eq("user_id", user.id)
+        .eq("period_days", 365);
+      const cachedAbcMap = new Map<string, "A" | "B" | "C" | "U">(
+        (cachedAbc || []).map((r) => [r.variant_id as string, r.grade as "A" | "B" | "C" | "U"]),
+      );
+
       const productMap = new Map(products.map((p) => [p.id, p]));
 
       // sales aggregation per variant + windows
@@ -496,7 +506,9 @@ const SkuVariantsReport = () => {
         const margin = (v.retail_price || 0) > 0
           ? (((v.retail_price || 0) - (v.cost || 0)) / (v.retail_price || 0)) * 100
           : 0;
-        const grade: Row["abc"] = u365 === 0 ? "U" : (abcMap.get(v.id) || "C");
+        const grade: Row["abc"] =
+          cachedAbcMap.get(v.id) ??
+          (u365 === 0 ? "U" : (abcMap.get(v.id) || "C"));
         const lastRec = v.sku ? lastRecBySku.get(v.sku) || null : null;
         const firstRec = v.sku ? firstRecBySku.get(v.sku) || null : null;
 

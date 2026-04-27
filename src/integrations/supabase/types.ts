@@ -2144,6 +2144,42 @@ export type Database = {
         }
         Relationships: []
       }
+      product_abc_grades: {
+        Row: {
+          calculated_at: string
+          grade: string
+          id: string
+          period_days: number
+          product_id: string | null
+          revenue: number
+          units_sold: number
+          user_id: string
+          variant_id: string | null
+        }
+        Insert: {
+          calculated_at?: string
+          grade: string
+          id?: string
+          period_days?: number
+          product_id?: string | null
+          revenue?: number
+          units_sold?: number
+          user_id: string
+          variant_id?: string | null
+        }
+        Update: {
+          calculated_at?: string
+          grade?: string
+          id?: string
+          period_days?: number
+          product_id?: string | null
+          revenue?: number
+          units_sold?: number
+          user_id?: string
+          variant_id?: string | null
+        }
+        Relationships: []
+      }
       product_catalog_cache: {
         Row: {
           barcode: string | null

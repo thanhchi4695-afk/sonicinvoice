@@ -25,7 +25,6 @@ const COMPARISON: Array<[string, string, "live" | "soon"]> = [
   ["ABC analysis", "Coming soon", "soon"],
   ["Stock adjustments", "Coming soon", "soon"],
   ["Stocktakes", "Coming soon", "soon"],
-  ["Shuts down August 31, 2026", "Built for the long term", "live"],
 ];
 
 export default function StockyAnnouncementBar() {

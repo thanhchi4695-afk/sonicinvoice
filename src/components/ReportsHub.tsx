@@ -16,13 +16,14 @@ import { format, subDays, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-type ReportId = "valuation" | "ageing" | "supplier" | "sales" | "movement";
+type ReportId = "low_stock" | "valuation" | "ageing" | "supplier" | "sales" | "movement";
 
 interface ReportsHubProps {
   onBack: () => void;
 }
 
 const REPORT_CARDS: { id: ReportId; title: string; desc: string; icon: React.ElementType }[] = [
+  { id: "low_stock", title: "Low Stock Report", desc: "Vendor urgency, days to depletion & lost revenue", icon: AlertTriangle },
   { id: "valuation", title: "Inventory Valuation", desc: "On hand × cost per product, grouped by type", icon: Package },
   { id: "ageing", title: "Stock Ageing", desc: "Variants grouped by days since last sale", icon: TrendingUp },
   { id: "supplier", title: "Supplier Performance", desc: "On-time delivery, fill rate & cost trends", icon: Users },

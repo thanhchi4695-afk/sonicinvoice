@@ -188,18 +188,18 @@ export default function StockAdjustmentPanel({ onBack }: Props) {
     setSearching(true);
     try {
       let variants: Array<{
-        id: string; title: string; sku: string | null; barcode: string | null;
+        variant_id: string; sku: string | null; barcode: string | null;
         inventory_item_id: string; product_id: string; product_title: string;
       }> = [];
 
       // Try barcode first if numeric
       if (/^\d{6,}$/.test(q)) {
         const matches = await findVariantByBarcode(q);
-        variants = matches as typeof variants;
+        variants = matches;
       }
       if (variants.length === 0) {
         const v = await findVariantBySKU(q);
-        if (v) variants = [v as unknown as typeof variants[number]];
+        if (v) variants = [v];
       }
       if (variants.length === 0) {
         toast.error(`No product found for "${q}"`);
@@ -208,16 +208,16 @@ export default function StockAdjustmentPanel({ onBack }: Props) {
 
       const newLines: LineItem[] = [];
       for (const v of variants) {
-        if (lineItems.find(li => li.variant_id === String(v.id))) continue;
+        if (lineItems.find(li => li.variant_id === String(v.variant_id))) continue;
         const qtyBefore = await fetchCurrentQty(String(v.inventory_item_id));
         newLines.push({
           product_id: String(v.product_id),
-          variant_id: String(v.id),
+          variant_id: String(v.variant_id),
           inventory_item_id: String(v.inventory_item_id),
           sku: v.sku || "",
           barcode: v.barcode,
           product_title: v.product_title,
-          variant_title: v.title || "",
+          variant_title: [v.sku].filter(Boolean).join(" "),
           qty_before: qtyBefore,
           qty_adjustment: 0,
           qty_after: qtyBefore,

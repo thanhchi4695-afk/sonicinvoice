@@ -495,19 +495,31 @@ export default function InventoryDashboard({ onBack }: Props) {
           {/* ─── Products DataGrid ─── */}
           <TabsContent value="products">
             <DataGrid
-              data={data.variants}
-              storageKey="inv_products"
+              data={viewData.variants}
+              storageKey={`inv_products_${selectedLocation}`}
               enableSelection
               pageSize={50}
               exportFilename="inventory-products.csv"
               columns={[
-                { accessorKey: "sku", header: "SKU", size: 100, cell: ({ getValue, row }) => (
+                { accessorKey: "sku", header: "SKU", size: 100, cell: ({ getValue }) => (
                   <span className={cn("font-mono", highlightedSku && (getValue() as string)?.toLowerCase() === highlightedSku && "text-primary font-bold")}>{(getValue() as string) || "—"}</span>
                 )},
                 { accessorKey: "productTitle", header: "Product", size: 200, cell: ({ getValue }) => <span className="font-medium truncate block max-w-[200px]">{getValue() as string}</span> },
                 { accessorKey: "color", header: "Color", size: 70 },
                 { accessorKey: "size", header: "Size", size: 60 },
-                { accessorKey: "quantity", header: "On Hand", size: 70, cell: ({ getValue }) => <span className={cn("font-mono font-medium", (getValue() as number) === 0 && "text-destructive")}>{getValue() as number}</span> },
+                { accessorKey: "quantity", header: selectedLocation === "all" ? "On Hand (All)" : "On Hand", size: 90, cell: ({ getValue }) => <span className={cn("font-mono font-medium", (getValue() as number) === 0 && "text-destructive")}>{getValue() as number}</span> },
+                ...(selectedLocation === "all" ? [{
+                  id: "locationBreakdown",
+                  header: "Location breakdown",
+                  size: 220,
+                  accessorFn: (r: ProductVariant) =>
+                    Object.entries(r.byLocation)
+                      .map(([loc, q]) => `${loc}: ${q}`)
+                      .join(" / ") || "—",
+                  cell: ({ getValue }: { getValue: () => unknown }) => (
+                    <span className="text-[11px] text-muted-foreground">{(getValue() as string) || "—"}</span>
+                  ),
+                }] : []),
                 { accessorKey: "cost", header: "Cost", size: 70, cell: ({ getValue }) => `$${(getValue() as number).toFixed(2)}` },
                 { accessorKey: "retailPrice", header: "Retail", size: 70, cell: ({ getValue }) => `$${(getValue() as number).toFixed(2)}` },
                 { id: "margin", header: "Margin", size: 70, accessorFn: (r) => r.cost > 0 && r.retailPrice > 0 ? ((r.retailPrice - r.cost) / r.retailPrice) * 100 : -1, cell: ({ getValue }) => { const m = getValue() as number; return m >= 0 ? <Badge variant={m >= 50 ? "default" : m >= 30 ? "secondary" : "destructive"} className="text-[10px]">{m.toFixed(0)}%</Badge> : "—"; }},

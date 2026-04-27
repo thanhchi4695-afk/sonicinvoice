@@ -210,18 +210,54 @@ export default function SupplierBrainTab() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: si }, { data: sh }, contribFlag] = await Promise.all([
+    const [{ data: si }, { data: sh }, { data: sp }, contribFlag] = await Promise.all([
       supabase.from("supplier_intelligence")
         .select("id, supplier_name, detected_pattern, confidence_score, invoice_count, last_correction_rate, is_shared_origin, column_map, last_invoice_date")
         .order("invoice_count", { ascending: false }),
       supabase.from("shared_supplier_profiles")
         .select("supplier_name, contributing_users, total_invoices_processed, is_verified"),
+      supabase.from("supplier_profiles")
+        .select("supplier_name, lead_time_days, restock_period_days, default_restock_status, supplier_email, payment_terms, contact_name, portal_url"),
       getContributeShared(),
     ]);
     setRows((si || []) as SupplierRow[]);
     setShared((sh || []) as SharedRow[]);
+    const opsMap: Record<string, OpsFields> = {};
+    for (const p of (sp || []) as Array<Partial<OpsFields> & { supplier_name: string }>) {
+      opsMap[p.supplier_name] = {
+        lead_time_days: p.lead_time_days ?? 14,
+        restock_period_days: p.restock_period_days ?? 28,
+        default_restock_status: (p.default_restock_status as RestockStatus) ?? "ongoing",
+        supplier_email: p.supplier_email ?? "",
+        payment_terms: p.payment_terms ?? "",
+        contact_name: p.contact_name ?? "",
+        portal_url: p.portal_url ?? "",
+      };
+    }
+    setOpsData(opsMap);
     setContribute(contribFlag);
     setLoading(false);
+  };
+
+  const getOps = (name: string): OpsFields => opsData[name] || EMPTY_OPS;
+  const updateOps = (name: string, patch: Partial<OpsFields>) => {
+    setOpsData((prev) => ({ ...prev, [name]: { ...(prev[name] || EMPTY_OPS), ...patch } }));
+  };
+  const saveOps = async (name: string) => {
+    setSavingOps(name);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { toast.error("Not signed in"); setSavingOps(null); return; }
+    const ops = getOps(name);
+    const { error } = await supabase
+      .from("supplier_profiles")
+      .upsert({
+        user_id: user.id,
+        supplier_name: name,
+        ...ops,
+      } as never, { onConflict: "user_id,supplier_name" });
+    setSavingOps(null);
+    if (error) { toast.error("Save failed", { description: error.message }); return; }
+    toast.success(`Saved settings for ${name}`);
   };
 
   useEffect(() => { void load(); }, []);

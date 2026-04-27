@@ -1875,6 +1875,95 @@ export type Database = {
         }
         Relationships: []
       }
+      po_receipts: {
+        Row: {
+          created_at: string
+          id: string
+          line_items: Json
+          po_id: string
+          pushed_at: string | null
+          received_by: string | null
+          received_date: string
+          shopify_push_error: string | null
+          shopify_push_status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_items?: Json
+          po_id: string
+          pushed_at?: string | null
+          received_by?: string | null
+          received_date?: string
+          shopify_push_error?: string | null
+          shopify_push_status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_items?: Json
+          po_id?: string
+          pushed_at?: string | null
+          received_by?: string | null
+          received_date?: string
+          shopify_push_error?: string | null
+          shopify_push_status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "po_receipts_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      po_settings: {
+        Row: {
+          created_at: string
+          default_lead_time_days: number
+          email_body_template: string | null
+          email_subject_template: string | null
+          logo_url: string | null
+          payment_terms: string | null
+          store_abn: string | null
+          store_address: string | null
+          store_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_lead_time_days?: number
+          email_body_template?: string | null
+          email_subject_template?: string | null
+          logo_url?: string | null
+          payment_terms?: string | null
+          store_abn?: string | null
+          store_address?: string | null
+          store_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_lead_time_days?: number
+          email_body_template?: string | null
+          email_subject_template?: string | null
+          logo_url?: string | null
+          payment_terms?: string | null
+          store_abn?: string | null
+          store_address?: string | null
+          store_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pos_connections: {
         Row: {
           connected_at: string
@@ -2217,6 +2306,7 @@ export type Database = {
       purchase_order_lines: {
         Row: {
           actual_cost: number | null
+          barcode: string | null
           color: string | null
           created_at: string
           expected_cost: number
@@ -2226,12 +2316,16 @@ export type Database = {
           product_title: string
           purchase_order_id: string
           received_qty: number
+          shopify_product_id: string | null
+          shopify_variant_id: string | null
           size: string | null
           sku: string | null
           user_id: string
+          variant_title: string | null
         }
         Insert: {
           actual_cost?: number | null
+          barcode?: string | null
           color?: string | null
           created_at?: string
           expected_cost?: number
@@ -2241,12 +2335,16 @@ export type Database = {
           product_title?: string
           purchase_order_id: string
           received_qty?: number
+          shopify_product_id?: string | null
+          shopify_variant_id?: string | null
           size?: string | null
           sku?: string | null
           user_id: string
+          variant_title?: string | null
         }
         Update: {
           actual_cost?: number | null
+          barcode?: string | null
           color?: string | null
           created_at?: string
           expected_cost?: number
@@ -2256,9 +2354,12 @@ export type Database = {
           product_title?: string
           purchase_order_id?: string
           received_qty?: number
+          shopify_product_id?: string | null
+          shopify_variant_id?: string | null
           size?: string | null
           sku?: string | null
           user_id?: string
+          variant_title?: string | null
         }
         Relationships: [
           {
@@ -2272,46 +2373,82 @@ export type Database = {
       }
       purchase_orders: {
         Row: {
+          archived_at: string | null
           created_at: string
           expected_date: string | null
+          grand_total: number
           id: string
+          invoice_number: string | null
           linked_document_id: string | null
           match_result: Json | null
           notes: string | null
+          notes_internal: string | null
+          notes_supplier: string | null
+          po_date: string | null
           po_number: string
+          sent_at: string | null
+          ship_to_location: string | null
+          shipping: number
           status: string
+          subtotal: number
+          supplier_email: string | null
           supplier_id: string | null
           supplier_name: string
+          tax: number
           total_cost: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           expected_date?: string | null
+          grand_total?: number
           id?: string
+          invoice_number?: string | null
           linked_document_id?: string | null
           match_result?: Json | null
           notes?: string | null
+          notes_internal?: string | null
+          notes_supplier?: string | null
+          po_date?: string | null
           po_number: string
+          sent_at?: string | null
+          ship_to_location?: string | null
+          shipping?: number
           status?: string
+          subtotal?: number
+          supplier_email?: string | null
           supplier_id?: string | null
           supplier_name: string
+          tax?: number
           total_cost?: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           expected_date?: string | null
+          grand_total?: number
           id?: string
+          invoice_number?: string | null
           linked_document_id?: string | null
           match_result?: Json | null
           notes?: string | null
+          notes_internal?: string | null
+          notes_supplier?: string | null
+          po_date?: string | null
           po_number?: string
+          sent_at?: string | null
+          ship_to_location?: string | null
+          shipping?: number
           status?: string
+          subtotal?: number
+          supplier_email?: string | null
           supplier_id?: string | null
           supplier_name?: string
+          tax?: number
           total_cost?: number
           updated_at?: string
           user_id?: string

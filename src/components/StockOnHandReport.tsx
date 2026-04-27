@@ -141,18 +141,19 @@ const StockOnHandReport = () => {
       setProgress("Computing average cost…");
       const { data: poLines } = await supabase
         .from("purchase_order_lines")
-        .select("variant_id, sku, actual_cost, expected_cost, received_qty")
+        .select("sku, actual_cost, expected_cost, received_qty")
         .eq("user_id", user.id);
 
+      // Average cost is keyed by SKU (purchase_order_lines has no variant_id)
       const avgCostMap = new Map<string, { totalCost: number; totalQty: number }>();
       (poLines || []).forEach(l => {
         const cost = l.actual_cost ?? l.expected_cost ?? 0;
         const qty = l.received_qty ?? 0;
-        if (qty <= 0 || !l.variant_id) return;
-        const cur = avgCostMap.get(l.variant_id) || { totalCost: 0, totalQty: 0 };
+        if (qty <= 0 || !l.sku) return;
+        const cur = avgCostMap.get(l.sku) || { totalCost: 0, totalQty: 0 };
         cur.totalCost += cost * qty;
         cur.totalQty += qty;
-        avgCostMap.set(l.variant_id, cur);
+        avgCostMap.set(l.sku, cur);
       });
 
       const productMap = new Map((products || []).map(p => [p.id, p]));

@@ -3641,10 +3641,12 @@ export type Database = {
         Row: {
           auto_publish_eligible: boolean | null
           confidence_score: number | null
+          contact_name: string | null
           correction_rate: number | null
           country: string | null
           created_at: string
           currency: string | null
+          default_restock_status: string | null
           email_domains: string[] | null
           id: string
           invoice_count: number | null
@@ -3652,7 +3654,12 @@ export type Database = {
           is_active: boolean
           is_known_brand: boolean | null
           last_invoice_date: string | null
+          lead_time_days: number | null
+          payment_terms: string | null
+          portal_url: string | null
           profile_data: Json
+          restock_period_days: number | null
+          supplier_email: string | null
           supplier_name: string
           supplier_name_variants: string[] | null
           updated_at: string
@@ -3666,10 +3673,12 @@ export type Database = {
         Insert: {
           auto_publish_eligible?: boolean | null
           confidence_score?: number | null
+          contact_name?: string | null
           correction_rate?: number | null
           country?: string | null
           created_at?: string
           currency?: string | null
+          default_restock_status?: string | null
           email_domains?: string[] | null
           id?: string
           invoice_count?: number | null
@@ -3677,7 +3686,12 @@ export type Database = {
           is_active?: boolean
           is_known_brand?: boolean | null
           last_invoice_date?: string | null
+          lead_time_days?: number | null
+          payment_terms?: string | null
+          portal_url?: string | null
           profile_data?: Json
+          restock_period_days?: number | null
+          supplier_email?: string | null
           supplier_name: string
           supplier_name_variants?: string[] | null
           updated_at?: string
@@ -3691,10 +3705,12 @@ export type Database = {
         Update: {
           auto_publish_eligible?: boolean | null
           confidence_score?: number | null
+          contact_name?: string | null
           correction_rate?: number | null
           country?: string | null
           created_at?: string
           currency?: string | null
+          default_restock_status?: string | null
           email_domains?: string[] | null
           id?: string
           invoice_count?: number | null
@@ -3702,7 +3718,12 @@ export type Database = {
           is_active?: boolean
           is_known_brand?: boolean | null
           last_invoice_date?: string | null
+          lead_time_days?: number | null
+          payment_terms?: string | null
+          portal_url?: string | null
           profile_data?: Json
+          restock_period_days?: number | null
+          supplier_email?: string | null
           supplier_name?: string
           supplier_name_variants?: string[] | null
           updated_at?: string

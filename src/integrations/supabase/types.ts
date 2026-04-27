@@ -3148,12 +3148,21 @@ export type Database = {
           created_at: string
           expected_qty: number
           id: string
+          is_counted: boolean
+          product_id: string | null
           product_title: string | null
+          product_type: string | null
+          push_error: string | null
+          push_status: string
+          shopify_inventory_item_id: string | null
           shopify_variant_id: string | null
           sku: string | null
           stocktake_id: string
           user_id: string
           variance: number | null
+          variant_id: string | null
+          variant_title: string | null
+          vendor: string | null
         }
         Insert: {
           barcode?: string | null
@@ -3161,12 +3170,21 @@ export type Database = {
           created_at?: string
           expected_qty?: number
           id?: string
+          is_counted?: boolean
+          product_id?: string | null
           product_title?: string | null
+          product_type?: string | null
+          push_error?: string | null
+          push_status?: string
+          shopify_inventory_item_id?: string | null
           shopify_variant_id?: string | null
           sku?: string | null
           stocktake_id: string
           user_id: string
           variance?: number | null
+          variant_id?: string | null
+          variant_title?: string | null
+          vendor?: string | null
         }
         Update: {
           barcode?: string | null
@@ -3174,12 +3192,21 @@ export type Database = {
           created_at?: string
           expected_qty?: number
           id?: string
+          is_counted?: boolean
+          product_id?: string | null
           product_title?: string | null
+          product_type?: string | null
+          push_error?: string | null
+          push_status?: string
+          shopify_inventory_item_id?: string | null
           shopify_variant_id?: string | null
           sku?: string | null
           stocktake_id?: string
           user_id?: string
           variance?: number | null
+          variant_id?: string | null
+          variant_title?: string | null
+          vendor?: string | null
         }
         Relationships: [
           {
@@ -3193,32 +3220,56 @@ export type Database = {
       }
       stocktakes: {
         Row: {
+          adjustments_applied_at: string | null
+          count_submitted_at: string | null
           counted_at: string
           created_at: string
+          created_by: string | null
           id: string
           location: string
+          name: string | null
           notes: string | null
+          scope: string
+          scope_product_types: string[]
+          scope_vendors: string[]
           status: string
+          stocktake_number: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          adjustments_applied_at?: string | null
+          count_submitted_at?: string | null
           counted_at?: string
           created_at?: string
+          created_by?: string | null
           id?: string
           location?: string
+          name?: string | null
           notes?: string | null
+          scope?: string
+          scope_product_types?: string[]
+          scope_vendors?: string[]
           status?: string
+          stocktake_number?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          adjustments_applied_at?: string | null
+          count_submitted_at?: string | null
           counted_at?: string
           created_at?: string
+          created_by?: string | null
           id?: string
           location?: string
+          name?: string | null
           notes?: string | null
+          scope?: string
+          scope_product_types?: string[]
+          scope_vendors?: string[]
           status?: string
+          stocktake_number?: string
           updated_at?: string
           user_id?: string
         }

@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  getConnection,
   deleteConnection,
   initiateOAuth,
 } from "@/lib/shopify-api";
@@ -63,6 +62,7 @@ export default function PlatformConnectionsSection() {
   const [shopifyInput, setShopifyInput] = useState("");
   const [shopifyOAuthLoading, setShopifyOAuthLoading] = useState(false);
   const [shopifySyncing, setShopifySyncing] = useState(false);
+  const [connectedPlatformCount, setConnectedPlatformCount] = useState(0);
   const [showCustomApp, setShowCustomApp] = useState(false);
   const [customAppDomain, setCustomAppDomain] = useState("");
   const [customAppToken, setCustomAppToken] = useState("");
@@ -135,34 +135,45 @@ export default function PlatformConnectionsSection() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [{ data: { user } }, shopify, ls, counts] = await Promise.all([
+      const [{ data: { user } }, ls, counts] = await Promise.all([
         supabase.auth.getUser(),
-        getConnection().catch(() => null),
         loadLightspeedConn(),
         loadCatalogCounts(),
       ]);
 
       let shopifySyncMeta: { shop_domain: string | null; last_synced_at: string | null } | null = null;
+      let platformCount = 0;
       if (user) {
-        const { data } = await supabase
+        const [{ data }, activePlatforms] = await Promise.all([
+          supabase
           .from("platform_connections")
           .select("shop_domain, last_synced_at")
           .eq("user_id", user.id)
           .eq("platform", "shopify")
           .eq("is_active", true)
-          .maybeSingle();
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from("platform_connections")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("is_active", true),
+        ]);
         shopifySyncMeta = data;
+        platformCount = activePlatforms.count ?? 0;
       }
 
-      if (shopify) {
+      if (shopifySyncMeta?.shop_domain) {
         setShopifyConnected(true);
-        setShopifyDomain(shopifySyncMeta?.shop_domain || shopify.store_url);
+        setShopifyDomain(shopifySyncMeta.shop_domain);
         setShopifyLastSynced(shopifySyncMeta?.last_synced_at ?? null);
       } else {
         setShopifyConnected(false);
         setShopifyDomain("");
         setShopifyLastSynced(null);
       }
+      setConnectedPlatformCount(platformCount);
       setLsConn(ls);
       setShopifyCount(counts.shopify);
       setLsCount(counts.lightspeed);

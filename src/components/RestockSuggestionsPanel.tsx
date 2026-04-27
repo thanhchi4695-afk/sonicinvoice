@@ -123,7 +123,7 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
       // 1. Catalog (current qty, cost, etc.)
       const { data: catalog } = await supabase
         .from("product_catalog_cache")
-        .select("vendor, sku, barcode, product_title, variant_title, current_qty, current_cost, platform_product_id, platform_variant_id")
+        .select("vendor, sku, barcode, product_title, variant_title, current_qty, current_cost, platform_product_id, platform_variant_id, restock_status" as any)
         .eq("user_id", user.id)
         .limit(20000);
 
@@ -143,7 +143,7 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
         sold30.set(sku, (sold30.get(sku) || 0) + Number(s.quantity_sold || 0));
       });
 
-      // 3. Supplier profiles → lead_time / restock_period
+      // 3. Supplier profiles → lead_time / restock_period / default_restock_status
       const { data: profiles } = await supabase
         .from("supplier_profiles")
         .select("id, supplier_name, profile_data")
@@ -161,8 +161,12 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
       });
       setSupplierLeads(leadMap);
 
+      const supplierDefaults = buildSupplierDefaultMap(profiles as any);
+      const overrides = await loadRestockOverrides(user.id);
+
       // 4. Build restock rows
       const out: RestockRow[] = [];
+      let excluded = 0;
       (catalog || []).forEach((c: any) => {
         const vendor = (c.vendor || "Unknown").toString();
         const lead = leadMap.get(vendor.toLowerCase())?.lead_time_days ?? DEFAULT_LEAD;
@@ -172,6 +176,16 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
         const perDay = sold / 30;
         const suggested = Math.max(0, Math.ceil(perDay * (lead + restock) - available));
         if (suggested <= 0) return; // only show items needing restock
+
+        const status = resolveRestockStatus({
+          platformVariantId: c.platform_variant_id,
+          vendor,
+          cacheStatus: c.restock_status,
+          overrides,
+          supplierDefaults,
+        });
+        if (status === "no_reorder") { excluded += 1; return; } // never suggest
+
         const dtd = perDay > 0 ? available / perDay : Infinity;
         out.push({
           key: `${c.platform_variant_id || c.sku || c.product_title}-${c.variant_title || ""}`,
@@ -191,11 +205,13 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
           override_qty: suggested,
           days_to_depletion: dtd,
           urgency: urgencyFor(dtd),
+          restock_status: status,
         });
       });
 
       out.sort((a, b) => a.days_to_depletion - b.days_to_depletion);
       setRows(out);
+      setExcludedNoReorder(excluded);
     } catch (e: any) {
       toast.error(e.message || "Failed to load restock suggestions");
     } finally {

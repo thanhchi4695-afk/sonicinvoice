@@ -992,6 +992,49 @@ export default function PostParseReviewScreen({
     { key: "rejected", label: "Rejected", count: rejected.length, icon: <X className="w-3.5 h-3.5" />, colorClass: "text-destructive" },
   ];
 
+
+  /** Render a single review row. Extracted so flat view and the new
+   *  by-collection view share identical row UI + handlers. */
+  const renderReviewRow = (p: ReviewProduct) => (
+    <ReviewRow
+      key={p._rowIndex}
+      product={p}
+      tab={activeTab}
+      isEditing={editingRow === p._rowIndex}
+      isSelected={selectedRows.has(p._rowIndex)}
+      onToggleSelect={() => toggleSelectRow(p._rowIndex)}
+      onStartEdit={() => setEditingRow(p._rowIndex)}
+      onStopEdit={() => {
+        const pendingForRow = pendingFieldsForRow(p._rowIndex);
+        if (pendingForRow.length > 0) {
+          setAwaitingReasonRows(prev => new Set(prev).add(p._rowIndex));
+        } else {
+          setEditingRow(null);
+        }
+      }}
+      onApprove={() => approveRow(p._rowIndex)}
+      onReject={() => rejectRow(p._rowIndex)}
+      onMoveToReview={() => moveToReview(p._rowIndex)}
+      onRestore={() => restoreToReview(p._rowIndex)}
+      onUpdateField={(field, value) => updateField(p._rowIndex, field, value)}
+      pendingRowCorrections={pendingFieldsForRow(p._rowIndex)}
+      savedReasonFields={new Set(Object.keys(savedReasonFlash).filter(k => k.startsWith(`${p._rowIndex}::`)).map(k => k.split("::")[1]))}
+      awaitingRowReason={awaitingReasonRows.has(p._rowIndex)}
+      onConfirmRowReason={(reason, detail) => confirmRowReason(p._rowIndex, reason, detail)}
+      onSkipRowReason={() => skipRowReason(p._rowIndex)}
+      onMarkAs={(markAs) => markRowAs(p._rowIndex, markAs)}
+      onSplit={() => splitRow(p._rowIndex)}
+      showTeachAI={showTeachAI === p._rowIndex}
+      onToggleTeachAI={() => setShowTeachAI(showTeachAI === p._rowIndex ? null : p._rowIndex)}
+      supplierName={supplierName}
+      parsingPlan={debug.parsingPlan}
+      invoicePages={invoicePages}
+      onShowSourceTrace={(prod) => setSourceTraceProduct(prod)}
+      lowConfFields={lowConfFields}
+      qtyHeaderWarning={lookupQtyWarning(p)}
+    />
+  );
+
   return (
     <div className="flex flex-col min-h-0">
       {/* Header */}

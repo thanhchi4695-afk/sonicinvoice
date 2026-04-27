@@ -89,6 +89,9 @@ export default function InventoryDashboard({ onBack }: Props) {
   const [data, setData] = useState<DashboardData>({ variants: [], locations: [] });
   const [tab, setTab] = useState("overview");
   const [highlightedSku, setHighlightedSku] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [selectedRows, setSelectedRows] = useState<ProductVariant[]>([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const { selected: selectedLocation, selectedLocation: selectedLocationObj } = useShopifyLocations();
 
   // Global barcode scanner integration
@@ -100,6 +103,40 @@ export default function InventoryDashboard({ onBack }: Props) {
       setTimeout(() => setHighlightedSku(null), 5000);
     });
   }, [registerHandler]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null));
+  }, []);
+
+  /** Patch a single variant's restock status in local state without refetching. */
+  const patchRestockLocal = (variantIds: string[], next: RestockStatus) => {
+    setData((prev) => ({
+      ...prev,
+      variants: prev.variants.map((v) =>
+        variantIds.includes(v.variantId) ? { ...v, restockStatus: next } : v,
+      ),
+    }));
+  };
+
+  const handleBulkSetRestock = async (next: RestockStatus) => {
+    if (!userId || selectedRows.length === 0) return;
+    setBulkSaving(true);
+    try {
+      const updated = await setRestockBulk(
+        userId,
+        selectedRows.map((r) => ({ platform_variant_id: r.shopifyVariantId })),
+        next,
+      );
+      if (updated > 0) {
+        patchRestockLocal(selectedRows.map((r) => r.variantId), next);
+        toast.success(
+          `${updated} variant${updated === 1 ? "" : "s"} set to ${RESTOCK_STATUS_EMOJI[next]} ${RESTOCK_STATUS_LABEL[next]}`,
+        );
+      }
+    } finally {
+      setBulkSaving(false);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);

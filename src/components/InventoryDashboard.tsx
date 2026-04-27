@@ -14,6 +14,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import LocationFilter from "@/components/LocationFilter";
+import { useShopifyLocations } from "@/hooks/use-shopify-locations";
 
 /* ─── Types ─── */
 

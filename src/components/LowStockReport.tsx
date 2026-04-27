@@ -456,11 +456,11 @@ const LowStockReport = () => {
         </Card>
         <Card>
           <CardHeader className="pb-2 flex-row items-center gap-2 space-y-0">
-            <TrendingDown className="h-4 w-4 text-orange-500" />
+            <TrendingDown className="h-4 w-4 text-secondary-foreground" />
             <CardTitle className="text-xs font-medium">🟠 Low (8–14d)</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-orange-500">{kpis.low}</p>
+            <p className="text-2xl font-bold text-secondary-foreground">{kpis.low}</p>
           </CardContent>
         </Card>
         <Card>

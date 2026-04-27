@@ -78,7 +78,9 @@ interface PostParseReviewScreenProps {
 
 type ReviewTab = "accepted" | "review" | "rejected";
 type ConfFilter = "all" | "high" | "medium" | "low";
-type ViewMode = "flat" | "grouped";
+type ViewMode = "flat" | "grouped" | "by-collection";
+
+const UNASSIGNED_COLLECTION = "Unassigned";
 
 // Extended product type with extra flags
 interface ReviewProduct extends ValidatedProduct {

@@ -674,6 +674,7 @@ function SeoWriterPanel({ onBack }: { onBack: () => void }) {
 }
 // ── Google Feed Preview Panel ──────────────────────────────
 function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
+  const promptDialog = usePromptDialog();
   const [copied, setCopied] = useState(false);
   const [saleStart, setSaleStart] = useState('');
   const [saleEnd, setSaleEnd] = useState('');
@@ -1069,7 +1070,6 @@ function LearningMemoryPanel({ onBack }: { onBack: () => void }) {
 }
 
 const ToolsScreen = () => {
-  const promptDialog = usePromptDialog();
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [instructions, setInstructions] = useState("");
 

@@ -62,6 +62,8 @@ export default function SupplierBrainTab() {
   const [contribute, setContribute] = useState(true);
   const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState<SupplierRow | null>(null);
+  const [opsData, setOpsData] = useState<Record<string, OpsFields>>({});
+  const [savingOps, setSavingOps] = useState<string | null>(null);
   const [driveUrl, setDriveUrl] = useState("");
 
   // Drive picker state machine: idle → picking → seeding → done

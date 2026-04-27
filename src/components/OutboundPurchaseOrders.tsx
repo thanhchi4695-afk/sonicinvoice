@@ -469,7 +469,7 @@ function EditView({ po, onBack, onReceive }: { po: PO; onBack: () => void; onRec
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
     const skus = lines.map(l => l.sku).filter(Boolean) as string[];
     if (!skus.length) return toast.info("Lines need SKUs to forecast");
-    const { data: sales } = await supabase
+    const { data: sales } = await (supabase as any)
       .from("sales_data")
       .select("sku, quantity")
       .in("sku", skus)

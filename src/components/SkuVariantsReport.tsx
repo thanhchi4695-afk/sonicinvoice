@@ -503,6 +503,28 @@ const SkuVariantsReport = () => {
         if (!first || d < first) firstRecBySku.set(r.style_number, d);
       });
 
+      // Restock status sources
+      const [{ data: cacheRaw }, { data: profilesRaw }, restockOverrides] = await Promise.all([
+        supabase
+          .from("product_catalog_cache" as any)
+          .select("platform_variant_id, restock_status, shop_domain")
+          .eq("user_id", user.id),
+        supabase
+          .from("supplier_profiles")
+          .select("supplier_name, profile_data")
+          .eq("user_id", user.id),
+        loadRestockOverrides(user.id),
+      ]);
+      const cacheStatusByVid = new Map<string, string>();
+      const cacheShopByVid = new Map<string, string>();
+      ((cacheRaw as any[]) || []).forEach((r) => {
+        if (r?.platform_variant_id) {
+          if (r?.restock_status) cacheStatusByVid.set(String(r.platform_variant_id), String(r.restock_status));
+          if (r?.shop_domain) cacheShopByVid.set(String(r.platform_variant_id), String(r.shop_domain));
+        }
+      });
+      const supplierDefaultsMap = buildSupplierDefaultMap(profilesRaw as any);
+
       const out: Row[] = variants.map((v) => {
         const product = productMap.get(v.product_id);
         const variantTitle = [v.color, v.size].filter(Boolean).join(" / ") || "—";
@@ -521,13 +543,15 @@ const SkuVariantsReport = () => {
           (u365 === 0 ? "U" : (abcMap.get(v.id) || "C"));
         const lastRec = v.sku ? lastRecBySku.get(v.sku) || null : null;
         const firstRec = v.sku ? firstRecBySku.get(v.sku) || null : null;
+        const platformVid = v.shopify_variant_id || null;
+        const vendor = product?.vendor || "—";
 
         return {
           variantId: v.id,
           productId: v.product_id,
           shopifyProductId: product?.shopify_product_id || "",
           shopifyVariantId: v.shopify_variant_id || "",
-          vendor: product?.vendor || "—",
+          vendor,
           productTitle: product?.title || "—",
           productType: product?.product_type || "",
           variantTitle,
@@ -542,7 +566,7 @@ const SkuVariantsReport = () => {
           units90: u90,
           units365: u365,
           refunds30: refunds30.get(v.id) || 0,
-          cancelled30: 0, // not tracked separately
+          cancelled30: 0,
           salesPerDay: spd,
           daysUntilDepletion: days,
           abc: grade,
@@ -552,6 +576,14 @@ const SkuVariantsReport = () => {
           firstReceivedAt: firstRec,
           totalRetailValue: totalAvail * (v.retail_price || 0),
           totalCostValue: totalAvail * (v.cost || 0),
+          restockStatus: resolveRestockStatus({
+            platformVariantId: platformVid,
+            vendor,
+            cacheStatus: platformVid ? cacheStatusByVid.get(String(platformVid)) ?? null : null,
+            overrides: restockOverrides,
+            supplierDefaults: supplierDefaultsMap,
+          }),
+          shopDomain: platformVid ? cacheShopByVid.get(String(platformVid)) ?? null : null,
         };
       });
 

@@ -496,18 +496,102 @@ export default function SupplierBrainTab() {
                 </div>
 
                 {viewing?.id === r.id && (
-                  <div className="mt-3 rounded-md bg-muted/30 p-3 text-[11px] space-y-1">
-                    <p className="text-muted-foreground">Column map:</p>
-                    {Object.keys(r.column_map || {}).length === 0 ? (
-                      <p className="italic">Not learned yet.</p>
-                    ) : (
-                      <ul className="font-mono space-y-0.5">
-                        {Object.entries(r.column_map || {}).map(([k, v]) => (
-                          <li key={k}><span className="text-muted-foreground">{k}</span> → <strong>{v}</strong></li>
-                        ))}
-                      </ul>
-                    )}
-                    <Button size="sm" variant="ghost" onClick={() => setViewing(null)} className="mt-2">Close</Button>
+                  <div className="mt-3 rounded-md bg-muted/30 p-3 text-[11px] space-y-3">
+                    {/* Operational settings — used by Restock Suggestions & POs */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold">Operational settings</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Lead time (days)</Label>
+                          <Input
+                            type="number" min={0}
+                            value={getOps(r.supplier_name).lead_time_days}
+                            onChange={(e) => updateOps(r.supplier_name, { lead_time_days: parseInt(e.target.value) || 0 })}
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Restock period (days)</Label>
+                          <Input
+                            type="number" min={0}
+                            value={getOps(r.supplier_name).restock_period_days}
+                            onChange={(e) => updateOps(r.supplier_name, { restock_period_days: parseInt(e.target.value) || 0 })}
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Default restock status</Label>
+                          <Select
+                            value={getOps(r.supplier_name).default_restock_status}
+                            onValueChange={(v) => updateOps(r.supplier_name, { default_restock_status: v as RestockStatus })}
+                          >
+                            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ongoing">Ongoing</SelectItem>
+                              <SelectItem value="refill">Refill</SelectItem>
+                              <SelectItem value="no_reorder">No reorder</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Supplier email</Label>
+                          <Input
+                            type="email"
+                            value={getOps(r.supplier_name).supplier_email}
+                            onChange={(e) => updateOps(r.supplier_name, { supplier_email: e.target.value })}
+                            placeholder="orders@supplier.com"
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Contact name</Label>
+                          <Input
+                            value={getOps(r.supplier_name).contact_name}
+                            onChange={(e) => updateOps(r.supplier_name, { contact_name: e.target.value })}
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">Payment terms</Label>
+                          <Input
+                            value={getOps(r.supplier_name).payment_terms}
+                            onChange={(e) => updateOps(r.supplier_name, { payment_terms: e.target.value })}
+                            placeholder="Net 30 days"
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1 col-span-2 md:col-span-3">
+                          <Label className="text-[10px] text-muted-foreground">Website / portal URL</Label>
+                          <Input
+                            type="url"
+                            value={getOps(r.supplier_name).portal_url}
+                            onChange={(e) => updateOps(r.supplier_name, { portal_url: e.target.value })}
+                            placeholder="https://..."
+                            className="h-7 text-xs"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button size="sm" onClick={() => saveOps(r.supplier_name)} disabled={savingOps === r.supplier_name}>
+                          {savingOps === r.supplier_name ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : null}
+                          Save settings
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-border pt-2 space-y-1">
+                      <p className="text-muted-foreground">Column map:</p>
+                      {Object.keys(r.column_map || {}).length === 0 ? (
+                        <p className="italic">Not learned yet.</p>
+                      ) : (
+                        <ul className="font-mono space-y-0.5">
+                          {Object.entries(r.column_map || {}).map(([k, v]) => (
+                            <li key={k}><span className="text-muted-foreground">{k}</span> → <strong>{v}</strong></li>
+                          ))}
+                        </ul>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => setViewing(null)} className="mt-2">Close</Button>
+                    </div>
                   </div>
                 )}
               </Card>

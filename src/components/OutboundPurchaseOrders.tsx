@@ -130,6 +130,52 @@ export default function OutboundPurchaseOrders({ onBack }: Props) {
     loadPOs();
   }, [loadPOs]);
 
+  // Honor a "restock_po_seed" handoff from RestockSuggestionsPanel
+  useEffect(() => {
+    if (view !== "list") return;
+    try {
+      const raw = sessionStorage.getItem("restock_po_seed");
+      if (!raw) return;
+      const seed = JSON.parse(raw);
+      if (!seed?.lines?.length) return;
+      sessionStorage.removeItem("restock_po_seed");
+      const today = new Date().toISOString().slice(0, 10);
+      setActivePO({
+        id: "",
+        po_number: "",
+        supplier_id: null,
+        supplier_name: seed.vendor || "",
+        supplier_email: "",
+        ship_to_location: LOCATIONS[0],
+        po_date: today,
+        expected_date: "",
+        invoice_number: "",
+        notes_supplier: "",
+        notes_internal: `Seeded from Restock Suggestions on ${today}`,
+        status: "draft",
+        subtotal: 0, shipping: 0, tax: 0, grand_total: 0, total_cost: 0,
+        created_at: "", sent_at: null, archived_at: null,
+        lines: seed.lines.map((l: any) => ({
+          id: crypto.randomUUID(),
+          product_title: l.product_title || "",
+          variant_title: l.variant_title ?? null,
+          sku: l.sku ?? null,
+          barcode: l.barcode ?? null,
+          shopify_product_id: l.shopify_product_id ?? null,
+          shopify_variant_id: l.shopify_variant_id ?? null,
+          cost_price: Number(l.cost_price ?? 0),
+          qty_ordered: Number(l.qty_ordered ?? 0),
+          qty_received: 0,
+          current_stock: Number(l.current_stock ?? 0),
+        })),
+      });
+      setView("edit");
+      toast.success(`Loaded ${seed.lines.length} restock line${seed.lines.length === 1 ? "" : "s"} for ${seed.vendor || "vendor"}`);
+    } catch {
+      /* ignore malformed seeds */
+    }
+  }, [view]);
+
   const filteredPOs = useMemo(() => {
     return pos.filter(p => {
       if (filterStatus !== "all" && p.status !== filterStatus) return false;

@@ -255,11 +255,14 @@ const StockOnHandReport = () => {
   const filteredRows = useMemo(() => {
     let out = rows;
     if (locationFilter !== "all") out = out.filter(r => r.location === locationFilter);
+    if (globalLocSelected !== "all" && globalLocObj) {
+      out = out.filter(r => r.location === globalLocObj.name);
+    }
     if (vendorFilter.length > 0) out = out.filter(r => vendorFilter.includes(r.vendor));
     if (typeFilter.length > 0) out = out.filter(r => typeFilter.includes(r.productType));
     if (hideZero) out = out.filter(r => r.quantity > 0);
     return out;
-  }, [rows, locationFilter, vendorFilter, typeFilter, hideZero]);
+  }, [rows, locationFilter, globalLocSelected, globalLocObj, vendorFilter, typeFilter, hideZero]);
 
   // Sorting
   const sortedRows = useMemo(() => {
@@ -392,8 +395,9 @@ const StockOnHandReport = () => {
 
         {/* Filters */}
         <Card><CardContent className="p-3 flex flex-wrap items-center gap-3">
+          <LocationFilter showLabel={false} size="sm" />
           <div className="flex items-center gap-2">
-            <Label className="text-xs">Location</Label>
+            <Label className="text-xs">Sub-location</Label>
             <Select value={locationFilter} onValueChange={setLocationFilter}>
               <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>

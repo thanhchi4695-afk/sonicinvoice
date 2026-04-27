@@ -147,6 +147,26 @@ export default function InventoryDashboard({ onBack }: Props) {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Apply the global location filter. When "all" is selected we keep the
+  // variant's full quantity; when a specific location is picked we replace
+  // `quantity` with that location's qty (defaulting to 0).
+  const viewVariants = useMemo<ProductVariant[]>(() => {
+    if (selectedLocation === "all" || !selectedLocationObj) return data.variants;
+    const locName = selectedLocationObj.name;
+    return data.variants.map(v => ({
+      ...v,
+      quantity: v.byLocation[locName] ?? 0,
+    }));
+  }, [data.variants, selectedLocation, selectedLocationObj]);
+
+  const viewData = useMemo<DashboardData>(() => ({
+    variants: viewVariants,
+    locations:
+      selectedLocation === "all" || !selectedLocationObj
+        ? data.locations
+        : data.locations.filter(l => l.location === selectedLocationObj.name),
+  }), [viewVariants, data.locations, selectedLocation, selectedLocationObj]);
+
   /* ─── Computed stats ─── */
   // ── Bug fix: Cost / Retail / Margin must be derived from the SAME variant set,
   // otherwise we get nonsense like "Retail < Cost with positive margin" when

@@ -41,6 +41,7 @@ const ScanMode = lazy(() => import("@/components/ScanMode"));
 const OrderFormFlow = lazy(() => import("@/components/OrderFormFlow"));
 const PurchaseOrderPanel = lazy(() => import("@/components/PurchaseOrderPanel"));
 const OutboundPurchaseOrders = lazy(() => import("@/components/OutboundPurchaseOrders"));
+const RestockSuggestionsPanel = lazy(() => import("@/components/RestockSuggestionsPanel"));
 const SeasonManager = lazy(() => import("@/components/SeasonManager"));
 const ReorderPanel = lazy(() => import("@/components/ReorderPanel"));
 const SupplierPanel = lazy(() => import("@/components/SupplierPanel"));
@@ -169,6 +170,7 @@ const FLOW_KEYS = {
   stocky_dashboard: true,
   stock_reconciliation: true,
   teach_invoice_tutorial: true,
+  restock_suggestions: true,
 } as const;
 
 export type ActiveFlow = keyof typeof FLOW_KEYS;
@@ -529,6 +531,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       case "suppliers": flowEl = <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />; break;
       case "audit_log": flowEl = <AuditLogPanel onBack={() => setActiveFlow(null)} />; break;
       case "purchase_orders": flowEl = <OutboundPurchaseOrders onBack={() => setActiveFlow(null)} />; break;
+      case "restock_suggestions": flowEl = <RestockSuggestionsPanel onBack={() => setActiveFlow(null)} onOpenPO={() => setActiveFlow("purchase_orders")} />; break;
       case "quick_receive": flowEl = <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />; break;
       case "catalog_memory": flowEl = <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />; break;
       case "email_inbox": flowEl = <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />; break;

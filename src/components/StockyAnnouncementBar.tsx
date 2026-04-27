@@ -13,19 +13,18 @@ import { Button } from "@/components/ui/button";
 
 const STORAGE_KEY = "sonic_stocky_announcement_dismissed";
 
-const COMPARISON: Array<[string, string]> = [
-  ["Manual PO data entry", "AI extracts invoice data automatically"],
-  ["Receive stock against POs", "Receive stock from any supplier invoice"],
-  ["Inventory on hand view", "Live inventory with multi-location view"],
-  ["Supplier management", "Supplier Brain — AI-trained per supplier"],
-  ["Low stock reports", "Low stock alerts with depletion forecast"],
-  ["Rule-based restock forecasting", "Velocity-based restock suggestions"],
-  ["ABC analysis", "ABC analysis built in"],
-  ["Stock adjustments", "Manual stock adjustments"],
-  ["Stocktakes", "Stocktake module with barcode scan"],
-  ["No accounting integration", "Xero + MYOB integration"],
-  ["No email automation", "Auto-pulls invoices from your inbox"],
-  ["Shuts down August 31, 2026", "Built for the long term"],
+const COMPARISON: Array<[string, string, "live" | "soon"]> = [
+  ["Manual PO data entry", "AI extracts invoice data automatically", "live"],
+  ["Inventory on hand view", "Live inventory view", "live"],
+  ["Supplier management", "Supplier Brain — AI-trained per supplier", "live"],
+  ["No email automation", "Auto-pulls invoices from your inbox", "live"],
+  ["No accounting integration", "Xero + MYOB integration", "live"],
+  ["Privacy policy", "Privacy policy with AI disclosure", "live"],
+  ["Low stock reports", "Coming soon", "soon"],
+  ["Rule-based restock forecasting", "Coming soon", "soon"],
+  ["ABC analysis", "Coming soon", "soon"],
+  ["Stock adjustments", "Coming soon", "soon"],
+  ["Stocktakes", "Coming soon", "soon"],
 ];
 
 export default function StockyAnnouncementBar() {
@@ -134,15 +133,18 @@ export default function StockyAnnouncementBar() {
                   </tr>
                 </thead>
                 <tbody>
-                  {COMPARISON.map(([s, v], i) => (
+                  {COMPARISON.map(([s, v, status], i) => (
                     <tr key={i} className={i % 2 === 0 ? "bg-muted/20" : "bg-background"}>
                       <td className="px-4 py-2.5 text-muted-foreground line-through decoration-muted-foreground/40">
                         {s}
                       </td>
                       <td className="px-4 py-2.5 text-foreground">
                         <span className="inline-flex items-center gap-2">
-                          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 shrink-0">
-                            <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                          <span className={status === "live"
+                            ? "inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 shrink-0"
+                            : "inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-100 text-amber-700 shrink-0 text-[10px]"
+                          }>
+                            {status === "live" ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : "🔜"}
                           </span>
                           {v}
                         </span>

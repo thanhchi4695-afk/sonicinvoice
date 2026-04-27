@@ -19,10 +19,7 @@ import {
   normalizeStoreUrl, type DirectStore,
 } from "@/lib/shopify-direct";
 import { getCollectionRules, saveCollectionRules, resetCollectionRules, type CollectionRule } from "@/lib/collection-engine";
-import {
-  saveConnection, testConnection, getConnection, deleteConnection,
-  getLocations, updateConnectionSettings, ShopifyConnection, initiateOAuth,
-} from "@/lib/shopify-api";
+import { saveConnection } from "@/lib/shopify-api";
 import { getApiKeys, saveApiKeys, getCacheStats, clearCache, type PriceApiKeys } from "@/lib/price-intelligence";
 import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType, type LightspeedVersion } from "@/lib/prompt-builder";
 import { getIndustryProfileChoices, getIndustryDefinition } from "@/lib/industry-config";
@@ -51,18 +48,6 @@ const AccountScreen = () => {
   const [taxRegion, setTaxRegion] = useState(() => getTaxConfig().regionCode || "AU");
   const [taxSubRegion, setTaxSubRegion] = useState(() => getTaxConfig().subRegionCode || "");
 
-  // Shopify connection
-  const [shopifyUrl, setShopifyUrl] = useState("");
-  const [shopifyConnected, setShopifyConnected] = useState(false);
-  const [shopName, setShopName] = useState("");
-  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
-  const [testMessage, setTestMessage] = useState("");
-  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
-  const [defaultLocation, setDefaultLocation] = useState("");
-  const [productStatus, setProductStatus] = useState("draft");
-  const [saving, setSaving] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(false);
-
   useEffect(() => {
     const cfg = getStoreConfig();
     setStoreName(cfg.name || '');
@@ -71,72 +56,7 @@ const AccountScreen = () => {
     setLsVersion(cfg.lightspeedVersion || 'x_series');
     setStoreCity(cfg.city || '');
     setFreeShippingThreshold(cfg.freeShippingThreshold || '');
-
-    getConnection().then((conn) => {
-      if (conn) {
-        setShopifyUrl(conn.store_url);
-        setShopifyConnected(true);
-        setShopName(conn.shop_name || conn.store_url);
-        setDefaultLocation(conn.default_location_id || "");
-        setProductStatus(conn.product_status || "draft");
-      }
-    });
-
-    // Check if returning from OAuth
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("shopify_connected") === "1") {
-      window.history.replaceState({}, "", window.location.pathname);
-      getConnection().then((conn) => {
-        if (conn) {
-          setShopifyUrl(conn.store_url);
-          setShopifyConnected(true);
-          setShopName(conn.shop_name || conn.store_url);
-        }
-      });
-    }
   }, []);
-
-  const handleOAuthConnect = async () => {
-    if (!shopifyUrl) {
-      setTestStatus("error");
-      setTestMessage("Enter your store URL first");
-      return;
-    }
-    setOauthLoading(true);
-    setTestStatus("idle");
-    try {
-      const url = shopifyUrl.includes(".myshopify.com")
-        ? shopifyUrl
-        : `${shopifyUrl}.myshopify.com`;
-      const installUrl = await initiateOAuth(url);
-      window.location.href = installUrl;
-    } catch (err) {
-      setTestStatus("error");
-      setTestMessage(err instanceof Error ? err.message : "OAuth failed");
-      setOauthLoading(false);
-    }
-  };
-
-  const handleDisconnect = async () => {
-    await deleteConnection();
-    setShopifyConnected(false);
-    setShopifyUrl("");
-    setShopName("");
-    setTestStatus("idle");
-    setTestMessage("");
-    setLocations([]);
-  };
-
-  const handleSaveSettings = async () => {
-    setSaving(true);
-    try {
-      await updateConnectionSettings({
-        default_location_id: defaultLocation || undefined,
-        product_status: productStatus,
-      });
-    } catch {}
-    setSaving(false);
-  };
 
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
@@ -295,91 +215,6 @@ const AccountScreen = () => {
           <BrandDatabaseSyncPanel />
         </Section>
       )}
-
-      {/* Shopify Connection */}
-      <Section title="Shopify connection">
-        {shopifyConnected && (
-          <div className="bg-success/10 rounded-lg p-3 mb-3 flex items-center gap-2">
-            <Check className="w-4 h-4 text-success" />
-            <span className="text-sm text-success font-medium">Connected to: {shopName}</span>
-          </div>
-        )}
-
-        {shopifyConnected && <ShopifyTokenMigrationButton />}
-
-        {!shopifyConnected && (
-          <>
-            <Field
-              label="Store URL"
-              value={shopifyUrl}
-              onChange={setShopifyUrl}
-              placeholder="yourstore.myshopify.com"
-            />
-
-            <Button
-              variant="outline"
-              className="w-full h-10"
-              onClick={handleOAuthConnect}
-              disabled={oauthLoading}
-            >
-              {oauthLoading ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <ExternalLink className="w-4 h-4 mr-2" />
-              )}
-              {oauthLoading ? "Redirecting to Shopify..." : "Connect to Shopify"}
-            </Button>
-
-            <p className="text-[11px] text-muted-foreground">
-              You'll be redirected to Shopify to authorize access. No manual tokens needed.
-            </p>
-          </>
-        )}
-
-        {testStatus === "error" && (
-          <p className="text-xs text-destructive flex items-center gap-1 mt-1">
-            <X className="w-3 h-3" /> {testMessage}
-          </p>
-        )}
-
-        {testStatus === "success" && (
-          <p className="text-xs text-success flex items-center gap-1 mt-1">
-            <Check className="w-3 h-3" /> {testMessage}
-          </p>
-        )}
-        {testStatus === "error" && (
-          <p className="text-xs text-destructive flex items-center gap-1 mt-1">
-            <X className="w-3 h-3" /> {testMessage}
-          </p>
-        )}
-
-        {/* Store settings after connection */}
-        {shopifyConnected && (
-          <div className="mt-3 space-y-3 pt-3 border-t border-border">
-            {locations.length > 0 && (
-              <SelectField
-                label="Default location"
-                value={defaultLocation}
-                onChange={(v) => { setDefaultLocation(v); }}
-                options={locations.map((l) => ({ v: l.id, l: l.name }))}
-              />
-            )}
-            <SelectField
-              label="Product status"
-              value={productStatus}
-              onChange={(v) => { setProductStatus(v); }}
-              options={[{ v: "draft", l: "Draft" }, { v: "active", l: "Active" }]}
-            />
-            <Button variant="outline" size="sm" onClick={handleSaveSettings} disabled={saving} className="w-full">
-              {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
-              Save Shopify settings
-            </Button>
-            <button onClick={handleDisconnect} className="flex items-center gap-1 text-xs text-destructive mt-2">
-              <Unplug className="w-3 h-3" /> Disconnect Shopify
-            </button>
-          </div>
-        )}
-      </Section>
 
       {/* Automation — AI Watchdog Agent */}
       <Section title="Automation">

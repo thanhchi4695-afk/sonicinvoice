@@ -48,7 +48,7 @@ const Support = () => {
           <div className="space-y-4 text-sm">
             {[
               { q: "How do I convert an invoice to Shopify products?", a: "Upload any PDF, Excel, CSV, or Word invoice. AI extracts every product and maps it to Shopify fields — title, SKU, barcode, price, cost, quantity, colour, size. Review and push to Shopify in minutes." },
-              { q: "What platforms does Sonic Invoices connect to?", a: "Sonic Invoices currently connects to Shopify (direct inventory and product push), Lightspeed (CSV export), Xero and MYOB (accounting sync), and Gmail (auto invoice monitoring). Wholesale platform integrations like JOOR and Faire are on the roadmap." },
+              { q: "What platforms does Sonic Invoices connect to?", a: "Sonic Invoices currently connects to Shopify (direct inventory push), Lightspeed (CSV export), Xero, and MYOB. Additional wholesale platform integrations are planned for a future release." },
               { q: "How do bulk discounts work?", a: "Apply bulk discounts, markups, or exact pricing to any product selection. Put entire collections on sale or restore original prices. Margin protection ensures no product falls below cost." },
               { q: "What file types are supported?", a: "PDF (digital and scanned), Excel (XLSX/XLS), CSV, Word documents, and invoice photos (JPG/PNG)." },
               { q: "Will anything push to Shopify automatically?", a: "No. Every action requires your approval. Nothing posts to Shopify without you clicking confirm." },

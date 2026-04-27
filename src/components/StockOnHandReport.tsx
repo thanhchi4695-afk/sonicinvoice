@@ -255,11 +255,14 @@ const StockOnHandReport = () => {
   const filteredRows = useMemo(() => {
     let out = rows;
     if (locationFilter !== "all") out = out.filter(r => r.location === locationFilter);
+    if (globalLocSelected !== "all" && globalLocObj) {
+      out = out.filter(r => r.location === globalLocObj.name);
+    }
     if (vendorFilter.length > 0) out = out.filter(r => vendorFilter.includes(r.vendor));
     if (typeFilter.length > 0) out = out.filter(r => typeFilter.includes(r.productType));
     if (hideZero) out = out.filter(r => r.quantity > 0);
     return out;
-  }, [rows, locationFilter, vendorFilter, typeFilter, hideZero]);
+  }, [rows, locationFilter, globalLocSelected, globalLocObj, vendorFilter, typeFilter, hideZero]);
 
   // Sorting
   const sortedRows = useMemo(() => {

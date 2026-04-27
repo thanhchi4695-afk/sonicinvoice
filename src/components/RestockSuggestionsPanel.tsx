@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { ArrowLeft, Loader2, Sparkles, ShoppingCart, RefreshCw, Search } from "lucide-react";
+import { ArrowLeft, Loader2, Sparkles, ShoppingCart, RefreshCw, Search, Ban } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,17 @@ import LocationFilter from "@/components/LocationFilter";
 import { useShopifyLocations } from "@/hooks/use-shopify-locations";
 import { toast } from "sonner";
 import { addAuditEntry } from "@/lib/audit-log";
+import {
+  buildSupplierDefaultMap,
+  loadRestockOverrides,
+  REFILL_ROW_BG,
+  RESTOCK_STATUS_BADGE,
+  RESTOCK_STATUS_EMOJI,
+  RESTOCK_STATUS_LABEL,
+  resolveRestockStatus,
+  setRestockStatusBulk,
+  type RestockStatus,
+} from "@/lib/restock-status";
 
 interface Props {
   onBack: () => void;
@@ -55,6 +66,7 @@ interface RestockRow {
   override_qty: number;
   days_to_depletion: number;          // Infinity when no sales
   urgency: Urgency;
+  restock_status: RestockStatus;
 }
 
 const DEFAULT_LEAD = 14;
@@ -83,13 +95,17 @@ function formatDays(d: number) {
 export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<RestockRow[]>([]);
+  const [excludedNoReorder, setExcludedNoReorder] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [vendorFilter, setVendorFilter] = useState<string[]>([]);
   const [urgencyFilter, setUrgencyFilter] = useState<"all" | Urgency>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "ongoing" | "refill">("all");
   const [minQty, setMinQty] = useState(1);
   const [search, setSearch] = useState("");
   const [supplierLeads, setSupplierLeads] = useState<Map<string, SupplierLeadInfo>>(new Map());
   const [savingLeads, setSavingLeads] = useState(false);
+  const [singlePoMode, setSinglePoMode] = useState<"per_vendor" | "single">("per_vendor");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const { selected: globalLocSelected, locations: globalLocs } = useShopifyLocations();
   const globalLocObj = useMemo(
@@ -107,7 +123,7 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
       // 1. Catalog (current qty, cost, etc.)
       const { data: catalog } = await supabase
         .from("product_catalog_cache")
-        .select("vendor, sku, barcode, product_title, variant_title, current_qty, current_cost, platform_product_id, platform_variant_id")
+        .select("vendor, sku, barcode, product_title, variant_title, current_qty, current_cost, platform_product_id, platform_variant_id, restock_status" as any)
         .eq("user_id", user.id)
         .limit(20000);
 
@@ -127,7 +143,7 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
         sold30.set(sku, (sold30.get(sku) || 0) + Number(s.quantity_sold || 0));
       });
 
-      // 3. Supplier profiles → lead_time / restock_period
+      // 3. Supplier profiles → lead_time / restock_period / default_restock_status
       const { data: profiles } = await supabase
         .from("supplier_profiles")
         .select("id, supplier_name, profile_data")
@@ -145,8 +161,12 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
       });
       setSupplierLeads(leadMap);
 
+      const supplierDefaults = buildSupplierDefaultMap(profiles as any);
+      const overrides = await loadRestockOverrides(user.id);
+
       // 4. Build restock rows
       const out: RestockRow[] = [];
+      let excluded = 0;
       (catalog || []).forEach((c: any) => {
         const vendor = (c.vendor || "Unknown").toString();
         const lead = leadMap.get(vendor.toLowerCase())?.lead_time_days ?? DEFAULT_LEAD;
@@ -156,6 +176,16 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
         const perDay = sold / 30;
         const suggested = Math.max(0, Math.ceil(perDay * (lead + restock) - available));
         if (suggested <= 0) return; // only show items needing restock
+
+        const status = resolveRestockStatus({
+          platformVariantId: c.platform_variant_id,
+          vendor,
+          cacheStatus: c.restock_status,
+          overrides,
+          supplierDefaults,
+        });
+        if (status === "no_reorder") { excluded += 1; return; } // never suggest
+
         const dtd = perDay > 0 ? available / perDay : Infinity;
         out.push({
           key: `${c.platform_variant_id || c.sku || c.product_title}-${c.variant_title || ""}`,
@@ -175,11 +205,13 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
           override_qty: suggested,
           days_to_depletion: dtd,
           urgency: urgencyFor(dtd),
+          restock_status: status,
         });
       });
 
       out.sort((a, b) => a.days_to_depletion - b.days_to_depletion);
       setRows(out);
+      setExcludedNoReorder(excluded);
     } catch (e: any) {
       toast.error(e.message || "Failed to load restock suggestions");
     } finally {
@@ -201,6 +233,7 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
     return rows.filter((r) => {
       if (vendorFilter.length && !vendorFilter.includes(r.vendor)) return false;
       if (urgencyFilter !== "all" && r.urgency !== urgencyFilter) return false;
+      if (statusFilter !== "all" && r.restock_status !== statusFilter) return false;
       if ((r.override_qty ?? r.suggested_qty) < minQty) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -212,7 +245,18 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
       }
       return true;
     });
-  }, [rows, vendorFilter, urgencyFilter, minQty, search]);
+  }, [rows, vendorFilter, urgencyFilter, statusFilter, minQty, search]);
+
+  // Summary card counts (based on filtered)
+  const summary = useMemo(() => {
+    let critical = 0, ongoingCount = 0, refillCount = 0;
+    filtered.forEach((r) => {
+      if (r.urgency === "critical") critical += 1;
+      if (r.restock_status === "ongoing") ongoingCount += 1;
+      else if (r.restock_status === "refill") refillCount += 1;
+    });
+    return { critical, ongoingCount, refillCount };
+  }, [filtered]);
 
   // Recalculate suggestion when supplier lead/restock changes locally
   const updateLead = (vendor: string, patch: Partial<SupplierLeadInfo>) => {
@@ -313,15 +357,11 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
   const createPOFromSelected = () => {
     const lines = filtered.filter((r) => selected.has(r.key) && r.override_qty > 0);
     if (!lines.length) { toast.info("Select at least one line"); return; }
-    // Group by vendor — if multiple vendors, send first only and warn
     const vendorsInSelection = Array.from(new Set(lines.map((l) => l.vendor)));
-    if (vendorsInSelection.length > 1) {
-      toast.warning(`Selection spans ${vendorsInSelection.length} vendors — only "${vendorsInSelection[0]}" will be added. Group your selection by vendor.`);
-    }
-    const vendor = vendorsInSelection[0];
-    const seeded = lines
-      .filter((l) => l.vendor === vendor)
-      .map((l) => ({
+
+    const buildSeed = (vendor: string, vendorLines: typeof lines) => ({
+      vendor,
+      lines: vendorLines.map((l) => ({
         product_title: l.product_title,
         variant_title: l.variant_title || null,
         sku: l.sku,
@@ -332,15 +372,58 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
         qty_ordered: l.override_qty,
         qty_received: 0,
         current_stock: l.available_qty,
-      }));
-    sessionStorage.setItem("restock_po_seed", JSON.stringify({
-      vendor,
-      lines: seeded,
+        restock_status: l.restock_status,
+        notes: l.restock_status === "refill" ? "🔁 Seasonal — confirm season is active" : "",
+      })),
       created_at: Date.now(),
-    }));
-    addAuditEntry("restock_create_po", `Seeding PO with ${seeded.length} lines for ${vendor}`);
+    });
+
+    if (singlePoMode === "per_vendor" && vendorsInSelection.length > 1) {
+      // Stash a queue of seeds; PO panel will pop them one by one
+      const queue = vendorsInSelection.map((v) => buildSeed(v, lines.filter((l) => l.vendor === v)));
+      sessionStorage.setItem("restock_po_seed_queue", JSON.stringify(queue));
+      sessionStorage.setItem("restock_po_seed", JSON.stringify(queue[0]));
+      toast.success(`Creating ${queue.length} POs (one per vendor) — first opened, ${queue.length - 1} queued`);
+      addAuditEntry("restock_create_po", `Queued ${queue.length} POs across vendors`);
+    } else {
+      const vendor = vendorsInSelection[0];
+      const seeded = singlePoMode === "single"
+        ? lines // single PO regardless of vendor — use first vendor name
+        : lines.filter((l) => l.vendor === vendor);
+      const seed = buildSeed(vendor, seeded);
+      sessionStorage.setItem("restock_po_seed", JSON.stringify(seed));
+      sessionStorage.removeItem("restock_po_seed_queue");
+      addAuditEntry("restock_create_po", `Seeding PO with ${seeded.length} lines for ${vendor}`);
+    }
+
     if (onOpenPO) onOpenPO();
     else window.dispatchEvent(new CustomEvent("sonic:set-flow", { detail: "purchase_orders" }));
+  };
+
+  // ── Bulk: Mark selected as No Reorder ──
+  const markSelectedNoReorder = async () => {
+    if (!selected.size) { toast.info("Select at least one line"); return; }
+    setBulkBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const targets = rows.filter((r) => selected.has(r.key));
+      await setRestockStatusBulk(
+        user.id,
+        targets.map((t) => ({ platform_variant_id: t.shopify_variant_id })),
+        "no_reorder",
+      );
+      // Remove from view immediately
+      setRows((prev) => prev.filter((r) => !selected.has(r.key)));
+      setExcludedNoReorder((n) => n + targets.length);
+      setSelected(new Set());
+      toast.success(`Marked ${targets.length} variant${targets.length === 1 ? "" : "s"} as No Reorder`);
+      addAuditEntry("restock_no_reorder", `${targets.length} variant(s) marked No Reorder`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to update");
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   // ── Affected supplier list (lead-time editor) ──
@@ -370,9 +453,19 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
           <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="w-4 h-4 mr-1" />Back</Button>
           <h1 className="text-xl font-semibold">Restock Suggestions</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          <Select value={singlePoMode} onValueChange={(v) => setSinglePoMode(v as any)}>
+            <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="per_vendor">One PO per vendor</SelectItem>
+              <SelectItem value="single">Single PO</SelectItem>
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loading ? "animate-spin" : ""}`} />Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={markSelectedNoReorder} disabled={!selected.size || bulkBusy}>
+            <Ban className="w-3.5 h-3.5 mr-1" />Mark No Reorder ({selected.size})
           </Button>
           <Button size="sm" onClick={createPOFromSelected} disabled={!selected.size}>
             <ShoppingCart className="w-3.5 h-3.5 mr-1" />Create PO from selected ({selected.size})
@@ -380,9 +473,31 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        Based on current stock levels and sales velocity, these products need reordering. Review and create a PO directly from this list. Suggested qty = (sales/day × (lead + restock period)) − available qty.
-      </p>
+      <div className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+        Showing restock suggestions for <strong>Ongoing</strong> and <strong>Refill</strong> products only.
+        Products marked <strong>No Reorder</strong> are excluded.
+        Update restock status in Inventory → Restock column.
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card><CardContent className="pt-4">
+          <div className="text-[11px] text-muted-foreground">🔴 Critical (≤7 days)</div>
+          <div className="text-2xl font-semibold text-destructive">{summary.critical}</div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4">
+          <div className="text-[11px] text-muted-foreground">🔄 Ongoing to reorder</div>
+          <div className="text-2xl font-semibold">{summary.ongoingCount}</div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4">
+          <div className="text-[11px] text-muted-foreground">🔁 Refill to reorder</div>
+          <div className="text-2xl font-semibold text-primary">{summary.refillCount}</div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4">
+          <div className="text-[11px] text-muted-foreground">⛔ Excluded (No Reorder)</div>
+          <div className="text-2xl font-semibold text-muted-foreground">{excludedNoReorder}</div>
+        </CardContent></Card>
+      </div>
 
       {/* Filters */}
       <Card>
@@ -416,6 +531,17 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
                 <SelectItem value="critical">🔴 Critical (≤7 days)</SelectItem>
                 <SelectItem value="low">🟠 Low (8–14 days)</SelectItem>
                 <SelectItem value="plan">🟡 Plan (15–30 days)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Restock Status</Label>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All (Ongoing + Refill)</SelectItem>
+                <SelectItem value="ongoing">🔄 Ongoing only</SelectItem>
+                <SelectItem value="refill">🔁 Refill only</SelectItem>
               </SelectContent>
             </Select>
           </div>

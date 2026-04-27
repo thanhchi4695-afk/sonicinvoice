@@ -2280,6 +2280,7 @@ export type Database = {
           platform_product_id: string
           platform_variant_id: string | null
           product_title: string | null
+          restock_status: string
           size: string | null
           sku: string | null
           user_id: string
@@ -2298,6 +2299,7 @@ export type Database = {
           platform_product_id: string
           platform_variant_id?: string | null
           product_title?: string | null
+          restock_status?: string
           size?: string | null
           sku?: string | null
           user_id: string
@@ -2316,6 +2318,7 @@ export type Database = {
           platform_product_id?: string
           platform_variant_id?: string | null
           product_title?: string | null
+          restock_status?: string
           size?: string | null
           sku?: string | null
           user_id?: string
@@ -2708,6 +2711,39 @@ export type Database = {
           status?: string
           supplier_name?: string | null
           total_lines?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      restock_status_override: {
+        Row: {
+          id: string
+          platform: string
+          platform_variant_id: string
+          restock_status: string
+          shop_domain: string | null
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          platform?: string
+          platform_variant_id: string
+          restock_status: string
+          shop_domain?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          platform?: string
+          platform_variant_id?: string
+          restock_status?: string
+          shop_domain?: string | null
+          updated_at?: string
+          updated_by?: string | null
           user_id?: string
         }
         Relationships: []

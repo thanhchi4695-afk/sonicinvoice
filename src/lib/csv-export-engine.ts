@@ -563,8 +563,13 @@ export function generateShopifyCSV(
 const VARIANT_MODE_KEY = "sonic_invoice_variant_mode";
 
 export function getVariantMode(): VariantMode {
-  return (localStorage.getItem(VARIANT_MODE_KEY) as VariantMode) || "simple";
+  // Default to "variant" so multiple invoice rows for the same product collapse
+  // into one Shopify product with multiple variants (or one merged variant when
+  // sizes/colours are missing). "simple" was producing one Shopify product per
+  // raw row, which Shopify rejected when SKUs/handles collided.
+  return (localStorage.getItem(VARIANT_MODE_KEY) as VariantMode) || "variant";
 }
+
 
 export function setVariantMode(mode: VariantMode): void {
   localStorage.setItem(VARIANT_MODE_KEY, mode);

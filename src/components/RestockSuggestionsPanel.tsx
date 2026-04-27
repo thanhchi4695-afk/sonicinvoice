@@ -233,6 +233,7 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
     return rows.filter((r) => {
       if (vendorFilter.length && !vendorFilter.includes(r.vendor)) return false;
       if (urgencyFilter !== "all" && r.urgency !== urgencyFilter) return false;
+      if (statusFilter !== "all" && r.restock_status !== statusFilter) return false;
       if ((r.override_qty ?? r.suggested_qty) < minQty) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -244,7 +245,18 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
       }
       return true;
     });
-  }, [rows, vendorFilter, urgencyFilter, minQty, search]);
+  }, [rows, vendorFilter, urgencyFilter, statusFilter, minQty, search]);
+
+  // Summary card counts (based on filtered)
+  const summary = useMemo(() => {
+    let critical = 0, ongoingCount = 0, refillCount = 0;
+    filtered.forEach((r) => {
+      if (r.urgency === "critical") critical += 1;
+      if (r.restock_status === "ongoing") ongoingCount += 1;
+      else if (r.restock_status === "refill") refillCount += 1;
+    });
+    return { critical, ongoingCount, refillCount };
+  }, [filtered]);
 
   // Recalculate suggestion when supplier lead/restock changes locally
   const updateLead = (vendor: string, patch: Partial<SupplierLeadInfo>) => {

@@ -51,6 +51,14 @@ import { cn } from "@/lib/utils";
 import { format, subDays } from "date-fns";
 import LocationFilter from "@/components/LocationFilter";
 import { useShopifyLocations } from "@/hooks/use-shopify-locations";
+import {
+  type RestockStatus,
+  RESTOCK_STATUS_LABEL,
+  loadRestockOverrides,
+  buildSupplierDefaultMap,
+  resolveRestockStatus,
+} from "@/lib/restock-status";
+import RestockStatusCell from "@/components/RestockStatusCell";
 
 // ── Types ────────────────────────────────────────────────────────────
 

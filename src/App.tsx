@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ShopifyEmbeddedProvider from "@/components/ShopifyEmbeddedProvider";
 import EmbeddedAuthHealthCheck from "@/components/EmbeddedAuthHealthCheck";
 import InstallAppBanner from "@/components/InstallAppBanner";
+import StockyAnnouncementBar from "@/components/StockyAnnouncementBar";
 import BarcodeProvider from "@/components/BarcodeProvider";
 import { ConfirmDialogProvider } from "@/hooks/use-confirm-dialog";
 import { PromptDialogProvider } from "@/hooks/use-prompt-dialog";

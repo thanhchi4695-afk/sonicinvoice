@@ -467,15 +467,16 @@ const ReportsHub = ({ onBack }: ReportsHubProps) => {
   if (activeReport) {
     const card = REPORT_CARDS.find(c => c.id === activeReport)!;
     const Icon = card.icon;
-    const isWide = activeReport === "low_stock";
+    const isWide = activeReport === "low_stock" || activeReport === "stock_on_hand";
     return (
-      <div className={cn("mx-auto p-4 space-y-4", isWide ? "max-w-7xl" : "max-w-4xl")}>
+      <div className={cn("mx-auto p-4 space-y-4", isWide ? "max-w-[1600px]" : "max-w-4xl")}>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setActiveReport(null)}><ArrowLeft className="h-4 w-4 mr-1" />Reports</Button>
           <Icon className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold">{card.title}</h2>
         </div>
         {activeReport === "low_stock" && <LowStockReport />}
+        {activeReport === "stock_on_hand" && <StockOnHandReport />}
         {activeReport === "valuation" && <InventoryValuationReport />}
         {activeReport === "ageing" && <StockAgeingReport />}
         {activeReport === "supplier" && <SupplierPerformanceReport />}

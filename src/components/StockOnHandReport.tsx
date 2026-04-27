@@ -395,8 +395,9 @@ const StockOnHandReport = () => {
 
         {/* Filters */}
         <Card><CardContent className="p-3 flex flex-wrap items-center gap-3">
+          <LocationFilter showLabel={false} size="sm" />
           <div className="flex items-center gap-2">
-            <Label className="text-xs">Location</Label>
+            <Label className="text-xs">Sub-location</Label>
             <Select value={locationFilter} onValueChange={setLocationFilter}>
               <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
-import { ArrowLeft, Download, Calendar, TrendingUp, Package, Users, ShoppingCart, ArrowRightLeft } from "lucide-react";
+import { ArrowLeft, Download, Calendar, TrendingUp, Package, Users, ShoppingCart, ArrowRightLeft, AlertTriangle } from "lucide-react";
+import LowStockReport from "./LowStockReport";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,13 +16,14 @@ import { format, subDays, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-type ReportId = "valuation" | "ageing" | "supplier" | "sales" | "movement";
+type ReportId = "low_stock" | "valuation" | "ageing" | "supplier" | "sales" | "movement";
 
 interface ReportsHubProps {
   onBack: () => void;
 }
 
 const REPORT_CARDS: { id: ReportId; title: string; desc: string; icon: React.ElementType }[] = [
+  { id: "low_stock", title: "Low Stock Report", desc: "Vendor urgency, days to depletion & lost revenue", icon: AlertTriangle },
   { id: "valuation", title: "Inventory Valuation", desc: "On hand × cost per product, grouped by type", icon: Package },
   { id: "ageing", title: "Stock Ageing", desc: "Variants grouped by days since last sale", icon: TrendingUp },
   { id: "supplier", title: "Supplier Performance", desc: "On-time delivery, fill rate & cost trends", icon: Users },
@@ -463,13 +465,15 @@ const ReportsHub = ({ onBack }: ReportsHubProps) => {
   if (activeReport) {
     const card = REPORT_CARDS.find(c => c.id === activeReport)!;
     const Icon = card.icon;
+    const isWide = activeReport === "low_stock";
     return (
-      <div className="max-w-4xl mx-auto p-4 space-y-4">
+      <div className={cn("mx-auto p-4 space-y-4", isWide ? "max-w-7xl" : "max-w-4xl")}>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setActiveReport(null)}><ArrowLeft className="h-4 w-4 mr-1" />Reports</Button>
           <Icon className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold">{card.title}</h2>
         </div>
+        {activeReport === "low_stock" && <LowStockReport />}
         {activeReport === "valuation" && <InventoryValuationReport />}
         {activeReport === "ageing" && <StockAgeingReport />}
         {activeReport === "supplier" && <SupplierPerformanceReport />}

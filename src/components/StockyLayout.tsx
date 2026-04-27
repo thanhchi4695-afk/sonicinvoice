@@ -19,6 +19,7 @@ import {
   GraduationCap,
   History as HistoryIcon,
   CreditCard,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

@@ -1,4 +1,4 @@
-import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight, X, Users, Brain, History } from "lucide-react";
+import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight, X, Users, Brain, History, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EmbeddedNavProps {
@@ -30,6 +30,7 @@ const navSections = [
       { id: "supplier_intelligence", label: "Supplier Brain", icon: Brain, type: "flow" as const },
       { id: "catalog_memory", label: "Catalog Memory", icon: BookOpen, type: "flow" as const },
       { id: "restock", label: "Restock Analytics", icon: Package, type: "flow" as const },
+      { id: "restock_suggestions", label: "Restock Suggestions", icon: Sparkles, type: "flow" as const },
       { id: "collab_seo", label: "Collab SEO", icon: Link, type: "flow" as const },
       { id: "google_ads_setup", label: "Google Ads Setup", icon: Megaphone, type: "flow" as const },
       { id: "meta_ads_setup", label: "Meta Ads Setup", icon: Target, type: "flow" as const },

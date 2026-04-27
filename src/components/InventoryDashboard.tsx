@@ -62,6 +62,7 @@ export default function InventoryDashboard({ onBack }: Props) {
   const [data, setData] = useState<DashboardData>({ variants: [], locations: [] });
   const [tab, setTab] = useState("overview");
   const [highlightedSku, setHighlightedSku] = useState<string | null>(null);
+  const { selected: selectedLocation, selectedLocation: selectedLocationObj } = useShopifyLocations();
 
   // Global barcode scanner integration
   const { registerHandler } = useBarcode();

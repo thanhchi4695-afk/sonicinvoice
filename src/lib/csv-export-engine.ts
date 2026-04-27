@@ -240,7 +240,21 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
   const lines: ExportLine[] = rawLines.flatMap((ln) => expandLineBySize(ln));
 
   if (mode === "simple") {
-    return lines.map(ln => {
+    // Even in simple mode, Shopify rejects multiple rows that share the same
+    // handle but the same Default Title option value. Collapse identical lines
+    // (same brand+title+SKU+colour+size) into one with summed qty so each
+    // emitted product is unique enough for Shopify to import.
+    const simpleMap = new Map<string, ExportLine>();
+    for (const ln of lines) {
+      const k = `${(ln.brand || "").toLowerCase()}|${(ln.name || "").toLowerCase().trim()}|${(ln.sku || "").toLowerCase().trim()}|${(ln.colour || "").toLowerCase().trim()}|${(ln.size || "").toLowerCase().trim()}`;
+      const existing = simpleMap.get(k);
+      if (existing) {
+        existing.qty = (existing.qty ?? 0) + (ln.qty ?? 0);
+      } else {
+        simpleMap.set(k, { ...ln, qty: ln.qty ?? 0 });
+      }
+    }
+    return Array.from(simpleMap.values()).map(ln => {
       const title = deduplicateTitle(ln.name, ln.brand);
       return {
         handle: generateHandle(title, ln.brand),
@@ -270,6 +284,7 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
       };
     });
   }
+
 
   // Variant mode: group by normalized base title + vendor + type
   const groups = new Map<string, { base: ExportLine; lines: ExportLine[] }>();

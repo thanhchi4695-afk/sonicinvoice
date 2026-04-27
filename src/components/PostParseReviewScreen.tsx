@@ -286,6 +286,11 @@ export default function PostParseReviewScreen({
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [showTeachAI, setShowTeachAI] = useState<number | null>(null);
   const [bulkVendor, setBulkVendor] = useState("");
+  const [bulkCollection, setBulkCollection] = useState("");
+  /** When set, only that collection is shown in by-collection mode (focus mode). */
+  const [focusedCollection, setFocusedCollection] = useState<string | null>(null);
+  /** Collection sections the user has marked as "done" — collapses them. */
+  const [doneCollections, setDoneCollections] = useState<Set<string>>(new Set());
   const [sourceTraceProduct, setSourceTraceProduct] = useState<ValidatedProduct | null>(null);
   const [showDebugZones, setShowDebugZones] = useState(false);
   const [showDebugOverlay, setShowDebugOverlay] = useState(false);

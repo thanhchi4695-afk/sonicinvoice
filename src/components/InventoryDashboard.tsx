@@ -12,10 +12,30 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import LocationFilter from "@/components/LocationFilter";
 import { useShopifyLocations } from "@/hooks/use-shopify-locations";
+import {
+  type RestockStatus,
+  RESTOCK_STATUS_LABEL,
+  RESTOCK_STATUS_EMOJI,
+  RESTOCK_STATUS_OPTIONS,
+  RESTOCK_STATUS_BADGE,
+  loadRestockOverrides,
+  buildSupplierDefaultMap,
+  resolveRestockStatus,
+} from "@/lib/restock-status";
+import RestockStatusCell, { setRestockBulk } from "@/components/RestockStatusCell";
+import { toast } from "sonner";
 
 /* ─── Types ─── */
 
@@ -34,6 +54,10 @@ interface ProductVariant {
   quantity: number;
   /** Per-location breakdown: location name → qty (only includes locations with inventory rows). */
   byLocation: Record<string, number>;
+  /** Shopify variant ID for restock-override lookup. */
+  shopifyVariantId: string | null;
+  /** Effective restock status (override → cache → supplier default → ongoing). */
+  restockStatus: RestockStatus;
 }
 
 interface InventoryLocation {
@@ -65,6 +89,9 @@ export default function InventoryDashboard({ onBack }: Props) {
   const [data, setData] = useState<DashboardData>({ variants: [], locations: [] });
   const [tab, setTab] = useState("overview");
   const [highlightedSku, setHighlightedSku] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [selectedRows, setSelectedRows] = useState<ProductVariant[]>([]);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const { selected: selectedLocation, selectedLocation: selectedLocationObj } = useShopifyLocations();
 
   // Global barcode scanner integration
@@ -77,6 +104,40 @@ export default function InventoryDashboard({ onBack }: Props) {
     });
   }, [registerHandler]);
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? null));
+  }, []);
+
+  /** Patch a single variant's restock status in local state without refetching. */
+  const patchRestockLocal = (variantIds: string[], next: RestockStatus) => {
+    setData((prev) => ({
+      ...prev,
+      variants: prev.variants.map((v) =>
+        variantIds.includes(v.variantId) ? { ...v, restockStatus: next } : v,
+      ),
+    }));
+  };
+
+  const handleBulkSetRestock = async (next: RestockStatus) => {
+    if (!userId || selectedRows.length === 0) return;
+    setBulkSaving(true);
+    try {
+      const updated = await setRestockBulk(
+        userId,
+        selectedRows.map((r) => ({ platform_variant_id: r.shopifyVariantId })),
+        next,
+      );
+      if (updated > 0) {
+        patchRestockLocal(selectedRows.map((r) => r.variantId), next);
+        toast.success(
+          `${updated} variant${updated === 1 ? "" : "s"} set to ${RESTOCK_STATUS_EMOJI[next]} ${RESTOCK_STATUS_LABEL[next]}`,
+        );
+      }
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -86,7 +147,7 @@ export default function InventoryDashboard({ onBack }: Props) {
       // Fetch variants with product info
       const { data: variantsRaw } = await supabase
         .from("variants")
-        .select("id, product_id, sku, color, size, cost, retail_price, quantity")
+        .select("id, product_id, sku, color, size, cost, retail_price, quantity, shopify_variant_id")
         .eq("user_id", user.id);
 
       const { data: productsRaw } = await supabase
@@ -98,6 +159,26 @@ export default function InventoryDashboard({ onBack }: Props) {
         .from("inventory")
         .select("variant_id, location, quantity")
         .eq("user_id", user.id);
+
+      // Restock status sources
+      const [{ data: cacheRaw }, { data: profilesRaw }, overrides] = await Promise.all([
+        supabase
+          .from("product_catalog_cache" as any)
+          .select("platform_variant_id, restock_status")
+          .eq("user_id", user.id),
+        supabase
+          .from("supplier_profiles")
+          .select("supplier_name, profile_data")
+          .eq("user_id", user.id),
+        loadRestockOverrides(user.id),
+      ]);
+      const cacheStatusByVariant = new Map<string, string>();
+      ((cacheRaw as any[]) || []).forEach((r) => {
+        if (r?.platform_variant_id && r?.restock_status) {
+          cacheStatusByVariant.set(String(r.platform_variant_id), String(r.restock_status));
+        }
+      });
+      const supplierDefaults = buildSupplierDefaultMap(profilesRaw as any);
 
       const productMap = new Map((productsRaw || []).map(p => [p.id, p]));
 
@@ -112,9 +193,9 @@ export default function InventoryDashboard({ onBack }: Props) {
       const variants: ProductVariant[] = (variantsRaw || []).map(v => {
         const prod = productMap.get(v.product_id);
         const byLocation = byVariantLocation.get(v.id) || {};
-        // If we have inventory rows, use them; otherwise fall back to variants.quantity
         const sumFromInventory = Object.values(byLocation).reduce((a, b) => a + b, 0);
         const baseQty = Object.keys(byLocation).length > 0 ? sumFromInventory : (v.quantity || 0);
+        const platformVariantId = v.shopify_variant_id || null;
         return {
           variantId: v.id,
           productId: v.product_id,
@@ -128,6 +209,14 @@ export default function InventoryDashboard({ onBack }: Props) {
           retailPrice: Number(v.retail_price) || 0,
           quantity: baseQty,
           byLocation,
+          shopifyVariantId: platformVariantId,
+          restockStatus: resolveRestockStatus({
+            platformVariantId,
+            vendor: prod?.vendor || null,
+            cacheStatus: platformVariantId ? cacheStatusByVariant.get(String(platformVariantId)) ?? null : null,
+            overrides,
+            supplierDefaults,
+          }),
         };
       });
 
@@ -498,8 +587,31 @@ export default function InventoryDashboard({ onBack }: Props) {
               data={viewData.variants}
               storageKey={`inv_products_${selectedLocation}`}
               enableSelection
+              onSelectionChange={setSelectedRows}
               pageSize={50}
               exportFilename="inventory-products.csv"
+              toolbar={
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline" disabled={selectedRows.length === 0 || bulkSaving}>
+                      Set Restock {selectedRows.length > 0 && `(${selectedRows.length})`}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuLabel className="text-[11px]">Apply to selected</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {RESTOCK_STATUS_OPTIONS.map((s) => (
+                      <DropdownMenuItem
+                        key={s}
+                        onClick={() => handleBulkSetRestock(s)}
+                        className="text-xs"
+                      >
+                        {RESTOCK_STATUS_EMOJI[s]} {RESTOCK_STATUS_LABEL[s]}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              }
               columns={[
                 { accessorKey: "sku", header: "SKU", size: 100, cell: ({ getValue }) => (
                   <span className={cn("font-mono", highlightedSku && (getValue() as string)?.toLowerCase() === highlightedSku && "text-primary font-bold")}>{(getValue() as string) || "—"}</span>
@@ -524,6 +636,22 @@ export default function InventoryDashboard({ onBack }: Props) {
                 { accessorKey: "retailPrice", header: "Retail", size: 70, cell: ({ getValue }) => `$${(getValue() as number).toFixed(2)}` },
                 { id: "margin", header: "Margin", size: 70, accessorFn: (r) => r.cost > 0 && r.retailPrice > 0 ? ((r.retailPrice - r.cost) / r.retailPrice) * 100 : -1, cell: ({ getValue }) => { const m = getValue() as number; return m >= 0 ? <Badge variant={m >= 50 ? "default" : m >= 30 ? "secondary" : "destructive"} className="text-[10px]">{m.toFixed(0)}%</Badge> : "—"; }},
                 { accessorKey: "vendor", header: "Vendor", size: 100, cell: ({ getValue }) => <span className="text-muted-foreground">{(getValue() as string) || "—"}</span> },
+                {
+                  id: "restockStatus",
+                  header: "Restock",
+                  size: 140,
+                  enableSorting: false,
+                  accessorFn: (r: ProductVariant) => r.restockStatus,
+                  cell: ({ row }) => (
+                    <RestockStatusCell
+                      value={(row.original as ProductVariant).restockStatus}
+                      platformVariantId={(row.original as ProductVariant).shopifyVariantId}
+                      userId={userId}
+                      size="xs"
+                      onChange={(next) => patchRestockLocal([(row.original as ProductVariant).variantId], next)}
+                    />
+                  ),
+                },
               ] as ColumnDef<ProductVariant, any>[]}
             />
           </TabsContent>

@@ -4390,7 +4390,6 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               <Button variant="outline" size="sm" onClick={() => setPreviewAll(true)} className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview all</Button>
               <Button variant="outline" size="sm" onClick={() => setImageHelperActive(true)} className="gap-1"><ImageIcon className="w-3.5 h-3.5" /> Images</Button>
               <Button variant="outline" size="sm" onClick={() => setPriceMatchActive(true)} className="gap-1"><Tag className="w-3.5 h-3.5" /> Price Match</Button>
-              <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
               <Button variant="teal" size="sm" onClick={() => { finalizeQualityMetrics(); setStep(4); }}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>
           </div>
@@ -4607,7 +4606,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setStep(3)}>
                       Review issues first
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground">
+                    <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => { finalizeQualityMetrics(); /* user explicitly bypassed gate; keep step 4 active */ }}>
                       Export all anyway
                     </Button>
                   </div>
@@ -5398,7 +5397,6 @@ const VariantGroupCard = ({ group, onSplit, onPreview }: {
             <Button variant="ghost" size="sm" onClick={onSplit}>
               <Scissors className="w-3.5 h-3.5 mr-1" /> Split into separate products
             </Button>
-            <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
           </div>
         </div>
       )}

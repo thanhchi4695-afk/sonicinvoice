@@ -286,11 +286,29 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
 
   return Array.from(groups.values()).map(({ base, lines: groupLines }) => {
     const title = deduplicateTitle(base.name.replace(/\b(XXS|XS|S|M|L|XL|XXL|\d{1,3})\b/gi, "").trim() || base.name, base.brand);
-    const hasSize = groupLines.some(l => l.size);
-    const hasColour = groupLines.some(l => l.colour);
-    const isMultiVariant = groupLines.length > 1 || hasSize || hasColour;
+    const hasSize = groupLines.some(l => !!l.size);
+    const hasColour = groupLines.some(l => !!l.colour);
+
+    // CRITICAL: Shopify rejects products where multiple variants share the same option-value combination.
+    // Merge duplicate variants (same colour+size+sku) by summing qty. If a group has no size and no colour
+    // distinction at all, collapse to a single Default Title variant.
+    const mergeKey = (ln: ExportLine) =>
+      `${(ln.colour || "").toLowerCase().trim()}|${(ln.size || "").toLowerCase().trim()}|${(ln.sku || "").toLowerCase().trim()}`;
+    const mergedMap = new Map<string, ExportLine>();
+    for (const ln of groupLines) {
+      const k = mergeKey(ln);
+      const existing = mergedMap.get(k);
+      if (existing) {
+        existing.qty = (existing.qty ?? 0) + (ln.qty ?? 0);
+      } else {
+        mergedMap.set(k, { ...ln, qty: ln.qty ?? 0 });
+      }
+    }
+    const mergedLines = Array.from(mergedMap.values());
+    const isMultiVariant = mergedLines.length > 1 || hasSize || hasColour;
 
     if (!isMultiVariant) {
+      const only = mergedLines[0] ?? base;
       return {
         handle: generateHandle(title, base.brand),
         title,
@@ -307,13 +325,12 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
         variants: [{
           option1Name: "Title",
           option1Value: "Default Title",
-          price: base.rrp.toFixed(2),
-          // Compare-at-price stays blank by default (set only when applying a markdown/sale).
+          price: only.rrp.toFixed(2),
           compareAtPrice: "",
-          sku: base.sku || "",
-          barcode: base.barcode || "",
-          cogs: base.cogs?.toFixed(2),
-          qty: String(base.qty ?? 0),
+          sku: only.sku || "",
+          barcode: only.barcode || "",
+          cogs: only.cogs?.toFixed(2),
+          qty: String(only.qty ?? 0),
         }],
       };
     }
@@ -323,19 +340,33 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
     const option1Name = hasColour ? "Colour" : hasSize ? "Size" : "Title";
     const option2Name = hasColour && hasSize ? "Size" : undefined;
 
-    const variants = groupLines.map(ln => ({
-      option1Name,
-      option1Value: hasColour ? (ln.colour || "Default") : hasSize ? (ln.size || "One Size") : "Default Title",
-      option2Name,
-      option2Value: option2Name ? (ln.size || "One Size") : undefined,
-      price: ln.rrp.toFixed(2),
-      // Compare-at-price stays blank by default (set only when applying a markdown/sale).
-      compareAtPrice: "",
-      sku: ln.sku || "",
-      barcode: ln.barcode || "",
-      cogs: ln.cogs?.toFixed(2),
-      qty: String(ln.qty ?? 0),
-    }));
+    // Final dedupe pass on the option-value combination Shopify actually sees.
+    const seenOptionKey = new Set<string>();
+    const variants: GroupedProduct["variants"] = [];
+    for (const ln of mergedLines) {
+      const o1 = hasColour ? (ln.colour || "Default") : hasSize ? (ln.size || "One Size") : "Default Title";
+      const o2 = option2Name ? (ln.size || "One Size") : undefined;
+      const optKey = `${o1}||${o2 ?? ""}`.toLowerCase();
+      if (seenOptionKey.has(optKey)) {
+        // Roll qty into the existing variant with the same option combination.
+        const existing = variants.find(v => `${v.option1Value}||${v.option2Value ?? ""}`.toLowerCase() === optKey);
+        if (existing) existing.qty = String((parseInt(existing.qty || "0", 10) || 0) + (ln.qty ?? 0));
+        continue;
+      }
+      seenOptionKey.add(optKey);
+      variants.push({
+        option1Name,
+        option1Value: o1,
+        option2Name,
+        option2Value: o2,
+        price: ln.rrp.toFixed(2),
+        compareAtPrice: "",
+        sku: ln.sku || "",
+        barcode: ln.barcode || "",
+        cogs: ln.cogs?.toFixed(2),
+        qty: String(ln.qty ?? 0),
+      });
+    }
 
     return {
       handle,

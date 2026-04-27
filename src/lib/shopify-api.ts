@@ -400,6 +400,15 @@ export async function adjustInventory(locationId: string, inventoryItemId: strin
   });
 }
 
+export async function setInventory(locationId: string, inventoryItemId: string, available: number): Promise<void> {
+  await callProxy({
+    action: "set_inventory" as any,
+    location_id: locationId,
+    inventory_item_id: inventoryItemId,
+    available,
+  } as any);
+}
+
 export async function updateVariantCost(variantId: string, cost: string): Promise<void> {
   await callProxy({ action: "update_variant_cost", variant_id: variantId, cost });
 }

@@ -12,7 +12,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "update_variant_price" | "adjust_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog" | "graphql_create_collection";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "update_variant_price" | "adjust_inventory" | "set_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog" | "graphql_create_collection";
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant / find_by_barcode
@@ -271,6 +271,30 @@ Deno.serve(async (req) => {
         const data = await resp.json();
         if (!resp.ok) {
           return new Response(JSON.stringify({ error: "Failed to adjust inventory", details: data }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = { inventory_level: data.inventory_level };
+        break;
+      }
+
+      case "set_inventory": {
+        if (!body.location_id || !body.inventory_item_id) {
+          return new Response(JSON.stringify({ error: "Missing inventory parameters" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const resp = await shopifyFetch("/inventory_levels/set.json", {
+          method: "POST",
+          body: JSON.stringify({
+            location_id: body.location_id,
+            inventory_item_id: body.inventory_item_id,
+            available: typeof body.available === "number" ? body.available : 0,
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to set inventory", details: data }), {
             status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }

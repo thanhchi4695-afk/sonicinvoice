@@ -170,7 +170,7 @@ const StockOnHandReport = () => {
       (variants || []).forEach(v => {
         const prod = productMap.get(v.product_id);
         const locs = invMap.get(v.id);
-        const avg = avgCostMap.get(v.id);
+        const avg = v.sku ? avgCostMap.get(v.sku) : undefined;
         const averageCost = avg && avg.totalQty > 0 ? avg.totalCost / avg.totalQty : (v.cost || 0);
         const variantTitle = [v.color, v.size].filter(Boolean).join(" / ") || "—";
         const baseRow = {

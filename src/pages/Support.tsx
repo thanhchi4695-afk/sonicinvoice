@@ -5,7 +5,7 @@ const Support = () => {
   useEffect(() => {
     document.title = "Support — Sonic Invoices | Help for Shopify Invoice Processing";
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", "Get help with Sonic Invoices — invoice to Shopify conversion, JOOR & Faire sync, bulk discounts, Google Shopping feed fixes, and inventory management. Email support and FAQs.");
+    if (metaDesc) metaDesc.setAttribute("content", "Get help with Sonic Invoices — invoice to Shopify conversion, bulk discounts, Google Shopping feed fixes, Xero/MYOB accounting sync, and inventory management. Email support and FAQs.");
   }, []);
 
   return (

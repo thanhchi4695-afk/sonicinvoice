@@ -203,6 +203,28 @@ function deriveCollections(tagsStr: string, brand: string): string[] {
   return matchCollectionsWithBrand(tagList, brand || "");
 }
 
+/**
+ * Merge derived collection names into the Tags string so that Shopify smart
+ * collections (which match on tags) auto-include the product on import.
+ * Shopify's product CSV does not support a "Collection" column.
+ */
+function mergeTagsAndCollections(tagsStr: string, collections: string[]): string {
+  const existing = (tagsStr || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const seen = new Set(existing.map((t) => t.toLowerCase()));
+  for (const c of collections || []) {
+    const name = (c || "").trim();
+    if (!name) continue;
+    if (!seen.has(name.toLowerCase())) {
+      existing.push(name);
+      seen.add(name.toLowerCase());
+    }
+  }
+  return existing.join(", ");
+}
+
 function normalizeBaseTitle(name: string): string {
   return name
     .replace(/\b(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|\d{1,3})\b/gi, "")

@@ -84,6 +84,8 @@ interface Row {
   firstReceivedAt: Date | null;
   totalRetailValue: number;
   totalCostValue: number;
+  restockStatus: import("@/lib/restock-status").RestockStatus;
+  shopDomain: string | null;
 }
 
 type FilterState = {

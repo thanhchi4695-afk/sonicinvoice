@@ -20,7 +20,7 @@ import {
   Tooltip,
   ReferenceLine,
 } from "recharts";
-import { LocationFilter } from "./LocationFilter";
+import LocationFilter from "./LocationFilter";
 import { useShopifyLocations } from "@/hooks/use-shopify-locations";
 import { addAuditEntry } from "@/lib/audit-log";
 import { toast } from "sonner";

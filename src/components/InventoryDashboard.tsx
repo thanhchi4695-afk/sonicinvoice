@@ -174,7 +174,7 @@ export default function InventoryDashboard({ onBack }: Props) {
   // "priced" subset (cost > 0 AND retailPrice > 0) for retail & margin, and
   // expose the underlying counts so the UI can flag missing data.
   const stats = useMemo(() => {
-    const { variants } = data;
+    const variants = viewData.variants;
     const totalUnits = variants.reduce((s, v) => s + v.quantity, 0);
     const totalValueAtCost = variants.reduce((s, v) => s + v.quantity * v.cost, 0);
     const uniqueProducts = new Set(variants.map(v => v.productId)).size;
@@ -199,44 +199,38 @@ export default function InventoryDashboard({ onBack }: Props) {
       avgMargin, variantCount: variants.length,
       missingRetailCount,
       pricedCount: priced.length,
-      // Cost value of the SAME priced subset that retail+margin are computed over,
-      // so users can see apples-to-apples next to the totals.
       totalValueAtCostPriced,
     };
-  }, [data]);
+  }, [viewData]);
 
-  // Best sellers = highest quantity (proxy for popular items stocked heavily)
-  // Slow movers = lowest quantity > 0 with high cost (capital tied up)
   const bestSellers = useMemo(() => {
-    return [...data.variants]
+    return [...viewData.variants]
       .filter(v => v.quantity > 0)
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 10);
-  }, [data.variants]);
+  }, [viewData.variants]);
 
   const slowMovers = useMemo(() => {
-    return [...data.variants]
+    return [...viewData.variants]
       .filter(v => v.quantity > 0)
       .sort((a, b) => {
-        // Sort by days-of-stock value (quantity * cost) ascending — least capital efficiency
         const aVal = a.quantity * a.cost;
         const bVal = b.quantity * b.cost;
-        // Highest value with lowest quantity ratio = slow mover
         return (a.quantity > 0 ? aVal / a.quantity : 0) - (b.quantity > 0 ? bVal / b.quantity : 0);
       })
       .sort((a, b) => a.quantity - b.quantity)
       .slice(0, 10);
-  }, [data.variants]);
+  }, [viewData.variants]);
 
   const lowStockItems = useMemo(() => {
-    return [...data.variants]
+    return [...viewData.variants]
       .filter(v => v.quantity > 0 && v.quantity <= 3)
       .sort((a, b) => a.quantity - b.quantity);
-  }, [data.variants]);
+  }, [viewData.variants]);
 
   const outOfStockItems = useMemo(() => {
-    return data.variants.filter(v => v.quantity <= 0);
-  }, [data.variants]);
+    return viewData.variants.filter(v => v.quantity <= 0);
+  }, [viewData.variants]);
 
   // Stock by location
   const locationSummary = useMemo(() => {

@@ -430,6 +430,7 @@ const LowStockReport = () => {
             : "No data yet"}
         </div>
         <div className="flex items-center gap-2">
+          <LocationFilter showLabel={false} size="sm" />
           <Button
             size="sm"
             variant="outline"

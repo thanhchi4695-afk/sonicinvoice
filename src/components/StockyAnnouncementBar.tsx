@@ -20,11 +20,11 @@ const COMPARISON: Array<[string, string, "live" | "soon"]> = [
   ["No email automation", "Auto-pulls invoices from your inbox", "live"],
   ["No accounting integration", "Xero + MYOB integration", "live"],
   ["Privacy policy", "Privacy policy with AI disclosure", "live"],
-  ["Low stock reports", "Coming soon", "soon"],
-  ["Rule-based restock forecasting", "Coming soon", "soon"],
-  ["ABC analysis", "Coming soon", "soon"],
-  ["Stock adjustments", "Coming soon", "soon"],
-  ["Stocktakes", "Coming soon", "soon"],
+  ["Low stock reports", "Low stock reports with reorder suggestions", "live"],
+  ["Rule-based restock forecasting", "Rule-based restock forecasting", "live"],
+  ["ABC analysis", "ABC analysis (revenue-weighted)", "live"],
+  ["Stock adjustments", "Stock adjustments with audit trail", "live"],
+  ["Stocktakes", "Full stocktakes & reconciliation", "live"],
 ];
 
 export default function StockyAnnouncementBar() {

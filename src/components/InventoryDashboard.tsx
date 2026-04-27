@@ -311,16 +311,22 @@ export default function InventoryDashboard({ onBack }: Props) {
   return (
     <div className="px-4 pt-4 pb-24 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
         <button onClick={onBack} className="text-muted-foreground">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-[200px]">
           <h2 className="text-lg font-semibold font-display flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" /> Inventory Dashboard
           </h2>
-          <p className="text-xs text-muted-foreground">Real-time inventory health overview</p>
+          <p className="text-xs text-muted-foreground">
+            Real-time inventory health overview
+            {selectedLocation !== "all" && selectedLocationObj && (
+              <span className="ml-1">· filtered to <span className="font-medium text-foreground">{selectedLocationObj.name}</span></span>
+            )}
+          </p>
         </div>
+        <LocationFilter showLabel={false} size="sm" />
         <BulkInventoryActions mode="inventory" onComplete={fetchData} />
         <Button variant="ghost" size="sm" onClick={fetchData}>
           <RefreshCw className="w-4 h-4" />

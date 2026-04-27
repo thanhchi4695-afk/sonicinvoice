@@ -1071,7 +1071,24 @@ function LearningMemoryPanel({ onBack }: { onBack: () => void }) {
 
 const ToolsScreen = () => {
   const [activeTool, setActiveTool] = useState<string | null>(null);
-  const [instructions, setInstructions] = useState("");
+  const [instructions, setInstructions] = useState(() => {
+    try { return localStorage.getItem("ai_instructions_global") || ""; } catch { return ""; }
+  });
+  const [saveForAll, setSaveForAll] = useState(false);
+
+  const handleSaveInstructions = () => {
+    try {
+      localStorage.setItem("ai_instructions_global", instructions);
+      if (saveForAll) localStorage.setItem("ai_instructions_apply_to_all", "1");
+      else localStorage.removeItem("ai_instructions_apply_to_all");
+      // dynamic import keeps Sonner happy without restructuring imports
+      import("sonner").then(({ toast }) => toast.success("Instructions saved", {
+        description: saveForAll ? "Will apply to all future invoices from any supplier." : "Saved as your default AI instructions.",
+      }));
+    } catch {
+      import("sonner").then(({ toast }) => toast.error("Could not save — browser storage blocked"));
+    }
+  };
 
   if (activeTool === "price_lookup") return <PriceLookup onBack={() => setActiveTool(null)} />;
   if (activeTool === "supplier_emails") return <SupplierEmails onBack={() => setActiveTool(null)} />;
@@ -1159,10 +1176,10 @@ const ToolsScreen = () => {
           ))}
         </div>
         <div className="flex items-center gap-2 mt-4">
-          <input type="checkbox" id="save-all" className="w-4 h-4 rounded border-border" />
+          <input type="checkbox" id="save-all" checked={saveForAll} onChange={(e) => setSaveForAll(e.target.checked)} className="w-4 h-4 rounded border-border" />
           <label htmlFor="save-all" className="text-sm text-muted-foreground">Save for all future invoices from this supplier</label>
         </div>
-        <Button variant="teal" className="w-full mt-6 h-12 text-base">Save instructions</Button>
+        <Button variant="teal" className="w-full mt-6 h-12 text-base" onClick={handleSaveInstructions}>Save instructions</Button>
       </div>
     );
   }

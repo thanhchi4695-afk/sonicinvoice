@@ -133,7 +133,6 @@ const HomeScreen = ({
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">Sonic Invoice is coming to the Shopify App Store.</p>
             <p className="text-xs text-muted-foreground mt-0.5">Install directly from Shopify for automatic connection and one-click setup.</p>
-            <button className="text-xs text-primary font-medium mt-1.5 hover:underline">Join the waitlist →</button>
           </div>
           <button onClick={dismissBanner} className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
             <X className="w-4 h-4" />

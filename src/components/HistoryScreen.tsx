@@ -212,6 +212,36 @@ const HistoryScreen = () => {
     }
   };
 
+  const handleReExport = (inv: InvoiceHistoryRow) => {
+    const match = exports.find((e) => e.supplier.toLowerCase() === inv.supplier_name.toLowerCase());
+    if (!match) {
+      toast.error("No export found", { description: "Run this invoice through the export step first." });
+      return;
+    }
+    toast.info("Re-export queued", {
+      description: `Open ${match.supplier} from the Invoices tab and re-run export to get the latest CSV.`,
+    });
+  };
+
+  const handleDownloadOriginal = async (inv: InvoiceHistoryRow) => {
+    if (!inv.original_file_path) {
+      toast.error("Original file not available");
+      return;
+    }
+    try {
+      const { data, error } = await supabase.storage
+        .from("invoices")
+        .createSignedUrl(inv.original_file_path, 60);
+      if (error || !data?.signedUrl) {
+        toast.error("Download failed", { description: error?.message || "Could not generate download link." });
+        return;
+      }
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } catch (err: any) {
+      toast.error("Download failed", { description: err?.message || "Please try again." });
+    }
+  };
+
   return (
     <TooltipProvider delayDuration={150}>
       <div className="px-4 pt-6 pb-24 animate-fade-in">
@@ -319,13 +349,25 @@ const HistoryScreen = () => {
                       </Tooltip>
                     )}
                     {exports.some((e) => e.supplier.toLowerCase() === inv.supplier_name.toLowerCase()) && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8" title="Re-export">
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleReExport(inv)}>
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">Re-export latest CSV</TooltipContent>
+                      </Tooltip>
                     )}
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Download className="w-4 h-4" />
-                    </Button>
+                    {inv.original_file_path && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadOriginal(inv)}>
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">Download original invoice file</TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
               </div>

@@ -101,8 +101,20 @@ export default function InventoryDashboard({ onBack }: Props) {
 
       const productMap = new Map((productsRaw || []).map(p => [p.id, p]));
 
+      // Build per-variant location → qty breakdown.
+      const byVariantLocation = new Map<string, Record<string, number>>();
+      (inventoryRaw || []).forEach(i => {
+        const m = byVariantLocation.get(i.variant_id) || {};
+        m[i.location] = (m[i.location] || 0) + (i.quantity || 0);
+        byVariantLocation.set(i.variant_id, m);
+      });
+
       const variants: ProductVariant[] = (variantsRaw || []).map(v => {
         const prod = productMap.get(v.product_id);
+        const byLocation = byVariantLocation.get(v.id) || {};
+        // If we have inventory rows, use them; otherwise fall back to variants.quantity
+        const sumFromInventory = Object.values(byLocation).reduce((a, b) => a + b, 0);
+        const baseQty = Object.keys(byLocation).length > 0 ? sumFromInventory : (v.quantity || 0);
         return {
           variantId: v.id,
           productId: v.product_id,
@@ -114,7 +126,8 @@ export default function InventoryDashboard({ onBack }: Props) {
           size: v.size,
           cost: Number(v.cost) || 0,
           retailPrice: Number(v.retail_price) || 0,
-          quantity: v.quantity || 0,
+          quantity: baseQty,
+          byLocation,
         };
       });
 

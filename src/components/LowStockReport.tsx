@@ -381,7 +381,7 @@ const LowStockReport = () => {
       return sortAsc ? cmp : -cmp;
     });
     return sorted;
-  }, [rows, locationFilter, vendorFilter, flagFilter, maxDays, zeroOnly, sortKey, sortAsc]);
+  }, [rows, locationFilter, vendorFilter, flagFilter, maxDays, zeroOnly, sortKey, sortAsc, globalLocSelected, globalLocObj]);
 
   const kpis = useMemo(() => {
     let critical = 0;

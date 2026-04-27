@@ -5653,8 +5653,6 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
               </Button>
             )}
             {onPreview && <Button variant="outline" size="sm" onClick={onPreview}><Eye className="w-3.5 h-3.5 mr-1" /> Preview</Button>}
-            <Button variant="ghost" size="sm"><RotateCcw className="w-3.5 h-3.5 mr-1" /> Regenerate</Button>
-            <Button variant="ghost" size="sm" className="text-destructive"><X className="w-3.5 h-3.5 mr-1" /> Remove</Button>
           </div>
         </div>
       )}

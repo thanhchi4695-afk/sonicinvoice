@@ -3959,6 +3959,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_saved_reports: {
+        Row: {
+          column_state: Json
+          created_at: string
+          filter_state: Json
+          id: string
+          report_key: string
+          report_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          column_state?: Json
+          created_at?: string
+          filter_state?: Json
+          id?: string
+          report_key: string
+          report_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          column_state?: Json
+          created_at?: string
+          filter_state?: Json
+          id?: string
+          report_key?: string
+          report_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           automation_auto_extract: boolean

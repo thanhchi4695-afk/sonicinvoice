@@ -345,6 +345,9 @@ const LowStockReport = () => {
 
   const filtered = useMemo(() => {
     let list = rows;
+    // Global location filter (Shopify-wide) takes precedence
+    if (globalLocSelected !== "all" && globalLocObj)
+      list = list.filter((r) => r.location === globalLocObj.name);
     if (locationFilter !== "all")
       list = list.filter((r) => r.location === locationFilter);
     if (vendorFilter.length > 0)

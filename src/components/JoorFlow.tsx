@@ -21,6 +21,7 @@ import {
   Upload, Search, Filter, ChevronRight, Link2, Unplug,
   Package, AlertTriangle, FileUp, Sparkles, Eye,
 } from "lucide-react";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface JoorFlowProps {
   onBack: () => void;
@@ -41,6 +42,7 @@ interface JoorOrder {
 type Step = "connect" | "orders" | "detail" | "file_import" | "file_review";
 
 const JoorFlow = ({ onBack }: JoorFlowProps) => {
+  const confirmDialog = useConfirmDialog();
   const [step, setStep] = useState<Step>("connect");
   const [connected, setConnected] = useState(false);
   const [tokenLabel, setTokenLabel] = useState("");
@@ -647,10 +649,13 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
             <Download className="w-4 h-4 mr-2" /> Lightspeed CSV
           </Button>
           <Button
-            onClick={() => {
-              if (confirm(`Push ${groupedProducts.length} products from this order to Shopify?`)) {
-                pushToShopify(groupedProducts);
-              }
+            onClick={async () => {
+              const ok = await confirmDialog({
+                title: `Push ${groupedProducts.length} products to Shopify?`,
+                description: "Products from this Joor order will be created in your Shopify store.",
+                confirmLabel: "Push to Shopify",
+              });
+              if (ok) pushToShopify(groupedProducts);
             }}
             disabled={pushing}
           >
@@ -819,10 +824,13 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
             <Download className="w-4 h-4 mr-2" /> Lightspeed CSV
           </Button>
           <Button
-            onClick={() => {
-              if (confirm(`Push ${fileGroupedProducts.length} products to Shopify?`)) {
-                pushToShopify(fileGroupedProducts);
-              }
+            onClick={async () => {
+              const ok = await confirmDialog({
+                title: `Push ${fileGroupedProducts.length} products to Shopify?`,
+                description: "These products will be created in your Shopify store.",
+                confirmLabel: "Push to Shopify",
+              });
+              if (ok) pushToShopify(fileGroupedProducts);
             }}
             disabled={pushing || fileGroupedProducts.length === 0}
           >

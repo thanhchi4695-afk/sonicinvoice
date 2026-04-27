@@ -7,6 +7,7 @@ import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orch
 import { detectBrandFromSku } from "@/lib/sku-brand-prefix";
 import POSPickerDialog, { hasPickedPOS } from "@/components/POSPickerDialog";
 import { toast } from "sonner";
+import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag, CloudDownload } from "lucide-react";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
@@ -290,6 +291,7 @@ const CustomInstructionsField = ({
 }: {
   value: string; onChange: (v: string) => void; supplierName: string;
 }) => {
+  const promptDialog = usePromptDialog();
   const [showHistory, setShowHistory] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
   const [saveForSupplier, setSaveForSupplier] = useState(false);
@@ -357,9 +359,13 @@ const CustomInstructionsField = ({
     toast.success(`Loaded "${p.name}"`, { description: "AI will follow these rules for this invoice." });
   };
 
-  const saveCurrentAsPreset = () => {
+  const saveCurrentAsPreset = async () => {
     if (!value.trim()) { toast.error("Write some instructions first"); return; }
-    const name = window.prompt("Name this logic preset:", supplierName || "My custom logic");
+    const name = await promptDialog({
+      title: "Name this logic preset",
+      label: "Preset name",
+      defaultValue: supplierName || "My custom logic",
+    });
     if (!name) return;
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
     saveUserPreset({

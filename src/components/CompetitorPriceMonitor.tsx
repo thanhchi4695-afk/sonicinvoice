@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { addAuditEntry } from "@/lib/audit-log";
 import { formatRelativeTime } from "@/lib/audit-log";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 /* ─── Types ─── */
 
@@ -62,6 +63,7 @@ type MatchMethod = "match" | "beat_dollar" | "beat_percent";
 /* ─── Component ─── */
 
 export default function CompetitorPriceMonitor({ onBack }: { onBack: () => void }) {
+  const confirmDialog = useConfirmDialog();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [products, setProducts] = useState<MonitoredProduct[]>([]);
@@ -295,7 +297,12 @@ export default function CompetitorPriceMonitor({ onBack }: { onBack: () => void 
     if (product.product_id) {
       const { data: variant } = await supabase.from("variants").select("cost").eq("product_id", product.product_id).maybeSingle();
       if (variant?.cost && newPrice < variant.cost) {
-        const proceed = confirm(`⚠️ Warning: New price $${newPrice.toFixed(2)} is below cost $${variant.cost.toFixed(2)}. Proceed anyway?`);
+        const proceed = await confirmDialog({
+          title: "Price below cost",
+          description: `New price $${newPrice.toFixed(2)} is below cost $${variant.cost.toFixed(2)}. You'll lose money on every sale. Proceed anyway?`,
+          confirmLabel: "Proceed anyway",
+          destructive: true,
+        });
         if (!proceed) { setUpdatingPrice(false); return; }
       }
     }

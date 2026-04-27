@@ -24,6 +24,7 @@ import {
   searchBrands, sortBrandsByIndustry, exportBrandsCSV, importBrandsCSV, getCSVTemplate,
   type BrandDirectoryEntry,
 } from "@/lib/brand-directory";
+import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 
 const tools = [
   { id: "price_lookup", icon: DollarSign, label: "Price lookup", desc: "Look up retail prices via APIs", color: "text-success" },
@@ -673,6 +674,7 @@ function SeoWriterPanel({ onBack }: { onBack: () => void }) {
 }
 // ── Google Feed Preview Panel ──────────────────────────────
 function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
+  const promptDialog = usePromptDialog();
   const [copied, setCopied] = useState(false);
   const [saleStart, setSaleStart] = useState('');
   const [saleEnd, setSaleEnd] = useState('');
@@ -825,11 +827,13 @@ function GoogleFeedPanel({ onBack }: { onBack: () => void }) {
         </p>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>Margin floor: <strong className="text-foreground">Cost × {marginFloor.toFixed(2)}</strong></span>
-          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => {
-            const val = prompt(
-              'Set minimum margin multiplier:\n1.20 = 20% above cost (recommended)\n1.15 = 15% above cost\n1.30 = 30% above cost\n\nCurrent: ' + marginFloor.toFixed(2),
-              String(marginFloor)
-            );
+          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={async () => {
+            const val = await promptDialog({
+              title: "Set minimum margin multiplier",
+              description: "1.20 = 20% above cost (recommended)\n1.15 = 15% above cost\n1.30 = 30% above cost",
+              label: "Multiplier (between 1.0 and 3.0)",
+              defaultValue: String(marginFloor),
+            });
             const num = parseFloat(val || '');
             if (!isNaN(num) && num >= 1.0 && num <= 3.0) {
               setMarginFloor(num);

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Papa from "papaparse";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 export interface CatalogItem {
   id: string;
@@ -32,6 +33,7 @@ interface Props {
 }
 
 export default function SupplierCatalog({ supplierId, supplierName }: Props) {
+  const confirmDialog = useConfirmDialog();
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -107,7 +109,13 @@ export default function SupplierCatalog({ supplierId, supplierName }: Props) {
   };
 
   const handleDelete = async (item: CatalogItem) => {
-    if (!confirm(`Delete "${item.product_name}" from catalog?`)) return;
+    const ok = await confirmDialog({
+      title: `Delete "${item.product_name}"?`,
+      description: "This catalog entry will be permanently removed.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     await supabase.from("supplier_catalog_items").delete().eq("id", item.id);
     toast.success("Item deleted");
     await loadItems();

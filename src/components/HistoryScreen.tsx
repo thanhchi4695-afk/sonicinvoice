@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface ExportEntry {
   supplier: string;
@@ -118,6 +119,7 @@ const FILTER_TABS: { key: QualityBucket; label: string }[] = [
 ];
 
 const HistoryScreen = () => {
+  const confirmDialog = useConfirmDialog();
   const [invoices, setInvoices] = useState<InvoiceHistoryRow[]>([]);
   const [exports, setExports] = useState<ExportEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,9 +185,11 @@ const HistoryScreen = () => {
       });
       return;
     }
-    const confirmed = window.confirm(
-      "Re-process this invoice using updated supplier rules? The original extraction will be replaced.",
-    );
+    const confirmed = await confirmDialog({
+      title: "Re-process this invoice?",
+      description: "Sonic will use your latest supplier rules to re-extract data. The original extraction will be replaced.",
+      confirmLabel: "Re-process",
+    });
     if (!confirmed) return;
 
     setReprocessingId(inv.id);

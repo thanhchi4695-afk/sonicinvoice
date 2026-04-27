@@ -3,6 +3,7 @@ import { ChevronLeft, Mail, Copy, Check, ExternalLink, Download, Save, Plus, Tra
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getStoreConfig } from "@/lib/prompt-builder";
+import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 
 // ── Types ──────────────────────────────────────────────────
 interface SupplierContact {
@@ -146,6 +147,7 @@ ${c.storeName}`,
 
 // ── Component ─────────────────────────────────────────────
 const SupplierEmails = ({ onBack }: { onBack: () => void }) => {
+  const promptDialog = usePromptDialog();
   const config = getStoreConfig();
   const storeName = config.name || "My Store";
   const storeCity = config.city || "";
@@ -198,8 +200,12 @@ const SupplierEmails = ({ onBack }: { onBack: () => void }) => {
     a.click();
   };
 
-  const handleSaveCustom = () => {
-    const name = prompt("Template name:");
+  const handleSaveCustom = async () => {
+    const name = await promptDialog({
+      title: "Save custom template",
+      label: "Template name",
+      placeholder: "e.g. Reorder follow-up",
+    });
     if (!name) return;
     const updated = [...customTemplates, { name, subject, body }];
     setCustomTemplates(updated);

@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface GmailConnection {
   id: string;
@@ -51,6 +52,7 @@ interface Props {
 }
 
 export default function GmailMonitoringPanel({ onRunComplete }: Props) {
+  const confirmDialog = useConfirmDialog();
   const [conn, setConn] = useState<GmailConnection | null>(null);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -155,7 +157,13 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
 
   async function disconnect() {
     if (!conn) return;
-    if (!confirm("Disconnect Gmail? Sonic will stop monitoring this inbox.")) return;
+    const ok = await confirmDialog({
+      title: "Disconnect Gmail?",
+      description: "Sonic will stop monitoring this inbox for new supplier invoices. You can reconnect at any time.",
+      confirmLabel: "Disconnect",
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase
       .from("gmail_connections")
       .delete()

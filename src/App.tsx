@@ -8,6 +8,7 @@ import EmbeddedAuthHealthCheck from "@/components/EmbeddedAuthHealthCheck";
 import InstallAppBanner from "@/components/InstallAppBanner";
 import BarcodeProvider from "@/components/BarcodeProvider";
 import { ConfirmDialogProvider } from "@/hooks/use-confirm-dialog";
+import { PromptDialogProvider } from "@/hooks/use-prompt-dialog";
 import Index from "./pages/Index.tsx";
 import Landing from "./pages/Landing.tsx";
 import Login from "./pages/Login.tsx";
@@ -27,6 +28,7 @@ const App = () => (
       <ShopifyEmbeddedProvider>
         <BarcodeProvider>
           <ConfirmDialogProvider>
+            <PromptDialogProvider>
             <Toaster />
             <Sonner />
           <BrowserRouter>
@@ -60,6 +62,7 @@ const App = () => (
           </BrowserRouter>
           <InstallAppBanner />
           <EmbeddedAuthHealthCheck />
+            </PromptDialogProvider>
           </ConfirmDialogProvider>
         </BarcodeProvider>
       </ShopifyEmbeddedProvider>

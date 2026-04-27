@@ -48,6 +48,26 @@ interface SharedRow {
   is_verified: boolean;
 }
 
+type RestockStatus = "ongoing" | "refill" | "no_reorder";
+interface OpsFields {
+  lead_time_days: number;
+  restock_period_days: number;
+  default_restock_status: RestockStatus;
+  supplier_email: string;
+  payment_terms: string;
+  contact_name: string;
+  portal_url: string;
+}
+const EMPTY_OPS: OpsFields = {
+  lead_time_days: 14,
+  restock_period_days: 28,
+  default_restock_status: "ongoing",
+  supplier_email: "",
+  payment_terms: "",
+  contact_name: "",
+  portal_url: "",
+};
+
 function confidenceTone(score: number) {
   if (score >= 90) return { label: "Fully trained", cls: "bg-success/15 text-success border-success/30" };
   if (score >= 70) return { label: "Well trained",  cls: "bg-primary/15 text-primary border-primary/30" };

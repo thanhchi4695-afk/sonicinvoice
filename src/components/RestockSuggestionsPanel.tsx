@@ -453,9 +453,19 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
           <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="w-4 h-4 mr-1" />Back</Button>
           <h1 className="text-xl font-semibold">Restock Suggestions</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          <Select value={singlePoMode} onValueChange={(v) => setSinglePoMode(v as any)}>
+            <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="per_vendor">One PO per vendor</SelectItem>
+              <SelectItem value="single">Single PO</SelectItem>
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             <RefreshCw className={`w-3.5 h-3.5 mr-1 ${loading ? "animate-spin" : ""}`} />Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={markSelectedNoReorder} disabled={!selected.size || bulkBusy}>
+            <Ban className="w-3.5 h-3.5 mr-1" />Mark No Reorder ({selected.size})
           </Button>
           <Button size="sm" onClick={createPOFromSelected} disabled={!selected.size}>
             <ShoppingCart className="w-3.5 h-3.5 mr-1" />Create PO from selected ({selected.size})
@@ -463,9 +473,31 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        Based on current stock levels and sales velocity, these products need reordering. Review and create a PO directly from this list. Suggested qty = (sales/day × (lead + restock period)) − available qty.
-      </p>
+      <div className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+        Showing restock suggestions for <strong>Ongoing</strong> and <strong>Refill</strong> products only.
+        Products marked <strong>No Reorder</strong> are excluded.
+        Update restock status in Inventory → Restock column.
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card><CardContent className="pt-4">
+          <div className="text-[11px] text-muted-foreground">🔴 Critical (≤7 days)</div>
+          <div className="text-2xl font-semibold text-destructive">{summary.critical}</div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4">
+          <div className="text-[11px] text-muted-foreground">🔄 Ongoing to reorder</div>
+          <div className="text-2xl font-semibold">{summary.ongoingCount}</div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4">
+          <div className="text-[11px] text-muted-foreground">🔁 Refill to reorder</div>
+          <div className="text-2xl font-semibold text-primary">{summary.refillCount}</div>
+        </CardContent></Card>
+        <Card><CardContent className="pt-4">
+          <div className="text-[11px] text-muted-foreground">⛔ Excluded (No Reorder)</div>
+          <div className="text-2xl font-semibold text-muted-foreground">{excludedNoReorder}</div>
+        </CardContent></Card>
+      </div>
 
       {/* Filters */}
       <Card>

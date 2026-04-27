@@ -535,6 +535,17 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
             </Select>
           </div>
           <div>
+            <Label className="text-xs">Restock Status</Label>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+              <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All (Ongoing + Refill)</SelectItem>
+                <SelectItem value="ongoing">🔄 Ongoing only</SelectItem>
+                <SelectItem value="refill">🔁 Refill only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label className="text-xs">Min suggested qty</Label>
             <Input type="number" min={0} className="h-9" value={minQty} onChange={(e) => setMinQty(Number(e.target.value) || 0)} />
           </div>

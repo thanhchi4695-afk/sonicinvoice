@@ -95,13 +95,17 @@ function formatDays(d: number) {
 export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<RestockRow[]>([]);
+  const [excludedNoReorder, setExcludedNoReorder] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [vendorFilter, setVendorFilter] = useState<string[]>([]);
   const [urgencyFilter, setUrgencyFilter] = useState<"all" | Urgency>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "ongoing" | "refill">("all");
   const [minQty, setMinQty] = useState(1);
   const [search, setSearch] = useState("");
   const [supplierLeads, setSupplierLeads] = useState<Map<string, SupplierLeadInfo>>(new Map());
   const [savingLeads, setSavingLeads] = useState(false);
+  const [singlePoMode, setSinglePoMode] = useState<"per_vendor" | "single">("per_vendor");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const { selected: globalLocSelected, locations: globalLocs } = useShopifyLocations();
   const globalLocObj = useMemo(

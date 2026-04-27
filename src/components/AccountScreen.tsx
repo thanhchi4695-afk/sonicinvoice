@@ -19,10 +19,7 @@ import {
   normalizeStoreUrl, type DirectStore,
 } from "@/lib/shopify-direct";
 import { getCollectionRules, saveCollectionRules, resetCollectionRules, type CollectionRule } from "@/lib/collection-engine";
-import {
-  saveConnection, testConnection, getConnection, deleteConnection,
-  getLocations, updateConnectionSettings, ShopifyConnection, initiateOAuth,
-} from "@/lib/shopify-api";
+import { saveConnection } from "@/lib/shopify-api";
 import { getApiKeys, saveApiKeys, getCacheStats, clearCache, type PriceApiKeys } from "@/lib/price-intelligence";
 import { getStoreConfig, saveStoreConfig, getIndustryConfig, type StoreType, type LightspeedVersion } from "@/lib/prompt-builder";
 import { getIndustryProfileChoices, getIndustryDefinition } from "@/lib/industry-config";
@@ -51,18 +48,6 @@ const AccountScreen = () => {
   const [taxRegion, setTaxRegion] = useState(() => getTaxConfig().regionCode || "AU");
   const [taxSubRegion, setTaxSubRegion] = useState(() => getTaxConfig().subRegionCode || "");
 
-  // Shopify connection
-  const [shopifyUrl, setShopifyUrl] = useState("");
-  const [shopifyConnected, setShopifyConnected] = useState(false);
-  const [shopName, setShopName] = useState("");
-  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
-  const [testMessage, setTestMessage] = useState("");
-  const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
-  const [defaultLocation, setDefaultLocation] = useState("");
-  const [productStatus, setProductStatus] = useState("draft");
-  const [saving, setSaving] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(false);
-
   useEffect(() => {
     const cfg = getStoreConfig();
     setStoreName(cfg.name || '');
@@ -71,72 +56,7 @@ const AccountScreen = () => {
     setLsVersion(cfg.lightspeedVersion || 'x_series');
     setStoreCity(cfg.city || '');
     setFreeShippingThreshold(cfg.freeShippingThreshold || '');
-
-    getConnection().then((conn) => {
-      if (conn) {
-        setShopifyUrl(conn.store_url);
-        setShopifyConnected(true);
-        setShopName(conn.shop_name || conn.store_url);
-        setDefaultLocation(conn.default_location_id || "");
-        setProductStatus(conn.product_status || "draft");
-      }
-    });
-
-    // Check if returning from OAuth
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("shopify_connected") === "1") {
-      window.history.replaceState({}, "", window.location.pathname);
-      getConnection().then((conn) => {
-        if (conn) {
-          setShopifyUrl(conn.store_url);
-          setShopifyConnected(true);
-          setShopName(conn.shop_name || conn.store_url);
-        }
-      });
-    }
   }, []);
-
-  const handleOAuthConnect = async () => {
-    if (!shopifyUrl) {
-      setTestStatus("error");
-      setTestMessage("Enter your store URL first");
-      return;
-    }
-    setOauthLoading(true);
-    setTestStatus("idle");
-    try {
-      const url = shopifyUrl.includes(".myshopify.com")
-        ? shopifyUrl
-        : `${shopifyUrl}.myshopify.com`;
-      const installUrl = await initiateOAuth(url);
-      window.location.href = installUrl;
-    } catch (err) {
-      setTestStatus("error");
-      setTestMessage(err instanceof Error ? err.message : "OAuth failed");
-      setOauthLoading(false);
-    }
-  };
-
-  const handleDisconnect = async () => {
-    await deleteConnection();
-    setShopifyConnected(false);
-    setShopifyUrl("");
-    setShopName("");
-    setTestStatus("idle");
-    setTestMessage("");
-    setLocations([]);
-  };
-
-  const handleSaveSettings = async () => {
-    setSaving(true);
-    try {
-      await updateConnectionSettings({
-        default_location_id: defaultLocation || undefined,
-        product_status: productStatus,
-      });
-    } catch {}
-    setSaving(false);
-  };
 
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
-import { ArrowLeft, Download, Calendar, TrendingUp, Package, Users, ShoppingCart, ArrowRightLeft } from "lucide-react";
+import { ArrowLeft, Download, Calendar, TrendingUp, Package, Users, ShoppingCart, ArrowRightLeft, AlertTriangle } from "lucide-react";
+import LowStockReport from "./LowStockReport";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

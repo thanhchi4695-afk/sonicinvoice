@@ -3,6 +3,7 @@ import { ChevronLeft, Mail, Copy, Check, ExternalLink, Download, Save, Plus, Tra
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getStoreConfig } from "@/lib/prompt-builder";
+import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 
 // ── Types ──────────────────────────────────────────────────
 interface SupplierContact {

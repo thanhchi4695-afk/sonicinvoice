@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { addAuditEntry } from "@/lib/audit-log";
 import { formatRelativeTime } from "@/lib/audit-log";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 /* ─── Types ─── */
 

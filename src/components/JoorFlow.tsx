@@ -21,6 +21,7 @@ import {
   Upload, Search, Filter, ChevronRight, Link2, Unplug,
   Package, AlertTriangle, FileUp, Sparkles, Eye,
 } from "lucide-react";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface JoorFlowProps {
   onBack: () => void;

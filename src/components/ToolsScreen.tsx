@@ -24,6 +24,7 @@ import {
   searchBrands, sortBrandsByIndustry, exportBrandsCSV, importBrandsCSV, getCSVTemplate,
   type BrandDirectoryEntry,
 } from "@/lib/brand-directory";
+import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 
 const tools = [
   { id: "price_lookup", icon: DollarSign, label: "Price lookup", desc: "Look up retail prices via APIs", color: "text-success" },

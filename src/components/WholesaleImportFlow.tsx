@@ -26,6 +26,7 @@ import {
   Upload, Search, ChevronRight, Link2, Unplug,
   Package, FileUp, Globe, FileSpreadsheet, PackageCheck,
 } from "lucide-react";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface Props {
   onBack: () => void;

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Papa from "papaparse";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 export interface CatalogItem {
   id: string;

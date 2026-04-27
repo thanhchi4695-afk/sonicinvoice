@@ -203,6 +203,28 @@ function deriveCollections(tagsStr: string, brand: string): string[] {
   return matchCollectionsWithBrand(tagList, brand || "");
 }
 
+/**
+ * Merge derived collection names into the Tags string so that Shopify smart
+ * collections (which match on tags) auto-include the product on import.
+ * Shopify's product CSV does not support a "Collection" column.
+ */
+function mergeTagsAndCollections(tagsStr: string, collections: string[]): string {
+  const existing = (tagsStr || "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const seen = new Set(existing.map((t) => t.toLowerCase()));
+  for (const c of collections || []) {
+    const name = (c || "").trim();
+    if (!name) continue;
+    if (!seen.has(name.toLowerCase())) {
+      existing.push(name);
+      seen.add(name.toLowerCase());
+    }
+  }
+  return existing.join(", ");
+}
+
 function normalizeBaseTitle(name: string): string {
   return name
     .replace(/\b(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|\d{1,3})\b/gi, "")
@@ -417,13 +439,19 @@ export function generateShopifyCSV(
   for (const prod of grouped) {
     prod.variants.forEach((v, vi) => {
       const isFirstRow = vi === 0;
+      // Merge collection names into Tags so Shopify smart collections (which
+      // typically match on tag = "Collection Name") auto-include the product.
+      // This replaces the old non-standard "Collection" column that broke imports.
+      const tagsWithCollections = isFirstRow
+        ? mergeTagsAndCollections(prod.tags, prod.collections)
+        : "";
       const row: Record<string, string> = {
         Handle: prod.handle,
         Title: isFirstRow ? prod.title : "",
         "Body (HTML)": isFirstRow ? prod.bodyHtml : "",
         Vendor: isFirstRow ? prod.vendor : "",
         Type: isFirstRow ? prod.type : "",
-        Tags: isFirstRow ? prod.tags : "",
+        Tags: tagsWithCollections,
         Published: isFirstRow ? "TRUE" : "",
         "Option1 Name": v.option1Name,
         "Option1 Value": v.option1Value,
@@ -452,7 +480,6 @@ export function generateShopifyCSV(
         Status: isFirstRow ? defaultStatus : "",
         "SEO Title": isFirstRow ? prod.seoTitle : "",
         "SEO Description": isFirstRow ? prod.seoDesc : "",
-        Collection: isFirstRow ? prod.collections.join(", ") : "",
         ...(v.cogs ? { "Cost per item": v.cogs } : {}),
       };
 
@@ -481,9 +508,10 @@ export function generateShopifyCSV(
     "Image Src", "Status", "SEO Title", "SEO Description",
   ];
 
-  if (rows.some((r) => r.Collection?.trim())) {
-    baseColumns.push("Collection");
-  }
+  // NOTE: Shopify product CSV does not support a "Collection" column.
+  // Smart collections auto-include products by tag rules; manual collections
+  // can only be assigned in the Shopify admin. Collection names are merged
+  // into the Tags column upstream so smart-collection rules can pick them up.
 
   if (rows.some(r => r["Cost per item"])) {
     baseColumns.push("Cost per item");

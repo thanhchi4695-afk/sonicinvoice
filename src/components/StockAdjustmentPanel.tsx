@@ -314,6 +314,7 @@ export default function StockAdjustmentPanel({ onBack }: Props) {
 
       const payload = {
         user_id: userId,
+        adjustment_number: "", // populated by DB trigger
         location,
         reason,
         notes: notes || null,
@@ -335,10 +336,10 @@ export default function StockAdjustmentPanel({ onBack }: Props) {
         if (error) throw error;
       }
 
-      await addAuditEntry({
-        action: apply ? "stock_adjustment_applied" : "stock_adjustment_saved",
-        details: { location, reason, line_count: workingLines.length },
-      });
+      addAuditEntry(
+        apply ? "stock_adjustment_applied" : "stock_adjustment_saved",
+        `${location} · ${reason} · ${workingLines.length} variant${workingLines.length === 1 ? "" : "s"}`,
+      );
 
       toast.success(apply ? "Adjustment applied to Shopify" : "Adjustment saved as draft");
       resetForm();

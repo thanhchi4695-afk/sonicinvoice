@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
-import { ArrowLeft, Download, Calendar, TrendingUp, Package, Users, ShoppingCart, ArrowRightLeft, AlertTriangle, Layers } from "lucide-react";
+import { ArrowLeft, Download, Calendar, TrendingUp, Package, Users, ShoppingCart, ArrowRightLeft, AlertTriangle, Layers, Boxes } from "lucide-react";
 import LowStockReport from "./LowStockReport";
 import StockOnHandReport from "./StockOnHandReport";
+import SkuVariantsReport from "./SkuVariantsReport";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,7 +18,7 @@ import { format, subDays, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-type ReportId = "low_stock" | "stock_on_hand" | "valuation" | "ageing" | "supplier" | "sales" | "movement";
+type ReportId = "low_stock" | "stock_on_hand" | "sku_variants" | "valuation" | "ageing" | "supplier" | "sales" | "movement";
 
 interface ReportsHubProps {
   onBack: () => void;
@@ -26,6 +27,7 @@ interface ReportsHubProps {
 const REPORT_CARDS: { id: ReportId; title: string; desc: string; icon: React.ElementType }[] = [
   { id: "low_stock", title: "Low Stock Report", desc: "Vendor urgency, days to depletion & lost revenue", icon: AlertTriangle },
   { id: "stock_on_hand", title: "Stock on Hand", desc: "Full inventory snapshot with cost, retail & margin", icon: Layers },
+  { id: "sku_variants", title: "SKU / Variants Report", desc: "Range planning: ABC grade, sales velocity, on-order, save filters", icon: Boxes },
   { id: "valuation", title: "Inventory Valuation", desc: "On hand × cost per product, grouped by type", icon: Package },
   { id: "ageing", title: "Stock Ageing", desc: "Variants grouped by days since last sale", icon: TrendingUp },
   { id: "supplier", title: "Supplier Performance", desc: "On-time delivery, fill rate & cost trends", icon: Users },
@@ -467,7 +469,7 @@ const ReportsHub = ({ onBack }: ReportsHubProps) => {
   if (activeReport) {
     const card = REPORT_CARDS.find(c => c.id === activeReport)!;
     const Icon = card.icon;
-    const isWide = activeReport === "low_stock" || activeReport === "stock_on_hand";
+    const isWide = activeReport === "low_stock" || activeReport === "stock_on_hand" || activeReport === "sku_variants";
     return (
       <div className={cn("mx-auto p-4 space-y-4", isWide ? "max-w-[1600px]" : "max-w-4xl")}>
         <div className="flex items-center gap-2">
@@ -477,6 +479,7 @@ const ReportsHub = ({ onBack }: ReportsHubProps) => {
         </div>
         {activeReport === "low_stock" && <LowStockReport />}
         {activeReport === "stock_on_hand" && <StockOnHandReport />}
+        {activeReport === "sku_variants" && <SkuVariantsReport />}
         {activeReport === "valuation" && <InventoryValuationReport />}
         {activeReport === "ageing" && <StockAgeingReport />}
         {activeReport === "supplier" && <SupplierPerformanceReport />}

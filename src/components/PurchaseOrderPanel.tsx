@@ -18,6 +18,7 @@ import { adjustInventory, findVariantBySKU, getConnection, getLocations } from "
 import { CatalogPicker, type CatalogItem } from "@/components/SupplierCatalog";
 import BulkInventoryActions from "@/components/BulkInventoryActions";
 import RoleGate from "@/components/RoleGate";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 // ── Types ──────────────────────────────────────────────────
 interface POLine {
@@ -91,6 +92,7 @@ type View = "list" | "create" | "edit" | "receive" | "match" | "detail";
 
 const PurchaseOrderPanel = ({ onBack }: Props) => {
   const [view, setView] = useState<View>("list");
+  const confirmDialog = useConfirmDialog();
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -352,7 +354,13 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
   // ── Delete PO ───────────────────────────────────────────
   const handleDelete = async (id: string) => {
     const po = orders.find(o => o.id === id);
-    if (!confirm(`Delete ${po?.po_number}?`)) return;
+    const ok = await confirmDialog({
+      title: `Delete ${po?.po_number ?? "this PO"}?`,
+      description: "This permanently removes the purchase order and its line items. This cannot be undone.",
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     await supabase.from("purchase_orders").delete().eq("id", id);
     toast.success("PO deleted");
     await loadOrders();

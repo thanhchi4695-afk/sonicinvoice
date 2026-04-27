@@ -66,6 +66,7 @@ interface RestockRow {
   override_qty: number;
   days_to_depletion: number;          // Infinity when no sales
   urgency: Urgency;
+  restock_status: RestockStatus;
 }
 
 const DEFAULT_LEAD = 14;

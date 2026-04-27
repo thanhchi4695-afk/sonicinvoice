@@ -592,8 +592,8 @@ export default function StockAdjustmentPanel({ onBack }: Props) {
       </div>
 
       {!hasShopify && (
-        <Card className="p-3 mb-4 border-amber-500/30 bg-amber-500/10 flex gap-2 items-center text-sm">
-          <AlertTriangle className="w-4 h-4 text-amber-500" />
+        <Card className="p-3 mb-4 border-warning/30 bg-warning/10 flex gap-2 items-center text-sm">
+          <AlertTriangle className="w-4 h-4 text-warning" />
           Shopify is not connected. You can save as draft, but cannot apply to Shopify.
         </Card>
       )}

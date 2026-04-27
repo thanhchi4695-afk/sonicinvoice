@@ -40,6 +40,7 @@ const QuickCapture = lazy(() => import("@/components/QuickCapture"));
 const ScanMode = lazy(() => import("@/components/ScanMode"));
 const OrderFormFlow = lazy(() => import("@/components/OrderFormFlow"));
 const PurchaseOrderPanel = lazy(() => import("@/components/PurchaseOrderPanel"));
+const OutboundPurchaseOrders = lazy(() => import("@/components/OutboundPurchaseOrders"));
 const SeasonManager = lazy(() => import("@/components/SeasonManager"));
 const ReorderPanel = lazy(() => import("@/components/ReorderPanel"));
 const SupplierPanel = lazy(() => import("@/components/SupplierPanel"));

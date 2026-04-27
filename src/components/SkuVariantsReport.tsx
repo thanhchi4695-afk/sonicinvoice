@@ -176,6 +176,7 @@ const COLUMNS: ColDef[] = [
   { key: "cancelled30", label: "Cancelled 30d", defaultVisible: false, numeric: true },
   { key: "firstReceivedAt", label: "First received", defaultVisible: false },
   { key: "weight", label: "Weight", defaultVisible: false, numeric: true },
+  { key: "restockStatus", label: "Restock", defaultVisible: true },
 ];
 
 const DEFAULT_COLS: Record<ColKey, boolean> = COLUMNS.reduce((acc, c) => {

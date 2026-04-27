@@ -15,6 +15,9 @@ export interface RawProduct {
   group_key?: string;
   cost_source?: string;
   _lineTotal?: number;
+  /** Optional collection / story / delivery / range label, e.g. "Summer Chintz".
+   *  Powers the "Group by Collection" review mode. Editable by the merchant. */
+  collection?: string;
 }
 
 export type CellClassification =

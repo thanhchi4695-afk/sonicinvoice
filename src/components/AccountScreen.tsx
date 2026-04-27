@@ -468,11 +468,11 @@ const AccountScreen = () => {
           <div className="flex justify-between"><span className="text-muted-foreground">Build date</span><span className="font-mono-data">Mar 2026</span></div>
         </div>
         <div className="flex flex-wrap gap-2 mt-2">
-          <button className="text-xs text-primary hover:underline">View changelog</button>
+          <a href="/support" className="text-xs text-primary hover:underline">View changelog</a>
           <span className="text-muted-foreground">·</span>
-          <button className="text-xs text-primary hover:underline">Contact support</button>
+          <a href="/support" className="text-xs text-primary hover:underline">Contact support</a>
           <span className="text-muted-foreground">·</span>
-          <button className="text-xs text-primary hover:underline">Documentation</button>
+          <a href="https://docs.lovable.dev" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">Documentation</a>
         </div>
         <div className="mt-3 flex items-center gap-2 bg-muted/50 rounded-lg p-2.5 border border-border">
           <span className="text-sm">🛍</span>

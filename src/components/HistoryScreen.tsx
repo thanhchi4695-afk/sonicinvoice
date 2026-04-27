@@ -319,13 +319,25 @@ const HistoryScreen = () => {
                       </Tooltip>
                     )}
                     {exports.some((e) => e.supplier.toLowerCase() === inv.supplier_name.toLowerCase()) && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8" title="Re-export">
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleReExport(inv)}>
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">Re-export latest CSV</TooltipContent>
+                      </Tooltip>
                     )}
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Download className="w-4 h-4" />
-                    </Button>
+                    {inv.original_file_path && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadOriginal(inv)}>
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">Download original invoice file</TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
               </div>

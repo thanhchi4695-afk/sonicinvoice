@@ -412,18 +412,7 @@ const PhaseFiveSixPanel = ({
             </Button>
           </ExportSection>
 
-          {/* Section D — Additional exports (collapsed by default) */}
-          <details className="rounded-md border border-border bg-muted/20">
-            <summary className="px-3 py-2 text-xs font-medium cursor-pointer hover:bg-muted/40">
-              D. Additional exports (Google Shopping feed, packing slip PDF, accounting push, price update CSV)
-            </summary>
-            <div className="p-3 grid sm:grid-cols-2 gap-2">
-              <Button size="sm" variant="outline" className="justify-start"><Download className="w-3.5 h-3.5" />Google Shopping feed (XML/TSV)</Button>
-              <Button size="sm" variant="outline" className="justify-start"><Download className="w-3.5 h-3.5" />Packing slip PDF</Button>
-              <Button size="sm" variant="outline" className="justify-start"><Download className="w-3.5 h-3.5" />Accounting push (Xero/MYOB)</Button>
-              <Button size="sm" variant="outline" className="justify-start"><Download className="w-3.5 h-3.5" />Price update CSV</Button>
-            </div>
-          </details>
+          {/* Section D — Additional exports (coming soon — wire to working flows once available) */}
 
           {/* Footer actions */}
           <div className="flex items-center justify-between pt-3 border-t border-border">

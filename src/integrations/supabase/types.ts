@@ -2968,6 +2968,42 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          location_filter: string | null
+          snapshot_date: string
+          total_cost_value: number
+          total_retail_value: number
+          total_skus: number
+          total_units: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_filter?: string | null
+          snapshot_date?: string
+          total_cost_value?: number
+          total_retail_value?: number
+          total_skus?: number
+          total_units?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_filter?: string | null
+          snapshot_date?: string
+          total_cost_value?: number
+          total_retail_value?: number
+          total_skus?: number
+          total_units?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       stocktake_lines: {
         Row: {
           barcode: string | null

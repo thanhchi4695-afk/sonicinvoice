@@ -357,15 +357,11 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
   const createPOFromSelected = () => {
     const lines = filtered.filter((r) => selected.has(r.key) && r.override_qty > 0);
     if (!lines.length) { toast.info("Select at least one line"); return; }
-    // Group by vendor — if multiple vendors, send first only and warn
     const vendorsInSelection = Array.from(new Set(lines.map((l) => l.vendor)));
-    if (vendorsInSelection.length > 1) {
-      toast.warning(`Selection spans ${vendorsInSelection.length} vendors — only "${vendorsInSelection[0]}" will be added. Group your selection by vendor.`);
-    }
-    const vendor = vendorsInSelection[0];
-    const seeded = lines
-      .filter((l) => l.vendor === vendor)
-      .map((l) => ({
+
+    const buildSeed = (vendor: string, vendorLines: typeof lines) => ({
+      vendor,
+      lines: vendorLines.map((l) => ({
         product_title: l.product_title,
         variant_title: l.variant_title || null,
         sku: l.sku,
@@ -376,15 +372,58 @@ export default function RestockSuggestionsPanel({ onBack, onOpenPO }: Props) {
         qty_ordered: l.override_qty,
         qty_received: 0,
         current_stock: l.available_qty,
-      }));
-    sessionStorage.setItem("restock_po_seed", JSON.stringify({
-      vendor,
-      lines: seeded,
+        restock_status: l.restock_status,
+        notes: l.restock_status === "refill" ? "🔁 Seasonal — confirm season is active" : "",
+      })),
       created_at: Date.now(),
-    }));
-    addAuditEntry("restock_create_po", `Seeding PO with ${seeded.length} lines for ${vendor}`);
+    });
+
+    if (singlePoMode === "per_vendor" && vendorsInSelection.length > 1) {
+      // Stash a queue of seeds; PO panel will pop them one by one
+      const queue = vendorsInSelection.map((v) => buildSeed(v, lines.filter((l) => l.vendor === v)));
+      sessionStorage.setItem("restock_po_seed_queue", JSON.stringify(queue));
+      sessionStorage.setItem("restock_po_seed", JSON.stringify(queue[0]));
+      toast.success(`Creating ${queue.length} POs (one per vendor) — first opened, ${queue.length - 1} queued`);
+      addAuditEntry("restock_create_po", `Queued ${queue.length} POs across vendors`);
+    } else {
+      const vendor = vendorsInSelection[0];
+      const seeded = singlePoMode === "single"
+        ? lines // single PO regardless of vendor — use first vendor name
+        : lines.filter((l) => l.vendor === vendor);
+      const seed = buildSeed(vendor, seeded);
+      sessionStorage.setItem("restock_po_seed", JSON.stringify(seed));
+      sessionStorage.removeItem("restock_po_seed_queue");
+      addAuditEntry("restock_create_po", `Seeding PO with ${seeded.length} lines for ${vendor}`);
+    }
+
     if (onOpenPO) onOpenPO();
     else window.dispatchEvent(new CustomEvent("sonic:set-flow", { detail: "purchase_orders" }));
+  };
+
+  // ── Bulk: Mark selected as No Reorder ──
+  const markSelectedNoReorder = async () => {
+    if (!selected.size) { toast.info("Select at least one line"); return; }
+    setBulkBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const targets = rows.filter((r) => selected.has(r.key));
+      await setRestockStatusBulk(
+        user.id,
+        targets.map((t) => ({ platform_variant_id: t.shopify_variant_id })),
+        "no_reorder",
+      );
+      // Remove from view immediately
+      setRows((prev) => prev.filter((r) => !selected.has(r.key)));
+      setExcludedNoReorder((n) => n + targets.length);
+      setSelected(new Set());
+      toast.success(`Marked ${targets.length} variant${targets.length === 1 ? "" : "s"} as No Reorder`);
+      addAuditEntry("restock_no_reorder", `${targets.length} variant(s) marked No Reorder`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to update");
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   // ── Affected supplier list (lead-time editor) ──

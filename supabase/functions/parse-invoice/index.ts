@@ -459,6 +459,7 @@ Return ONLY valid JSON (no markdown, no explanation):
       "line_total": number or null,
       "barcode": "if visible",
       "product_type": "e.g. One Piece, Dress, Pant, Top",
+      "collection": "Story / Collection / Delivery / Range label for this row, e.g. 'Summer Chintz', 'Beach Bound', 'Resort 26'. Look for a 'Story' or 'Collection' or 'Delivery' or 'Range' column. If a section header above the row names a collection, inherit it. Empty string if none.",
       "group_key": "style_code|colour for grouping variants",
       "confidence": 0-100,
       "parse_notes": "any issues, ambiguity, or extraction strategy used",

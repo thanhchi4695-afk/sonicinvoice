@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import Papa from "papaparse";
 import { toast } from "sonner";
+import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 /* ─── Types ─── */
 interface ExpenseItem {
@@ -213,6 +214,7 @@ const PIE_COLORS = [
 ];
 
 const ProfitLossPanel = ({ onBack }: Props) => {
+  const confirmDialog = useConfirmDialog();
   const [data, setData] = useState<PLData>(loadPLData);
   const [view, setView] = useState<View>("overview");
   const [dateFrom, setDateFrom] = useState<Date>(() => subMonths(startOfMonth(new Date()), 11));
@@ -1101,12 +1103,17 @@ const ProfitLossPanel = ({ onBack }: Props) => {
       <Card className="p-4">
         <h3 className="text-sm font-semibold mb-2">Reset Data</h3>
         <p className="text-xs text-muted-foreground mb-3">Clear all P&L data and start fresh with default categories.</p>
-        <Button variant="destructive" size="sm" onClick={() => {
-          if (confirm("Reset all P&L data? This cannot be undone.")) {
-            localStorage.removeItem(STORAGE_KEY);
-            setData(loadPLData());
-            toast.success("P&L data reset");
-          }
+        <Button variant="destructive" size="sm" onClick={async () => {
+          const ok = await confirmDialog({
+            title: "Reset all P&L data?",
+            description: "This clears every category, mapping, and amount and restores defaults. This cannot be undone.",
+            confirmLabel: "Reset all data",
+            destructive: true,
+          });
+          if (!ok) return;
+          localStorage.removeItem(STORAGE_KEY);
+          setData(loadPLData());
+          toast.success("P&L data reset");
         }}>
           <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Reset All Data
         </Button>

@@ -137,7 +137,8 @@ type ColKey =
   | "daysUntilDepletion" | "abc" | "onOrder" | "lastReceivedAt"
   | "shopifyProductId" | "shopifyVariantId" | "productType"
   | "compareAtPrice" | "totalRetailValue" | "totalCostValue"
-  | "refunds30" | "cancelled30" | "firstReceivedAt" | "weight";
+  | "refunds30" | "cancelled30" | "firstReceivedAt" | "weight"
+  | "restockStatus";
 
 interface ColDef {
   key: ColKey;

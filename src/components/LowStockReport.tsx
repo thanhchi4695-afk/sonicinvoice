@@ -181,6 +181,9 @@ const LowStockReport = () => {
   const [loading, setLoading] = useState(false);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
 
+  // Global Shopify location filter (shared with Inventory + Stock on Hand)
+  const { selected: globalLocSelected, selectedLocation: globalLocObj } = useShopifyLocations();
+
   // filters
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [vendorFilter, setVendorFilter] = useState<string[]>([]);

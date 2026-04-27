@@ -295,7 +295,14 @@ export default function PlatformConnectionsSection() {
       toast.success("Shopify catalog synced");
       const counts = await loadCatalogCounts();
       setShopifyCount(counts.shopify);
-      setShopifyLastSynced(new Date().toISOString());
+      const syncedAt = new Date().toISOString();
+      await supabase
+        .from("platform_connections")
+        .update({ last_synced_at: syncedAt })
+        .eq("user_id", user.id)
+        .eq("platform", "shopify")
+        .eq("is_active", true);
+      setShopifyLastSynced(syncedAt);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sync failed");
     } finally {
@@ -735,7 +742,7 @@ export default function PlatformConnectionsSection() {
           <div>
             <div className="text-muted-foreground">Connected platforms</div>
             <div className="text-lg font-semibold mt-0.5">
-              {(shopifyConnected ? 1 : 0) + (lsConn ? 1 : 0)}
+              {connectedPlatformCount}
             </div>
           </div>
         </div>

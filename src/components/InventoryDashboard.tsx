@@ -110,7 +110,7 @@ export default function InventoryDashboard({ onBack }: Props) {
       // Fetch variants with product info
       const { data: variantsRaw } = await supabase
         .from("variants")
-        .select("id, product_id, sku, color, size, cost, retail_price, quantity")
+        .select("id, product_id, sku, color, size, cost, retail_price, quantity, shopify_variant_id")
         .eq("user_id", user.id);
 
       const { data: productsRaw } = await supabase
@@ -122,6 +122,26 @@ export default function InventoryDashboard({ onBack }: Props) {
         .from("inventory")
         .select("variant_id, location, quantity")
         .eq("user_id", user.id);
+
+      // Restock status sources
+      const [{ data: cacheRaw }, { data: profilesRaw }, overrides] = await Promise.all([
+        supabase
+          .from("product_catalog_cache" as any)
+          .select("platform_variant_id, restock_status")
+          .eq("user_id", user.id),
+        supabase
+          .from("supplier_profiles")
+          .select("supplier_name, profile_data")
+          .eq("user_id", user.id),
+        loadRestockOverrides(user.id),
+      ]);
+      const cacheStatusByVariant = new Map<string, string>();
+      ((cacheRaw as any[]) || []).forEach((r) => {
+        if (r?.platform_variant_id && r?.restock_status) {
+          cacheStatusByVariant.set(String(r.platform_variant_id), String(r.restock_status));
+        }
+      });
+      const supplierDefaults = buildSupplierDefaultMap(profilesRaw as any);
 
       const productMap = new Map((productsRaw || []).map(p => [p.id, p]));
 
@@ -136,9 +156,9 @@ export default function InventoryDashboard({ onBack }: Props) {
       const variants: ProductVariant[] = (variantsRaw || []).map(v => {
         const prod = productMap.get(v.product_id);
         const byLocation = byVariantLocation.get(v.id) || {};
-        // If we have inventory rows, use them; otherwise fall back to variants.quantity
         const sumFromInventory = Object.values(byLocation).reduce((a, b) => a + b, 0);
         const baseQty = Object.keys(byLocation).length > 0 ? sumFromInventory : (v.quantity || 0);
+        const platformVariantId = v.shopify_variant_id || null;
         return {
           variantId: v.id,
           productId: v.product_id,
@@ -152,6 +172,14 @@ export default function InventoryDashboard({ onBack }: Props) {
           retailPrice: Number(v.retail_price) || 0,
           quantity: baseQty,
           byLocation,
+          shopifyVariantId: platformVariantId,
+          restockStatus: resolveRestockStatus({
+            platformVariantId,
+            vendor: prod?.vendor || null,
+            cacheStatus: platformVariantId ? cacheStatusByVariant.get(String(platformVariantId)) ?? null : null,
+            overrides,
+            supplierDefaults,
+          }),
         };
       });
 

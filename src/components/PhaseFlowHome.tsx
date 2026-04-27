@@ -186,9 +186,6 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <AltBtn icon={<Mail className="w-4 h-4" />} label="Email inbox" onClick={props.onStartEmailInbox} />
-          <AltBtn icon={<Briefcase className="w-4 h-4" />} label="JOOR" onClick={props.onStartJoor} />
-          <AltBtn icon={<Briefcase className="w-4 h-4" />} label="Wholesale" onClick={props.onStartWholesaleImport} />
-          <AltBtn icon={<Briefcase className="w-4 h-4" />} label="Lookbook" onClick={props.onStartLookbookImport} />
         </div>
 
         {/* Original HomeWizard kept fully accessible below as the

@@ -424,11 +424,7 @@ const HomeScreen = ({
         <FeatureTile icon="📦" label="Packing slip" onClick={onStartPackingSlip} />
         <FeatureTile icon="📷" label="Scan mode" onClick={onStartScanMode} />
         <FeatureTile icon="🔍" label="Stock check" onClick={onStartStockCheck} highlight />
-        <FeatureTile icon="🔗" label="JOOR" onClick={onStartJoor} />
-        <FeatureTile icon="📥" label="Wholesale import" onClick={onStartWholesaleImport} />
-        <FeatureTile icon="📸" label="Lookbook import" onClick={onStartLookbookImport} />
         <FeatureTile icon="📋" label="Purchase orders" onClick={onStartPurchaseOrders} />
-        <FeatureTile icon="📝" label="Order forms" onClick={onStartOrderForm} />
         <FeatureTile icon="💼" label="Accounting push" onClick={onStartAccounting} />
       </CollapsibleSection>
 

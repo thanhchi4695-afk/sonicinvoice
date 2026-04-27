@@ -291,6 +291,7 @@ const CustomInstructionsField = ({
 }: {
   value: string; onChange: (v: string) => void; supplierName: string;
 }) => {
+  const promptDialog = usePromptDialog();
   const [showHistory, setShowHistory] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
   const [saveForSupplier, setSaveForSupplier] = useState(false);

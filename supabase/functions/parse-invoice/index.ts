@@ -227,6 +227,26 @@ Size labels appear as column headers across the row. Quantities are printed in c
 - Create one output row per size with quantity > 0
 - Each output row inherits the style_code, colour, unit_cost, and product_title from the parent product row
 
+**Method 2a: FLOATING size-header rows (Seafolly, Jets, Baku, Sunseeker style — CRITICAL)**
+Some invoices print the size header row ONCE above a *group* of products, and that header applies to every product row underneath until a NEW size header appears. Example (Seafolly):
+
+  Style              Colour  Description           Story          [6  8  10  12  14  16  18]   TotalQty Units  Price ...
+                                                                   6  8  10  12  14  16  18           ← size header row (no product data)
+  31377-332.Ecru     Ecru    Longline Slide Tri    SummerChintz    1  1  2   2   1                7   Each   50.00
+  31467-072.Begonia  Begonia Ring Front Tank       Beach Bound     1  2  3   2   1                9   Each   54.55
+                                                                   8  10 12  14  16  18                ← NEW size header (different range)
+  31475DD332.Ecru    Ecru    DD Cup Underwire Bra  SummerChintz    1  1  2   2                   6   Each   63.64
+
+Rules for this layout:
+- The size header row contains ONLY size labels (numbers like 6/8/10 or letters XS/S/M/L) — no style code, no colour, no price. It is NOT a product.
+- Every subsequent product row INHERITS that size header until a new size header row appears.
+- Map each cell under a size column to that size's quantity for the product on that row.
+- You MUST emit one output row per (product × size where qty > 0). NEVER emit a product row with empty `size` when a size header is in scope.
+- The TotalQty column on the right MUST equal the sum of cells you extracted for that row — use it as a checksum.
+- If you cannot read the per-cell quantities but you can see TotalQty, set size to the FIRST visible size in the header and put the full TotalQty there, then add "size_grid_unreadable" to parse_notes — do NOT silently drop the sizes.
+
+**ABSOLUTE RULE for Methods 2 / 2a / 2b / 2c**: When the document shows a size grid (printed labels OR floating header), every product row MUST have a non-empty `size` field. If you emit multiple rows for the same product, each row must have a DIFFERENT size value. Never emit N rows for one product all with `size: ""`.
+
 **Method 2b: Size grid with HANDWRITTEN tick marks / pen annotations (CRITICAL)**
 Many fashion wholesale invoices have a printed size grid but the QUANTITIES are written by hand — ticks (✓ / ✔), pen marks, circles, or handwritten numbers.
 

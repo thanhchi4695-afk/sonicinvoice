@@ -33,6 +33,7 @@ const App = () => (
             <Toaster />
             <Sonner />
           <BrowserRouter>
+            <StockyAnnouncementBar />
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/dashboard" element={<Index />} />

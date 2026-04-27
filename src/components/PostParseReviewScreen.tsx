@@ -1420,6 +1420,21 @@ export default function PostParseReviewScreen({
               <Input value={bulkVendor} onChange={e => setBulkVendor(e.target.value)} placeholder="Vendor..." className="h-7 text-[10px] w-24" />
               <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={applyBulkVendor} disabled={!bulkVendor.trim()}>Apply</Button>
             </div>
+            <div className="flex items-center gap-1" title="Tag selected rows with a collection / story (e.g. Summer Chintz)">
+              <FolderTree className="w-3 h-3 text-muted-foreground" />
+              <Input
+                value={bulkCollection}
+                onChange={e => setBulkCollection(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") applyBulkCollection(); }}
+                placeholder="Collection..."
+                list="sonic-known-collections"
+                className="h-7 text-[10px] w-32"
+              />
+              <datalist id="sonic-known-collections">
+                {allCollectionNames.map(n => <option key={n} value={n} />)}
+              </datalist>
+              <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={applyBulkCollection} disabled={!bulkCollection.trim()}>Tag</Button>
+            </div>
           </>
         )}
         {selectedRows.size === 0 && (

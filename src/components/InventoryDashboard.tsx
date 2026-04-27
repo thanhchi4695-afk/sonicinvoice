@@ -30,7 +30,10 @@ interface ProductVariant {
   size: string | null;
   cost: number;
   retailPrice: number;
+  /** Quantity for the currently selected location (or sum across all locations). */
   quantity: number;
+  /** Per-location breakdown: location name → qty (only includes locations with inventory rows). */
+  byLocation: Record<string, number>;
 }
 
 interface InventoryLocation {

@@ -13,7 +13,58 @@
 // ════════════════════════════════════════════════════════════════
 
 import { load as cheerioLoad } from "https://esm.sh/cheerio@1.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { downloadImages, collectImageUrls } from "./image-pipeline.ts";
+
+// ────────────────────────────────────────────────────────────────
+// Processing-history logger
+// Best-effort: never let logging failures break the response.
+// ────────────────────────────────────────────────────────────────
+async function logProcessingHistory(entry: {
+  userId: string | null;
+  url: string;
+  status: "success" | "failed";
+  productName?: string | null;
+  errorMessage?: string | null;
+  imagesCount?: number;
+  extractionStrategy?: "jsonld" | "selectors" | "llm" | null;
+  processingTimeMs: number;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceKey) return;
+    const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    await supabase.from("processing_history").insert({
+      user_id: entry.userId,
+      source: "product-extract",
+      url: entry.url,
+      status: entry.status,
+      product_name: entry.productName ?? null,
+      error_message: entry.errorMessage ?? null,
+      images_count: entry.imagesCount ?? 0,
+      extraction_strategy: entry.extractionStrategy ?? null,
+      processing_time_ms: entry.processingTimeMs,
+      metadata: entry.metadata ?? {},
+    });
+  } catch (e) {
+    console.warn("[product-extract] failed to log processing_history:", (e as Error).message);
+  }
+}
+
+/** Extract user id from JWT in Authorization header, if present. */
+function getUserIdFromAuth(req: Request): string | null {
+  try {
+    const auth = req.headers.get("Authorization") ?? "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split(".")[1] ?? ""));
+    return typeof payload?.sub === "string" ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -280,7 +331,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: false, error: "Body must include a valid http(s) `url`" }, 400);
   }
   const url = body.url;
-
+  const userId = getUserIdFromAuth(req);
   const overall = AbortSignal.timeout(TIMEOUT_MS);
   const start = Date.now();
 
@@ -303,6 +354,14 @@ Deno.serve(async (req) => {
     }
 
     if (!product) {
+      const ms = Date.now() - start;
+      await logProcessingHistory({
+        userId,
+        url,
+        status: "failed",
+        errorMessage: "Could not extract product data from URL",
+        processingTimeMs: ms,
+      });
       return jsonResponse(
         { success: false, error: "Could not extract product data from URL" },
         422,
@@ -327,6 +386,23 @@ Deno.serve(async (req) => {
     const priceNormalized = normalizeCurrency(product.price, product.currency);
 
     const warnings = [...priceNormalized.warnings, ...imageResult.warnings];
+    const durationMs = Date.now() - start;
+
+    await logProcessingHistory({
+      userId,
+      url,
+      status: "success",
+      productName: product.name,
+      imagesCount: imageResult.images.length,
+      extractionStrategy: strategyUsed,
+      processingTimeMs: durationMs,
+      metadata: {
+        currency: priceNormalized.currency,
+        priceValue: priceNormalized.value,
+        killSwitchTripped: imageResult.killSwitchTripped,
+        warningCount: warnings.length,
+      },
+    });
 
     return jsonResponse({
       success: true,
@@ -344,13 +420,20 @@ Deno.serve(async (req) => {
         sourceUrl: url,
         extractedAt: new Date().toISOString(),
         strategyUsed,
-        durationMs: Date.now() - start,
+        durationMs,
         warnings,
       },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[product-extract] failed", { url, message });
+    await logProcessingHistory({
+      userId,
+      url,
+      status: "failed",
+      errorMessage: message,
+      processingTimeMs: Date.now() - start,
+    });
     const status = message.toLowerCase().includes("timeout") || message.includes("aborted") ? 504 : 500;
     return jsonResponse({ success: false, error: message }, status);
   }

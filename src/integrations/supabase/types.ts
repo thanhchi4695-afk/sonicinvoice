@@ -2162,6 +2162,51 @@ export type Database = {
         }
         Relationships: []
       }
+      processing_history: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          extraction_strategy: string | null
+          id: string
+          images_count: number
+          metadata: Json
+          processing_time_ms: number | null
+          product_name: string | null
+          source: string
+          status: string
+          url: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          extraction_strategy?: string | null
+          id?: string
+          images_count?: number
+          metadata?: Json
+          processing_time_ms?: number | null
+          product_name?: string | null
+          source?: string
+          status: string
+          url: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          extraction_strategy?: string | null
+          id?: string
+          images_count?: number
+          metadata?: Json
+          processing_time_ms?: number | null
+          product_name?: string | null
+          source?: string
+          status?: string
+          url?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       processing_queue: {
         Row: {
           attempts: number

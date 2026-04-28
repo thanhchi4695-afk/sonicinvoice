@@ -264,6 +264,7 @@ CRITICAL ALIGNMENT RULES for this layout:
    - If you still cannot reconcile, add "baku_alignment_unreconciled" to parse_notes and emit qtys distributed across the size range from Sizeway1 — but NEVER emit fewer units than the printed Total.
 5. A product may have MULTIPLE colour rows under the same size header (e.g. PANT321KKM Kokomo Regular has BLACK and WHITE rows). Treat each colour row independently; both share the same size header above them.
 6. Numeric size values like 6, 8, 10, 12, 14, 16, 18, 20 in the header row are SIZE LABELS, never quantities. Quantities under this header are typically small integers 1-9.
+7. CUP DESIGNATORS in the product description (e.g. "D/DD", "E/F/G", "D/E", "DD/E", "B/C") are PART OF THE PRODUCT NAME — they describe bra cup coverage, NOT a size. Keep them inside \`product_title\` (e.g. "Kokomo D/DD Twist Bra"). NEVER put "D/DD" or "E/F/G" into the \`size\` field. The \`size\` field is reserved for the band/dress size (8, 10, 12, 14, 16, 18) shown in the per-product size grid.
 
 **ABSOLUTE RULE for Methods 2 / 2a / 2a-BAKU / 2b / 2c**: When the document shows a size grid (printed labels OR floating header), every product row MUST have a non-empty \`size\` field. If you emit multiple rows for the same product, each row must have a DIFFERENT size value. Never emit N rows for one product all with \`size: ""\`. The sum of extracted quantities for a product MUST equal its printed Total column when one is present.
 

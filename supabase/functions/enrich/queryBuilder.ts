@@ -1,7 +1,7 @@
 // ───────────────────────────────────────────────────────────────
 // Query Builder
 // Builds an ordered array of search queries for product enrichment,
-// ranging from most specific (brand + SKU) to most general (fallback).
+// prioritising rich product attributes before low-signal SKU fallbacks.
 // ───────────────────────────────────────────────────────────────
 
 export interface ProductQueryInput {
@@ -68,23 +68,23 @@ export function buildProductQuery(productData: ProductQueryInput): string[] {
 
   const queries: string[] = [];
 
-  // 1. Most specific: brand + SKU
+  // 1. Best match rate: brand + product name + colour + material
+  const richAttributeQuery = joinParts([brand, productName, colour, material]);
+  if (richAttributeQuery) queries.push(richAttributeQuery);
+
+  // 2. Brand + product name + category
+  const categoryQuery = joinParts([brand, productName, category]);
+  if (categoryQuery) queries.push(categoryQuery);
+
+  // 3. Product name + brand fallback
+  const nameBrandQuery = joinParts([productName, brand]);
+  if (nameBrandQuery) queries.push(nameBrandQuery);
+
+  // 4. SKU fallback last — useful, but lower match rate than structured attributes
   if (sku) {
-    const q = joinParts([brand, sku]);
-    if (q) queries.push(q);
+    const skuQuery = joinParts([brand, sku]);
+    if (skuQuery) queries.push(skuQuery);
   }
-
-  // 2. Brand + product name + colour + material
-  const q2 = joinParts([brand, productName, colour, material]);
-  if (q2) queries.push(q2);
-
-  // 3. Brand + product name + category
-  const q3 = joinParts([brand, productName, category]);
-  if (q3) queries.push(q3);
-
-  // 4. Fallback: product name + brand
-  const q4 = joinParts([productName, brand]);
-  if (q4) queries.push(q4);
 
   // De-duplicate while preserving order
   const seen = new Set<string>();

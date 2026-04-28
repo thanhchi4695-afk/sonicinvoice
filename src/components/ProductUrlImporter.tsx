@@ -854,9 +854,12 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                 </div>
 
                 <p className="text-[11px] text-muted-foreground px-1">
-                  Drag <GripVertical className="inline w-3 h-3 -mt-0.5" /> to reorder — items merge in this order.
+                  Drag <GripVertical className="inline w-3 h-3 -mt-0.5" /> to reorder — works with mouse <span className="hidden sm:inline">or touch</span><span className="sm:hidden">, or just touch & swipe up/down</span>.
                 </p>
-                <ul className="max-h-72 overflow-y-auto space-y-1.5">
+                <ul
+                  ref={bulkListRef}
+                  className="max-h-72 overflow-y-auto space-y-1.5 touch-pan-y"
+                >
                   {bulkRows.map((row, i) => {
                     const draggable = !bulkRunning && row.status === "success";
                     const isDragging = dragIndex === i;
@@ -864,6 +867,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                     return (
                     <li
                       key={`${row.url}-${i}`}
+                      data-row-index={i}
                       onDragOver={(e) => {
                         if (dragIndex === null || !draggable) return;
                         e.preventDefault();

@@ -11,6 +11,45 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import AgentInfoPopover, { type AgentInfo } from "./AgentInfoPopover";
+
+const AGENT_INFO: Record<string, AgentInfo> = {
+  Watchdog: {
+    name: "Watchdog",
+    why: "Monitors your inbox so invoices land in the pipeline the moment a supplier sends them — no manual upload needed.",
+    inputs: ["Connected Gmail account", "Sender allowlist (supplier emails)"],
+    outputs: ["Detected invoice attachments queued for processing"],
+    triggers: "Continuously, when Gmail monitoring is enabled.",
+  },
+  Classifier: {
+    name: "Classifier",
+    why: "Learns each supplier's invoice layout so extraction gets faster and more accurate after every run.",
+    inputs: ["Invoice PDF / image", "Supplier profile + past corrections"],
+    outputs: ["Structured line items (SKU, name, qty, cost)", "Confidence scores per field"],
+    triggers: "When a new invoice enters the pipeline.",
+  },
+  Enrichment: {
+    name: "Enrichment",
+    why: "Wholesale invoices lack retail-ready data. This agent fetches descriptions, RRP, images and attributes from brand sites and stockists.",
+    inputs: ["Classified invoice lines", "Brand + product attributes"],
+    outputs: ["Product descriptions, RRP, hero images, tags"],
+    triggers: "After classification, for any line missing retail attributes.",
+  },
+  Publishing: {
+    name: "Publishing",
+    why: "Pushes verified products straight to Shopify so eligible suppliers go from invoice → live listing hands-free.",
+    inputs: ["Enriched products with HIGH confidence (≥90%)", "Shopify connection"],
+    outputs: ["Live Shopify products + variants", "Inventory + pricing updates"],
+    triggers: "When auto-publish is on and supplier is publish-eligible.",
+  },
+  Learning: {
+    name: "Learning",
+    why: "Every correction trains the supplier profile so future invoices need less manual review — confidence rises over time.",
+    inputs: ["User corrections", "Run history per supplier"],
+    outputs: ["Updated supplier profile", "Auto-publish eligibility flag"],
+    triggers: "After every processed invoice.",
+  },
+};
 
 interface Props {
   onOpenGuide?: () => void;

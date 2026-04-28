@@ -1554,62 +1554,64 @@ INSTRUCTIONS FOR RETRY:
     }
 
     // ── Step B: OCR text fallback ──
-    // If any line item has confidence < 70 OR quality_warning is set, run a text-extraction
-    // pass using a vision model to get raw OCR text, then re-parse with a fast text-only model.
+    // If any line item has confidence < 70 OR quality_warning is set, run a
+    // text-extraction pass using a vision model to get raw OCR text, then
+    // re-parse with a fast text-only model.
+    //
+    // Step B is EXPENSIVE (~70-80s). To stay safely under the 150s edge
+    // function gateway timeout we now ASYNC-DETACH it whenever we have an
+    // authenticated caller: Step A returns immediately with a job id, and the
+    // upgraded products land in `public.invoice_processing_jobs` for the UI
+    // to pick up via realtime / polling.
     const products = parsed.products || [];
     const hasLowConfidence = products.some((p: Record<string, unknown>) => (Number(p.confidence) || 0) < 70);
     const hasQualityWarning = parsed.quality_warning === true || parsed.parsing_plan?.expected_review_level === "high";
-    const shouldFallbackOCR = (hasLowConfidence || hasQualityWarning) && (isImage || isPdf) && !detailedMode && !budgetExceeded();
+    const shouldFallbackOCR = (hasLowConfidence || hasQualityWarning) && (isImage || isPdf) && !detailedMode;
 
-    if (!parsedFromWalnutText && shouldFallbackOCR) {
-      console.log(`[parse-invoice] Step B: OCR text fallback triggered — lowConf=${hasLowConfidence}, qualityWarn=${hasQualityWarning}`);
-      try {
-        // Step B.1: Extract raw OCR text from the image using vision model
-        const ocrMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
-          {
-            role: "system",
-            content: `You are a precise OCR engine. Extract ALL visible text from this document image exactly as it appears, preserving the layout structure (rows, columns, spacing). Include every number, code, word, and symbol you can see. Output ONLY the raw text, no commentary or formatting. Preserve table structure using | as column separators and newlines for rows. Include headers, data rows, and totals — extract EVERYTHING visible.`,
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${isImage ? `image/${fileType === "jpg" ? "jpeg" : fileType}` : "application/pdf"};base64,${fileContent}`,
-                },
+    // Always-defined helper: runs the OCR fallback and returns the merged
+    // result. Pure — does not touch outer `parsed` directly.
+    const runOcrUpgrade = async (originalProducts: Record<string, unknown>[]) => {
+      const upgrade: Record<string, any> = {
+        products: originalProducts,
+        ocr_fallback_used: false,
+        ocr_fallback_attempted: true,
+      };
+      const ocrMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
+        {
+          role: "system",
+          content: `You are a precise OCR engine. Extract ALL visible text from this document image exactly as it appears, preserving the layout structure (rows, columns, spacing). Include every number, code, word, and symbol you can see. Output ONLY the raw text, no commentary or formatting. Preserve table structure using | as column separators and newlines for rows. Include headers, data rows, and totals — extract EVERYTHING visible.`,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${isImage ? `image/${fileType === "jpg" ? "jpeg" : fileType}` : "application/pdf"};base64,${fileContent}`,
               },
-              { type: "text", text: "Extract all text from this document image. Preserve table layout with | separators." },
-            ],
-          },
-        ];
-
-        const ocrData = await callAI({ model: "google/gemini-2.5-flash", messages: ocrMessages, temperature: 0.0 });
-        const ocrText = getContent(ocrData);
-
-        if (ocrText && ocrText.length > 50) {
-          console.log(`[parse-invoice] Step B: OCR extracted ${ocrText.length} chars of text`);
-
-          let usedDeterministicWalnutOcr = false;
-          if (/walnut/i.test(fileName || "") || /walnut melbourne/i.test(supplierName || "") || /tax invoice[\s\S]{0,500}invoice no[\s:]+\d+/i.test(ocrText)) {
-            const deterministicFromOcr = parseWalnutInvoiceChunks(ocrText, supplierName || "Walnut Melbourne");
-            if (deterministicFromOcr?.products?.length) {
-              console.log(`[parse-invoice] Step B: Using deterministic Walnut OCR parser (${deterministicFromOcr.products.length} products)`);
-              parsed = { ...parsed, ...deterministicFromOcr, ocr_fallback_used: true, ocr_text_length: ocrText.length };
-              usedDeterministicWalnutOcr = true;
-            }
-          }
-
-          if (!usedDeterministicWalnutOcr) {
-            // Step B.2: Re-parse the OCR text with a fast text-only model
-            const ocrParseMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
-            {
-              role: "system",
-              content: systemPrompt,
             },
-            {
-              role: "user",
-              content: `Below is raw OCR text extracted from a fashion supplier invoice image. The original vision extraction had low confidence. Please re-extract ALL product line items from this text.
+            { type: "text", text: "Extract all text from this document image. Preserve table layout with | separators." },
+          ],
+        },
+      ];
+
+      const ocrData = await callAI({ model: "google/gemini-2.5-flash", messages: ocrMessages, temperature: 0.0 });
+      const ocrText = getContent(ocrData);
+      if (!ocrText || ocrText.length <= 50) return upgrade;
+
+      // Deterministic Walnut path
+      if (/walnut/i.test(fileName || "") || /walnut melbourne/i.test(supplierName || "") || /tax invoice[\s\S]{0,500}invoice no[\s:]+\d+/i.test(ocrText)) {
+        const deterministicFromOcr = parseWalnutInvoiceChunks(ocrText, supplierName || "Walnut Melbourne");
+        if (deterministicFromOcr?.products?.length) {
+          return { ...deterministicFromOcr, ocr_fallback_used: true, ocr_fallback_attempted: true, ocr_text_length: ocrText.length };
+        }
+      }
+
+      const ocrParseMessages: Array<{ role: string; content: string | Array<Record<string, unknown>> }> = [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: `Below is raw OCR text extracted from a fashion supplier invoice image. The original vision extraction had low confidence. Please re-extract ALL product line items from this text.
 
 IMPORTANT:
 - Each product row must have: style_code, product_title, quantity, unit_cost, colour, size
@@ -1619,63 +1621,124 @@ IMPORTANT:
 
 OCR TEXT:
 ${ocrText}`,
-            },
-          ];
+        },
+      ];
 
-            const ocrParsed = await callAI({ model: "google/gemini-2.5-flash", messages: ocrParseMessages, temperature: 0.1 });
-            const ocrContent = getContent(ocrParsed);
-            const ocrJsonMatch = ocrContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, ocrContent];
-            const ocrJsonStr = (ocrJsonMatch[1] || ocrContent).trim();
+      const ocrParsed = await callAI({ model: "google/gemini-2.5-flash", messages: ocrParseMessages, temperature: 0.1 });
+      const ocrContent = getContent(ocrParsed);
+      const ocrJsonMatch = ocrContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, ocrContent];
+      const ocrJsonStr = (ocrJsonMatch[1] || ocrContent).trim();
 
-            try {
-              const ocrResult = JSON.parse(ocrJsonStr);
-              const ocrProducts = ocrResult.products || [];
-              console.log(`[parse-invoice] Step B: OCR re-parse found ${ocrProducts.length} products`);
+      try {
+        const ocrResult = JSON.parse(ocrJsonStr);
+        const ocrProducts = ocrResult.products || [];
+        const originalAvgConf = originalProducts.length > 0
+          ? originalProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / originalProducts.length
+          : 0;
+        const ocrAvgConf = ocrProducts.length > 0
+          ? ocrProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / ocrProducts.length
+          : 0;
 
-            // Merge strategy: use OCR results if they found more products or higher confidence
-            const originalAvgConf = products.length > 0
-              ? products.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / products.length
-              : 0;
-            const ocrAvgConf = ocrProducts.length > 0
-              ? ocrProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / ocrProducts.length
-              : 0;
-
-              if (ocrProducts.length > products.length || (ocrProducts.length === products.length && ocrAvgConf > originalAvgConf)) {
-                console.log(`[parse-invoice] Step B: Using OCR results (${ocrProducts.length} products, avg conf ${ocrAvgConf.toFixed(0)}) over original (${products.length} products, avg conf ${originalAvgConf.toFixed(0)})`);
-                parsed.products = ocrProducts;
-                parsed.ocr_fallback_used = true;
-                parsed.ocr_text_length = ocrText.length;
-                if (ocrResult.parsing_plan) parsed.parsing_plan = { ...parsed.parsing_plan, ...ocrResult.parsing_plan, ocr_fallback: true };
-                if (ocrResult.rejected_rows) parsed.rejected_rows = [...(parsed.rejected_rows || []), ...ocrResult.rejected_rows];
-              } else {
-                console.log(`[parse-invoice] Step B: Keeping original results (higher quality)`);
-                parsed.ocr_fallback_attempted = true;
-                parsed.ocr_fallback_used = false;
-              }
-
-            // If BOTH passes returned low confidence, mark as needs_manual_review
-              const finalProducts = parsed.products || [];
-              const finalAvgConf = finalProducts.length > 0
-                ? finalProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / finalProducts.length
-                : 0;
-              if (finalAvgConf < 60 || finalProducts.length === 0) {
-                parsed.needs_manual_review = true;
-                parsed.review_reason = finalProducts.length === 0
-                  ? "Both vision and OCR fallback failed to extract products"
-                  : `Average confidence ${finalAvgConf.toFixed(0)}% is below threshold after OCR fallback`;
-                console.log(`[parse-invoice] Step B: Marked as needs_manual_review — ${parsed.review_reason}`);
-              }
-            } catch (ocrParseErr) {
-              console.warn("[parse-invoice] Step B: OCR re-parse JSON failed:", ocrParseErr);
-              parsed.ocr_fallback_attempted = true;
-              parsed.ocr_fallback_used = false;
-            }
-          }
+        if (ocrProducts.length > originalProducts.length || (ocrProducts.length === originalProducts.length && ocrAvgConf > originalAvgConf)) {
+          upgrade.products = ocrProducts;
+          upgrade.ocr_fallback_used = true;
+          upgrade.ocr_text_length = ocrText.length;
+          if (ocrResult.parsing_plan) upgrade.parsing_plan = { ...ocrResult.parsing_plan, ocr_fallback: true };
+          if (ocrResult.rejected_rows) upgrade.rejected_rows = ocrResult.rejected_rows;
         }
-      } catch (ocrErr) {
-        console.warn("[parse-invoice] Step B: OCR fallback failed:", ocrErr);
-        parsed.ocr_fallback_attempted = true;
-        parsed.ocr_fallback_used = false;
+
+        const finalProducts = upgrade.products || [];
+        const finalAvgConf = finalProducts.length > 0
+          ? finalProducts.reduce((s: number, p: Record<string, unknown>) => s + (Number(p.confidence) || 0), 0) / finalProducts.length
+          : 0;
+        if (finalAvgConf < 60 || finalProducts.length === 0) {
+          upgrade.needs_manual_review = true;
+          upgrade.review_reason = finalProducts.length === 0
+            ? "Both vision and OCR fallback failed to extract products"
+            : `Average confidence ${finalAvgConf.toFixed(0)}% is below threshold after OCR fallback`;
+        }
+      } catch (e) {
+        console.warn("[parse-invoice] Step B: OCR re-parse JSON failed:", e);
+      }
+      return upgrade;
+    };
+
+    if (!parsedFromWalnutText && shouldFallbackOCR) {
+      // ── Async path: detach to background and return Step A immediately ──
+      if (resolvedUserId && typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+        try {
+          const admin = createClient(supabaseUrl, serviceKey);
+          const { data: jobRow, error: jobErr } = await admin
+            .from("invoice_processing_jobs")
+            .insert({
+              user_id: resolvedUserId,
+              job_kind: "ocr_upgrade",
+              file_name: fileName || null,
+              status: "running",
+            })
+            .select("id")
+            .single();
+
+          if (jobErr || !jobRow) {
+            console.warn("[parse-invoice] Could not create OCR upgrade job, falling back to inline:", jobErr);
+          } else {
+            const jobId = jobRow.id;
+            console.log(`[parse-invoice] Step B: detached to background job ${jobId}`);
+            // Mark on the response so the UI can subscribe
+            parsed.ocr_upgrade_job_id = jobId;
+            parsed.ocr_fallback_attempted = true;
+            parsed.ocr_fallback_used = false;
+            parsed.ocr_upgrade_pending = true;
+
+            const bgWork = (async () => {
+              try {
+                const upgrade = await runOcrUpgrade(products);
+                await admin.from("invoice_processing_jobs").update({
+                  status: "done",
+                  result: upgrade,
+                  completed_at: new Date().toISOString(),
+                }).eq("id", jobId);
+                console.log(`[parse-invoice] Step B job ${jobId} complete (used=${upgrade.ocr_fallback_used})`);
+              } catch (bgErr) {
+                console.error(`[parse-invoice] Step B job ${jobId} failed:`, bgErr);
+                await admin.from("invoice_processing_jobs").update({
+                  status: "failed",
+                  error_message: bgErr instanceof Error ? bgErr.message : String(bgErr),
+                  completed_at: new Date().toISOString(),
+                }).eq("id", jobId);
+              }
+            })();
+            EdgeRuntime.waitUntil(bgWork);
+          }
+        } catch (kickoffErr) {
+          console.warn("[parse-invoice] Failed to kick off async Step B:", kickoffErr);
+        }
+      } else if (!budgetExceeded()) {
+        // ── Inline fallback (service-role caller, anonymous, or no EdgeRuntime) ──
+        console.log(`[parse-invoice] Step B: running INLINE — lowConf=${hasLowConfidence}, qualityWarn=${hasQualityWarning}`);
+        try {
+          const upgrade = await runOcrUpgrade(products);
+          if (upgrade.ocr_fallback_used) {
+            parsed.products = upgrade.products;
+            parsed.ocr_fallback_used = true;
+            parsed.ocr_text_length = upgrade.ocr_text_length;
+            if (upgrade.parsing_plan) parsed.parsing_plan = { ...parsed.parsing_plan, ...upgrade.parsing_plan };
+            if (upgrade.rejected_rows) parsed.rejected_rows = [...(parsed.rejected_rows || []), ...upgrade.rejected_rows];
+          } else {
+            parsed.ocr_fallback_attempted = true;
+            parsed.ocr_fallback_used = false;
+          }
+          if (upgrade.needs_manual_review) {
+            parsed.needs_manual_review = true;
+            parsed.review_reason = upgrade.review_reason;
+          }
+        } catch (ocrErr) {
+          console.warn("[parse-invoice] Step B inline failed:", ocrErr);
+          parsed.ocr_fallback_attempted = true;
+          parsed.ocr_fallback_used = false;
+        }
+      } else {
+        console.log("[parse-invoice] Step B skipped — budget exceeded and no async path available");
       }
     }
 

@@ -293,6 +293,110 @@ const AgentGuide = ({ onBack, onOpenAutomation }: Props) => {
         )}
       </AgentSection>
 
+      {/* ── Enrichment sub-agents section ─────────────────── */}
+      <div className="space-y-3 pt-4">
+        <div className="flex items-center gap-2 border-t border-border pt-6">
+          <Workflow className="h-5 w-5 text-accent" />
+          <div>
+            <h2 className="font-display text-xl font-bold text-foreground">
+              Inside the Enrichment Agent
+              <Badge variant="secondary" className="ml-2 text-[10px]">New</Badge>
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              4 specialised sub-agents work together to reach 80–95% product match accuracy.
+            </p>
+          </div>
+        </div>
+
+        <AgentSection
+          number={1}
+          name="Query Builder"
+          icon={Search}
+          accent="text-accent"
+          description="Generates ranked search queries for every product, prioritising rich attributes over bare SKUs."
+          active
+          statusActive="Always active"
+          statusInactive=""
+          activate={["Runs automatically for every line item — no setup required."]}
+          automatic={[
+            "Builds queries in priority order: Brand + Name + Colour + Material first",
+            "Adds Brand + Product Name as a strong fallback",
+            "Pushes SKU-only queries to the bottom (lowest match rate)",
+            "Skips empty/invalid attribute combinations",
+          ]}
+          manual={[
+            "Nothing — query generation is fully automatic",
+            "Improve results by keeping supplier brand & colour fields filled in",
+          ]}
+        />
+
+        <AgentSection
+          number={2}
+          name="Supplier Agent"
+          icon={Building2}
+          accent="text-primary"
+          description="Crawls the brand's own website first — usually the highest-quality source for descriptions and hero images."
+          active
+          statusActive="Always active"
+          statusInactive=""
+          activate={["Runs in parallel with the Web Agent for every product."]}
+          automatic={[
+            "Searches the supplier's official site using the ranked queries",
+            "Validates that results look like real product pages (/products/, /shop/, /p/)",
+            "Rejects search/listing/category pages to avoid false matches",
+            "Extracts title, description, image, price, and structured data",
+          ]}
+          manual={[
+            "Nothing — runs hands-free",
+            "If the brand has no website, the Web Agent picks up the slack",
+          ]}
+        />
+
+        <AgentSection
+          number={3}
+          name="Web Agent"
+          icon={Globe2}
+          accent="text-purple-500"
+          description="Searches Australian retailers and stockists in parallel via Brave Search to find market pricing and additional imagery."
+          active
+          statusActive="Always active"
+          statusInactive=""
+          activate={["Always active — runs alongside the Supplier Agent."]}
+          automatic={[
+            "Queries Brave Search with the same ranked attribute strategy",
+            "Pulls candidate pages from multiple AU retailers simultaneously",
+            "Extracts retailer RRP for market-price benchmarking",
+            "Feeds all candidates into the Verifier for scoring",
+          ]}
+          manual={[
+            "Nothing — fully automatic",
+            "Override any value on the Review screen if a wrong match slips through",
+          ]}
+        />
+
+        <AgentSection
+          number={4}
+          name="Verifier"
+          icon={ShieldCheck}
+          accent="text-success"
+          description="Scores every candidate and picks the single highest-confidence match — instead of accepting the first hit."
+          active
+          statusActive="Always active"
+          statusInactive=""
+          activate={["Runs at the end of every enrichment cycle."]}
+          automatic={[
+            "Collects candidates from both Supplier and Web agents across all queries",
+            "Verifies the top 3 candidates against the original invoice line",
+            "Compares brand, name, colour, material, and SKU signals",
+            "Returns the highest-confidence match (or marks as 'needs review' if none qualify)",
+          ]}
+          manual={[
+            "Confirm low-confidence matches on the Review screen",
+            "Your corrections feed back into the Learning Agent",
+          ]}
+        />
+      </div>
+
       {loading && <p className="text-center text-xs text-muted-foreground">Loading live stats…</p>}
     </div>
   );

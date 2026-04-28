@@ -96,6 +96,15 @@ function absoluteUrl(maybeUrl: string, base: string): string {
   }
 }
 
+function looksLikeProductPage(url: string): boolean {
+  try {
+    const { pathname } = new URL(url);
+    return /\/(products?|shop|p)\//i.test(pathname);
+  } catch {
+    return /\/(products?|shop|p)\//i.test(url);
+  }
+}
+
 // ───────────────────────────────────────────────────────────────
 // Extraction
 // ───────────────────────────────────────────────────────────────
@@ -206,8 +215,9 @@ export async function searchSupplier(input: SupplierAgentInput): Promise<Supplie
         break;
       }
     }
-    // If the search page itself looks like a product page, try extracting from it
-    if (!pageHtml) {
+    // Only accept the current page when it is an actual product URL.
+    // Search/listing pages often expose generic OG tags and create false 90-confidence hits.
+    if (!pageHtml && looksLikeProductPage(url)) {
       pageUrl = url;
       pageHtml = html;
     }
@@ -228,7 +238,7 @@ export async function searchSupplier(input: SupplierAgentInput): Promise<Supplie
     }
   }
 
-  if (!pageHtml || !pageUrl) {
+  if (!pageHtml || !pageUrl || !looksLikeProductPage(pageUrl)) {
     return { success: false, error: "No product found on supplier website" };
   }
 

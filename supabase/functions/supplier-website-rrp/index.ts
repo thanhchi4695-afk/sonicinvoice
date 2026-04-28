@@ -330,11 +330,13 @@ function findProductByNameAndColour(
 
   if (candidates.length === 0) return null;
 
-  // ── Step 1d: silhouette filter from supplier code prefix ──
-  // (PANT* → bottom, BRA* → bra/top, M* → one-piece). This disambiguates
-  // when the token matcher returns several products from the same story.
-  if (codes.length && candidates.length > 1) {
-    const filtered = candidates.filter(silhouetteFilter(codes[0]));
+  // ── Step 1d: silhouette / category filter ──
+  // Runs whenever we have either an SKU code OR an inferred category
+  // from the invoice name (dress, top, bottom, jumpsuit, footwear, etc.)
+  // — so the disambiguation works for ALL brands, not only those that
+  // embed silhouette info in their SKU prefix.
+  if (candidates.length > 1 && (codes.length || inferredCategories.size)) {
+    const filtered = candidates.filter(silhouetteFilter(codes[0] || ""));
     if (filtered.length) candidates = filtered;
   }
 

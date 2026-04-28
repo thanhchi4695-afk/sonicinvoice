@@ -39,6 +39,8 @@ interface PhaseFiveSixPanelProps {
   onExportCSV?: () => void;
   onPushToShopify?: () => void;
   onProcessAnother?: () => void;
+  /** When false, replaces the Push to Shopify button with a Connect prompt. `null` = still loading. */
+  shopifyConnected?: boolean | null;
 }
 
 function getPreferredPos(): Pos {
@@ -47,7 +49,7 @@ function getPreferredPos(): Pos {
 }
 
 const PhaseFiveSixPanel = ({
-  products, supplierName, onExportCSV, onPushToShopify, onProcessAnother,
+  products, supplierName, onExportCSV, onPushToShopify, onProcessAnother, shopifyConnected = null,
 }: PhaseFiveSixPanelProps) => {
   const pos = useMemo<Pos>(() => getPreferredPos(), []);
   const [tab, setTab] = useState("products");
@@ -171,10 +173,19 @@ const PhaseFiveSixPanel = ({
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:shrink-0 w-full sm:w-auto">
             {pos === "shopify" ? (
               <>
-                <Button size="lg" variant="teal" onClick={onPushToShopify} disabled={accepted.length === 0} className="shadow-lg w-full sm:w-auto">
-                  <ShoppingBag className="w-4 h-4" />
-                  Push to Shopify
-                </Button>
+                {shopifyConnected === false ? (
+                  <Button size="lg" variant="outline" asChild className="shadow-lg w-full sm:w-auto">
+                    <a href="/dashboard?tab=connections">
+                      <ShoppingBag className="w-4 h-4" />
+                      Connect Shopify to publish
+                    </a>
+                  </Button>
+                ) : (
+                  <Button size="lg" variant="teal" onClick={onPushToShopify} disabled={accepted.length === 0 || shopifyConnected === null} className="shadow-lg w-full sm:w-auto">
+                    <ShoppingBag className="w-4 h-4" />
+                    Push to Shopify
+                  </Button>
+                )}
                 <Button size="lg" variant="outline" onClick={onExportCSV} disabled={accepted.length === 0} className="w-full sm:w-auto">
                   <Download className="w-4 h-4" />
                   Export CSV
@@ -381,10 +392,19 @@ const PhaseFiveSixPanel = ({
               Export new products CSV
             </Button>
             {pos === "shopify" && (
-              <Button size="sm" variant="outline" onClick={onPushToShopify}>
-                <ShoppingBag className="w-3.5 h-3.5" />
-                Push to Shopify (live)
-              </Button>
+              shopifyConnected === false ? (
+                <Button size="sm" variant="outline" asChild>
+                  <a href="/dashboard?tab=connections">
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    Connect Shopify
+                  </a>
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" onClick={onPushToShopify} disabled={shopifyConnected === null}>
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  Push to Shopify (live)
+                </Button>
+              )
             )}
           </ExportSection>
 

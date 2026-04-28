@@ -169,13 +169,16 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
                   <div className={cn("flex h-8 w-8 items-center justify-center rounded-md", c.active ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
                     <Icon className="h-4 w-4" />
                   </div>
-                  <span
-                    className={cn(
-                      "h-2 w-2 rounded-full",
-                      c.active ? "bg-success" : "bg-muted-foreground/40"
-                    )}
-                    aria-label={c.active ? "active" : "inactive"}
-                  />
+                  <div className="flex items-center gap-1">
+                    {AGENT_INFO[c.name] && <AgentInfoPopover info={AGENT_INFO[c.name]} />}
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        c.active ? "bg-success" : "bg-muted-foreground/40"
+                      )}
+                      aria-label={c.active ? "active" : "inactive"}
+                    />
+                  </div>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-foreground">{c.name}</p>

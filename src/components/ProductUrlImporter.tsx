@@ -907,14 +907,23 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                   <Plus className="w-4 h-4 mr-1.5" />
                   Add to current invoice
                 </Button>
-                <Button size="sm" variant="teal" onClick={handlePushSingleToShopify} disabled={pushingShopify}>
-                  {pushingShopify ? (
-                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                  ) : (
-                    <ShoppingBag className="w-4 h-4 mr-1.5" />
-                  )}
-                  Publish to Shopify
-                </Button>
+                {shopifyConnected === false ? (
+                  <Button size="sm" variant="outline" asChild>
+                    <a href="/dashboard?tab=connections">
+                      <ShoppingBag className="w-4 h-4 mr-1.5" />
+                      Connect Shopify to publish
+                    </a>
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="teal" onClick={handlePushSingleToShopify} disabled={pushingShopify || shopifyConnected === null}>
+                    {pushingShopify ? (
+                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                    ) : (
+                      <ShoppingBag className="w-4 h-4 mr-1.5" />
+                    )}
+                    Publish to Shopify
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -1196,23 +1205,33 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                       <Plus className="w-4 h-4 mr-1.5" />
                       Merge {bulkRows.filter((r) => r.status === "success").length} into invoice
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="teal"
-                      onClick={handlePushBulkToShopify}
-                      disabled={
-                        bulkRunning ||
-                        pushingShopify ||
-                        bulkRows.filter((r) => r.status === "success").length === 0
-                      }
-                    >
-                      {pushingShopify ? (
-                        <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                      ) : (
-                        <ShoppingBag className="w-4 h-4 mr-1.5" />
-                      )}
-                      Publish {bulkRows.filter((r) => r.status === "success").length} to Shopify
-                    </Button>
+                    {shopifyConnected === false ? (
+                      <Button size="sm" variant="outline" asChild>
+                        <a href="/dashboard?tab=connections">
+                          <ShoppingBag className="w-4 h-4 mr-1.5" />
+                          Connect Shopify to publish
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="teal"
+                        onClick={handlePushBulkToShopify}
+                        disabled={
+                          bulkRunning ||
+                          pushingShopify ||
+                          shopifyConnected === null ||
+                          bulkRows.filter((r) => r.status === "success").length === 0
+                        }
+                      >
+                        {pushingShopify ? (
+                          <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                        ) : (
+                          <ShoppingBag className="w-4 h-4 mr-1.5" />
+                        )}
+                        Publish {bulkRows.filter((r) => r.status === "success").length} to Shopify
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

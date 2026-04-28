@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sonic-invoices-v1';
+const CACHE_NAME = 'sonic-invoices-v2';
 const APP_SHELL = [
   '/',
   '/index.html',

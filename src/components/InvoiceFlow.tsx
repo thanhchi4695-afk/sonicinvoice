@@ -1993,6 +1993,56 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         });
       }
 
+      // ── Async OCR upgrade poller ──
+      // parse-invoice now detaches the slow OCR fallback to a background job
+      // when the first pass is low-confidence. The first response arrives
+      // ~80s sooner; the upgraded products land in invoice_processing_jobs.
+      // We notify the user when the upgrade is ready so they can re-run if
+      // the initial extraction missed lines.
+      if (data.ocr_upgrade_job_id) {
+        const jobId = data.ocr_upgrade_job_id as string;
+        toast.info("Sharper extraction running in the background", {
+          description: "We returned the first pass instantly. A higher-accuracy upgrade is processing — we'll notify you when it's ready.",
+          duration: 6000,
+        });
+        // Fire-and-forget poller (max ~3 min, every 4s)
+        (async () => {
+          const started = Date.now();
+          const MAX_MS = 180_000;
+          const POLL_MS = 4_000;
+          while (Date.now() - started < MAX_MS) {
+            await new Promise((r) => setTimeout(r, POLL_MS));
+            const { data: job } = await supabase
+              .from("invoice_processing_jobs")
+              .select("status, result, error_message")
+              .eq("id", jobId)
+              .maybeSingle();
+            if (!job) continue;
+            if (job.status === "done") {
+              const result = (job.result || {}) as Record<string, any>;
+              const upgraded = Array.isArray(result.products) ? result.products : [];
+              const usedOcr = result.ocr_fallback_used === true;
+              if (usedOcr && upgraded.length > 0) {
+                toast.success(`Upgraded extraction ready (${upgraded.length} products)`, {
+                  description: "A higher-accuracy OCR pass found a better result. Re-process this invoice to apply it.",
+                  duration: 12000,
+                });
+              } else {
+                toast.message("Background OCR upgrade finished", {
+                  description: "No higher-accuracy result was found — the original extraction is your best version.",
+                });
+              }
+              return;
+            }
+            if (job.status === "failed") {
+              console.warn("[InvoiceFlow] OCR upgrade job failed:", job.error_message);
+              return;
+            }
+          }
+          console.warn("[InvoiceFlow] OCR upgrade polling timed out for job", jobId);
+        })();
+      }
+
       return data.products || [];
     } catch (err) {
       console.log('[SONIC-DEBUG] Invoice processing error', err);

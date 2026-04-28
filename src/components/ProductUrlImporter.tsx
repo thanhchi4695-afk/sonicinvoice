@@ -113,6 +113,10 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     };
 
     onAddToInvoice?.(item);
+    addAuditEntry(
+      "url_import",
+      `Imported "${item.name}" from ${item.sourceUrl}${item.price !== undefined ? ` — ${item.currency ?? ""} ${item.price}` : ""}`,
+    );
     toast.success(`Added "${item.name}" to invoice`);
     reset();
   };

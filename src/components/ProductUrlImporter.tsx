@@ -272,6 +272,46 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
           </Button>
         </div>
 
+        {loading && (
+          <div
+            className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2"
+            role="status"
+            aria-live="polite"
+          >
+            <p className="text-xs font-semibold text-primary mb-1">
+              Working on it… this usually takes 5–15 seconds
+            </p>
+            <ul className="space-y-1.5">
+              {STEPS.map((step, i) => {
+                const done = i < stepIndex;
+                const active = i === stepIndex;
+                return (
+                  <li
+                    key={step.key}
+                    className={cn(
+                      "flex items-center gap-2 text-xs transition-colors",
+                      done && "text-muted-foreground",
+                      active && "text-foreground font-medium",
+                      !done && !active && "text-muted-foreground/60",
+                    )}
+                  >
+                    <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                      {done ? (
+                        <Check className="w-3.5 h-3.5 text-primary" />
+                      ) : active ? (
+                        <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                      ) : (
+                        <Circle className="w-2.5 h-2.5" />
+                      )}
+                    </span>
+                    <span>{step.label}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         {error && (
           <p className="text-xs text-destructive" role="alert">
             {error}

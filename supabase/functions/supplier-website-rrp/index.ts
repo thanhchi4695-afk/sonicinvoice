@@ -67,8 +67,60 @@ interface ShopifyProduct {
   vendor: string;
   product_type: string;
   created_at: string;
-  images: { src: string }[];
-  variants: { price: string; compare_at_price: string | null }[];
+  images: { src: string; alt?: string | null }[];
+  variants: { price: string; compare_at_price: string | null; sku?: string | null; title?: string | null }[];
+  tags?: string[] | string;
+}
+
+// ── Abbreviation expansion (swimwear / fashion supplier shorthand) ──
+// Used to "expand" invoice tokens before matching against retailer titles.
+// e.g. invoice "KOKOMO LLINE OP" → tokens [kokomo, longline, one, piece]
+const ABBREV_MAP: Record<string, string> = {
+  "lline": "longline",
+  "llline": "longline",
+  "ll": "longline",
+  "op": "one piece",
+  "1pc": "one piece",
+  "onepc": "one piece",
+  "uw": "underwire",
+  "halt": "halter",
+  "tie": "tieside",
+  "pant": "bottom",
+  "pants": "bottom",
+  "bra": "top",
+  "reg": "regular",
+  "uh": "ultra high",
+  "uhw": "ultra high",
+  "hw": "high waist",
+  "mw": "mid waist",
+  "lw": "low waist",
+  "bd": "bandeau",
+  "boost": "booster",
+};
+
+function expandAbbreviations(name: string): string {
+  return name
+    .toLowerCase()
+    // Normalise punctuation: "D.E" → "d/e", "D.DD" → "d/dd", "EFG" stays
+    .replace(/\bd\.e\b/g, "d/e")
+    .replace(/\bd\.dd\b/g, "d/dd")
+    .replace(/\bc\.dd\b/g, "c/dd")
+    .replace(/\be-f\b/g, "e/f")
+    .replace(/[.,]/g, " ")
+    .split(/\s+/)
+    .map((w) => ABBREV_MAP[w] || w)
+    .join(" ");
+}
+
+/** Extract a supplier style code (alpha+digits, e.g. BRA403KKM) from the styleNumber or name. */
+function extractStyleCodes(s: string): string[] {
+  if (!s) return [];
+  const out = new Set<string>();
+  // Match patterns like BRA403KKM, M785RCE, PANT321KKM (3+ letters, digits, optional letters)
+  const re = /\b([A-Z]{2,6}\d{2,5}[A-Z]{0,5})\b/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s)) !== null) out.add(m[1].toUpperCase());
+  return [...out];
 }
 
 /**
@@ -89,50 +141,182 @@ function colourVariants(colour: string): string[] {
   return out;
 }
 
+/** Build a single haystack string per product (title + handle + type + tags + image filenames + variant SKUs). */
+function productHaystack(p: ShopifyProduct): string {
+  const tags = Array.isArray(p.tags) ? p.tags.join(" ") : (p.tags || "");
+  const imgs = (p.images || []).map((i) => `${i.src || ""} ${i.alt || ""}`).join(" ");
+  const skus = (p.variants || []).map((v) => v.sku || "").join(" ");
+  return `${p.title} ${p.handle} ${p.product_type} ${p.vendor} ${tags} ${imgs} ${skus}`.toLowerCase();
+}
+
 function findProductByNameAndColour(
   products: ShopifyProduct[],
   name: string,
   colour?: string,
+  styleNumber?: string,
 ): ShopifyProduct | null {
   if (!products?.length) return null;
-  const nameLow = name.toLowerCase().trim();
 
-  // Step 1: title contains every meaningful token of the product name
-  const STOP = new Set(["the", "a", "an", "and", "or", "of", "in", "on", "for", "with"]);
-  const tokens = nameLow.split(/\s+/).map((t) => t.replace(/[^a-z0-9]/g, ""))
+  // ── Step 0: STYLE-CODE MATCH (highest precision) ──
+  // Supplier codes (e.g. BRA403KKM, M785RCE, PANT512KKM) appear in
+  // various places depending on the brand:
+  //   • Title / handle / body_html / variant SKUs (most precise)
+  //   • Tags
+  //   • Image filenames in the CDN URL or alt text (less precise —
+  //     brands like Baku reuse a single lookbook photo across the
+  //     bra+bottom pair, so the same image filename references
+  //     multiple style codes).
+  //
+  // To avoid false positives from shared lookbook images we:
+  //   1. Try the precise fields first.
+  //   2. Fall back to image filenames, but only after filtering by
+  //      SKU-prefix → silhouette (BRA* → bra/top, PANT* → bottom,
+  //      M*/MAIL* → one-piece/swimsuit).
+  const codes = [
+    ...extractStyleCodes(styleNumber || ""),
+    ...extractStyleCodes(name),
+  ];
+  const silhouetteFilter = (code: string) => (p: ShopifyProduct) => {
+    const t = `${p.title} ${p.product_type}`.toLowerCase();
+    const u = code.toUpperCase();
+    if (u.startsWith("PANT")) return /\b(bottom|brief|short|pant)\b/.test(t);
+    if (u.startsWith("BRA")) return /\b(bra|top|halter|bandeau|bralette)\b/.test(t);
+    if (/^M\d/.test(u) || u.startsWith("MAIL") || u.startsWith("OP")) {
+      return /\b(one[\s-]?piece|swimsuit|maillot)\b/.test(t);
+    }
+    return true;
+  };
+  if (codes.length) {
+    for (const code of codes) {
+      const codeLow = code.toLowerCase();
+      // 0a — precise fields (title, handle, body, tags, SKU)
+      const precise = products.find((p) => {
+        const tags = Array.isArray(p.tags) ? p.tags.join(" ") : (p.tags || "");
+        const skus = (p.variants || []).map((v) => v.sku || "").join(" ");
+        const hay = `${p.title} ${p.handle} ${p.body_html} ${tags} ${skus}`.toLowerCase();
+        return hay.includes(codeLow);
+      });
+      if (precise) return precise;
+      // 0b — image-filename match, narrowed by silhouette
+      const imgMatches = products.filter((p) => {
+        const imgs = (p.images || []).map((i) => `${i.src || ""} ${i.alt || ""}`).join(" ").toLowerCase();
+        return imgs.includes(codeLow);
+      });
+      if (imgMatches.length === 1) return imgMatches[0];
+      if (imgMatches.length > 1) {
+        const filtered = imgMatches.filter(silhouetteFilter(code));
+        if (filtered.length === 1) return filtered[0];
+        // If still ambiguous, fall through to token matcher rather than
+        // returning a wrong product.
+      }
+    }
+  }
+
+  const expanded = expandAbbreviations(name);
+  const STOP = new Set(["the", "a", "an", "and", "or", "of", "in", "on", "for", "with", "cup"]);
+  const tokens = expanded
+    .split(/\s+/)
+    .map((t) => t.replace(/[^a-z0-9/]/g, ""))
     .filter((t) => t.length >= 2 && !STOP.has(t));
 
+  if (!tokens.length) return null;
+
+  // First token is treated as the "anchor" (usually the story/collection
+  // word like KOKOMO, ROCOCCO, CAPRI). Anchor MUST appear in title or product_type.
+  const anchor = tokens[0];
+
+  // ── Step 1a: Strict — every token in title ──
   let candidates = products.filter((p) => {
     const t = p.title.toLowerCase();
     return tokens.every((tok) => t.includes(tok));
   });
+
+  // ── Step 1b: Anchor + ≥50% other tokens in title|product_type|handle ──
+  if (candidates.length === 0) {
+    const otherTokens = tokens.slice(1);
+    const minOverlap = Math.max(1, Math.ceil(otherTokens.length * 0.5));
+    candidates = products.filter((p) => {
+      const hay = `${p.title} ${p.product_type} ${p.handle}`.toLowerCase();
+      if (!hay.includes(anchor)) return false;
+      if (!otherTokens.length) return true;
+      const hits = otherTokens.filter((tok) => hay.includes(tok)).length;
+      return hits >= minOverlap;
+    });
+  }
+
+  // ── Step 1c: Anchor only (story-level fallback) ──
+  if (candidates.length === 0) {
+    candidates = products.filter((p) => {
+      const hay = `${p.title} ${p.product_type}`.toLowerCase();
+      return hay.includes(anchor);
+    });
+  }
+
   if (candidates.length === 0) return null;
+
+  // ── Step 1d: silhouette filter from supplier code prefix ──
+  // (PANT* → bottom, BRA* → bra/top, M* → one-piece). This disambiguates
+  // when the token matcher returns several products from the same story.
+  if (codes.length && candidates.length > 1) {
+    const filtered = candidates.filter(silhouetteFilter(codes[0]));
+    if (filtered.length) candidates = filtered;
+  }
+
   if (candidates.length === 1) return candidates[0];
 
-  // Step 2: narrow by colour token, with fuzzy-tail fallback
-  // (case-insensitive match; tries full colour, then strips the last
-  // word and retries — handles "Mosaique Green" → "Mosaique".)
+  // ── Step 2: narrow by colour ──
   for (const variant of colourVariants(colour || "")) {
     const variantTokens = variant.split(/\s+/).filter((t) => t.length >= 3);
     if (!variantTokens.length) continue;
-    const colourMatch = candidates.find((p) =>
-      variantTokens.every((t) => p.title.toLowerCase().includes(t))
-    );
+    const colourMatch = candidates.find((p) => {
+      const hay = productHaystack(p);
+      return variantTokens.every((t) => hay.includes(t));
+    });
     if (colourMatch) return colourMatch;
   }
 
-  // Step 3: most-recently created (likely current season)
+  // ── Step 3: most-recently created ──
   candidates = [...candidates].sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
   return candidates[0];
+}
+
+/** Fetch up to `maxPages` pages of products.json, accumulating results. */
+async function fetchAllProducts(endpoint: string, maxPages = 4): Promise<ShopifyProduct[]> {
+  const all: ShopifyProduct[] = [];
+  // Endpoint may already include ?limit=...; ensure we can append &page=
+  const sep = endpoint.includes("?") ? "&" : "?";
+  for (let page = 1; page <= maxPages; page++) {
+    const url = `${endpoint}${sep}page=${page}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const res = await fetch(url, {
+        signal: ctrl.signal,
+        headers: { "User-Agent": "SonicInvoice/1.0 (+https://sonicinvoices.com)" },
+      });
+      if (!res.ok) break;
+      const data = await res.json();
+      const ps = (data?.products || []) as ShopifyProduct[];
+      if (!ps.length) break;
+      all.push(...ps);
+      if (ps.length < 50) break; // last page
+    } catch (e) {
+      console.warn("[supplier-website-rrp] page fetch failed:", url, (e as Error).message);
+      break;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return all;
 }
 
 async function fetchFromRegistry(
   endpoint: string,
   styleName: string,
   colour?: string,
+  styleNumber?: string,
 ): Promise<
   | {
       price: number;
@@ -140,24 +324,19 @@ async function fetchFromRegistry(
       product_title: string;
       image_url: string;
       description: string;
+      match_method?: string;
     }
   | null
 > {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const res = await fetch(endpoint, {
-      signal: ctrl.signal,
-      headers: { "User-Agent": "SonicInvoice/1.0 (+https://sonicinvoices.com)" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const products = (data?.products || []) as ShopifyProduct[];
-    const match = findProductByNameAndColour(products, styleName, colour);
+    const products = await fetchAllProducts(endpoint, 4);
+    if (!products.length) return null;
+    const match = findProductByNameAndColour(products, styleName, colour, styleNumber);
     if (!match) return null;
-    const variantPrice = parseFloat(match.variants?.[0]?.compare_at_price || match.variants?.[0]?.price || "0");
+    const variantPrice = parseFloat(
+      match.variants?.[0]?.compare_at_price || match.variants?.[0]?.price || "0",
+    );
     if (!variantPrice || variantPrice <= 0) return null;
-    // Reconstruct site origin to build product URL
     const origin = endpoint.replace(/\/products\.json.*$/, "");
     return {
       price: variantPrice,
@@ -169,8 +348,6 @@ async function fetchFromRegistry(
   } catch (e) {
     console.warn("[supplier-website-rrp] registry fetch failed:", endpoint, (e as Error).message);
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -370,6 +547,7 @@ Deno.serve(async (req) => {
         registry.products_json_endpoint,
         styleName,
         colour,
+        styleNumber,
       );
       if (liveResult) {
         return new Response(

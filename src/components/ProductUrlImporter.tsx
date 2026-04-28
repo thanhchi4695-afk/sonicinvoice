@@ -334,8 +334,10 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     // Validate all upfront so user sees per-row issues immediately.
     const initial: BulkRow[] = urls.map((u) => {
       const v = validateProductUrl(u);
-      if (v.ok) return { url: v.value, status: "pending" as const };
-      return { url: u, status: "error" as const, error: v.message };
+      if (v.ok === false) {
+        return { url: u, status: "error" as const, error: v.message };
+      }
+      return { url: v.value, status: "pending" as const };
     });
     setBulkRows(initial);
 

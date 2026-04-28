@@ -208,8 +208,25 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
 
       clearStepTimers();
       setStepIndex(STEPS.length); // mark all done
-      setResult(data.product ?? {});
-      toast.success("Product details fetched");
+      const product: ExtractedProduct = data.product ?? {};
+      setResult(product);
+      const priceText =
+        typeof product.price === "number"
+          ? String(product.price)
+          : typeof product.price === "string"
+            ? product.price
+            : product.priceNormalized !== undefined
+              ? String(product.priceNormalized)
+              : "";
+      setEdit({
+        name: product.name?.trim() ?? "",
+        description: product.description?.trim() ?? "",
+        priceText,
+        currency: product.currency ?? "",
+        images: (product.images ?? []).filter((i) => !!i?.storedUrl),
+        primaryIndex: 0,
+      });
+      toast.success("Product details fetched — review and edit before adding");
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Something went wrong";
       const message = friendlyError(raw);

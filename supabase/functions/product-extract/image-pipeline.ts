@@ -181,13 +181,38 @@ export async function downloadImages(
         break;
       }
 
-      const { webp, width, height } = await optimise(bytes);
+      // Skip the WASM decode/encode for already-small images — saves
+      // significant CPU time on the Edge runtime (where the imagescript
+      // decode is the dominant cost).
+      const small = bytes.byteLength < SKIP_OPTIMISE_BYTES;
 
-      const path = buildStoragePath(sourceUrl, i);
+      let uploadBytes: Uint8Array;
+      let uploadContentType: string;
+      let width = 0;
+      let height = 0;
+      let optimised: boolean;
+      let ext: string;
+
+      if (small) {
+        uploadBytes = bytes;
+        uploadContentType = contentType || "application/octet-stream";
+        optimised = false;
+        ext = mimeToExt(uploadContentType);
+      } else {
+        const opt = await optimise(bytes);
+        uploadBytes = opt.webp;
+        uploadContentType = "image/webp";
+        width = opt.width;
+        height = opt.height;
+        optimised = true;
+        ext = "webp";
+      }
+
+      const path = buildStoragePath(sourceUrl, i, ext);
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
-        .upload(path, webp, {
-          contentType: "image/webp",
+        .upload(path, uploadBytes, {
+          contentType: uploadContentType,
           upsert: false,
           cacheControl: "31536000, immutable",
         });
@@ -200,15 +225,13 @@ export async function downloadImages(
         originalUrl: url,
         width,
         height,
-        bytes: webp.byteLength,
-        contentType: "image/webp",
+        bytes: uploadBytes.byteLength,
+        contentType: uploadContentType,
+        optimised,
       });
 
       // Tiny breather to be polite to source servers (matches our Shopify cadence)
       if (i < urls.length - 1) await new Promise((r) => setTimeout(r, 150));
-
-      // also flag obviously bad source content-types upstream for debugging
-      void contentType;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       warnings.push(`Image ${url} skipped: ${msg}`);

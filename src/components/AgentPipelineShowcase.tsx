@@ -76,6 +76,8 @@ interface PipelineState {
 
 const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, onOpenIntegrations }: Props) => {
   const [s, setS] = useState<PipelineState | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [activeTourId, setActiveTourId] = useState<string | null>(null);
 
   useEffect(() => {
     void load();

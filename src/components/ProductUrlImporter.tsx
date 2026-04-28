@@ -195,6 +195,19 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   const [stepIndex, setStepIndex] = useState(0);
   const stepTimers = useRef<number[]>([]);
   const [pushingShopify, setPushingShopify] = useState(false);
+  const [shopifyConnected, setShopifyConnected] = useState<boolean | null>(null);
+
+  // Validate Shopify connection on mount (and after a push) so the Publish
+  // buttons only show when the merchant actually has a connected store.
+  const refreshShopifyConnection = async () => {
+    try {
+      const conn = await getShopifyConnection();
+      setShopifyConnected(!!conn?.store_url);
+    } catch {
+      setShopifyConnected(false);
+    }
+  };
+  useEffect(() => { void refreshShopifyConnection(); }, []);
 
   // Build a Shopify draft product payload from an ImportedLineItem.
   const lineItemToPushProduct = (item: ImportedLineItem): PushProduct => ({

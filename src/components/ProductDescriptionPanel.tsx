@@ -27,6 +27,7 @@ import {
   type DescriptionResult,
 } from "@/hooks/use-product-descriptions";
 import type { PriceMatchLineItem } from "@/lib/price-match-utils";
+import EnrichProductButton from "@/components/EnrichProductButton";
 
 type ExportFormat = "shopify" | "lightspeed";
 
@@ -569,16 +570,31 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                       />
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-[11px]"
-                        disabled={isLoading}
-                        onClick={() => fetchDescription(item, { forceRefresh: !!r })}
-                      >
-                        {r ? <RefreshCcw className="w-3 h-3" /> : null}
-                        {r ? "Refetch" : "Fetch"}
-                      </Button>
+                      <div className="flex flex-col items-end gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-[11px]"
+                          disabled={isLoading}
+                          onClick={() => fetchDescription(item, { forceRefresh: !!r })}
+                        >
+                          {r ? <RefreshCcw className="w-3 h-3" /> : null}
+                          {r ? "Refetch" : "Fetch"}
+                        </Button>
+                        <EnrichProductButton
+                          invoiceProduct={{
+                            brand: item.brand,
+                            product_name: item.style_name,
+                            sku: item.style_number,
+                          }}
+                          hasDescriptionAndImage={false}
+                          onEnriched={(fields) => {
+                            if (fields.description) {
+                              updateDescription(key, fields.description);
+                            }
+                          }}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

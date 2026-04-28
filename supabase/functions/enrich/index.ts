@@ -24,6 +24,7 @@ const corsHeaders = {
 const AGENT_TIMEOUT_MS = 10_000;
 const TOTAL_BUDGET_MS = 25_000;
 const MAX_QUERIES_TO_TRY = 3;
+const MAX_CANDIDATES_TO_VERIFY = 3;
 
 interface EnrichRequest {
   productId?: string;
@@ -133,7 +134,7 @@ Deno.serve(async (req) => {
       log(productId, "warn_missing_brand");
     }
 
-    let bestCandidate: NormalizedCandidate | null = null;
+    const candidatePool: NormalizedCandidate[] = [];
     let triedQueries = 0;
 
     for (const q of queries.slice(0, MAX_QUERIES_TO_TRY)) {
@@ -173,19 +174,16 @@ Deno.serve(async (req) => {
       );
 
       if (candidates.length > 0) {
-        // Pick highest raw confidence (supplier ~90 typically beats web ~75)
-        candidates.sort((a, b) => b.rawConfidence - a.rawConfidence);
-        bestCandidate = candidates[0];
-        log(productId, "candidate_selected", {
-          source: bestCandidate.source,
-          rawConfidence: bestCandidate.rawConfidence,
-          url: bestCandidate.data.url,
+        candidatePool.push(...candidates);
+        log(productId, "candidates_collected", {
+          count: candidates.length,
+          total: candidatePool.length,
+          sources: candidates.map((c) => c.source),
         });
-        break;
       }
     }
 
-    if (!bestCandidate) {
+    if (candidatePool.length === 0) {
       log(productId, "no_candidate", { triedQueries });
       return json({
         success: false,
@@ -194,6 +192,9 @@ Deno.serve(async (req) => {
         triedQueries,
       });
     }
+
+    candidatePool.sort((a, b) => b.rawConfidence - a.rawConfidence);
+    const candidatesToVerify = candidatePool.slice(0, MAX_CANDIDATES_TO_VERIFY);
 
     // ─── Verify ────────────────────────────────────────────────
     let verifierConfidence = bestCandidate.rawConfidence;

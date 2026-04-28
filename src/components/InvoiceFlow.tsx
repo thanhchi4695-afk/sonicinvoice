@@ -2133,9 +2133,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         inferredRules = await buildInferredRules(supplierName || "", headersForFingerprintRe, sampleSheetRows);
       } catch { /* ignore */ }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
+      const response = await fetchWithRetry(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        timeoutMs: 90_000,
+        maxAttempts: 3,
+        onRetry: (attempt, reason) => {
+          console.warn(`[Sonic Invoice] Reprocess retry ${attempt} (${reason})`);
+        },
         body: JSON.stringify({
           fileContent: base64,
           fileName: file.name,
@@ -2160,12 +2165,24 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           detailedMode: true,
           expectedProductCount: expectedRowCount || undefined,
         }),
+      }).catch((err) => {
+        const isTimeout = err instanceof FetchTimeoutError;
+        console.error("[Sonic Invoice] Reprocess fetch failed:", err);
+        toast.error(isTimeout ? "Reprocessing timed out" : "Network error", {
+          description: isTimeout
+            ? "Try again on Wi-Fi or with a smaller file."
+            : (err as Error)?.message || "Could not re-extract products",
+        });
+        setIsReprocessing(false);
+        return null;
       });
+
+      if (!response) return;
 
       if (!response.ok) {
         const errText = await response.text();
         console.log('[SONIC-DEBUG] Edge function response received', { data: null, error: errText });
-        toast.error("Reprocessing failed", { description: "Could not re-extract products" });
+        toast.error("Reprocessing failed", { description: `Server returned ${response.status}` });
         setIsReprocessing(false);
         return;
       }

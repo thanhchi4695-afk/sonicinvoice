@@ -24,6 +24,7 @@ const corsHeaders = {
 const AGENT_TIMEOUT_MS = 10_000;
 const TOTAL_BUDGET_MS = 25_000;
 const MAX_QUERIES_TO_TRY = 3;
+const MAX_CANDIDATES_TO_VERIFY = 3;
 
 interface EnrichRequest {
   productId?: string;
@@ -133,7 +134,7 @@ Deno.serve(async (req) => {
       log(productId, "warn_missing_brand");
     }
 
-    let bestCandidate: NormalizedCandidate | null = null;
+    const candidatePool: NormalizedCandidate[] = [];
     let triedQueries = 0;
 
     for (const q of queries.slice(0, MAX_QUERIES_TO_TRY)) {
@@ -173,19 +174,16 @@ Deno.serve(async (req) => {
       );
 
       if (candidates.length > 0) {
-        // Pick highest raw confidence (supplier ~90 typically beats web ~75)
-        candidates.sort((a, b) => b.rawConfidence - a.rawConfidence);
-        bestCandidate = candidates[0];
-        log(productId, "candidate_selected", {
-          source: bestCandidate.source,
-          rawConfidence: bestCandidate.rawConfidence,
-          url: bestCandidate.data.url,
+        candidatePool.push(...candidates);
+        log(productId, "candidates_collected", {
+          count: candidates.length,
+          total: candidatePool.length,
+          sources: candidates.map((c) => c.source),
         });
-        break;
       }
     }
 
-    if (!bestCandidate) {
+    if (candidatePool.length === 0) {
       log(productId, "no_candidate", { triedQueries });
       return json({
         success: false,
@@ -195,41 +193,63 @@ Deno.serve(async (req) => {
       });
     }
 
+    candidatePool.sort((a, b) => b.rawConfidence - a.rawConfidence);
+    const candidatesToVerify = candidatePool.slice(0, MAX_CANDIDATES_TO_VERIFY);
+
     // ─── Verify ────────────────────────────────────────────────
-    let verifierConfidence = bestCandidate.rawConfidence;
+    let bestCandidate = candidatesToVerify[0];
+    let verifierConfidence = -1;
     let verifierMatch: string = "unknown";
     let verifierReasoning = "";
 
-    try {
-      const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
-      if (remaining < 2_000) {
-        log(productId, "verifier_skipped_budget", { remaining });
-      } else {
+    for (const candidate of candidatesToVerify) {
+      let candidateConfidence = candidate.rawConfidence;
+      let candidateMatch = "unknown";
+      let candidateReasoning = "";
+
+      try {
+        const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
+        if (remaining < 2_000) {
+          log(productId, "verifier_skipped_budget", { remaining, source: candidate.source });
+          break;
+        }
+
         const verifyP = verifyMatch(invoiceProduct, {
-          title: bestCandidate.data.title,
-          description: bestCandidate.data.description,
-          imageUrl: bestCandidate.data.imageUrl,
-          price: bestCandidate.data.price,
-          source: bestCandidate.source,
+          title: candidate.data.title,
+          description: candidate.data.description,
+          imageUrl: candidate.data.imageUrl,
+          price: candidate.data.price,
+          source: candidate.source,
         });
         const v = await withTimeout(verifyP, Math.min(8_000, remaining - 1_000), "verifierAgent");
-        verifierConfidence = v.confidence;
-        verifierMatch = v.match;
-        verifierReasoning = v.reasoning;
+        candidateConfidence = v.confidence;
+        candidateMatch = v.match;
+        candidateReasoning = v.reasoning;
         log(productId, "verifier_done", {
+          source: candidate.source,
           confidence: v.confidence,
           match: v.match,
           warnings: v.warnings,
+          url: candidate.data.url,
         });
+      } catch (err) {
+        if (err instanceof AIGatewayError && (err.status === 429 || err.status === 402)) {
+          log(productId, "verifier_ai_limit", { source: candidate.source, status: err.status, message: err.message });
+          // Fall back to raw confidence rather than failing the whole pipeline
+        } else {
+          log(productId, "verifier_error", { source: candidate.source, error: err instanceof Error ? err.message : String(err) });
+        }
       }
-    } catch (err) {
-      if (err instanceof AIGatewayError && (err.status === 429 || err.status === 402)) {
-        log(productId, "verifier_ai_limit", { status: err.status, message: err.message });
-        // Fall back to raw confidence rather than failing the whole pipeline
-      } else {
-        log(productId, "verifier_error", { error: err instanceof Error ? err.message : String(err) });
+
+      if (verifierConfidence < 0 || candidateConfidence > verifierConfidence) {
+        bestCandidate = candidate;
+        verifierConfidence = candidateConfidence;
+        verifierMatch = candidateMatch;
+        verifierReasoning = candidateReasoning;
       }
     }
+
+    if (verifierConfidence < 0) verifierConfidence = bestCandidate.rawConfidence;
 
     // ─── Decide action ─────────────────────────────────────────
     const enrichedProduct = {

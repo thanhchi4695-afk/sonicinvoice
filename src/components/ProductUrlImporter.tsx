@@ -239,20 +239,25 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   };
 
   const handleAdd = () => {
-    if (!result) return;
-    const numericPrice =
-      typeof result.price === "number"
-        ? result.price
-        : typeof result.price === "string" && result.price.trim() !== ""
-          ? Number(result.price)
-          : undefined;
+    if (!result || !edit) return;
+    const trimmedPrice = edit.priceText.trim();
+    const parsedPrice = trimmedPrice === "" ? undefined : Number(trimmedPrice);
+    if (trimmedPrice !== "" && !Number.isFinite(parsedPrice)) {
+      toast.error("Price must be a number (e.g. 49.95).");
+      return;
+    }
+
+    // Re-order images so the chosen primary is first.
+    const ordered = edit.images.length
+      ? [edit.images[edit.primaryIndex], ...edit.images.filter((_, i) => i !== edit.primaryIndex)]
+      : [];
 
     const item: ImportedLineItem = {
-      name: result.name?.trim() || "Imported product",
-      description: result.description?.trim() || undefined,
-      price: Number.isFinite(numericPrice) ? (numericPrice as number) : result.priceNormalized,
-      currency: result.currency,
-      imageUrls: (result.images ?? []).map((i) => i.storedUrl).filter(Boolean),
+      name: edit.name.trim() || "Imported product",
+      description: edit.description.trim() || undefined,
+      price: parsedPrice,
+      currency: edit.currency.trim() || undefined,
+      imageUrls: ordered.map((i) => i.storedUrl).filter(Boolean),
       sourceUrl: result.sourceUrl ?? url,
     };
 

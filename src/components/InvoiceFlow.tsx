@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { setSessionProducts as setInvoiceSessionProducts } from "@/stores/invoice-session-store";
 import { startShadowSession, logShadowStep, logShadowFeedback, completeShadowSession } from "@/lib/agent-shadow";
 import { syncInvoiceItemsToCatalog } from "@/lib/invoice-catalog-sync";
+import { fetchWithRetry, FetchTimeoutError, FetchRetryError } from "@/lib/fetch-with-retry";
 import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orchestrator";
 import { detectBrandFromSku } from "@/lib/sku-brand-prefix";
 import POSPickerDialog, { hasPickedPOS } from "@/components/POSPickerDialog";
@@ -1756,9 +1757,17 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         console.warn("[Sonic Invoice] Pre-extraction inference failed:", e);
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
+      const response = await fetchWithRetry(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        // 90s per attempt × up to 3 attempts. Mobile Safari silently kills long
+        // background fetches — without this the UI hangs forever at "Searching".
+        timeoutMs: 90_000,
+        maxAttempts: 3,
+        onRetry: (attempt, reason) => {
+          console.warn(`[Sonic Invoice] AI parse retry ${attempt} (${reason})`);
+          setEnrichLines([{ name: "Reading invoice…", status: "searching", action: `Retrying (${reason})…`, confidence: 0 }]);
+        },
         body: JSON.stringify({
           fileContent: base64,
           fileName: file.name,
@@ -1783,12 +1792,29 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             price_logic: fpHit.price_logic,
           } : undefined,
         }),
+      }).catch((err) => {
+        const isTimeout = err instanceof FetchTimeoutError;
+        const isNetwork = err instanceof FetchRetryError;
+        console.error("[Sonic Invoice] AI parse fetch failed:", err);
+        toast.error(isTimeout ? "Reading timed out" : "Network error reading invoice", {
+          description: isTimeout
+            ? "Your phone may have throttled the upload. Try again on Wi-Fi or with a smaller file."
+            : isNetwork
+              ? "Check your connection and try again."
+              : (err as Error)?.message || "Unknown error",
+        });
+        setEnrichLines([]);
+        return null;
       });
+
+      if (!response) return [];
 
       if (!response.ok) {
         const errText = await response.text();
         console.log('[SONIC-DEBUG] Edge function response received', { data: null, error: errText });
         console.error("AI parse failed:", errText);
+        toast.error("Reading failed", { description: `Server returned ${response.status}` });
+        setEnrichLines([]);
         return [];
       }
 
@@ -2107,9 +2133,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         inferredRules = await buildInferredRules(supplierName || "", headersForFingerprintRe, sampleSheetRows);
       } catch { /* ignore */ }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
+      const response = await fetchWithRetry(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        timeoutMs: 90_000,
+        maxAttempts: 3,
+        onRetry: (attempt, reason) => {
+          console.warn(`[Sonic Invoice] Reprocess retry ${attempt} (${reason})`);
+        },
         body: JSON.stringify({
           fileContent: base64,
           fileName: file.name,
@@ -2134,12 +2165,24 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           detailedMode: true,
           expectedProductCount: expectedRowCount || undefined,
         }),
+      }).catch((err) => {
+        const isTimeout = err instanceof FetchTimeoutError;
+        console.error("[Sonic Invoice] Reprocess fetch failed:", err);
+        toast.error(isTimeout ? "Reprocessing timed out" : "Network error", {
+          description: isTimeout
+            ? "Try again on Wi-Fi or with a smaller file."
+            : (err as Error)?.message || "Could not re-extract products",
+        });
+        setIsReprocessing(false);
+        return null;
       });
+
+      if (!response) return;
 
       if (!response.ok) {
         const errText = await response.text();
         console.log('[SONIC-DEBUG] Edge function response received', { data: null, error: errText });
-        toast.error("Reprocessing failed", { description: "Could not re-extract products" });
+        toast.error("Reprocessing failed", { description: `Server returned ${response.status}` });
         setIsReprocessing(false);
         return;
       }

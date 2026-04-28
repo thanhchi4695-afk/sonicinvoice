@@ -63,6 +63,7 @@ export function useProductDescriptions() {
       if (!item.style_name?.trim() || !item.brand?.trim()) {
         const result: DescriptionResult = {
           description: null,
+          full_product_name: null,
           source_url: "",
           source_name: "",
           source_type: "retailer",

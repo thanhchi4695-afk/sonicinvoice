@@ -918,6 +918,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     status: LineStatus;
     action: string;
     confidence: number;
+    pipeline?: import("@/components/LinePipelineProgress").PipelineStage[];
   }
   const [enrichLines, setEnrichLines] = useState<EnrichLine[]>([]);
 

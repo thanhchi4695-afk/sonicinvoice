@@ -25,6 +25,7 @@ import { FileText, Package, ShoppingBag, Store, Mail, Upload, Briefcase, Camera,
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import AgentPipelineShowcase from "@/components/AgentPipelineShowcase";
+import EnrichmentAgentsShowcase from "@/components/EnrichmentAgentsShowcase";
 
 export type DocType = "invoice" | "packing_slip";
 export type PosChoice = "shopify" | "lightspeed";

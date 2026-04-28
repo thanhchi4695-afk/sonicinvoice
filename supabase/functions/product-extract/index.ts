@@ -13,7 +13,58 @@
 // ════════════════════════════════════════════════════════════════
 
 import { load as cheerioLoad } from "https://esm.sh/cheerio@1.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { downloadImages, collectImageUrls } from "./image-pipeline.ts";
+
+// ────────────────────────────────────────────────────────────────
+// Processing-history logger
+// Best-effort: never let logging failures break the response.
+// ────────────────────────────────────────────────────────────────
+async function logProcessingHistory(entry: {
+  userId: string | null;
+  url: string;
+  status: "success" | "failed";
+  productName?: string | null;
+  errorMessage?: string | null;
+  imagesCount?: number;
+  extractionStrategy?: "jsonld" | "selectors" | "llm" | null;
+  processingTimeMs: number;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceKey) return;
+    const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    await supabase.from("processing_history").insert({
+      user_id: entry.userId,
+      source: "product-extract",
+      url: entry.url,
+      status: entry.status,
+      product_name: entry.productName ?? null,
+      error_message: entry.errorMessage ?? null,
+      images_count: entry.imagesCount ?? 0,
+      extraction_strategy: entry.extractionStrategy ?? null,
+      processing_time_ms: entry.processingTimeMs,
+      metadata: entry.metadata ?? {},
+    });
+  } catch (e) {
+    console.warn("[product-extract] failed to log processing_history:", (e as Error).message);
+  }
+}
+
+/** Extract user id from JWT in Authorization header, if present. */
+function getUserIdFromAuth(req: Request): string | null {
+  try {
+    const auth = req.headers.get("Authorization") ?? "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split(".")[1] ?? ""));
+    return typeof payload?.sub === "string" ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

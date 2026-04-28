@@ -20,11 +20,13 @@ interface Props {
   info: AgentInfo;
   className?: string;
   variant?: "default" | "accent";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-const AgentInfoPopover = ({ info, className, variant = "default" }: Props) => {
+const AgentInfoPopover = ({ info, className, variant = "default", open, onOpenChange }: Props) => {
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"

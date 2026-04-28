@@ -7,6 +7,7 @@ import { fetchWithRetry, FetchTimeoutError, FetchRetryError } from "@/lib/fetch-
 import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orchestrator";
 import { detectBrandFromSku } from "@/lib/sku-brand-prefix";
 import POSPickerDialog, { hasPickedPOS } from "@/components/POSPickerDialog";
+import FetchFromUrlDialog, { type ExtractedProduct } from "@/components/FetchFromUrlDialog";
 import { toast } from "sonner";
 import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag, CloudDownload } from "lucide-react";
@@ -1401,6 +1402,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   const [driveImportOpen, setDriveImportOpen] = useState(false);
   const [driveImportUrl, setDriveImportUrl] = useState("");
+  const [fetchUrlOpen, setFetchUrlOpen] = useState(false);
   const [driveImporting, setDriveImporting] = useState(false);
   // 2-step Drive flow: "link" → paste URL; "confirm" → see file list + enqueue
   const [driveStage, setDriveStage] = useState<"link" | "confirm">("link");
@@ -3521,6 +3523,22 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             <CloudDownload className="w-4 h-4 text-primary" />
             Import from Google Drive
           </button>
+
+          <button
+            onClick={() => setFetchUrlOpen(true)}
+            className="w-full mt-2 h-12 rounded-lg border border-border bg-card flex items-center justify-center gap-2 text-sm active:bg-muted"
+          >
+            <Link className="w-4 h-4 text-primary" />
+            Fetch from URL
+          </button>
+
+          <FetchFromUrlDialog
+            open={fetchUrlOpen}
+            onClose={() => setFetchUrlOpen(false)}
+            onExtracted={(product: ExtractedProduct) => {
+              console.log("[InvoiceFlow] product extracted from URL", product);
+            }}
+          />
 
           <div className="mt-3">
             <DriveQueuePanel />

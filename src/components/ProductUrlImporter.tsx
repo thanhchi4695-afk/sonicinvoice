@@ -139,10 +139,21 @@ const STEPS = [
 ] as const;
 type StepKey = (typeof STEPS)[number]["key"];
 
+interface EditState {
+  name: string;
+  description: string;
+  priceText: string;
+  currency: string;
+  images: Array<{ storedUrl: string; originalUrl?: string }>;
+  primaryIndex: number;
+}
+
 export default function ProductUrlImporter({ onAddToInvoice, className }: Props) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ExtractedProduct | null>(null);
+  const [edit, setEdit] = useState<EditState | null>(null);
+  const [newImageUrl, setNewImageUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const stepTimers = useRef<number[]>([]);
@@ -157,6 +168,8 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   const reset = () => {
     setUrl("");
     setResult(null);
+    setEdit(null);
+    setNewImageUrl("");
     setError(null);
     setStepIndex(0);
     clearStepTimers();

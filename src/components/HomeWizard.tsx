@@ -25,6 +25,7 @@ import { FileText, Package, ShoppingBag, Store, Mail, Upload, Briefcase, Camera,
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import AgentPipelineShowcase from "@/components/AgentPipelineShowcase";
+import EnrichmentAgentsShowcase from "@/components/EnrichmentAgentsShowcase";
 
 export type DocType = "invoice" | "packing_slip";
 export type PosChoice = "shopify" | "lightspeed";
@@ -258,6 +259,18 @@ const HomeWizard = ({
         onStartInvoice={onStartInvoice}
         onOpenIntegrations={onOpenIntegrations}
       />
+
+      {/* ── Divider between agent groups ────────────────────── */}
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Powered by
+        </span>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+
+      {/* ── New: Enrichment sub-agents showcase ─────────────── */}
+      <EnrichmentAgentsShowcase onOpenGuide={onOpenAgentGuide} />
     </div>
   );
 };

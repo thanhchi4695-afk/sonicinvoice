@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { addAuditEntry } from "@/lib/audit-log";
 
 // ════════════════════════════════════════════════════════════════
 // ProductUrlImporter — standalone card variant of the URL paste-link

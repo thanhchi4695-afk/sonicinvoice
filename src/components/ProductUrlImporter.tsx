@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink, Check, Circle } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { addAuditEntry } from "@/lib/audit-log";
+import { cn } from "@/lib/utils";
 
 // ════════════════════════════════════════════════════════════════
 // ProductUrlImporter — standalone card variant of the URL paste-link
@@ -125,16 +126,35 @@ interface Props {
   className?: string;
 }
 
+const STEPS = [
+  { key: "fetch", label: "Fetching page" },
+  { key: "extract", label: "Extracting product details" },
+  { key: "images", label: "Downloading & optimising images" },
+  { key: "shopify", label: "Preparing Shopify-ready fields" },
+] as const;
+type StepKey = (typeof STEPS)[number]["key"];
+
 export default function ProductUrlImporter({ onAddToInvoice, className }: Props) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ExtractedProduct | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stepIndex, setStepIndex] = useState(0);
+  const stepTimers = useRef<number[]>([]);
+
+  const clearStepTimers = () => {
+    stepTimers.current.forEach((id) => window.clearTimeout(id));
+    stepTimers.current = [];
+  };
+
+  useEffect(() => () => clearStepTimers(), []);
 
   const reset = () => {
     setUrl("");
     setResult(null);
     setError(null);
+    setStepIndex(0);
+    clearStepTimers();
   };
 
   const handleFetch = async () => {
@@ -145,10 +165,19 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       toast.error(v.message);
       return;
     }
-    // Reflect the normalised URL back to the input (e.g. https:// added).
     if (v.value !== url) setUrl(v.value);
 
     setLoading(true);
+    setStepIndex(0);
+    clearStepTimers();
+    // Advance steps on a rough schedule so the UI feels alive even though the
+    // edge function is a single round-trip. Last step waits for completion.
+    const schedule = [1500, 4000, 8000]; // ms — advances to step 1, 2, 3
+    schedule.forEach((delay, i) => {
+      const id = window.setTimeout(() => setStepIndex(i + 1), delay);
+      stepTimers.current.push(id);
+    });
+
     try {
       const { data, error: fnError } = await supabase.functions.invoke("product-extract", {
         body: { url: v.value },
@@ -159,6 +188,8 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
         throw new Error(data?.error || "Could not extract product details");
       }
 
+      clearStepTimers();
+      setStepIndex(STEPS.length); // mark all done
       setResult(data.product ?? {});
       toast.success("Product details fetched");
     } catch (err) {
@@ -167,6 +198,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       setError(message);
       toast.error(message);
     } finally {
+      clearStepTimers();
       setLoading(false);
     }
   };
@@ -240,6 +272,46 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
             )}
           </Button>
         </div>
+
+        {loading && (
+          <div
+            className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2"
+            role="status"
+            aria-live="polite"
+          >
+            <p className="text-xs font-semibold text-primary mb-1">
+              Working on it… this usually takes 5–15 seconds
+            </p>
+            <ul className="space-y-1.5">
+              {STEPS.map((step, i) => {
+                const done = i < stepIndex;
+                const active = i === stepIndex;
+                return (
+                  <li
+                    key={step.key}
+                    className={cn(
+                      "flex items-center gap-2 text-xs transition-colors",
+                      done && "text-muted-foreground",
+                      active && "text-foreground font-medium",
+                      !done && !active && "text-muted-foreground/60",
+                    )}
+                  >
+                    <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                      {done ? (
+                        <Check className="w-3.5 h-3.5 text-primary" />
+                      ) : active ? (
+                        <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                      ) : (
+                        <Circle className="w-2.5 h-2.5" />
+                      )}
+                    </span>
+                    <span>{step.label}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {error && (
           <p className="text-xs text-destructive" role="alert">

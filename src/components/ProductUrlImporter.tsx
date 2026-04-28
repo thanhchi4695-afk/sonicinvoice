@@ -17,11 +17,86 @@ import { addAuditEntry } from "@/lib/audit-log";
 // edge function + ExtractedProduct shape.
 // ════════════════════════════════════════════════════════════════
 
-const urlSchema = z
+// ── URL validation ──────────────────────────────────────────────
+// Hosts we know cannot be extracted as a single product page.
+const UNSUPPORTED_HOSTS = [
+  "google.com", "google.co", "bing.com", "duckduckgo.com",
+  "facebook.com", "instagram.com", "tiktok.com", "twitter.com", "x.com",
+  "youtube.com", "youtu.be", "pinterest.com",
+  "amazon.com", "amazon.co.uk", "amazon.com.au",
+  "ebay.com", "ebay.com.au", "alibaba.com", "aliexpress.com",
+];
+
+const baseUrlSchema = z
   .string()
   .trim()
-  .url({ message: "Please paste a valid URL (https://…)" })
-  .max(2048, { message: "URL is too long" });
+  .min(1, { message: "Please paste a product URL." })
+  .max(2048, { message: "That URL is too long — please shorten it (max 2048 characters)." });
+
+/** Returns { ok, value } or { ok:false, message }. Auto-prepends https:// if missing. */
+function validateProductUrl(raw: string): { ok: true; value: string } | { ok: false; message: string } {
+  const base = baseUrlSchema.safeParse(raw);
+  if (!base.success) {
+    return { ok: false, message: base.error.issues[0]?.message ?? "Invalid URL" };
+  }
+
+  let candidate = base.data;
+  if (!/^[a-z]+:\/\//i.test(candidate)) {
+    candidate = `https://${candidate}`;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    return { ok: false, message: "That doesn't look like a valid web link. Example: https://brand.com/products/dress" };
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { ok: false, message: "Only http:// and https:// links are supported." };
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (!host || !host.includes(".")) {
+    return { ok: false, message: "URL is missing a domain (e.g. brand.com)." };
+  }
+  if (host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+    return { ok: false, message: "Local or IP addresses aren't supported — paste a public product page." };
+  }
+
+  if (UNSUPPORTED_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) {
+    return {
+      ok: false,
+      message: `${parsed.hostname} isn't supported — search engines, social media and major marketplaces block automated extraction. Paste the brand's own product page instead.`,
+    };
+  }
+
+  return { ok: true, value: parsed.toString() };
+}
+
+/** Map backend / network errors to friendly copy. */
+function friendlyError(raw: string): string {
+  const msg = (raw || "").toLowerCase();
+  if (msg.includes("timeout") || msg.includes("timed out")) {
+    return "The site took too long to respond. Try again, or paste a different product page.";
+  }
+  if (msg.includes("403") || msg.includes("forbidden") || msg.includes("blocked")) {
+    return "This site blocked our request. Try the brand's own page rather than a marketplace listing.";
+  }
+  if (msg.includes("404") || msg.includes("not found")) {
+    return "That page wasn't found (404). Double-check the link is still live.";
+  }
+  if (msg.includes("network") || msg.includes("fetch failed") || msg.includes("failed to fetch")) {
+    return "Couldn't reach the site. Check your connection and try again.";
+  }
+  if (msg.includes("no product") || msg.includes("could not extract") || msg.includes("not a product")) {
+    return "We couldn't find product details on that page. Make sure the link points directly to a single product — not a category or homepage.";
+  }
+  if (msg.includes("rate") || msg.includes("429")) {
+    return "We're being rate-limited by that site. Please wait a minute and try again.";
+  }
+  return raw || "Something went wrong fetching that product.";
+}
 
 export interface ImportedLineItem {
   name: string;

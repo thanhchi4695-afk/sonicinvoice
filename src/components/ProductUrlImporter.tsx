@@ -775,6 +775,152 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
             </div>
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="bulk" className="space-y-3 mt-0">
+            <div className="space-y-2">
+              <Label htmlFor="bulk-urls" className="text-sm font-medium flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-primary" />
+                Paste product links
+              </Label>
+              <Textarea
+                id="bulk-urls"
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                placeholder={"https://brand.com/products/dress-a\nhttps://brand.com/products/dress-b\nhttps://brand.com/products/dress-c"}
+                rows={5}
+                disabled={bulkRunning}
+                className="font-mono text-xs resize-y"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                One URL per line, or separated by commas/spaces. Max {MAX_BULK_URLS} at a time.
+                {bulkText.trim() && (() => {
+                  const count = parseBulkUrls(bulkText).length;
+                  return (
+                    <span className="ml-1 font-medium text-foreground">
+                      ({count} link{count === 1 ? "" : "s"} detected)
+                    </span>
+                  );
+                })()}
+              </p>
+              <div className="flex gap-2">
+                {!bulkRunning ? (
+                  <Button
+                    onClick={runBulk}
+                    disabled={!bulkText.trim()}
+                    size="lg"
+                    className="h-11 flex-1 font-semibold"
+                  >
+                    <Layers className="w-4 h-4 mr-2" />
+                    Extract all products
+                  </Button>
+                ) : (
+                  <Button onClick={stopBulk} variant="outline" size="lg" className="h-11 flex-1">
+                    <X className="w-4 h-4 mr-2" />
+                    Stop after current
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {bulkRows.length > 0 && (
+              <div className="rounded-lg border border-border bg-card/50 p-2 space-y-2">
+                <div className="flex items-center justify-between px-1 pb-1 border-b border-border/60">
+                  <p className="text-xs font-semibold">
+                    {bulkRows.filter((r) => r.status === "success").length} of {bulkRows.length} ready
+                    {bulkRunning && " · processing…"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setBulkRows([])}
+                    disabled={bulkRunning}
+                    className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  >
+                    Clear list
+                  </button>
+                </div>
+
+                <ul className="max-h-72 overflow-y-auto space-y-1.5">
+                  {bulkRows.map((row, i) => (
+                    <li
+                      key={`${row.url}-${i}`}
+                      className={cn(
+                        "flex items-center gap-2 rounded-md p-2 text-xs border",
+                        row.status === "success" && "border-primary/30 bg-primary/5",
+                        row.status === "error" && "border-destructive/30 bg-destructive/5",
+                        row.status === "fetching" && "border-primary/40 bg-primary/10",
+                        row.status === "pending" && "border-border bg-background/40",
+                      )}
+                    >
+                      <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                        {row.status === "success" && <Check className="w-3.5 h-3.5 text-primary" />}
+                        {row.status === "error" && <AlertTriangle className="w-3.5 h-3.5 text-destructive" />}
+                        {row.status === "fetching" && <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />}
+                        {row.status === "pending" && <Circle className="w-2.5 h-2.5 text-muted-foreground" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">
+                          {row.product?.name?.trim() || row.url}
+                        </p>
+                        {row.status === "success" && row.product && (
+                          <p className="text-[11px] text-muted-foreground font-mono truncate">
+                            {row.product.currency ?? ""} {row.product.price ?? ""} · {row.product.images?.length ?? 0} img
+                          </p>
+                        )}
+                        {row.status === "error" && (
+                          <p className="text-[11px] text-destructive truncate" title={row.error}>
+                            {row.error || "Failed"}
+                          </p>
+                        )}
+                        {row.status === "pending" && (
+                          <p className="text-[11px] text-muted-foreground truncate">{row.url}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {row.status === "error" && !bulkRunning && (
+                          <button
+                            type="button"
+                            onClick={() => retryBulkRow(i)}
+                            className="text-[11px] text-primary hover:underline px-1"
+                          >
+                            Retry
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeBulkRow(i)}
+                          disabled={bulkRunning && row.status === "fetching"}
+                          className="text-muted-foreground hover:text-destructive disabled:opacity-30"
+                          aria-label="Remove"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
+                  <span className="text-[11px] text-muted-foreground">
+                    Successful items will be merged into the invoice.
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={mergeBulkIntoInvoice}
+                    disabled={
+                      bulkRunning ||
+                      !onAddToInvoice ||
+                      bulkRows.filter((r) => r.status === "success").length === 0
+                    }
+                  >
+                    <Plus className="w-4 h-4 mr-1.5" />
+                    Merge {bulkRows.filter((r) => r.status === "success").length} into invoice
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

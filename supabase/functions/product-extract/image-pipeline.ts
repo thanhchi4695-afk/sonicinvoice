@@ -21,9 +21,10 @@ import { decode, Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 const BUCKET = "compressed-images";
 const MAX_TOTAL_BYTES = 10 * 1024 * 1024;       // 10 MB kill-switch
 const PER_IMAGE_TIMEOUT_MS = 8_000;
-const MAX_IMAGES = 8;
+const MAX_IMAGES = 4;                            // CPU-time safety on Edge runtime
 const MAX_DIMENSION = 1600;                      // longest side
 const WEBP_QUALITY = 82;
+const SKIP_OPTIMISE_BYTES = 150 * 1024;          // <150KB → upload original, skip WASM decode
 
 const UA = "Mozilla/5.0 (compatible; SonicInvoiceBot/1.0; +https://sonicinvoices.com)";
 

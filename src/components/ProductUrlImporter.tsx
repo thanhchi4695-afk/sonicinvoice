@@ -140,7 +140,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   const handleFetch = async () => {
     setError(null);
     const v = validateProductUrl(url);
-    if (!v.ok) {
+    if (v.ok === false) {
       setError(v.message);
       toast.error(v.message);
       return;

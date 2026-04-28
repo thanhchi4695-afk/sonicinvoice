@@ -16,7 +16,7 @@
 // ════════════════════════════════════════════════════════════════
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { decode, Image } from "https://esm.sh/imagescript@1.3.0";
+import { decode, Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 
 const BUCKET = "compressed-images";
 const MAX_TOTAL_BYTES = 10 * 1024 * 1024;       // 10 MB kill-switch

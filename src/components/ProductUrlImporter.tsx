@@ -910,15 +910,56 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                           setDragIndex(null);
                           setDragOverIndex(null);
                         }}
+                        // ── Touch / pointer reorder (mobile) ──
+                        onPointerDown={(e) => {
+                          if (!draggable) return;
+                          if (e.pointerType !== "touch" && e.pointerType !== "pen") return;
+                          touchDragRef.current = { from: i, pointerId: e.pointerId };
+                          setDragIndex(i);
+                          (e.currentTarget as HTMLButtonElement).setPointerCapture(e.pointerId);
+                        }}
+                        onPointerMove={(e) => {
+                          const drag = touchDragRef.current;
+                          if (!drag || drag.pointerId !== e.pointerId) return;
+                          e.preventDefault();
+                          const list = bulkListRef.current;
+                          if (!list) return;
+                          const el = document.elementFromPoint(e.clientX, e.clientY);
+                          const li = el?.closest<HTMLElement>("li[data-row-index]");
+                          if (!li || !list.contains(li)) {
+                            setDragOverIndex(null);
+                            return;
+                          }
+                          const overIdx = Number(li.dataset.rowIndex);
+                          if (Number.isFinite(overIdx) && overIdx !== drag.from && overIdx !== dragOverIndex) {
+                            setDragOverIndex(overIdx);
+                          }
+                        }}
+                        onPointerUp={(e) => {
+                          const drag = touchDragRef.current;
+                          if (!drag || drag.pointerId !== e.pointerId) return;
+                          if (dragOverIndex !== null && dragOverIndex !== drag.from) {
+                            reorderBulkRow(drag.from, dragOverIndex);
+                          }
+                          touchDragRef.current = null;
+                          setDragIndex(null);
+                          setDragOverIndex(null);
+                        }}
+                        onPointerCancel={(e) => {
+                          if (touchDragRef.current?.pointerId !== e.pointerId) return;
+                          touchDragRef.current = null;
+                          setDragIndex(null);
+                          setDragOverIndex(null);
+                        }}
                         disabled={!draggable}
                         aria-label="Drag to reorder"
-                        title={draggable ? "Drag to reorder" : "Only successful rows can be reordered"}
+                        title={draggable ? "Drag or swipe to reorder" : "Only successful rows can be reordered"}
                         className={cn(
-                          "shrink-0 p-0.5 -ml-0.5 rounded text-muted-foreground",
+                          "shrink-0 p-1.5 -ml-0.5 rounded text-muted-foreground touch-none select-none",
                           draggable ? "cursor-grab active:cursor-grabbing hover:text-foreground hover:bg-background/60" : "opacity-30 cursor-not-allowed",
                         )}
                       >
-                        <GripVertical className="w-3.5 h-3.5" />
+                        <GripVertical className="w-4 h-4" />
                       </button>
                       <span className="w-4 h-4 flex items-center justify-center shrink-0">
                         {row.status === "success" && <Check className="w-3.5 h-3.5 text-primary" />}

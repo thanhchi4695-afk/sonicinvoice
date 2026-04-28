@@ -115,6 +115,22 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
   const [filterMissingImages, setFilterMissingImages] = useState(true);
   const [variantMode, setVariantModeState] = useState<VariantMode>(getVariantMode());
   const [publishStatus, setPublishStatusState] = useState<PublishStatus>(getPublishStatus());
+  // Stock quantity mode — "invoice": use qty parsed from invoice;
+  // "zero": export every variant with qty 0 so the user can receive
+  // and count stock later in their POS (Lightspeed / Shopify).
+  // Persisted in localStorage so it sticks per browser/store.
+  const [qtyMode, setQtyMode] = useState<"invoice" | "zero">(() => {
+    try {
+      const v = localStorage.getItem("sonic_export_qty_mode");
+      return v === "zero" ? "zero" : "invoice";
+    } catch { return "invoice"; }
+  });
+  const updateQtyMode = (m: "invoice" | "zero") => {
+    setQtyMode(m);
+    try { localStorage.setItem("sonic_export_qty_mode", m); } catch { /* ignore */ }
+    setValidationResult(null);
+    setExportBlocked(false);
+  };
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [exportBlocked, setExportBlocked] = useState(false);
   const mode = useStoreMode();
@@ -179,7 +195,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
     }
     const enabledMeta = getEnabledMetafields();
     const { validation } = generateShopifyCSV(
-      filtered,
+      qtyMode === "zero" ? filtered.map(p => ({ ...p, qty: 0 })) : filtered,
       variantMode,
       enabledMeta.map(m => ({ key: m.key, shopifyColumn: m.shopifyColumn }))
     );
@@ -190,7 +206,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
 
   const handleExport = () => {
     const filename = generateFilename(supplierName, selectedFormat);
-    const prods = filtered;
+    const prods = (qtyMode === "zero" ? filtered.map(p => ({ ...p, qty: 0 })) : filtered);
 
     if (selectedFormat === "shopify_full") {
       const enabledMeta = getEnabledMetafields();
@@ -495,6 +511,37 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
               </div>
             </div>
           )}
+
+          {/* Stock quantity mode — invoice qty vs zero (receive later in POS) */}
+          <div className="bg-card rounded-lg border border-border p-4">
+            <h3 className="text-sm font-semibold mb-3">Stock quantity</h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Choose how stock quantities are written to the export. Use <strong>Invoice quantities</strong> if you trust the parsed numbers and want stock added immediately. Use <strong>Set all to 0</strong> if you prefer to receive and count stock in your POS (e.g. Lightspeed) when the goods physically arrive.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => updateQtyMode("invoice")}
+                className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
+                  qtyMode === "invoice" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-muted-foreground/30"
+                }`}
+              >
+                {qtyMode === "invoice" && <Check className="w-3.5 h-3.5 inline mr-1.5" />}Invoice quantities
+              </button>
+              <button
+                onClick={() => updateQtyMode("zero")}
+                className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
+                  qtyMode === "zero" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-muted-foreground/30"
+                }`}
+              >
+                {qtyMode === "zero" && <Check className="w-3.5 h-3.5 inline mr-1.5" />}Set all to 0 (receive later)
+              </button>
+            </div>
+            {qtyMode === "zero" && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Every variant will export with quantity <span className="font-mono-data">0</span>. Create a receive/PO in your POS to count stock on arrival.
+              </p>
+            )}
+          </div>
 
           {/* Publish status — Active vs Draft (applies to Shopify Status column and Lightspeed active flag) */}
           <div className="bg-card rounded-lg border border-border p-4">

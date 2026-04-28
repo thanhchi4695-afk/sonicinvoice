@@ -118,7 +118,7 @@ export async function fetchWithRetry(
       }
       onRetry?.(attempt, `HTTP ${res.status}`);
     } catch (err) {
-      clearTimeout(timer);
+      cleanup();
       externalSignal?.removeEventListener("abort", onExternalAbort);
       lastError = err;
 

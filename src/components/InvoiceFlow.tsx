@@ -4552,11 +4552,13 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 }}
                 onPushToShopify={() => {
                   void (async () => {
+                    const ok = await handlePushToShopify();
+                    if (!ok) return;
                     await logShadowStep({ step: "stock_check", status: "done", narrative: "Stock check approved." });
                     await logShadowStep({ step: "publish", status: "done", narrative: "Pushed to Shopify." });
                     await completeShadowSession("Run complete — pushed to Shopify.");
+                    finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
                   })();
-                  finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
                 }}
                 onPriceMatch={() => setPriceMatchActive(true)}
                 onGetDescriptions={() => setDescriptionsActive(true)}

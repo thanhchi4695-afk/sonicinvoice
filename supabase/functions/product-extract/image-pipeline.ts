@@ -34,7 +34,8 @@ export interface DownloadedImage {
   width: number;
   height: number;
   bytes: number;
-  contentType: "image/webp";
+  contentType: string;      // "image/webp" when optimised, original MIME otherwise
+  optimised: boolean;       // false when small originals were uploaded as-is
 }
 
 export interface DownloadImagesResult {

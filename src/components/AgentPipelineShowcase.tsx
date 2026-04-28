@@ -180,7 +180,13 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="flex items-center gap-1">
-                    {AGENT_INFO[c.name] && <AgentInfoPopover info={AGENT_INFO[c.name]} />}
+                    {AGENT_INFO[c.name] && (
+                      <AgentInfoPopover
+                        info={AGENT_INFO[c.name]}
+                        open={isActiveTourTarget ? true : undefined}
+                        onOpenChange={isActiveTourTarget ? () => {} : undefined}
+                      />
+                    )}
                     <span
                       className={cn(
                         "h-2 w-2 rounded-full",

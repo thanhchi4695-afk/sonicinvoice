@@ -884,16 +884,27 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/60">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/60">
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <ImageIcon className="w-3 h-3" />
                 {edit.images.length} image{edit.images.length === 1 ? "" : "s"} ready
               </div>
-              <Button size="sm" onClick={handleAdd} disabled={!onAddToInvoice}>
-                <Plus className="w-4 h-4 mr-1.5" />
-                Add to current invoice
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" onClick={handleAdd} disabled={!onAddToInvoice || pushingShopify}>
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Add to current invoice
+                </Button>
+                <Button size="sm" variant="teal" onClick={handlePushSingleToShopify} disabled={pushingShopify}>
+                  {pushingShopify ? (
+                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <ShoppingBag className="w-4 h-4 mr-1.5" />
+                  )}
+                  Publish to Shopify
+                </Button>
+              </div>
             </div>
+
           </div>
         )}
           </TabsContent>

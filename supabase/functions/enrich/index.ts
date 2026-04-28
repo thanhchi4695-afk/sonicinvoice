@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
 
     // ─── Verify ────────────────────────────────────────────────
     let bestCandidate = candidatesToVerify[0];
-    let verifierConfidence = bestCandidate.rawConfidence;
+    let verifierConfidence = -1;
     let verifierMatch: string = "unknown";
     let verifierReasoning = "";
 
@@ -241,13 +241,15 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (candidateConfidence > verifierConfidence) {
+      if (verifierConfidence < 0 || candidateConfidence > verifierConfidence) {
         bestCandidate = candidate;
         verifierConfidence = candidateConfidence;
         verifierMatch = candidateMatch;
         verifierReasoning = candidateReasoning;
       }
     }
+
+    if (verifierConfidence < 0) verifierConfidence = bestCandidate.rawConfidence;
 
     // ─── Decide action ─────────────────────────────────────────
     const enrichedProduct = {

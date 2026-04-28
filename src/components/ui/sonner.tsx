@@ -6,11 +6,15 @@ type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
+  // Lift toasts above the mobile bottom tab bar (h-16 + safe-area).
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const mobileOffset = "calc(4rem + env(safe-area-inset-bottom, 0px) + 0.75rem)";
 
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      offset={isDesktop ? undefined : mobileOffset}
       toastOptions={{
         classNames: {
           toast:

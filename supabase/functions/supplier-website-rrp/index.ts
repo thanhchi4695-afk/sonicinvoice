@@ -499,6 +499,7 @@ Deno.serve(async (req) => {
         registry.products_json_endpoint,
         styleName,
         colour,
+        styleNumber,
       );
       if (liveResult) {
         return new Response(

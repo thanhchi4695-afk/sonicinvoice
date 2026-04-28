@@ -4,6 +4,7 @@ import type { PriceMatchLineItem } from "@/lib/price-match-utils";
 
 export type DescriptionResult = {
   description: string | null;
+  full_product_name: string | null;
   source_url: string;
   source_name: string;
   source_type: "supplier" | "retailer";

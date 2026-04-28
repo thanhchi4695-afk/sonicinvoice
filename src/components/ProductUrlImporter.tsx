@@ -380,23 +380,13 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
           </p>
         )}
 
-        {result && (
-          <div className="rounded-lg border border-border bg-card/50 p-3 space-y-3">
+        {result && edit && (
+          <div className="rounded-lg border border-border bg-card/50 p-3 space-y-4">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold truncate">
-                  {result.name || "Untitled product"}
+                <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
+                  Review & edit before adding
                 </p>
-                {(result.price !== undefined || result.currency) && (
-                  <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                    {result.currency ?? ""} {result.price ?? ""}
-                    {result.priceNormalized !== undefined && result.currency !== "AUD" && (
-                      <span className="ml-1 text-muted-foreground/70">
-                        (≈ AUD {result.priceNormalized.toFixed(2)})
-                      </span>
-                    )}
-                  </p>
-                )}
                 {result.sourceUrl && (
                   <a
                     href={result.sourceUrl}
@@ -418,28 +408,182 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
               </button>
             </div>
 
-            {result.description && (
-              <p className="text-xs text-muted-foreground line-clamp-3">{result.description}</p>
-            )}
+            {/* Name */}
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name" className="text-xs">Product name</Label>
+              <Input
+                id="edit-name"
+                value={edit.name}
+                onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                placeholder="Untitled product"
+                maxLength={255}
+              />
+            </div>
 
-            {result.images && result.images.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {result.images.slice(0, 8).map((img, i) => (
-                  <img
-                    key={i}
-                    src={img.storedUrl}
-                    alt={`Product image ${i + 1}`}
-                    className="w-16 h-16 rounded-md object-cover border border-border shrink-0"
-                    loading="lazy"
-                  />
-                ))}
+            {/* Price + Currency */}
+            <div className="grid grid-cols-[1fr_110px] gap-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-price" className="text-xs">Price</Label>
+                <Input
+                  id="edit-price"
+                  inputMode="decimal"
+                  value={edit.priceText}
+                  onChange={(e) => setEdit({ ...edit, priceText: e.target.value })}
+                  placeholder="0.00"
+                  className="font-mono"
+                />
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-currency" className="text-xs">Currency</Label>
+                <Input
+                  id="edit-currency"
+                  value={edit.currency}
+                  onChange={(e) => setEdit({ ...edit, currency: e.target.value.toUpperCase().slice(0, 3) })}
+                  placeholder="AUD"
+                  maxLength={3}
+                  className="uppercase font-mono"
+                />
+              </div>
+            </div>
+            {result.priceNormalized !== undefined && edit.currency && edit.currency !== "AUD" && (
+              <p className="text-[11px] text-muted-foreground -mt-2 font-mono">
+                ≈ AUD {result.priceNormalized.toFixed(2)} (auto-converted)
+              </p>
             )}
 
-            <div className="flex items-center justify-between gap-2 pt-1">
+            {/* Description */}
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-desc" className="text-xs">Description</Label>
+              <Textarea
+                id="edit-desc"
+                value={edit.description}
+                onChange={(e) => setEdit({ ...edit, description: e.target.value })}
+                placeholder="Add or refine the product description…"
+                rows={4}
+                className="resize-y"
+              />
+            </div>
+
+            {/* Images */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">
+                  Images ({edit.images.length})
+                </Label>
+                <span className="text-[10px] text-muted-foreground">
+                  Click <Star className="inline w-2.5 h-2.5 -mt-0.5" /> to set the main image
+                </span>
+              </div>
+
+              {edit.images.length > 0 ? (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {edit.images.map((img, i) => {
+                    const isPrimary = i === edit.primaryIndex;
+                    return (
+                      <div
+                        key={`${img.storedUrl}-${i}`}
+                        className={cn(
+                          "relative w-20 h-20 rounded-md border shrink-0 group overflow-hidden",
+                          isPrimary ? "border-primary ring-2 ring-primary/40" : "border-border",
+                        )}
+                      >
+                        <img
+                          src={img.storedUrl}
+                          alt={`Product image ${i + 1}`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        {isPrimary && (
+                          <span className="absolute top-0.5 left-0.5 bg-primary text-primary-foreground text-[9px] font-semibold px-1 py-0.5 rounded">
+                            MAIN
+                          </span>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 flex justify-between bg-background/85 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => setEdit({ ...edit, primaryIndex: i })}
+                            className="flex-1 p-1 text-muted-foreground hover:text-primary"
+                            aria-label="Set as main image"
+                            title="Set as main image"
+                          >
+                            <Star className={cn("w-3.5 h-3.5 mx-auto", isPrimary && "fill-primary text-primary")} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = edit.images.filter((_, idx) => idx !== i);
+                              const newPrimary =
+                                edit.primaryIndex === i
+                                  ? 0
+                                  : edit.primaryIndex > i
+                                    ? edit.primaryIndex - 1
+                                    : edit.primaryIndex;
+                              setEdit({ ...edit, images: next, primaryIndex: Math.max(0, newPrimary) });
+                            }}
+                            className="flex-1 p-1 text-muted-foreground hover:text-destructive border-l border-border"
+                            aria-label="Remove image"
+                            title="Remove image"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground italic">No images — add one below.</p>
+              )}
+
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <ImagePlus className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    type="url"
+                    value={newImageUrl}
+                    onChange={(e) => setNewImageUrl(e.target.value)}
+                    placeholder="Paste image URL (https://…)"
+                    className="pl-8 h-9 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        document.getElementById("add-image-btn")?.click();
+                      }
+                    }}
+                  />
+                </div>
+                <Button
+                  id="add-image-btn"
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!newImageUrl.trim()}
+                  onClick={() => {
+                    const trimmed = newImageUrl.trim();
+                    try {
+                      const u = new URL(trimmed);
+                      if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error("bad protocol");
+                    } catch {
+                      toast.error("Image URL must start with http:// or https://");
+                      return;
+                    }
+                    setEdit({
+                      ...edit,
+                      images: [...edit.images, { storedUrl: trimmed, originalUrl: trimmed }],
+                    });
+                    setNewImageUrl("");
+                  }}
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Add
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/60">
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <ImageIcon className="w-3 h-3" />
-                {result.images?.length ?? 0} image{(result.images?.length ?? 0) === 1 ? "" : "s"}
+                {edit.images.length} image{edit.images.length === 1 ? "" : "s"} ready
               </div>
               <Button size="sm" onClick={handleAdd} disabled={!onAddToInvoice}>
                 <Plus className="w-4 h-4 mr-1.5" />

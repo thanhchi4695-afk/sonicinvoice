@@ -21,9 +21,10 @@ import { decode, Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 const BUCKET = "compressed-images";
 const MAX_TOTAL_BYTES = 10 * 1024 * 1024;       // 10 MB kill-switch
 const PER_IMAGE_TIMEOUT_MS = 8_000;
-const MAX_IMAGES = 8;
+const MAX_IMAGES = 4;                            // CPU-time safety on Edge runtime
 const MAX_DIMENSION = 1600;                      // longest side
 const WEBP_QUALITY = 82;
+const SKIP_OPTIMISE_BYTES = 150 * 1024;          // <150KB → upload original, skip WASM decode
 
 const UA = "Mozilla/5.0 (compatible; SonicInvoiceBot/1.0; +https://sonicinvoices.com)";
 
@@ -33,7 +34,8 @@ export interface DownloadedImage {
   width: number;
   height: number;
   bytes: number;
-  contentType: "image/webp";
+  contentType: string;      // "image/webp" when optimised, original MIME otherwise
+  optimised: boolean;       // false when small originals were uploaded as-is
 }
 
 export interface DownloadImagesResult {
@@ -110,7 +112,7 @@ async function optimise(bytes: Uint8Array): Promise<{ webp: Uint8Array; width: n
   return { webp, width: decoded.width, height: decoded.height };
 }
 
-function buildStoragePath(sourceUrl: string, idx: number): string {
+function buildStoragePath(sourceUrl: string, idx: number, ext = "webp"): string {
   // Group images per source host + path hash to keep the bucket browsable
   let host = "unknown";
   let pathHash = "0";
@@ -120,7 +122,18 @@ function buildStoragePath(sourceUrl: string, idx: number): string {
     pathHash = Math.abs(hashString(u.pathname)).toString(36);
   } catch { /* keep defaults */ }
   const stamp = Date.now();
-  return `product-extract/${host}/${pathHash}/${stamp}-${idx}.webp`;
+  return `product-extract/${host}/${pathHash}/${stamp}-${idx}.${ext}`;
+}
+
+function mimeToExt(mime: string): string {
+  const m = mime.toLowerCase().split(";")[0].trim();
+  if (m === "image/jpeg" || m === "image/jpg") return "jpg";
+  if (m === "image/png") return "png";
+  if (m === "image/webp") return "webp";
+  if (m === "image/gif") return "gif";
+  if (m === "image/avif") return "avif";
+  if (m === "image/svg+xml") return "svg";
+  return "bin";
 }
 
 function hashString(s: string): number {
@@ -179,13 +192,38 @@ export async function downloadImages(
         break;
       }
 
-      const { webp, width, height } = await optimise(bytes);
+      // Skip the WASM decode/encode for already-small images — saves
+      // significant CPU time on the Edge runtime (where the imagescript
+      // decode is the dominant cost).
+      const small = bytes.byteLength < SKIP_OPTIMISE_BYTES;
 
-      const path = buildStoragePath(sourceUrl, i);
+      let uploadBytes: Uint8Array;
+      let uploadContentType: string;
+      let width = 0;
+      let height = 0;
+      let optimised: boolean;
+      let ext: string;
+
+      if (small) {
+        uploadBytes = bytes;
+        uploadContentType = contentType || "application/octet-stream";
+        optimised = false;
+        ext = mimeToExt(uploadContentType);
+      } else {
+        const opt = await optimise(bytes);
+        uploadBytes = opt.webp;
+        uploadContentType = "image/webp";
+        width = opt.width;
+        height = opt.height;
+        optimised = true;
+        ext = "webp";
+      }
+
+      const path = buildStoragePath(sourceUrl, i, ext);
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
-        .upload(path, webp, {
-          contentType: "image/webp",
+        .upload(path, uploadBytes, {
+          contentType: uploadContentType,
           upsert: false,
           cacheControl: "31536000, immutable",
         });
@@ -198,15 +236,13 @@ export async function downloadImages(
         originalUrl: url,
         width,
         height,
-        bytes: webp.byteLength,
-        contentType: "image/webp",
+        bytes: uploadBytes.byteLength,
+        contentType: uploadContentType,
+        optimised,
       });
 
       // Tiny breather to be polite to source servers (matches our Shopify cadence)
       if (i < urls.length - 1) await new Promise((r) => setTimeout(r, 150));
-
-      // also flag obviously bad source content-types upstream for debugging
-      void contentType;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       warnings.push(`Image ${url} skipped: ${msg}`);

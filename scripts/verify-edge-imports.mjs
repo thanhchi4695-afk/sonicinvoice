@@ -29,7 +29,14 @@ import { join, relative } from "node:path";
 const ROOT = "supabase/functions";
 const NETWORK = process.argv.includes("--network");
 
-const IMPORT_RE = /(?:import\s+(?:[^"']+?\s+from\s+)?|export\s+[^"']+?\s+from\s+)["']([^"']+)["']/g;
+// Static `import ... from "x"` and `export ... from "x"` (incl. bare `import "x"`).
+const STATIC_IMPORT_RE =
+  /(?:^|[\s;])import\s+(?:[^"']+?\s+from\s+)?["']([^"']+)["']|(?:^|[\s;])export\s+[^"']+?\s+from\s+["']([^"']+)["']/g;
+// Dynamic `import("x")` — must NOT match `.import(` method calls, so require
+// a non-identifier char (or start of line) before `import`.
+const DYNAMIC_IMPORT_RE = /(?:^|[^.\w$])import\s*\(\s*["']([^"']+)["']\s*\)/g;
+// CommonJS `require("x")` — same boundary guard to avoid `.require(`.
+const REQUIRE_RE = /(?:^|[^.\w$])require\s*\(\s*["']([^"']+)["']\s*\)/g;
 const MANGLE_RE = /\[email[\s\u00A0\u200B-]protected\]|\[email\s/i;
 
 /** Recursively list .ts/.js files under dir. */
@@ -110,20 +117,29 @@ async function main() {
 
   for (const file of files) {
     const src = await readFile(file, "utf8");
-    const urls = new Set();
-    for (const m of src.matchAll(IMPORT_RE)) {
-      const u = m[1];
-      // only care about remote / npm specifiers
-      if (/^(https?:|npm:|jsr:|node:)/.test(u)) urls.add(u);
-    }
+    // Map<url, Set<kind>> — same URL may appear as both static + dynamic.
+    const urls = new Map();
+    const collect = (re, kind) => {
+      for (const m of src.matchAll(re)) {
+        const u = m[1] ?? m[2];
+        if (!u) continue;
+        if (!/^(https?:|npm:|jsr:|node:)/.test(u)) continue;
+        if (!urls.has(u)) urls.set(u, new Set());
+        urls.get(u).add(kind);
+      }
+    };
+    collect(STATIC_IMPORT_RE, "static");
+    collect(DYNAMIC_IMPORT_RE, "dynamic");
+    collect(REQUIRE_RE, "require");
     if (!urls.size) continue;
 
     console.log(`📄 ${relative(process.cwd(), file)}`);
-    for (const url of urls) {
+    for (const [url, kinds] of urls) {
       total += 1;
       const bytes = Buffer.byteLength(url, "utf8");
       const preview = url.length > 120 ? url.slice(0, 117) + "..." : url;
-      console.log(`   • [${bytes}B] ${preview}`);
+      const tag = [...kinds].join("+");
+      console.log(`   • [${tag}] [${bytes}B] ${preview}`);
 
       const issues = classify(url);
       for (const i of issues) {

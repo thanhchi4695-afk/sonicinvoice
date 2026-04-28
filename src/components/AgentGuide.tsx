@@ -5,7 +5,7 @@
 // ════════════════════════════════════════════════════════════════
 
 import { useEffect, useState } from "react";
-import { Eye, Layers, Sparkles, Rocket, Brain, ArrowLeft, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
+import { Eye, Layers, Sparkles, Rocket, Brain, ArrowLeft, CheckCircle2, AlertCircle, ExternalLink, Search, Building2, Globe2, ShieldCheck, Workflow } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

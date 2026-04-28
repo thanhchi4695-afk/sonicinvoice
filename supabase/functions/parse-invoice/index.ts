@@ -1171,6 +1171,23 @@ serve(async (req) => {
       });
     }
 
+    // Resolve the calling user (best-effort) so we can write background-job
+    // rows under their RLS scope when Step B is moved off the request path.
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    let resolvedUserId: string | null = null;
+    try {
+      const authHeader = req.headers.get("Authorization") || "";
+      if (authHeader && authHeader !== `Bearer ${serviceKey}`) {
+        const userClient = createClient(supabaseUrl, anonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data } = await userClient.auth.getUser();
+        resolvedUserId = data?.user?.id ?? null;
+      }
+    } catch { /* anonymous or service-role caller — Step B will run inline as before */ }
+
     const isImage = ["jpg", "jpeg", "png", "webp", "heic"].includes(fileType);
     const isPdf = fileType === "pdf";
 

@@ -43,17 +43,10 @@ interface NormalisedPrice {
 // Helpers expected from later tasks — wired as stubs for now
 // ────────────────────────────────────────────────────────────────
 
-/**
- * TODO (Task 5): Replace with the real Sharp + storage pipeline
- * (`src/lib/product-extract/image-downloader.ts` mirrored here).
- * For now, return the raw URLs unchanged so the function can run
- * end-to-end during development.
- */
-async function downloadImages(urls: string[], _sourceUrl: string): Promise<string[]> {
-  // TODO: stream each URL via Sharp → upload to `compressed-images`
-  //       bucket, return public URLs. Enforce 10MB total kill-switch.
-  return urls;
-}
+// `downloadImages` + `collectImageUrls` now provided by ./image-pipeline.ts
+// (Task 5 complete: streams via WASM imagescript → compressed-images bucket,
+//  enforces 10MB kill-switch, follows priority order: og:image → near-price
+//  → product container → gallery).
 
 /**
  * TODO (Task 6): Replace with `currency-detector.ts` logic

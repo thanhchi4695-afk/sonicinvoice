@@ -149,11 +149,16 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
           <h2 className="text-sm font-semibold text-foreground">Your AI automation pipeline</h2>
           <p className="text-xs text-muted-foreground">5 agents working together to process invoices hands-free.</p>
         </div>
-        {onOpenGuide && (
-          <Button variant="ghost" size="sm" onClick={onOpenGuide} className="text-xs">
-            See how automation works <ChevronRight className="h-3 w-3" />
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => setTourOpen(true)} className="text-xs">
+            <PlayCircle className="h-3 w-3" /> Tour
           </Button>
-        )}
+          {onOpenGuide && (
+            <Button variant="ghost" size="sm" onClick={onOpenGuide} className="text-xs">
+              See how it works <ChevronRight className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* ── 5 agent cards ───────────────────────────── */}

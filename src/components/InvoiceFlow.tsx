@@ -1835,7 +1835,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         maxAttempts: 3,
         onRetry: (attempt, reason) => {
           console.warn(`[Sonic Invoice] AI parse retry ${attempt} (${reason})`);
-          setEnrichLines([{ name: "Reading invoice…", status: "searching", action: `Retrying (${reason})…`, confidence: 0 }]);
+          const label = reason === "resumed"
+            ? "Resuming after returning to app…"
+            : `Retrying (${reason})…`;
+          setEnrichLines([{ name: "Reading invoice…", status: "searching", action: label, confidence: 0 }]);
         },
         body: JSON.stringify({
           fileContent: base64,

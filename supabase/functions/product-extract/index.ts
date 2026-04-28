@@ -13,6 +13,7 @@
 // ════════════════════════════════════════════════════════════════
 
 import { load as cheerioLoad } from "https://esm.sh/cheerio@1.0.0";
+import { downloadImages, collectImageUrls } from "./image-pipeline.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

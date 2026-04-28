@@ -197,38 +197,55 @@ Deno.serve(async (req) => {
     const candidatesToVerify = candidatePool.slice(0, MAX_CANDIDATES_TO_VERIFY);
 
     // ─── Verify ────────────────────────────────────────────────
+    let bestCandidate = candidatesToVerify[0];
     let verifierConfidence = bestCandidate.rawConfidence;
     let verifierMatch: string = "unknown";
     let verifierReasoning = "";
 
-    try {
-      const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
-      if (remaining < 2_000) {
-        log(productId, "verifier_skipped_budget", { remaining });
-      } else {
+    for (const candidate of candidatesToVerify) {
+      let candidateConfidence = candidate.rawConfidence;
+      let candidateMatch = "unknown";
+      let candidateReasoning = "";
+
+      try {
+        const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
+        if (remaining < 2_000) {
+          log(productId, "verifier_skipped_budget", { remaining, source: candidate.source });
+          break;
+        }
+
         const verifyP = verifyMatch(invoiceProduct, {
-          title: bestCandidate.data.title,
-          description: bestCandidate.data.description,
-          imageUrl: bestCandidate.data.imageUrl,
-          price: bestCandidate.data.price,
-          source: bestCandidate.source,
+          title: candidate.data.title,
+          description: candidate.data.description,
+          imageUrl: candidate.data.imageUrl,
+          price: candidate.data.price,
+          source: candidate.source,
         });
         const v = await withTimeout(verifyP, Math.min(8_000, remaining - 1_000), "verifierAgent");
-        verifierConfidence = v.confidence;
-        verifierMatch = v.match;
-        verifierReasoning = v.reasoning;
+        candidateConfidence = v.confidence;
+        candidateMatch = v.match;
+        candidateReasoning = v.reasoning;
         log(productId, "verifier_done", {
+          source: candidate.source,
           confidence: v.confidence,
           match: v.match,
           warnings: v.warnings,
+          url: candidate.data.url,
         });
+      } catch (err) {
+        if (err instanceof AIGatewayError && (err.status === 429 || err.status === 402)) {
+          log(productId, "verifier_ai_limit", { source: candidate.source, status: err.status, message: err.message });
+          // Fall back to raw confidence rather than failing the whole pipeline
+        } else {
+          log(productId, "verifier_error", { source: candidate.source, error: err instanceof Error ? err.message : String(err) });
+        }
       }
-    } catch (err) {
-      if (err instanceof AIGatewayError && (err.status === 429 || err.status === 402)) {
-        log(productId, "verifier_ai_limit", { status: err.status, message: err.message });
-        // Fall back to raw confidence rather than failing the whole pipeline
-      } else {
-        log(productId, "verifier_error", { error: err instanceof Error ? err.message : String(err) });
+
+      if (candidateConfidence > verifierConfidence) {
+        bestCandidate = candidate;
+        verifierConfidence = candidateConfidence;
+        verifierMatch = candidateMatch;
+        verifierReasoning = candidateReasoning;
       }
     }
 

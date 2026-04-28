@@ -72,30 +72,54 @@ interface ShopifyProduct {
   tags?: string[] | string;
 }
 
-// ── Abbreviation expansion (swimwear / fashion supplier shorthand) ──
+// ── Abbreviation expansion (general fashion / footwear / accessories) ──
 // Used to "expand" invoice tokens before matching against retailer titles.
-// e.g. invoice "KOKOMO LLINE OP" → tokens [kokomo, longline, one, piece]
+// Covers swimwear, apparel, footwear, lingerie, accessories, beauty.
+// e.g. invoice "KOKOMO LLINE OP"      → [kokomo, longline, one, piece]
+//      invoice "DAISY MIDI DRS S/S"    → [daisy, midi, dress, short, sleeve]
+//      invoice "BLK LTHR BT SZ8"       → [black, leather, boot, size, 8]
 const ABBREV_MAP: Record<string, string> = {
-  "lline": "longline",
-  "llline": "longline",
-  "ll": "longline",
-  "op": "one piece",
-  "1pc": "one piece",
-  "onepc": "one piece",
-  "uw": "underwire",
-  "halt": "halter",
-  "tie": "tieside",
-  "pant": "bottom",
-  "pants": "bottom",
-  "bra": "top",
-  "reg": "regular",
-  "uh": "ultra high",
-  "uhw": "ultra high",
-  "hw": "high waist",
-  "mw": "mid waist",
-  "lw": "low waist",
-  "bd": "bandeau",
-  "boost": "booster",
+  // Swimwear / lingerie
+  "lline": "longline", "llline": "longline", "ll": "longline",
+  "op": "one piece", "1pc": "one piece", "onepc": "one piece",
+  "uw": "underwire", "halt": "halter", "tie": "tieside",
+  "bd": "bandeau", "boost": "booster", "brz": "bralette",
+  // Apparel — silhouettes
+  "drs": "dress", "dr": "dress", "skt": "skirt", "shrt": "shirt",
+  "blz": "blazer", "jkt": "jacket", "jckt": "jacket", "cdgn": "cardigan",
+  "swtr": "sweater", "swt": "sweat", "hd": "hoodie", "tshirt": "t-shirt",
+  "tee": "t-shirt", "ts": "t-shirt", "tnk": "tank", "cami": "camisole",
+  "jmpst": "jumpsuit", "jmps": "jumpsuit", "rmpr": "romper",
+  "plyst": "playsuit", "pls": "playsuit", "ovrl": "overall",
+  "shrts": "shorts", "trsr": "trouser", "trsrs": "trouser",
+  "lggn": "legging", "lggns": "legging", "jn": "jean", "jns": "jean",
+  // Footwear
+  "bt": "boot", "bts": "boot", "snkr": "sneaker", "sndl": "sandal",
+  "snd": "sandal", "mcsn": "moccasin", "lfr": "loafer", "hl": "heel",
+  // Accessories / bags
+  "bg": "bag", "bp": "backpack", "ttbg": "tote", "clt": "clutch",
+  "wlt": "wallet", "blt": "belt", "scrf": "scarf", "ht": "hat",
+  // Length / cut / fit
+  "mdi": "midi", "mxi": "maxi", "mn": "mini", "krt": "crop",
+  "crp": "crop", "ovsz": "oversized", "rlx": "relaxed", "slm": "slim",
+  "stra": "straight", "wd": "wide", "tprd": "tapered", "rgr": "regular",
+  "reg": "regular", "tll": "tall", "ptt": "petite",
+  // Sleeves / necklines
+  "ss": "short sleeve", "ls": "long sleeve", "sl": "sleeveless",
+  "v-nk": "v neck", "vnk": "v neck", "crwn": "crew neck", "scp": "scoop",
+  // Waist (also kept from swimwear)
+  "uh": "ultra high", "uhw": "ultra high", "hw": "high waist",
+  "mw": "mid waist", "lw": "low waist",
+  // Materials / colours shorthand
+  "ltr": "leather", "lthr": "leather", "sd": "suede", "lin": "linen",
+  "lnn": "linen", "ctn": "cotton", "wl": "wool", "csh": "cashmere",
+  "vlv": "velvet", "stn": "satin", "slk": "silk", "dnm": "denim",
+  "chf": "chiffon", "lc": "lace",
+  "blk": "black", "wht": "white", "nvy": "navy", "gry": "grey",
+  "grn": "green", "brn": "brown", "crm": "cream", "bge": "beige",
+  "ntl": "natural", "chrcl": "charcoal",
+  // Generic noun overrides (kept from swimwear matcher)
+  "pant": "bottom", "pants": "bottom", "bra": "top",
 };
 
 function expandAbbreviations(name: string): string {

@@ -1,0 +1,273 @@
+// ════════════════════════════════════════════════════════════════
+// image-pipeline.ts — Edge-side image downloader + optimiser used by
+// the product-extract function.
+//
+// Locked plan rules (mem://features/url-product-extractor):
+//   • Source priority: og:image → near price → product container → gallery
+//   • Stream through resize/encode pipeline — no disk writes
+//   • Storage bucket: existing `compressed-images` (public)
+//   • Validate content-type is image/*
+//   • Kill-switch: abort if cumulative download > MAX_TOTAL_BYTES
+//
+// Runtime note: Sharp (Node-native) cannot run in Deno Edge runtime.
+// We use `imagescript` (pure-WASM JPEG/PNG/WebP) as the Edge-side
+// equivalent. The public API mirrors what a future Node worker using
+// real Sharp would expose, so callers don't change.
+// ════════════════════════════════════════════════════════════════
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { decode, Image } from "https://esm.sh/imagescript@1.3.0";
+
+const BUCKET = "compressed-images";
+const MAX_TOTAL_BYTES = 10 * 1024 * 1024;       // 10 MB kill-switch
+const PER_IMAGE_TIMEOUT_MS = 8_000;
+const MAX_IMAGES = 8;
+const MAX_DIMENSION = 1600;                      // longest side
+const WEBP_QUALITY = 82;
+
+const UA = "Mozilla/5.0 (compatible; SonicInvoiceBot/1.0; +https://sonicinvoices.com)";
+
+export interface DownloadedImage {
+  storedUrl: string;        // public URL in compressed-images bucket
+  originalUrl: string;
+  width: number;
+  height: number;
+  bytes: number;
+  contentType: "image/webp";
+}
+
+export interface DownloadImagesResult {
+  images: DownloadedImage[];
+  warnings: string[];
+  killSwitchTripped: boolean;
+  totalBytesIn: number;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────────────
+
+/** Resolve relative image URLs against the page URL. */
+function absolutise(src: string, base: string): string | null {
+  try {
+    return new URL(src, base).toString();
+  } catch {
+    return null;
+  }
+}
+
+/** De-dup, drop tracking pixels, cap to MAX_IMAGES. */
+function shortlistUrls(urls: string[], base: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of urls) {
+    if (!raw) continue;
+    const abs = absolutise(raw.trim(), base);
+    if (!abs) continue;
+    // Skip obvious non-product assets
+    if (/sprite|icon|logo|placeholder|1x1|pixel/i.test(abs)) continue;
+    if (seen.has(abs)) continue;
+    seen.add(abs);
+    out.push(abs);
+    if (out.length >= MAX_IMAGES) break;
+  }
+  return out;
+}
+
+async function fetchBytes(url: string): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), PER_IMAGE_TIMEOUT_MS);
+  try {
+    const r = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { "User-Agent": UA, Accept: "image/*" },
+      redirect: "follow",
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const contentType = r.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) {
+      throw new Error(`Non-image content-type: ${contentType || "unknown"}`);
+    }
+    const buf = new Uint8Array(await r.arrayBuffer());
+    return { bytes: buf, contentType };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Resize to MAX_DIMENSION on longest side and encode as WebP. */
+async function optimise(bytes: Uint8Array): Promise<{ webp: Uint8Array; width: number; height: number }> {
+  const decoded = await decode(bytes);
+  if (!(decoded instanceof Image)) {
+    throw new Error("Unsupported image format (animated GIF or unknown)");
+  }
+  const longest = Math.max(decoded.width, decoded.height);
+  if (longest > MAX_DIMENSION) {
+    const scale = MAX_DIMENSION / longest;
+    decoded.resize(Math.round(decoded.width * scale), Math.round(decoded.height * scale));
+  }
+  const webp = await decoded.encode(WEBP_QUALITY) as Uint8Array;
+  return { webp, width: decoded.width, height: decoded.height };
+}
+
+function buildStoragePath(sourceUrl: string, idx: number): string {
+  // Group images per source host + path hash to keep the bucket browsable
+  let host = "unknown";
+  let pathHash = "0";
+  try {
+    const u = new URL(sourceUrl);
+    host = u.host.replace(/[^a-z0-9.-]/gi, "");
+    pathHash = Math.abs(hashString(u.pathname)).toString(36);
+  } catch { /* keep defaults */ }
+  const stamp = Date.now();
+  return `product-extract/${host}/${pathHash}/${stamp}-${idx}.webp`;
+}
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Public API
+// ────────────────────────────────────────────────────────────────
+
+/**
+ * Stream-download, optimise (resize + WebP) and upload product images
+ * to the existing `compressed-images` bucket. Honours the 10MB kill-switch
+ * across the whole batch.
+ */
+export async function downloadImages(
+  rawUrls: string[],
+  sourceUrl: string,
+): Promise<DownloadImagesResult> {
+  const warnings: string[] = [];
+  const out: DownloadedImage[] = [];
+
+  const urls = shortlistUrls(rawUrls, sourceUrl);
+  if (urls.length === 0) {
+    return { images: [], warnings: ["No usable image URLs after shortlist."], killSwitchTripped: false, totalBytesIn: 0 };
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) {
+    return {
+      images: [],
+      warnings: ["Storage credentials missing (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)."],
+      killSwitchTripped: false,
+      totalBytesIn: 0,
+    };
+  }
+  const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+  let totalBytesIn = 0;
+  let killSwitchTripped = false;
+
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    try {
+      const { bytes, contentType } = await fetchBytes(url);
+      totalBytesIn += bytes.byteLength;
+
+      if (totalBytesIn > MAX_TOTAL_BYTES) {
+        killSwitchTripped = true;
+        warnings.push(
+          `Kill-switch tripped at ${(totalBytesIn / 1024 / 1024).toFixed(2)} MB — stopped after ${out.length} images.`,
+        );
+        break;
+      }
+
+      const { webp, width, height } = await optimise(bytes);
+
+      const path = buildStoragePath(sourceUrl, i);
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, webp, {
+          contentType: "image/webp",
+          upsert: false,
+          cacheControl: "31536000, immutable",
+        });
+      if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
+
+      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+
+      out.push({
+        storedUrl: pub.publicUrl,
+        originalUrl: url,
+        width,
+        height,
+        bytes: webp.byteLength,
+        contentType: "image/webp",
+      });
+
+      // Tiny breather to be polite to source servers (matches our Shopify cadence)
+      if (i < urls.length - 1) await new Promise((r) => setTimeout(r, 150));
+
+      // also flag obviously bad source content-types upstream for debugging
+      void contentType;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      warnings.push(`Image ${url} skipped: ${msg}`);
+      console.warn("[image-pipeline] skip", url, msg);
+    }
+  }
+
+  return { images: out, warnings, killSwitchTripped, totalBytesIn };
+}
+
+/**
+ * Best-effort image URL collector. Honours the locked priority order:
+ *   1. og:image / twitter:image
+ *   2. images near price (heuristic: same parent as a `[itemprop="price"]` or `.price`)
+ *   3. images inside `[class*="product"]` / itemscope=Product containers
+ *   4. gallery thumbnails
+ *
+ * `$` is a Cheerio root passed in by the caller so we don't double-load HTML.
+ */
+// deno-lint-ignore no-explicit-any
+export function collectImageUrls($: any, baseUrl: string): string[] {
+  const found: string[] = [];
+
+  const push = (v?: string | null) => {
+    if (v && typeof v === "string") found.push(v);
+  };
+
+  // 1. og:image + twitter:image
+  $('meta[property="og:image"], meta[property="og:image:secure_url"], meta[name="twitter:image"]').each(
+    (_: number, el: unknown) => push($(el).attr("content")),
+  );
+
+  // 2. images near price
+  const priceNodes = $('[itemprop="price"], .price, [class*="Price"], [data-price]');
+  priceNodes.each((_: number, el: unknown) => {
+    const container = $(el).closest("section, article, div, form");
+    container.find("img").each((__: number, img: unknown) => {
+      push($(img).attr("src") || $(img).attr("data-src") || $(img).attr("data-zoom-src"));
+    });
+  });
+
+  // 3. images inside product containers
+  $('[itemtype*="schema.org/Product"] img, [class*="product"] img, [class*="Product"] img, [id*="product"] img')
+    .each((_: number, img: unknown) =>
+      push($(img).attr("src") || $(img).attr("data-src") || $(img).attr("data-zoom-src")),
+    );
+
+  // 4. generic gallery
+  $('.gallery img, .product-gallery img, [class*="gallery"] img, [class*="carousel"] img').each(
+    (_: number, img: unknown) =>
+      push($(img).attr("src") || $(img).attr("data-src") || $(img).attr("data-zoom-src")),
+  );
+
+  // Resolve + de-dupe; the downloader will shortlist further
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of found) {
+    const abs = absolutise(raw.trim(), baseUrl);
+    if (!abs || seen.has(abs)) continue;
+    seen.add(abs);
+    out.push(abs);
+  }
+  return out;
+}

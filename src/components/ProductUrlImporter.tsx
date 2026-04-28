@@ -439,7 +439,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     setBulkText("");
   };
 
-
+  return (
     <Card className={className}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">

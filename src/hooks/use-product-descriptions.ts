@@ -122,6 +122,7 @@ export function useProductDescriptions() {
       } catch (err) {
         const result: DescriptionResult = {
           description: null,
+          full_product_name: null,
           source_url: "",
           source_name: "",
           source_type: "retailer",

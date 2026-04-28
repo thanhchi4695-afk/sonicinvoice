@@ -854,7 +854,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                 </div>
 
                 <p className="text-[11px] text-muted-foreground px-1">
-                  Drag <GripVertical className="inline w-3 h-3 -mt-0.5" /> to reorder — works with mouse <span className="hidden sm:inline">or touch</span><span className="sm:hidden">, or just touch & swipe up/down</span>.
+                  Drag <GripVertical className="inline w-3 h-3 -mt-0.5" />, swipe on touch, or use the <ChevronUp className="inline w-3 h-3 -mt-0.5" /><ChevronDown className="inline w-3 h-3 -mt-0.5" /> buttons to reorder — items merge in this order.
                 </p>
                 <ul
                   ref={bulkListRef}

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink, Check, Circle } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";

@@ -194,6 +194,94 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   const [error, setError] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const stepTimers = useRef<number[]>([]);
+  const [pushingShopify, setPushingShopify] = useState(false);
+
+  // Build a Shopify draft product payload from an ImportedLineItem.
+  const lineItemToPushProduct = (item: ImportedLineItem): PushProduct => ({
+    title: item.name || "Imported product",
+    body_html: item.description || "",
+    status: "draft",
+    images: (item.imageUrls || []).filter(Boolean).map((src) => ({ src })),
+    variants: [
+      {
+        price: item.price !== undefined && Number.isFinite(item.price) ? String(item.price) : "0",
+        sku: "",
+        inventory_management: "shopify",
+        inventory_quantity: 0,
+      },
+    ],
+  });
+
+  // Push one or many imported items to Shopify as draft products.
+  const pushItemsToShopify = async (items: ImportedLineItem[]): Promise<boolean> => {
+    if (items.length === 0) return false;
+    if (pushingShopify) return false;
+
+    setPushingShopify(true);
+    const toastId = toast.loading("Connecting to Shopify…");
+
+    try {
+      const conn = await getShopifyConnection();
+      if (!conn) {
+        toast.error("No Shopify store connected", {
+          id: toastId,
+          description: "Connect a Shopify store under Connections, then try again.",
+        });
+        return false;
+      }
+
+      let success = 0;
+      let errors = 0;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        toast.loading(`Pushing ${i + 1}/${items.length}: ${item.name.slice(0, 40)}…`, { id: toastId });
+        try {
+          await pushProductGraphQL(lineItemToPushProduct(item));
+          success++;
+          addAuditEntry("url_import", `Pushed "${item.name}" to Shopify as draft`);
+        } catch (err) {
+          errors++;
+          console.error("[ProductUrlImporter] Shopify push failed for", item.name, err);
+        }
+        if (i < items.length - 1) await new Promise((r) => setTimeout(r, 500));
+      }
+
+      try {
+        await recordPush(
+          conn.store_url,
+          success,
+          0,
+          errors,
+          `URL import push: ${success} ok / ${errors} failed`,
+          "url_importer",
+        );
+      } catch (e) {
+        console.warn("[ProductUrlImporter] recordPush failed:", e);
+      }
+
+      if (errors === 0) {
+        toast.success(`Pushed ${success} draft product${success === 1 ? "" : "s"} to Shopify`, {
+          id: toastId,
+          description: "Created as drafts so you can review before publishing.",
+        });
+        return true;
+      }
+      toast.warning(`Pushed ${success} of ${items.length}`, {
+        id: toastId,
+        description: `${errors} failed — check console for details.`,
+      });
+      return success > 0;
+    } catch (err) {
+      console.error("[ProductUrlImporter] Shopify push fatal:", err);
+      toast.error("Push to Shopify failed", {
+        id: toastId,
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+      return false;
+    } finally {
+      setPushingShopify(false);
+    }
+  };
 
   const clearStepTimers = () => {
     stepTimers.current.forEach((id) => window.clearTimeout(id));

@@ -577,6 +577,32 @@ CRITICAL RULES:
 
 // ── Server-side post-AI validation ──────────────────────────
 function crossValidateProducts(products: Record<string, unknown>[]): Record<string, unknown>[] {
+  // ── Group-total checksum (Baku/Seafolly size-grid mis-alignment guard) ──
+  // For each (style_code|colour) group, compare the sum of extracted variant
+  // qtys against the printed "Total" column the AI reported in `group_total_qty`.
+  // A mismatch almost always means the AI mis-aligned the qty row under the
+  // size header. We flag every variant in that group so the UI surfaces it
+  // and the confidence drops below the auto-export threshold.
+  const groupSums = new Map<string, { sum: number; printedTotal: number | null }>();
+  for (const p of products) {
+    const key = String(p.group_key || `${p.style_code || ""}|${p.colour || ""}`);
+    if (!key.replace("|", "")) continue;
+    const qty = Number(p.quantity) || 0;
+    const printed = p.group_total_qty != null && p.group_total_qty !== ""
+      ? Number(p.group_total_qty) : null;
+    const cur = groupSums.get(key) || { sum: 0, printedTotal: null };
+    cur.sum += qty;
+    if (printed != null && !Number.isNaN(printed)) cur.printedTotal = printed;
+    groupSums.set(key, cur);
+  }
+  const mismatchedGroups = new Set<string>();
+  for (const [key, { sum, printedTotal }] of groupSums) {
+    if (printedTotal != null && printedTotal > 0 && sum !== printedTotal) {
+      mismatchedGroups.add(key);
+      console.warn(`[parse-invoice] group qty mismatch ${key}: extracted ${sum} ≠ printed total ${printedTotal}`);
+    }
+  }
+
   return products.map(p => {
     const unitCost = Number(p.unit_cost) || 0;
     const qty = Number(p.quantity) || 0;
@@ -629,6 +655,14 @@ function crossValidateProducts(products: Record<string, unknown>[]): Record<stri
       const styleCode = String(p.style_code || "");
       const colour = String(p.colour || "");
       p.group_key = styleCode ? `${styleCode}|${colour}` : "";
+    }
+
+    // Rule 7: Group-total checksum mismatch (size-grid alignment)
+    const gKey = String(p.group_key || "");
+    if (gKey && mismatchedGroups.has(gKey)) {
+      const info = groupSums.get(gKey)!;
+      notes.push(`size_grid_total_mismatch: extracted_sum=${info.sum} printed_total=${info.printedTotal} — verify size column alignment`);
+      confidence = Math.max(0, confidence - 25);
     }
 
     p.confidence = Math.min(100, Math.max(0, confidence));

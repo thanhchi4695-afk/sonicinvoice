@@ -165,8 +165,10 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
         {cards.map((c, i) => {
           const Icon = c.icon;
+          const tourId = `pipeline-${c.name.toLowerCase()}`;
+          const isActiveTourTarget = activeTourId === tourId;
           return (
-            <div key={c.name} className="relative">
+            <div key={c.name} className="relative" data-tour-id={tourId}>
               <Card
                 className={cn(
                   "flex h-full flex-col gap-2 p-3 transition-colors",

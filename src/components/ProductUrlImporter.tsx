@@ -182,6 +182,8 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
   const [bulkRunning, setBulkRunning] = useState(false);
   const bulkAbortRef = useRef(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ExtractedProduct | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);

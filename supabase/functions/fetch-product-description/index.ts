@@ -155,6 +155,7 @@ Return ONLY the JSON object — no other text.`;
       return new Response(
         JSON.stringify({
           description: null,
+          full_product_name: null,
           source_url: "",
           source_name: "",
           source_type: "retailer",

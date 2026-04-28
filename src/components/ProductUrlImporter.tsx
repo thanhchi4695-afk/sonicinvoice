@@ -1,10 +1,15 @@
 import { useState, useRef, useEffect } from "react";
-import { Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink, Check, Circle } from "lucide-react";
+import {
+  Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink, Check, Circle,
+  Star, Trash2, ImagePlus,
+} from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { addAuditEntry } from "@/lib/audit-log";
 import { cn } from "@/lib/utils";

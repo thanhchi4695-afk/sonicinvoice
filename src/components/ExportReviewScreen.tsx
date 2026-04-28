@@ -115,6 +115,22 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
   const [filterMissingImages, setFilterMissingImages] = useState(true);
   const [variantMode, setVariantModeState] = useState<VariantMode>(getVariantMode());
   const [publishStatus, setPublishStatusState] = useState<PublishStatus>(getPublishStatus());
+  // Stock quantity mode — "invoice": use qty parsed from invoice;
+  // "zero": export every variant with qty 0 so the user can receive
+  // and count stock later in their POS (Lightspeed / Shopify).
+  // Persisted in localStorage so it sticks per browser/store.
+  const [qtyMode, setQtyMode] = useState<"invoice" | "zero">(() => {
+    try {
+      const v = localStorage.getItem("sonic_export_qty_mode");
+      return v === "zero" ? "zero" : "invoice";
+    } catch { return "invoice"; }
+  });
+  const updateQtyMode = (m: "invoice" | "zero") => {
+    setQtyMode(m);
+    try { localStorage.setItem("sonic_export_qty_mode", m); } catch { /* ignore */ }
+    setValidationResult(null);
+    setExportBlocked(false);
+  };
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [exportBlocked, setExportBlocked] = useState(false);
   const mode = useStoreMode();

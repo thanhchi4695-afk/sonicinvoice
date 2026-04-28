@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
-import { FileText, Package, ShoppingBag, Store, Mail, Briefcase, Upload, Check } from "lucide-react";
+import { FileText, Package, ShoppingBag, Store, Mail, Briefcase, Upload, Check, Link as LinkIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HomeWizard from "@/components/HomeWizard";
+import ProductUrlImporter, { type ImportedLineItem } from "@/components/ProductUrlImporter";
+import { setSessionProducts } from "@/stores/invoice-session-store";
+import { toast } from "sonner";
 
 // ─────────────────────────────────────────────────────────────
 // Phase 1 — Upload

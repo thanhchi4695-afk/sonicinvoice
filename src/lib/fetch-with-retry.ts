@@ -154,7 +154,10 @@ export async function fetchWithRetry(
       if (isAbort && abortedForResume) {
         resumedFromBackground = true;
         onRetry?.(attempt, "resumed");
-        // Skip back-off and don't increment the failure counter.
+        // Don't burn the retry budget on a background-kill — rewind the
+        // counter so the user gets a fresh attempt, and skip back-off so the
+        // resume feels instant.
+        attempt--;
         continue;
       }
 

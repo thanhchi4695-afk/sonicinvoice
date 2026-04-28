@@ -1409,6 +1409,48 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [driveStage, setDriveStage] = useState<"link" | "confirm">("link");
   const [drivePreview, setDrivePreview] = useState<{ id: string; name: string; mimeType: string }[]>([]);
 
+  const pollInvoiceReadJob = async (jobId: string, label = "Reading invoice…"): Promise<Record<string, any> | null> => {
+    const started = Date.now();
+    const MAX_MS = 12 * 60_000;
+    const POLL_MS = 3_000;
+    let lastStatus = "running";
+
+    setEnrichLines([{ name: label, status: "searching", action: "Reading safely in the background…", confidence: 0 }]);
+
+    while (Date.now() - started < MAX_MS) {
+      const { data: job, error } = await supabase
+        .from("invoice_processing_jobs")
+        .select("status, result, error_message")
+        .eq("id", jobId)
+        .maybeSingle();
+
+      if (error) {
+        console.warn("[InvoiceFlow] Invoice read job poll failed:", error);
+      }
+
+      if (job?.status && job.status !== lastStatus) {
+        lastStatus = job.status;
+        setEnrichLines([{ name: label, status: "searching", action: `Background reader ${job.status}…`, confidence: 0 }]);
+      }
+
+      if (job?.status === "done") {
+        return (job.result || {}) as Record<string, any>;
+      }
+
+      if (job?.status === "failed") {
+        toast.error("Reading failed", { description: job.error_message || "The background reader could not finish this invoice." });
+        return null;
+      }
+
+      await new Promise((r) => setTimeout(r, POLL_MS));
+    }
+
+    toast.error("Reading is still running", {
+      description: "Your phone can safely leave this screen and try again shortly; the upload is no longer tied to one long request.",
+    });
+    return null;
+  };
+
   // Step 1 — paste folder/file link, list files via drive-list (no download).
   const handleDriveListFiles = async () => {
     if (!driveImportUrl.trim()) {

@@ -239,9 +239,10 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
       const r = results.get(ck(item));
       const desc = r?.description?.trim();
       if (!desc) continue;
+      const fullName = r?.full_product_name?.trim() || item.style_name;
       rows.push([
-        slugify(item.style_number || item.style_name),
-        item.style_name,
+        slugify(item.style_number || fullName),
+        fullName,
         descriptionToHtml(desc),
         item.brand,
         item.product_type || "",
@@ -280,8 +281,9 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
       const r = results.get(ck(item));
       const desc = r?.description?.trim();
       if (!desc) continue;
+      const fullName = r?.full_product_name?.trim() || item.style_name;
       rows.push([
-        item.style_name,
+        fullName,
         stripHtml(desc),
         item.brand,
         item.style_number,
@@ -434,13 +436,21 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
 
                 return (
                   <TableRow key={key} className="align-top">
-                    <TableCell className="max-w-[180px]">
+                    <TableCell className="max-w-[220px]">
                       <p className="text-xs font-medium">{item.style_name || "—"}</p>
                       {item.style_number && (
                         <p className="text-[10px] text-muted-foreground font-mono">
                           {item.style_number}
                         </p>
                       )}
+                      {r?.full_product_name &&
+                        r.full_product_name.toLowerCase().trim() !==
+                          (item.style_name || "").toLowerCase().trim() && (
+                          <p className="text-[10px] text-primary mt-1 leading-tight">
+                            <span className="text-muted-foreground">Full name:</span>{" "}
+                            {r.full_product_name}
+                          </p>
+                        )}
                     </TableCell>
                     <TableCell className="text-xs">{item.brand || "—"}</TableCell>
                     <TableCell className="min-w-[140px]">

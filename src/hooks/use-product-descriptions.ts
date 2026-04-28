@@ -4,6 +4,7 @@ import type { PriceMatchLineItem } from "@/lib/price-match-utils";
 
 export type DescriptionResult = {
   description: string | null;
+  full_product_name: string | null;
   source_url: string;
   source_name: string;
   source_type: "supplier" | "retailer";
@@ -62,6 +63,7 @@ export function useProductDescriptions() {
       if (!item.style_name?.trim() || !item.brand?.trim()) {
         const result: DescriptionResult = {
           description: null,
+          full_product_name: null,
           source_url: "",
           source_name: "",
           source_type: "retailer",
@@ -103,6 +105,7 @@ export function useProductDescriptions() {
         const description = payload?.description?.trim() || null;
         const result: DescriptionResult = {
           description,
+          full_product_name: payload?.full_product_name?.trim() || null,
           source_url: payload?.source_url || "",
           source_name: payload?.source_name || "",
           source_type: (payload?.source_type as "supplier" | "retailer") || "retailer",
@@ -119,6 +122,7 @@ export function useProductDescriptions() {
       } catch (err) {
         const result: DescriptionResult = {
           description: null,
+          full_product_name: null,
           source_url: "",
           source_name: "",
           source_type: "retailer",
@@ -167,6 +171,7 @@ export function useProductDescriptions() {
         } else {
           next.set(key, {
             description: newText.trim() ? newText : null,
+            full_product_name: null,
             source_url: "",
             source_name: "Manual entry",
             source_type: "retailer",

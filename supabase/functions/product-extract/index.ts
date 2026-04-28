@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: false, error: "Body must include a valid http(s) `url`" }, 400);
   }
   const url = body.url;
-
+  const userId = getUserIdFromAuth(req);
   const overall = AbortSignal.timeout(TIMEOUT_MS);
   const start = Date.now();
 
@@ -354,6 +354,14 @@ Deno.serve(async (req) => {
     }
 
     if (!product) {
+      const ms = Date.now() - start;
+      await logProcessingHistory({
+        userId,
+        url,
+        status: "failed",
+        errorMessage: "Could not extract product data from URL",
+        processingTimeMs: ms,
+      });
       return jsonResponse(
         { success: false, error: "Could not extract product data from URL" },
         422,
@@ -378,6 +386,23 @@ Deno.serve(async (req) => {
     const priceNormalized = normalizeCurrency(product.price, product.currency);
 
     const warnings = [...priceNormalized.warnings, ...imageResult.warnings];
+    const durationMs = Date.now() - start;
+
+    await logProcessingHistory({
+      userId,
+      url,
+      status: "success",
+      productName: product.name,
+      imagesCount: imageResult.images.length,
+      extractionStrategy: strategyUsed,
+      processingTimeMs: durationMs,
+      metadata: {
+        currency: priceNormalized.currency,
+        priceValue: priceNormalized.value,
+        killSwitchTripped: imageResult.killSwitchTripped,
+        warningCount: warnings.length,
+      },
+    });
 
     return jsonResponse({
       success: true,
@@ -395,13 +420,20 @@ Deno.serve(async (req) => {
         sourceUrl: url,
         extractedAt: new Date().toISOString(),
         strategyUsed,
-        durationMs: Date.now() - start,
+        durationMs,
         warnings,
       },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[product-extract] failed", { url, message });
+    await logProcessingHistory({
+      userId,
+      url,
+      status: "failed",
+      errorMessage: message,
+      processingTimeMs: Date.now() - start,
+    });
     const status = message.toLowerCase().includes("timeout") || message.includes("aborted") ? 504 : 500;
     return jsonResponse({ success: false, error: message }, status);
   }

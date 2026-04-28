@@ -10,10 +10,10 @@
 
 // Using linkedom (npm) instead of deno-dom because the deno.land/x URL
 // is mangled by an upstream email-obfuscation filter (`@v0.x.y` → `[email protected]`).
-import { parseHTML } from "https://esm.sh/linkedom@0.18.12?bundle&exports=parseHTML";
+import { parse as parseHTML } from "https://esm.sh/node-html-parser@7.1.0";
 class DOMParser {
   parseFromString(html: string, _mime: string) {
-    return parseHTML(html).document;
+    return parseHTML(html, { blockTextElements: { script: true, style: true } }) as any;
   }
 }
 type Element = any;

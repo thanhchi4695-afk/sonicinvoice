@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════════
 
 import { useEffect, useState } from "react";
-import { Eye, Layers, Sparkles, Rocket, Brain, ArrowRight, CheckCircle2, ChevronRight } from "lucide-react";
+import { Eye, Layers, Sparkles, Rocket, Brain, ArrowRight, CheckCircle2, ChevronRight, PlayCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import AgentInfoPopover, { type AgentInfo } from "./AgentInfoPopover";
+import AgentTourController, { type TourStep } from "./AgentTourController";
 
 const AGENT_INFO: Record<string, AgentInfo> = {
   Watchdog: {
@@ -75,6 +76,8 @@ interface PipelineState {
 
 const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, onOpenIntegrations }: Props) => {
   const [s, setS] = useState<PipelineState | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [activeTourId, setActiveTourId] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -146,19 +149,26 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
           <h2 className="text-sm font-semibold text-foreground">Your AI automation pipeline</h2>
           <p className="text-xs text-muted-foreground">5 agents working together to process invoices hands-free.</p>
         </div>
-        {onOpenGuide && (
-          <Button variant="ghost" size="sm" onClick={onOpenGuide} className="text-xs">
-            See how automation works <ChevronRight className="h-3 w-3" />
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => setTourOpen(true)} className="text-xs">
+            <PlayCircle className="h-3 w-3" /> Tour
           </Button>
-        )}
+          {onOpenGuide && (
+            <Button variant="ghost" size="sm" onClick={onOpenGuide} className="text-xs">
+              See how it works <ChevronRight className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* ── 5 agent cards ───────────────────────────── */}
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
         {cards.map((c, i) => {
           const Icon = c.icon;
+          const tourId = `pipeline-${c.name.toLowerCase()}`;
+          const isActiveTourTarget = activeTourId === tourId;
           return (
-            <div key={c.name} className="relative">
+            <div key={c.name} className="relative" data-tour-id={tourId}>
               <Card
                 className={cn(
                   "flex h-full flex-col gap-2 p-3 transition-colors",
@@ -170,7 +180,13 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="flex items-center gap-1">
-                    {AGENT_INFO[c.name] && <AgentInfoPopover info={AGENT_INFO[c.name]} />}
+                    {AGENT_INFO[c.name] && (
+                      <AgentInfoPopover
+                        info={AGENT_INFO[c.name]}
+                        open={isActiveTourTarget ? true : undefined}
+                        onOpenChange={isActiveTourTarget ? () => {} : undefined}
+                      />
+                    )}
                     <span
                       className={cn(
                         "h-2 w-2 rounded-full",
@@ -242,6 +258,17 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
           </ul>
         </Card>
       )}
+
+      <AgentTourController
+        steps={cards.map((c) => ({
+          targetId: `pipeline-${c.name.toLowerCase()}`,
+          title: AGENT_INFO[c.name]?.name ?? c.name,
+          caption: AGENT_INFO[c.name]?.why ?? c.desc,
+        }))}
+        open={tourOpen}
+        onClose={() => setTourOpen(false)}
+        onStepChange={setActiveTourId}
+      />
     </div>
   );
 };

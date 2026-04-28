@@ -377,15 +377,13 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     }
 
     setBulkRunning(false);
-    const successCount = (await new Promise<number>((res) =>
-      setBulkRows((rows) => {
-        res(rows.filter((r) => r.status === "success").length);
-        return rows;
-      }),
-    ));
-    if (successCount > 0) {
-      toast.success(`Fetched ${successCount} product${successCount === 1 ? "" : "s"} — review then merge.`);
-    }
+    setBulkRows((rows) => {
+      const successCount = rows.filter((r) => r.status === "success").length;
+      if (successCount > 0) {
+        toast.success(`Fetched ${successCount} product${successCount === 1 ? "" : "s"} — review then merge.`);
+      }
+      return rows;
+    });
   };
 
   const stopBulk = () => {

@@ -10,8 +10,10 @@ const EmbeddedAuthHealthCheck = () => {
   const { isEmbedded, authState, shop, authError } = useShopifyEmbedded();
   if (!isEmbedded) return null;
 
+  // Sit above the mobile bottom tab bar (h-16 + safe-area) on small screens;
+  // restore default bottom-3 on lg+ where the sidebar replaces the tab bar.
   const base =
-    "fixed bottom-3 right-3 z-50 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur max-w-[20rem]";
+    "fixed right-3 z-40 flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium shadow-lg backdrop-blur max-w-[20rem] bottom-[calc(4rem+env(safe-area-inset-bottom,0px)+0.75rem)] lg:bottom-3";
 
   if (authState === "loading") {
     return (

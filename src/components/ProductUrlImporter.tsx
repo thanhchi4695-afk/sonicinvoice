@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink, Check, Circle,
-  Star, Trash2, ImagePlus, Layers, AlertTriangle,
+  Star, Trash2, ImagePlus, Layers, AlertTriangle, GripVertical,
 } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";

@@ -43,6 +43,14 @@ EXTRACTION RULES:
 - Remove size-guide content — any sentence containing "size 8", "size 10", "fits true to size", "model is wearing", "model wears", measurements like "bust 86cm".
 - Strip mentions of competitor brand names (only the searched brand may appear).
 
+FULL PRODUCT NAME RULES:
+- Also capture the OFFICIAL FULL product name as displayed on the source page (the H1 / product title).
+- This is often longer than the invoice's short name. Example: invoice says "Kokomo Ultra High" but the brand site shows "Kokomo Ultra High Pant" → return "Kokomo Ultra High Pant".
+- Title Case. Do NOT include the brand prefix (e.g. return "Kokomo Ultra High Pant", not "Baku Kokomo Ultra High Pant").
+- Do NOT include color, size, SKU, price, or promotional words ("NEW", "SALE").
+- If the page only shows the same short name as the invoice, return that short name unchanged.
+- If no product page is found, set full_product_name to null.
+
 LENGTH RULES:
 - If cleaned description is under 20 words → too short, treat as not_found and try the next source.
 - Prefer 40–150 words. If a source gives more than 200 words, truncate at the last full sentence before the 150-word mark.
@@ -60,6 +68,7 @@ OUTPUT:
 Return ONLY a JSON object — no preamble, no markdown fences, no commentary:
 {
   "description": string | null,
+  "full_product_name": string | null,
   "source_url": string,
   "source_name": string,
   "source_type": "supplier" | "retailer",
@@ -67,7 +76,7 @@ Return ONLY a JSON object — no preamble, no markdown fences, no commentary:
   "raw_word_count": number,
   "confidence": "high" | "medium" | "low"
 }
-If nothing usable is found, set description to null and other fields to empty string / 0.`;
+If nothing usable is found, set description and full_product_name to null and other fields to empty string / 0.`;
 
 function safeJSON(text: string): DescriptionPayload | null {
   if (!text) return null;

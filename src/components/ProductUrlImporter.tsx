@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink, Check, Circle,
-  Star, Trash2, ImagePlus,
+  Star, Trash2, ImagePlus, Layers, AlertTriangle,
 } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

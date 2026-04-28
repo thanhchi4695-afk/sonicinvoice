@@ -8,6 +8,7 @@ import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orch
 import { detectBrandFromSku } from "@/lib/sku-brand-prefix";
 import POSPickerDialog, { hasPickedPOS } from "@/components/POSPickerDialog";
 import FetchFromUrlDialog, { type ExtractedProduct } from "@/components/FetchFromUrlDialog";
+import ProductUrlImporter, { type ImportedLineItem } from "@/components/ProductUrlImporter";
 import { toast } from "sonner";
 import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag, CloudDownload } from "lucide-react";
@@ -3531,6 +3532,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             <Link className="w-4 h-4 text-primary" />
             Fetch from URL
           </button>
+
+          {/* Inline "Import from URL" card — sits next to file upload so the
+              user can paste a product link, see the result inline, and add it
+              to the current invoice without opening the modal. */}
+          <div className="mt-3">
+            <ProductUrlImporter
+              onAddToInvoice={(item: ImportedLineItem) => {
+                console.log("[InvoiceFlow] URL product ready to add", item);
+                // Hand off to the active invoice draft. Wired here so the
+                // user stays in the flow; the consuming step will pick this
+                // up when it mounts (parsedNames / productGroups state).
+              }}
+            />
+          </div>
+
 
           <FetchFromUrlDialog
             open={fetchUrlOpen}

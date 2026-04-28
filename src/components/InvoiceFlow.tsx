@@ -1868,13 +1868,20 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         console.warn("[Sonic Invoice] Pre-extraction inference failed:", e);
       }
 
+      const { data: authData } = await supabase.auth.getSession();
+      const accessToken = authData.session?.access_token;
+
       const response = await fetchWithRetry(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        // 90s per attempt × up to 3 attempts. Mobile Safari silently kills long
-        // background fetches — without this the UI hangs forever at "Searching".
-        timeoutMs: 90_000,
-        maxAttempts: 3,
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        // The heavy AI work now runs as a backend job. This call should only
+        // create the job, so keep the phone-side request short and recoverable.
+        timeoutMs: 25_000,
+        maxAttempts: 2,
         onRetry: (attempt, reason) => {
           console.warn(`[Sonic Invoice] AI parse retry ${attempt} (${reason})`);
           const label = reason === "resumed"
@@ -1895,6 +1902,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           templateHint: combinedHint || undefined,
           supplierProfile: supplierProfileData || undefined,
           inferredRules: inferredRules || undefined,
+          async: !!accessToken,
           // Fingerprint pre-check — when present, parse-invoice can skip column detection
           // and go straight to value extraction using the saved column_map.
           fingerprintMatch: fpHit ? {
@@ -1932,7 +1940,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         return [];
       }
 
-      const data = await response.json();
+      let data = await response.json();
+      if (response.status === 202 && data?.job_id) {
+        const jobResult = await pollInvoiceReadJob(data.job_id as string);
+        if (!jobResult) {
+          setEnrichLines([]);
+          return [];
+        }
+        data = jobResult;
+      }
       console.log('[SONIC-DEBUG] Edge function response received', { data, error: null });
       if (data.supplier && !supplierName) {
         setSupplierName(data.supplier);

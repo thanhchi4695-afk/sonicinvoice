@@ -158,9 +158,12 @@ function findProductByNameAndColour(
   if (!products?.length) return null;
 
   // ── Step 0: STYLE-CODE MATCH (highest precision) ──
-  // Supplier codes (e.g. BRA403KKM, M785RCE) often appear in the Shopify
-  // product image filename (CDN URL) or in the body description / handle.
-  // This nails the right product even when the title is heavily abbreviated.
+  // Supplier codes (e.g. BRA403KKM, M785RCE) sometimes appear in the
+  // product's title, handle, body description, tags or variant SKUs.
+  // We deliberately EXCLUDE image filenames here, because brands like
+  // Baku reuse a single lookbook image across multiple products and
+  // bundle several style codes into one filename — that would cause
+  // false positives.
   const codes = [
     ...extractStyleCodes(styleNumber || ""),
     ...extractStyleCodes(name),
@@ -168,7 +171,12 @@ function findProductByNameAndColour(
   if (codes.length) {
     for (const code of codes) {
       const codeLow = code.toLowerCase();
-      const codeMatch = products.find((p) => productHaystack(p).includes(codeLow));
+      const codeMatch = products.find((p) => {
+        const tags = Array.isArray(p.tags) ? p.tags.join(" ") : (p.tags || "");
+        const skus = (p.variants || []).map((v) => v.sku || "").join(" ");
+        const hay = `${p.title} ${p.handle} ${p.body_html} ${tags} ${skus}`.toLowerCase();
+        return hay.includes(codeLow);
+      });
       if (codeMatch) return codeMatch;
     }
   }

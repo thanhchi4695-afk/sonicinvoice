@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink, Check, Circle,
-  Star, Trash2, ImagePlus, Layers, AlertTriangle, GripVertical, ChevronUp, ChevronDown,
+  Star, Trash2, ImagePlus, Layers, AlertTriangle, GripVertical, ChevronUp, ChevronDown, ShoppingBag,
 } from "lucide-react";
+import { getConnection as getShopifyConnection, pushProductGraphQL, recordPush, type PushProduct } from "@/lib/shopify-api";
 import { z } from "zod";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -193,6 +194,94 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   const [error, setError] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const stepTimers = useRef<number[]>([]);
+  const [pushingShopify, setPushingShopify] = useState(false);
+
+  // Build a Shopify draft product payload from an ImportedLineItem.
+  const lineItemToPushProduct = (item: ImportedLineItem): PushProduct => ({
+    title: item.name || "Imported product",
+    body_html: item.description || "",
+    status: "draft",
+    images: (item.imageUrls || []).filter(Boolean).map((src) => ({ src })),
+    variants: [
+      {
+        price: item.price !== undefined && Number.isFinite(item.price) ? String(item.price) : "0",
+        sku: "",
+        inventory_management: "shopify",
+        inventory_quantity: 0,
+      },
+    ],
+  });
+
+  // Push one or many imported items to Shopify as draft products.
+  const pushItemsToShopify = async (items: ImportedLineItem[]): Promise<boolean> => {
+    if (items.length === 0) return false;
+    if (pushingShopify) return false;
+
+    setPushingShopify(true);
+    const toastId = toast.loading("Connecting to Shopify…");
+
+    try {
+      const conn = await getShopifyConnection();
+      if (!conn) {
+        toast.error("No Shopify store connected", {
+          id: toastId,
+          description: "Connect a Shopify store under Connections, then try again.",
+        });
+        return false;
+      }
+
+      let success = 0;
+      let errors = 0;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        toast.loading(`Pushing ${i + 1}/${items.length}: ${item.name.slice(0, 40)}…`, { id: toastId });
+        try {
+          await pushProductGraphQL(lineItemToPushProduct(item));
+          success++;
+          addAuditEntry("url_import", `Pushed "${item.name}" to Shopify as draft`);
+        } catch (err) {
+          errors++;
+          console.error("[ProductUrlImporter] Shopify push failed for", item.name, err);
+        }
+        if (i < items.length - 1) await new Promise((r) => setTimeout(r, 500));
+      }
+
+      try {
+        await recordPush(
+          conn.store_url,
+          success,
+          0,
+          errors,
+          `URL import push: ${success} ok / ${errors} failed`,
+          "url_importer",
+        );
+      } catch (e) {
+        console.warn("[ProductUrlImporter] recordPush failed:", e);
+      }
+
+      if (errors === 0) {
+        toast.success(`Pushed ${success} draft product${success === 1 ? "" : "s"} to Shopify`, {
+          id: toastId,
+          description: "Created as drafts so you can review before publishing.",
+        });
+        return true;
+      }
+      toast.warning(`Pushed ${success} of ${items.length}`, {
+        id: toastId,
+        description: `${errors} failed — check console for details.`,
+      });
+      return success > 0;
+    } catch (err) {
+      console.error("[ProductUrlImporter] Shopify push fatal:", err);
+      toast.error("Push to Shopify failed", {
+        id: toastId,
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+      return false;
+    } finally {
+      setPushingShopify(false);
+    }
+  };
 
   const clearStepTimers = () => {
     stepTimers.current.forEach((id) => window.clearTimeout(id));
@@ -274,21 +363,18 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     }
   };
 
-  const handleAdd = () => {
-    if (!result || !edit) return;
+  const buildItemFromEdit = (): ImportedLineItem | null => {
+    if (!result || !edit) return null;
     const trimmedPrice = edit.priceText.trim();
     const parsedPrice = trimmedPrice === "" ? undefined : Number(trimmedPrice);
     if (trimmedPrice !== "" && !Number.isFinite(parsedPrice)) {
       toast.error("Price must be a number (e.g. 49.95).");
-      return;
+      return null;
     }
-
-    // Re-order images so the chosen primary is first.
     const ordered = edit.images.length
       ? [edit.images[edit.primaryIndex], ...edit.images.filter((_, i) => i !== edit.primaryIndex)]
       : [];
-
-    const item: ImportedLineItem = {
+    return {
       name: edit.name.trim() || "Imported product",
       description: edit.description.trim() || undefined,
       price: parsedPrice,
@@ -296,7 +382,11 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       imageUrls: ordered.map((i) => i.storedUrl).filter(Boolean),
       sourceUrl: result.sourceUrl ?? url,
     };
+  };
 
+  const handleAdd = () => {
+    const item = buildItemFromEdit();
+    if (!item) return;
     onAddToInvoice?.(item);
     addAuditEntry(
       "url_import",
@@ -304,6 +394,24 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     );
     toast.success(`Added "${item.name}" to invoice`);
     reset();
+  };
+
+  const handlePushSingleToShopify = async () => {
+    const item = buildItemFromEdit();
+    if (!item) return;
+    const ok = await pushItemsToShopify([item]);
+    if (ok) reset();
+  };
+
+  const handlePushBulkToShopify = async () => {
+    const items = bulkRows
+      .filter((r) => r.status === "success" && r.product)
+      .map((r) => productToItem(r.product as ExtractedProduct, r.url));
+    if (items.length === 0) {
+      toast.error("Nothing to push", { description: "No successfully fetched products available." });
+      return;
+    }
+    await pushItemsToShopify(items);
   };
 
   // ── Bulk mode ──────────────────────────────────────────────────
@@ -776,16 +884,27 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/60">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/60">
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <ImageIcon className="w-3 h-3" />
                 {edit.images.length} image{edit.images.length === 1 ? "" : "s"} ready
               </div>
-              <Button size="sm" onClick={handleAdd} disabled={!onAddToInvoice}>
-                <Plus className="w-4 h-4 mr-1.5" />
-                Add to current invoice
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" onClick={handleAdd} disabled={!onAddToInvoice || pushingShopify}>
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Add to current invoice
+                </Button>
+                <Button size="sm" variant="teal" onClick={handlePushSingleToShopify} disabled={pushingShopify}>
+                  {pushingShopify ? (
+                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <ShoppingBag className="w-4 h-4 mr-1.5" />
+                  )}
+                  Publish to Shopify
+                </Button>
+              </div>
             </div>
+
           </div>
         )}
           </TabsContent>
@@ -1045,22 +1164,43 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                   })}
                 </ul>
 
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/60">
                   <span className="text-[11px] text-muted-foreground">
-                    Successful items will be merged into the invoice.
+                    Send successful items to your invoice or publish straight to Shopify as drafts.
                   </span>
-                  <Button
-                    size="sm"
-                    onClick={mergeBulkIntoInvoice}
-                    disabled={
-                      bulkRunning ||
-                      !onAddToInvoice ||
-                      bulkRows.filter((r) => r.status === "success").length === 0
-                    }
-                  >
-                    <Plus className="w-4 h-4 mr-1.5" />
-                    Merge {bulkRows.filter((r) => r.status === "success").length} into invoice
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={mergeBulkIntoInvoice}
+                      disabled={
+                        bulkRunning ||
+                        pushingShopify ||
+                        !onAddToInvoice ||
+                        bulkRows.filter((r) => r.status === "success").length === 0
+                      }
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
+                      Merge {bulkRows.filter((r) => r.status === "success").length} into invoice
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="teal"
+                      onClick={handlePushBulkToShopify}
+                      disabled={
+                        bulkRunning ||
+                        pushingShopify ||
+                        bulkRows.filter((r) => r.status === "success").length === 0
+                      }
+                    >
+                      {pushingShopify ? (
+                        <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      ) : (
+                        <ShoppingBag className="w-4 h-4 mr-1.5" />
+                      )}
+                      Publish {bulkRows.filter((r) => r.status === "success").length} to Shopify
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink, Check, Circle,
-  Star, Trash2, ImagePlus, Layers, AlertTriangle, GripVertical,
+  Star, Trash2, ImagePlus, Layers, AlertTriangle, GripVertical, ChevronUp, ChevronDown,
 } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -854,7 +854,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                 </div>
 
                 <p className="text-[11px] text-muted-foreground px-1">
-                  Drag <GripVertical className="inline w-3 h-3 -mt-0.5" /> to reorder — works with mouse <span className="hidden sm:inline">or touch</span><span className="sm:hidden">, or just touch & swipe up/down</span>.
+                  Drag <GripVertical className="inline w-3 h-3 -mt-0.5" />, swipe on touch, or use the <ChevronUp className="inline w-3 h-3 -mt-0.5" /><ChevronDown className="inline w-3 h-3 -mt-0.5" /> buttons to reorder — items merge in this order.
                 </p>
                 <ul
                   ref={bulkListRef}
@@ -864,6 +864,9 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                     const draggable = !bulkRunning && row.status === "success";
                     const isDragging = dragIndex === i;
                     const isDragOver = dragOverIndex === i && dragIndex !== null && dragIndex !== i;
+                    // Find previous / next sibling (any row) for keyboard reorder.
+                    const canMoveUp = draggable && i > 0;
+                    const canMoveDown = draggable && i < bulkRows.length - 1;
                     return (
                     <li
                       key={`${row.url}-${i}`}
@@ -961,6 +964,38 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                       >
                         <GripVertical className="w-4 h-4" />
                       </button>
+                      <div className="hidden sm:flex flex-col shrink-0 -my-1" role="group" aria-label="Reorder">
+                        <button
+                          type="button"
+                          onClick={() => reorderBulkRow(i, i - 1)}
+                          disabled={!canMoveUp}
+                          aria-label={`Move ${row.product?.name?.trim() || "row"} up`}
+                          title="Move up"
+                          className={cn(
+                            "p-0.5 rounded text-muted-foreground transition-colors",
+                            canMoveUp
+                              ? "hover:text-foreground hover:bg-background/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                              : "opacity-30 cursor-not-allowed",
+                          )}
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => reorderBulkRow(i, i + 1)}
+                          disabled={!canMoveDown}
+                          aria-label={`Move ${row.product?.name?.trim() || "row"} down`}
+                          title="Move down"
+                          className={cn(
+                            "p-0.5 rounded text-muted-foreground transition-colors",
+                            canMoveDown
+                              ? "hover:text-foreground hover:bg-background/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                              : "opacity-30 cursor-not-allowed",
+                          )}
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                       <span className="w-4 h-4 flex items-center justify-center shrink-0">
                         {row.status === "success" && <Check className="w-3.5 h-3.5 text-primary" />}
                         {row.status === "error" && <AlertTriangle className="w-3.5 h-3.5 text-destructive" />}

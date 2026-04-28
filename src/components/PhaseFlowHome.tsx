@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
-import { FileText, Package, ShoppingBag, Store, Mail, Briefcase, Upload, Check } from "lucide-react";
+import { FileText, Package, ShoppingBag, Store, Mail, Briefcase, Upload, Check, Link as LinkIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HomeWizard from "@/components/HomeWizard";
+import ProductUrlImporter, { type ImportedLineItem } from "@/components/ProductUrlImporter";
+import { setSessionProducts } from "@/stores/invoice-session-store";
+import { toast } from "sonner";
 
 // ─────────────────────────────────────────────────────────────
 // Phase 1 — Upload
@@ -161,23 +164,58 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
       </section>
 
       {/* ── Continue CTA ── */}
-      <div className="mb-10">
+      <div className="mb-6">
         <button
           onClick={enterFlow}
           disabled={!ready}
           className={cn(
-            "w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-md font-semibold transition-colors",
+            "w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-lg font-semibold text-base transition-colors shadow-sm",
             ready
               ? "bg-primary text-primary-foreground hover:bg-primary/90"
               : "bg-muted text-muted-foreground cursor-not-allowed",
           )}
         >
-          <Upload className="w-4 h-4" />
+          <Upload className="w-5 h-5" />
           {ready
             ? `Continue → upload ${kind === "invoice" ? "invoice" : "packing slip"}`
             : "Choose both options to continue"}
         </button>
       </div>
+
+      {/* ── Import from URL — second-largest entry point ── */}
+      <section className="mb-10">
+        <div className="flex items-center gap-2 mb-2">
+          <LinkIcon className="w-4 h-4 text-primary" />
+          <h2 className="text-base font-semibold">Import a single product from a URL</h2>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Paste any product page link — our AI agents fetch the name, description, price and images,
+          then drop it straight into a fresh invoice session.
+        </p>
+        <ProductUrlImporter
+          className="border-2 border-primary/20"
+          onAddToInvoice={(item: ImportedLineItem) => {
+            // Hand off to the same downstream flow as an extracted invoice.
+            setSessionProducts(
+              [
+                {
+                  product_title: item.name,
+                  sku: "",
+                  vendor: "",
+                  unit_cost: 0,
+                  rrp: typeof item.price === "number" ? item.price : 0,
+                  margin_pct: 0,
+                  qty: 1,
+                },
+              ],
+              "",
+            );
+            toast.success("Imported — opening invoice flow…");
+            props.onStartInvoice();
+          }}
+        />
+      </section>
+
 
       {/* ── Alternate entry points (preserved) ── */}
       <div className="border-t border-border pt-6">

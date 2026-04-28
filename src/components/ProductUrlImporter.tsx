@@ -864,6 +864,9 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                     const draggable = !bulkRunning && row.status === "success";
                     const isDragging = dragIndex === i;
                     const isDragOver = dragOverIndex === i && dragIndex !== null && dragIndex !== i;
+                    // Find previous / next sibling (any row) for keyboard reorder.
+                    const canMoveUp = draggable && i > 0;
+                    const canMoveDown = draggable && i < bulkRows.length - 1;
                     return (
                     <li
                       key={`${row.url}-${i}`}

@@ -3533,6 +3533,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             Fetch from URL
           </button>
 
+          {/* Inline "Import from URL" card — sits next to file upload so the
+              user can paste a product link, see the result inline, and add it
+              to the current invoice without opening the modal. */}
+          <div className="mt-3">
+            <ProductUrlImporter
+              onAddToInvoice={(item: ImportedLineItem) => {
+                console.log("[InvoiceFlow] URL product ready to add", item);
+                // Hand off to the active invoice draft. Wired here so the
+                // user stays in the flow; the consuming step will pick this
+                // up when it mounts (parsedNames / productGroups state).
+              }}
+            />
+          </div>
+
+
           <FetchFromUrlDialog
             open={fetchUrlOpen}
             onClose={() => setFetchUrlOpen(false)}

@@ -2313,11 +2313,18 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         inferredRules = await buildInferredRules(supplierName || "", headersForFingerprintRe, sampleSheetRows);
       } catch { /* ignore */ }
 
+      const { data: authData } = await supabase.auth.getSession();
+      const accessToken = authData.session?.access_token;
+
       const response = await fetchWithRetry(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        timeoutMs: 90_000,
-        maxAttempts: 3,
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        timeoutMs: 25_000,
+        maxAttempts: 2,
         onRetry: (attempt, reason) => {
           console.warn(`[Sonic Invoice] Reprocess retry ${attempt} (${reason})`);
         },
@@ -2334,6 +2341,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           templateHint: combinedHint || undefined,
           supplierProfile: supplierProfileData || undefined,
           inferredRules: inferredRules || undefined,
+          async: !!accessToken,
           fingerprintMatch: fpHitRe ? {
             layout_fingerprint: fpHitRe.layout_fingerprint,
             source: fpHitRe.source,
@@ -2367,7 +2375,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         return;
       }
 
-      const data = await response.json();
+      let data = await response.json();
+      if (response.status === 202 && data?.job_id) {
+        const jobResult = await pollInvoiceReadJob(data.job_id as string, "Reprocessing invoice…");
+        if (!jobResult) {
+          setIsReprocessing(false);
+          return;
+        }
+        data = jobResult;
+      }
       console.log('[SONIC-DEBUG] Edge function response received', { data, error: null });
       const products = data.products || [];
 

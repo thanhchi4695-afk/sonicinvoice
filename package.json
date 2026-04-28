@@ -10,7 +10,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:edge-imports": "node scripts/verify-edge-imports.mjs",
+    "verify:edge-imports:network": "node scripts/verify-edge-imports.mjs --network",
+    "predeploy": "npm run verify:edge-imports"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

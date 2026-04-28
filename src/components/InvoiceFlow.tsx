@@ -1541,7 +1541,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       }
 
       try {
-        await recordPush(conn.store_url, success, 0, errors);
+        await recordPush(conn.store_url, success, 0, errors, `Invoice push: ${success} ok / ${errors} failed`, "invoice_flow");
       } catch (e) {
         console.warn("[Sonic Invoice] recordPush failed:", e);
       }

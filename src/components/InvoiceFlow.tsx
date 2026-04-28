@@ -1409,6 +1409,48 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [driveStage, setDriveStage] = useState<"link" | "confirm">("link");
   const [drivePreview, setDrivePreview] = useState<{ id: string; name: string; mimeType: string }[]>([]);
 
+  const pollInvoiceReadJob = async (jobId: string, label = "Reading invoice…"): Promise<Record<string, any> | null> => {
+    const started = Date.now();
+    const MAX_MS = 12 * 60_000;
+    const POLL_MS = 3_000;
+    let lastStatus = "running";
+
+    setEnrichLines([{ name: label, status: "searching", action: "Reading safely in the background…", confidence: 0 }]);
+
+    while (Date.now() - started < MAX_MS) {
+      const { data: job, error } = await supabase
+        .from("invoice_processing_jobs")
+        .select("status, result, error_message")
+        .eq("id", jobId)
+        .maybeSingle();
+
+      if (error) {
+        console.warn("[InvoiceFlow] Invoice read job poll failed:", error);
+      }
+
+      if (job?.status && job.status !== lastStatus) {
+        lastStatus = job.status;
+        setEnrichLines([{ name: label, status: "searching", action: `Background reader ${job.status}…`, confidence: 0 }]);
+      }
+
+      if (job?.status === "done") {
+        return (job.result || {}) as Record<string, any>;
+      }
+
+      if (job?.status === "failed") {
+        toast.error("Reading failed", { description: job.error_message || "The background reader could not finish this invoice." });
+        return null;
+      }
+
+      await new Promise((r) => setTimeout(r, POLL_MS));
+    }
+
+    toast.error("Reading is still running", {
+      description: "Your phone can safely leave this screen and try again shortly; the upload is no longer tied to one long request.",
+    });
+    return null;
+  };
+
   // Step 1 — paste folder/file link, list files via drive-list (no download).
   const handleDriveListFiles = async () => {
     if (!driveImportUrl.trim()) {
@@ -1826,13 +1868,20 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         console.warn("[Sonic Invoice] Pre-extraction inference failed:", e);
       }
 
+      const { data: authData } = await supabase.auth.getSession();
+      const accessToken = authData.session?.access_token;
+
       const response = await fetchWithRetry(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        // 90s per attempt × up to 3 attempts. Mobile Safari silently kills long
-        // background fetches — without this the UI hangs forever at "Searching".
-        timeoutMs: 90_000,
-        maxAttempts: 3,
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        // The heavy AI work now runs as a backend job. This call should only
+        // create the job, so keep the phone-side request short and recoverable.
+        timeoutMs: 25_000,
+        maxAttempts: 2,
         onRetry: (attempt, reason) => {
           console.warn(`[Sonic Invoice] AI parse retry ${attempt} (${reason})`);
           const label = reason === "resumed"
@@ -1853,6 +1902,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           templateHint: combinedHint || undefined,
           supplierProfile: supplierProfileData || undefined,
           inferredRules: inferredRules || undefined,
+          async: !!accessToken,
           // Fingerprint pre-check — when present, parse-invoice can skip column detection
           // and go straight to value extraction using the saved column_map.
           fingerprintMatch: fpHit ? {
@@ -1890,7 +1940,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         return [];
       }
 
-      const data = await response.json();
+      let data = await response.json();
+      if (response.status === 202 && data?.job_id) {
+        const jobResult = await pollInvoiceReadJob(data.job_id as string);
+        if (!jobResult) {
+          setEnrichLines([]);
+          return [];
+        }
+        data = jobResult;
+      }
       console.log('[SONIC-DEBUG] Edge function response received', { data, error: null });
       if (data.supplier && !supplierName) {
         setSupplierName(data.supplier);
@@ -2255,11 +2313,18 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         inferredRules = await buildInferredRules(supplierName || "", headersForFingerprintRe, sampleSheetRows);
       } catch { /* ignore */ }
 
+      const { data: authData } = await supabase.auth.getSession();
+      const accessToken = authData.session?.access_token;
+
       const response = await fetchWithRetry(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-        timeoutMs: 90_000,
-        maxAttempts: 3,
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        timeoutMs: 25_000,
+        maxAttempts: 2,
         onRetry: (attempt, reason) => {
           console.warn(`[Sonic Invoice] Reprocess retry ${attempt} (${reason})`);
         },
@@ -2276,6 +2341,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           templateHint: combinedHint || undefined,
           supplierProfile: supplierProfileData || undefined,
           inferredRules: inferredRules || undefined,
+          async: !!accessToken,
           fingerprintMatch: fpHitRe ? {
             layout_fingerprint: fpHitRe.layout_fingerprint,
             source: fpHitRe.source,
@@ -2309,7 +2375,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         return;
       }
 
-      const data = await response.json();
+      let data = await response.json();
+      if (response.status === 202 && data?.job_id) {
+        const jobResult = await pollInvoiceReadJob(data.job_id as string, "Reprocessing invoice…");
+        if (!jobResult) {
+          setIsReprocessing(false);
+          return;
+        }
+        data = jobResult;
+      }
       console.log('[SONIC-DEBUG] Edge function response received', { data, error: null });
       const products = data.products || [];
 

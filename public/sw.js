@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sonic-invoices-v1';
+const CACHE_NAME = 'sonic-invoices-v2';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -29,21 +29,15 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Network-first for API / Supabase calls
+  // Network-only for API / Supabase calls. Caching these can leave mobile PWA
+  // users stuck on stale job statuses such as "running" after the app resumes.
   if (
     url.pathname.startsWith('/rest/') ||
     url.pathname.startsWith('/auth/') ||
+    url.pathname.startsWith('/functions/') ||
     url.hostname.includes('supabase')
   ) {
-    event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
-          return res;
-        })
-        .catch(() => caches.match(event.request))
-    );
+    event.respondWith(fetch(event.request));
     return;
   }
 

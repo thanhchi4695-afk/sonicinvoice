@@ -1763,7 +1763,9 @@ export type Database = {
           file_name: string | null
           id: string
           job_kind: string
+          request_payload: Json | null
           result: Json | null
+          started_at: string | null
           status: string
           updated_at: string
           user_id: string
@@ -1775,7 +1777,9 @@ export type Database = {
           file_name?: string | null
           id?: string
           job_kind?: string
+          request_payload?: Json | null
           result?: Json | null
+          started_at?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -1787,7 +1791,9 @@ export type Database = {
           file_name?: string | null
           id?: string
           job_kind?: string
+          request_payload?: Json | null
           result?: Json | null
+          started_at?: string | null
           status?: string
           updated_at?: string
           user_id?: string

@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { setSessionProducts as setInvoiceSessionProducts } from "@/stores/invoice-session-store";
 import { startShadowSession, logShadowStep, logShadowFeedback, completeShadowSession } from "@/lib/agent-shadow";
 import { syncInvoiceItemsToCatalog } from "@/lib/invoice-catalog-sync";
+import { fetchWithRetry, FetchTimeoutError, FetchRetryError } from "@/lib/fetch-with-retry";
 import { runPhase3PriceResearch, type Phase3Item } from "@/lib/phase3-price-orchestrator";
 import { detectBrandFromSku } from "@/lib/sku-brand-prefix";
 import POSPickerDialog, { hasPickedPOS } from "@/components/POSPickerDialog";

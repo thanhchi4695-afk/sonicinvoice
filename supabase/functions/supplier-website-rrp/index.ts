@@ -67,8 +67,60 @@ interface ShopifyProduct {
   vendor: string;
   product_type: string;
   created_at: string;
-  images: { src: string }[];
-  variants: { price: string; compare_at_price: string | null }[];
+  images: { src: string; alt?: string | null }[];
+  variants: { price: string; compare_at_price: string | null; sku?: string | null; title?: string | null }[];
+  tags?: string[] | string;
+}
+
+// ── Abbreviation expansion (swimwear / fashion supplier shorthand) ──
+// Used to "expand" invoice tokens before matching against retailer titles.
+// e.g. invoice "KOKOMO LLINE OP" → tokens [kokomo, longline, one, piece]
+const ABBREV_MAP: Record<string, string> = {
+  "lline": "longline",
+  "llline": "longline",
+  "ll": "longline",
+  "op": "one piece",
+  "1pc": "one piece",
+  "onepc": "one piece",
+  "uw": "underwire",
+  "halt": "halter",
+  "tie": "tieside",
+  "pant": "bottom",
+  "pants": "bottom",
+  "bra": "top",
+  "reg": "regular",
+  "uh": "ultra high",
+  "uhw": "ultra high",
+  "hw": "high waist",
+  "mw": "mid waist",
+  "lw": "low waist",
+  "bd": "bandeau",
+  "boost": "booster",
+};
+
+function expandAbbreviations(name: string): string {
+  return name
+    .toLowerCase()
+    // Normalise punctuation: "D.E" → "d/e", "D.DD" → "d/dd", "EFG" stays
+    .replace(/\bd\.e\b/g, "d/e")
+    .replace(/\bd\.dd\b/g, "d/dd")
+    .replace(/\bc\.dd\b/g, "c/dd")
+    .replace(/\be-f\b/g, "e/f")
+    .replace(/[.,]/g, " ")
+    .split(/\s+/)
+    .map((w) => ABBREV_MAP[w] || w)
+    .join(" ");
+}
+
+/** Extract a supplier style code (alpha+digits, e.g. BRA403KKM) from the styleNumber or name. */
+function extractStyleCodes(s: string): string[] {
+  if (!s) return [];
+  const out = new Set<string>();
+  // Match patterns like BRA403KKM, M785RCE, PANT321KKM (3+ letters, digits, optional letters)
+  const re = /\b([A-Z]{2,6}\d{2,5}[A-Z]{0,5})\b/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s)) !== null) out.add(m[1].toUpperCase());
+  return [...out];
 }
 
 /**

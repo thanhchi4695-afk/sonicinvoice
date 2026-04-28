@@ -195,7 +195,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
     }
     const enabledMeta = getEnabledMetafields();
     const { validation } = generateShopifyCSV(
-      filtered,
+      qtyMode === "zero" ? filtered.map(p => ({ ...p, qty: 0 })) : filtered,
       variantMode,
       enabledMeta.map(m => ({ key: m.key, shopifyColumn: m.shopifyColumn }))
     );

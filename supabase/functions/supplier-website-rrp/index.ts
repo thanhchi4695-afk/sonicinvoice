@@ -215,15 +215,52 @@ function findProductByNameAndColour(
     ...extractStyleCodes(styleNumber || ""),
     ...extractStyleCodes(name),
   ];
+  // ── Category / silhouette inference (works across all brands) ──
+  // Detects the product category from BOTH the SKU prefix AND tokens
+  // present in the invoice product name. The matched product on the
+  // retailer site must satisfy the same category to count as a hit.
+  // Categories: dress, top, bottom, jumpsuit, outerwear, knitwear,
+  // swim_top, swim_bottom, one_piece, footwear, bag, accessory.
+  const CATEGORY_PATTERNS: Array<{ key: string; nameRe: RegExp; siteRe: RegExp }> = [
+    { key: "dress",      nameRe: /\b(dress|gown|frock)\b/,                                          siteRe: /\b(dress|gown|frock)\b/ },
+    { key: "jumpsuit",   nameRe: /\b(jumpsuit|romper|playsuit|overall)\b/,                          siteRe: /\b(jumpsuit|romper|playsuit|overall)\b/ },
+    { key: "outerwear",  nameRe: /\b(jacket|coat|blazer|parka|puffer|trench)\b/,                    siteRe: /\b(jacket|coat|blazer|parka|puffer|trench)\b/ },
+    { key: "knitwear",   nameRe: /\b(knit|sweater|jumper|cardigan|hoodie|sweatshirt)\b/,            siteRe: /\b(knit|sweater|jumper|cardigan|hoodie|sweatshirt)\b/ },
+    { key: "swim_top",   nameRe: /\b(bra|halter|bandeau|bralette)\b/,                               siteRe: /\b(bra|top|halter|bandeau|bralette)\b/ },
+    { key: "swim_bottom",nameRe: /\b(bottom|brief|tieside|hipster)\b/,                              siteRe: /\b(bottom|brief|short|pant)\b/ },
+    { key: "one_piece",  nameRe: /\b(one[\s-]?piece|onepiece|swimsuit|maillot)\b/,                  siteRe: /\b(one[\s-]?piece|swimsuit|maillot)\b/ },
+    { key: "footwear",   nameRe: /\b(shoe|boot|sneaker|sandal|heel|loafer|moccasin|flat|trainer)\b/,siteRe: /\b(shoe|boot|sneaker|sandal|heel|loafer|moccasin|flat|trainer|footwear)\b/ },
+    { key: "bag",        nameRe: /\b(bag|tote|clutch|backpack|crossbody|satchel)\b/,                siteRe: /\b(bag|tote|clutch|backpack|crossbody|satchel)\b/ },
+    { key: "accessory",  nameRe: /\b(belt|scarf|hat|cap|wallet|jewel|necklace|earring|ring)\b/,     siteRe: /\b(belt|scarf|hat|cap|wallet|jewel|necklace|earring|ring|accessor)\b/ },
+    { key: "top",        nameRe: /\b(top|shirt|blouse|tee|t-?shirt|tank|cami|camisole)\b/,          siteRe: /\b(top|shirt|blouse|tee|t-?shirt|tank|cami|camisole)\b/ },
+    { key: "bottom",     nameRe: /\b(pant|trouser|jean|short|skirt|legging|culotte)\b/,             siteRe: /\b(pant|trouser|jean|short|skirt|legging|culotte|bottom)\b/ },
+  ];
+  const expandedName = expandAbbreviations(name);
+  const inferCategoryFromCode = (code: string): string | null => {
+    const u = code.toUpperCase();
+    if (u.startsWith("PANT")) return "swim_bottom";
+    if (u.startsWith("BRA")) return "swim_top";
+    if (/^M\d/.test(u) || u.startsWith("MAIL") || u.startsWith("OP")) return "one_piece";
+    if (u.startsWith("DRS") || u.startsWith("DR")) return "dress";
+    if (u.startsWith("JKT") || u.startsWith("BLZ") || u.startsWith("CT")) return "outerwear";
+    if (u.startsWith("KN") || u.startsWith("SWT")) return "knitwear";
+    if (u.startsWith("BT") || u.startsWith("SH") || u.startsWith("SNK")) return "footwear";
+    if (u.startsWith("BG") || u.startsWith("BAG")) return "bag";
+    return null;
+  };
+  const inferredCategories = new Set<string>();
+  for (const c of CATEGORY_PATTERNS) if (c.nameRe.test(expandedName)) inferredCategories.add(c.key);
   const silhouetteFilter = (code: string) => (p: ShopifyProduct) => {
     const t = `${p.title} ${p.product_type}`.toLowerCase();
-    const u = code.toUpperCase();
-    if (u.startsWith("PANT")) return /\b(bottom|brief|short|pant)\b/.test(t);
-    if (u.startsWith("BRA")) return /\b(bra|top|halter|bandeau|bralette)\b/.test(t);
-    if (/^M\d/.test(u) || u.startsWith("MAIL") || u.startsWith("OP")) {
-      return /\b(one[\s-]?piece|swimsuit|maillot)\b/.test(t);
+    const cats = new Set(inferredCategories);
+    const fromCode = inferCategoryFromCode(code);
+    if (fromCode) cats.add(fromCode);
+    if (cats.size === 0) return true; // no signal → don't filter
+    for (const cat of cats) {
+      const def = CATEGORY_PATTERNS.find((c) => c.key === cat);
+      if (def && def.siteRe.test(t)) return true;
     }
-    return true;
+    return false;
   };
   if (codes.length) {
     for (const code of codes) {

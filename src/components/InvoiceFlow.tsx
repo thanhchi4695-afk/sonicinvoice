@@ -1473,6 +1473,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         toast.error("No Shopify store connected", {
           id: toastId,
           description: "Connect a Shopify store under Connections, then try again.",
+          action: {
+            label: "Connect Shopify",
+            onClick: () => { window.location.href = "/dashboard?tab=connections"; },
+          },
         });
         return false;
       }

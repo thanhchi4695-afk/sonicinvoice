@@ -236,12 +236,18 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     try {
       const conn = await getShopifyConnection();
       if (!conn) {
+        setShopifyConnected(false);
         toast.error("No Shopify store connected", {
           id: toastId,
           description: "Connect a Shopify store under Connections, then try again.",
+          action: {
+            label: "Connect Shopify",
+            onClick: () => { window.location.href = "/dashboard?tab=connections"; },
+          },
         });
         return false;
       }
+      setShopifyConnected(true);
 
       let success = 0;
       let errors = 0;

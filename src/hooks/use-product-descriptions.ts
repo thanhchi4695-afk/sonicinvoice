@@ -171,6 +171,7 @@ export function useProductDescriptions() {
         } else {
           next.set(key, {
             description: newText.trim() ? newText : null,
+            full_product_name: null,
             source_url: "",
             source_name: "Manual entry",
             source_type: "retailer",

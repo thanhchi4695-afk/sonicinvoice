@@ -47,6 +47,7 @@ import PriceMatchPanel from "@/components/PriceMatchPanel";
 import ProductDescriptionPanel from "@/components/ProductDescriptionPanel";
 import ImageHelperPanel from "@/components/ImageHelperPanel";
 import { mapInvoiceItemsToPriceMatch } from "@/lib/price-match-utils";
+import { getConnection as getShopifyConnection, pushProductGraphQL, recordPush, type PushProduct } from "@/lib/shopify-api";
 import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import SupplierTemplateTeach from "@/components/SupplierTemplateTeach";
 import { extractWithTemplate, parseFileToRows, autoDetectMappings, type SupplierTemplate as DBSupplierTemplate } from "@/lib/rule-based-extractor";

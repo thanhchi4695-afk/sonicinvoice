@@ -245,7 +245,27 @@ Rules for this layout:
 - The TotalQty column on the right MUST equal the sum of cells you extracted for that row — use it as a checksum.
 - If you cannot read the per-cell quantities but you can see TotalQty, set size to the FIRST visible size in the header and put the full TotalQty there, then add "size_grid_unreadable" to parse_notes — do NOT silently drop the sizes.
 
-**ABSOLUTE RULE for Methods 2 / 2a / 2b / 2c**: When the document shows a size grid (printed labels OR floating header), every product row MUST have a non-empty \`size\` field. If you emit multiple rows for the same product, each row must have a DIFFERENT size value. Never emit N rows for one product all with \`size: ""\`.
+**Method 2a-BAKU: Per-product size grid with colour label on the qty row (Baku Australia style — CRITICAL)**
+Baku invoices use a per-product mini-grid (NOT a floating group header). For EACH style code the layout is:
+
+  CODE        DESCRIPTION         Story    Sizeway1  Total  Tax
+  PANT670KKM  KOKOMO ULTRA HIGH   KOKOMO   8-18  4   4      GS
+  Fabric Content: ...
+                  8   10  12  14  16  18                          ← size header row
+  BLACK               1   1   1   1                               ← colour label + qty row
+
+CRITICAL ALIGNMENT RULES for this layout:
+1. The colour label ("BLACK", "WHITE", "NERO", "ELECTRIC") sits in the LEFT margin and is NOT a quantity. The qty digits start in the column under the FIRST size header where a digit is actually printed — NOT under the first size header by default.
+2. Use SPATIAL alignment: each printed qty digit must sit DIRECTLY below a specific size header column. Read column positions visually — do not assume left-to-right packing.
+3. Empty leading columns mean those sizes were NOT ordered. Empty trailing columns also mean those sizes were NOT ordered. Example above: BLACK row has 4 digits ("1 1 1 1") under headers 10/12/14/16 → emit (size 10, qty 1), (size 12, qty 1), (size 14, qty 1), (size 16, qty 1).
+4. The "Sizeway1" column shows a size RANGE (e.g. "8-18") and a Total qty (e.g. "4"). The TOTAL column is the SOURCE OF TRUTH:
+   - sum(extracted qtys for this product across all colours) MUST equal the Total column value.
+   - If sum ≠ Total, you misread the alignment. Re-examine the grid and shift the qty row until sum equals Total.
+   - If you still cannot reconcile, add "baku_alignment_unreconciled" to parse_notes and emit qtys distributed across the size range from Sizeway1 — but NEVER emit fewer units than the printed Total.
+5. A product may have MULTIPLE colour rows under the same size header (e.g. PANT321KKM Kokomo Regular has BLACK and WHITE rows). Treat each colour row independently; both share the same size header above them.
+6. Numeric size values like 6, 8, 10, 12, 14, 16, 18, 20 in the header row are SIZE LABELS, never quantities. Quantities under this header are typically small integers 1-9.
+
+**ABSOLUTE RULE for Methods 2 / 2a / 2a-BAKU / 2b / 2c**: When the document shows a size grid (printed labels OR floating header), every product row MUST have a non-empty \`size\` field. If you emit multiple rows for the same product, each row must have a DIFFERENT size value. Never emit N rows for one product all with \`size: ""\`. The sum of extracted quantities for a product MUST equal its printed Total column when one is present.
 
 **Method 2b: Size grid with HANDWRITTEN tick marks / pen annotations (CRITICAL)**
 Many fashion wholesale invoices have a printed size grid but the QUANTITIES are written by hand — ticks (✓ / ✔), pen marks, circles, or handwritten numbers.

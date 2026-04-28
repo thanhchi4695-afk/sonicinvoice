@@ -363,21 +363,18 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     }
   };
 
-  const handleAdd = () => {
-    if (!result || !edit) return;
+  const buildItemFromEdit = (): ImportedLineItem | null => {
+    if (!result || !edit) return null;
     const trimmedPrice = edit.priceText.trim();
     const parsedPrice = trimmedPrice === "" ? undefined : Number(trimmedPrice);
     if (trimmedPrice !== "" && !Number.isFinite(parsedPrice)) {
       toast.error("Price must be a number (e.g. 49.95).");
-      return;
+      return null;
     }
-
-    // Re-order images so the chosen primary is first.
     const ordered = edit.images.length
       ? [edit.images[edit.primaryIndex], ...edit.images.filter((_, i) => i !== edit.primaryIndex)]
       : [];
-
-    const item: ImportedLineItem = {
+    return {
       name: edit.name.trim() || "Imported product",
       description: edit.description.trim() || undefined,
       price: parsedPrice,
@@ -385,7 +382,11 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       imageUrls: ordered.map((i) => i.storedUrl).filter(Boolean),
       sourceUrl: result.sourceUrl ?? url,
     };
+  };
 
+  const handleAdd = () => {
+    const item = buildItemFromEdit();
+    if (!item) return;
     onAddToInvoice?.(item);
     addAuditEntry(
       "url_import",
@@ -393,6 +394,24 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     );
     toast.success(`Added "${item.name}" to invoice`);
     reset();
+  };
+
+  const handlePushSingleToShopify = async () => {
+    const item = buildItemFromEdit();
+    if (!item) return;
+    const ok = await pushItemsToShopify([item]);
+    if (ok) reset();
+  };
+
+  const handlePushBulkToShopify = async () => {
+    const items = bulkRows
+      .filter((r) => r.status === "success" && r.product)
+      .map((r) => productToItem(r.product as ExtractedProduct, r.url));
+    if (items.length === 0) {
+      toast.error("Nothing to push", { description: "No successfully fetched products available." });
+      return;
+    }
+    await pushItemsToShopify(items);
   };
 
   // ── Bulk mode ──────────────────────────────────────────────────

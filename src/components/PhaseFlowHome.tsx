@@ -182,15 +182,14 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
         </button>
       </div>
 
-      {/* ── Import from URL — second-largest entry point ── */}
+      {/* ── Import from URL — second-largest entry point, sits directly under Upload Invoice ── */}
       <section className="mb-10">
         <div className="flex items-center gap-2 mb-2">
-          <LinkIcon className="w-4 h-4 text-primary" />
-          <h2 className="text-base font-semibold">Import a single product from a URL</h2>
+          <LinkIcon className="w-5 h-5 text-primary" />
+          <h2 className="text-lg font-semibold">Import from URL</h2>
         </div>
-        <p className="text-xs text-muted-foreground mb-3">
-          Paste any product page link — our AI agents fetch the name, description, price and images,
-          then drop it straight into a fresh invoice session.
+        <p className="text-sm text-muted-foreground mb-4">
+          Paste a product link to pull name, description, price and images straight onto this invoice.
         </p>
         <ProductUrlImporter
           className="border-2 border-primary/20"

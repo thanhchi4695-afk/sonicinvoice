@@ -309,11 +309,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 5 — image download/optimise (stub until Task 5)
-    const images = await downloadImages(product.imageUrls, url);
+    // Merge image URLs: priority-ordered collector first, then any extras
+    // surfaced by the extraction strategy (JSON-LD / LLM may find more).
+    const collected = collectImageUrls($, url);
+    const mergedSeen = new Set<string>();
+    const mergedUrls: string[] = [];
+    for (const u of [...collected, ...product.imageUrls]) {
+      if (!u || mergedSeen.has(u)) continue;
+      mergedSeen.add(u);
+      mergedUrls.push(u);
+    }
+
+    // Step 5 — stream → optimise → store in `compressed-images`
+    const imageResult = await downloadImages(mergedUrls, url);
 
     // Step 4 — currency normalisation (stub until Task 6)
     const priceNormalized = normalizeCurrency(product.price, product.currency);
+
+    const warnings = [...priceNormalized.warnings, ...imageResult.warnings];
 
     return jsonResponse({
       success: true,
@@ -323,11 +336,16 @@ Deno.serve(async (req) => {
         price: product.price,
         currency: product.currency,
         priceNormalized,
-        images,
+        images: imageResult.images,
+        imageWarnings: {
+          killSwitchTripped: imageResult.killSwitchTripped,
+          totalBytesIn: imageResult.totalBytesIn,
+        },
         sourceUrl: url,
         extractedAt: new Date().toISOString(),
         strategyUsed,
         durationMs: Date.now() - start,
+        warnings,
       },
     });
   } catch (err) {

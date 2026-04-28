@@ -8,7 +8,10 @@
 // matching the supplierAgent fallback approach.
 // ───────────────────────────────────────────────────────────────
 
-import { DOMParser, type Element } from "https://deno.land/x/[email protected]/deno-dom-wasm.ts";
+// Using linkedom (npm) instead of deno-dom because the deno.land/x URL
+// is mangled by an upstream email-obfuscation filter (`@v0.x.y` → `[email protected]`).
+import { DOMParser } from "npm:[email protected]";
+type Element = any;
 
 const FETCH_TIMEOUT_MS = 8_000;
 const USER_AGENT =

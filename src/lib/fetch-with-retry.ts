@@ -61,13 +61,45 @@ export async function fetchWithRetry(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const controller = new AbortController();
+    const startedAt = Date.now();
+
+    // Primary timeout (works when tab is foregrounded).
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    // Wall-clock guard: iOS Safari (especially the installed PWA) aggressively
+    // throttles setTimeout when the tab is backgrounded, so the timer above can
+    // miss its deadline by minutes. Poll Date.now() on a short interval — even
+    // throttled intervals fire eventually and `Date.now()` reflects real time.
+    const wallClockGuard = setInterval(() => {
+      if (Date.now() - startedAt >= timeoutMs) {
+        controller.abort();
+      }
+    }, 1_000);
+
+    // Visibility guard: if the page becomes visible again and the request has
+    // already exceeded its budget, abort immediately so the retry can run.
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && Date.now() - startedAt >= timeoutMs) {
+        controller.abort();
+      }
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibility);
+    }
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      clearInterval(wallClockGuard);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibility);
+      }
+    };
 
     // Respect external aborts (e.g. user clicks "Cancel processing").
     const onExternalAbort = () => controller.abort();
     if (externalSignal) {
       if (externalSignal.aborted) {
-        clearTimeout(timer);
+        cleanup();
         throw new DOMException("Aborted by caller", "AbortError");
       }
       externalSignal.addEventListener("abort", onExternalAbort, { once: true });
@@ -75,7 +107,7 @@ export async function fetchWithRetry(
 
     try {
       const res = await fetch(url, { ...rest, signal: controller.signal });
-      clearTimeout(timer);
+      cleanup();
       externalSignal?.removeEventListener("abort", onExternalAbort);
 
       if (res.ok) return res;
@@ -86,7 +118,7 @@ export async function fetchWithRetry(
       }
       onRetry?.(attempt, `HTTP ${res.status}`);
     } catch (err) {
-      clearTimeout(timer);
+      cleanup();
       externalSignal?.removeEventListener("abort", onExternalAbort);
       lastError = err;
 

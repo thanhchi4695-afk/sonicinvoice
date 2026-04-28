@@ -453,6 +453,19 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       </CardHeader>
 
       <CardContent className="space-y-3">
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "single" | "bulk")}>
+          <TabsList className="grid grid-cols-2 w-full mb-3">
+            <TabsTrigger value="single" className="text-xs">
+              <LinkIcon className="w-3.5 h-3.5 mr-1.5" />
+              Single URL
+            </TabsTrigger>
+            <TabsTrigger value="bulk" className="text-xs">
+              <Layers className="w-3.5 h-3.5 mr-1.5" />
+              Multiple URLs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="single" className="space-y-3 mt-0">
         <div className="space-y-2">
           <label
             htmlFor="product-url-input"

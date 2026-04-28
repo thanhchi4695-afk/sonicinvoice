@@ -149,8 +149,39 @@ interface EditState {
   primaryIndex: number;
 }
 
+type BulkStatus = "pending" | "fetching" | "success" | "error";
+interface BulkRow {
+  url: string;
+  status: BulkStatus;
+  product?: ExtractedProduct;
+  error?: string;
+}
+
+const MAX_BULK_URLS = 25;
+
+/** Parse a multi-URL textarea (newline / comma / space / tab separated). */
+function parseBulkUrls(raw: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  raw.split(/[\s,]+/).forEach((tok) => {
+    const t = tok.trim();
+    if (!t) return;
+    const v = validateProductUrl(t);
+    const key = v.ok ? v.value : t.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(v.ok ? v.value : t);
+  });
+  return out;
+}
+
 export default function ProductUrlImporter({ onAddToInvoice, className }: Props) {
+  const [mode, setMode] = useState<"single" | "bulk">("single");
   const [url, setUrl] = useState("");
+  const [bulkText, setBulkText] = useState("");
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const bulkAbortRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ExtractedProduct | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);

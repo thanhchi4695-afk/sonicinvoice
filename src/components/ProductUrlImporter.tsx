@@ -302,7 +302,144 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     reset();
   };
 
-  return (
+  // ── Bulk mode ──────────────────────────────────────────────────
+  const productToItem = (p: ExtractedProduct, fallbackUrl: string): ImportedLineItem => {
+    const numericPrice =
+      typeof p.price === "number"
+        ? p.price
+        : typeof p.price === "string" && p.price.trim() !== ""
+          ? Number(p.price)
+          : undefined;
+    return {
+      name: p.name?.trim() || "Imported product",
+      description: p.description?.trim() || undefined,
+      price: Number.isFinite(numericPrice) ? (numericPrice as number) : p.priceNormalized,
+      currency: p.currency,
+      imageUrls: (p.images ?? []).map((i) => i.storedUrl).filter(Boolean),
+      sourceUrl: p.sourceUrl ?? fallbackUrl,
+    };
+  };
+
+  const runBulk = async () => {
+    const urls = parseBulkUrls(bulkText);
+    if (urls.length === 0) {
+      toast.error("Paste at least one product URL.");
+      return;
+    }
+    if (urls.length > MAX_BULK_URLS) {
+      toast.error(`Too many URLs — max ${MAX_BULK_URLS} at a time.`);
+      return;
+    }
+
+    // Validate all upfront so user sees per-row issues immediately.
+    const initial: BulkRow[] = urls.map((u) => {
+      const v = validateProductUrl(u);
+      return v.ok
+        ? { url: v.value, status: "pending" }
+        : { url: u, status: "error", error: v.message };
+    });
+    setBulkRows(initial);
+
+    bulkAbortRef.current = false;
+    setBulkRunning(true);
+
+    // Sequential — respects upstream sites & avoids edge fn rate limits.
+    for (let i = 0; i < initial.length; i++) {
+      if (bulkAbortRef.current) break;
+      if (initial[i].status === "error") continue;
+
+      setBulkRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, status: "fetching" } : r)));
+
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke("product-extract", {
+          body: { url: initial[i].url },
+        });
+        if (fnError) throw new Error(fnError.message || "Extraction failed");
+        if (!data?.success) throw new Error(data?.error || "Could not extract product details");
+        const product: ExtractedProduct = data.product ?? {};
+        setBulkRows((rows) =>
+          rows.map((r, idx) => (idx === i ? { ...r, status: "success", product } : r)),
+        );
+      } catch (err) {
+        const raw = err instanceof Error ? err.message : "Something went wrong";
+        setBulkRows((rows) =>
+          rows.map((r, idx) =>
+            idx === i ? { ...r, status: "error", error: friendlyError(raw) } : r,
+          ),
+        );
+      }
+
+      // Light delay between requests to be a good citizen.
+      if (i < initial.length - 1) {
+        await new Promise((res) => setTimeout(res, 600));
+      }
+    }
+
+    setBulkRunning(false);
+    const successCount = (await new Promise<number>((res) =>
+      setBulkRows((rows) => {
+        res(rows.filter((r) => r.status === "success").length);
+        return rows;
+      }),
+    ));
+    if (successCount > 0) {
+      toast.success(`Fetched ${successCount} product${successCount === 1 ? "" : "s"} — review then merge.`);
+    }
+  };
+
+  const stopBulk = () => {
+    bulkAbortRef.current = true;
+    toast.message("Stopping after current URL…");
+  };
+
+  const removeBulkRow = (idx: number) => {
+    setBulkRows((rows) => rows.filter((_, i) => i !== idx));
+  };
+
+  const retryBulkRow = async (idx: number) => {
+    const row = bulkRows[idx];
+    if (!row || bulkRunning) return;
+    setBulkRows((rows) => rows.map((r, i) => (i === idx ? { ...r, status: "fetching", error: undefined } : r)));
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("product-extract", {
+        body: { url: row.url },
+      });
+      if (fnError) throw new Error(fnError.message || "Extraction failed");
+      if (!data?.success) throw new Error(data?.error || "Could not extract product details");
+      const product: ExtractedProduct = data.product ?? {};
+      setBulkRows((rows) => rows.map((r, i) => (i === idx ? { ...r, status: "success", product } : r)));
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "Something went wrong";
+      setBulkRows((rows) =>
+        rows.map((r, i) => (i === idx ? { ...r, status: "error", error: friendlyError(raw) } : r)),
+      );
+    }
+  };
+
+  const mergeBulkIntoInvoice = () => {
+    const successes = bulkRows.filter((r) => r.status === "success" && r.product);
+    if (successes.length === 0) {
+      toast.error("No successful products to merge yet.");
+      return;
+    }
+    if (!onAddToInvoice) {
+      toast.error("No invoice target connected.");
+      return;
+    }
+    successes.forEach((row) => {
+      const item = productToItem(row.product!, row.url);
+      onAddToInvoice(item);
+      addAuditEntry(
+        "url_import",
+        `Bulk imported "${item.name}" from ${item.sourceUrl}${item.price !== undefined ? ` — ${item.currency ?? ""} ${item.price}` : ""}`,
+      );
+    });
+    toast.success(`Merged ${successes.length} product${successes.length === 1 ? "" : "s"} into invoice`);
+    setBulkRows([]);
+    setBulkText("");
+  };
+
+
     <Card className={className}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">

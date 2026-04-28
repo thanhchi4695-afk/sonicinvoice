@@ -206,7 +206,7 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
 
   const handleExport = () => {
     const filename = generateFilename(supplierName, selectedFormat);
-    const prods = filtered;
+    const prods = (qtyMode === "zero" ? filtered.map(p => ({ ...p, qty: 0 })) : filtered);
 
     if (selectedFormat === "shopify_full") {
       const enabledMeta = getEnabledMetafields();

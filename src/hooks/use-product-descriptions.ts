@@ -105,6 +105,7 @@ export function useProductDescriptions() {
         const description = payload?.description?.trim() || null;
         const result: DescriptionResult = {
           description,
+          full_product_name: payload?.full_product_name?.trim() || null,
           source_url: payload?.source_url || "",
           source_name: payload?.source_name || "",
           source_type: (payload?.source_type as "supplier" | "retailer") || "retailer",

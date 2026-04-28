@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// EdgeRuntime is provided by Supabase Edge Functions runtime
+declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void } | undefined;
 
 // ── Concept-based extraction system prompt ──────────────────
 const SYSTEM_PROMPT = `You are an expert document intelligence AI for extracting structured product data from fashion wholesale invoices, packing slips, and delivery dockets.

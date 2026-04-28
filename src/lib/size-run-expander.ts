@@ -63,6 +63,18 @@ export function expandSizeValue(raw: string): string[] {
   const value = (raw || "").trim();
   if (!value) return [""];
 
+  // Guard: bra cup designators like "D/DD", "E/F/G", "D/E", "DD/E"
+  // are NOT real sizes — they're cup-coverage labels that belong in the
+  // product TITLE (e.g. "Kokomo D/DD Twist Bra"). If every slash-separated
+  // token is 1-3 letters AND looks like a cup letter (A-K plus optional D/DD/DDD),
+  // treat the whole string as one literal "size" so we never create variants
+  // like (D, DD) or (E, F, G).
+  if (value.includes("/")) {
+    const tokens = value.split("/").map(s => s.trim()).filter(Boolean);
+    const isCupRange = tokens.length >= 2 && tokens.every(t => /^(A|B|C|D|DD|DDD|E|F|FF|G|H|HH|I|J|K)$/i.test(t));
+    if (isCupRange) return [value];
+  }
+
   // Explicit list separators take precedence over range
   if (/[\/,;|]/.test(value)) {
     return value.split(/[\/,;|]/).map(s => s.trim()).filter(Boolean);

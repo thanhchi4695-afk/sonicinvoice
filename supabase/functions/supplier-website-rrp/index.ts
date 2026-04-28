@@ -136,14 +136,29 @@ function expandAbbreviations(name: string): string {
     .join(" ");
 }
 
-/** Extract a supplier style code (alpha+digits, e.g. BRA403KKM) from the styleNumber or name. */
+/** Extract a supplier style code from styleNumber or name.
+ *  Accepts common patterns across brands:
+ *    BRA403KKM, M785RCE, PANT321KKM   (alpha+digits+alpha — Baku, Seafolly)
+ *    AB-12345, AW24-1234              (hyphenated season codes)
+ *    1234567 / 12345-678              (digit-only SKUs — common in apparel)
+ *    SKU.123.ABC                      (dotted)
+ *  Returns up to 5 distinct uppercase codes. */
 function extractStyleCodes(s: string): string[] {
   if (!s) return [];
   const out = new Set<string>();
-  // Match patterns like BRA403KKM, M785RCE, PANT321KKM (3+ letters, digits, optional letters)
-  const re = /\b([A-Z]{2,6}\d{2,5}[A-Z]{0,5})\b/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(s)) !== null) out.add(m[1].toUpperCase());
+  const patterns = [
+    /\b([A-Z]{2,6}\d{2,5}[A-Z]{0,5})\b/gi,  // alpha-digit-alpha
+    /\b([A-Z]{1,4}[-.]?\d{2,6}[-.]?[A-Z0-9]{0,6})\b/gi, // hyphen/dot variants
+    /\b(\d{5,8})\b/g, // bare numeric SKUs
+  ];
+  for (const re of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(s)) !== null) {
+      const code = m[1].toUpperCase().replace(/[.\-]/g, "");
+      if (code.length >= 4) out.add(code);
+      if (out.size >= 5) break;
+    }
+  }
   return [...out];
 }
 

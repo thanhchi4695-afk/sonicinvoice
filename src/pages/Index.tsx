@@ -200,7 +200,6 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showQuickSearch, setShowQuickSearch] = useState(false);
   const [reconciliationResult, setReconciliationResult] = useState<any>(null);
-  const [embeddedAuthTimedOut, setEmbeddedAuthTimedOut] = useState(false);
 
   const handleReconciliationExport = useCallback((_sets: unknown) => {
     // Hand-off back to invoice flow's export step
@@ -293,24 +292,6 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       setAuthLoading(false);
     }
     // "loading" → keep authLoading true (default)
-  }, [isEmbedded, embeddedAuthState]);
-
-  // ── Hard timeout safety net ──
-  // If embedded auth never resolves (App Bridge CDN blocked, network stall,
-  // verify endpoint hanging), drop the loading screen after 15s so the user
-  // sees the reinstall / retry UI rather than an infinite spinner.
-  useEffect(() => {
-    if (!isEmbedded) return;
-    if (embeddedAuthState !== "loading") {
-      setEmbeddedAuthTimedOut(false);
-      return;
-    }
-    const t = window.setTimeout(() => {
-      console.warn("[embedded-auth] Hard timeout — forcing authLoading=false after 15s");
-      setAuthLoading(false);
-      setEmbeddedAuthTimedOut(true);
-    }, 15000);
-    return () => window.clearTimeout(t);
   }, [isEmbedded, embeddedAuthState]);
 
   // Handle Shopify OAuth callback redirect (store connection)
@@ -413,62 +394,11 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   // ── Embedded auth gate ──
   // While the embedded session-token handshake is running, show a loading
   // state instead of falling through to the public marketing AuthScreen.
-  if (isEmbedded && embeddedAuthState === "loading" && !embeddedAuthTimedOut) {
+  if (isEmbedded && embeddedAuthState === "loading") {
     return (
       <div className="flex items-center justify-center min-h-screen flex-col gap-3 p-6 text-center">
         <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         <p className="text-sm text-muted-foreground">Signing you in via Shopify…</p>
-      </div>
-    );
-  }
-
-  // Hard timeout reached — App Bridge / verify endpoint never returned.
-  // Show a retry button so the user isn't stuck on an infinite spinner.
-  if (isEmbedded && embeddedAuthState === "loading" && embeddedAuthTimedOut) {
-    // Detect if we're actually inside a Shopify Admin iframe. If we're at the
-    // top window, the user is browsing the preview/published URL directly with
-    // stale ?shop=&host= params (or a stuck dev_embedded_mode flag) and App
-    // Bridge will never load — give them a one-click escape hatch.
-    const inIframe = (() => { try { return window.self !== window.top; } catch { return true; } })();
-    const exitEmbedded = () => {
-      try { localStorage.removeItem("dev_embedded_mode"); } catch { /* noop */ }
-      const url = new URL(window.location.href);
-      url.searchParams.delete("shop");
-      url.searchParams.delete("host");
-      url.searchParams.delete("embedded");
-      url.searchParams.delete("id_token");
-      window.location.replace(url.pathname + (url.search ? url.search : "") + url.hash);
-    };
-    return (
-      <div className="flex items-center justify-center min-h-screen flex-col gap-3 p-6 text-center max-w-md mx-auto">
-        <h1 className="text-lg font-semibold text-foreground">Sign-in is taking longer than expected</h1>
-        <p className="text-sm text-muted-foreground">
-          We couldn't complete the Shopify session handshake. This usually clears with a reload.
-          {embeddedAuthError ? <span className="block mt-2 text-xs opacity-70">{embeddedAuthError}</span> : null}
-        </p>
-        <div className="flex flex-col sm:flex-row gap-2 mt-2">
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
-          >
-            Reload app
-          </button>
-          {!inIframe && (
-            <button
-              type="button"
-              onClick={exitEmbedded}
-              className="px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted"
-            >
-              Continue without Shopify
-            </button>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          {inIframe
-            ? "Still stuck? Open the app from your Shopify Admin home (Apps → Sonic Invoices)."
-            : "You're not inside Shopify Admin — use \"Continue without Shopify\" to sign in normally, or open the app from Shopify Admin (Apps → Sonic Invoices)."}
-        </p>
       </div>
     );
   }

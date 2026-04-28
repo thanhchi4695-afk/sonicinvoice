@@ -501,6 +501,7 @@ Return ONLY valid JSON (no markdown, no explanation):
       "product_type": "e.g. One Piece, Dress, Pant, Top",
       "collection": "Story / Collection / Delivery / Range label for this row, e.g. 'Summer Chintz', 'Beach Bound', 'Resort 26'. Look for a 'Story' or 'Collection' or 'Delivery' or 'Range' column. If a section header above the row names a collection, inherit it. Empty string if none.",
       "group_key": "style_code|colour for grouping variants",
+      "group_total_qty": "if a Total/Total Qty column is printed for this product, copy its INTEGER value here (same value on every variant row of the same style+colour). Use null if no total is printed.",
       "confidence": 0-100,
       "parse_notes": "any issues, ambiguity, or extraction strategy used",
       "extraction_reason": "brief explanation of why this row was identified as a product",

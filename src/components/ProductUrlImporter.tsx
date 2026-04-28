@@ -243,34 +243,55 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       </CardHeader>
 
       <CardContent className="space-y-3">
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Input
-            type="url"
-            inputMode="url"
-            placeholder="https://brand.com/products/example"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !loading) handleFetch();
-            }}
-            maxLength={2048}
-            disabled={loading}
-            className="flex-1"
-            aria-label="Product URL"
-          />
-          <Button onClick={handleFetch} disabled={loading || !url.trim()}>
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Fetching…
-              </>
-            ) : (
-              <>
-                <LinkIcon className="w-4 h-4 mr-2" />
-                Fetch product
-              </>
-            )}
-          </Button>
+        <div className="space-y-2">
+          <label
+            htmlFor="product-url-input"
+            className="flex items-center gap-1.5 text-sm font-medium text-foreground"
+          >
+            <LinkIcon className="w-3.5 h-3.5 text-primary" />
+            Paste link
+          </label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                id="product-url-input"
+                type="url"
+                inputMode="url"
+                placeholder="https://brand.com/products/example"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !loading) handleFetch();
+                }}
+                maxLength={2048}
+                disabled={loading}
+                className="pl-9 h-11"
+                aria-label="Product URL"
+              />
+            </div>
+            <Button
+              onClick={handleFetch}
+              disabled={loading || !url.trim()}
+              size="lg"
+              className="h-11 sm:min-w-[170px] font-semibold"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Extracting…
+                </>
+              ) : (
+                <>
+                  <LinkIcon className="w-4 h-4 mr-2" />
+                  Extract product
+                </>
+              )}
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Press Enter or click <span className="font-medium text-foreground">Extract product</span> to start parsing.
+          </p>
         </div>
 
         {loading && (

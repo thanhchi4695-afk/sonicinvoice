@@ -112,7 +112,7 @@ async function optimise(bytes: Uint8Array): Promise<{ webp: Uint8Array; width: n
   return { webp, width: decoded.width, height: decoded.height };
 }
 
-function buildStoragePath(sourceUrl: string, idx: number): string {
+function buildStoragePath(sourceUrl: string, idx: number, ext = "webp"): string {
   // Group images per source host + path hash to keep the bucket browsable
   let host = "unknown";
   let pathHash = "0";
@@ -122,7 +122,18 @@ function buildStoragePath(sourceUrl: string, idx: number): string {
     pathHash = Math.abs(hashString(u.pathname)).toString(36);
   } catch { /* keep defaults */ }
   const stamp = Date.now();
-  return `product-extract/${host}/${pathHash}/${stamp}-${idx}.webp`;
+  return `product-extract/${host}/${pathHash}/${stamp}-${idx}.${ext}`;
+}
+
+function mimeToExt(mime: string): string {
+  const m = mime.toLowerCase().split(";")[0].trim();
+  if (m === "image/jpeg" || m === "image/jpg") return "jpg";
+  if (m === "image/png") return "png";
+  if (m === "image/webp") return "webp";
+  if (m === "image/gif") return "gif";
+  if (m === "image/avif") return "avif";
+  if (m === "image/svg+xml") return "svg";
+  return "bin";
 }
 
 function hashString(s: string): number {

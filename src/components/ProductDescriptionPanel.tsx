@@ -27,6 +27,7 @@ import {
   type DescriptionResult,
 } from "@/hooks/use-product-descriptions";
 import type { PriceMatchLineItem } from "@/lib/price-match-utils";
+import EnrichProductButton from "@/components/EnrichProductButton";
 
 type ExportFormat = "shopify" | "lightspeed";
 

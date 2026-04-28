@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink, Check, Circle,
-  Star, Trash2, ImagePlus, Layers, AlertTriangle,
+  Star, Trash2, ImagePlus, Layers, AlertTriangle, GripVertical,
 } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -182,6 +182,8 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
   const [bulkRunning, setBulkRunning] = useState(false);
   const bulkAbortRef = useRef(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ExtractedProduct | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);
@@ -393,6 +395,17 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
 
   const removeBulkRow = (idx: number) => {
     setBulkRows((rows) => rows.filter((_, i) => i !== idx));
+  };
+
+  const reorderBulkRow = (from: number, to: number) => {
+    if (from === to) return;
+    setBulkRows((rows) => {
+      if (from < 0 || from >= rows.length || to < 0 || to >= rows.length) return rows;
+      const next = rows.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   };
 
   const retryBulkRow = async (idx: number) => {
@@ -838,18 +851,69 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                   </button>
                 </div>
 
+                <p className="text-[11px] text-muted-foreground px-1">
+                  Drag <GripVertical className="inline w-3 h-3 -mt-0.5" /> to reorder — items merge in this order.
+                </p>
                 <ul className="max-h-72 overflow-y-auto space-y-1.5">
-                  {bulkRows.map((row, i) => (
+                  {bulkRows.map((row, i) => {
+                    const draggable = !bulkRunning && row.status === "success";
+                    const isDragging = dragIndex === i;
+                    const isDragOver = dragOverIndex === i && dragIndex !== null && dragIndex !== i;
+                    return (
                     <li
                       key={`${row.url}-${i}`}
+                      onDragOver={(e) => {
+                        if (dragIndex === null || !draggable) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverIndex !== i) setDragOverIndex(i);
+                      }}
+                      onDrop={(e) => {
+                        if (dragIndex === null) return;
+                        e.preventDefault();
+                        reorderBulkRow(dragIndex, i);
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverIndex === i) setDragOverIndex(null);
+                      }}
                       className={cn(
-                        "flex items-center gap-2 rounded-md p-2 text-xs border",
+                        "flex items-center gap-2 rounded-md p-2 text-xs border transition-all",
                         row.status === "success" && "border-primary/30 bg-primary/5",
                         row.status === "error" && "border-destructive/30 bg-destructive/5",
                         row.status === "fetching" && "border-primary/40 bg-primary/10",
                         row.status === "pending" && "border-border bg-background/40",
+                        isDragging && "opacity-40",
+                        isDragOver && "border-t-2 border-t-primary",
                       )}
                     >
+                      <button
+                        type="button"
+                        draggable={draggable}
+                        onDragStart={(e) => {
+                          if (!draggable) {
+                            e.preventDefault();
+                            return;
+                          }
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", String(i));
+                          setDragIndex(i);
+                        }}
+                        onDragEnd={() => {
+                          setDragIndex(null);
+                          setDragOverIndex(null);
+                        }}
+                        disabled={!draggable}
+                        aria-label="Drag to reorder"
+                        title={draggable ? "Drag to reorder" : "Only successful rows can be reordered"}
+                        className={cn(
+                          "shrink-0 p-0.5 -ml-0.5 rounded text-muted-foreground",
+                          draggable ? "cursor-grab active:cursor-grabbing hover:text-foreground hover:bg-background/60" : "opacity-30 cursor-not-allowed",
+                        )}
+                      >
+                        <GripVertical className="w-3.5 h-3.5" />
+                      </button>
                       <span className="w-4 h-4 flex items-center justify-center shrink-0">
                         {row.status === "success" && <Check className="w-3.5 h-3.5 text-primary" />}
                         {row.status === "error" && <AlertTriangle className="w-3.5 h-3.5 text-destructive" />}
@@ -895,7 +959,8 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                         </button>
                       </div>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
 
                 <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">

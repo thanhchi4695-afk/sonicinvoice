@@ -5,11 +5,13 @@
 // tappable info tooltip explaining inputs, outputs, and why it runs.
 // ════════════════════════════════════════════════════════════════
 
-import { Search, Building2, Globe2, ShieldCheck, ArrowRight, ChevronRight, Workflow } from "lucide-react";
+import { useState } from "react";
+import { Search, Building2, Globe2, ShieldCheck, ArrowRight, ChevronRight, Workflow, PlayCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AgentInfoPopover, { type AgentInfo } from "./AgentInfoPopover";
+import AgentTourController, { type TourStep } from "./AgentTourController";
 
 interface Props {
   onOpenGuide?: () => void;

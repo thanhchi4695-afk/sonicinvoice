@@ -60,16 +60,21 @@ export async function fetchWithRetry(
     maxAttempts = 3,
     backoffMs = 800,
     onRetry,
+    resumeOnForeground = true,
     signal: externalSignal,
     ...rest
   } = init;
 
   let lastError: unknown;
   let lastStatus: number | undefined;
+  let resumedFromBackground = false;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const controller = new AbortController();
     const startedAt = Date.now();
+    let wasHiddenDuringAttempt =
+      typeof document !== "undefined" && document.visibilityState === "hidden";
+    let abortedForResume = false;
 
     // Primary timeout (works when tab is foregrounded).
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -84,10 +89,18 @@ export async function fetchWithRetry(
       }
     }, 1_000);
 
-    // Visibility guard: if the page becomes visible again and the request has
-    // already exceeded its budget, abort immediately so the retry can run.
+    // Visibility guard:
+    //  1. Track whether the page was hidden at any point during the attempt.
+    //  2. When the page becomes visible again, abort the in-flight fetch so we
+    //     can retry fresh — backgrounded mobile fetches are usually already
+    //     dead by the time the user returns, but the promise never resolves.
     const onVisibility = () => {
-      if (document.visibilityState === "visible" && Date.now() - startedAt >= timeoutMs) {
+      if (document.visibilityState === "hidden") {
+        wasHiddenDuringAttempt = true;
+        return;
+      }
+      if (document.visibilityState === "visible" && resumeOnForeground && wasHiddenDuringAttempt) {
+        abortedForResume = true;
         controller.abort();
       }
     };
@@ -133,7 +146,19 @@ export async function fetchWithRetry(
       // External abort → bubble up immediately, no retry.
       if (externalSignal?.aborted) throw err;
 
-      const isTimeout = err instanceof DOMException && err.name === "AbortError";
+      const isAbort = err instanceof DOMException && err.name === "AbortError";
+
+      // Foreground-resume path: don't count this as a "real" failure. Retry
+      // immediately, and grant an extra attempt so a single backgrounding
+      // doesn't burn the user's retry budget.
+      if (isAbort && abortedForResume) {
+        resumedFromBackground = true;
+        onRetry?.(attempt, "resumed");
+        // Skip back-off and don't increment the failure counter.
+        continue;
+      }
+
+      const isTimeout = isAbort;
       if (attempt === maxAttempts) {
         if (isTimeout) throw new FetchTimeoutError(timeoutMs, attempt);
         throw new FetchRetryError(
@@ -152,7 +177,11 @@ export async function fetchWithRetry(
 
   // Should never get here, but TypeScript wants it.
   throw new FetchRetryError(
-    lastError instanceof Error ? lastError.message : "Request failed",
+    lastError instanceof Error
+      ? lastError.message
+      : resumedFromBackground
+        ? "Request failed after returning from background"
+        : "Request failed",
     maxAttempts,
     lastStatus,
   );

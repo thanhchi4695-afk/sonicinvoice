@@ -1164,22 +1164,43 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                   })}
                 </ul>
 
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/60">
                   <span className="text-[11px] text-muted-foreground">
-                    Successful items will be merged into the invoice.
+                    Send successful items to your invoice or publish straight to Shopify as drafts.
                   </span>
-                  <Button
-                    size="sm"
-                    onClick={mergeBulkIntoInvoice}
-                    disabled={
-                      bulkRunning ||
-                      !onAddToInvoice ||
-                      bulkRows.filter((r) => r.status === "success").length === 0
-                    }
-                  >
-                    <Plus className="w-4 h-4 mr-1.5" />
-                    Merge {bulkRows.filter((r) => r.status === "success").length} into invoice
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={mergeBulkIntoInvoice}
+                      disabled={
+                        bulkRunning ||
+                        pushingShopify ||
+                        !onAddToInvoice ||
+                        bulkRows.filter((r) => r.status === "success").length === 0
+                      }
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
+                      Merge {bulkRows.filter((r) => r.status === "success").length} into invoice
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="teal"
+                      onClick={handlePushBulkToShopify}
+                      disabled={
+                        bulkRunning ||
+                        pushingShopify ||
+                        bulkRows.filter((r) => r.status === "success").length === 0
+                      }
+                    >
+                      {pushingShopify ? (
+                        <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      ) : (
+                        <ShoppingBag className="w-4 h-4 mr-1.5" />
+                      )}
+                      Publish {bulkRows.filter((r) => r.status === "success").length} to Shopify
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}

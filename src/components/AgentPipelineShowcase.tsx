@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════════
 
 import { useEffect, useState } from "react";
-import { Eye, Layers, Sparkles, Rocket, Brain, ArrowRight, CheckCircle2, ChevronRight } from "lucide-react";
+import { Eye, Layers, Sparkles, Rocket, Brain, ArrowRight, CheckCircle2, ChevronRight, PlayCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import AgentInfoPopover, { type AgentInfo } from "./AgentInfoPopover";
+import AgentTourController, { type TourStep } from "./AgentTourController";
 
 const AGENT_INFO: Record<string, AgentInfo> = {
   Watchdog: {

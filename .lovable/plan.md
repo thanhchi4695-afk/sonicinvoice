@@ -1,60 +1,143 @@
-# URL Product Extractor Agent — Active Plan
+# Sonic Invoices — Sola.ai-Inspired Agentic Roadmap
 
-**Goal:** User pastes a product URL → agent returns `{ name, description, price, currency, normalizedPrice, images[] }` ready for the Shopify pipeline.
+This plan governs all upcoming prompts. Future changes must align with these four lessons. Reject any prompt that contradicts the locked principles below.
 
-## Locked extraction cascade (escalate only on failure)
-| Step | Method | Coverage | When |
-|---|---|---|---|
-| 1 | JSON-LD / microdata Product schema | ~15% | Sites with rich snippets |
-| 2 | Universal DOM selectors (Cheerio + og:*) | ~30–40% | Shopify / WooCommerce |
-| 3 | LLM raw HTML → tool-call JSON | ~80% | Most remaining sites |
-| 4 | Playwright + LLM | ~90–95% | JS-heavy / blocked |
-| 5 | 3rd-party API (Apify / ScrapingBee) | ~99% | Last resort |
+---
 
-## File structure (locked)
+## North-star principle
+
+Move Sonic Invoices from **passive rule-based alerts** to an **agentic, decision-making, screen-learning, cross-system orchestrator** for wholesale buyers.
+
+We are NOT cloning Sola.ai features. We are adopting its core principles and applying them to wholesale buying (JOOR, NuOrder, supplier sites, Shopify, Lightspeed, Slack, email, accounting).
+
+---
+
+## Lesson 1 — Margin Guardian Agent (not a static alert)
+
+**Goal:** Replace the existing margin protection alert with an *agent* that monitors and intervenes across multiple touchpoints in real time.
+
+### Touchpoints (locked)
+| Surface | Behaviour |
+|---|---|
+| JOOR / NuOrder cart (Chrome extension) | Recalculate margin live as items added/removed; inject ⚡ badge with current margin %, floor, exposure |
+| Slack channel | For POs above a configurable $ threshold, post summary + manager sign-off button BEFORE buyer can submit |
+| Email / PO system | Auto-flag any outbound PO that dips below margin floor; halt send until human review |
+| Sonic Invoices app | Central inbox of pending guardian decisions with audit trail |
+
+### Implementation rules
+- Reuse `src/lib/margin-protection.ts` as the calculation core. Do NOT fork margin logic.
+- Agent logic lives in a new edge function `margin-guardian` (server-side decisions, never client-only).
+- Decisions logged to a new `margin_guardian_events` table (event sourcing — no destructive updates).
+- Slack approval = approval token in Supabase; expires after 24h.
+- Reject prompts that ask for plain `toast`-only alerts. Must be agent-mediated.
+
+---
+
+## Lesson 2 — Screen-to-Agent (record & replay workflows)
+
+**Goal:** Buyer demonstrates a workflow once in the Chrome extension; system generates a reusable, self-healing automation.
+
+### Locked cascade
+1. **Record** — extension captures DOM events, network calls, and selector context for a user-demonstrated flow (e.g. supplier stock check).
+2. **Interpret** — recording sent to edge function `workflow-interpret`; LLM (via AI Gateway, gemini-2.5-pro → flash fallback) converts into a structured workflow JSON (steps, selectors, semantic intent).
+3. **Store** — saved to `recorded_workflows` table, scoped per-user, versioned.
+4. **Replay** — extension or edge function executes the workflow on demand (one-click "AI Stock Check").
+5. **Self-heal** — if a selector breaks, re-run interpretation against fresh DOM, prefer semantic intent over raw selectors.
+
+### First target use case (locked)
+- "AI Stock Check" on JOOR + NuOrder product pages — replaces manual SKU copy → new tab → inventory lookup.
+
+### Implementation rules
+- Recording uses the existing extension infrastructure in `extension/`. Do NOT spawn a new extension project.
+- Storage: `recorded_workflows` table with RLS (owner-only).
+- Interpretation goes through AI Gateway only. No direct Anthropic/Google calls from the extension.
+- Reject any prompt that asks to hardcode supplier-specific scrapers — recorded workflows are the path.
+
+---
+
+## Lesson 3 — Citizen Developer Condition Builder
+
+**Goal:** Business owner builds their own guardian rules visually, no code, no support ticket.
+
+### Locked schema (no-code rule shape)
 ```
-src/lib/product-extract/
-  extract-product.ts      ← orchestrator
-  jsonld-parser.ts
-  dom-selectors.ts
-  llm-extractor.ts
-  image-downloader.ts
-  currency-detector.ts
-supabase/functions/product-enrich/index.ts
+WHEN  <trigger>           // e.g. margin_below, po_total_above, brand_is, vendor_first_time
+WITH  <conditions[]>      // AND-combined filters
+AND   <conditions[]>
+THEN  <action>            // email_manager | slack_approval | block_order | log_only
 ```
 
-## Images
-- Priority: `og:image` → near price → product container → gallery
-- Stream via Sharp (resize, WebP) → existing `compressed-images` bucket, no disk
-- Validate `content-type` is image/*; kill-switch >10MB total
+### UI placement
+- New panel inside the side panel: **Guardian Rules**.
+- Rules CRUD lives in a new `guardian_rules` table with RLS.
+- Rule evaluation runs inside the `margin-guardian` edge function (single source of truth).
 
-## Currency
-- Regex + `currency-symbol-map` → ISO; cross-check `<html lang>`
-- Always store `originalPrice` + `originalCurrency`
-- Frankfurter API for optional display conversion
-- Unknown currency → `warnings[]`, never silent default
+### Implementation rules
+- Builder UI uses existing shadcn primitives + design tokens (no custom colors).
+- Triggers/actions are an enum — extending the enum requires explicit prompt + migration.
+- Reject prompts that bypass the builder and hardcode rules in components.
 
-## Controls
-- Per-user rate limit in edge function
-- All 3rd-party API keys live in edge env only
-- Log every attempt to processing history (URL, strategy, ms, image count, currency)
+---
 
-## UI entry points
-- "Fetch from URL" button in `InvoiceFlow` and `QuickCapture`
-- Reuse `LinePipelineProgress` to visualise the 5-step cascade
+## Lesson 4 — Downfield Automation ("Reapply Last Fix")
 
-## Roadmap (do not reorder)
-1. Orchestrator + strategies 1–3
-2. Image downloader (Sharp + storage)
-3. Currency detector + normalisation
-4. UI "Fetch from URL" buttons
-5. Edge function deploy + test 10–20 real pages
-6. Rate limiting / budget caps
-7. (Later) Strategy 4 Playwright + Strategy 5 3rd-party APIs
+**Goal:** A margin alert's "Fix" action becomes an executable trigger, not a suggestion. Built on the Lesson 2 recording infrastructure.
+
+### Locked flow
+1. Buyer manually corrects a margin violation once (e.g. updates price in JOOR, emails supplier).
+2. The correction is recorded via the same Lesson 2 pipeline → stored as a `correction_workflow` linked to the violating rule.
+3. On the next matching violation, the alert UI shows a **Reapply Last Fix** button.
+4. Clicking it replays the stored workflow end-to-end (cart update + email draft + audit entry).
+
+### Implementation rules
+- Re-use `recorded_workflows` table; add `purpose = 'correction'` discriminator.
+- Replay must always require explicit user confirmation (no silent auto-fix). Logged to `margin_guardian_events`.
+- Reject prompts that ask for fully autonomous correction without confirmation.
+
+---
+
+## Cross-cutting non-negotiables
+
+- **AI Gateway only** — every LLM call goes through the centralized fallback (`gemini-2.5-pro` → `gemini-2.5-flash`). No direct provider SDKs from client or extension.
+- **RLS on every new table** — owner-scoped, no anonymous access.
+- **Event sourcing** for guardian decisions — never overwrite history.
+- **Design system** — semantic tokens only, no hardcoded colors. Syne headings, IBM Plex Mono for data, teal/amber accents.
+- **Sequential Shopify writes** — 500ms minimum delay, batch metafields 8 at a time.
+- **Variant order** — Colour first, Size second (Shopify CSV, previews, recorded workflows).
+- **Audit log** — every guardian action and workflow replay appended to existing audit log (500-entry localStorage cap still applies for client mirror).
+
+---
+
+## Build order (do not reorder without approval)
+
+1. `margin_guardian_events` table + `margin-guardian` edge function (Lesson 1 backbone)
+2. JOOR/NuOrder live margin badge in extension (Lesson 1, surface 1)
+3. Slack approval flow for high-$ POs (Lesson 1, surface 2)
+4. Email/PO outbound guardrail (Lesson 1, surface 3)
+5. `guardian_rules` table + Condition Builder UI (Lesson 3)
+6. Recording infrastructure in extension + `recorded_workflows` table (Lesson 2 foundation)
+7. `workflow-interpret` edge function + AI Stock Check (Lesson 2 first use case)
+8. Self-healing selector retry on replay failure (Lesson 2 hardening)
+9. Correction recording + Reapply Last Fix (Lesson 4)
+10. Replay confirmation + audit surfacing across UI
+
+---
 
 ## Plan-adherence rules for future prompts
-- Reject any change that adds a new extraction step outside the 5-tier cascade.
-- Reject any prompt that asks to call AI providers directly from the client — must go through `product-enrich`.
-- Reject any plan to bypass JSON-LD/selectors and jump straight to LLM (cost discipline).
-- Reject any new image storage bucket — reuse `compressed-images`.
-- Reject any silent currency default — must surface `warnings[]`.
+
+- Reject any margin alert change that is not routed through the `margin-guardian` agent.
+- Reject any new supplier-specific scraper — must use recorded workflows.
+- Reject any LLM call outside the AI Gateway.
+- Reject any guardian rule hardcoded in a component instead of stored in `guardian_rules`.
+- Reject any auto-fix action that runs without explicit user confirmation.
+- Reject any new storage bucket or new auth provider unless the prompt explicitly justifies it.
+- Reject reordering of the build sequence above without an explicit user instruction.
+
+---
+
+## Out of scope (explicitly)
+
+- Cloning Sola.ai's general-purpose RPA studio.
+- Generic web automation outside wholesale-buying surfaces.
+- Replacing existing extraction cascades (URL importer, invoice parsing) — those keep their own locked plans.
+- Removing Lovable Cloud / swapping backend providers.

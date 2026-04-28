@@ -1886,6 +1886,8 @@ ${ocrText}`,
       // OCR fallback metadata
       ocr_fallback_used: parsed.ocr_fallback_used || false,
       ocr_fallback_attempted: parsed.ocr_fallback_attempted || false,
+      ocr_upgrade_job_id: parsed.ocr_upgrade_job_id || null,
+      ocr_upgrade_pending: parsed.ocr_upgrade_pending || false,
       needs_manual_review: parsed.needs_manual_review || false,
       review_reason: parsed.review_reason || null,
       // Walnut Round 2, Bug #1: surface the GST-footer detection so the UI

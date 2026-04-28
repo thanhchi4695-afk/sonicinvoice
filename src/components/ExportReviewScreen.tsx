@@ -512,6 +512,37 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
             </div>
           )}
 
+          {/* Stock quantity mode — invoice qty vs zero (receive later in POS) */}
+          <div className="bg-card rounded-lg border border-border p-4">
+            <h3 className="text-sm font-semibold mb-3">Stock quantity</h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Choose how stock quantities are written to the export. Use <strong>Invoice quantities</strong> if you trust the parsed numbers and want stock added immediately. Use <strong>Set all to 0</strong> if you prefer to receive and count stock in your POS (e.g. Lightspeed) when the goods physically arrive.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => updateQtyMode("invoice")}
+                className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
+                  qtyMode === "invoice" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-muted-foreground/30"
+                }`}
+              >
+                {qtyMode === "invoice" && <Check className="w-3.5 h-3.5 inline mr-1.5" />}Invoice quantities
+              </button>
+              <button
+                onClick={() => updateQtyMode("zero")}
+                className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
+                  qtyMode === "zero" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-muted-foreground/30"
+                }`}
+              >
+                {qtyMode === "zero" && <Check className="w-3.5 h-3.5 inline mr-1.5" />}Set all to 0 (receive later)
+              </button>
+            </div>
+            {qtyMode === "zero" && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Every variant will export with quantity <span className="font-mono-data">0</span>. Create a receive/PO in your POS to count stock on arrival.
+              </p>
+            )}
+          </div>
+
           {/* Publish status — Active vs Draft (applies to Shopify Status column and Lightspeed active flag) */}
           <div className="bg-card rounded-lg border border-border p-4">
             <h3 className="text-sm font-semibold mb-3">Publish status</h3>

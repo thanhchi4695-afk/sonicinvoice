@@ -434,13 +434,21 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
 
                 return (
                   <TableRow key={key} className="align-top">
-                    <TableCell className="max-w-[180px]">
+                    <TableCell className="max-w-[220px]">
                       <p className="text-xs font-medium">{item.style_name || "—"}</p>
                       {item.style_number && (
                         <p className="text-[10px] text-muted-foreground font-mono">
                           {item.style_number}
                         </p>
                       )}
+                      {r?.full_product_name &&
+                        r.full_product_name.toLowerCase().trim() !==
+                          (item.style_name || "").toLowerCase().trim() && (
+                          <p className="text-[10px] text-primary mt-1 leading-tight">
+                            <span className="text-muted-foreground">Full name:</span>{" "}
+                            {r.full_product_name}
+                          </p>
+                        )}
                     </TableCell>
                     <TableCell className="text-xs">{item.brand || "—"}</TableCell>
                     <TableCell className="min-w-[140px]">

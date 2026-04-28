@@ -139,18 +139,19 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
 
   const handleFetch = async () => {
     setError(null);
-    const parsed = urlSchema.safeParse(url);
-    if (!parsed.success) {
-      const msg = parsed.error.issues[0]?.message ?? "Invalid URL";
-      setError(msg);
-      toast.error(msg);
+    const v = validateProductUrl(url);
+    if (!v.ok) {
+      setError(v.message);
+      toast.error(v.message);
       return;
     }
+    // Reflect the normalised URL back to the input (e.g. https:// added).
+    if (v.value !== url) setUrl(v.value);
 
     setLoading(true);
     try {
       const { data, error: fnError } = await supabase.functions.invoke("product-extract", {
-        body: { url: parsed.data },
+        body: { url: v.value },
       });
 
       if (fnError) throw new Error(fnError.message || "Extraction failed");
@@ -161,7 +162,8 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       setResult(data.product ?? {});
       toast.success("Product details fetched");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Something went wrong";
+      const raw = err instanceof Error ? err.message : "Something went wrong";
+      const message = friendlyError(raw);
       setError(message);
       toast.error(message);
     } finally {

@@ -397,6 +397,17 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     setBulkRows((rows) => rows.filter((_, i) => i !== idx));
   };
 
+  const reorderBulkRow = (from: number, to: number) => {
+    if (from === to) return;
+    setBulkRows((rows) => {
+      if (from < 0 || from >= rows.length || to < 0 || to >= rows.length) return rows;
+      const next = rows.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
   const retryBulkRow = async (idx: number) => {
     const row = bulkRows[idx];
     if (!row || bulkRunning) return;

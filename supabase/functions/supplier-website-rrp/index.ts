@@ -158,26 +158,57 @@ function findProductByNameAndColour(
   if (!products?.length) return null;
 
   // ── Step 0: STYLE-CODE MATCH (highest precision) ──
-  // Supplier codes (e.g. BRA403KKM, M785RCE) sometimes appear in the
-  // product's title, handle, body description, tags or variant SKUs.
-  // We deliberately EXCLUDE image filenames here, because brands like
-  // Baku reuse a single lookbook image across multiple products and
-  // bundle several style codes into one filename — that would cause
-  // false positives.
+  // Supplier codes (e.g. BRA403KKM, M785RCE, PANT512KKM) appear in
+  // various places depending on the brand:
+  //   • Title / handle / body_html / variant SKUs (most precise)
+  //   • Tags
+  //   • Image filenames in the CDN URL or alt text (less precise —
+  //     brands like Baku reuse a single lookbook photo across the
+  //     bra+bottom pair, so the same image filename references
+  //     multiple style codes).
+  //
+  // To avoid false positives from shared lookbook images we:
+  //   1. Try the precise fields first.
+  //   2. Fall back to image filenames, but only after filtering by
+  //      SKU-prefix → silhouette (BRA* → bra/top, PANT* → bottom,
+  //      M*/MAIL* → one-piece/swimsuit).
   const codes = [
     ...extractStyleCodes(styleNumber || ""),
     ...extractStyleCodes(name),
   ];
+  const silhouetteFilter = (code: string) => (p: ShopifyProduct) => {
+    const t = `${p.title} ${p.product_type}`.toLowerCase();
+    const u = code.toUpperCase();
+    if (u.startsWith("PANT")) return /\b(bottom|brief|short|pant)\b/.test(t);
+    if (u.startsWith("BRA")) return /\b(bra|top|halter|bandeau|bralette)\b/.test(t);
+    if (/^M\d/.test(u) || u.startsWith("MAIL") || u.startsWith("OP")) {
+      return /\b(one[\s-]?piece|swimsuit|maillot)\b/.test(t);
+    }
+    return true;
+  };
   if (codes.length) {
     for (const code of codes) {
       const codeLow = code.toLowerCase();
-      const codeMatch = products.find((p) => {
+      // 0a — precise fields (title, handle, body, tags, SKU)
+      const precise = products.find((p) => {
         const tags = Array.isArray(p.tags) ? p.tags.join(" ") : (p.tags || "");
         const skus = (p.variants || []).map((v) => v.sku || "").join(" ");
         const hay = `${p.title} ${p.handle} ${p.body_html} ${tags} ${skus}`.toLowerCase();
         return hay.includes(codeLow);
       });
-      if (codeMatch) return codeMatch;
+      if (precise) return precise;
+      // 0b — image-filename match, narrowed by silhouette
+      const imgMatches = products.filter((p) => {
+        const imgs = (p.images || []).map((i) => `${i.src || ""} ${i.alt || ""}`).join(" ").toLowerCase();
+        return imgs.includes(codeLow);
+      });
+      if (imgMatches.length === 1) return imgMatches[0];
+      if (imgMatches.length > 1) {
+        const filtered = imgMatches.filter(silhouetteFilter(code));
+        if (filtered.length === 1) return filtered[0];
+        // If still ambiguous, fall through to token matcher rather than
+        // returning a wrong product.
+      }
     }
   }
 

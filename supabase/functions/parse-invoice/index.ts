@@ -245,7 +245,27 @@ Rules for this layout:
 - The TotalQty column on the right MUST equal the sum of cells you extracted for that row — use it as a checksum.
 - If you cannot read the per-cell quantities but you can see TotalQty, set size to the FIRST visible size in the header and put the full TotalQty there, then add "size_grid_unreadable" to parse_notes — do NOT silently drop the sizes.
 
-**ABSOLUTE RULE for Methods 2 / 2a / 2b / 2c**: When the document shows a size grid (printed labels OR floating header), every product row MUST have a non-empty \`size\` field. If you emit multiple rows for the same product, each row must have a DIFFERENT size value. Never emit N rows for one product all with \`size: ""\`.
+**Method 2a-BAKU: Per-product size grid with colour label on the qty row (Baku Australia style — CRITICAL)**
+Baku invoices use a per-product mini-grid (NOT a floating group header). For EACH style code the layout is:
+
+  CODE        DESCRIPTION         Story    Sizeway1  Total  Tax
+  PANT670KKM  KOKOMO ULTRA HIGH   KOKOMO   8-18  4   4      GS
+  Fabric Content: ...
+                  8   10  12  14  16  18                          ← size header row
+  BLACK               1   1   1   1                               ← colour label + qty row
+
+CRITICAL ALIGNMENT RULES for this layout:
+1. The colour label ("BLACK", "WHITE", "NERO", "ELECTRIC") sits in the LEFT margin and is NOT a quantity. The qty digits start in the column under the FIRST size header where a digit is actually printed — NOT under the first size header by default.
+2. Use SPATIAL alignment: each printed qty digit must sit DIRECTLY below a specific size header column. Read column positions visually — do not assume left-to-right packing.
+3. Empty leading columns mean those sizes were NOT ordered. Empty trailing columns also mean those sizes were NOT ordered. Example above: BLACK row has 4 digits ("1 1 1 1") under headers 10/12/14/16 → emit (size 10, qty 1), (size 12, qty 1), (size 14, qty 1), (size 16, qty 1).
+4. The "Sizeway1" column shows a size RANGE (e.g. "8-18") and a Total qty (e.g. "4"). The TOTAL column is the SOURCE OF TRUTH:
+   - sum(extracted qtys for this product across all colours) MUST equal the Total column value.
+   - If sum ≠ Total, you misread the alignment. Re-examine the grid and shift the qty row until sum equals Total.
+   - If you still cannot reconcile, add "baku_alignment_unreconciled" to parse_notes and emit qtys distributed across the size range from Sizeway1 — but NEVER emit fewer units than the printed Total.
+5. A product may have MULTIPLE colour rows under the same size header (e.g. PANT321KKM Kokomo Regular has BLACK and WHITE rows). Treat each colour row independently; both share the same size header above them.
+6. Numeric size values like 6, 8, 10, 12, 14, 16, 18, 20 in the header row are SIZE LABELS, never quantities. Quantities under this header are typically small integers 1-9.
+
+**ABSOLUTE RULE for Methods 2 / 2a / 2a-BAKU / 2b / 2c**: When the document shows a size grid (printed labels OR floating header), every product row MUST have a non-empty \`size\` field. If you emit multiple rows for the same product, each row must have a DIFFERENT size value. Never emit N rows for one product all with \`size: ""\`. The sum of extracted quantities for a product MUST equal its printed Total column when one is present.
 
 **Method 2b: Size grid with HANDWRITTEN tick marks / pen annotations (CRITICAL)**
 Many fashion wholesale invoices have a printed size grid but the QUANTITIES are written by hand — ticks (✓ / ✔), pen marks, circles, or handwritten numbers.
@@ -481,6 +501,7 @@ Return ONLY valid JSON (no markdown, no explanation):
       "product_type": "e.g. One Piece, Dress, Pant, Top",
       "collection": "Story / Collection / Delivery / Range label for this row, e.g. 'Summer Chintz', 'Beach Bound', 'Resort 26'. Look for a 'Story' or 'Collection' or 'Delivery' or 'Range' column. If a section header above the row names a collection, inherit it. Empty string if none.",
       "group_key": "style_code|colour for grouping variants",
+      "group_total_qty": "if a Total/Total Qty column is printed for this product, copy its INTEGER value here (same value on every variant row of the same style+colour). Use null if no total is printed.",
       "confidence": 0-100,
       "parse_notes": "any issues, ambiguity, or extraction strategy used",
       "extraction_reason": "brief explanation of why this row was identified as a product",
@@ -556,6 +577,32 @@ CRITICAL RULES:
 
 // ── Server-side post-AI validation ──────────────────────────
 function crossValidateProducts(products: Record<string, unknown>[]): Record<string, unknown>[] {
+  // ── Group-total checksum (Baku/Seafolly size-grid mis-alignment guard) ──
+  // For each (style_code|colour) group, compare the sum of extracted variant
+  // qtys against the printed "Total" column the AI reported in `group_total_qty`.
+  // A mismatch almost always means the AI mis-aligned the qty row under the
+  // size header. We flag every variant in that group so the UI surfaces it
+  // and the confidence drops below the auto-export threshold.
+  const groupSums = new Map<string, { sum: number; printedTotal: number | null }>();
+  for (const p of products) {
+    const key = String(p.group_key || `${p.style_code || ""}|${p.colour || ""}`);
+    if (!key.replace("|", "")) continue;
+    const qty = Number(p.quantity) || 0;
+    const printed = p.group_total_qty != null && p.group_total_qty !== ""
+      ? Number(p.group_total_qty) : null;
+    const cur = groupSums.get(key) || { sum: 0, printedTotal: null };
+    cur.sum += qty;
+    if (printed != null && !Number.isNaN(printed)) cur.printedTotal = printed;
+    groupSums.set(key, cur);
+  }
+  const mismatchedGroups = new Set<string>();
+  for (const [key, { sum, printedTotal }] of groupSums) {
+    if (printedTotal != null && printedTotal > 0 && sum !== printedTotal) {
+      mismatchedGroups.add(key);
+      console.warn(`[parse-invoice] group qty mismatch ${key}: extracted ${sum} ≠ printed total ${printedTotal}`);
+    }
+  }
+
   return products.map(p => {
     const unitCost = Number(p.unit_cost) || 0;
     const qty = Number(p.quantity) || 0;
@@ -608,6 +655,14 @@ function crossValidateProducts(products: Record<string, unknown>[]): Record<stri
       const styleCode = String(p.style_code || "");
       const colour = String(p.colour || "");
       p.group_key = styleCode ? `${styleCode}|${colour}` : "";
+    }
+
+    // Rule 7: Group-total checksum mismatch (size-grid alignment)
+    const gKey = String(p.group_key || "");
+    if (gKey && mismatchedGroups.has(gKey)) {
+      const info = groupSums.get(gKey)!;
+      notes.push(`size_grid_total_mismatch: extracted_sum=${info.sum} printed_total=${info.printedTotal} — verify size column alignment`);
+      confidence = Math.max(0, confidence - 25);
     }
 
     p.confidence = Math.min(100, Math.max(0, confidence));

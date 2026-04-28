@@ -4604,6 +4604,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 })();
                 finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
               }}
+              shopifyConnected={shopifyConnected}
               onPushToShopify={() => {
                 void (async () => {
                   const ok = await handlePushToShopify();

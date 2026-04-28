@@ -47,6 +47,7 @@ import PriceMatchPanel from "@/components/PriceMatchPanel";
 import ProductDescriptionPanel from "@/components/ProductDescriptionPanel";
 import ImageHelperPanel from "@/components/ImageHelperPanel";
 import { mapInvoiceItemsToPriceMatch } from "@/lib/price-match-utils";
+import { getConnection as getShopifyConnection, pushProductGraphQL, recordPush, type PushProduct } from "@/lib/shopify-api";
 import CollectionSEOFlow from "@/components/CollectionSEOFlow";
 import SupplierTemplateTeach from "@/components/SupplierTemplateTeach";
 import { extractWithTemplate, parseFileToRows, autoDetectMappings, type SupplierTemplate as DBSupplierTemplate } from "@/lib/rule-based-extractor";
@@ -1448,10 +1449,129 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     toast.error("Reading is still running", {
       description: "Your phone can safely leave this screen and try again shortly; the upload is no longer tied to one long request.",
     });
-    return null;
   };
 
-  // Step 1 — paste folder/file link, list files via drive-list (no download).
+  // Push accepted invoice products to Shopify. Groups variants by SKU prefix /
+  // (vendor + base title) so colour/size variants land on a single product —
+  // matches the variant-grouping rules used elsewhere in the app.
+  const [pushingShopify, setPushingShopify] = useState(false);
+  const handlePushToShopify = async (): Promise<boolean> => {
+    if (pushingShopify) return false;
+
+    const accepted = (validatedProducts || []).filter((p) => !p._rejected);
+    if (accepted.length === 0) {
+      toast.error("Nothing to push", { description: "No accepted products available." });
+      return false;
+    }
+
+    setPushingShopify(true);
+    const toastId = toast.loading("Connecting to Shopify…");
+
+    try {
+      const conn = await getShopifyConnection();
+      if (!conn) {
+        toast.error("No Shopify store connected", {
+          id: toastId,
+          description: "Connect a Shopify store under Connections, then try again.",
+        });
+        return false;
+      }
+
+      // Group by SKU prefix (everything before the last "-") falling back to
+      // vendor+title so single-SKU products still publish.
+      const groups = new Map<string, ValidatedProduct[]>();
+      for (const p of accepted) {
+        const sku = (p.sku || "").trim();
+        const prefix = sku.includes("-") ? sku.slice(0, sku.lastIndexOf("-")) : sku;
+        const key = prefix
+          ? `sku:${prefix.toLowerCase()}`
+          : `title:${(p.brand || "").toLowerCase()}|${(p._suggestedTitle || p.name || "").toLowerCase()}`;
+        const arr = groups.get(key) ?? [];
+        arr.push(p);
+        groups.set(key, arr);
+      }
+
+      const totalGroups = groups.size;
+      let success = 0;
+      let errors = 0;
+      let i = 0;
+
+      for (const [, variants] of groups) {
+        i++;
+        const first = variants[0];
+        const title = first._suggestedTitle || first.name || "Untitled product";
+        toast.loading(`Pushing ${i}/${totalGroups}: ${title.slice(0, 40)}…`, { id: toastId });
+
+        // Always Colour first, Size second (project rule).
+        const hasColour = variants.some((v) => v.colour);
+        const hasSize = variants.some((v) => v.size);
+        const options: { name: string }[] = [];
+        if (hasColour) options.push({ name: "Color" });
+        if (hasSize) options.push({ name: "Size" });
+
+        const product: PushProduct = {
+          title,
+          body_html: "",
+          vendor: first.brand || first._suggestedVendor || undefined,
+          product_type: first.type || undefined,
+          status: "draft",
+          tags: undefined,
+          options: options.length > 0 ? options : undefined,
+          variants: variants.map((v) => ({
+            option1: hasColour ? (v.colour || "Default") : undefined,
+            option2: hasSize ? (v.size || "OS") : undefined,
+            sku: v.sku || "",
+            price: String(v._suggestedPrice || v.rrp || v.cost || 0),
+            cost: v.cost ? String(v.cost) : undefined,
+            inventory_management: "shopify",
+            inventory_quantity: v.qty || 0,
+          })),
+        };
+
+        try {
+          await pushProductGraphQL(product);
+          success++;
+        } catch (err) {
+          errors++;
+          console.error("[Sonic Invoice] Shopify push failed for", title, err);
+        }
+
+        // Respect the 500ms sequential delay rule.
+        if (i < totalGroups) await new Promise((r) => setTimeout(r, 500));
+      }
+
+      try {
+        await recordPush(conn.store_url, success, 0, errors, `Invoice push: ${success} ok / ${errors} failed`, "invoice_flow");
+      } catch (e) {
+        console.warn("[Sonic Invoice] recordPush failed:", e);
+      }
+
+      if (errors === 0) {
+        toast.success(`Pushed ${success} product${success === 1 ? "" : "s"} to Shopify`, {
+          id: toastId,
+          description: "Products were created as drafts so you can review before publishing.",
+        });
+        return true;
+      }
+
+      toast.warning(`Pushed ${success} of ${totalGroups} products`, {
+        id: toastId,
+        description: `${errors} failed — check console for details.`,
+      });
+      return success > 0;
+    } catch (err) {
+      console.error("[Sonic Invoice] Shopify push fatal error:", err);
+      toast.error("Push to Shopify failed", {
+        id: toastId,
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+      return false;
+    } finally {
+      setPushingShopify(false);
+    }
+  };
+
+
   const handleDriveListFiles = async () => {
     if (!driveImportUrl.trim()) {
       toast.error("Paste a Google Drive folder or file link first");
@@ -4432,11 +4552,13 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 }}
                 onPushToShopify={() => {
                   void (async () => {
+                    const ok = await handlePushToShopify();
+                    if (!ok) return;
                     await logShadowStep({ step: "stock_check", status: "done", narrative: "Stock check approved." });
                     await logShadowStep({ step: "publish", status: "done", narrative: "Pushed to Shopify." });
                     await completeShadowSession("Run complete — pushed to Shopify.");
+                    finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
                   })();
-                  finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
                 }}
                 onPriceMatch={() => setPriceMatchActive(true)}
                 onGetDescriptions={() => setDescriptionsActive(true)}
@@ -4467,10 +4589,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               }}
               onPushToShopify={() => {
                 void (async () => {
+                  const ok = await handlePushToShopify();
+                  if (!ok) return;
                   await logShadowStep({ step: "publish", status: "done", narrative: "Pushed to Shopify." });
                   await completeShadowSession("Run complete — pushed to Shopify.");
+                  finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
                 })();
-                finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
               }}
               onProcessAnother={() => { setStep(1); }}
             />

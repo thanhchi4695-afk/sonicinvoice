@@ -239,9 +239,10 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
       const r = results.get(ck(item));
       const desc = r?.description?.trim();
       if (!desc) continue;
+      const fullName = r?.full_product_name?.trim() || item.style_name;
       rows.push([
-        slugify(item.style_number || item.style_name),
-        item.style_name,
+        slugify(item.style_number || fullName),
+        fullName,
         descriptionToHtml(desc),
         item.brand,
         item.product_type || "",

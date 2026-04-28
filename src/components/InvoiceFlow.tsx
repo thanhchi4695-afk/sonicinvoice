@@ -1455,6 +1455,19 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   // (vendor + base title) so colour/size variants land on a single product —
   // matches the variant-grouping rules used elsewhere in the app.
   const [pushingShopify, setPushingShopify] = useState(false);
+  const [shopifyConnected, setShopifyConnected] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const conn = await getShopifyConnection();
+        if (!cancelled) setShopifyConnected(!!conn?.store_url);
+      } catch {
+        if (!cancelled) setShopifyConnected(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const handlePushToShopify = async (): Promise<boolean> => {
     if (pushingShopify) return false;
 

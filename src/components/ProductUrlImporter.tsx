@@ -125,16 +125,35 @@ interface Props {
   className?: string;
 }
 
+const STEPS = [
+  { key: "fetch", label: "Fetching page" },
+  { key: "extract", label: "Extracting product details" },
+  { key: "images", label: "Downloading & optimising images" },
+  { key: "shopify", label: "Preparing Shopify-ready fields" },
+] as const;
+type StepKey = (typeof STEPS)[number]["key"];
+
 export default function ProductUrlImporter({ onAddToInvoice, className }: Props) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ExtractedProduct | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stepIndex, setStepIndex] = useState(0);
+  const stepTimers = useRef<number[]>([]);
+
+  const clearStepTimers = () => {
+    stepTimers.current.forEach((id) => window.clearTimeout(id));
+    stepTimers.current = [];
+  };
+
+  useEffect(() => () => clearStepTimers(), []);
 
   const reset = () => {
     setUrl("");
     setResult(null);
     setError(null);
+    setStepIndex(0);
+    clearStepTimers();
   };
 
   const handleFetch = async () => {
@@ -145,10 +164,19 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       toast.error(v.message);
       return;
     }
-    // Reflect the normalised URL back to the input (e.g. https:// added).
     if (v.value !== url) setUrl(v.value);
 
     setLoading(true);
+    setStepIndex(0);
+    clearStepTimers();
+    // Advance steps on a rough schedule so the UI feels alive even though the
+    // edge function is a single round-trip. Last step waits for completion.
+    const schedule = [1500, 4000, 8000]; // ms — advances to step 1, 2, 3
+    schedule.forEach((delay, i) => {
+      const id = window.setTimeout(() => setStepIndex(i + 1), delay);
+      stepTimers.current.push(id);
+    });
+
     try {
       const { data, error: fnError } = await supabase.functions.invoke("product-extract", {
         body: { url: v.value },
@@ -159,6 +187,8 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
         throw new Error(data?.error || "Could not extract product details");
       }
 
+      clearStepTimers();
+      setStepIndex(STEPS.length); // mark all done
       setResult(data.product ?? {});
       toast.success("Product details fetched");
     } catch (err) {
@@ -167,6 +197,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       setError(message);
       toast.error(message);
     } finally {
+      clearStepTimers();
       setLoading(false);
     }
   };

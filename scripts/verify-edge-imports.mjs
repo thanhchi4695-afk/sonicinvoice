@@ -29,7 +29,14 @@ import { join, relative } from "node:path";
 const ROOT = "supabase/functions";
 const NETWORK = process.argv.includes("--network");
 
-const IMPORT_RE = /(?:import\s+(?:[^"']+?\s+from\s+)?|export\s+[^"']+?\s+from\s+)["']([^"']+)["']/g;
+// Static `import ... from "x"` and `export ... from "x"` (incl. bare `import "x"`).
+const STATIC_IMPORT_RE =
+  /(?:^|[\s;])import\s+(?:[^"']+?\s+from\s+)?["']([^"']+)["']|(?:^|[\s;])export\s+[^"']+?\s+from\s+["']([^"']+)["']/g;
+// Dynamic `import("x")` — must NOT match `.import(` method calls, so require
+// a non-identifier char (or start of line) before `import`.
+const DYNAMIC_IMPORT_RE = /(?:^|[^.\w$])import\s*\(\s*["']([^"']+)["']\s*\)/g;
+// CommonJS `require("x")` — same boundary guard to avoid `.require(`.
+const REQUIRE_RE = /(?:^|[^.\w$])require\s*\(\s*["']([^"']+)["']\s*\)/g;
 const MANGLE_RE = /\[email[\s\u00A0\u200B-]protected\]|\[email\s/i;
 
 /** Recursively list .ts/.js files under dir. */

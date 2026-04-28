@@ -72,7 +72,9 @@ function classify(url) {
     const pkg = spec.startsWith("@")
       ? spec.split("/").slice(0, 2).join("/")
       : spec.split("/")[0];
-    if (!/@\d/.test(pkg)) {
+    // Allowlist: Lovable-managed packages are intentionally unpinned.
+    const ALLOW_UNPINNED = new Set(["@lovable.dev/email-js"]);
+    if (!/@\d/.test(pkg) && !ALLOW_UNPINNED.has(pkg)) {
       issues.push("UNPINNED npm: specifier — add @version");
     }
   }

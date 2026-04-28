@@ -1,51 +1,60 @@
+# URL Product Extractor Agent — Active Plan
 
-# Shopify App Store Compliance Plan
+**Goal:** User pastes a product URL → agent returns `{ name, description, price, currency, normalizedPrice, images[] }` ready for the Shopify pipeline.
 
-## Phase 1: Fix Authentication (Real Supabase Auth)
-- Remove `authed = true` bypass in Index.tsx
-- Make email/password form use real `supabase.auth.signUp` / `supabase.auth.signInWithPassword`
-- Add proper session management with `onAuthStateChange`
-- Add forgot password flow
-- Add loading states for auth
+## Locked extraction cascade (escalate only on failure)
+| Step | Method | Coverage | When |
+|---|---|---|---|
+| 1 | JSON-LD / microdata Product schema | ~15% | Sites with rich snippets |
+| 2 | Universal DOM selectors (Cheerio + og:*) | ~30–40% | Shopify / WooCommerce |
+| 3 | LLM raw HTML → tool-call JSON | ~80% | Most remaining sites |
+| 4 | Playwright + LLM | ~90–95% | JS-heavy / blocked |
+| 5 | 3rd-party API (Apify / ScrapingBee) | ~99% | Last resort |
 
-## Phase 2: Embedded Session Token Auth
-- When app loads embedded (shop + host params), use App Bridge `getSessionToken()` to get a Shopify session token
-- Create new edge function `shopify-session-verify` that:
-  - Decodes the session token JWT
-  - Verifies it against SHOPIFY_API_SECRET
-  - Looks up or creates a Supabase user for the shop
-  - Returns Supabase access/refresh tokens
-- Auto-authenticate embedded users without showing login screen
-- Handle reinstall flow (existing user, new session)
+## File structure (locked)
+```
+src/lib/product-extract/
+  extract-product.ts      ← orchestrator
+  jsonld-parser.ts
+  dom-selectors.ts
+  llm-extractor.ts
+  image-downloader.ts
+  currency-detector.ts
+supabase/functions/product-enrich/index.ts
+```
 
-## Phase 3: Shopify Billing API
-- Create edge function `shopify-billing` that:
-  - Creates an `appSubscriptionCreate` GraphQL mutation
-  - Single plan: e.g. $29/month with 14-day free trial
-  - Returns confirmation URL for merchant approval
-  - Handles `appSubscriptionLineItemUpdate` for upgrades
-- Add billing status check on app load
-- Add plan selection / upgrade UI in Account screen
-- Store billing status in a new `shopify_subscriptions` table
+## Images
+- Priority: `og:image` → near price → product container → gallery
+- Stream via Sharp (resize, WebP) → existing `compressed-images` bucket, no disk
+- Validate `content-type` is image/*; kill-switch >10MB total
 
-## Phase 4: OAuth Callback Fix for Embedded Mode
-- Fix redirect after OAuth — use `APP_URL` env var instead of `origin` header
-- When embedded, redirect to `https://admin.shopify.com/store/{shop}/apps/{api_key}`
-- Ensure reinstall flow works cleanly
+## Currency
+- Regex + `currency-symbol-map` → ISO; cross-check `<html lang>`
+- Always store `originalPrice` + `originalCurrency`
+- Frankfurter API for optional display conversion
+- Unknown currency → `warnings[]`, never silent default
 
-## Phase 5: Quality & Error Handling
-- Add loading states for all async operations
-- Add error boundaries
-- Handle edge cases: empty upload, invalid invoice, API failures
-- Remove console errors
-- Ensure no blank screens
+## Controls
+- Per-user rate limit in edge function
+- All 3rd-party API keys live in edge env only
+- Log every attempt to processing history (URL, strategy, ms, image count, currency)
 
-## Phase 6: Final Review Checklist
-- Verify HTTPS (already covered by hosting)
-- Verify GDPR webhooks (already done)
-- Verify correct scopes
-- Verify no ads/promotions in admin UI
-- Test all flows end-to-end
+## UI entry points
+- "Fetch from URL" button in `InvoiceFlow` and `QuickCapture`
+- Reuse `LinePipelineProgress` to visualise the 5-step cascade
 
-## Database Migration Needed
-- `shopify_subscriptions` table for billing status tracking
+## Roadmap (do not reorder)
+1. Orchestrator + strategies 1–3
+2. Image downloader (Sharp + storage)
+3. Currency detector + normalisation
+4. UI "Fetch from URL" buttons
+5. Edge function deploy + test 10–20 real pages
+6. Rate limiting / budget caps
+7. (Later) Strategy 4 Playwright + Strategy 5 3rd-party APIs
+
+## Plan-adherence rules for future prompts
+- Reject any change that adds a new extraction step outside the 5-tier cascade.
+- Reject any prompt that asks to call AI providers directly from the client — must go through `product-enrich`.
+- Reject any plan to bypass JSON-LD/selectors and jump straight to LLM (cost discipline).
+- Reject any new image storage bucket — reuse `compressed-images`.
+- Reject any silent currency default — must surface `warnings[]`.

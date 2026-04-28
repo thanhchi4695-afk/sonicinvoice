@@ -39,6 +39,14 @@ export interface FetchWithRetryOptions extends RequestInit {
   backoffMs?: number;
   /** Optional callback fired before each retry, useful for UI status updates. */
   onRetry?: (attempt: number, reason: string) => void;
+  /**
+   * When true (default), if the document was hidden at any point during an
+   * attempt and then becomes visible again, abort the in-flight request and
+   * retry immediately (no back-off). Mobile browsers frequently kill
+   * backgrounded fetches silently, so resuming on foreground is the only way
+   * to recover without making the user tap "Try again".
+   */
+  resumeOnForeground?: boolean;
 }
 
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);

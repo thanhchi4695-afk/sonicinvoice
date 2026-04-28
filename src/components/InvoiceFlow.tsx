@@ -1757,9 +1757,17 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         console.warn("[Sonic Invoice] Pre-extraction inference failed:", e);
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
+      const response = await fetchWithRetry(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-extract-validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        // 90s per attempt × up to 3 attempts. Mobile Safari silently kills long
+        // background fetches — without this the UI hangs forever at "Searching".
+        timeoutMs: 90_000,
+        maxAttempts: 3,
+        onRetry: (attempt, reason) => {
+          console.warn(`[Sonic Invoice] AI parse retry ${attempt} (${reason})`);
+          setEnrichLines([{ name: "Reading invoice…", status: "searching", action: `Retrying (${reason})…`, confidence: 0 }]);
+        },
         body: JSON.stringify({
           fileContent: base64,
           fileName: file.name,
@@ -1784,12 +1792,29 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             price_logic: fpHit.price_logic,
           } : undefined,
         }),
+      }).catch((err) => {
+        const isTimeout = err instanceof FetchTimeoutError;
+        const isNetwork = err instanceof FetchRetryError;
+        console.error("[Sonic Invoice] AI parse fetch failed:", err);
+        toast.error(isTimeout ? "Reading timed out" : "Network error reading invoice", {
+          description: isTimeout
+            ? "Your phone may have throttled the upload. Try again on Wi-Fi or with a smaller file."
+            : isNetwork
+              ? "Check your connection and try again."
+              : (err as Error)?.message || "Unknown error",
+        });
+        setEnrichLines([]);
+        return null;
       });
+
+      if (!response) return [];
 
       if (!response.ok) {
         const errText = await response.text();
         console.log('[SONIC-DEBUG] Edge function response received', { data: null, error: errText });
         console.error("AI parse failed:", errText);
+        toast.error("Reading failed", { description: `Server returned ${response.status}` });
+        setEnrichLines([]);
         return [];
       }
 

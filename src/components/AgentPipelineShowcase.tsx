@@ -258,6 +258,17 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
           </ul>
         </Card>
       )}
+
+      <AgentTourController
+        steps={cards.map((c) => ({
+          targetId: `pipeline-${c.name.toLowerCase()}`,
+          title: AGENT_INFO[c.name]?.name ?? c.name,
+          caption: AGENT_INFO[c.name]?.why ?? c.desc,
+        }))}
+        open={tourOpen}
+        onClose={() => setTourOpen(false)}
+        onStepChange={setActiveTourId}
+      />
     </div>
   );
 };

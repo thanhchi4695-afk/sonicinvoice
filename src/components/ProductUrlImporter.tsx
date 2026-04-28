@@ -964,6 +964,38 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                       >
                         <GripVertical className="w-4 h-4" />
                       </button>
+                      <div className="hidden sm:flex flex-col shrink-0 -my-1" role="group" aria-label="Reorder">
+                        <button
+                          type="button"
+                          onClick={() => reorderBulkRow(i, i - 1)}
+                          disabled={!canMoveUp}
+                          aria-label={`Move ${row.product?.name?.trim() || "row"} up`}
+                          title="Move up"
+                          className={cn(
+                            "p-0.5 rounded text-muted-foreground transition-colors",
+                            canMoveUp
+                              ? "hover:text-foreground hover:bg-background/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                              : "opacity-30 cursor-not-allowed",
+                          )}
+                        >
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => reorderBulkRow(i, i + 1)}
+                          disabled={!canMoveDown}
+                          aria-label={`Move ${row.product?.name?.trim() || "row"} down`}
+                          title="Move down"
+                          className={cn(
+                            "p-0.5 rounded text-muted-foreground transition-colors",
+                            canMoveDown
+                              ? "hover:text-foreground hover:bg-background/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                              : "opacity-30 cursor-not-allowed",
+                          )}
+                        >
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                       <span className="w-4 h-4 flex items-center justify-center shrink-0">
                         {row.status === "success" && <Check className="w-3.5 h-3.5 text-primary" />}
                         {row.status === "error" && <AlertTriangle className="w-3.5 h-3.5 text-destructive" />}

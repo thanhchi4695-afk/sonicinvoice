@@ -961,8 +961,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       setShowCompletionSummary(true);
       return;
     }
+    const initialPipeline = (): import("@/components/LinePipelineProgress").PipelineStage[] => ([
+      { key: "query",    status: "pending" },
+      { key: "supplier", status: "pending" },
+      { key: "web",      status: "pending" },
+      { key: "verifier", status: "pending" },
+    ]);
     const lines: EnrichLine[] = names.map(name => ({
       name, status: "waiting" as LineStatus, action: "○ Waiting", confidence: 0,
+      pipeline: initialPipeline(),
     }));
     setEnrichLines([...lines]);
 
@@ -996,27 +1003,84 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         return;
       }
       const i = lineIdx;
-      let actionIdx = 0;
       const brandGuess = names[i].split(" ")[0]?.toLowerCase() || "supplier";
-      lines[i] = { ...lines[i], status: "searching", action: `Searching ${brandGuess}.com.au...` };
+
+      type Stage = import("@/components/LinePipelineProgress").PipelineStage;
+      const setStage = (key: Stage["key"], patch: Partial<Stage>) => {
+        const pipeline = (lines[i].pipeline ?? initialPipeline()).map((s) =>
+          s.key === key ? { ...s, ...patch } : s
+        );
+        lines[i] = { ...lines[i], pipeline };
+        setEnrichLines([...lines]);
+      };
+
+      // Stage 1 — Query Builder
+      lines[i] = { ...lines[i], status: "searching", action: "Building ranked queries…" };
+      setStage("query", { status: "active", detail: "Brand + Name + Colour first" });
       setEnrichLines([...lines]);
 
-      const stepAction = () => {
+      setTimeout(() => {
         if (cancelled.current) return;
-        actionIdx++;
-        if (actionIdx < actionSequence.length - 1) {
-          lines[i] = { ...lines[i], status: "extracting", action: actionSequence[actionIdx] };
+        setStage("query", { status: "done", detail: "3 queries ranked", candidates: 3 });
+
+        // Stage 2 — Supplier Agent
+        lines[i] = { ...lines[i], action: `Searching ${brandGuess}.com.au…` };
+        setStage("supplier", { status: "active", detail: `Crawling ${brandGuess}.com.au` });
+        setEnrichLines([...lines]);
+
+        setTimeout(() => {
+          if (cancelled.current) return;
+          const supplierHits = Math.random() > 0.25 ? 1 + Math.floor(Math.random() * 2) : 0;
+          setStage("supplier", {
+            status: supplierHits > 0 ? "done" : "skipped",
+            detail: supplierHits > 0 ? "Found product page" : "No brand site match",
+            candidates: supplierHits,
+          });
+
+          // Stage 3 — Web Agent
+          lines[i] = { ...lines[i], status: "extracting", action: "Searching AU retailers…" };
+          setStage("web", { status: "active", detail: "Brave Search across stockists" });
           setEnrichLines([...lines]);
-          setTimeout(stepAction, 200 + Math.random() * 300);
-        } else {
-          const finalStatus: LineStatus = Math.random() > 0.85 ? "review" : "done";
-          lines[i] = { ...lines[i], status: finalStatus, action: "Done ✓", confidence: finalStatus === "review" ? 72 : 95 };
-          setEnrichLines([...lines]);
-          lineIdx++;
-          setTimeout(processNextLine, 150);
-        }
-      };
-      setTimeout(stepAction, 300 + Math.random() * 400);
+
+          setTimeout(() => {
+            if (cancelled.current) return;
+            const webHits = Math.floor(Math.random() * 4);
+            setStage("web", {
+              status: webHits > 0 ? "done" : "skipped",
+              detail: webHits > 0 ? `${webHits} retailer matches` : "No retailer hits",
+              candidates: webHits,
+            });
+
+            // Stage 4 — Verifier
+            const totalHits = supplierHits + webHits;
+            if (totalHits === 0) {
+              setStage("verifier", { status: "skipped", detail: "Nothing to verify" });
+              lines[i] = { ...lines[i], status: "not_found", action: "✗ No candidates", confidence: 0 };
+              setEnrichLines([...lines]);
+              lineIdx++;
+              setTimeout(processNextLine, 150);
+              return;
+            }
+
+            lines[i] = { ...lines[i], action: `Verifying top ${Math.min(3, totalHits)} candidates…` };
+            setStage("verifier", { status: "active", detail: `Scoring top ${Math.min(3, totalHits)}` });
+            setEnrichLines([...lines]);
+
+            setTimeout(() => {
+              if (cancelled.current) return;
+              const conf = Math.random() > 0.85
+                ? 60 + Math.floor(Math.random() * 15)
+                : 88 + Math.floor(Math.random() * 12);
+              const finalStatus: LineStatus = conf >= 88 ? "done" : "review";
+              setStage("verifier", { status: "done", detail: "Best match selected", confidence: conf });
+              lines[i] = { ...lines[i], status: finalStatus, action: "Done ✓", confidence: conf };
+              setEnrichLines([...lines]);
+              lineIdx++;
+              setTimeout(processNextLine, 150);
+            }, 350 + Math.random() * 350);
+          }, 500 + Math.random() * 500);
+        }, 500 + Math.random() * 500);
+      }, 250 + Math.random() * 200);
     };
     processNextLine();
   };

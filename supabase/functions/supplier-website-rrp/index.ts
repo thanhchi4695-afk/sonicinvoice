@@ -253,6 +253,15 @@ function findProductByNameAndColour(
   }
 
   if (candidates.length === 0) return null;
+
+  // ── Step 1d: silhouette filter from supplier code prefix ──
+  // (PANT* → bottom, BRA* → bra/top, M* → one-piece). This disambiguates
+  // when the token matcher returns several products from the same story.
+  if (codes.length && candidates.length > 1) {
+    const filtered = candidates.filter(silhouetteFilter(codes[0]));
+    if (filtered.length) candidates = filtered;
+  }
+
   if (candidates.length === 1) return candidates[0];
 
   // ── Step 2: narrow by colour ──

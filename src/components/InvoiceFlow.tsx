@@ -4589,10 +4589,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               }}
               onPushToShopify={() => {
                 void (async () => {
+                  const ok = await handlePushToShopify();
+                  if (!ok) return;
                   await logShadowStep({ step: "publish", status: "done", narrative: "Pushed to Shopify." });
                   await completeShadowSession("Run complete — pushed to Shopify.");
+                  finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
                 })();
-                finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
               }}
               onProcessAnother={() => { setStep(1); }}
             />

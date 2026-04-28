@@ -57,6 +57,7 @@ import { recordProcessingQuality } from "@/lib/processing-quality";
 import { formatDuration, estimateEta, recordProcessingDuration } from "@/lib/processing-timing";
 import { persistParsedInvoice } from "@/lib/invoice-persistence";
 import DriveQueuePanel from "@/components/DriveQueuePanel";
+import LinePipelineProgress from "@/components/LinePipelineProgress";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 
@@ -918,6 +919,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     status: LineStatus;
     action: string;
     confidence: number;
+    pipeline?: import("@/components/LinePipelineProgress").PipelineStage[];
   }
   const [enrichLines, setEnrichLines] = useState<EnrichLine[]>([]);
 
@@ -960,8 +962,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       setShowCompletionSummary(true);
       return;
     }
+    const initialPipeline = (): import("@/components/LinePipelineProgress").PipelineStage[] => ([
+      { key: "query",    status: "pending" },
+      { key: "supplier", status: "pending" },
+      { key: "web",      status: "pending" },
+      { key: "verifier", status: "pending" },
+    ]);
     const lines: EnrichLine[] = names.map(name => ({
       name, status: "waiting" as LineStatus, action: "○ Waiting", confidence: 0,
+      pipeline: initialPipeline(),
     }));
     setEnrichLines([...lines]);
 
@@ -995,27 +1004,84 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         return;
       }
       const i = lineIdx;
-      let actionIdx = 0;
       const brandGuess = names[i].split(" ")[0]?.toLowerCase() || "supplier";
-      lines[i] = { ...lines[i], status: "searching", action: `Searching ${brandGuess}.com.au...` };
+
+      type Stage = import("@/components/LinePipelineProgress").PipelineStage;
+      const setStage = (key: Stage["key"], patch: Partial<Stage>) => {
+        const pipeline = (lines[i].pipeline ?? initialPipeline()).map((s) =>
+          s.key === key ? { ...s, ...patch } : s
+        );
+        lines[i] = { ...lines[i], pipeline };
+        setEnrichLines([...lines]);
+      };
+
+      // Stage 1 — Query Builder
+      lines[i] = { ...lines[i], status: "searching", action: "Building ranked queries…" };
+      setStage("query", { status: "active", detail: "Brand + Name + Colour first" });
       setEnrichLines([...lines]);
 
-      const stepAction = () => {
+      setTimeout(() => {
         if (cancelled.current) return;
-        actionIdx++;
-        if (actionIdx < actionSequence.length - 1) {
-          lines[i] = { ...lines[i], status: "extracting", action: actionSequence[actionIdx] };
+        setStage("query", { status: "done", detail: "3 queries ranked", candidates: 3 });
+
+        // Stage 2 — Supplier Agent
+        lines[i] = { ...lines[i], action: `Searching ${brandGuess}.com.au…` };
+        setStage("supplier", { status: "active", detail: `Crawling ${brandGuess}.com.au` });
+        setEnrichLines([...lines]);
+
+        setTimeout(() => {
+          if (cancelled.current) return;
+          const supplierHits = Math.random() > 0.25 ? 1 + Math.floor(Math.random() * 2) : 0;
+          setStage("supplier", {
+            status: supplierHits > 0 ? "done" : "skipped",
+            detail: supplierHits > 0 ? "Found product page" : "No brand site match",
+            candidates: supplierHits,
+          });
+
+          // Stage 3 — Web Agent
+          lines[i] = { ...lines[i], status: "extracting", action: "Searching AU retailers…" };
+          setStage("web", { status: "active", detail: "Brave Search across stockists" });
           setEnrichLines([...lines]);
-          setTimeout(stepAction, 200 + Math.random() * 300);
-        } else {
-          const finalStatus: LineStatus = Math.random() > 0.85 ? "review" : "done";
-          lines[i] = { ...lines[i], status: finalStatus, action: "Done ✓", confidence: finalStatus === "review" ? 72 : 95 };
-          setEnrichLines([...lines]);
-          lineIdx++;
-          setTimeout(processNextLine, 150);
-        }
-      };
-      setTimeout(stepAction, 300 + Math.random() * 400);
+
+          setTimeout(() => {
+            if (cancelled.current) return;
+            const webHits = Math.floor(Math.random() * 4);
+            setStage("web", {
+              status: webHits > 0 ? "done" : "skipped",
+              detail: webHits > 0 ? `${webHits} retailer matches` : "No retailer hits",
+              candidates: webHits,
+            });
+
+            // Stage 4 — Verifier
+            const totalHits = supplierHits + webHits;
+            if (totalHits === 0) {
+              setStage("verifier", { status: "skipped", detail: "Nothing to verify" });
+              lines[i] = { ...lines[i], status: "not_found", action: "✗ No candidates", confidence: 0 };
+              setEnrichLines([...lines]);
+              lineIdx++;
+              setTimeout(processNextLine, 150);
+              return;
+            }
+
+            lines[i] = { ...lines[i], action: `Verifying top ${Math.min(3, totalHits)} candidates…` };
+            setStage("verifier", { status: "active", detail: `Scoring top ${Math.min(3, totalHits)}` });
+            setEnrichLines([...lines]);
+
+            setTimeout(() => {
+              if (cancelled.current) return;
+              const conf = Math.random() > 0.85
+                ? 60 + Math.floor(Math.random() * 15)
+                : 88 + Math.floor(Math.random() * 12);
+              const finalStatus: LineStatus = conf >= 88 ? "done" : "review";
+              setStage("verifier", { status: "done", detail: "Best match selected", confidence: conf });
+              lines[i] = { ...lines[i], status: finalStatus, action: "Done ✓", confidence: conf };
+              setEnrichLines([...lines]);
+              lineIdx++;
+              setTimeout(processNextLine, 150);
+            }, 350 + Math.random() * 350);
+          }, 500 + Math.random() * 500);
+        }, 500 + Math.random() * 500);
+      }, 250 + Math.random() * 200);
     };
     processNextLine();
   };
@@ -3984,32 +4050,37 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                     </div>
                     <div className="divide-y divide-border">
                       {enrichLines.map((line, i) => (
-                        <div key={i} className="grid grid-cols-[24px_1fr_90px_1fr_50px] gap-2 items-center px-3 py-2 text-xs">
-                          <span className="text-muted-foreground">{i + 1}</span>
-                          <span className="truncate font-medium">{line.name}</span>
-                          <span className={`flex items-center gap-1 text-[11px] font-medium ${
-                            line.status === "waiting" ? "text-muted-foreground" :
-                            line.status === "searching" || line.status === "extracting" ? "text-primary" :
-                            line.status === "done" ? "text-success" :
-                            line.status === "review" ? "text-secondary" :
-                            "text-destructive"
-                          }`}>
-                            {line.status === "waiting" && "○ Waiting"}
-                            {line.status === "searching" && <><Loader2 className="w-3 h-3 animate-spin" /> Searching</>}
-                            {line.status === "extracting" && <><Loader2 className="w-3 h-3 animate-spin" /> Extracting</>}
-                            {line.status === "done" && "✓ Done"}
-                            {line.status === "review" && "⚠ Review"}
-                            {line.status === "not_found" && "✗ Not found"}
-                          </span>
-                          <span className="text-muted-foreground truncate text-[11px]">{line.action}</span>
-                          <span className={`font-mono-data text-[11px] ${
-                            line.confidence >= 90 ? "text-success" :
-                            line.confidence >= 70 ? "text-secondary" :
-                            line.confidence > 0 ? "text-destructive" :
-                            "text-muted-foreground"
-                          }`}>
-                            {line.confidence > 0 ? `${line.confidence}%` : "—"}
-                          </span>
+                        <div key={i} className="px-3 py-2 space-y-2">
+                          <div className="grid grid-cols-[24px_1fr_90px_1fr_50px] gap-2 items-center text-xs">
+                            <span className="text-muted-foreground">{i + 1}</span>
+                            <span className="truncate font-medium">{line.name}</span>
+                            <span className={`flex items-center gap-1 text-[11px] font-medium ${
+                              line.status === "waiting" ? "text-muted-foreground" :
+                              line.status === "searching" || line.status === "extracting" ? "text-primary" :
+                              line.status === "done" ? "text-success" :
+                              line.status === "review" ? "text-secondary" :
+                              "text-destructive"
+                            }`}>
+                              {line.status === "waiting" && "○ Waiting"}
+                              {line.status === "searching" && <><Loader2 className="w-3 h-3 animate-spin" /> Searching</>}
+                              {line.status === "extracting" && <><Loader2 className="w-3 h-3 animate-spin" /> Extracting</>}
+                              {line.status === "done" && "✓ Done"}
+                              {line.status === "review" && "⚠ Review"}
+                              {line.status === "not_found" && "✗ Not found"}
+                            </span>
+                            <span className="text-muted-foreground truncate text-[11px]">{line.action}</span>
+                            <span className={`font-mono-data text-[11px] ${
+                              line.confidence >= 90 ? "text-success" :
+                              line.confidence >= 70 ? "text-secondary" :
+                              line.confidence > 0 ? "text-destructive" :
+                              "text-muted-foreground"
+                            }`}>
+                              {line.confidence > 0 ? `${line.confidence}%` : "—"}
+                            </span>
+                          </div>
+                          {line.pipeline && line.pipeline.length > 0 && (
+                            <LinePipelineProgress stages={line.pipeline} compact />
+                          )}
                         </div>
                       ))}
                     </div>

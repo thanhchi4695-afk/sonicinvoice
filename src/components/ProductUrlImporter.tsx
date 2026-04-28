@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import {
   Link as LinkIcon, Loader2, ImageIcon, Plus, X, ExternalLink, Check, Circle,
-  Star, Trash2, ImagePlus,
+  Star, Trash2, ImagePlus, Layers, AlertTriangle,
 } from "lucide-react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -148,8 +149,39 @@ interface EditState {
   primaryIndex: number;
 }
 
+type BulkStatus = "pending" | "fetching" | "success" | "error";
+interface BulkRow {
+  url: string;
+  status: BulkStatus;
+  product?: ExtractedProduct;
+  error?: string;
+}
+
+const MAX_BULK_URLS = 25;
+
+/** Parse a multi-URL textarea (newline / comma / space / tab separated). */
+function parseBulkUrls(raw: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  raw.split(/[\s,]+/).forEach((tok) => {
+    const t = tok.trim();
+    if (!t) return;
+    const v = validateProductUrl(t);
+    const key = v.ok ? v.value : t.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(v.ok ? v.value : t);
+  });
+  return out;
+}
+
 export default function ProductUrlImporter({ onAddToInvoice, className }: Props) {
+  const [mode, setMode] = useState<"single" | "bulk">("single");
   const [url, setUrl] = useState("");
+  const [bulkText, setBulkText] = useState("");
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([]);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const bulkAbortRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ExtractedProduct | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);
@@ -270,6 +302,142 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     reset();
   };
 
+  // ── Bulk mode ──────────────────────────────────────────────────
+  const productToItem = (p: ExtractedProduct, fallbackUrl: string): ImportedLineItem => {
+    const numericPrice =
+      typeof p.price === "number"
+        ? p.price
+        : typeof p.price === "string" && p.price.trim() !== ""
+          ? Number(p.price)
+          : undefined;
+    return {
+      name: p.name?.trim() || "Imported product",
+      description: p.description?.trim() || undefined,
+      price: Number.isFinite(numericPrice) ? (numericPrice as number) : p.priceNormalized,
+      currency: p.currency,
+      imageUrls: (p.images ?? []).map((i) => i.storedUrl).filter(Boolean),
+      sourceUrl: p.sourceUrl ?? fallbackUrl,
+    };
+  };
+
+  const runBulk = async () => {
+    const urls = parseBulkUrls(bulkText);
+    if (urls.length === 0) {
+      toast.error("Paste at least one product URL.");
+      return;
+    }
+    if (urls.length > MAX_BULK_URLS) {
+      toast.error(`Too many URLs — max ${MAX_BULK_URLS} at a time.`);
+      return;
+    }
+
+    // Validate all upfront so user sees per-row issues immediately.
+    const initial: BulkRow[] = urls.map((u) => {
+      const v = validateProductUrl(u);
+      if (v.ok === false) {
+        return { url: u, status: "error" as const, error: v.message };
+      }
+      return { url: v.value, status: "pending" as const };
+    });
+    setBulkRows(initial);
+
+    bulkAbortRef.current = false;
+    setBulkRunning(true);
+
+    // Sequential — respects upstream sites & avoids edge fn rate limits.
+    for (let i = 0; i < initial.length; i++) {
+      if (bulkAbortRef.current) break;
+      if (initial[i].status === "error") continue;
+
+      setBulkRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, status: "fetching" } : r)));
+
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke("product-extract", {
+          body: { url: initial[i].url },
+        });
+        if (fnError) throw new Error(fnError.message || "Extraction failed");
+        if (!data?.success) throw new Error(data?.error || "Could not extract product details");
+        const product: ExtractedProduct = data.product ?? {};
+        setBulkRows((rows) =>
+          rows.map((r, idx) => (idx === i ? { ...r, status: "success", product } : r)),
+        );
+      } catch (err) {
+        const raw = err instanceof Error ? err.message : "Something went wrong";
+        setBulkRows((rows) =>
+          rows.map((r, idx) =>
+            idx === i ? { ...r, status: "error", error: friendlyError(raw) } : r,
+          ),
+        );
+      }
+
+      // Light delay between requests to be a good citizen.
+      if (i < initial.length - 1) {
+        await new Promise((res) => setTimeout(res, 600));
+      }
+    }
+
+    setBulkRunning(false);
+    setBulkRows((rows) => {
+      const successCount = rows.filter((r) => r.status === "success").length;
+      if (successCount > 0) {
+        toast.success(`Fetched ${successCount} product${successCount === 1 ? "" : "s"} — review then merge.`);
+      }
+      return rows;
+    });
+  };
+
+  const stopBulk = () => {
+    bulkAbortRef.current = true;
+    toast.message("Stopping after current URL…");
+  };
+
+  const removeBulkRow = (idx: number) => {
+    setBulkRows((rows) => rows.filter((_, i) => i !== idx));
+  };
+
+  const retryBulkRow = async (idx: number) => {
+    const row = bulkRows[idx];
+    if (!row || bulkRunning) return;
+    setBulkRows((rows) => rows.map((r, i) => (i === idx ? { ...r, status: "fetching", error: undefined } : r)));
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("product-extract", {
+        body: { url: row.url },
+      });
+      if (fnError) throw new Error(fnError.message || "Extraction failed");
+      if (!data?.success) throw new Error(data?.error || "Could not extract product details");
+      const product: ExtractedProduct = data.product ?? {};
+      setBulkRows((rows) => rows.map((r, i) => (i === idx ? { ...r, status: "success", product } : r)));
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "Something went wrong";
+      setBulkRows((rows) =>
+        rows.map((r, i) => (i === idx ? { ...r, status: "error", error: friendlyError(raw) } : r)),
+      );
+    }
+  };
+
+  const mergeBulkIntoInvoice = () => {
+    const successes = bulkRows.filter((r) => r.status === "success" && r.product);
+    if (successes.length === 0) {
+      toast.error("No successful products to merge yet.");
+      return;
+    }
+    if (!onAddToInvoice) {
+      toast.error("No invoice target connected.");
+      return;
+    }
+    successes.forEach((row) => {
+      const item = productToItem(row.product!, row.url);
+      onAddToInvoice(item);
+      addAuditEntry(
+        "url_import",
+        `Bulk imported "${item.name}" from ${item.sourceUrl}${item.price !== undefined ? ` — ${item.currency ?? ""} ${item.price}` : ""}`,
+      );
+    });
+    toast.success(`Merged ${successes.length} product${successes.length === 1 ? "" : "s"} into invoice`);
+    setBulkRows([]);
+    setBulkText("");
+  };
+
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
@@ -283,6 +451,19 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       </CardHeader>
 
       <CardContent className="space-y-3">
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "single" | "bulk")}>
+          <TabsList className="grid grid-cols-2 w-full mb-3">
+            <TabsTrigger value="single" className="text-xs">
+              <LinkIcon className="w-3.5 h-3.5 mr-1.5" />
+              Single URL
+            </TabsTrigger>
+            <TabsTrigger value="bulk" className="text-xs">
+              <Layers className="w-3.5 h-3.5 mr-1.5" />
+              Multiple URLs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="single" className="space-y-3 mt-0">
         <div className="space-y-2">
           <label
             htmlFor="product-url-input"
@@ -592,6 +773,152 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
             </div>
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="bulk" className="space-y-3 mt-0">
+            <div className="space-y-2">
+              <Label htmlFor="bulk-urls" className="text-sm font-medium flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-primary" />
+                Paste product links
+              </Label>
+              <Textarea
+                id="bulk-urls"
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                placeholder={"https://brand.com/products/dress-a\nhttps://brand.com/products/dress-b\nhttps://brand.com/products/dress-c"}
+                rows={5}
+                disabled={bulkRunning}
+                className="font-mono text-xs resize-y"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                One URL per line, or separated by commas/spaces. Max {MAX_BULK_URLS} at a time.
+                {bulkText.trim() && (() => {
+                  const count = parseBulkUrls(bulkText).length;
+                  return (
+                    <span className="ml-1 font-medium text-foreground">
+                      ({count} link{count === 1 ? "" : "s"} detected)
+                    </span>
+                  );
+                })()}
+              </p>
+              <div className="flex gap-2">
+                {!bulkRunning ? (
+                  <Button
+                    onClick={runBulk}
+                    disabled={!bulkText.trim()}
+                    size="lg"
+                    className="h-11 flex-1 font-semibold"
+                  >
+                    <Layers className="w-4 h-4 mr-2" />
+                    Extract all products
+                  </Button>
+                ) : (
+                  <Button onClick={stopBulk} variant="outline" size="lg" className="h-11 flex-1">
+                    <X className="w-4 h-4 mr-2" />
+                    Stop after current
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {bulkRows.length > 0 && (
+              <div className="rounded-lg border border-border bg-card/50 p-2 space-y-2">
+                <div className="flex items-center justify-between px-1 pb-1 border-b border-border/60">
+                  <p className="text-xs font-semibold">
+                    {bulkRows.filter((r) => r.status === "success").length} of {bulkRows.length} ready
+                    {bulkRunning && " · processing…"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setBulkRows([])}
+                    disabled={bulkRunning}
+                    className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  >
+                    Clear list
+                  </button>
+                </div>
+
+                <ul className="max-h-72 overflow-y-auto space-y-1.5">
+                  {bulkRows.map((row, i) => (
+                    <li
+                      key={`${row.url}-${i}`}
+                      className={cn(
+                        "flex items-center gap-2 rounded-md p-2 text-xs border",
+                        row.status === "success" && "border-primary/30 bg-primary/5",
+                        row.status === "error" && "border-destructive/30 bg-destructive/5",
+                        row.status === "fetching" && "border-primary/40 bg-primary/10",
+                        row.status === "pending" && "border-border bg-background/40",
+                      )}
+                    >
+                      <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                        {row.status === "success" && <Check className="w-3.5 h-3.5 text-primary" />}
+                        {row.status === "error" && <AlertTriangle className="w-3.5 h-3.5 text-destructive" />}
+                        {row.status === "fetching" && <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />}
+                        {row.status === "pending" && <Circle className="w-2.5 h-2.5 text-muted-foreground" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">
+                          {row.product?.name?.trim() || row.url}
+                        </p>
+                        {row.status === "success" && row.product && (
+                          <p className="text-[11px] text-muted-foreground font-mono truncate">
+                            {row.product.currency ?? ""} {row.product.price ?? ""} · {row.product.images?.length ?? 0} img
+                          </p>
+                        )}
+                        {row.status === "error" && (
+                          <p className="text-[11px] text-destructive truncate" title={row.error}>
+                            {row.error || "Failed"}
+                          </p>
+                        )}
+                        {row.status === "pending" && (
+                          <p className="text-[11px] text-muted-foreground truncate">{row.url}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {row.status === "error" && !bulkRunning && (
+                          <button
+                            type="button"
+                            onClick={() => retryBulkRow(i)}
+                            className="text-[11px] text-primary hover:underline px-1"
+                          >
+                            Retry
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeBulkRow(i)}
+                          disabled={bulkRunning && row.status === "fetching"}
+                          className="text-muted-foreground hover:text-destructive disabled:opacity-30"
+                          aria-label="Remove"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
+                  <span className="text-[11px] text-muted-foreground">
+                    Successful items will be merged into the invoice.
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={mergeBulkIntoInvoice}
+                    disabled={
+                      bulkRunning ||
+                      !onAddToInvoice ||
+                      bulkRows.filter((r) => r.status === "success").length === 0
+                    }
+                  >
+                    <Plus className="w-4 h-4 mr-1.5" />
+                    Merge {bulkRows.filter((r) => r.status === "success").length} into invoice
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

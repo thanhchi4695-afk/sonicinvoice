@@ -105,6 +105,15 @@ const agents: EnrichAgent[] = [
 ];
 
 const EnrichmentAgentsShowcase = ({ onOpenGuide }: Props) => {
+  const [tourOpen, setTourOpen] = useState(false);
+  const [activeTourId, setActiveTourId] = useState<string | null>(null);
+
+  const tourSteps: TourStep[] = agents.map((a) => ({
+    targetId: `enrich-${a.name.toLowerCase().replace(/\s+/g, "-")}`,
+    title: a.info.name,
+    caption: a.info.why,
+  }));
+
   return (
     <div className="space-y-3">
       {/* Header */}
@@ -121,26 +130,43 @@ const EnrichmentAgentsShowcase = ({ onOpenGuide }: Props) => {
             </p>
           </div>
         </div>
-        {onOpenGuide && (
-          <Button variant="ghost" size="sm" onClick={onOpenGuide} className="text-xs">
-            How it works <ChevronRight className="h-3 w-3" />
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setTourOpen(true)}
+            className="text-xs"
+          >
+            <PlayCircle className="h-3 w-3" /> Tour
           </Button>
-        )}
+          {onOpenGuide && (
+            <Button variant="ghost" size="sm" onClick={onOpenGuide} className="text-xs">
+              How it works <ChevronRight className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Agent cards */}
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {agents.map((a, i) => {
           const Icon = a.icon;
+          const tourId = `enrich-${a.name.toLowerCase().replace(/\s+/g, "-")}`;
+          const isActiveTourTarget = activeTourId === tourId;
           return (
-            <div key={a.name} className="relative">
+            <div key={a.name} className="relative" data-tour-id={tourId}>
               <Card className="flex h-full flex-col gap-2 border-accent/30 bg-card p-3">
                 <div className="flex items-start justify-between">
                   <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent/10 text-accent">
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="flex items-center gap-1">
-                    <AgentInfoPopover info={a.info} variant="accent" />
+                    <AgentInfoPopover
+                      info={a.info}
+                      variant="accent"
+                      open={isActiveTourTarget ? true : undefined}
+                      onOpenChange={isActiveTourTarget ? () => {} : undefined}
+                    />
                     <span className="h-2 w-2 rounded-full bg-success" aria-label="active" />
                   </div>
                 </div>
@@ -157,6 +183,13 @@ const EnrichmentAgentsShowcase = ({ onOpenGuide }: Props) => {
           );
         })}
       </div>
+
+      <AgentTourController
+        steps={tourSteps}
+        open={tourOpen}
+        onClose={() => setTourOpen(false)}
+        onStepChange={setActiveTourId}
+      />
     </div>
   );
 };

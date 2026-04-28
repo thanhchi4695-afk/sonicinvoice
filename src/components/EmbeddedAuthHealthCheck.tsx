@@ -24,7 +24,7 @@ const EmbeddedAuthHealthCheck = () => {
 
   if (authState === "authenticated") {
     return (
-      <div className={`${base} bg-primary/10 text-primary`}>
+      <div className={`${base} bg-primary/10 text-primary hidden lg:inline-flex`}>
         <CheckCircle2 className="h-3.5 w-3.5" />
         Embedded session active{shop ? ` • ${shop}` : ""}
       </div>

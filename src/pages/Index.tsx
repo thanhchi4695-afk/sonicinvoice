@@ -200,7 +200,6 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showQuickSearch, setShowQuickSearch] = useState(false);
   const [reconciliationResult, setReconciliationResult] = useState<any>(null);
-  const [embeddedAuthTimedOut, setEmbeddedAuthTimedOut] = useState(false);
 
   const handleReconciliationExport = useCallback((_sets: unknown) => {
     // Hand-off back to invoice flow's export step
@@ -293,24 +292,6 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       setAuthLoading(false);
     }
     // "loading" → keep authLoading true (default)
-  }, [isEmbedded, embeddedAuthState]);
-
-  // ── Hard timeout safety net ──
-  // If embedded auth never resolves (App Bridge CDN blocked, network stall,
-  // verify endpoint hanging), drop the loading screen after 15s so the user
-  // sees the reinstall / retry UI rather than an infinite spinner.
-  useEffect(() => {
-    if (!isEmbedded) return;
-    if (embeddedAuthState !== "loading") {
-      setEmbeddedAuthTimedOut(false);
-      return;
-    }
-    const t = window.setTimeout(() => {
-      console.warn("[embedded-auth] Hard timeout — forcing authLoading=false after 15s");
-      setAuthLoading(false);
-      setEmbeddedAuthTimedOut(true);
-    }, 15000);
-    return () => window.clearTimeout(t);
   }, [isEmbedded, embeddedAuthState]);
 
   // Handle Shopify OAuth callback redirect (store connection)

@@ -32,6 +32,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rule?: MarginRule | null;
+  /** Seed values for a brand-new rule (ignored when `rule` is set). */
+  template?: Pick<MarginRule, "name" | "is_active" | "conditions" | "actions" | "priority"> | null;
   defaultPriority?: number;
 }
 
@@ -42,7 +44,11 @@ interface DraftState extends Omit<DraftRule, "conditions"> {
   rootGroup: ConditionGroup;
 }
 
-function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftState {
+function toDraft(
+  rule?: MarginRule | null,
+  defaultPriority = 0,
+  template?: Props["template"],
+): DraftState {
   if (rule) {
     return {
       id: rule.id,
@@ -51,6 +57,15 @@ function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftState {
       rootGroup: toRootGroup(rule.conditions),
       actions: rule.actions,
       priority: rule.priority,
+    };
+  }
+  if (template) {
+    return {
+      name: template.name,
+      is_active: template.is_active,
+      rootGroup: toRootGroup(template.conditions),
+      actions: template.actions.length > 0 ? template.actions : [EMPTY_ACTION],
+      priority: defaultPriority,
     };
   }
   return {

@@ -67,28 +67,111 @@ async function verifySlackSignature(req: Request, rawBody: string): Promise<bool
   return diff === 0;
 }
 
-// ---- Slack API ----
+// ---- Slack API with retry/backoff ----
+// Slack errors that are NOT worth retrying — they will never succeed without
+// a config change (wrong channel, missing scope, bad token, etc.).
+const NON_RETRYABLE_SLACK_ERRORS = new Set([
+  "channel_not_found",
+  "not_in_channel",
+  "is_archived",
+  "msg_too_long",
+  "invalid_blocks",
+  "invalid_blocks_format",
+  "invalid_auth",
+  "not_authed",
+  "token_revoked",
+  "account_inactive",
+  "no_permission",
+  "missing_scope",
+  "restricted_action",
+]);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function slackApiCall(
+  endpoint: "chat.postMessage" | "chat.update",
+  payload: Record<string, unknown>,
+  opts: { maxAttempts?: number; baseDelayMs?: number } = {},
+): Promise<{ ok: boolean; error?: string; retryable?: boolean; data?: any; attempts: number }> {
+  const maxAttempts = opts.maxAttempts ?? 4;
+  const baseDelayMs = opts.baseDelayMs ?? 400;
+  let lastErr: string | undefined;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const resp = await fetch(`https://slack.com/api/${endpoint}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+          "Content-Type": "application/json; charset=utf-8",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      // 429 — honour Retry-After
+      if (resp.status === 429) {
+        const retryAfter = Number(resp.headers.get("retry-after") ?? "1");
+        lastErr = "ratelimited";
+        if (attempt < maxAttempts) {
+          await sleep(Math.max(retryAfter, 1) * 1000);
+          continue;
+        }
+        return { ok: false, error: "ratelimited", retryable: true, attempts: attempt };
+      }
+
+      // 5xx — backoff
+      if (resp.status >= 500) {
+        lastErr = `http_${resp.status}`;
+        if (attempt < maxAttempts) {
+          await sleep(baseDelayMs * 2 ** (attempt - 1));
+          continue;
+        }
+        return { ok: false, error: lastErr, retryable: true, attempts: attempt };
+      }
+
+      const data = await resp.json();
+      if (data.ok) return { ok: true, data, attempts: attempt };
+
+      // Application-level error
+      lastErr = String(data.error ?? "unknown_error");
+      if (NON_RETRYABLE_SLACK_ERRORS.has(lastErr)) {
+        return { ok: false, error: lastErr, retryable: false, attempts: attempt };
+      }
+      // Slack-side rate limit hint
+      if (lastErr === "ratelimited") {
+        const retryAfter = Number(resp.headers.get("retry-after") ?? "1");
+        if (attempt < maxAttempts) {
+          await sleep(Math.max(retryAfter, 1) * 1000);
+          continue;
+        }
+      }
+      if (attempt < maxAttempts) {
+        await sleep(baseDelayMs * 2 ** (attempt - 1));
+        continue;
+      }
+      return { ok: false, error: lastErr, retryable: true, attempts: attempt };
+    } catch (err) {
+      // Network error — retry
+      lastErr = err instanceof Error ? err.message : String(err);
+      console.error(`Slack ${endpoint} network error (attempt ${attempt}):`, lastErr);
+      if (attempt < maxAttempts) {
+        await sleep(baseDelayMs * 2 ** (attempt - 1));
+        continue;
+      }
+      return { ok: false, error: lastErr, retryable: true, attempts: attempt };
+    }
+  }
+
+  return { ok: false, error: lastErr ?? "unknown", retryable: true, attempts: maxAttempts };
+}
+
 async function slackPostMessage(channel: string, blocks: unknown[], text: string) {
-  const resp = await fetch("https://slack.com/api/chat.postMessage", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: JSON.stringify({ channel, blocks, text }),
-  });
-  return await resp.json();
+  return await slackApiCall("chat.postMessage", { channel, blocks, text });
 }
 
 async function slackUpdateMessage(channel: string, ts: string, blocks: unknown[], text: string) {
-  await fetch("https://slack.com/api/chat.update", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      "Content-Type": "application/json; charset=utf-8",
-    },
-    body: JSON.stringify({ channel, ts, blocks, text }),
-  });
+  // Best-effort with limited retries — UI update should not block decision finalisation.
+  return await slackApiCall("chat.update", { channel, ts, blocks, text }, { maxAttempts: 2 });
 }
 
 // ---- Block Kit builders ----
@@ -177,11 +260,39 @@ async function handlePost(req: Request) {
     buildBlocks(body, token),
     `Margin approval needed: ${body.ruleName}`,
   );
+
   if (!slackResp.ok) {
-    return jsonResponse({ error: `Slack error: ${slackResp.error}` }, 502);
+    // Permanent failure → fail-safe the decision so the extension stops polling
+    // and the buyer sees an actionable error instead of a stuck "pending".
+    const errMsg = `slack_post_failed:${slackResp.error}`;
+    console.error(
+      `Slack post failed for decision ${body.decisionId} after ${slackResp.attempts} attempt(s): ${slackResp.error} (retryable=${slackResp.retryable})`,
+    );
+    await supabase
+      .from("margin_agent_decisions")
+      .update({
+        decision_outcome: "failed",
+        approval_token: null,
+        action_taken: errMsg,
+      })
+      .eq("id", body.decisionId);
+    return jsonResponse(
+      {
+        error: `Slack error: ${slackResp.error}`,
+        retryable: slackResp.retryable,
+        attempts: slackResp.attempts,
+      },
+      slackResp.retryable ? 503 : 502,
+    );
   }
 
-  return jsonResponse({ success: true, ts: slackResp.ts, channel: slackResp.channel, token });
+  return jsonResponse({
+    success: true,
+    ts: slackResp.data?.ts,
+    channel: slackResp.data?.channel,
+    token,
+    attempts: slackResp.attempts,
+  });
 }
 
 async function handleActions(req: Request) {

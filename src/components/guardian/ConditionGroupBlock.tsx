@@ -34,7 +34,15 @@ interface Props {
   errorAt?: (path: string) => string | undefined;
 }
 
-export function ConditionGroupBlock({ group, onChange, onRemove, depth = 0, isRoot = false }: Props) {
+export function ConditionGroupBlock({
+  group,
+  onChange,
+  onRemove,
+  depth = 0,
+  isRoot = false,
+  trail = "",
+  errorAt,
+}: Props) {
   const updateChild = (idx: number, next: ConditionNode) => {
     const children = [...group.children];
     children[idx] = next;

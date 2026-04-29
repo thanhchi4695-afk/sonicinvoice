@@ -243,6 +243,14 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
                   Fix {validation.issues.length} issue{validation.issues.length === 1 ? "" : "s"} to save
                 </span>
               )}
+              <Button
+                variant="outline"
+                onClick={() => setLiveTestOpen(true)}
+                disabled={!isValid}
+                title="Run this rule against the live JOOR / NuOrder cart in your browser"
+              >
+                Test with current cart
+              </Button>
               <Button variant="outline" onClick={() => setTestOpen(true)} disabled={!isValid}>
                 Test rule
               </Button>

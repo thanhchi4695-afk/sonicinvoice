@@ -25,6 +25,12 @@ interface Props {
   onChange: (next: RuleCondition) => void;
   onRemove: () => void;
   index: number;
+  /** Inline error keyed to the value cell, e.g. "Value required". */
+  valueError?: string;
+  /** Inline error keyed to the operator cell. */
+  operatorError?: string;
+  /** Generic row-level error (e.g. field/operator mismatch from refinements). */
+  rowError?: string;
 }
 
 const FIELD_OPTIONS: ConditionField[] = [

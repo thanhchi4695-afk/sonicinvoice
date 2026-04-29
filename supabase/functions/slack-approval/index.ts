@@ -273,7 +273,7 @@ async function handlePost(req: Request) {
       .update({
         decision_outcome: "failed",
         approval_token: null,
-        decision_reason: errMsg,
+        action_taken: errMsg,
       })
       .eq("id", body.decisionId);
     return jsonResponse(

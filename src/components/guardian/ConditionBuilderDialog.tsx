@@ -235,7 +235,12 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
                 </Button>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {!isValid && validation.issues.length > 0 && (
+                <span className="text-xs text-destructive">
+                  Fix {validation.issues.length} issue{validation.issues.length === 1 ? "" : "s"} to save
+                </span>
+              )}
               <Button variant="outline" onClick={() => setTestOpen(true)} disabled={!isValid}>
                 Test rule
               </Button>

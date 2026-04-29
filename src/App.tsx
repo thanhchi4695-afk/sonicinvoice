@@ -20,6 +20,7 @@ import Support from "./pages/Support.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import Health from "./pages/Health.tsx";
 import AdminSecrets from "./pages/AdminSecrets.tsx";
+import Rules from "./pages/Rules.tsx";
 
 const queryClient = new QueryClient();
 

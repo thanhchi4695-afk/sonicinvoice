@@ -1827,6 +1827,96 @@ export type Database = {
         }
         Relationships: []
       }
+      margin_agent_decisions: {
+        Row: {
+          action_taken: Json
+          approval_expires_at: string | null
+          approval_token: string | null
+          cart_snapshot: Json
+          created_at: string
+          decision_outcome: string
+          id: string
+          parent_decision_id: string | null
+          rule_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action_taken?: Json
+          approval_expires_at?: string | null
+          approval_token?: string | null
+          cart_snapshot: Json
+          created_at?: string
+          decision_outcome: string
+          id?: string
+          parent_decision_id?: string | null
+          rule_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action_taken?: Json
+          approval_expires_at?: string | null
+          approval_token?: string | null
+          cart_snapshot?: Json
+          created_at?: string
+          decision_outcome?: string
+          id?: string
+          parent_decision_id?: string | null
+          rule_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "margin_agent_decisions_parent_decision_id_fkey"
+            columns: ["parent_decision_id"]
+            isOneToOne: false
+            referencedRelation: "margin_agent_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "margin_agent_decisions_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "margin_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      margin_rules: {
+        Row: {
+          actions: Json
+          conditions: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          priority: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          actions?: Json
+          conditions?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          priority?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          actions?: Json
+          conditions?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          priority?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       markdown_ladder_items: {
         Row: {
           block_reason: string | null

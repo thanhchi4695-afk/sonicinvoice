@@ -32,6 +32,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rule?: MarginRule | null;
+  /** Seed values for a brand-new rule (ignored when `rule` is set). */
+  template?: Pick<MarginRule, "name" | "is_active" | "conditions" | "actions" | "priority"> | null;
   defaultPriority?: number;
 }
 
@@ -42,7 +44,11 @@ interface DraftState extends Omit<DraftRule, "conditions"> {
   rootGroup: ConditionGroup;
 }
 
-function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftState {
+function toDraft(
+  rule?: MarginRule | null,
+  defaultPriority = 0,
+  template?: Props["template"],
+): DraftState {
   if (rule) {
     return {
       id: rule.id,
@@ -51,6 +57,15 @@ function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftState {
       rootGroup: toRootGroup(rule.conditions),
       actions: rule.actions,
       priority: rule.priority,
+    };
+  }
+  if (template) {
+    return {
+      name: template.name,
+      is_active: template.is_active,
+      rootGroup: toRootGroup(template.conditions),
+      actions: template.actions.length > 0 ? template.actions : [EMPTY_ACTION],
+      priority: defaultPriority,
     };
   }
   return {
@@ -62,16 +77,16 @@ function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftState {
   };
 }
 
-export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriority = 0 }: Props) {
+export function ConditionBuilderDialog({ open, onOpenChange, rule, template, defaultPriority = 0 }: Props) {
   const { saveRule, deleteRule } = useMarginRules();
-  const [draft, setDraft] = useState<DraftState>(toDraft(rule, defaultPriority));
+  const [draft, setDraft] = useState<DraftState>(toDraft(rule, defaultPriority, template));
   const [saving, setSaving] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
   const [liveTestOpen, setLiveTestOpen] = useState(false);
 
   useEffect(() => {
-    if (open) setDraft(toDraft(rule, defaultPriority));
-  }, [open, rule, defaultPriority]);
+    if (open) setDraft(toDraft(rule, defaultPriority, template));
+  }, [open, rule, defaultPriority, template]);
 
   // Build the persisted shape: flatten to legacy array if no OR groups, otherwise keep root group.
   const persisted = useMemo<DraftRule>(

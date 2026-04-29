@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ConditionBuilderDialog } from "./ConditionBuilderDialog";
+import { RuleTemplatePicker, type RuleTemplate } from "./RuleTemplatePicker";
 import { useMarginRules } from "./use-margin-rules";
 import {
   ACTION_LABELS,
@@ -129,6 +130,8 @@ function SortableRule({ rule, index, onToggle, onEdit }: SortableRuleProps) {
 export function RuleListPage() {
   const { rules, loading, toggleActive, reorder } = useMarginRules();
   const [open, setOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [template, setTemplate] = useState<RuleTemplate["seed"] | null>(null);
   const [editing, setEditing] = useState<MarginRule | null>(null);
   // Local mirror of order for optimistic drag-and-drop UX.
   const [localRules, setLocalRules] = useState<MarginRule[]>(rules);
@@ -187,7 +190,7 @@ export function RuleListPage() {
             No-code margin protection rules. Drag the handle to reorder — lower priority numbers run first.
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setOpen(true); }}>
+        <Button onClick={() => { setEditing(null); setTemplate(null); setPickerOpen(true); }}>
           <Plus className="h-4 w-4" />
           New rule
         </Button>
@@ -198,8 +201,12 @@ export function RuleListPage() {
           <Loader2 className="h-4 w-4 animate-spin" /> Loading rules…
         </div>
       ) : localRules.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          No rules yet. Create your first guardian rule to start protecting margins.
+        <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground space-y-3">
+          <p>No rules yet. Create your first guardian rule to start protecting margins.</p>
+          <Button size="sm" onClick={() => { setEditing(null); setTemplate(null); setPickerOpen(true); }}>
+            <Plus className="h-4 w-4" />
+            Start from a template
+          </Button>
         </div>
       ) : (
         <DndContext
@@ -221,7 +228,7 @@ export function RuleListPage() {
                     const res: { ok: boolean; error?: string } = await toggleActive(rule.id, v);
                     if (!res.ok) toast.error(res.error ?? "Update failed");
                   }}
-                  onEdit={() => { setEditing(rule); setOpen(true); }}
+                  onEdit={() => { setEditing(rule); setTemplate(null); setOpen(true); }}
                 />
               ))}
             </ol>
@@ -229,10 +236,22 @@ export function RuleListPage() {
         </DndContext>
       )}
 
+      <RuleTemplatePicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onPick={(seed) => {
+          setTemplate(seed);
+          setEditing(null);
+          setPickerOpen(false);
+          setOpen(true);
+        }}
+      />
+
       <ConditionBuilderDialog
         open={open}
         onOpenChange={setOpen}
         rule={editing}
+        template={template}
         defaultPriority={localRules.length}
       />
     </div>

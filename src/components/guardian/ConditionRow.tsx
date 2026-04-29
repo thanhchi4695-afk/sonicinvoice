@@ -142,44 +142,69 @@ export function ConditionRow({ condition, onChange, onRemove, index, valueError,
     );
   };
 
+  const hasError = Boolean(valueError || operatorError || rowError);
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card p-3">
-      {index > 0 && <span className="text-xs font-medium text-muted-foreground">AND</span>}
+    <div
+      className={
+        "rounded-md border bg-card p-3 " +
+        (hasError ? "border-destructive/60" : "border-border")
+      }
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        {index > 0 && <span className="text-xs font-medium text-muted-foreground">AND</span>}
 
-      <Select value={condition.field} onValueChange={(v) => handleFieldChange(v as ConditionField)}>
-        <SelectTrigger className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {FIELD_OPTIONS.map((f) => (
-            <SelectItem key={f} value={f}>
-              {FIELD_LABELS[f]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <Select value={condition.field} onValueChange={(v) => handleFieldChange(v as ConditionField)}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {FIELD_OPTIONS.map((f) => (
+              <SelectItem key={f} value={f}>
+                {FIELD_LABELS[f]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Select
-        value={condition.operator}
-        onValueChange={(v) => handleOperatorChange(v as ConditionOperator)}
-      >
-        <SelectTrigger className="w-40">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {operatorsForField(condition.field).map((op) => (
-            <SelectItem key={op.value} value={op.value}>
-              {op.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <div className="flex flex-col">
+          <Select
+            value={condition.operator}
+            onValueChange={(v) => handleOperatorChange(v as ConditionOperator)}
+          >
+            <SelectTrigger
+              className={"w-40 " + (operatorError ? "border-destructive" : "")}
+              aria-invalid={Boolean(operatorError)}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {operatorsForField(condition.field).map((op) => (
+                <SelectItem key={op.value} value={op.value}>
+                  {op.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      {renderValueInput()}
+        <div className="flex flex-col">
+          <div className={valueError ? "[&_input]:border-destructive [&_button]:border-destructive" : ""}>
+            {renderValueInput()}
+          </div>
+        </div>
 
-      <Button variant="ghost" size="icon" onClick={onRemove} aria-label="Remove condition" className="ml-auto">
-        <Trash2 className="h-4 w-4" />
-      </Button>
+        <Button variant="ghost" size="icon" onClick={onRemove} aria-label="Remove condition" className="ml-auto">
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {(valueError || operatorError || rowError) && (
+        <div className="mt-1.5 space-y-0.5 pl-1">
+          {operatorError && <p className="text-xs text-destructive">{operatorError}</p>}
+          {valueError && <p className="text-xs text-destructive">{valueError}</p>}
+          {rowError && <p className="text-xs text-destructive">{rowError}</p>}
+        </div>
+      )}
     </div>
   );
 }

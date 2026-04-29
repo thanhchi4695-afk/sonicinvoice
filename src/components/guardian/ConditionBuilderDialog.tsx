@@ -76,9 +76,9 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
   const handleDelete = async () => {
     if (!draft.id) return;
     if (!confirm("Delete this rule? Decision history is preserved.")) return;
-    const res = await deleteRule(draft.id);
+    const res: { ok: boolean; error?: string } = await deleteRule(draft.id);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(res.error ?? "Delete failed");
       return;
     }
     toast.success("Rule deleted");

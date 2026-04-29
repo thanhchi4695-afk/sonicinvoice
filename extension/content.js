@@ -215,3 +215,17 @@ observer.observe(document.body, {
 });
 
 window.addEventListener("load", scheduleEvaluate);
+
+// Respond to the dashboard's "Test with current cart" — re-extract on demand
+// so the response reflects the live DOM, not a possibly-stale snapshot.
+chrome.runtime.onMessage.addListener((req, _sender, sendResponse) => {
+  if (req?.type === "GET_CART") {
+    try {
+      const items = extractCartItems();
+      sendResponse({ items, surface: SURFACE });
+    } catch (e) {
+      sendResponse({ items: [], surface: SURFACE, error: String(e) });
+    }
+    return false;
+  }
+});

@@ -91,6 +91,22 @@ export function ExtensionTokensPanel() {
     }
   };
 
+  const handleDownload = () => {
+    fetch("/sonic-margin-guardian.zip")
+      .then((res) => {
+        if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "sonic-margin-guardian.zip";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      })
+      .catch((err) => toast.error(err.message));
+  };
+
   return (
     <Card>
       <CardHeader>

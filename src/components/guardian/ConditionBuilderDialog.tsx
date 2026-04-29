@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { ActionRow } from "./ActionRow";
 import { ConditionGroupBlock } from "./ConditionGroupBlock";
 import { TestRuleDialog } from "./TestRuleDialog";
+import { TestWithCurrentCartDialog } from "./TestWithCurrentCartDialog";
 import { useMarginRules } from "./use-margin-rules";
 import { useRuleValidation } from "./use-rule-validation";
 import {
@@ -66,6 +67,7 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
   const [draft, setDraft] = useState<DraftState>(toDraft(rule, defaultPriority));
   const [saving, setSaving] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
+  const [liveTestOpen, setLiveTestOpen] = useState(false);
 
   useEffect(() => {
     if (open) setDraft(toDraft(rule, defaultPriority));
@@ -241,6 +243,14 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
                   Fix {validation.issues.length} issue{validation.issues.length === 1 ? "" : "s"} to save
                 </span>
               )}
+              <Button
+                variant="outline"
+                onClick={() => setLiveTestOpen(true)}
+                disabled={!isValid}
+                title="Run this rule against the live JOOR / NuOrder cart in your browser"
+              >
+                Test with current cart
+              </Button>
               <Button variant="outline" onClick={() => setTestOpen(true)} disabled={!isValid}>
                 Test rule
               </Button>
@@ -257,6 +267,11 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
       </Dialog>
 
       <TestRuleDialog open={testOpen} onOpenChange={setTestOpen} rule={persisted} />
+      <TestWithCurrentCartDialog
+        open={liveTestOpen}
+        onOpenChange={setLiveTestOpen}
+        rule={persisted}
+      />
     </>
   );
 }

@@ -87,10 +87,21 @@ interface CartItem {
   targetMargin?: number;
 }
 
+interface DraftRulePayload {
+  // Subset of the saved-rule shape used for unsaved "Test with current cart" runs.
+  // No id required; we never persist anything when this is supplied.
+  name?: string;
+  conditions: ConditionsField;
+  actions: RuleAction[];
+}
+
 interface EvaluateRequest {
   cartItems: CartItem[];
   surface?: string;
   dryRun?: boolean;
+  /** When present, evaluate ONLY this rule and skip loading saved rules from the DB.
+   *  Forces dry-run semantics (no decision row, no Slack/email side effects). */
+  draftRule?: DraftRulePayload;
 }
 
 // ---------- Helpers ----------
@@ -268,7 +279,9 @@ Deno.serve(async (req) => {
 
   try {
     const body = (await req.json()) as EvaluateRequest;
-    const { cartItems, surface, dryRun } = body ?? {};
+    const { cartItems, surface, draftRule } = body ?? {};
+    // A draftRule implies dry-run — never log or fire side effects for an unsaved rule.
+    const dryRun = body?.dryRun === true || !!draftRule;
 
     if (!Array.isArray(cartItems)) {
       return new Response(
@@ -315,15 +328,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch active rules ordered by priority (lowest number = highest priority).
-    const { data: rules, error: rulesErr } = await supabase
-      .from("margin_rules")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .order("priority", { ascending: true });
-
-    if (rulesErr) throw rulesErr;
+    // Rule list to evaluate. If a draftRule is supplied (Test with current cart from
+    // the unsaved editor), evaluate ONLY that rule — saved rules are ignored so the
+    // result reflects the rule the user is currently editing.
+    let rules: MarginRule[];
+    if (draftRule) {
+      if (!draftRule.conditions || !Array.isArray(draftRule.actions)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid draftRule" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      rules = [{
+        id: "__draft__",
+        user_id: userId,
+        name: draftRule.name || "Draft rule",
+        is_active: true,
+        conditions: draftRule.conditions,
+        actions: draftRule.actions,
+        priority: 0,
+      }];
+    } else {
+      const { data: saved, error: rulesErr } = await supabase
+        .from("margin_rules")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .order("priority", { ascending: true });
+      if (rulesErr) throw rulesErr;
+      rules = (saved ?? []) as MarginRule[];
+    }
 
     // Fetch cost data for SKUs lacking client-supplied landedCost.
     const skusNeedingLookup = cartItems
@@ -392,7 +426,7 @@ Deno.serve(async (req) => {
       return { matched: false, matchingItems: enriched };
     }
 
-    for (const rule of (rules ?? []) as MarginRule[]) {
+    for (const rule of rules) {
       const conds = rule.conditions;
       const isEmpty = !conds || (Array.isArray(conds) ? conds.length === 0 : !conds.children?.length);
       if (isEmpty) continue;

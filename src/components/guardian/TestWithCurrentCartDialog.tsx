@@ -106,7 +106,7 @@ export function TestWithCurrentCartDialog({ open, onOpenChange, rule }: Props) {
     setState({ kind: "fetching_cart" });
     const cartResult = await fetchCurrentCart();
     if (!cartResult.ok) {
-      setState({ kind: "no_cart", result: cartResult });
+      setState({ kind: "no_cart", result: cartResult as NoCartResult });
       return;
     }
     const cart = { items: cartResult.items, surface: cartResult.surface, url: cartResult.url };

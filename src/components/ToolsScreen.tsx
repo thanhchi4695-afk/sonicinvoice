@@ -1215,7 +1215,15 @@ const ToolsScreen = ({ onStartFlow }: ToolsScreenProps = {}) => {
     },
     {
       title: "Import & Export",
-      ids: ["lightspeed_convert", "export_collections", "import_collections"],
+      ids: ["lightspeed_convert", "lightspeed_import", "export_collections", "import_collections"],
+    },
+    {
+      title: "Margin Guardian",
+      ids: ["margin_guardian_rules", "margin_guardian_tokens"],
+    },
+    {
+      title: "Image SEO",
+      ids: ["image_seo"],
     },
   ];
 

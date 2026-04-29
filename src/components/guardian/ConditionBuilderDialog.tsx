@@ -267,6 +267,11 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
       </Dialog>
 
       <TestRuleDialog open={testOpen} onOpenChange={setTestOpen} rule={persisted} />
+      <TestWithCurrentCartDialog
+        open={liveTestOpen}
+        onOpenChange={setLiveTestOpen}
+        rule={persisted}
+      />
     </>
   );
 }

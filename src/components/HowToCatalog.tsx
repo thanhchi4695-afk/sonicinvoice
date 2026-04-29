@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
-import { Search, ChevronDown, ChevronRight, BookOpen, Lightbulb, ArrowRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, ChevronDown, ChevronRight, BookOpen, Lightbulb, ArrowRight, Link2, List } from "lucide-react";
+import { toast } from "sonner";
 import {
   featureRegistry,
   getFeaturesByCategory,

@@ -72,12 +72,17 @@ export function ConditionGroupBlock({
   const canNest = depth + 1 < MAX_GROUP_DEPTH;
   const operatorLabel = group.operator === "AND" ? "All of these must be true" : "Any of these must be true";
 
+  // Group-level error: empty group, depth, "conditions" root error, etc.
+  const groupKey = isRoot ? "conditions" : `group:${trail}`;
+  const groupError = errorAt?.(groupKey);
+
   return (
     <div
       className={
-        isRoot
+        (isRoot
           ? "space-y-2"
-          : "rounded-md border border-dashed border-border bg-muted/20 p-3 space-y-2"
+          : "rounded-md border border-dashed bg-muted/20 p-3 space-y-2 ") +
+        (!isRoot && groupError ? "border-destructive/60" : !isRoot ? "border-border" : "")
       }
     >
       {/* Group header */}
@@ -107,15 +112,20 @@ export function ConditionGroupBlock({
         )}
       </div>
 
+      {groupError && (
+        <p className="text-xs text-destructive pl-1">{groupError}</p>
+      )}
+
       {/* Children */}
       <div className="space-y-2">
         {group.children.length === 0 && (
-          <p className="text-xs text-muted-foreground italic px-1">
+          <p className="text-xs text-destructive italic px-1">
             Empty group — add at least one condition.
           </p>
         )}
         {group.children.map((child, i) => {
           const connector = i > 0 ? group.operator : null;
+          const childTrail = trail === "" ? String(i) : `${trail}.${i}`;
           return (
             <div key={i} className="space-y-2">
               {connector && (
@@ -132,6 +142,8 @@ export function ConditionGroupBlock({
                   depth={depth + 1}
                   onChange={(next) => updateChild(i, next)}
                   onRemove={() => removeChild(i)}
+                  trail={childTrail}
+                  errorAt={errorAt}
                 />
               ) : (
                 <ConditionRow
@@ -139,6 +151,9 @@ export function ConditionGroupBlock({
                   index={i}
                   onChange={(next) => updateChild(i, next)}
                   onRemove={() => removeChild(i)}
+                  valueError={errorAt?.(`cond:${childTrail}:value`)}
+                  operatorError={errorAt?.(`cond:${childTrail}:operator`)}
+                  rowError={errorAt?.(`cond:${childTrail}`)}
                 />
               )}
             </div>

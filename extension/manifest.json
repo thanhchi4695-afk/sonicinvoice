@@ -1,23 +1,31 @@
 {
   "manifest_version": 3,
-  "name": "Sonic Invoices - Instant Price Check",
+  "name": "Sonic Invoices — Margin Guardian",
   "version": "1.0.0",
-  "description": "Instantly compare competitor prices against your Shopify store while browsing.",
-  "permissions": ["activeTab", "storage", "scripting"],
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": "icon.png"
-  },
+  "description": "Real-time margin protection for JOOR and NuOrder carts.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://*.jooraccess.com/*",
+    "https://app.joor.com/*",
+    "https://*.nuorder.com/*",
+    "https://xuaakgdkkrrsqxafffyj.supabase.co/*"
+  ],
+  "background": { "service_worker": "background.js" },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://*.jooraccess.com/*",
+        "https://app.joor.com/*",
+        "https://*.nuorder.com/*"
+      ],
       "js": ["content.js"],
-      "css": ["content.css"],
+      "css": ["styles.css"],
       "run_at": "document_idle"
     }
   ],
-  "icons": {
-    "48": "icon.png",
-    "128": "icon.png"
-  }
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Sonic Invoices"
+  },
+  "icons": { "48": "icon.png", "128": "icon.png" }
 }

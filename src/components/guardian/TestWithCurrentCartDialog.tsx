@@ -55,8 +55,6 @@ type State =
     }
   | { kind: "error"; message: string };
 
-type NoCartResult = Extract<GetCartResult, { ok: false }>;
-
 function describeNoCart(result: NoCartResult): { title: string; body: string } {
   switch (result.reason) {
     case "not_installed":

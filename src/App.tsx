@@ -59,6 +59,7 @@ const App = () => (
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/health" element={<Health />} />
               <Route path="/admin/secrets" element={<AdminSecrets />} />
+              <Route path="/rules" element={<Rules />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

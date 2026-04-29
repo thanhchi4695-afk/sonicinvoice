@@ -225,8 +225,13 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
                           onClick={() => {
                             const next = isOpen ? null : feature.id;
                             setOpenFeature(next);
+                            const base = `${window.location.pathname}${window.location.search}`;
                             if (next) {
-                              history.replaceState(null, "", `#${featureAnchor}`);
+                              // pushState so refresh + back button + share all work.
+                              history.pushState(null, "", `${base}#${featureAnchor}`);
+                            } else {
+                              // Closing clears the hash so the URL reflects current view.
+                              history.pushState(null, "", base);
                             }
                           }}
                           className="flex-1 flex items-center gap-3 text-left min-w-0"

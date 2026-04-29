@@ -77,16 +77,16 @@ function toDraft(
   };
 }
 
-export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriority = 0 }: Props) {
+export function ConditionBuilderDialog({ open, onOpenChange, rule, template, defaultPriority = 0 }: Props) {
   const { saveRule, deleteRule } = useMarginRules();
-  const [draft, setDraft] = useState<DraftState>(toDraft(rule, defaultPriority));
+  const [draft, setDraft] = useState<DraftState>(toDraft(rule, defaultPriority, template));
   const [saving, setSaving] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
   const [liveTestOpen, setLiveTestOpen] = useState(false);
 
   useEffect(() => {
-    if (open) setDraft(toDraft(rule, defaultPriority));
-  }, [open, rule, defaultPriority]);
+    if (open) setDraft(toDraft(rule, defaultPriority, template));
+  }, [open, rule, defaultPriority, template]);
 
   // Build the persisted shape: flatten to legacy array if no OR groups, otherwise keep root group.
   const persisted = useMemo<DraftRule>(

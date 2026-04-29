@@ -41,11 +41,13 @@ interface DecisionResponse {
   error?: string;
 }
 
+type NoCartResult = Extract<GetCartResult, { ok: false }>;
+
 type State =
   | { kind: "idle" }
   | { kind: "fetching_cart" }
   | { kind: "evaluating"; cart: { items: CartItem[]; surface: string; url?: string } }
-  | { kind: "no_cart"; result: GetCartResult }
+  | { kind: "no_cart"; result: NoCartResult }
   | {
       kind: "done";
       decision: DecisionResponse;

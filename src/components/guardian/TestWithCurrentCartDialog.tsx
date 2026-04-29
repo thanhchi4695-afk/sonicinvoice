@@ -53,8 +53,9 @@ type State =
     }
   | { kind: "error"; message: string };
 
-function describeNoCart(result: GetCartResult): { title: string; body: string } {
-  if (result.ok) return { title: "", body: "" };
+type NoCartResult = Extract<GetCartResult, { ok: false }>;
+
+function describeNoCart(result: NoCartResult): { title: string; body: string } {
   switch (result.reason) {
     case "not_installed":
       return {

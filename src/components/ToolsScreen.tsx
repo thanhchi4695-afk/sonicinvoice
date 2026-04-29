@@ -1254,6 +1254,10 @@ const ToolsScreen = ({ onStartFlow }: ToolsScreenProps = {}) => {
                   return (
                     <button key={tool.id} onClick={() => {
                       if (tool.id === "image_seo" && onStartFlow) { onStartFlow("image_seo"); return; }
+                      if (tool.id === "margin_guardian_rules" || tool.id === "margin_guardian_tokens") {
+                        navigate("/rules");
+                        return;
+                      }
                       setActiveTool(tool.id);
                     }}
                       className="bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors">

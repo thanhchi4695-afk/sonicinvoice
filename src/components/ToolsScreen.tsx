@@ -61,6 +61,9 @@ const tools = [
   { id: "competitor_intel", icon: Bot, label: "Competitor intel", desc: "Analyse competitor pricing & positioning", color: "text-primary" },
   { id: "price_monitor", icon: DollarSign, label: "Price monitor", desc: "Monitor & match competitor prices in real-time", color: "text-success" },
   { id: "geo_agentic", icon: Globe, label: "Local SEO", desc: "Geo-targeted SEO for local store visibility", color: "text-success" },
+  // Margin Guardian
+  { id: "margin_guardian_rules", icon: Shield, label: "Margin Guardian rules", desc: "Build conditional rules: alerts, blocks & price corrections", color: "text-amber-500" },
+  { id: "margin_guardian_tokens", icon: Key, label: "Extension tokens", desc: "Manage Chrome extension API tokens for Margin Guardian", color: "text-amber-500" },
 ];
 
 const quickInserts = [

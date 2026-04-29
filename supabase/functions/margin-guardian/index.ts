@@ -87,10 +87,21 @@ interface CartItem {
   targetMargin?: number;
 }
 
+interface DraftRulePayload {
+  // Subset of the saved-rule shape used for unsaved "Test with current cart" runs.
+  // No id required; we never persist anything when this is supplied.
+  name?: string;
+  conditions: ConditionsField;
+  actions: RuleAction[];
+}
+
 interface EvaluateRequest {
   cartItems: CartItem[];
   surface?: string;
   dryRun?: boolean;
+  /** When present, evaluate ONLY this rule and skip loading saved rules from the DB.
+   *  Forces dry-run semantics (no decision row, no Slack/email side effects). */
+  draftRule?: DraftRulePayload;
 }
 
 // ---------- Helpers ----------

@@ -370,3 +370,125 @@ CREATE TABLE public.agent_decisions (
 - Auto-applying price corrections without human confirmation (Lesson 4 still requires explicit confirm).
 - Multi-rule chaining (only first matching rule fires).
 - Per-line approval (approval is whole-cart in v1).
+
+---
+
+## Appendix D — Condition Builder: detailed Part B mockup (locked)
+
+This appendix is the authoritative source for the Condition Builder UI. Where it conflicts with Appendix B, **Appendix D wins** for layout, fields, operators, and actions. Appendix B's storage section (`guardian_rules`) is **superseded** by Appendix C's `margin_rules` table — use `margin_rules` everywhere.
+
+### D.1 Placement
+- Primary surface: dashboard route `/dashboard?tab=rules` (new tab inside `MarginProtectionPanel`).
+- Secondary surface: collapsible section inside the Chrome extension side panel (same React components reused via shared `src/components/guardian/` directory).
+- Mobile (<1024px): full-screen sheet from bottom tab. Desktop: two-column inline layout.
+
+### D.2 Locked layout
+```
+┌─ Condition Builder ──────────────────────[Save] [Cancel]─┐
+│ Rule Name:  [ Prevent low-margin Brand X orders        ] │
+│ Active?     [x] Yes                                       │
+├──────────────────────────────────────────────────────────┤
+│ WHEN all of these conditions are met:                    │
+│ ┌──────────────────────────────────────────────────────┐ │
+│ │ [Brand]        [is exactly]      [Brand X]   [×]    │ │
+│ │ [Margin %]     [is below]        [45]   %    [×]    │ │
+│ │ [Total PO]     [is greater than] [5000]      [×]    │ │
+│ │ [+ Add condition]                                    │ │
+│ └──────────────────────────────────────────────────────┘ │
+├──────────────────────────────────────────────────────────┤
+│ THEN take these actions:                                 │
+│ ┌──────────────────────────────────────────────────────┐ │
+│ │ [x] Block checkout                                   │ │
+│ │ [x] Send Slack approval to [#buying-team ▾]          │ │
+│ │ [ ] Send email to [manager@example.com]              │ │
+│ │ [ ] Auto-apply price correction to reach [45]%       │ │
+│ │ [+ Add action]                                       │ │
+│ └──────────────────────────────────────────────────────┘ │
+├──────────────────────────────────────────────────────────┤
+│ Priority: [↑ Higher]   (higher priority runs first)      │
+│ [Test Rule]                                [Delete Rule] │
+└──────────────────────────────────────────────────────────┘
+```
+
+### D.3 Field + operator matrix (locked enums — extending requires explicit prompt + migration)
+| Field | Type | Operators |
+|---|---|---|
+| `brand` | text | `is`, `is_not`, `contains`, `starts_with`, `in`, `not_in` |
+| `vendor` | text | same as brand |
+| `sku` | text | `is`, `contains`, `starts_with`, `in` |
+| `product_category` | text | `is`, `is_not`, `in`, `not_in` |
+| `margin_pct` | number (%) | `is_below`, `is_above`, `is_between`, `equals` |
+| `po_total` | number (currency) | `is_below`, `is_above`, `is_between`, `equals` |
+| `quantity` | number | `is_below`, `is_above`, `is_between`, `equals` |
+| `surface` | enum | `is`, `is_not` (values: `joor`, `nuorder`, `po`, `email`, `invoice_review`) |
+
+- Conditions are **AND-combined only** in v1 (matches Appendix B.3). No OR groups, no nesting.
+- `is_between` shows two value inputs.
+- `in` / `not_in` show a chip multi-input.
+
+### D.4 Action types (locked enum)
+| Action | Required config |
+|---|---|
+| `block_checkout` | none |
+| `slack_approval` | Slack channel picker (autocomplete from connected workspace via Slack connector `conversations.list`) |
+| `email_notify` | recipient email (zod-validated), optional subject template |
+| `price_correction` | target margin %, optional message template — **flagged "requires confirmation" badge** (never silent) |
+| `log_only` | none |
+
+- Multiple actions per rule are allowed; they execute in the order listed.
+- `price_correction` always creates a `pending_approval` decision in `margin_agent_decisions`; replay still requires the user-confirmation gate from Appendix A Lesson 4.
+
+### D.5 Component structure (locked file layout)
+```
+src/components/guardian/
+  RuleListPage.tsx              # /dashboard?tab=rules — list + reorder + create button
+  ConditionBuilderDialog.tsx    # the dialog above
+  ConditionRow.tsx              # one WHEN row
+  ActionRow.tsx                 # one THEN row
+  TestRuleDialog.tsx            # the "Test Rule" modal
+  use-margin-rules.ts           # CRUD hook against margin_rules
+```
+- Use shadcn primitives only: `Dialog`, `Select`, `Input`, `Checkbox`, `Switch`, `Badge`, `Button`. No custom colors — semantic tokens (`bg-card`, `border-border`, `text-foreground`, `bg-primary`, `bg-warning`, `bg-destructive`) only.
+- Icons: `lucide-react` (already in project) — `MinusCircle`, `PlusCircle`, `ChevronUp`, `ChevronDown`, `Trash2`. **Do not introduce Heroicons.**
+- All form inputs validated with **Zod** before submit (rule name 1–100 chars, channel name `^#?[a-z0-9_-]{1,80}$`, email RFC-5322 via `z.string().email()`, numeric ranges enforced).
+
+### D.6 Test Rule flow (locked)
+- Modal accepts either a JOOR order number (autoload via existing JOOR connection) or a pasted cart JSON.
+- Calls `POST /margin-guardian/evaluate` with `dry_run: true`.
+- **Server enforces `dry_run`**: writes nothing, sends no Slack/email, returns `{ would_fire, decision_outcome, matched_rule_id, narrative }`.
+- Result rendered as a single sentence: "This rule **would block** the order." / "This rule **would not fire**."
+
+### D.7 Reordering
+- Drag-and-drop list using existing dnd primitives if already in the project; otherwise up/down arrows. **Do not add a new DnD library** without an explicit prompt.
+- Priority is stored as integer `priority` in `margin_rules`; lower = runs first; reorder rewrites priorities in a single transactional `update`.
+
+### D.8 Acceptance criteria
+- A user can create, edit, pause, reorder, test, and delete a rule end-to-end without leaving the dialog/list.
+- Save is disabled until: name present, ≥1 valid condition, ≥1 valid action, all required action configs filled.
+- "Test Rule" never mutates `margin_agent_decisions` and never sends Slack/email (asserted by integration test).
+- Pausing a rule sets `is_active=false`; the agent skips it. Deleting a rule cascades to `margin_agent_decisions.rule_id = null` (FK `on delete set null`) — history preserved.
+- The same components render correctly in the extension side panel at 360px width.
+
+### D.9 Out of scope for v1
+- OR / nested condition groups.
+- Time-window conditions (sale season, weekday-only).
+- Per-rule budgets.
+- Rule sharing across users / team templates.
+- Rule import/export.
+
+---
+
+## Appendix E — Lovable build order (locked, supersedes the order in §"Build order")
+
+This is the authoritative implementation sequence. Do not reorder without an explicit user instruction.
+
+| Step | Task | Notes |
+|---|---|---|
+| 1 | Migration: create `margin_rules` + `margin_agent_decisions` with RLS owner-only | Use the locked schema in Appendix C.2 |
+| 2 | `src/components/guardian/` — Condition Builder UI (Appendix D) | shadcn + semantic tokens + Zod validation |
+| 3 | Edge function `margin-guardian` with `evaluate` (incl. `dry_run`), `request-approval`, `slack-actions`, `replay-fix` | Reuse `src/lib/margin-protection.ts`; AI Gateway only for narratives |
+| 4 | Chrome extension cart monitor (`MutationObserver`, 400ms debounce, 5-min LRU cache) | JOOR + NuOrder; calls `evaluate` |
+| 5 | Slack custom-app setup + signing-secret HMAC handler | Required because connector cannot receive interactive callbacks (see Appendix C.4) |
+| 6 | Realtime subscription in extension on `margin_agent_decisions` to unblock checkout post-approval | <3s round-trip target |
+| 7 | Lesson 2 recording infrastructure (`recorded_workflows`) + `workflow-interpret` edge function | AI Gateway only |
+| 8 | Lesson 4 "Reapply Last Fix" button wired to `replay-fix` (explicit confirm gate) | Logged as new decision row with `parent_decision_id` |

@@ -201,8 +201,12 @@ export function RuleListPage() {
           <Loader2 className="h-4 w-4 animate-spin" /> Loading rules…
         </div>
       ) : localRules.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          No rules yet. Create your first guardian rule to start protecting margins.
+        <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground space-y-3">
+          <p>No rules yet. Create your first guardian rule to start protecting margins.</p>
+          <Button size="sm" onClick={() => { setEditing(null); setTemplate(null); setPickerOpen(true); }}>
+            <Plus className="h-4 w-4" />
+            Start from a template
+          </Button>
         </div>
       ) : (
         <DndContext

@@ -1404,6 +1404,87 @@ export type Database = {
           },
         ]
       }
+      image_seo_jobs: {
+        Row: {
+          alt_text: string | null
+          created_at: string
+          error: string | null
+          height: number | null
+          id: string
+          new_filename: string | null
+          new_size: number | null
+          new_url: string | null
+          original_content_type: string | null
+          original_size: number | null
+          original_url: string | null
+          product_handle: string | null
+          product_id: string | null
+          product_title: string | null
+          savings_pct: number | null
+          shopify_media_id: string | null
+          shopify_pushed_at: string | null
+          source_ref: string | null
+          source_type: string
+          status: string
+          updated_at: string
+          user_id: string
+          vendor: string | null
+          width: number | null
+        }
+        Insert: {
+          alt_text?: string | null
+          created_at?: string
+          error?: string | null
+          height?: number | null
+          id?: string
+          new_filename?: string | null
+          new_size?: number | null
+          new_url?: string | null
+          original_content_type?: string | null
+          original_size?: number | null
+          original_url?: string | null
+          product_handle?: string | null
+          product_id?: string | null
+          product_title?: string | null
+          savings_pct?: number | null
+          shopify_media_id?: string | null
+          shopify_pushed_at?: string | null
+          source_ref?: string | null
+          source_type: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          vendor?: string | null
+          width?: number | null
+        }
+        Update: {
+          alt_text?: string | null
+          created_at?: string
+          error?: string | null
+          height?: number | null
+          id?: string
+          new_filename?: string | null
+          new_size?: number | null
+          new_url?: string | null
+          original_content_type?: string | null
+          original_size?: number | null
+          original_url?: string | null
+          product_handle?: string | null
+          product_id?: string | null
+          product_title?: string | null
+          savings_pct?: number | null
+          shopify_media_id?: string | null
+          shopify_pushed_at?: string | null
+          source_ref?: string | null
+          source_type?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          vendor?: string | null
+          width?: number | null
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           id: string

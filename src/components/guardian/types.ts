@@ -23,6 +23,64 @@ export interface RuleCondition {
   value: string | number | (string | number)[] | [number, number];
 }
 
+// ── Nested groups (AND/OR) ──
+// A group is a logical container with an operator and an ordered list of children.
+// Each child is either a leaf condition or another nested group.
+export type GroupOperator = "AND" | "OR";
+
+export interface ConditionGroup {
+  kind: "group";
+  operator: GroupOperator;
+  children: ConditionNode[];
+}
+
+export type ConditionNode = ConditionGroup | RuleCondition;
+
+export const MAX_GROUP_DEPTH = 3;
+
+export function isGroup(node: ConditionNode): node is ConditionGroup {
+  return (node as ConditionGroup).kind === "group";
+}
+
+/** A rule's conditions can be stored as either a flat AND-array (legacy) or as a single root group. */
+export type RuleConditionsField = RuleCondition[] | ConditionGroup;
+
+/** True if the field is a single root group object, false for legacy flat array. */
+export function isGroupField(value: RuleConditionsField): value is ConditionGroup {
+  return !Array.isArray(value) && (value as ConditionGroup)?.kind === "group";
+}
+
+/** Wrap an existing flat AND-array (or empty) in a root AND group for editing. */
+export function toRootGroup(value: RuleConditionsField | undefined): ConditionGroup {
+  if (!value) return { kind: "group", operator: "AND", children: [] };
+  if (isGroupField(value)) return value;
+  return { kind: "group", operator: "AND", children: value as RuleCondition[] };
+}
+
+/** Recursively check whether a tree contains any OR group. If not, it can be flattened to legacy shape. */
+export function containsOr(node: ConditionNode): boolean {
+  if (!isGroup(node)) return false;
+  if (node.operator === "OR" && node.children.length > 1) return true;
+  return node.children.some(containsOr);
+}
+
+/** Flatten a pure-AND tree into a flat array of leaf conditions (legacy storage shape). */
+export function flattenLeaves(node: ConditionNode): RuleCondition[] {
+  if (!isGroup(node)) return [node];
+  return node.children.flatMap(flattenLeaves);
+}
+
+/** Count total leaf conditions in a tree (used for limits & validation). */
+export function countLeaves(node: ConditionNode): number {
+  return flattenLeaves(node).length;
+}
+
+/** Decide the final on-disk shape for the rule's conditions field. */
+export function serializeConditions(root: ConditionGroup): RuleConditionsField {
+  if (containsOr(root)) return root;
+  return flattenLeaves(root);
+}
+
 export type ActionType =
   | "block_checkout"
   | "slack_approval"
@@ -47,7 +105,7 @@ export interface MarginRule {
   user_id: string;
   name: string;
   is_active: boolean;
-  conditions: RuleCondition[];
+  conditions: RuleConditionsField;
   actions: RuleAction[];
   priority: number;
   created_at: string;

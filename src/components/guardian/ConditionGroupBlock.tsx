@@ -28,6 +28,10 @@ interface Props {
   onRemove?: () => void; // undefined for root
   depth?: number;
   isRoot?: boolean;
+  /** Dot-joined index trail from the root group (root = ""). */
+  trail?: string;
+  /** Error lookup keyed on UI paths produced by use-rule-validation. */
+  errorAt?: (path: string) => string | undefined;
 }
 
 export function ConditionGroupBlock({ group, onChange, onRemove, depth = 0, isRoot = false }: Props) {

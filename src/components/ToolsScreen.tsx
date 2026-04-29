@@ -1070,7 +1070,11 @@ function LearningMemoryPanel({ onBack }: { onBack: () => void }) {
   );
 }
 
-const ToolsScreen = () => {
+interface ToolsScreenProps {
+  onStartFlow?: (flow: string) => void;
+}
+
+const ToolsScreen = ({ onStartFlow }: ToolsScreenProps = {}) => {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [instructions, setInstructions] = useState(() => {
     try { return localStorage.getItem("ai_instructions_global") || ""; } catch { return ""; }

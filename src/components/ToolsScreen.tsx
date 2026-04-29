@@ -1070,7 +1070,11 @@ function LearningMemoryPanel({ onBack }: { onBack: () => void }) {
   );
 }
 
-const ToolsScreen = () => {
+interface ToolsScreenProps {
+  onStartFlow?: (flow: string) => void;
+}
+
+const ToolsScreen = ({ onStartFlow }: ToolsScreenProps = {}) => {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [instructions, setInstructions] = useState(() => {
     try { return localStorage.getItem("ai_instructions_global") || ""; } catch { return ""; }
@@ -1235,7 +1239,10 @@ const ToolsScreen = () => {
                 {sectionTools.map((tool) => {
                   const Icon = tool.icon;
                   return (
-                    <button key={tool.id} onClick={() => setActiveTool(tool.id)}
+                    <button key={tool.id} onClick={() => {
+                      if (tool.id === "image_seo" && onStartFlow) { onStartFlow("image_seo"); return; }
+                      setActiveTool(tool.id);
+                    }}
                       className="bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors">
                       <Icon className={`w-6 h-6 ${tool.color} mb-3`} />
                       <p className="text-sm font-semibold">{tool.label}</p>

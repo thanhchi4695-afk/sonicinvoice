@@ -141,3 +141,122 @@ THEN  <action>            // email_manager | slack_approval | block_order | log_
 - Generic web automation outside wholesale-buying surfaces.
 - Replacing existing extraction cascades (URL importer, invoice parsing) — those keep their own locked plans.
 - Removing Lovable Cloud / swapping backend providers.
+
+---
+
+## Appendix A — Agentic Margin Guardian: technical requirements
+
+### A.1 System architecture
+- **Calculation core:** reuse `src/lib/margin-protection.ts` (`checkMargin`, `checkMultiPrice`, `bulkMarginCheck`). No forks.
+- **Agent runtime:** new edge function `margin-guardian` (server-authoritative; never trust client margin verdicts).
+- **Event store:** `margin_guardian_events` (append-only). Every evaluation, gate, approval, override, and replay is one row.
+- **Rule store:** `guardian_rules` (see Appendix B). Loaded at evaluation time.
+- **Decision pipeline (per evaluation):**
+  1. Load applicable rules for `user_id` + `surface` (joor | nuorder | po | email | invoice_review).
+  2. Resolve cost via `resolveCost` (invoice → shopify → manual).
+  3. Compute margin via existing engine.
+  4. Apply rules in priority order; first matching `then` wins; emit a `decision` (allow | warn | gate | block).
+  5. Persist event with full input snapshot + chosen action + rule id.
+  6. Dispatch side-effects (Slack post, email halt token, in-app inbox card).
+
+### A.2 Surfaces & wire format
+| Surface | Input source | Trigger | Output |
+|---|---|---|---|
+| JOOR / NuOrder cart | Chrome extension content script | DOM mutation on cart rows (debounced 400ms) | ⚡ badge with margin %, floor, exposure $; tooltip lists violating rules |
+| Slack | `margin-guardian` → Slack webhook | PO total ≥ rule threshold | Block-kit card with Approve / Reject buttons; signed approval token (24h TTL) |
+| Email / PO | Outbound interceptor edge function | Pre-send hook | Halt with `requires_review=true` until inbox card resolved |
+| Sonic Invoices inbox | `margin_guardian_events` realtime channel | Any `gate` or `block` event | Card in `MarginProtectionPanel` with Approve / Override / Reapply Last Fix |
+
+### A.3 Edge function contract (`margin-guardian`)
+- `POST /evaluate` — body: `{ surface, user_id, line_items[], po_total, vendor, brand, context }`. Returns `{ decision, rule_id, event_id, narrative, exposure_cents, requires_approval }`.
+- `POST /approve` — body: `{ event_id, approval_token, decision: 'approve'|'reject', notes }`. Server validates token, updates event chain (never overwrites prior events).
+- `POST /replay-fix` — body: `{ event_id, workflow_id }`. Requires explicit user confirmation flag. Logs replay as a new event linked to the original.
+
+### A.4 Schema (Appendix-locked; future migrations follow this shape)
+```
+margin_guardian_events (
+  id uuid pk,
+  user_id uuid not null,
+  surface text not null,
+  rule_id uuid null references guardian_rules,
+  parent_event_id uuid null references margin_guardian_events,
+  decision text check (decision in ('allow','warn','gate','block','approve','reject','replay')),
+  exposure_cents integer,
+  margin_pct numeric,
+  cost_cents integer,
+  price_cents integer,
+  vendor text, brand text,
+  input_snapshot jsonb not null,
+  approval_token text null,
+  approval_expires_at timestamptz null,
+  narrative text,
+  created_at timestamptz default now()
+)
+```
+- RLS: owner-only (`auth.uid() = user_id`).
+- Indexes: `(user_id, created_at desc)`, `(parent_event_id)`, `(approval_token) where approval_token is not null`.
+
+### A.5 Cost & AI Gateway
+- Narratives generated via AI Gateway (`gemini-2.5-pro` → flash fallback). Hard-cap one LLM call per `gate`/`block` event. No LLM call for `allow`.
+- Each event records `cost_cents` and contributes to `agent_budgets`.
+
+### A.6 Acceptance criteria
+- Server-side calculation matches `checkMargin` output for ≥1000 randomized fixtures (test added under `src/test/`).
+- Slack approval flow: token expires at 24h, single-use, signed.
+- No client component is allowed to mutate `margin_guardian_events` directly — RLS denies INSERT from anon; client uses `supabase.functions.invoke('margin-guardian', ...)`.
+- Every `block` event has at least one matching `guardian_rules` row referenced by `rule_id`.
+
+---
+
+## Appendix B — Condition Builder: mockup spec
+
+### B.1 Placement
+- New tab inside `MarginProtectionPanel` titled **Guardian Rules** (do not create a new top-level page).
+- Mobile (<1024px): full-screen sheet from bottom tab. Desktop: inline in the existing two-column layout.
+
+### B.2 Visual structure (semantic tokens only)
+```
+┌─ Guardian Rules ─────────────────────────────┐
+│  [+ New rule]                  [Search rules]│
+├──────────────────────────────────────────────┤
+│  ⚡  Swimwear margin floor          ● Active │
+│      WHEN margin_below 35%                   │
+│      AND  brand IS "Seafolly"                │
+│      AND  po_total_above $2,000              │
+│      THEN slack_approval (#buying)           │
+│      Last fired: 2h ago · 12 events          │
+│      [Edit] [Duplicate] [Pause] [Delete]     │
+└──────────────────────────────────────────────┘
+```
+
+### B.3 Builder dialog (3 fixed sections)
+1. **WHEN — Trigger** (single-select, enum):
+   `margin_below`, `cost_increase_above`, `po_total_above`, `vendor_first_time`, `price_below_cost`, `compare_at_below_price`.
+2. **AND — Conditions** (repeatable, AND-combined only — no OR in v1):
+   Field + operator + value chips. Fields: `brand`, `vendor`, `category`, `tag`, `season`, `surface`, `po_total`, `margin_pct`, `cost_delta_pct`.
+   Operators: `is`, `is_not`, `in`, `not_in`, `>`, `<`, `between`.
+3. **THEN — Action** (single-select, enum):
+   `log_only`, `warn_in_app`, `email_manager`, `slack_approval`, `block_order`, `require_reapply_fix`.
+   Action-specific fields appear inline (Slack channel picker, manager email, etc.).
+
+### B.4 UX rules
+- Live preview chip at the top of the dialog renders the rule as a sentence (matches the card view above).
+- "Test rule" button runs `margin-guardian /evaluate` against the last 30 days of events (read-only) and shows how many would have fired.
+- Save is disabled until trigger + at least one condition + action are valid.
+- Use shadcn `Dialog`, `Select`, `Input`, `Badge`, `Button` only. No custom colors. Status dots use `bg-primary` / `bg-warning` / `bg-destructive`.
+
+### B.5 Storage
+- `guardian_rules` table: `id, user_id, name, trigger, conditions jsonb, action, action_config jsonb, priority int, is_active bool, created_at, updated_at, last_fired_at, fire_count int`.
+- RLS owner-only. Priority is integer; lower = higher precedence; ties broken by `created_at`.
+
+### B.6 Acceptance criteria
+- Rules created in the UI are evaluated by `margin-guardian` within the same request cycle (no caching layer in v1).
+- Pausing a rule sets `is_active=false`; the agent skips it without deleting history.
+- Deleting a rule sets `is_active=false` and soft-deletes (event history preserved by `rule_id` FK with `on delete set null`).
+- "Test rule" never mutates state and never sends Slack/email.
+
+### B.7 Out of scope for v1
+- OR / nested condition groups.
+- Time-window conditions (e.g. "during sale season").
+- Per-rule budgets.
+- Rule sharing across users.

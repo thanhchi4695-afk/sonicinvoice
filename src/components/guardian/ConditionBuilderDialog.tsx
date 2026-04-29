@@ -131,7 +131,18 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
                   maxLength={100}
                   onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                   placeholder="Prevent low-margin Brand X orders"
+                  className={nameError ? "border-destructive" : ""}
+                  aria-invalid={Boolean(nameError)}
+                  aria-describedby={nameError ? "rule-name-error" : undefined}
                 />
+                {nameError && (
+                  <p id="rule-name-error" className="mt-1 text-xs text-destructive">
+                    {nameError}
+                  </p>
+                )}
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {draft.name.trim().length}/100
+                </p>
               </div>
               <div className="flex items-center gap-2 pb-2">
                 <Switch
@@ -151,6 +162,7 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
                 group={draft.rootGroup}
                 isRoot
                 onChange={(next) => setDraft({ ...draft, rootGroup: next })}
+                errorAt={validation.errorAt}
               />
             </section>
 
@@ -169,9 +181,25 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
                     onRemove={() =>
                       setDraft({ ...draft, actions: draft.actions.filter((_, idx) => idx !== i) })
                     }
+                    errors={{
+                      channel: validation.errorAt(`action:${i}:channel`) ?? validation.errorAt(`action:${i}`),
+                      email: validation.errorAt(`action:${i}:email`),
+                      subject: validation.errorAt(`action:${i}:subject`),
+                      target_margin: validation.errorAt(`action:${i}:target_margin`),
+                      // Surface the action-level refinement only when no field error already covers it.
+                      row:
+                        validation.errorAt(`action:${i}:channel`) ||
+                        validation.errorAt(`action:${i}:email`) ||
+                        validation.errorAt(`action:${i}:target_margin`)
+                          ? undefined
+                          : validation.errorAt(`action:${i}`),
+                    }}
                   />
                 ))}
               </div>
+              {actionsError && (
+                <p className="mt-1 text-xs text-destructive">{actionsError}</p>
+              )}
               <Button
                 variant="outline"
                 size="sm"

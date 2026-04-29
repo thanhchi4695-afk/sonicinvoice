@@ -362,27 +362,55 @@ Deno.serve(async (req) => {
         : "No rule matched. Cart approved.",
     };
 
-    for (const rule of (rules ?? []) as MarginRule[]) {
-      if (!rule.conditions || rule.conditions.length === 0) continue;
-      let allMatch = true;
-      let lastMatchingItems: EnrichedItem[] = enriched;
-      for (const c of rule.conditions) {
-        const { matched, matchingItems } = evalCondition(c, enriched, poTotal, surface);
-        if (!matched) {
-          allMatch = false;
-          break;
-        }
-        lastMatchingItems = matchingItems;
+    // Recursive node evaluator: handles legacy flat AND-array and nested AND/OR groups.
+    const isGroup = (n: unknown): n is ConditionGroup =>
+      !!n && typeof n === "object" && (n as ConditionGroup).kind === "group";
+
+    function evalNode(
+      node: RuleCondition | ConditionGroup,
+    ): { matched: boolean; matchingItems: EnrichedItem[] } {
+      if (!isGroup(node)) {
+        return evalCondition(node, enriched, poTotal, surface);
       }
-      if (allMatch) {
+      if (!node.children || node.children.length === 0) {
+        return { matched: false, matchingItems: enriched };
+      }
+      if (node.operator === "AND") {
+        let last: EnrichedItem[] = enriched;
+        for (const c of node.children) {
+          const r = evalNode(c);
+          if (!r.matched) return { matched: false, matchingItems: enriched };
+          last = r.matchingItems;
+        }
+        return { matched: true, matchingItems: last };
+      }
+      // OR — first match wins
+      for (const c of node.children) {
+        const r = evalNode(c);
+        if (r.matched) return r;
+      }
+      return { matched: false, matchingItems: enriched };
+    }
+
+    for (const rule of (rules ?? []) as MarginRule[]) {
+      const conds = rule.conditions;
+      const isEmpty = !conds || (Array.isArray(conds) ? conds.length === 0 : !conds.children?.length);
+      if (isEmpty) continue;
+
+      const root: ConditionGroup = Array.isArray(conds)
+        ? { kind: "group", operator: "AND", children: conds }
+        : conds;
+
+      const { matched, matchingItems } = evalNode(root);
+      if (matched) {
         const blocks = rule.actions.some((a) => a.type === "block_checkout");
         decision = {
           allowed: !blocks,
           ruleId: rule.id,
           ruleName: rule.name,
           actions: rule.actions,
-          message: buildMessage(rule, lastMatchingItems),
-          matchingItems: lastMatchingItems,
+          message: buildMessage(rule, matchingItems),
+          matchingItems,
         };
         break;
       }

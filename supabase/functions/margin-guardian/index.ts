@@ -57,12 +57,20 @@ interface RuleAction {
   params?: Record<string, unknown>;
 }
 
+interface ConditionGroup {
+  kind: "group";
+  operator: "AND" | "OR";
+  children: Array<RuleCondition | ConditionGroup>;
+}
+
+type ConditionsField = RuleCondition[] | ConditionGroup;
+
 interface MarginRule {
   id: string;
   user_id: string;
   name: string;
   is_active: boolean;
-  conditions: RuleCondition[];
+  conditions: ConditionsField;
   actions: RuleAction[];
   priority: number;
 }

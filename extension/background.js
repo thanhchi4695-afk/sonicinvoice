@@ -32,12 +32,33 @@ async function evaluateCart({ cartItems, surface }) {
   }
 }
 
+async function pollDecision({ decisionId }) {
+  const token = await getToken();
+  if (!token) return { error: "no_token" };
+  try {
+    const resp = await fetch(`${ENDPOINT}?decisionId=${encodeURIComponent(decisionId)}`, {
+      method: "GET",
+      headers: { "X-Sonic-Token": token },
+    });
+    if (!resp.ok) return { error: `http_${resp.status}` };
+    return await resp.json();
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
 chrome.runtime.onMessage.addListener((req, _sender, sendResponse) => {
   if (req?.type === "EVALUATE_CART") {
     evaluateCart({ cartItems: req.cartItems, surface: req.surface })
       .then(sendResponse)
       .catch((e) => sendResponse({ allowed: true, error: String(e) }));
-    return true; // keep channel open for async sendResponse
+    return true;
+  }
+  if (req?.type === "POLL_DECISION") {
+    pollDecision({ decisionId: req.decisionId })
+      .then(sendResponse)
+      .catch((e) => sendResponse({ error: String(e) }));
+    return true;
   }
   if (req?.type === "PING") {
     sendResponse({ ok: true });

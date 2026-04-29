@@ -121,11 +121,56 @@ function renderDots(marginData) {
     });
 }
 
+let pollTimer = null;
+let pollingDecisionId = null;
+
+function stopPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+  pollingDecisionId = null;
+}
+
+function startPolling(decisionId) {
+  if (pollingDecisionId === decisionId) return;
+  stopPolling();
+  pollingDecisionId = decisionId;
+  let attempts = 0;
+  pollTimer = setInterval(async () => {
+    attempts += 1;
+    if (attempts > 60) return stopPolling(); // 5 min cap
+    const status = await chrome.runtime.sendMessage({
+      type: "POLL_DECISION",
+      decisionId,
+    });
+    if (!status || status.error) return;
+    if (status.decision_outcome && status.decision_outcome !== "pending_approval") {
+      stopPolling();
+      // Surface the resolution and re-run evaluate so the banner/checkout state refreshes.
+      const banner = document.getElementById("sonic-margin-banner");
+      if (banner) {
+        const note = document.createElement("div");
+        note.className = "sonic-banner-message";
+        note.style.marginTop = "8px";
+        note.textContent =
+          status.decision_outcome === "approved"
+            ? "✅ Approved in Slack — cart unblocked."
+            : status.decision_outcome === "denied"
+              ? "❌ Denied in Slack — cart remains blocked."
+              : "⏰ Approval expired.";
+        banner.querySelector(".sonic-banner-row > div")?.appendChild(note);
+      }
+      lastSnapshot = ""; // force re-eval
+      scheduleEvaluate();
+    }
+  }, 5000);
+}
+
 async function evaluateNow() {
   if (inFlight) return;
   const items = extractCartItems();
   if (items.length === 0) {
     renderBanner({ allowed: true });
+    stopPolling();
     return;
   }
   const key = snapshotKey(items);
@@ -142,6 +187,13 @@ async function evaluateNow() {
     renderBanner(decision);
     toggleCheckout(decision);
     renderDots(decision.marginData);
+
+    const needsApproval = (decision.actions || []).some((a) => a.type === "slack_approval");
+    if (needsApproval && decision.decisionId) {
+      startPolling(decision.decisionId);
+    } else {
+      stopPolling();
+    }
   } catch (e) {
     console.warn("[sonic] evaluate failed", e);
   } finally {

@@ -35,7 +35,7 @@ export function TestRuleDialog({ open, onOpenChange, rule }: Props) {
   const runTest = async () => {
     setResult({ state: "running" });
     try {
-      let cart: unknown = null;
+      let cart: { items?: unknown[]; surface?: string } | null = null;
       if (cartJson.trim()) {
         try {
           cart = JSON.parse(cartJson);
@@ -45,24 +45,30 @@ export function TestRuleDialog({ open, onOpenChange, rule }: Props) {
         }
       }
 
-      // Local dry-run preview. The server-side dry_run path lives in the
-      // forthcoming `margin-guardian` edge function (Appendix D.6) and will
-      // replace this client-side preview with an authoritative check.
-      const items = Array.isArray((cart as { items?: unknown })?.items)
-        ? ((cart as { items: { margin_pct?: number; brand?: string; po_total?: number }[] }).items)
-        : [];
-      const wouldFire = rule.conditions.every((c) => {
-        if (c.field === "margin_pct" && c.operator === "is_below") {
-          return items.some((i) => typeof i.margin_pct === "number" && i.margin_pct < Number(c.value));
-        }
-        if (c.field === "brand" && c.operator === "is") {
-          return items.some((i) => i.brand === c.value);
-        }
-        return true;
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth?.user) {
+        setResult({ state: "error", message: "You must be signed in to test rules." });
+        return;
+      }
+
+      // Server evaluates the SAVED rules with dryRun=true (no log write, no Slack/email).
+      const { data, error } = await supabase.functions.invoke("margin-guardian", {
+        body: {
+          userId: auth.user.id,
+          cartItems: Array.isArray(cart?.items) ? cart!.items : [],
+          surface: cart?.surface ?? "test",
+          dryRun: true,
+        },
       });
-      const narrative = wouldFire
-        ? "This rule would fire on the supplied cart."
-        : "This rule would not fire on the supplied cart.";
+
+      if (error) {
+        setResult({ state: "error", message: error.message });
+        return;
+      }
+
+      const wouldFire = !!data?.ruleId;
+      const narrative = data?.message ??
+        (wouldFire ? "A rule would fire on the supplied cart." : "No rule would fire on the supplied cart.");
       setResult({ state: "done", would_fire: wouldFire, narrative });
     } catch (err) {
       setResult({ state: "error", message: err instanceof Error ? err.message : "Test failed" });

@@ -85,8 +85,10 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
     [draft],
   );
 
-  const validation = useMemo(() => ruleSchema.safeParse(persisted), [persisted]);
-  const isValid = validation.success;
+  const validation = useRuleValidation(persisted, draft.rootGroup);
+  const isValid = validation.isValid;
+  const nameError = validation.errorAt("name");
+  const actionsError = validation.errorAt("actions");
 
   const handleSave = async () => {
     setSaving(true);

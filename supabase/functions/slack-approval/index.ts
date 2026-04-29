@@ -260,11 +260,39 @@ async function handlePost(req: Request) {
     buildBlocks(body, token),
     `Margin approval needed: ${body.ruleName}`,
   );
+
   if (!slackResp.ok) {
-    return jsonResponse({ error: `Slack error: ${slackResp.error}` }, 502);
+    // Permanent failure → fail-safe the decision so the extension stops polling
+    // and the buyer sees an actionable error instead of a stuck "pending".
+    const errMsg = `slack_post_failed:${slackResp.error}`;
+    console.error(
+      `Slack post failed for decision ${body.decisionId} after ${slackResp.attempts} attempt(s): ${slackResp.error} (retryable=${slackResp.retryable})`,
+    );
+    await supabase
+      .from("margin_agent_decisions")
+      .update({
+        decision_outcome: "failed",
+        approval_token: null,
+        decision_reason: errMsg,
+      })
+      .eq("id", body.decisionId);
+    return jsonResponse(
+      {
+        error: `Slack error: ${slackResp.error}`,
+        retryable: slackResp.retryable,
+        attempts: slackResp.attempts,
+      },
+      slackResp.retryable ? 503 : 502,
+    );
   }
 
-  return jsonResponse({ success: true, ts: slackResp.ts, channel: slackResp.channel, token });
+  return jsonResponse({
+    success: true,
+    ts: slackResp.data?.ts,
+    channel: slackResp.data?.channel,
+    token,
+    attempts: slackResp.attempts,
+  });
 }
 
 async function handleActions(req: Request) {

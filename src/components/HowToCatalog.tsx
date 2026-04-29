@@ -19,8 +19,70 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
   const [searchQuery, setSearchQuery] = useState("");
   const [openFeature, setOpenFeature] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const featureRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const stepRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
   const filteredFeatures = useMemo(() => searchFeatures(searchQuery), [searchQuery]);
+
+  // ── Deep-link support: #how/<feature-id> and #how/<feature-id>/step-N ──
+  // Always show a ToC for these flagship guides; auto-show for any 5+ step feature.
+  const TOC_FORCE_FEATURES = new Set([
+    "margin_guardian_rules",
+    "slack_approval_workflow",
+    "margin_guardian_extension",
+  ]);
+  const shouldShowToc = (id: string, stepCount: number) =>
+    TOC_FORCE_FEATURES.has(id) || stepCount >= 5;
+
+  const slugForStep = (featureId: string, stepIndex: number) =>
+    `how/${featureId}/step-${stepIndex + 1}`;
+
+  const parseHash = (hash: string): { featureId?: string; stepIndex?: number } => {
+    const cleaned = hash.replace(/^#/, "");
+    if (!cleaned.startsWith("how/")) return {};
+    const parts = cleaned.split("/");
+    const featureId = parts[1];
+    const stepPart = parts[2];
+    const stepMatch = stepPart?.match(/^step-(\d+)$/);
+    return {
+      featureId,
+      stepIndex: stepMatch ? Math.max(0, Number(stepMatch[1]) - 1) : undefined,
+    };
+  };
+
+  // On mount + hashchange, jump to the targeted feature (and step).
+  useEffect(() => {
+    const apply = () => {
+      const { featureId, stepIndex } = parseHash(window.location.hash);
+      if (!featureId) return;
+      const target = featureRegistry.find(f => f.id === featureId);
+      if (!target) return;
+      setOpenFeature(featureId);
+      setExpandedCategories(prev => new Set(prev).add(target.category));
+      // Wait a tick for the expanded section to render before scrolling.
+      requestAnimationFrame(() => {
+        const stepEl = stepIndex !== undefined ? stepRefs.current[`${featureId}:${stepIndex}`] : null;
+        const featureEl = featureRefs.current[featureId];
+        const el = stepEl ?? featureEl;
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    };
+    apply();
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const copyAnchor = async (anchor: string, label: string) => {
+    const url = `${window.location.origin}${window.location.pathname}#${anchor}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(`Copied link to ${label}`);
+    } catch {
+      window.location.hash = anchor;
+      toast.message("Link applied to URL — copy from address bar");
+    }
+  };
 
   const grouped = useMemo(() => {
     const g: Record<string, FeatureEntry[]> = {};

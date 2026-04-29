@@ -221,7 +221,7 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
         </DialogContent>
       </Dialog>
 
-      <TestRuleDialog open={testOpen} onOpenChange={setTestOpen} rule={draft} />
+      <TestRuleDialog open={testOpen} onOpenChange={setTestOpen} rule={persisted} />
     </>
   );
 }

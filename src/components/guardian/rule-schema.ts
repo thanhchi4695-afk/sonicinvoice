@@ -38,9 +38,12 @@ const conditionSchema = z
   });
 
 // Recursive group schema. z.lazy() gives us a self-reference for nested children.
-type ConditionNodeShape = z.infer<typeof conditionSchema> | { kind: "group"; operator: "AND" | "OR"; children: ConditionNodeShape[] };
+type ConditionNodeShape =
+  | z.infer<typeof conditionSchema>
+  | { kind: "group"; operator: "AND" | "OR"; children: ConditionNodeShape[] };
 
-const groupSchema: z.ZodType<{ kind: "group"; operator: "AND" | "OR"; children: ConditionNodeShape[] }> = z.lazy(() =>
+// Use ZodTypeAny to sidestep the recursive type-inference limitation in Zod 3.
+const groupSchema: z.ZodTypeAny = z.lazy(() =>
   z.object({
     kind: z.literal("group"),
     operator: z.enum(["AND", "OR"]),

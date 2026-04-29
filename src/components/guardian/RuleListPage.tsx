@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ConditionBuilderDialog } from "./ConditionBuilderDialog";
+import { RuleTemplatePicker, type RuleTemplate } from "./RuleTemplatePicker";
 import { useMarginRules } from "./use-margin-rules";
 import {
   ACTION_LABELS,

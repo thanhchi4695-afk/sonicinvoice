@@ -260,3 +260,113 @@ margin_guardian_events (
 - Time-window conditions (e.g. "during sale season").
 - Per-rule budgets.
 - Rule sharing across users.
+
+---
+
+## Appendix C — Margin Guardian: detailed Part A spec (locked)
+
+This appendix is the authoritative source for the agent's runtime behaviour. Where it conflicts with Appendix A, Appendix C wins for table names, sequence, and Slack contract; Appendix A still governs RLS, AI Gateway, and event-sourcing principles.
+
+### C.1 Core capabilities (locked)
+| Capability | Implementation |
+|---|---|
+| Real-time cart monitoring | Chrome extension content script with `MutationObserver` on the JOOR/NuOrder cart container. Debounce 400ms. |
+| Continuous margin calc | Extension calls edge function `check-batch-margin` with full cart snapshot on every change. Local product cache TTL = 5 minutes. |
+| Contextual decision engine | JSON-based rule decision tree evaluated server-side in `margin-guardian` (single source of truth — extension never decides alone). |
+| Proactive actions | Extension intercepts the "Place Order" click and conditionally blocks submission until rules are satisfied. |
+| Cross-channel orchestration | Edge function dispatches to Slack (connector gateway), email (Resend connector), and Sonic Invoices inbox via Supabase Realtime. |
+
+### C.2 Tables (locked names — use these in migrations)
+```sql
+-- Rule definitions authored via the Condition Builder
+CREATE TABLE public.margin_rules (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  conditions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  actions    JSONB NOT NULL DEFAULT '[]'::jsonb,
+  priority   INT  NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Append-only decision log (event sourcing)
+CREATE TABLE public.agent_decisions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  rule_id UUID NULL REFERENCES public.margin_rules(id) ON DELETE SET NULL,
+  cart_snapshot JSONB NOT NULL,
+  decision_outcome TEXT NOT NULL CHECK (decision_outcome IN ('allowed','blocked','pending_approval','approved','denied','expired')),
+  action_taken JSONB NOT NULL DEFAULT '[]'::jsonb,
+  approval_token TEXT NULL,
+  approval_expires_at TIMESTAMPTZ NULL,
+  parent_decision_id UUID NULL REFERENCES public.agent_decisions(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+- RLS owner-only on both tables.
+- The existing `agent_decisions` table in this project is NOT this one (it logs LLM step decisions). When migrating, namespace the new one as `margin_agent_decisions` to avoid collision with the existing `public.agent_decisions`. **Locked rename: use `margin_agent_decisions` everywhere this appendix says `agent_decisions`.**
+- Indexes: `(user_id, created_at desc)`, `(approval_token) where approval_token is not null`, `(parent_decision_id)`.
+
+### C.3 Agent loop (locked sequence)
+1. Cart change detected → extension extracts cart items.
+2. Extension `POST /functions/v1/margin-guardian/evaluate` with `{ surface, cart_items[], po_total, vendor, brand, context }`.
+3. Edge function:
+   - Loads landed costs (invoice → shopify → manual via `resolveCost`).
+   - Loads active `margin_rules` for `user_id`, ordered by `priority` ASC then `created_at` ASC.
+   - Computes margin per item via `checkMargin`.
+   - Evaluates conditions; first matching rule wins.
+   - Returns `{ allowed, reason, requiredAction, decision_id, approval_required }`.
+4. Extension:
+   - Renders banner (red = blocked, amber = pending approval, green = allowed).
+   - If any action is `block_checkout`, disables Place Order.
+   - If `manager_approval` required, exposes "Request Approval" button.
+5. Approval click → `POST /margin-guardian/request-approval` → posts Slack message with signed token (24h TTL).
+6. Slack button → Slack hits `POST /margin-guardian/slack-actions` → validates Slack signing secret → updates row → broadcasts via Supabase Realtime on `margin_agent_decisions`.
+7. Extension subscribed to realtime channel → re-evaluates → unblocks checkout if approved.
+
+### C.4 Slack contract (locked)
+- Connector: Slack via gateway (`https://connector-gateway.lovable.dev/slack/api/...`). No direct Slack SDK from edge or extension.
+- Signing secret stored as `SLACK_SIGNING_SECRET` (custom app required because we receive interactive callbacks; the connector cannot receive events).
+- Approval payload (Block Kit) — exact shape:
+```json
+{
+  "blocks": [
+    {"type":"section","text":{"type":"mrkdwn","text":"*🛑 Margin Approval Required*"}},
+    {"type":"section","fields":[
+      {"type":"mrkdwn","text":"*Brand:*\nBrand X"},
+      {"type":"mrkdwn","text":"*Total Margin:*\n38% (7% below target)"}
+    ]},
+    {"type":"actions","elements":[
+      {"type":"button","text":{"type":"plain_text","text":"✅ Approve"},"style":"primary","value":"approve","action_id":"margin_approve"},
+      {"type":"button","text":{"type":"plain_text","text":"❌ Deny"},"style":"danger","value":"deny","action_id":"margin_deny"}
+    ]}
+  ]
+}
+```
+- The `value` of every button MUST embed the signed `approval_token` (e.g. `approve:{token}`). Server rejects buttons without a valid, unexpired, single-use token.
+
+### C.5 Edge function endpoints (locked)
+- `POST /margin-guardian/evaluate` — runs the loop, writes a `pending_approval`/`blocked`/`allowed` row.
+- `POST /margin-guardian/request-approval` — sends Slack message, attaches token to existing row.
+- `POST /margin-guardian/slack-actions` — Slack interactive callback; validates signing secret; appends `approved`/`denied` event row with `parent_decision_id`.
+- `POST /margin-guardian/replay-fix` — Lesson 4 hook (see Appendix A.3).
+- All endpoints validate input with Zod and return `{ error }` on 400. JWT verification disabled for `slack-actions` only (Slack cannot send a Supabase JWT) — Slack signing-secret HMAC is the auth.
+
+### C.6 Cache & performance
+- Extension keeps a 5-minute LRU of `(sku → { cost, margin })`. Invalidated on any `evaluate` response that changes cost source.
+- Edge function batches DB reads: one query for rules, one for product costs (IN clause on SKUs).
+- Hard cap: max 50 cart items per `evaluate` request — extension splits larger carts.
+
+### C.7 Acceptance criteria
+- Cart change → banner update p95 < 600ms on a 20-item cart.
+- Slack approval round-trip updates the extension banner via Realtime in < 3s.
+- Tampering with the Slack `value` token (modifying the embedded token) results in 401 and no row update.
+- Every `blocked` decision references a rule_id; `pending_approval` may have `rule_id` null only when triggered by a global default (logged with `rule_id = null` and `action_taken[0].source = 'default'`).
+- `cart_snapshot` is never mutated after insert (event sourcing). Subsequent state changes create new rows linked via `parent_decision_id`.
+
+### C.8 Out of scope for v1
+- Auto-applying price corrections without human confirmation (Lesson 4 still requires explicit confirm).
+- Multi-rule chaining (only first matching rule fires).
+- Per-line approval (approval is whole-cart in v1).

@@ -356,10 +356,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify(decision), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Per-SKU margin map for the extension's row dots.
+    const marginData: Record<string, number | null> = {};
+    for (const it of enriched) marginData[it.sku] = it.marginPct;
+
+    return new Response(
+      JSON.stringify({ ...decision, marginData, poTotal }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err) {
     console.error("margin-guardian error", err);
     return new Response(

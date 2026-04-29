@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ActionRow } from "./ActionRow";
+import { ActionsSection } from "./ActionsSection";
 import { ConditionGroupBlock } from "./ConditionGroupBlock";
 import { TestRuleDialog } from "./TestRuleDialog";
 import { TestWithCurrentCartDialog } from "./TestWithCurrentCartDialog";
@@ -170,47 +170,12 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
 
             <section>
               <div className="mb-2 text-sm font-medium">THEN take these actions:</div>
-              <div className="space-y-2">
-                {draft.actions.map((a, i) => (
-                  <ActionRow
-                    key={i}
-                    action={a}
-                    onChange={(next) => {
-                      const copy = [...draft.actions];
-                      copy[i] = next;
-                      setDraft({ ...draft, actions: copy });
-                    }}
-                    onRemove={() =>
-                      setDraft({ ...draft, actions: draft.actions.filter((_, idx) => idx !== i) })
-                    }
-                    errors={{
-                      channel: validation.errorAt(`action:${i}:channel`) ?? validation.errorAt(`action:${i}`),
-                      email: validation.errorAt(`action:${i}:email`),
-                      subject: validation.errorAt(`action:${i}:subject`),
-                      target_margin: validation.errorAt(`action:${i}:target_margin`),
-                      // Surface the action-level refinement only when no field error already covers it.
-                      row:
-                        validation.errorAt(`action:${i}:channel`) ||
-                        validation.errorAt(`action:${i}:email`) ||
-                        validation.errorAt(`action:${i}:target_margin`)
-                          ? undefined
-                          : validation.errorAt(`action:${i}`),
-                    }}
-                  />
-                ))}
-              </div>
-              {actionsError && (
-                <p className="mt-1 text-xs text-destructive">{actionsError}</p>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => setDraft({ ...draft, actions: [...draft.actions, { ...EMPTY_ACTION }] })}
-              >
-                <Plus className="h-4 w-4" />
-                Add action
-              </Button>
+              <ActionsSection
+                actions={draft.actions}
+                onChange={(next) => setDraft({ ...draft, actions: next })}
+                errorAt={validation.errorAt}
+                actionsError={actionsError}
+              />
             </section>
 
             <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted/30 p-3">

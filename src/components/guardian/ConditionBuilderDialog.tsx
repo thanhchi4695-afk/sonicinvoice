@@ -16,7 +16,7 @@ import { ActionRow } from "./ActionRow";
 import { ConditionGroupBlock } from "./ConditionGroupBlock";
 import { TestRuleDialog } from "./TestRuleDialog";
 import { useMarginRules } from "./use-margin-rules";
-import { ruleSchema } from "./rule-schema";
+import { useRuleValidation } from "./use-rule-validation";
 import { useRuleValidation } from "./use-rule-validation";
 import {
   serializeConditions,

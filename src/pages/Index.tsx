@@ -102,6 +102,7 @@ const StockyHomeDashboard = lazy(() => import("@/components/StockyHomeDashboard"
 const PriceMatchPanel = lazy(() => import("@/components/PriceMatchPanel"));
 const ProductDescriptionPanel = lazy(() => import("@/components/ProductDescriptionPanel"));
 const StockReconciliationPanel = lazy(() => import("@/components/StockReconciliationPanel").then(m => ({ default: m.StockReconciliationPanel })));
+const ImageSEOFlow = lazy(() => import("@/components/ImageSEOFlow"));
 // ── Flow keys registry — single source of truth for all activeFlow values ──
 // Add a new flow by adding its key here; TypeScript will enforce usage everywhere.
 const FLOW_KEYS = {
@@ -171,6 +172,7 @@ const FLOW_KEYS = {
   stock_reconciliation: true,
   teach_invoice_tutorial: true,
   restock_suggestions: true,
+  image_seo: true,
 } as const;
 
 export type ActiveFlow = keyof typeof FLOW_KEYS;
@@ -490,6 +492,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       case "joor": flowEl = <JoorFlow onBack={() => setActiveFlow(null)} />; break;
       case "wholesale_import": flowEl = <WholesaleImportFlow onBack={() => setActiveFlow(null)} />; break;
       case "lookbook_import": flowEl = <LookbookImportFlow onBack={() => setActiveFlow(null)} />; break;
+      case "image_seo": flowEl = <ImageSEOFlow onBack={() => setActiveFlow(null)} />; break;
       case "accounting": flowEl = <AccountingIntegration onBack={() => setActiveFlow(null)} />; break;
       case "profit_loss": flowEl = <ProfitLossPanel onBack={() => setActiveFlow(null)} />; break;
       case "stocky_hub": flowEl = <StockyHub onBack={() => setActiveFlow(null)} onNavigate={(t) => {

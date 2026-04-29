@@ -328,15 +328,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch active rules ordered by priority (lowest number = highest priority).
-    const { data: rules, error: rulesErr } = await supabase
-      .from("margin_rules")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .order("priority", { ascending: true });
-
-    if (rulesErr) throw rulesErr;
+    // Rule list to evaluate. If a draftRule is supplied (Test with current cart from
+    // the unsaved editor), evaluate ONLY that rule — saved rules are ignored so the
+    // result reflects the rule the user is currently editing.
+    let rules: MarginRule[];
+    if (draftRule) {
+      if (!draftRule.conditions || !Array.isArray(draftRule.actions)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid draftRule" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      rules = [{
+        id: "__draft__",
+        user_id: userId,
+        name: draftRule.name || "Draft rule",
+        is_active: true,
+        conditions: draftRule.conditions,
+        actions: draftRule.actions,
+        priority: 0,
+      }];
+    } else {
+      const { data: saved, error: rulesErr } = await supabase
+        .from("margin_rules")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("is_active", true)
+        .order("priority", { ascending: true });
+      if (rulesErr) throw rulesErr;
+      rules = (saved ?? []) as MarginRule[];
+    }
 
     // Fetch cost data for SKUs lacking client-supplied landedCost.
     const skusNeedingLookup = cartItems

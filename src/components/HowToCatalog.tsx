@@ -287,7 +287,8 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
                                         href={`#${slug}`}
                                         onClick={(e) => {
                                           e.preventDefault();
-                                          history.replaceState(null, "", `#${slug}`);
+                                          const base = `${window.location.pathname}${window.location.search}`;
+                                          history.pushState(null, "", `${base}#${slug}`);
                                           stepRefs.current[`${feature.id}:${i}`]?.scrollIntoView({
                                             behavior: "smooth",
                                             block: "center",

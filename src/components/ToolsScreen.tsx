@@ -1079,6 +1079,7 @@ interface ToolsScreenProps {
 }
 
 const ToolsScreen = ({ onStartFlow }: ToolsScreenProps = {}) => {
+  const navigate = useNavigate();
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [instructions, setInstructions] = useState(() => {
     try { return localStorage.getItem("ai_instructions_global") || ""; } catch { return ""; }

@@ -81,7 +81,6 @@ interface CartItem {
 
 interface EvaluateRequest {
   cartItems: CartItem[];
-  userId: string;
   surface?: string;
   dryRun?: boolean;
 }

@@ -190,7 +190,7 @@ export function RuleListPage() {
             No-code margin protection rules. Drag the handle to reorder — lower priority numbers run first.
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setOpen(true); }}>
+        <Button onClick={() => { setEditing(null); setTemplate(null); setPickerOpen(true); }}>
           <Plus className="h-4 w-4" />
           New rule
         </Button>

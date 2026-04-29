@@ -204,6 +204,53 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // GET ?decisionId=<uuid> → poll a single decision's current outcome (extension polling)
+  if (req.method === "GET") {
+    const url = new URL(req.url);
+    const decisionId = url.searchParams.get("decisionId");
+    if (!decisionId) {
+      return new Response(JSON.stringify({ error: "Missing decisionId" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // Auth via extension token (same as POST).
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+    const extToken = req.headers.get("x-sonic-token");
+    let userId: string | null = null;
+    if (extToken) {
+      const hash = await sha256Hex(extToken);
+      const { data: tokenUser } = await supabase.rpc("verify_extension_token", { _token_hash: hash });
+      if (tokenUser) userId = tokenUser as string;
+    }
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data, error } = await supabase
+      .from("margin_agent_decisions")
+      .select("id, decision_outcome, approval_expires_at")
+      .eq("id", decisionId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify(data ?? { error: "Not found" }), {
+      status: data ? 200 : 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,

@@ -52,9 +52,10 @@ export function TestRuleDialog({ open, onOpenChange, rule }: Props) {
       }
 
       // Server evaluates the SAVED rules with dryRun=true (no log write, no Slack/email).
+      // userId is derived from the JWT — never trust a client-supplied value.
+      void auth.user.id;
       const { data, error } = await supabase.functions.invoke("margin-guardian", {
         body: {
-          userId: auth.user.id,
           cartItems: Array.isArray(cart?.items) ? cart!.items : [],
           surface: cart?.surface ?? "test",
           dryRun: true,

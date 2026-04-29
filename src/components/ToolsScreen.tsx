@@ -1,5 +1,6 @@
 import { useState, useRef, lazy, Suspense } from "react";
-import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail, CalendarDays, ShoppingCart, Image, Sparkles, Brain, ChevronDown, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Tag, Search, Globe, Bot, ChevronLeft, DollarSign, Plus, Trash2, ToggleLeft, ToggleRight, RotateCcw, Copy, Check, ExternalLink, Upload, Download, Monitor, Mail, CalendarDays, ShoppingCart, Image, Sparkles, Brain, ChevronDown, ChevronRight, Shield, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PriceLookup from "@/components/PriceLookup";
 import SupplierEmails from "@/components/SupplierEmails";
@@ -60,6 +61,9 @@ const tools = [
   { id: "competitor_intel", icon: Bot, label: "Competitor intel", desc: "Analyse competitor pricing & positioning", color: "text-primary" },
   { id: "price_monitor", icon: DollarSign, label: "Price monitor", desc: "Monitor & match competitor prices in real-time", color: "text-success" },
   { id: "geo_agentic", icon: Globe, label: "Local SEO", desc: "Geo-targeted SEO for local store visibility", color: "text-success" },
+  // Margin Guardian
+  { id: "margin_guardian_rules", icon: Shield, label: "Margin Guardian rules", desc: "Build conditional rules: alerts, blocks & price corrections", color: "text-amber-500" },
+  { id: "margin_guardian_tokens", icon: Key, label: "Extension tokens", desc: "Manage Chrome extension API tokens for Margin Guardian", color: "text-amber-500" },
 ];
 
 const quickInserts = [
@@ -1075,6 +1079,7 @@ interface ToolsScreenProps {
 }
 
 const ToolsScreen = ({ onStartFlow }: ToolsScreenProps = {}) => {
+  const navigate = useNavigate();
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [instructions, setInstructions] = useState(() => {
     try { return localStorage.getItem("ai_instructions_global") || ""; } catch { return ""; }
@@ -1210,7 +1215,15 @@ const ToolsScreen = ({ onStartFlow }: ToolsScreenProps = {}) => {
     },
     {
       title: "Import & Export",
-      ids: ["lightspeed_convert", "export_collections", "import_collections"],
+      ids: ["lightspeed_convert", "lightspeed_import", "export_collections", "import_collections"],
+    },
+    {
+      title: "Margin Guardian",
+      ids: ["margin_guardian_rules", "margin_guardian_tokens"],
+    },
+    {
+      title: "Image SEO",
+      ids: ["image_seo"],
     },
   ];
 
@@ -1241,6 +1254,10 @@ const ToolsScreen = ({ onStartFlow }: ToolsScreenProps = {}) => {
                   return (
                     <button key={tool.id} onClick={() => {
                       if (tool.id === "image_seo" && onStartFlow) { onStartFlow("image_seo"); return; }
+                      if (tool.id === "margin_guardian_rules" || tool.id === "margin_guardian_tokens") {
+                        navigate("/rules");
+                        return;
+                      }
                       setActiveTool(tool.id);
                     }}
                       className="bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors">

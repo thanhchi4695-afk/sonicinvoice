@@ -26,3 +26,6 @@ verify_jwt = true
 
 [functions.margin-guardian]
 verify_jwt = false
+
+[functions.slack-approval]
+verify_jwt = false

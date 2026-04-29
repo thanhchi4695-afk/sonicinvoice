@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -146,15 +146,27 @@ export function ConditionRow({ condition, onChange, onRemove, index, valueError,
   return (
     <div
       className={
-        "rounded-md border bg-card p-3 " +
+        "group/row rounded-lg border bg-card p-3 shadow-sm transition-colors " +
+        "hover:bg-muted/40 " +
         (hasError ? "border-destructive/60" : "border-border")
       }
     >
-      <div className="flex flex-wrap items-center gap-2">
-        {index > 0 && <span className="text-xs font-medium text-muted-foreground">AND</span>}
+      {/* Stack on mobile, inline on >=sm. The drag handle stays leftmost. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex items-center gap-2 sm:contents">
+          <GripVertical
+            className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground/50 opacity-0 transition-opacity group-hover/row:opacity-100"
+            aria-hidden="true"
+          />
+          {index > 0 && (
+            <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground sm:bg-transparent sm:px-0 sm:py-0">
+              AND
+            </span>
+          )}
+        </div>
 
         <Select value={condition.field} onValueChange={(v) => handleFieldChange(v as ConditionField)}>
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-full sm:w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -172,7 +184,7 @@ export function ConditionRow({ condition, onChange, onRemove, index, valueError,
             onValueChange={(v) => handleOperatorChange(v as ConditionOperator)}
           >
             <SelectTrigger
-              className={"w-40 " + (operatorError ? "border-destructive" : "")}
+              className={"w-full sm:w-40 " + (operatorError ? "border-destructive" : "")}
               aria-invalid={Boolean(operatorError)}
             >
               <SelectValue />
@@ -187,13 +199,24 @@ export function ConditionRow({ condition, onChange, onRemove, index, valueError,
           </Select>
         </div>
 
-        <div className="flex flex-col">
-          <div className={valueError ? "[&_input]:border-destructive [&_button]:border-destructive" : ""}>
+        <div className="flex w-full flex-col sm:w-auto">
+          <div
+            className={
+              "[&_input]:w-full sm:[&_input]:w-auto " +
+              (valueError ? "[&_input]:border-destructive [&_button]:border-destructive" : "")
+            }
+          >
             {renderValueInput()}
           </div>
         </div>
 
-        <Button variant="ghost" size="icon" onClick={onRemove} aria-label="Remove condition" className="ml-auto">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onRemove}
+          aria-label="Remove condition"
+          className="ml-auto text-muted-foreground hover:text-destructive"
+        >
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>

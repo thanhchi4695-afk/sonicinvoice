@@ -194,37 +194,46 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:justify-between">
-            <div>
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+            <div className="order-2 sm:order-1">
               {draft.id && (
-                <Button variant="ghost" onClick={handleDelete} className="text-destructive">
+                <Button
+                  variant="ghost"
+                  onClick={handleDelete}
+                  disabled={saving}
+                  className="w-full text-destructive sm:w-auto"
+                >
                   Delete rule
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="order-1 flex flex-col items-stretch gap-2 sm:order-2 sm:flex-row sm:items-center">
               {!isValid && validation.issues.length > 0 && (
-                <span className="text-xs text-destructive">
+                <span className="text-xs text-destructive sm:mr-1">
                   Fix {validation.issues.length} issue{validation.issues.length === 1 ? "" : "s"} to save
                 </span>
               )}
               <Button
                 variant="outline"
                 onClick={() => setLiveTestOpen(true)}
-                disabled={!isValid}
+                disabled={!isValid || saving}
                 title="Run this rule against the live JOOR / NuOrder cart in your browser"
               >
                 Test with current cart
               </Button>
-              <Button variant="outline" onClick={() => setTestOpen(true)} disabled={!isValid}>
+              <Button
+                variant="outline"
+                onClick={() => setTestOpen(true)}
+                disabled={!isValid || saving}
+              >
                 Test rule
               </Button>
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
                 Cancel
               </Button>
               <Button onClick={handleSave} disabled={!isValid || saving}>
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                Save
+                {saving ? "Saving…" : "Save"}
               </Button>
             </div>
           </DialogFooter>

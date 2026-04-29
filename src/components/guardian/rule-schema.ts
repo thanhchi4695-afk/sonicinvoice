@@ -83,7 +83,7 @@ const actionSchema = z
     type: z.enum(["block_checkout", "slack_approval", "email_notify", "price_correction", "log_only"]),
     params: z
       .object({
-        channel: z.string().regex(slackChannelRegex, "Invalid Slack channel").optional(),
+        channel: z.string().regex(slackChannelRegex, "Channel must start with # or @").optional(),
         email: z.string().email("Invalid email").max(255).optional(),
         subject: z.string().max(200).optional(),
         target_margin: z.number().min(0).max(100).optional(),

@@ -6,11 +6,31 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ConditionBuilderDialog } from "./ConditionBuilderDialog";
 import { useMarginRules } from "./use-margin-rules";
-import { ACTION_LABELS, FIELD_LABELS, type MarginRule } from "./types";
+import {
+  ACTION_LABELS,
+  FIELD_LABELS,
+  isGroup,
+  isGroupField,
+  type ConditionNode,
+  type MarginRule,
+  type RuleCondition,
+} from "./types";
+
+function summarizeNode(node: ConditionNode): string {
+  if (isGroup(node)) {
+    if (node.children.length === 0) return "(empty)";
+    const inner = node.children.map(summarizeNode).join(` ${node.operator} `);
+    return node.children.length > 1 ? `(${inner})` : inner;
+  }
+  const c = node as RuleCondition;
+  const v = Array.isArray(c.value) ? c.value.join("/") : c.value;
+  return `${FIELD_LABELS[c.field]} ${c.operator.replace(/_/g, " ")} ${v}`;
+}
 
 function summarizeConditions(rule: MarginRule): string {
-  return rule.conditions
-    .map((c) => `${FIELD_LABELS[c.field]} ${c.operator.replace(/_/g, " ")} ${Array.isArray(c.value) ? c.value.join("/") : c.value}`)
+  if (isGroupField(rule.conditions)) return summarizeNode(rule.conditions);
+  return (rule.conditions as RuleCondition[])
+    .map((c) => summarizeNode(c))
     .join(" AND ");
 }
 

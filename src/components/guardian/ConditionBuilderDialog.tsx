@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -12,12 +12,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ConditionRow } from "./ConditionRow";
 import { ActionRow } from "./ActionRow";
+import { ConditionGroupBlock } from "./ConditionGroupBlock";
 import { TestRuleDialog } from "./TestRuleDialog";
 import { useMarginRules } from "./use-margin-rules";
 import { ruleSchema } from "./rule-schema";
-import type { DraftRule, MarginRule, RuleAction, RuleCondition } from "./types";
+import {
+  serializeConditions,
+  toRootGroup,
+  type ConditionGroup,
+  type DraftRule,
+  type MarginRule,
+  type RuleAction,
+  type RuleCondition,
+} from "./types";
 
 interface Props {
   open: boolean;
@@ -29,13 +37,17 @@ interface Props {
 const EMPTY_CONDITION: RuleCondition = { field: "brand", operator: "is", value: "" };
 const EMPTY_ACTION: RuleAction = { type: "block_checkout" };
 
-function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftRule {
+interface DraftState extends Omit<DraftRule, "conditions"> {
+  rootGroup: ConditionGroup;
+}
+
+function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftState {
   if (rule) {
     return {
       id: rule.id,
       name: rule.name,
       is_active: rule.is_active,
-      conditions: rule.conditions,
+      rootGroup: toRootGroup(rule.conditions),
       actions: rule.actions,
       priority: rule.priority,
     };
@@ -43,7 +55,7 @@ function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftRule {
   return {
     name: "",
     is_active: true,
-    conditions: [EMPTY_CONDITION],
+    rootGroup: { kind: "group", operator: "AND", children: [{ ...EMPTY_CONDITION }] },
     actions: [EMPTY_ACTION],
     priority: defaultPriority,
   };

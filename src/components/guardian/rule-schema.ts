@@ -1,7 +1,11 @@
 // Zod validators for the Margin Guardian rule shape.
 // Mirrors src/components/guardian/types.ts. Validation happens before any DB write.
+//
+// `conditions` is polymorphic: either a flat AND-array of conditions (legacy) or a
+// single root group `{ kind: "group", operator, children: [...] }` for nested AND/OR.
 
 import { z } from "zod";
+import { MAX_GROUP_DEPTH } from "./types";
 
 const textOperator = z.enum(["is", "is_not", "contains", "starts_with", "in", "not_in"]);
 const numberOperator = z.enum(["is_below", "is_above", "is_between", "equals"]);
@@ -32,6 +36,40 @@ const conditionSchema = z
       ctx.addIssue({ code: "custom", message: "is_between requires two values" });
     }
   });
+
+// Recursive group schema. z.lazy() gives us a self-reference for nested children.
+type ConditionNodeShape = z.infer<typeof conditionSchema> | { kind: "group"; operator: "AND" | "OR"; children: ConditionNodeShape[] };
+
+const groupSchema: z.ZodType<{ kind: "group"; operator: "AND" | "OR"; children: ConditionNodeShape[] }> = z.lazy(() =>
+  z.object({
+    kind: z.literal("group"),
+    operator: z.enum(["AND", "OR"]),
+    children: z.array(z.union([conditionSchema, groupSchema])).min(1, "Group needs at least one condition").max(20),
+  }),
+);
+
+function depth(node: ConditionNodeShape): number {
+  if (!(node as any).kind) return 1;
+  const g = node as { children: ConditionNodeShape[] };
+  return 1 + Math.max(0, ...g.children.map(depth));
+}
+
+function leafCount(node: ConditionNodeShape): number {
+  if (!(node as any).kind) return 1;
+  return (node as { children: ConditionNodeShape[] }).children.reduce((acc, c) => acc + leafCount(c), 0);
+}
+
+const conditionsField = z.union([
+  z.array(conditionSchema).min(1, "Add at least one condition").max(20),
+  groupSchema.superRefine((root, ctx) => {
+    if (depth(root) > MAX_GROUP_DEPTH) {
+      ctx.addIssue({ code: "custom", message: `Groups can be nested at most ${MAX_GROUP_DEPTH} levels deep` });
+    }
+    const total = leafCount(root);
+    if (total < 1) ctx.addIssue({ code: "custom", message: "Add at least one condition" });
+    if (total > 20) ctx.addIssue({ code: "custom", message: "Maximum 20 conditions per rule" });
+  }),
+]);
 
 // Slack channel: optional leading #, lowercase letters/numbers/dashes/underscores, 1-80.
 const slackChannelRegex = /^#?[a-z0-9_-]{1,80}$/;
@@ -64,7 +102,7 @@ const actionSchema = z
 export const ruleSchema = z.object({
   name: z.string().trim().min(1, "Rule name is required").max(100, "Rule name too long"),
   is_active: z.boolean(),
-  conditions: z.array(conditionSchema).min(1, "Add at least one condition").max(20),
+  conditions: conditionsField,
   actions: z.array(actionSchema).min(1, "Add at least one action").max(10),
   priority: z.number().int().min(0).max(9999),
 });

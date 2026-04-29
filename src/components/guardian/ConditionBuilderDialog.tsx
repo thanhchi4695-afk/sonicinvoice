@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { ActionRow } from "./ActionRow";
 import { ConditionGroupBlock } from "./ConditionGroupBlock";
 import { TestRuleDialog } from "./TestRuleDialog";
+import { TestWithCurrentCartDialog } from "./TestWithCurrentCartDialog";
 import { useMarginRules } from "./use-margin-rules";
 import { useRuleValidation } from "./use-rule-validation";
 import {

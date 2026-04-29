@@ -214,11 +214,11 @@ Deno.serve(async (req) => {
 
   try {
     const body = (await req.json()) as EvaluateRequest;
-    const { cartItems, userId, surface, dryRun } = body ?? {};
+    const { cartItems, surface, dryRun } = body ?? {};
 
-    if (!userId || !Array.isArray(cartItems)) {
+    if (!Array.isArray(cartItems)) {
       return new Response(
-        JSON.stringify({ error: "Missing userId or cartItems" }),
+        JSON.stringify({ error: "Missing cartItems" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -227,6 +227,39 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
+
+    // -- Resolve userId from credentials. Two supported flows: --
+    //   1. Dashboard: Authorization: Bearer <supabase JWT>
+    //   2. Chrome extension: X-Sonic-Token: <raw extension token>
+    let userId: string | null = null;
+    const extToken = req.headers.get("x-sonic-token");
+    const authHeader = req.headers.get("authorization");
+
+    if (extToken) {
+      const hash = await sha256Hex(extToken);
+      const { data: tokenUser } = await supabase.rpc("verify_extension_token", {
+        _token_hash: hash,
+      });
+      if (tokenUser) {
+        userId = tokenUser as string;
+        // Best-effort touch of last_used_at; ignore failure.
+        await supabase
+          .from("margin_guardian_extension_tokens")
+          .update({ last_used_at: new Date().toISOString() })
+          .eq("token_hash", hash);
+      }
+    } else if (authHeader?.startsWith("Bearer ")) {
+      const jwt = authHeader.slice(7);
+      const { data, error } = await supabase.auth.getClaims(jwt);
+      if (!error && data?.claims?.sub) userId = data.claims.sub;
+    }
+
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Fetch active rules ordered by priority (lowest number = highest priority).
     const { data: rules, error: rulesErr } = await supabase

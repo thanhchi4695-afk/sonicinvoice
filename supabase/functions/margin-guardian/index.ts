@@ -7,9 +7,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-sonic-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 // ---------- Types (mirror src/components/guardian/types.ts) ----------
 type ConditionField =

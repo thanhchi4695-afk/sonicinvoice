@@ -250,7 +250,10 @@ Deno.serve(async (req) => {
     } else if (authHeader?.startsWith("Bearer ")) {
       const jwt = authHeader.slice(7);
       const { data, error } = await supabase.auth.getClaims(jwt);
+      console.log("[margin-guardian] auth path: jwt", { hasClaims: !!data?.claims, sub: data?.claims?.sub, error: error?.message });
       if (!error && data?.claims?.sub) userId = data.claims.sub;
+    } else {
+      console.log("[margin-guardian] no credentials", { hasAuth: !!authHeader, hasExt: !!extToken });
     }
 
     if (!userId) {

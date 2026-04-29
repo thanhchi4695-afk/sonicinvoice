@@ -63,13 +63,13 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
 
   const handleSave = async () => {
     setSaving(true);
-    const res = (await saveRule(draft)) as { ok: true } | { ok: false; error: string };
+    const res: { ok: boolean; error?: string } = await saveRule(draft);
     setSaving(false);
     if (res.ok) {
       toast.success(draft.id ? "Rule updated" : "Rule created");
       onOpenChange(false);
     } else {
-      toast.error(res.error);
+      toast.error(res.error ?? "Save failed");
     }
   };
 

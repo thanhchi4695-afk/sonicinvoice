@@ -50,28 +50,60 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
     };
   };
 
-  // On mount + hashchange, jump to the targeted feature (and step).
-  useEffect(() => {
-    const apply = () => {
-      const { featureId, stepIndex } = parseHash(window.location.hash);
-      if (!featureId) return;
-      const target = featureRegistry.find(f => f.id === featureId);
-      if (!target) return;
-      setOpenFeature(featureId);
-      setExpandedCategories(prev => new Set(prev).add(target.category));
-      // Wait a tick for the expanded section to render before scrolling.
-      requestAnimationFrame(() => {
-        const stepEl = stepIndex !== undefined ? stepRefs.current[`${featureId}:${stepIndex}`] : null;
-        const featureEl = featureRefs.current[featureId];
-        const el = stepEl ?? featureEl;
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
+  // Apply current URL hash → expand the right feature and scroll to step.
+  // Runs on mount, on hashchange (back/forward + manual edits), and again
+  // once the targeted card has actually rendered so step refs exist.
+  const applyHash = () => {
+    const { featureId, stepIndex } = parseHash(window.location.hash);
+    if (!featureId) return;
+    const target = featureRegistry.find(f => f.id === featureId);
+    if (!target) return;
+    setOpenFeature(featureId);
+    setExpandedCategories(prev => {
+      if (prev.has(target.category)) return prev;
+      const next = new Set(prev);
+      next.add(target.category);
+      return next;
+    });
+    // Try scrolling now and again after layout settles (refs may not exist yet).
+    const scrollTo = () => {
+      const stepEl = stepIndex !== undefined ? stepRefs.current[`${featureId}:${stepIndex}`] : null;
+      const featureEl = featureRefs.current[featureId];
+      const el = stepEl ?? featureEl;
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: stepEl ? "center" : "start" });
+        return true;
+      }
+      return false;
     };
-    apply();
-    window.addEventListener("hashchange", apply);
-    return () => window.removeEventListener("hashchange", apply);
+    requestAnimationFrame(() => {
+      if (!scrollTo()) {
+        // Card still mounting after expanding category — retry on next frame.
+        requestAnimationFrame(() => { scrollTo(); });
+      }
+    });
+  };
+
+  useEffect(() => {
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // After openFeature changes (e.g. on first render the card wasn't mounted yet),
+  // re-sync scroll to the step from the URL if any.
+  useEffect(() => {
+    if (!openFeature) return;
+    const { featureId, stepIndex } = parseHash(window.location.hash);
+    if (featureId !== openFeature || stepIndex === undefined) return;
+    requestAnimationFrame(() => {
+      stepRefs.current[`${featureId}:${stepIndex}`]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  }, [openFeature]);
 
   const copyAnchor = async (anchor: string, label: string) => {
     const url = `${window.location.origin}${window.location.pathname}#${anchor}`;
@@ -193,8 +225,13 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
                           onClick={() => {
                             const next = isOpen ? null : feature.id;
                             setOpenFeature(next);
+                            const base = `${window.location.pathname}${window.location.search}`;
                             if (next) {
-                              history.replaceState(null, "", `#${featureAnchor}`);
+                              // pushState so refresh + back button + share all work.
+                              history.pushState(null, "", `${base}#${featureAnchor}`);
+                            } else {
+                              // Closing clears the hash so the URL reflects current view.
+                              history.pushState(null, "", base);
                             }
                           }}
                           className="flex-1 flex items-center gap-3 text-left min-w-0"
@@ -250,7 +287,8 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
                                         href={`#${slug}`}
                                         onClick={(e) => {
                                           e.preventDefault();
-                                          history.replaceState(null, "", `#${slug}`);
+                                          const base = `${window.location.pathname}${window.location.search}`;
+                                          history.pushState(null, "", `${base}#${slug}`);
                                           stepRefs.current[`${feature.id}:${i}`]?.scrollIntoView({
                                             behavior: "smooth",
                                             block: "center",

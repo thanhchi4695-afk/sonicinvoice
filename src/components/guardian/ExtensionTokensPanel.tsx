@@ -117,6 +117,12 @@ export function ExtensionTokensPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/40 p-3 text-sm">
+          <span>Need the extension? Download the latest build and load it via <code>chrome://extensions</code> → "Load unpacked".</span>
+          <Button size="sm" variant="outline" onClick={handleDownload}>
+            Download .zip
+          </Button>
+        </div>
         <div className="flex gap-2">
           <Input
             placeholder="Label (e.g. Work laptop)"

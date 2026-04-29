@@ -1,86 +1,165 @@
-// Sonic Invoices Content Script - Zap Button Injection
+// Content script — observes JOOR / NuOrder cart DOM, asks background to evaluate,
+// and renders banner + per-row margin dots. Selectors are best-effort across known
+// surfaces; users can refine via the dashboard if their JOOR theme differs.
 
-(function() {
-  'use strict';
+const SURFACE = location.hostname.includes("nuorder") ? "nuorder" : "joor";
 
-  // Only run on product pages
-  const isProductPage = () => {
-    const url = window.location.pathname;
-    return url.includes('/products/') || url.includes('/product/') || 
-           document.querySelector('[itemtype*="Product"]') !== null;
-  };
+let lastSnapshot = "";
+let inFlight = false;
+let debounceTimer = null;
 
-  if (!isProductPage()) return;
+function text(el) {
+  return (el?.textContent || "").trim();
+}
 
-  // Find the product title element
-  const titleSelectors = [
-    'h1.product-single__title',
-    'h1.product__title',
-    'h1[data-product-title]',
-    '.product-title h1',
-    '.product-info h1',
-    'h1.title',
-    '[itemprop="name"]',
-  ];
+function num(s) {
+  const n = parseFloat(String(s).replace(/[^0-9.\-]/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
 
-  let titleEl = null;
-  for (const sel of titleSelectors) {
-    titleEl = document.querySelector(sel);
-    if (titleEl) break;
-  }
+function extractCartItems() {
+  const rows = document.querySelectorAll(
+    '.cart-item, .order-item-row, [data-testid="cart-item"], tr[data-row="cart"]',
+  );
+  const items = [];
+  rows.forEach((row) => {
+    const skuEl =
+      row.querySelector("[data-sku]") ||
+      row.querySelector(".sku") ||
+      row.querySelector(".item-sku");
+    const qtyEl =
+      row.querySelector('input[type="number"]') ||
+      row.querySelector(".item-qty") ||
+      row.querySelector("[data-qty]");
+    const priceEl =
+      row.querySelector(".unit-price") ||
+      row.querySelector(".item-price") ||
+      row.querySelector("[data-price]");
+    const brandEl =
+      row.querySelector(".brand-name") ||
+      row.querySelector(".vendor") ||
+      row.querySelector("[data-brand]");
 
-  if (!titleEl) return;
+    const sku = skuEl?.getAttribute?.("data-sku") || text(skuEl);
+    const qty = qtyEl?.value ? parseInt(qtyEl.value, 10) : num(text(qtyEl));
+    const price = num(text(priceEl) || priceEl?.getAttribute?.("data-price"));
 
-  // Create the Zap button
-  const zapBtn = document.createElement('button');
-  zapBtn.innerHTML = '⚡ Zap';
-  zapBtn.className = 'sonic-zap-btn';
-  zapBtn.title = 'Check price in Sonic Invoices';
-
-  zapBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const title = titleEl.textContent?.trim() || '';
-    
-    // Find price on page
-    const priceSelectors = [
-      '.product__price .money',
-      '.product-single__price .money',
-      '[data-product-price]',
-      '.price .money',
-      '.current-price',
-      '[itemprop="price"]',
-    ];
-
-    let price = null;
-    for (const sel of priceSelectors) {
-      const el = document.querySelector(sel);
-      if (el) {
-        const text = el.textContent || el.getAttribute('content') || '';
-        const match = text.match(/[\d,.]+/);
-        if (match) {
-          price = parseFloat(match[0].replace(/,/g, ''));
-          break;
-        }
-      }
+    if (sku && qty && price !== null) {
+      items.push({
+        sku,
+        quantity: qty,
+        unitListPrice: price,
+        brand: text(brandEl) || undefined,
+      });
     }
-
-    // Send to extension popup
-    chrome.runtime.sendMessage({
-      type: 'ZAP_PRODUCT',
-      data: { title, price, url: window.location.href },
-    });
-
-    // Visual feedback
-    zapBtn.innerHTML = '✅ Sent!';
-    zapBtn.style.background = '#10b981';
-    setTimeout(() => {
-      zapBtn.innerHTML = '⚡ Zap';
-      zapBtn.style.background = '';
-    }, 2000);
   });
+  return items;
+}
 
-  // Insert after the title
-  titleEl.parentNode.insertBefore(zapBtn, titleEl.nextSibling);
-})();
+function snapshotKey(items) {
+  return items.map((i) => `${i.sku}:${i.quantity}:${i.unitListPrice}`).join("|");
+}
+
+function renderBanner(decision) {
+  document.getElementById("sonic-margin-banner")?.remove();
+  if (decision.allowed) return;
+  const banner = document.createElement("div");
+  banner.id = "sonic-margin-banner";
+  banner.className = "sonic-banner";
+  banner.innerHTML = `
+    <div class="sonic-banner-row">
+      <div>
+        <strong>⚠️ Margin alert</strong>
+        <div class="sonic-banner-message">${decision.message || "A rule was triggered."}</div>
+        <div class="sonic-banner-actions">${(decision.actions || []).map((a) => a.type).join(", ")}</div>
+      </div>
+      <button class="sonic-dismiss" type="button">Dismiss</button>
+    </div>`;
+  const host =
+    document.querySelector(".cart-summary") ||
+    document.querySelector(".order-summary") ||
+    document.body;
+  host.prepend(banner);
+  banner.querySelector(".sonic-dismiss")?.addEventListener("click", () => banner.remove());
+}
+
+function toggleCheckout(decision) {
+  const btn =
+    document.querySelector('button[type="submit"].place-order') ||
+    document.querySelector(".checkout-button") ||
+    document.querySelector('[data-testid="place-order"]');
+  if (!btn) return;
+  if (!decision.allowed) {
+    btn.disabled = true;
+    btn.style.opacity = "0.5";
+    btn.setAttribute("data-sonic-disabled", "true");
+  } else if (btn.getAttribute("data-sonic-disabled") === "true") {
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.removeAttribute("data-sonic-disabled");
+  }
+}
+
+function renderDots(marginData) {
+  if (!marginData) return;
+  document.querySelectorAll(".sonic-margin-dot").forEach((d) => d.remove());
+  document
+    .querySelectorAll('.cart-item, .order-item-row, [data-testid="cart-item"]')
+    .forEach((row) => {
+      const skuEl =
+        row.querySelector("[data-sku]") ||
+        row.querySelector(".sku") ||
+        row.querySelector(".item-sku");
+      const sku = skuEl?.getAttribute?.("data-sku") || text(skuEl);
+      const margin = sku ? marginData[sku] : null;
+      if (margin === undefined || margin === null) return;
+      const dot = document.createElement("span");
+      dot.className = "sonic-margin-dot";
+      dot.style.background = margin >= 45 ? "#16a34a" : margin >= 35 ? "#eab308" : "#dc2626";
+      dot.title = `Margin ${margin.toFixed(1)}%`;
+      skuEl?.parentNode?.appendChild(dot);
+    });
+}
+
+async function evaluateNow() {
+  if (inFlight) return;
+  const items = extractCartItems();
+  if (items.length === 0) {
+    renderBanner({ allowed: true });
+    return;
+  }
+  const key = snapshotKey(items);
+  if (key === lastSnapshot) return;
+  lastSnapshot = key;
+  inFlight = true;
+  try {
+    const decision = await chrome.runtime.sendMessage({
+      type: "EVALUATE_CART",
+      cartItems: items,
+      surface: SURFACE,
+    });
+    if (!decision) return;
+    renderBanner(decision);
+    toggleCheckout(decision);
+    renderDots(decision.marginData);
+  } catch (e) {
+    console.warn("[sonic] evaluate failed", e);
+  } finally {
+    inFlight = false;
+  }
+}
+
+function scheduleEvaluate() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(evaluateNow, 800);
+}
+
+const observer = new MutationObserver(() => scheduleEvaluate());
+observer.observe(document.body, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ["value"],
+});
+
+window.addEventListener("load", scheduleEvaluate);

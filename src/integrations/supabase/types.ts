@@ -1881,6 +1881,36 @@ export type Database = {
           },
         ]
       }
+      margin_guardian_extension_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          last_used_at: string | null
+          revoked_at: string | null
+          token_hash: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+          token_hash: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+          token_hash?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       margin_rules: {
         Row: {
           actions: Json
@@ -4576,6 +4606,7 @@ export type Database = {
         }[]
       }
       reset_agent_budgets_monthly: { Args: never; Returns: undefined }
+      verify_extension_token: { Args: { _token_hash: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "buyer" | "warehouse" | "viewer"

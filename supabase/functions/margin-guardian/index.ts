@@ -7,9 +7,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-sonic-token",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+async function sha256Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 // ---------- Types (mirror src/components/guardian/types.ts) ----------
 type ConditionField =
@@ -74,7 +81,6 @@ interface CartItem {
 
 interface EvaluateRequest {
   cartItems: CartItem[];
-  userId: string;
   surface?: string;
   dryRun?: boolean;
 }
@@ -207,11 +213,11 @@ Deno.serve(async (req) => {
 
   try {
     const body = (await req.json()) as EvaluateRequest;
-    const { cartItems, userId, surface, dryRun } = body ?? {};
+    const { cartItems, surface, dryRun } = body ?? {};
 
-    if (!userId || !Array.isArray(cartItems)) {
+    if (!Array.isArray(cartItems)) {
       return new Response(
-        JSON.stringify({ error: "Missing userId or cartItems" }),
+        JSON.stringify({ error: "Missing cartItems" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -220,6 +226,39 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
+
+    // -- Resolve userId from credentials. Two supported flows: --
+    //   1. Dashboard: Authorization: Bearer <supabase JWT>
+    //   2. Chrome extension: X-Sonic-Token: <raw extension token>
+    let userId: string | null = null;
+    const extToken = req.headers.get("x-sonic-token");
+    const authHeader = req.headers.get("authorization");
+
+    if (extToken) {
+      const hash = await sha256Hex(extToken);
+      const { data: tokenUser } = await supabase.rpc("verify_extension_token", {
+        _token_hash: hash,
+      });
+      if (tokenUser) {
+        userId = tokenUser as string;
+        // Best-effort touch of last_used_at; ignore failure.
+        await supabase
+          .from("margin_guardian_extension_tokens")
+          .update({ last_used_at: new Date().toISOString() })
+          .eq("token_hash", hash);
+      }
+    } else if (authHeader?.startsWith("Bearer ")) {
+      const jwt = authHeader.slice(7);
+      const { data, error } = await supabase.auth.getClaims(jwt);
+      if (!error && data?.claims?.sub) userId = data.claims.sub;
+    }
+
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Fetch active rules ordered by priority (lowest number = highest priority).
     const { data: rules, error: rulesErr } = await supabase
@@ -317,10 +356,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify(decision), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Per-SKU margin map for the extension's row dots.
+    const marginData: Record<string, number | null> = {};
+    for (const it of enriched) marginData[it.sku] = it.marginPct;
+
+    return new Response(
+      JSON.stringify({ ...decision, marginData, poTotal }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err) {
     console.error("margin-guardian error", err);
     return new Response(

@@ -296,15 +296,24 @@ Deno.serve(async (req) => {
 
     // Log decision unless this is a dry-run from TestRuleDialog.
     if (!dryRun) {
+      const requiresApproval = decision.actions.some((a) => a.type === "slack_approval");
+      const outcome = requiresApproval
+        ? "pending_approval"
+        : decision.allowed
+          ? "allowed"
+          : "blocked";
       await supabase.from("margin_agent_decisions").insert({
         user_id: userId,
         rule_id: decision.ruleId ?? null,
-        rule_name: decision.ruleName ?? null,
-        surface: surface ?? null,
-        allowed: decision.allowed,
-        actions: decision.actions,
-        message: decision.message,
-        cart_snapshot: { items: enriched, poTotal },
+        decision_outcome: outcome,
+        action_taken: decision.actions,
+        cart_snapshot: {
+          items: enriched,
+          poTotal,
+          surface: surface ?? null,
+          rule_name: decision.ruleName ?? null,
+          message: decision.message,
+        },
       });
     }
 

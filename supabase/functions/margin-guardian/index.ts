@@ -334,26 +334,58 @@ Deno.serve(async (req) => {
     }
 
     // Log decision unless this is a dry-run from TestRuleDialog.
+    let decisionRowId: string | null = null;
     if (!dryRun) {
-      const requiresApproval = decision.actions.some((a) => a.type === "slack_approval");
+      const slackAction = decision.actions.find((a) => a.type === "slack_approval");
+      const requiresApproval = !!slackAction;
       const outcome = requiresApproval
         ? "pending_approval"
         : decision.allowed
           ? "allowed"
           : "blocked";
-      await supabase.from("margin_agent_decisions").insert({
-        user_id: userId,
-        rule_id: decision.ruleId ?? null,
-        decision_outcome: outcome,
-        action_taken: decision.actions,
-        cart_snapshot: {
-          items: enriched,
-          poTotal,
-          surface: surface ?? null,
-          rule_name: decision.ruleName ?? null,
-          message: decision.message,
-        },
-      });
+      const { data: inserted } = await supabase
+        .from("margin_agent_decisions")
+        .insert({
+          user_id: userId,
+          rule_id: decision.ruleId ?? null,
+          decision_outcome: outcome,
+          action_taken: decision.actions,
+          cart_snapshot: {
+            items: enriched,
+            poTotal,
+            surface: surface ?? null,
+            rule_name: decision.ruleName ?? null,
+            message: decision.message,
+          },
+        })
+        .select("id")
+        .single();
+      decisionRowId = inserted?.id ?? null;
+
+      // Fire-and-forget Slack message. Failures here must NOT break the cart evaluation.
+      if (requiresApproval && decisionRowId) {
+        const channel = (slackAction!.params?.channel as string) ?? "buying-team";
+        const slackUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/slack-approval`;
+        fetch(slackUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-internal-key": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+          },
+          body: JSON.stringify({
+            decisionId: decisionRowId,
+            channel,
+            ruleName: decision.ruleName,
+            message: decision.message,
+            cartItems: enriched.map((i) => ({
+              sku: i.sku,
+              quantity: i.quantity,
+              unitListPrice: i.unitListPrice,
+            })),
+            surface,
+          }),
+        }).catch((e) => console.warn("slack post failed", e));
+      }
     }
 
     // Per-SKU margin map for the extension's row dots.
@@ -361,7 +393,7 @@ Deno.serve(async (req) => {
     for (const it of enriched) marginData[it.sku] = it.marginPct;
 
     return new Response(
-      JSON.stringify({ ...decision, marginData, poTotal }),
+      JSON.stringify({ ...decision, decisionId: decisionRowId, marginData, poTotal }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {

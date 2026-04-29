@@ -279,7 +279,9 @@ Deno.serve(async (req) => {
 
   try {
     const body = (await req.json()) as EvaluateRequest;
-    const { cartItems, surface, dryRun } = body ?? {};
+    const { cartItems, surface, draftRule } = body ?? {};
+    // A draftRule implies dry-run — never log or fire side effects for an unsaved rule.
+    const dryRun = body?.dryRun === true || !!draftRule;
 
     if (!Array.isArray(cartItems)) {
       return new Response(

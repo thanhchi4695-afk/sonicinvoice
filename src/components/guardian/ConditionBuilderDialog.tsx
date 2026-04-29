@@ -67,6 +67,7 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
   const [draft, setDraft] = useState<DraftState>(toDraft(rule, defaultPriority));
   const [saving, setSaving] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
+  const [liveTestOpen, setLiveTestOpen] = useState(false);
 
   useEffect(() => {
     if (open) setDraft(toDraft(rule, defaultPriority));

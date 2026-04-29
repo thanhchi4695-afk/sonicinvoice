@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import type { DraftRule } from "./types";
 
@@ -21,13 +22,38 @@ interface Props {
   rule: DraftRule;
 }
 
+interface DecisionResponse {
+  allowed: boolean;
+  ruleId?: string;
+  ruleName?: string;
+  message?: string;
+  actions?: { type: string; params?: Record<string, unknown> }[];
+  marginData?: Record<string, number | null>;
+  poTotal?: number;
+  error?: string;
+}
+
 type TestResult =
   | { state: "idle" }
   | { state: "running" }
-  | { state: "done"; would_fire: boolean; narrative: string }
+  | { state: "done"; decision: DecisionResponse }
   | { state: "error"; message: string };
 
-export function TestRuleDialog({ open, onOpenChange, rule }: Props) {
+// Matches CartItem in supabase/functions/margin-guardian/index.ts
+const PLACEHOLDER_JSON = `{
+  "surface": "joor",
+  "items": [
+    {
+      "sku": "SW123",
+      "quantity": 5,
+      "unitListPrice": 45.00,
+      "landedCost": 28.00,
+      "brand": "SunnySwim"
+    }
+  ]
+}`;
+
+export function TestRuleDialog({ open, onOpenChange }: Props) {
   const [orderRef, setOrderRef] = useState("");
   const [cartJson, setCartJson] = useState("");
   const [result, setResult] = useState<TestResult>({ state: "idle" });
@@ -53,7 +79,6 @@ export function TestRuleDialog({ open, onOpenChange, rule }: Props) {
 
       // Server evaluates the SAVED rules with dryRun=true (no log write, no Slack/email).
       // userId is derived from the JWT — never trust a client-supplied value.
-      void auth.user.id;
       const { data, error } = await supabase.functions.invoke("margin-guardian", {
         body: {
           cartItems: Array.isArray(cart?.items) ? cart!.items : [],
@@ -67,14 +92,14 @@ export function TestRuleDialog({ open, onOpenChange, rule }: Props) {
         return;
       }
 
-      const wouldFire = !!data?.ruleId;
-      const narrative = data?.message ??
-        (wouldFire ? "A rule would fire on the supplied cart." : "No rule would fire on the supplied cart.");
-      setResult({ state: "done", would_fire: wouldFire, narrative });
+      setResult({ state: "done", decision: (data as DecisionResponse) ?? { allowed: true } });
     } catch (err) {
       setResult({ state: "error", message: err instanceof Error ? err.message : "Test failed" });
     }
   };
+
+  const decision = result.state === "done" ? result.decision : null;
+  const fired = !!decision?.ruleId;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -82,7 +107,7 @@ export function TestRuleDialog({ open, onOpenChange, rule }: Props) {
         <DialogHeader>
           <DialogTitle>Test rule</DialogTitle>
           <DialogDescription>
-            Dry-run only — never sends Slack, email, or writes to the decision log.
+            Dry-run against your saved rules. Never sends Slack, email, or writes to the decision log.
           </DialogDescription>
         </DialogHeader>
 
@@ -97,26 +122,66 @@ export function TestRuleDialog({ open, onOpenChange, rule }: Props) {
             />
           </div>
           <div>
-            <Label htmlFor="cart-json">Or paste cart JSON</Label>
+            <Label htmlFor="cart-json">Cart JSON</Label>
             <Textarea
               id="cart-json"
               value={cartJson}
               onChange={(e) => setCartJson(e.target.value)}
-              placeholder='{"items":[{"brand":"Brand X","margin_pct":38}],"po_total":5200}'
-              rows={6}
+              placeholder={PLACEHOLDER_JSON}
+              rows={9}
               className="font-mono text-xs"
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Items need <code>sku</code>, <code>quantity</code>, <code>unitListPrice</code>. Add{" "}
+              <code>landedCost</code> to override the cost lookup.
+            </p>
           </div>
 
-          {result.state === "done" && (
+          {decision && (
             <div
               className={`rounded-md border p-3 text-sm ${
-                result.would_fire
-                  ? "border-warning/40 bg-warning/10 text-warning-foreground"
-                  : "border-primary/40 bg-primary/10 text-foreground"
+                fired
+                  ? decision.allowed
+                    ? "border-warning/40 bg-warning/10"
+                    : "border-destructive/40 bg-destructive/10"
+                  : "border-primary/40 bg-primary/10"
               }`}
             >
-              {result.narrative}
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">
+                  {fired ? `Rule matched: ${decision.ruleName}` : "No rule matched"}
+                </span>
+                <Badge variant={decision.allowed ? "secondary" : "destructive"}>
+                  {decision.allowed ? "Allowed" : "Blocked"}
+                </Badge>
+              </div>
+              {decision.message && (
+                <p className="mt-2 text-foreground/80">{decision.message}</p>
+              )}
+              {decision.actions && decision.actions.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {decision.actions.map((a, i) => (
+                    <Badge key={i} variant="outline" className="text-[10px]">
+                      {a.type}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {decision.marginData && Object.keys(decision.marginData).length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs text-muted-foreground">
+                    Per-SKU margins {decision.poTotal !== undefined && `· PO total ${decision.poTotal.toFixed(2)}`}
+                  </summary>
+                  <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 font-mono text-[11px]">
+{Object.entries(decision.marginData)
+  .map(([sku, m]) => `${sku.padEnd(16)} ${m === null ? "—" : `${m.toFixed(1)}%`}`)
+  .join("\n")}
+                  </pre>
+                </details>
+              )}
+              {decision.error && (
+                <p className="mt-2 text-xs text-destructive">Error: {decision.error}</p>
+              )}
             </div>
           )}
           {result.state === "error" && (
@@ -131,7 +196,7 @@ export function TestRuleDialog({ open, onOpenChange, rule }: Props) {
             Close
           </Button>
           <Button onClick={runTest} disabled={result.state === "running"}>
-            {result.state === "running" && <Loader2 className="h-4 w-4 animate-spin" />}
+            {result.state === "running" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Run test
           </Button>
         </DialogFooter>

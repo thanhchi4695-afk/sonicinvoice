@@ -1239,7 +1239,10 @@ const ToolsScreen = ({ onStartFlow }: ToolsScreenProps = {}) => {
                 {sectionTools.map((tool) => {
                   const Icon = tool.icon;
                   return (
-                    <button key={tool.id} onClick={() => setActiveTool(tool.id)}
+                    <button key={tool.id} onClick={() => {
+                      if (tool.id === "image_seo" && onStartFlow) { onStartFlow("image_seo"); return; }
+                      setActiveTool(tool.id);
+                    }}
                       className="bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors">
                       <Icon className={`w-6 h-6 ${tool.color} mb-3`} />
                       <p className="text-sm font-semibold">{tool.label}</p>

@@ -81,22 +81,24 @@ export function ConditionGroupBlock({
       className={
         (isRoot
           ? "space-y-2"
-          : "rounded-md border border-dashed bg-muted/20 p-3 space-y-2 ") +
+          : "rounded-lg border border-dashed bg-muted/20 p-3 shadow-sm space-y-2 transition-colors hover:bg-muted/30 ") +
         (!isRoot && groupError ? "border-destructive/60" : !isRoot ? "border-border" : "")
       }
     >
-      {/* Group header */}
-      <div className="flex flex-wrap items-center gap-2">
-        {!isRoot && <FolderTree className="h-4 w-4 text-muted-foreground" />}
-        <Select value={group.operator} onValueChange={(v) => setOperator(v as GroupOperator)}>
-          <SelectTrigger className="h-8 w-[230px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="AND">All of these must be true (AND)</SelectItem>
-            <SelectItem value="OR">Any of these must be true (OR)</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Group header — stacks on mobile */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex items-center gap-2">
+          {!isRoot && <FolderTree className="h-4 w-4 text-muted-foreground" />}
+          <Select value={group.operator} onValueChange={(v) => setOperator(v as GroupOperator)}>
+            <SelectTrigger className="h-8 w-full text-xs sm:w-[230px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="AND">All of these must be true (AND)</SelectItem>
+              <SelectItem value="OR">Any of these must be true (OR)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <span className="text-[11px] text-muted-foreground">{operatorLabel}</span>
 
         {!isRoot && onRemove && (
@@ -105,7 +107,7 @@ export function ConditionGroupBlock({
             size="icon"
             onClick={onRemove}
             aria-label="Remove group"
-            className="ml-auto h-7 w-7 text-destructive"
+            className="ml-auto h-7 w-7 text-muted-foreground hover:text-destructive"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
@@ -163,12 +165,12 @@ export function ConditionGroupBlock({
 
       {/* Add controls */}
       <div className="flex flex-wrap gap-2 pt-1">
-        <Button variant="outline" size="sm" onClick={addCondition}>
+        <Button variant="outline" size="sm" onClick={addCondition} className="w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           Add condition
         </Button>
         {canNest && (
-          <Button variant="outline" size="sm" onClick={addGroup}>
+          <Button variant="outline" size="sm" onClick={addGroup} className="w-full sm:w-auto">
             <Plus className="h-4 w-4" />
             Add group
           </Button>

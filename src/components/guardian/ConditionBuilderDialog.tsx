@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -12,12 +12,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ConditionRow } from "./ConditionRow";
 import { ActionRow } from "./ActionRow";
+import { ConditionGroupBlock } from "./ConditionGroupBlock";
 import { TestRuleDialog } from "./TestRuleDialog";
 import { useMarginRules } from "./use-margin-rules";
 import { ruleSchema } from "./rule-schema";
-import type { DraftRule, MarginRule, RuleAction, RuleCondition } from "./types";
+import {
+  serializeConditions,
+  toRootGroup,
+  type ConditionGroup,
+  type DraftRule,
+  type MarginRule,
+  type RuleAction,
+  type RuleCondition,
+} from "./types";
 
 interface Props {
   open: boolean;
@@ -29,13 +37,17 @@ interface Props {
 const EMPTY_CONDITION: RuleCondition = { field: "brand", operator: "is", value: "" };
 const EMPTY_ACTION: RuleAction = { type: "block_checkout" };
 
-function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftRule {
+interface DraftState extends Omit<DraftRule, "conditions"> {
+  rootGroup: ConditionGroup;
+}
+
+function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftState {
   if (rule) {
     return {
       id: rule.id,
       name: rule.name,
       is_active: rule.is_active,
-      conditions: rule.conditions,
+      rootGroup: toRootGroup(rule.conditions),
       actions: rule.actions,
       priority: rule.priority,
     };
@@ -43,7 +55,7 @@ function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftRule {
   return {
     name: "",
     is_active: true,
-    conditions: [EMPTY_CONDITION],
+    rootGroup: { kind: "group", operator: "AND", children: [{ ...EMPTY_CONDITION }] },
     actions: [EMPTY_ACTION],
     priority: defaultPriority,
   };
@@ -51,7 +63,7 @@ function toDraft(rule?: MarginRule | null, defaultPriority = 0): DraftRule {
 
 export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriority = 0 }: Props) {
   const { saveRule, deleteRule } = useMarginRules();
-  const [draft, setDraft] = useState<DraftRule>(toDraft(rule, defaultPriority));
+  const [draft, setDraft] = useState<DraftState>(toDraft(rule, defaultPriority));
   const [saving, setSaving] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
 
@@ -59,11 +71,25 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
     if (open) setDraft(toDraft(rule, defaultPriority));
   }, [open, rule, defaultPriority]);
 
-  const isValid = ruleSchema.safeParse(draft).success;
+  // Build the persisted shape: flatten to legacy array if no OR groups, otherwise keep root group.
+  const persisted = useMemo<DraftRule>(
+    () => ({
+      id: draft.id,
+      name: draft.name,
+      is_active: draft.is_active,
+      priority: draft.priority,
+      actions: draft.actions,
+      conditions: serializeConditions(draft.rootGroup),
+    }),
+    [draft],
+  );
+
+  const validation = useMemo(() => ruleSchema.safeParse(persisted), [persisted]);
+  const isValid = validation.success;
 
   const handleSave = async () => {
     setSaving(true);
-    const res: { ok: boolean; error?: string } = await saveRule(draft);
+    const res: { ok: boolean; error?: string } = await saveRule(persisted);
     setSaving(false);
     if (res.ok) {
       toast.success(draft.id ? "Rule updated" : "Rule created");
@@ -116,33 +142,14 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
             </div>
 
             <section>
-              <div className="mb-2 text-sm font-medium">WHEN all of these conditions are met:</div>
-              <div className="space-y-2">
-                {draft.conditions.map((c, i) => (
-                  <ConditionRow
-                    key={i}
-                    condition={c}
-                    index={i}
-                    onChange={(next) => {
-                      const copy = [...draft.conditions];
-                      copy[i] = next;
-                      setDraft({ ...draft, conditions: copy });
-                    }}
-                    onRemove={() =>
-                      setDraft({ ...draft, conditions: draft.conditions.filter((_, idx) => idx !== i) })
-                    }
-                  />
-                ))}
+              <div className="mb-2 text-sm font-medium">
+                WHEN these conditions match (use groups for AND/OR logic):
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => setDraft({ ...draft, conditions: [...draft.conditions, { ...EMPTY_CONDITION }] })}
-              >
-                <Plus className="h-4 w-4" />
-                Add condition
-              </Button>
+              <ConditionGroupBlock
+                group={draft.rootGroup}
+                isRoot
+                onChange={(next) => setDraft({ ...draft, rootGroup: next })}
+              />
             </section>
 
             <section>
@@ -214,7 +221,7 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
         </DialogContent>
       </Dialog>
 
-      <TestRuleDialog open={testOpen} onOpenChange={setTestOpen} rule={draft} />
+      <TestRuleDialog open={testOpen} onOpenChange={setTestOpen} rule={persisted} />
     </>
   );
 }

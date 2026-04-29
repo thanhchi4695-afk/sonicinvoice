@@ -228,7 +228,7 @@ export function RuleListPage() {
                     const res: { ok: boolean; error?: string } = await toggleActive(rule.id, v);
                     if (!res.ok) toast.error(res.error ?? "Update failed");
                   }}
-                  onEdit={() => { setEditing(rule); setOpen(true); }}
+                  onEdit={() => { setEditing(rule); setTemplate(null); setOpen(true); }}
                 />
               ))}
             </ol>
@@ -236,10 +236,22 @@ export function RuleListPage() {
         </DndContext>
       )}
 
+      <RuleTemplatePicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onPick={(seed) => {
+          setTemplate(seed);
+          setEditing(null);
+          setPickerOpen(false);
+          setOpen(true);
+        }}
+      />
+
       <ConditionBuilderDialog
         open={open}
         onOpenChange={setOpen}
         rule={editing}
+        template={template}
         defaultPriority={localRules.length}
       />
     </div>

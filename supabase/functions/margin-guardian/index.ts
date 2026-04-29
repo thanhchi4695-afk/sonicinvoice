@@ -426,7 +426,7 @@ Deno.serve(async (req) => {
       return { matched: false, matchingItems: enriched };
     }
 
-    for (const rule of (rules ?? []) as MarginRule[]) {
+    for (const rule of rules) {
       const conds = rule.conditions;
       const isEmpty = !conds || (Array.isArray(conds) ? conds.length === 0 : !conds.children?.length);
       if (isEmpty) continue;

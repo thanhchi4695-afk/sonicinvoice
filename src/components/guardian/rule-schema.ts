@@ -74,15 +74,16 @@ const conditionsField = z.union([
   }),
 ]);
 
-// Slack channel: optional leading #, lowercase letters/numbers/dashes/underscores, 1-80.
-const slackChannelRegex = /^#?[a-z0-9_-]{1,80}$/;
+// Slack channel/DM target: must start with # (channel) or @ (user/IM),
+// then 1–80 lowercase letters/numbers/dashes/underscores/dots.
+const slackChannelRegex = /^[#@][a-z0-9._-]{1,80}$/;
 
 const actionSchema = z
   .object({
     type: z.enum(["block_checkout", "slack_approval", "email_notify", "price_correction", "log_only"]),
     params: z
       .object({
-        channel: z.string().regex(slackChannelRegex, "Invalid Slack channel").optional(),
+        channel: z.string().regex(slackChannelRegex, "Channel must start with # or @").optional(),
         email: z.string().email("Invalid email").max(255).optional(),
         subject: z.string().max(200).optional(),
         target_margin: z.number().min(0).max(100).optional(),

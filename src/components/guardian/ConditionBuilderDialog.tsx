@@ -65,12 +65,12 @@ export function ConditionBuilderDialog({ open, onOpenChange, rule, defaultPriori
     setSaving(true);
     const res = await saveRule(draft);
     setSaving(false);
-    if (!res.ok) {
+    if (res.ok) {
+      toast.success(draft.id ? "Rule updated" : "Rule created");
+      onOpenChange(false);
+    } else {
       toast.error(res.error);
-      return;
     }
-    toast.success(draft.id ? "Rule updated" : "Rule created");
-    onOpenChange(false);
   };
 
   const handleDelete = async () => {

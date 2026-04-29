@@ -130,6 +130,8 @@ function SortableRule({ rule, index, onToggle, onEdit }: SortableRuleProps) {
 export function RuleListPage() {
   const { rules, loading, toggleActive, reorder } = useMarginRules();
   const [open, setOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [template, setTemplate] = useState<RuleTemplate["seed"] | null>(null);
   const [editing, setEditing] = useState<MarginRule | null>(null);
   // Local mirror of order for optimistic drag-and-drop UX.
   const [localRules, setLocalRules] = useState<MarginRule[]>(rules);

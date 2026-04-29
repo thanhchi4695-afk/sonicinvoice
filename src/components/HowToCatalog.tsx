@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
-import { Search, ChevronDown, ChevronRight, BookOpen, Lightbulb, ArrowRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, ChevronDown, ChevronRight, BookOpen, Lightbulb, ArrowRight, Link2, List } from "lucide-react";
+import { toast } from "sonner";
 import {
   featureRegistry,
   getFeaturesByCategory,
@@ -18,8 +19,70 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
   const [searchQuery, setSearchQuery] = useState("");
   const [openFeature, setOpenFeature] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const featureRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const stepRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
   const filteredFeatures = useMemo(() => searchFeatures(searchQuery), [searchQuery]);
+
+  // ── Deep-link support: #how/<feature-id> and #how/<feature-id>/step-N ──
+  // Always show a ToC for these flagship guides; auto-show for any 5+ step feature.
+  const TOC_FORCE_FEATURES = new Set([
+    "margin_guardian_rules",
+    "slack_approval_workflow",
+    "margin_guardian_extension",
+  ]);
+  const shouldShowToc = (id: string, stepCount: number) =>
+    TOC_FORCE_FEATURES.has(id) || stepCount >= 5;
+
+  const slugForStep = (featureId: string, stepIndex: number) =>
+    `how/${featureId}/step-${stepIndex + 1}`;
+
+  const parseHash = (hash: string): { featureId?: string; stepIndex?: number } => {
+    const cleaned = hash.replace(/^#/, "");
+    if (!cleaned.startsWith("how/")) return {};
+    const parts = cleaned.split("/");
+    const featureId = parts[1];
+    const stepPart = parts[2];
+    const stepMatch = stepPart?.match(/^step-(\d+)$/);
+    return {
+      featureId,
+      stepIndex: stepMatch ? Math.max(0, Number(stepMatch[1]) - 1) : undefined,
+    };
+  };
+
+  // On mount + hashchange, jump to the targeted feature (and step).
+  useEffect(() => {
+    const apply = () => {
+      const { featureId, stepIndex } = parseHash(window.location.hash);
+      if (!featureId) return;
+      const target = featureRegistry.find(f => f.id === featureId);
+      if (!target) return;
+      setOpenFeature(featureId);
+      setExpandedCategories(prev => new Set(prev).add(target.category));
+      // Wait a tick for the expanded section to render before scrolling.
+      requestAnimationFrame(() => {
+        const stepEl = stepIndex !== undefined ? stepRefs.current[`${featureId}:${stepIndex}`] : null;
+        const featureEl = featureRefs.current[featureId];
+        const el = stepEl ?? featureEl;
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    };
+    apply();
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const copyAnchor = async (anchor: string, label: string) => {
+    const url = `${window.location.origin}${window.location.pathname}#${anchor}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(`Copied link to ${label}`);
+    } catch {
+      window.location.hash = anchor;
+      toast.message("Link applied to URL — copy from address bar");
+    }
+  };
 
   const grouped = useMemo(() => {
     const g: Record<string, FeatureEntry[]> = {};
@@ -115,28 +178,51 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
               <div className="space-y-1.5 mt-1">
                 {features.map(feature => {
                   const isOpen = openFeature === feature.id;
+                  const featureAnchor = `how/${feature.id}`;
+                  const showToc = shouldShowToc(feature.id, feature.howTo.length);
                   return (
                     <div
                       key={feature.id}
-                      className="bg-card rounded-lg border border-border overflow-hidden"
+                      id={featureAnchor}
+                      ref={el => (featureRefs.current[feature.id] = el)}
+                      className="bg-card rounded-lg border border-border overflow-hidden scroll-mt-20"
                     >
                       {/* Feature header */}
-                      <button
-                        onClick={() => setOpenFeature(isOpen ? null : feature.id)}
-                        className="w-full px-4 py-3 flex items-center gap-3 text-left"
-                      >
-                        <span className="text-xl flex-shrink-0">{feature.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{feature.name}</p>
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {feature.description}
-                          </p>
-                        </div>
-                        {isOpen
-                          ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                          : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                        }
-                      </button>
+                      <div className="w-full px-4 py-3 flex items-center gap-3">
+                        <button
+                          onClick={() => {
+                            const next = isOpen ? null : feature.id;
+                            setOpenFeature(next);
+                            if (next) {
+                              history.replaceState(null, "", `#${featureAnchor}`);
+                            }
+                          }}
+                          className="flex-1 flex items-center gap-3 text-left min-w-0"
+                        >
+                          <span className="text-xl flex-shrink-0">{feature.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{feature.name}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-1">
+                              {feature.description}
+                            </p>
+                          </div>
+                          {isOpen
+                            ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            : <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          }
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyAnchor(featureAnchor, feature.name);
+                          }}
+                          aria-label={`Copy link to ${feature.name}`}
+                          title="Copy link to this guide"
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-muted flex-shrink-0"
+                        >
+                          <Link2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
 
                       {/* Expanded content */}
                       {isOpen && (
@@ -145,14 +231,73 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
                             {feature.description}
                           </p>
 
+                          {/* Mini ToC for long / flagship guides */}
+                          {showToc && feature.howTo.length > 1 && (
+                            <nav
+                              aria-label={`${feature.name} table of contents`}
+                              className="mb-3 rounded-md border border-border bg-muted/30 p-3"
+                            >
+                              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
+                                <List className="w-3 h-3" /> On this page
+                              </p>
+                              <ol className="space-y-1 text-xs">
+                                {feature.howTo.map((step, i) => {
+                                  const slug = slugForStep(feature.id, i);
+                                  const preview = step.length > 70 ? step.slice(0, 67) + "…" : step;
+                                  return (
+                                    <li key={i} className="flex items-start gap-2">
+                                      <a
+                                        href={`#${slug}`}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          history.replaceState(null, "", `#${slug}`);
+                                          stepRefs.current[`${feature.id}:${i}`]?.scrollIntoView({
+                                            behavior: "smooth",
+                                            block: "center",
+                                          });
+                                        }}
+                                        className="text-primary hover:underline leading-relaxed flex-1"
+                                      >
+                                        <span className="font-mono text-[10px] text-muted-foreground mr-1.5">
+                                          {String(i + 1).padStart(2, "0")}
+                                        </span>
+                                        {preview}
+                                      </a>
+                                    </li>
+                                  );
+                                })}
+                              </ol>
+                            </nav>
+                          )}
+
                           {/* Steps */}
                           <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1">
                             <BookOpen className="w-3 h-3" /> Step-by-step
                           </h4>
                           <ol className="text-xs text-muted-foreground space-y-1.5 pl-4 list-decimal mb-3">
-                            {feature.howTo.map((step, i) => (
-                              <li key={i} className="leading-relaxed">{step}</li>
-                            ))}
+                            {feature.howTo.map((step, i) => {
+                              const slug = slugForStep(feature.id, i);
+                              return (
+                                <li
+                                  key={i}
+                                  id={slug}
+                                  ref={el => (stepRefs.current[`${feature.id}:${i}`] = el)}
+                                  className="leading-relaxed scroll-mt-24 group"
+                                >
+                                  {step}
+                                  {showToc && (
+                                    <button
+                                      onClick={() => copyAnchor(slug, `step ${i + 1}`)}
+                                      aria-label={`Copy link to step ${i + 1}`}
+                                      title="Copy link to this step"
+                                      className="ml-1.5 align-middle opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity"
+                                    >
+                                      <Link2 className="inline w-3 h-3" />
+                                    </button>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ol>
 
                           {/* Tips */}

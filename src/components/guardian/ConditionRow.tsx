@@ -44,7 +44,7 @@ const FIELD_OPTIONS: ConditionField[] = [
   "surface",
 ];
 
-export function ConditionRow({ condition, onChange, onRemove, index }: Props) {
+export function ConditionRow({ condition, onChange, onRemove, index, valueError, operatorError, rowError }: Props) {
   const handleFieldChange = (next: ConditionField) => {
     // Reset operator + value when switching field family.
     const ops = isNumberField(next) ? NUMBER_OPERATORS : TEXT_OPERATORS;

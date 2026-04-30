@@ -1,6 +1,5 @@
-import { Home, FileText, Wrench, CreditCard, User, Monitor, BookOpen, Rocket } from "lucide-react";
+import { Home, FileText, Wrench, CreditCard, User, BookOpen, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStoreMode } from "@/hooks/use-store-mode";
 import { useTranslation } from "react-i18next";
 
 interface BottomTabBarProps {

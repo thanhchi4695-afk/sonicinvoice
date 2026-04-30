@@ -21,6 +21,7 @@ import Privacy from "./pages/Privacy.tsx";
 import Health from "./pages/Health.tsx";
 import AdminSecrets from "./pages/AdminSecrets.tsx";
 import Rules from "./pages/Rules.tsx";
+import RulesSetup from "./pages/RulesSetup.tsx";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => (
               <Route path="/health" element={<Health />} />
               <Route path="/admin/secrets" element={<AdminSecrets />} />
               <Route path="/rules" element={<Rules />} />
+              <Route path="/rules/setup" element={<RulesSetup />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

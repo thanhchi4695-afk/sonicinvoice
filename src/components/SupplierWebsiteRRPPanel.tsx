@@ -313,6 +313,8 @@ export default function SupplierWebsiteRRPPanel() {
           </Card>
         ))}
       </div>
+        );
+      })()}
     </div>
   );
 }

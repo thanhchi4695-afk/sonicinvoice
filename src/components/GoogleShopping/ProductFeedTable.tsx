@@ -32,7 +32,14 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { updateProductFeedAttributes } from "@/lib/shopify/productFeedEnricher";
+import {
+  getProductFeedAttributes,
+  updateProductFeedAttributes,
+} from "@/lib/shopify/productFeedEnricher";
+import {
+  FixAttributesModal,
+  type ProductFixInput,
+} from "./FixAttributesModal";
 
 // ───────────────────────── Types ─────────────────────────
 

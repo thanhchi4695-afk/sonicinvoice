@@ -1,80 +1,219 @@
-import { useEffect } from "react";
-import { Mail, Calendar, Bug } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Mail, Upload, X, Send, CheckCircle2, Loader2, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
+import { z } from "zod";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
+
+const supportSchema = z.object({
+  email: z.string().trim().email("Please enter a valid email").max(255),
+  name: z.string().trim().max(100).optional(),
+  message: z.string().trim().min(10, "Message must be at least 10 characters").max(2000, "Message must be under 2000 characters"),
+});
+
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"];
 
 const Support = () => {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [message, setMessage] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+
   useEffect(() => {
-    document.title = "Support — Sonic Invoices | Help for Shopify Invoice Processing";
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", "Get help with Sonic Invoices — invoice to Shopify conversion, bulk discounts, Google Shopping feed fixes, Xero/MYOB accounting sync, and inventory management. Email support and FAQs.");
+    document.title = "Contact Support — Sonic Invoices";
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute("content", "Send a question to Sonic Invoices support. Attach a screenshot and we'll get back to you.");
   }, []);
+
+  useEffect(() => {
+    if (!file) { setPreview(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const handleFile = (f: File | null) => {
+    if (!f) { setFile(null); return; }
+    if (!ALLOWED_TYPES.includes(f.type)) {
+      toast({ title: "Unsupported file", description: "Please upload a PNG, JPG, WEBP, or GIF image.", variant: "destructive" });
+      return;
+    }
+    if (f.size > MAX_FILE_BYTES) {
+      toast({ title: "File too large", description: "Screenshot must be smaller than 10 MB.", variant: "destructive" });
+      return;
+    }
+    setFile(f);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = supportSchema.safeParse({ email, name: name || undefined, message });
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      toast({ title: "Please fix the form", description: first.message, variant: "destructive" });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      let screenshotUrl: string | undefined;
+
+      if (file) {
+        const ext = (file.name.split(".").pop() || "png").toLowerCase();
+        const path = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("support-screenshots")
+          .upload(path, file, { contentType: file.type, upsert: false });
+        if (upErr) throw upErr;
+        const { data } = supabase.storage.from("support-screenshots").getPublicUrl(path);
+        screenshotUrl = data.publicUrl;
+      }
+
+      const idempotencyKey = `support-${crypto.randomUUID()}`;
+      const { error: fnErr } = await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "support-request",
+          recipientEmail: "thanhchi4695@gmail.com",
+          idempotencyKey,
+          replyTo: parsed.data.email,
+          templateData: {
+            customerEmail: parsed.data.email,
+            customerName: parsed.data.name || "",
+            message: parsed.data.message,
+            screenshotUrl: screenshotUrl || "",
+            pageUrl: typeof window !== "undefined" ? window.location.href : "",
+            submittedAt: new Date().toLocaleString(),
+          },
+        },
+      });
+      if (fnErr) throw fnErr;
+
+      setDone(true);
+      setEmail(""); setName(""); setMessage(""); setFile(null);
+      toast({ title: "Message sent", description: "We've received your question and will reply soon." });
+    } catch (err) {
+      console.error("Support submit failed", err);
+      toast({ title: "Couldn't send your message", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-2xl mx-auto px-6 py-16">
-        <h1 className="text-3xl font-bold mb-2">Sonic Invoices Support</h1>
-        <p className="text-muted-foreground mb-10">
-          Need help with Sonic Invoices? We're here for you.
+      <div className="max-w-xl mx-auto px-6 py-12">
+        <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6">
+          <ArrowLeft className="w-4 h-4" /> Back to dashboard
+        </Link>
+
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Mail className="w-5 h-5 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold font-display">Contact support</h1>
+        </div>
+        <p className="text-sm text-muted-foreground mb-8">
+          Have a question or hit a snag? Send us a message and attach a screenshot — we'll reply by email.
         </p>
 
-        <section className="mb-10">
-          <h2 className="text-xl font-semibold mb-4">Contact us</h2>
-          <div className="space-y-3">
-            <a href="mailto:support@sonicinvoice.app" className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm hover:bg-muted/50 transition-colors">
-              <Mail className="w-5 h-5 text-primary" />
-              <div>
-                <p className="font-medium">Email support</p>
-                <p className="text-muted-foreground">support@sonicinvoice.app</p>
-              </div>
-            </a>
-            <a href="mailto:support@sonicinvoice.app?subject=Bug%20Report" className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm hover:bg-muted/50 transition-colors">
-              <Bug className="w-5 h-5 text-destructive" />
-              <div>
-                <p className="font-medium">Report a bug</p>
-                <p className="text-muted-foreground">Let us know what went wrong</p>
-              </div>
-            </a>
-            <a href="mailto:demo@sonicinvoice.app?subject=Demo%20Request" className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-sm hover:bg-muted/50 transition-colors">
-              <Calendar className="w-5 h-5 text-primary" />
-              <div>
-                <p className="font-medium">Book a demo</p>
-                <p className="text-muted-foreground">See Sonic Invoices in action</p>
-              </div>
-            </a>
+        {done ? (
+          <div className="rounded-xl border border-border bg-card p-8 text-center animate-fade-in">
+            <CheckCircle2 className="w-12 h-12 text-primary mx-auto mb-3" />
+            <h2 className="text-lg font-semibold mb-1">Message sent!</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Thanks for reaching out. We'll reply to your email shortly.
+            </p>
+            <Button onClick={() => setDone(false)} variant="outline">Send another message</Button>
           </div>
-        </section>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Your email *</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                maxLength={255}
+                placeholder="you@example.com"
+                className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </div>
 
-        <section className="mb-10">
-          <h2 className="text-xl font-semibold mb-4">Frequently asked questions</h2>
-          <div className="space-y-4 text-sm">
-            {[
-              { q: "How do I convert an invoice to Shopify products?", a: "Upload any PDF, Excel, CSV, or Word invoice. AI extracts every product and maps it to Shopify fields — title, SKU, barcode, price, cost, quantity, colour, size. Review and push to Shopify in minutes." },
-              { q: "What platforms does Sonic Invoices connect to?", a: "Sonic Invoices currently connects to Shopify (direct inventory push), Lightspeed (CSV export), Xero, and MYOB. Additional wholesale platform integrations are planned for a future release." },
-              { q: "How do bulk discounts work?", a: "Apply bulk discounts, markups, or exact pricing to any product selection. Put entire collections on sale or restore original prices. Margin protection ensures no product falls below cost." },
-              { q: "What file types are supported?", a: "PDF (digital and scanned), Excel (XLSX/XLS), CSV, Word documents, and invoice photos (JPG/PNG)." },
-              { q: "Will anything push to Shopify automatically?", a: "No. Every action requires your approval. Nothing posts to Shopify without you clicking confirm." },
-              { q: "Is my data private?", a: "Yes. Each user's data is stored separately and encrypted. Users cannot see each other's invoices, history, or products." },
-              { q: "Does this replace Shopify Stocky?", a: "Yes. Sonic Invoices includes purchase orders, demand forecasting, dead stock detection, stocktake management, and AI-powered reorder intelligence — everything Stocky had and more." },
-              { q: "Does this work with the Shopify POS?", a: "Yes. Sonic Invoices integrates with Shopify, which syncs with Shopify POS automatically." },
-            ].map((item, i) => (
-              <div key={i} className="rounded-lg border border-border bg-card p-4">
-                <p className="font-medium mb-1">{item.q}</p>
-                <p className="text-muted-foreground">{item.a}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Your name (optional)</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={100}
+                placeholder="Jane Doe"
+                className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </div>
 
-        <section>
-          <h2 className="text-xl font-semibold mb-4">Response times</h2>
-          <p className="text-sm text-muted-foreground">
-            We aim to respond to all support requests within 24 hours during business days (Mon–Fri, 9 AM – 5 PM AEST).
-            Critical bug reports are prioritised and typically addressed within 4 hours.
-          </p>
-        </section>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                Your question * <span className="text-muted-foreground/60">({message.length}/2000)</span>
+              </label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                required
+                maxLength={2000}
+                rows={6}
+                placeholder="Tell us what's happening, what you expected, and any steps to reproduce…"
+                className="w-full rounded-lg bg-input border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-y"
+              />
+            </div>
 
-        <footer className="mt-16 pt-6 border-t border-border text-xs text-muted-foreground text-center">
-          © {new Date().getFullYear()} Sonic Invoices. All rights reserved.
-        </footer>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Screenshot (optional)</label>
+              {file && preview ? (
+                <div className="relative rounded-lg border border-border overflow-hidden">
+                  <img src={preview} alt="Screenshot preview" className="w-full max-h-64 object-contain bg-muted" />
+                  <button
+                    type="button"
+                    onClick={() => handleFile(null)}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-background/90 border border-border flex items-center justify-center hover:bg-background"
+                    aria-label="Remove screenshot"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <p className="text-[11px] text-muted-foreground p-2 truncate">{file.name} · {(file.size / 1024).toFixed(0)} KB</p>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-2 h-28 rounded-lg border border-dashed border-border bg-card/50 cursor-pointer hover:bg-muted/40 transition-colors">
+                  <Upload className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">PNG, JPG, WEBP or GIF · max 10 MB</span>
+                  <input
+                    type="file"
+                    accept={ALLOWED_TYPES.join(",")}
+                    className="hidden"
+                    onChange={(e) => handleFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+              )}
+            </div>
+
+            <Button type="submit" disabled={submitting} className="w-full h-11">
+              {submitting ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending…</>
+              ) : (
+                <><Send className="w-4 h-4 mr-2" /> Send message</>
+              )}
+            </Button>
+
+            <p className="text-[11px] text-muted-foreground text-center">
+              Your message goes directly to the Sonic Invoices team. We typically reply within one business day.
+            </p>
+          </form>
+        )}
       </div>
     </div>
   );

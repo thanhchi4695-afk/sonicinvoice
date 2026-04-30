@@ -27,6 +27,8 @@ export function useKeyboardShortcuts(shortcuts: ShortcutDef[]) {
         const wantCtrl = !!s.ctrl;
         const hasCtrl = e.metaKey || e.ctrlKey;
         if (wantCtrl !== hasCtrl) continue;
+        const wantShift = !!s.shift;
+        if (wantShift !== e.shiftKey) continue;
         if (e.key.toLowerCase() === s.key.toLowerCase()) {
           e.preventDefault();
           s.action();

@@ -84,6 +84,15 @@ const App = () => (
                 }
               />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              {/* Phase slugs aren't standalone routes — Review/Enrich/Publish live
+                  inside the invoice flow on the dashboard. Redirect deep links so
+                  they don't 404. */}
+              <Route path="/review" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/enrich" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/publish" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/capture" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/price" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/analyse" element={<Index initialTab="analytics" />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

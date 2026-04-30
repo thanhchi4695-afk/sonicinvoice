@@ -10,7 +10,11 @@ import {
   ShieldCheck,
   Calculator,
   Info,
+  Tag,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ApplyDiscountsModal } from "@/components/pricing/ApplyDiscountsModal";
+import type { RecommendedPriceChange } from "@/lib/shopify/priceManager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +71,20 @@ export default function PricingIntelligence() {
   const [skipAi, setSkipAi] = useState(false);
   const [page, setPage] = useState(0);
   const [whatIfRow, setWhatIfRow] = useState<RecRow | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [applyOpen, setApplyOpen] = useState(false);
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
 
   async function runReport() {
     setRunning(true);
@@ -241,14 +259,62 @@ export default function PricingIntelligence() {
 
             {/* ── Table ── */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
                 <CardTitle className="text-base">Detailed recommendations</CardTitle>
+                <div className="flex items-center gap-2">
+                  {selectedIds.size > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {selectedIds.size} selected
+                    </span>
+                  )}
+                  {selectedIds.size > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={clearSelection}
+                      className="h-8"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    disabled={selectedIds.size === 0}
+                    onClick={() => setApplyOpen(true)}
+                    className="gap-2 h-8"
+                  >
+                    <Tag className="h-3.5 w-3.5" />
+                    Apply Selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm font-mono">
                     <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                       <tr>
+                        <th className="w-8 px-2 py-2">
+                          <Checkbox
+                            checked={
+                              pageRows.filter((r) => r.suggestedNewPrice != null).length > 0 &&
+                              pageRows
+                                .filter((r) => r.suggestedNewPrice != null)
+                                .every((r) => selectedIds.has(r.productId))
+                            }
+                            onCheckedChange={(checked) => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                const applicable = pageRows.filter(
+                                  (r) => r.suggestedNewPrice != null,
+                                );
+                                if (checked) applicable.forEach((r) => next.add(r.productId));
+                                else applicable.forEach((r) => next.delete(r.productId));
+                                return next;
+                              });
+                            }}
+                            aria-label="Select all on page"
+                          />
+                        </th>
                         <th className="text-left px-3 py-2 font-medium">Product</th>
                         <th className="text-left px-3 py-2 font-medium">Phase</th>
                         <th className="text-right px-3 py-2 font-medium">Days</th>
@@ -271,6 +337,14 @@ export default function PricingIntelligence() {
                             idx % 2 === 0 ? "" : "bg-muted/20"
                           }`}
                         >
+                          <td className="px-2 py-1 text-center">
+                            <Checkbox
+                              checked={selectedIds.has(r.productId)}
+                              disabled={r.suggestedNewPrice == null}
+                              onCheckedChange={() => toggleSelected(r.productId)}
+                              aria-label={`Select ${r.title}`}
+                            />
+                          </td>
                           <td className="px-3 py-1 font-sans truncate max-w-[260px]">
                             {r.title}
                             {r.vendor && (
@@ -346,7 +420,7 @@ export default function PricingIntelligence() {
                       ))}
                       {pageRows.length === 0 && (
                         <tr>
-                          <td colSpan={12} className="text-center py-8 text-muted-foreground">
+                          <td colSpan={13} className="text-center py-8 text-muted-foreground">
                             No products to show.
                           </td>
                         </tr>
@@ -388,6 +462,35 @@ export default function PricingIntelligence() {
 
         {/* ── What-if simulator ── */}
         <WhatIfModal row={whatIfRow} onClose={() => setWhatIfRow(null)} />
+
+        <ApplyDiscountsModal
+          open={applyOpen}
+          onClose={() => setApplyOpen(false)}
+          changes={
+            (report?.recommendations ?? [])
+              .filter(
+                (r) =>
+                  selectedIds.has(r.productId) && r.suggestedNewPrice != null,
+              )
+              .map<RecommendedPriceChange>((r) => ({
+                productId: r.productId,
+                title: r.title,
+                newPrice: r.suggestedNewPrice as number,
+                originalPrice: r.analysis.currentPrice,
+                reason: r.reason,
+                discountPercentage: r.discountPercentage,
+              }))
+          }
+          onApplied={(results) => {
+            // Drop successful ones from selection
+            const okIds = new Set(results.filter((r) => r.ok).map((r) => r.productId));
+            setSelectedIds((prev) => {
+              const next = new Set(prev);
+              okIds.forEach((id) => next.delete(id));
+              return next;
+            });
+          }}
+        />
       </div>
     </div>
   );

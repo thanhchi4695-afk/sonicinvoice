@@ -640,7 +640,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         {activeTab === "analytics" && <AnalyticsPanel />}
         {activeTab === "history" && <HistoryScreen />}
         {activeTab === "tools" && <ToolsScreen onStartFlow={handleStartFlow} />}
-        {activeTab === "guide" && <LightspeedGuide onBack={() => setActiveTab("home")} onNavigate={(f) => { if (f === "invoice" || f === "lightspeed_convert") setActiveFlow(f); }} />}
+        {activeTab === "guide" && <HowToCatalog onNavigateToFeature={(f) => setActiveFlow(f as any)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
         {activeTab === "google_ads" && <AdsGuideTabs />}
         {activeTab === "billing" && <BillingScreen />}
         {activeTab === "help" && <HelpCentre />}

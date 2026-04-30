@@ -544,6 +544,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [showDetails, setShowDetails] = useState(false);
   const [fileName, setFileName] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
+  const [showAdvancedInstructions, setShowAdvancedInstructions] = useState(false);
   const [supplierName, setSupplierName] = useState("");
   // Initial export format honours the Phase 1 POS choice
   // (set in PhaseFlowHome → localStorage "preferred_pos").

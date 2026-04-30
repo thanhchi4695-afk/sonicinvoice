@@ -58,9 +58,9 @@ export const SceneAudit = () => {
         <KpiCard label="Avg response time" value="0.4s" accent={COLORS.good} />
       </div>
 
-      {/* Bar chart */}
+      {/* Bar chart — bottom left, narrower so the outro doesn't overlap */}
       <div style={{
-        position: "absolute", top: 720, left: 130, width: 1100, height: 240,
+        position: "absolute", top: 730, left: 130, width: 880, height: 240,
         background: COLORS.surface, border: `1px solid ${COLORS.border}`,
         borderRadius: 24, padding: 28,
         opacity: interpolate(frame, [20, 34], [0, 1], { extrapolateRight: "clamp" }),
@@ -68,7 +68,7 @@ export const SceneAudit = () => {
         <div style={{ fontFamily: fontMono, fontSize: 16, color: COLORS.textMuted, letterSpacing: 3, textTransform: "uppercase" }}>
           Blocks per week
         </div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 26, marginTop: 24, height: 140 }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 22, marginTop: 24, height: 140 }}>
           {targets.map((t, i) => (
             <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
               <div style={{

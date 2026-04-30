@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import ConditionBuilderShowcase from "@/components/ConditionBuilderShowcase";
 
 /* ─── Types ─── */
 

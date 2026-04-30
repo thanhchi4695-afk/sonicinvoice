@@ -155,3 +155,82 @@ All with RLS scoped to `user_id`, following the [Security hardening](mem://tech-
 - [Inventory forecasting formulas](mem://features/inventory-forecasting-formulas)
 - [Confidence export gate](mem://constraints/confidence-export-gate)
 - [Audit log](mem://features/audit-log)
+
+---
+
+# 📦 PLAN 2: Google Merchant Center Feed Manager
+
+**Status:** Saved for later implementation. Awaiting prompt to build.
+**Date saved:** 2026-04-30
+
+## 🎯 Core Problem
+Shopify stores randomly get hit by Google Merchant Center errors that silently disable ads. Retailers must dig through clunky Google interfaces to diagnose missing GTINs, gender, age group, image-size issues, etc. We will build a dedicated Feed Manager dashboard inside the app — eligibility counts, error drill-down, bulk fixes, and price optimisation — without leaving Shopify.
+
+## 🏗️ Phase 1 — Data Foundation: Product Feed Attributes
+
+### Task 1.1 — Metafield Definitions for Google Attributes
+One-time setup script. Define Shopify metafields at product + variant level for apparel/accessories (swimwear, clothing).
+
+**Product-level (`namespace: "google"`):**
+- `color` — single line text
+- `gender` — single line text — allowed: `male`, `female`, `unisex`
+- `age_group` — single line text — allowed: `newborn`, `infant`, `toddler`, `kids`, `adult`
+- `material` — single line text
+- `pattern` — single line text
+- `category` — single line text — Google product taxonomy IDs
+- `custom_label_0` … `custom_label_4` — single line text
+
+**Variant-level (`namespace: "google"`):**
+- `size` — single line text
+
+**Function: `checkMetafieldDefinitions()`**
+1. Query existing definitions via GraphQL (`metafieldDefinitions`).
+2. Create missing ones via `metafieldDefinitionsCreate` mutation.
+3. Return `{ created: [...], existing: [...], failed: [...] }`.
+
+### Task 1.2 (recommended addition) — Backfill scanner
+Sweep catalogue and flag products missing required attributes per Google category. Output CSV + in-app fix queue.
+
+## 🏗️ Phase 2 — Eligibility Dashboard (UI)
+Mirror the screenshot the user shared:
+- Top stat cards: **Eligible / Pending / Submitted / Excluded / Disapproved**.
+- Error breakdown table: error code → affected product count → "Fix" CTA.
+- Filter chips per error type (missing GTIN, missing gender, missing age_group, image < 100×100, price mismatch, etc.).
+- Row drill-down → product detail with inline metafield editor.
+
+## 🏗️ Phase 3 — Bulk Fix Engine
+- "Fix All Missing Gender" → AI inference from product title/tags/collection (default `female` for swimwear collections, etc.) with confidence score.
+- Apply HIGH confidence (≥90%) automatically; MEDIUM (70–89%) requires confirmation. (Reuses existing confidence-export-gate rule.)
+- Batched `metafieldsSet` — 8 per call, 500ms delay (per Shopify API concurrency rule).
+
+## 🏗️ Phase 4 — Google Merchant Center Sync
+- OAuth into Google Merchant Center API.
+- Pull live `productstatuses` to know which SKUs are actually disapproved (not just predicted).
+- Two-way reconciliation: GMC error feed ↔ in-app fix queue.
+- Cron job (daily 5:00 AM UTC, matches existing automation pattern) to refresh statuses.
+
+## 🏗️ Phase 5 — Price Optimisation Layer
+- Feed-level price rules (round to .95, strike-through compare-at, currency conversion for multi-region feeds).
+- Hook into existing **Competitor price intelligence** + **Markdown ladder** so Feed Manager can suggest price moves that also satisfy GMC `[price mismatch]` errors.
+
+## 🔌 Recommended Integrations With Existing Modules
+- **Tag rules engine** — auto-derive `custom_label_0..4` from existing tag formula.
+- **Variant grouping logic** — ensures `item_group_id` is consistent in feed.
+- **Color attribute detection** — feeds `google.color` metafield.
+- **Audit log** — every bulk fix written to 500-entry log.
+- **AI Gateway** — Gemini Flash for inference, Pro for ambiguous cases (existing fallback chain).
+
+## 📁 Suggested Module Layout
+- `src/lib/feed/metafieldDefinitions.ts` — Task 1.1
+- `src/lib/feed/eligibilityScanner.ts` — Phase 2 data layer
+- `src/lib/feed/bulkFixer.ts` — Phase 3
+- `src/lib/feed/gmcClient.ts` — Phase 4 OAuth + API
+- `src/pages/FeedManager.tsx` — dashboard UI
+- `supabase/functions/gmc-sync/index.ts` — daily cron
+
+## ❓ Open Questions for Implementation Day
+1. **Scope of MVP** — start with Phase 1 + 2 only (metafields + dashboard), or include bulk-fix AI from day one?
+2. **GMC OAuth** — connect at launch (Phase 4) or ship "blind" mode first that infers status from feed validation rules?
+3. **Industry coverage** — apparel-only attribute set, or also include hard goods (electronics need GTIN + MPN + brand)?
+4. **Where to surface in UI** — new top-level "Feed Manager" tab, or nested under existing Google Shopping integration page?
+5. **Auto-fix policy** — should Phase 3 ever run fully unattended for HIGH-confidence inferences, or always require a "Review & Apply" click?

@@ -11,7 +11,8 @@ import BudgetPill from "@/components/BudgetPill";
 import { useUserRole } from "@/hooks/use-user-role";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard, Store } from "lucide-react";
+import { LogOut, Check, X, Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Unplug, Trash2, Save, Plus, Bell, FileText, ClipboardList, MapPin, Edit2, ExternalLink, CreditCard, Store, Settings as SettingsIcon, Plug, Brain, Tag as TagIcon, Users, Wrench } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { TAX_REGIONS, getTaxConfig, saveTaxConfig, getEffectiveTaxRate, formatTaxRate, getTaxLabel } from "@/lib/tax-service";
 import {
@@ -61,289 +62,286 @@ const AccountScreen = () => {
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
       <h1 className="text-2xl font-bold font-display mb-1">Account</h1>
-      <p className="text-muted-foreground text-sm mb-6">Store settings & pricing rules</p>
+      <p className="text-muted-foreground text-sm mb-4">Store settings & pricing rules</p>
 
-      {/* Store Details */}
-      <Section title="Store details">
-        <Field label="Store name" value={storeName} onChange={setStoreName} placeholder="My Boutique" />
-        <Field label="Store website" placeholder="mystore.com" />
-        <Field label="City / Location" value={storeCity} onChange={setStoreCity} placeholder="e.g. Darwin NT" />
-        <p className="text-[11px] text-muted-foreground -mt-2">Used in product descriptions and SEO meta text.</p>
-        <Field label="Free shipping threshold (AUD)" value={freeShippingThreshold} onChange={setFreeShippingThreshold} placeholder="e.g. 150" type="number" />
-        <p className="text-[11px] text-muted-foreground -mt-2">Leave blank to omit free shipping from descriptions.</p>
-        <div className="grid grid-cols-2 gap-3">
-          <SelectField label="Currency" value={currency} onChange={setCurrency}
-            options={CURRENCIES.map(c => ({ v: c.code, l: `${c.flag} ${c.code} (${c.symbol})` }))}
-          />
-          <SelectField label="Locale" value="AU" onChange={() => {}}
-            options={LOCALES.map(l => ({ v: l.id, l: `${l.flag} ${l.country}` }))}
-          />
-        </div>
-        <LanguageSelector />
-        <SelectField label="Store type / POS" value={storeType} onChange={(v) => { setStoreType(v as StoreType); saveStoreConfig({ storeType: v as StoreType }); }}
-          options={[
-            { v: "shopify", l: "🛍️ Shopify only" },
-            { v: "lightspeed_shopify", l: "🖥️ Lightspeed + Shopify" },
-            { v: "lightspeed", l: "🖥️ Lightspeed POS only" },
-            { v: "other", l: "📦 Other / Not sure" },
-          ]}
-        />
-        {(storeType === 'lightspeed' || storeType === 'lightspeed_shopify') && (
-          <>
-            <SelectField label="Lightspeed version" value={lsVersion} onChange={(v) => { setLsVersion(v as LightspeedVersion); saveStoreConfig({ lightspeedVersion: v as LightspeedVersion }); }}
-              options={[
-                { v: "x_series", l: "X-Series (current)" },
-                { v: "r_series", l: "R-Series (legacy)" },
-              ]}
-            />
-            <Field label="Outlet name" placeholder="e.g. Main Store" />
-            <Field label="Tax name" placeholder="GST" />
-            <SelectField label="Default export" value="lightspeed" onChange={() => {}}
-              options={[
-                { v: "lightspeed", l: "Lightspeed CSV" },
-                { v: "shopify", l: "Shopify CSV" },
-              ]}
-            />
-            <SelectField label="Attribute order" value="size_first" onChange={() => {}}
-              options={[
-                { v: "size_first", l: "Size first (Size → Colour)" },
-                { v: "colour_first", l: "Colour first (Colour → Size)" },
-              ]}
-            />
-          </>
-        )}
-        {storeType === 'lightspeed_shopify' && (
-          <div className="mt-3 pt-3 border-t border-border space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shopify settings (for post-import SEO update)</p>
-            <Field label="Shopify store URL" placeholder="yourstore.myshopify.com" />
-            <p className="text-[11px] text-muted-foreground">Your Shopify store is managed via Lightspeed. Only use these settings for the optional SEO update step.</p>
-          </div>
-        )}
-      </Section>
+      <Tabs defaultValue="store" className="w-full">
+        <TabsList className="w-full h-auto p-1 grid grid-cols-3 sm:grid-cols-6 gap-1 mb-5">
+          <TabsTrigger value="store" className="flex items-center gap-1.5 text-xs">
+            <SettingsIcon className="w-3.5 h-3.5" /> Store
+          </TabsTrigger>
+          <TabsTrigger value="connections" className="flex items-center gap-1.5 text-xs">
+            <Plug className="w-3.5 h-3.5" /> Connections
+          </TabsTrigger>
+          <TabsTrigger value="ai" className="flex items-center gap-1.5 text-xs">
+            <Brain className="w-3.5 h-3.5" /> AI & Data
+          </TabsTrigger>
+          <TabsTrigger value="catalog" className="flex items-center gap-1.5 text-xs">
+            <TagIcon className="w-3.5 h-3.5" /> Catalog
+          </TabsTrigger>
+          <TabsTrigger value="team" className="flex items-center gap-1.5 text-xs">
+            <Users className="w-3.5 h-3.5" /> Team & Billing
+          </TabsTrigger>
+          <TabsTrigger value="system" className="flex items-center gap-1.5 text-xs">
+            <Wrench className="w-3.5 h-3.5" /> System
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Industry Profile */}
-      <Section title="Industry profile">
-        <p className="text-[11px] text-muted-foreground mb-2">Controls field labels, Google Shopping mapping, and restock analytics behaviour.</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {getIndustryProfileChoices().map((opt) => {
-            const active = industry === opt.id;
-            const def = getIndustryDefinition(opt.id);
-            return (
-              <button
-                key={opt.id}
-                onClick={() => { setIndustry(opt.id); saveStoreConfig({ industry: opt.id }); }}
-                className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
-                  active ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-primary/50"
-                }`}
-              >
-                <span className="text-xl">{opt.icon}</span>
-                <span>{opt.name}</span>
-              </button>
-            );
-          })}
-        </div>
-        {(() => {
-          const def = getIndustryDefinition(industry);
-          return (
-            <div className="mt-3 p-3 rounded-md bg-muted/50 text-xs space-y-1">
-              <p><span className="font-semibold">Size label:</span> {def.fieldLabels.size}</p>
-              <p><span className="font-semibold">Colour label:</span> {def.fieldLabels.colour}</p>
-              <p><span className="font-semibold">Material label:</span> {def.fieldLabels.material}</p>
-              <p><span className="font-semibold">Size holes in restock:</span> {def.hasSizeHoles ? "Yes" : "No (unit-based reorder)"}</p>
+        {/* ─── STORE ─────────────────────────────────────────── */}
+        <TabsContent value="store" className="mt-0 space-y-0">
+          <Section title="Store details">
+            <Field label="Store name" value={storeName} onChange={setStoreName} placeholder="My Boutique" />
+            <Field label="Store website" placeholder="mystore.com" />
+            <Field label="City / Location" value={storeCity} onChange={setStoreCity} placeholder="e.g. Darwin NT" />
+            <p className="text-[11px] text-muted-foreground -mt-2">Used in product descriptions and SEO meta text.</p>
+            <Field label="Free shipping threshold (AUD)" value={freeShippingThreshold} onChange={setFreeShippingThreshold} placeholder="e.g. 150" type="number" />
+            <p className="text-[11px] text-muted-foreground -mt-2">Leave blank to omit free shipping from descriptions.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <SelectField label="Currency" value={currency} onChange={setCurrency}
+                options={CURRENCIES.map(c => ({ v: c.code, l: `${c.flag} ${c.code} (${c.symbol})` }))}
+              />
+              <SelectField label="Locale" value="AU" onChange={() => {}}
+                options={LOCALES.map(l => ({ v: l.id, l: `${l.flag} ${l.country}` }))}
+              />
             </div>
-          );
-        })()}
-      </Section>
-
-      {/* Tax Region */}
-      <Section title="Tax region">
-        <p className="text-[11px] text-muted-foreground mb-2">Determines tax rates for invoices and pricing. US sales tax varies by state; EU VAT varies by country.</p>
-        <SelectField
-          label="Country / Region"
-          value={taxRegion}
-          onChange={(v) => {
-            setTaxRegion(v);
-            setTaxSubRegion("");
-            saveTaxConfig({ regionCode: v, subRegionCode: undefined });
-          }}
-          options={TAX_REGIONS.map(r => ({ v: r.countryCode, l: `${r.flag} ${r.country} — ${r.taxLabel}` }))}
-        />
-        {(() => {
-          const region = TAX_REGIONS.find(r => r.countryCode === taxRegion);
-          if (!region?.subRegions?.length) return null;
-          const subLabel = taxRegion === "US" ? "State" : taxRegion === "CA" ? "Province" : "Country";
-          return (
-            <SelectField
-              label={subLabel}
-              value={taxSubRegion}
-              onChange={(v) => { setTaxSubRegion(v); saveTaxConfig({ regionCode: taxRegion, subRegionCode: v }); }}
+            <LanguageSelector />
+            <SelectField label="Store type / POS" value={storeType} onChange={(v) => { setStoreType(v as StoreType); saveStoreConfig({ storeType: v as StoreType }); }}
               options={[
-                { v: "", l: `— Use default (${(region.defaultRate * 100).toFixed(1)}%)` },
-                ...region.subRegions.map(s => ({ v: s.code, l: `${s.name} (${(s.rate * 100).toFixed(2)}%)` })),
+                { v: "shopify", l: "🛍️ Shopify only" },
+                { v: "lightspeed_shopify", l: "🖥️ Lightspeed + Shopify" },
+                { v: "lightspeed", l: "🖥️ Lightspeed POS only" },
+                { v: "other", l: "📦 Other / Not sure" },
               ]}
             />
-          );
-        })()}
-        <div className="mt-2 p-3 rounded-md bg-muted/50 text-xs space-y-1">
-          <p><span className="font-semibold">Tax label:</span> {getTaxLabel({ regionCode: taxRegion, subRegionCode: taxSubRegion || undefined })}</p>
-          <p><span className="font-semibold">Rate:</span> {formatTaxRate({ regionCode: taxRegion, subRegionCode: taxSubRegion || undefined })}</p>
-          <p><span className="font-semibold">Pricing:</span> {TAX_REGIONS.find(r => r.countryCode === taxRegion)?.taxInclusive ? "Tax-inclusive (prices include tax)" : "Tax-exclusive (tax added at checkout)"}</p>
-        </div>
-      </Section>
+            {(storeType === 'lightspeed' || storeType === 'lightspeed_shopify') && (
+              <>
+                <SelectField label="Lightspeed version" value={lsVersion} onChange={(v) => { setLsVersion(v as LightspeedVersion); saveStoreConfig({ lightspeedVersion: v as LightspeedVersion }); }}
+                  options={[
+                    { v: "x_series", l: "X-Series (current)" },
+                    { v: "r_series", l: "R-Series (legacy)" },
+                  ]}
+                />
+                <Field label="Outlet name" placeholder="e.g. Main Store" />
+                <Field label="Tax name" placeholder="GST" />
+                <SelectField label="Default export" value="lightspeed" onChange={() => {}}
+                  options={[
+                    { v: "lightspeed", l: "Lightspeed CSV" },
+                    { v: "shopify", l: "Shopify CSV" },
+                  ]}
+                />
+                <SelectField label="Attribute order" value="size_first" onChange={() => {}}
+                  options={[
+                    { v: "size_first", l: "Size first (Size → Colour)" },
+                    { v: "colour_first", l: "Colour first (Colour → Size)" },
+                  ]}
+                />
+              </>
+            )}
+            {storeType === 'lightspeed_shopify' && (
+              <div className="mt-3 pt-3 border-t border-border space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Shopify settings (for post-import SEO update)</p>
+                <Field label="Shopify store URL" placeholder="yourstore.myshopify.com" />
+                <p className="text-[11px] text-muted-foreground">Your Shopify store is managed via Lightspeed. Only use these settings for the optional SEO update step.</p>
+              </div>
+            )}
+          </Section>
 
-      {/* Pricing Rules */}
-      <Section title="Pricing rules">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Default markup</label>
-            <input value={markup} onChange={(e) => setMarkup(e.target.value)} className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm font-mono-data" />
-          </div>
-          <SelectField label="Rounding" value={rounding} onChange={setRounding}
-            options={[{ v: "nearest_05", l: "$0.05" }, { v: "nearest_1", l: "$1.00" }, { v: "charm_95", l: ".95" }]}
-          />
-        </div>
-      </Section>
+          <Section title="Industry profile">
+            <p className="text-[11px] text-muted-foreground mb-2">Controls field labels, Google Shopping mapping, and restock analytics behaviour.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {getIndustryProfileChoices().map((opt) => {
+                const active = industry === opt.id;
+                const def = getIndustryDefinition(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => { setIndustry(opt.id); saveStoreConfig({ industry: opt.id }); }}
+                    className={`flex flex-col items-center gap-1 p-3 rounded-lg border text-xs font-medium transition-colors ${
+                      active ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground hover:border-primary/50"
+                    }`}
+                  >
+                    <span className="text-xl">{opt.icon}</span>
+                    <span>{opt.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {(() => {
+              const def = getIndustryDefinition(industry);
+              return (
+                <div className="mt-3 p-3 rounded-md bg-muted/50 text-xs space-y-1">
+                  <p><span className="font-semibold">Size label:</span> {def.fieldLabels.size}</p>
+                  <p><span className="font-semibold">Colour label:</span> {def.fieldLabels.colour}</p>
+                  <p><span className="font-semibold">Material label:</span> {def.fieldLabels.material}</p>
+                  <p><span className="font-semibold">Size holes in restock:</span> {def.hasSizeHoles ? "Yes" : "No (unit-based reorder)"}</p>
+                </div>
+              );
+            })()}
+          </Section>
 
-      {/* Platform connections (Shopify + Lightspeed unified card view) */}
-      <Section title="Platform connections">
-        <PlatformConnectionsSection />
-      </Section>
+          <Section title="Tax region">
+            <p className="text-[11px] text-muted-foreground mb-2">Determines tax rates for invoices and pricing. US sales tax varies by state; EU VAT varies by country.</p>
+            <SelectField
+              label="Country / Region"
+              value={taxRegion}
+              onChange={(v) => {
+                setTaxRegion(v);
+                setTaxSubRegion("");
+                saveTaxConfig({ regionCode: v, subRegionCode: undefined });
+              }}
+              options={TAX_REGIONS.map(r => ({ v: r.countryCode, l: `${r.flag} ${r.country} — ${r.taxLabel}` }))}
+            />
+            {(() => {
+              const region = TAX_REGIONS.find(r => r.countryCode === taxRegion);
+              if (!region?.subRegions?.length) return null;
+              const subLabel = taxRegion === "US" ? "State" : taxRegion === "CA" ? "Province" : "Country";
+              return (
+                <SelectField
+                  label={subLabel}
+                  value={taxSubRegion}
+                  onChange={(v) => { setTaxSubRegion(v); saveTaxConfig({ regionCode: taxRegion, subRegionCode: v }); }}
+                  options={[
+                    { v: "", l: `— Use default (${(region.defaultRate * 100).toFixed(1)}%)` },
+                    ...region.subRegions.map(s => ({ v: s.code, l: `${s.name} (${(s.rate * 100).toFixed(2)}%)` })),
+                  ]}
+                />
+              );
+            })()}
+            <div className="mt-2 p-3 rounded-md bg-muted/50 text-xs space-y-1">
+              <p><span className="font-semibold">Tax label:</span> {getTaxLabel({ regionCode: taxRegion, subRegionCode: taxSubRegion || undefined })}</p>
+              <p><span className="font-semibold">Rate:</span> {formatTaxRate({ regionCode: taxRegion, subRegionCode: taxSubRegion || undefined })}</p>
+              <p><span className="font-semibold">Pricing:</span> {TAX_REGIONS.find(r => r.countryCode === taxRegion)?.taxInclusive ? "Tax-inclusive (prices include tax)" : "Tax-exclusive (tax added at checkout)"}</p>
+            </div>
+          </Section>
 
-      {/* Brand Database Sync — admins only */}
-      {isAdmin && (
-        <Section title="Brand database sync">
-          <BrandDatabaseSyncPanel />
-        </Section>
-      )}
+          <Section title="Pricing rules">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Default markup</label>
+                <input value={markup} onChange={(e) => setMarkup(e.target.value)} className="w-full h-10 rounded-md bg-input border border-border px-3 text-sm font-mono-data" />
+              </div>
+              <SelectField label="Rounding" value={rounding} onChange={setRounding}
+                options={[{ v: "nearest_05", l: "$0.05" }, { v: "nearest_1", l: "$1.00" }, { v: "charm_95", l: ".95" }]}
+              />
+            </div>
+          </Section>
 
-      {/* Automation — AI Watchdog Agent */}
-      <Section title="Automation">
-        <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
-          <AutomationSettings />
-        </Suspense>
-      </Section>
+          <LocationsSection />
 
-      {/* POS Connections (Stock Checking) */}
-      <Section title="🔌 POS integration">
-        <POSConnectionPanel />
-      </Section>
+          <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); }}>Save settings</Button>
+        </TabsContent>
 
-      {/* Wholesale Platform Connections */}
-      <WholesaleConnectionsSection />
+        {/* ─── CONNECTIONS ───────────────────────────────────── */}
+        <TabsContent value="connections" className="mt-0 space-y-0">
+          <Section title="Platform connections">
+            <PlatformConnectionsSection />
+          </Section>
+          <Section title="🔌 POS integration">
+            <POSConnectionPanel />
+          </Section>
+          <WholesaleConnectionsSection />
+          <AccountingConnectionsSection />
+          <ApiKeysSection />
+          <Section title="🔌 Connectors Marketplace">
+            <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
+              <ConnectorsMarketplace />
+            </Suspense>
+          </Section>
+        </TabsContent>
 
-      {/* Accounting Connections */}
-      <AccountingConnectionsSection />
+        {/* ─── AI & DATA ─────────────────────────────────────── */}
+        <TabsContent value="ai" className="mt-0 space-y-0">
+          {isAdmin && (
+            <Section title="Brand database sync">
+              <BrandDatabaseSyncPanel />
+            </Section>
+          )}
+          <Section title="📦 Brand database sync">
+            <BrandDatabaseUserSyncSection />
+          </Section>
+          <Section title="🔎 WebSearch usage">
+            <WebSearchUsageSection />
+          </Section>
+          <Section title="🧠 Agent budget">
+            <BudgetPill variant="full" />
+          </Section>
+          <DefaultInstructionsSection />
+          <SharedLearningSection />
+        </TabsContent>
 
-      {/* Price Intelligence API Keys */}
-      <ApiKeysSection />
+        {/* ─── CATALOG ───────────────────────────────────────── */}
+        <TabsContent value="catalog" className="mt-0 space-y-0">
+          <SeoTemplateSection />
+          <CollectionManagerSection />
+          <InvoiceTemplatesSection />
+          <MetafieldsSection />
+        </TabsContent>
 
-      {/* WebSearch usage (AI enrichment) */}
-      <Section title="🔎 WebSearch usage">
-        <WebSearchUsageSection />
-      </Section>
+        {/* ─── TEAM & BILLING ────────────────────────────────── */}
+        <TabsContent value="team" className="mt-0 space-y-0">
+          <Section title="👥 Team & Roles">
+            <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
+              <TeamManagement />
+            </Suspense>
+          </Section>
+          <BillingSection />
+        </TabsContent>
 
-      {/* Agent budget (AI orchestration spend) */}
-      <Section title="🧠 Agent budget">
-        <BudgetPill variant="full" />
-      </Section>
+        {/* ─── SYSTEM ────────────────────────────────────────── */}
+        <TabsContent value="system" className="mt-0 space-y-0">
+          <Section title="Automation">
+            <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+              <AutomationSettings />
+            </Suspense>
+          </Section>
+          <NotificationPrefsSection />
+          <Section title="🛠️ Developer mode">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Embedded sidebar layout</p>
+                <p className="text-xs text-muted-foreground">Preview the Shopify Admin sidebar layout without a real store connection</p>
+              </div>
+              <Switch
+                checked={getDevEmbeddedMode()}
+                onCheckedChange={(checked) => {
+                  setDevEmbeddedMode(checked);
+                  window.location.reload();
+                }}
+              />
+            </div>
+          </Section>
+          <Section title="App information">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Version</span><span className="font-mono-data">1.0.0</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Build date</span><span className="font-mono-data">Mar 2026</span></div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <a href="/support" className="text-xs text-primary hover:underline">View changelog</a>
+              <span className="text-muted-foreground">·</span>
+              <a href="/support" className="text-xs text-primary hover:underline">Contact support</a>
+              <span className="text-muted-foreground">·</span>
+              <a href="https://docs.lovable.dev" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">Documentation</a>
+            </div>
+            <div className="mt-3 flex items-center gap-2 bg-muted/50 rounded-lg p-2.5 border border-border">
+              <span className="text-sm">🛍</span>
+              <span className="text-xs text-muted-foreground">Works with Shopify</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              This app will be available on the Shopify App Store. When installed from the App Store, your store connects automatically — no manual token entry needed.
+            </p>
+          </Section>
 
-      {/* Brand database sync (per-user CSV) */}
-      <Section title="📦 Brand database sync">
-        <BrandDatabaseUserSyncSection />
-      </Section>
-
-      {/* SEO Templates */}
-      <SeoTemplateSection />
-
-      {/* Collections */}
-      <CollectionManagerSection />
-
-      {/* Default AI Instructions */}
-      <DefaultInstructionsSection />
-
-      {/* Shared Learning Opt-in */}
-      <SharedLearningSection />
-
-      {/* Notification Preferences */}
-      <NotificationPrefsSection />
-
-      {/* Locations */}
-      <LocationsSection />
-
-      {/* Invoice Templates */}
-      <InvoiceTemplatesSection />
-
-      {/* Metafields */}
-      <MetafieldsSection />
-
-      {/* Developer Mode */}
-      <Section title="🛠️ Developer mode">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">Embedded sidebar layout</p>
-            <p className="text-xs text-muted-foreground">Preview the Shopify Admin sidebar layout without a real store connection</p>
-          </div>
-          <Switch
-            checked={getDevEmbeddedMode()}
-            onCheckedChange={(checked) => {
-              setDevEmbeddedMode(checked);
-              window.location.reload();
+          <Button
+            variant="ghost"
+            className="w-full mt-6 text-destructive h-12"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              window.location.href = "/";
             }}
-          />
-        </div>
-      </Section>
-
-      {/* App Information */}
-      <Section title="App information">
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between"><span className="text-muted-foreground">Version</span><span className="font-mono-data">1.0.0</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Build date</span><span className="font-mono-data">Mar 2026</span></div>
-        </div>
-        <div className="flex flex-wrap gap-2 mt-2">
-          <a href="/support" className="text-xs text-primary hover:underline">View changelog</a>
-          <span className="text-muted-foreground">·</span>
-          <a href="/support" className="text-xs text-primary hover:underline">Contact support</a>
-          <span className="text-muted-foreground">·</span>
-          <a href="https://docs.lovable.dev" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">Documentation</a>
-        </div>
-        <div className="mt-3 flex items-center gap-2 bg-muted/50 rounded-lg p-2.5 border border-border">
-          <span className="text-sm">🛍</span>
-          <span className="text-xs text-muted-foreground">Works with Shopify</span>
-        </div>
-        <p className="text-[10px] text-muted-foreground mt-2">
-          This app will be available on the Shopify App Store. When installed from the App Store, your store connects automatically — no manual token entry needed.
-        </p>
-      </Section>
-
-      <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); }}>Save settings</Button>
-
-      {/* Connectors Marketplace */}
-      <Section title="🔌 Connectors Marketplace">
-        <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
-          <ConnectorsMarketplace />
-        </Suspense>
-      </Section>
-
-      {/* Team Management */}
-      <Section title="👥 Team & Roles">
-        <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
-          <TeamManagement />
-        </Suspense>
-      </Section>
-
-      {/* Billing / Plan */}
-      <BillingSection />
-
-      <Button
-        variant="ghost"
-        className="w-full mt-6 text-destructive h-12"
-        onClick={async () => {
-          await supabase.auth.signOut();
-          window.location.href = "/";
-        }}
-      >
-        <LogOut className="w-4 h-4 mr-2" /> Sign out
-      </Button>
+          >
+            <LogOut className="w-4 h-4 mr-2" /> Sign out
+          </Button>
+        </TabsContent>
+      </Tabs>
 
       {/* Branding footer */}
       <div className="text-center mt-8 mb-4 space-y-1">

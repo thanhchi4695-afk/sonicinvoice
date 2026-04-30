@@ -60,7 +60,32 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
   const [scraping, setScraping] = useState(false);
   const [scraped, setScraped] = useState<CompetitorPriceResult | null>(null);
 
-  // Build initial recommendation (no competitor data yet)
+  // Real velocity from sales_data (last 30d). Falls back to product.avgWeeklySales prop.
+  const [velocity, setVelocity] = useState<VelocityResult | null>(null);
+  const [velocityLoading, setVelocityLoading] = useState(false);
+  const [refreshingSales, setRefreshingSales] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setVelocityLoading(true);
+    getVelocityForVariant(product.id)
+      .then((v) => {
+        if (!cancelled) setVelocity(v);
+      })
+      .finally(() => {
+        if (!cancelled) setVelocityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, product.id]);
+
+  const effectiveVelocity =
+    velocity?.hasData ? velocity.avgWeeklySales : product.avgWeeklySales ?? 1.0;
+  const usingRealVelocity = !!velocity?.hasData;
+
+  // Build initial recommendation (now informed by real velocity for sell-through pressure)
   const baseRec = useMemo(
     () =>
       recommendPrice({
@@ -68,10 +93,10 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
         unitCost: product.unitCost,
         daysInInventory: product.daysInInventory,
         stockOnHand: product.stockOnHand,
-        avgWeeklySales: product.avgWeeklySales,
+        avgWeeklySales: usingRealVelocity ? effectiveVelocity : product.avgWeeklySales,
         competitorPrice: scraped?.price ?? undefined,
       }),
-    [product, scraped],
+    [product, scraped, effectiveVelocity, usingRealVelocity],
   );
 
   // Editable discount — defaults to engine recommendation
@@ -81,21 +106,38 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
   }, [baseRec.recommendedDiscountPct]);
 
   // What-if simulator (Option B: simple elasticity model, default 2.0)
-  const placeholderVelocity = product.avgWeeklySales ?? 1.0;
   const [elasticity, setElasticity] = useState(2.0);
   const whatIf = useMemo(
     () =>
       simulateWhatIf({
         currentPrice: product.currentPrice,
         unitCost: product.unitCost,
-        avgWeeklySales: placeholderVelocity,
+        avgWeeklySales: effectiveVelocity,
         stockOnHand: product.stockOnHand,
         discountPct,
         elasticity,
         horizonDays: 7,
       }),
-    [product, placeholderVelocity, discountPct, elasticity],
+    [product, effectiveVelocity, discountPct, elasticity],
   );
+
+  const handleRefreshSales = async () => {
+    setRefreshingSales(true);
+    const ok = await refreshSalesData();
+    if (ok) {
+      const v = await getVelocityForVariant(product.id);
+      setVelocity(v);
+      toast.success(
+        v.hasData
+          ? `Synced — ${v.unitsLast30d} units sold in last 30 days`
+          : "Synced — no sales found for this variant in last 30 days",
+      );
+    } else {
+      toast.error("Could not sync orders. Check your Shopify connection.");
+    }
+    setRefreshingSales(false);
+  };
+
 
   const newPrice = +(product.currentPrice * (1 - discountPct)).toFixed(2);
   const belowFloor = newPrice < baseRec.marginFloorPrice;

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Shield,
@@ -10,13 +11,16 @@ import {
   History,
   FlaskConical,
   Sparkles,
+  Play,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 /**
  * Homepage showcase for the visual Condition Builder (Margin Guardian).
  * Self-contained: drop into any home view. Uses /rules as the primary CTA.
  */
 const ConditionBuilderShowcase = () => {
+  const [videoOpen, setVideoOpen] = useState(false);
   return (
     <section
       aria-labelledby="condition-builder-heading"
@@ -44,6 +48,37 @@ const ConditionBuilderShowcase = () => {
         Our visual Condition Builder lets you set profit guardrails in plain
         English. No code. No complex logic. Just click, choose, and save.
       </p>
+
+      {/* Watch tour button */}
+      <button
+        type="button"
+        onClick={() => setVideoOpen(true)}
+        className="group mt-3 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+        aria-label="Watch Margin Guardian tour video"
+      >
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+          <Play className="h-2.5 w-2.5 fill-current" />
+        </span>
+        Watch the 60-second tour
+      </button>
+
+      <Dialog open={videoOpen} onOpenChange={setVideoOpen}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-border">
+          <DialogTitle className="sr-only">Margin Guardian tour</DialogTitle>
+          <DialogDescription className="sr-only">
+            A short video walkthrough of how the Margin Guardian Condition Builder protects your margins.
+          </DialogDescription>
+          {videoOpen && (
+            <video
+              src="/videos/margin-guardian-tour.mp4"
+              controls
+              autoPlay
+              playsInline
+              className="w-full h-auto max-h-[80vh] bg-black"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Two-column body: mockup + how-it-works */}
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-5">

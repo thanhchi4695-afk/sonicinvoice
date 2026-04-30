@@ -112,6 +112,51 @@ const InvoicesTab = (props: InvoicesTabProps) => {
     });
   }, [rows, search, vendorFilter, statusFilter]);
 
+  // Selection helpers — only IDs that exist in the currently filtered view count.
+  const filteredIds = useMemo(() => filtered.map(r => r.id), [filtered]);
+  const selectedInView = useMemo(() => filteredIds.filter(id => selected.has(id)), [filteredIds, selected]);
+  const allInViewSelected = filteredIds.length > 0 && selectedInView.length === filteredIds.length;
+  const someInViewSelected = selectedInView.length > 0 && !allInViewSelected;
+
+  const toggleRow = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllInView = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (allInViewSelected) {
+        filteredIds.forEach(id => next.delete(id));
+      } else {
+        filteredIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelected(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setDeleting(true);
+    const { error } = await supabase.from("invoice_patterns").delete().in("id", ids);
+    setDeleting(false);
+    setConfirmOpen(false);
+    if (error) {
+      toast.error(`Couldn't delete: ${error.message}`);
+      return;
+    }
+    setRows(prev => prev.filter(r => !selected.has(r.id)));
+    addAuditEntry("Invoices", `Deleted ${ids.length} invoice${ids.length === 1 ? "" : "s"} via bulk action`);
+    toast.success(`Deleted ${ids.length} invoice${ids.length === 1 ? "" : "s"}`);
+    clearSelection();
+  };
+
   const newInvoiceMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

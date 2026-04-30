@@ -4,7 +4,7 @@
 // ════════════════════════════════════════════════════════════════
 
 import { useEffect, useState } from "react";
-import { Eye, Layers, Sparkles, Rocket, Brain, ArrowRight, CheckCircle2, ChevronRight, PlayCircle } from "lucide-react";
+import { Eye, Layers, Sparkles, Rocket, Brain, ArrowRight, CheckCircle2, ChevronRight, ChevronDown, PlayCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,7 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
   const [s, setS] = useState<PipelineState | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
   const [activeTourId, setActiveTourId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     void load();
@@ -147,8 +148,50 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
   const incomplete = steps.filter((st) => !st.done);
   const completedCount = steps.length - incomplete.length;
 
+  // ── Compact mode: 60px status dot row ──────────────────
+  if (!expanded) {
+    return (
+      <Card className="p-3">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 flex items-center gap-3 min-w-0 overflow-x-auto">
+            {cards.map((c) => {
+              const Icon = c.icon;
+              return (
+                <div key={c.name} className="flex items-center gap-1.5 shrink-0" title={`${c.name} — ${c.active ? "active" : "inactive"}`}>
+                  <span className={cn("relative inline-flex h-2 w-2 rounded-full", c.active ? "bg-success" : "bg-muted-foreground/40")}>
+                    {c.active && <span className="absolute inset-0 rounded-full bg-success/60 animate-ping" />}
+                  </span>
+                  <Icon className={cn("h-3 w-3", c.active ? "text-foreground" : "text-muted-foreground")} />
+                  <span className={cn("text-[11px] font-medium", c.active ? "text-foreground" : "text-muted-foreground")}>{c.name}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+              <span className="font-semibold text-foreground">{activeCount}/5</span> active
+            </span>
+            {incomplete.length > 0 && (
+              <Badge variant="outline" className="h-5 px-1.5 text-[9px]">{incomplete.length} setup</Badge>
+            )}
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setExpanded(true)}>
+              Details <ChevronDown className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {/* ── Collapse control ─────────────────────────── */}
+      <div className="flex justify-end">
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setExpanded(false)}>
+          Collapse <ChevronRight className="h-3 w-3 rotate-90" />
+        </Button>
+      </div>
+
       {/* ── Pipeline header ─────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>

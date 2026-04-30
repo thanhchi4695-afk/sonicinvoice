@@ -4,9 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Plus, Search, FileText, Loader2, ChevronRight } from "lucide-react";
+import { Plus, Search, FileText, Loader2, ChevronRight, Trash2, X } from "lucide-react";
 import { getUnprocessedInboxCount } from "@/components/EmailInboxPanel";
-import { formatRelativeTime } from "@/lib/audit-log";
+import { formatRelativeTime, addAuditEntry } from "@/lib/audit-log";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 interface InvoicesTabProps {
   onStartInvoice: () => void;
@@ -54,6 +57,9 @@ const InvoicesTab = (props: InvoicesTabProps) => {
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const unread = getUnprocessedInboxCount();
 
   useEffect(() => {
@@ -105,6 +111,51 @@ const InvoicesTab = (props: InvoicesTabProps) => {
       return (r.original_filename ?? "").toLowerCase().includes(q) || (r.supplier_name ?? "").toLowerCase().includes(q);
     });
   }, [rows, search, vendorFilter, statusFilter]);
+
+  // Selection helpers — only IDs that exist in the currently filtered view count.
+  const filteredIds = useMemo(() => filtered.map(r => r.id), [filtered]);
+  const selectedInView = useMemo(() => filteredIds.filter(id => selected.has(id)), [filteredIds, selected]);
+  const allInViewSelected = filteredIds.length > 0 && selectedInView.length === filteredIds.length;
+  const someInViewSelected = selectedInView.length > 0 && !allInViewSelected;
+
+  const toggleRow = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllInView = () => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (allInViewSelected) {
+        filteredIds.forEach(id => next.delete(id));
+      } else {
+        filteredIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelected(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setDeleting(true);
+    const { error } = await supabase.from("invoice_patterns").delete().in("id", ids);
+    setDeleting(false);
+    setConfirmOpen(false);
+    if (error) {
+      toast.error(`Couldn't delete: ${error.message}`);
+      return;
+    }
+    setRows(prev => prev.filter(r => !selected.has(r.id)));
+    addAuditEntry("Invoices", `Deleted ${ids.length} invoice${ids.length === 1 ? "" : "s"} via bulk action`);
+    toast.success(`Deleted ${ids.length} invoice${ids.length === 1 ? "" : "s"}`);
+    clearSelection();
+  };
 
   const newInvoiceMenu = (
     <DropdownMenu>
@@ -173,6 +224,29 @@ const InvoicesTab = (props: InvoicesTabProps) => {
         </Select>
       </div>
 
+      {/* Bulk action bar — appears when rows are selected */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md border border-primary/30 bg-primary/5">
+          <span className="text-xs font-medium">{selected.size} selected</span>
+          <span className="text-[10px] text-muted-foreground">
+            {selectedInView.length < selected.size && `${selected.size - selectedInView.length} hidden by filters`}
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={clearSelection}>
+              <X className="w-3 h-3 mr-1" /> Clear
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-7 px-2 text-[11px]"
+              onClick={() => setConfirmOpen(true)}
+            >
+              <Trash2 className="w-3 h-3 mr-1" /> Delete
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Body */}
       {loading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
@@ -193,12 +267,28 @@ const InvoicesTab = (props: InvoicesTabProps) => {
         </div>
       ) : (
         <div className="bg-card rounded-lg border border-border overflow-hidden">
+          {/* Select-all header */}
+          <div className="px-3 py-2 flex items-center gap-3 border-b border-border bg-muted/30 text-[11px] text-muted-foreground">
+            <Checkbox
+              checked={allInViewSelected ? true : someInViewSelected ? "indeterminate" : false}
+              onCheckedChange={toggleAllInView}
+              aria-label="Select all visible invoices"
+            />
+            <span>
+              {allInViewSelected
+                ? `All ${filteredIds.length} selected on this view`
+                : someInViewSelected
+                ? `${selectedInView.length} of ${filteredIds.length} selected`
+                : "Select all on this view"}
+            </span>
+          </div>
           <div className="divide-y divide-border">
             {filtered.map(r => {
               const status = STATUS_BADGE[r.review_status ?? "draft"] ?? STATUS_BADGE.draft;
               const isDraft = (r.review_status ?? "draft") === "draft" || (r.review_status ?? "") === "needs_review";
               const actionLabel = isDraft ? "Resume" : "View";
               const handleOpen = () => props.onOpenHistory?.(r.id);
+              const isChecked = selected.has(r.id);
               return (
                 <div
                   key={r.id}
@@ -208,8 +298,15 @@ const InvoicesTab = (props: InvoicesTabProps) => {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOpen(); }
                   }}
-                  className="px-3 py-2.5 flex items-center gap-3 hover:bg-muted/40 cursor-pointer focus:outline-none focus:bg-muted/40"
+                  className={`px-3 py-2.5 flex items-center gap-3 hover:bg-muted/40 cursor-pointer focus:outline-none focus:bg-muted/40 ${isChecked ? "bg-primary/5" : ""}`}
                 >
+                  <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={() => toggleRow(r.id)}
+                      aria-label={`Select invoice ${r.original_filename ?? r.id}`}
+                    />
+                  </div>
                   <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -244,6 +341,29 @@ const InvoicesTab = (props: InvoicesTabProps) => {
           </div>
         </div>
       )}
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selected.size} invoice{selected.size === 1 ? "" : "s"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the invoice records and their extracted line data. Variants already
+              merged into your inventory will not be removed. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleBulkDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Deleting…</> : `Delete ${selected.size}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

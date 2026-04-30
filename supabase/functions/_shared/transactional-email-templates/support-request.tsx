@@ -127,6 +127,7 @@ export const template = {
     screenshotUrl: 'https://placehold.co/600x400',
     pageUrl: 'https://sonicinvoices.com/dashboard',
     submittedAt: new Date().toISOString(),
+    topic: 'Invoice processing',
   },
 } satisfies TemplateEntry
 

@@ -85,6 +85,36 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
     };
   }, [open, product.id]);
 
+  // Auto-resolved competitor price from cache (the monitoring agent).
+  // Manual paste-URL scrape (`scraped`) takes precedence when present.
+  const [autoCompetitor, setAutoCompetitor] = useState<ResolvedCompetitorPrice | null>(null);
+  const [autoCompetitorLoading, setAutoCompetitorLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setAutoCompetitorLoading(true);
+    resolveCompetitorPrice({
+      shopifyProductId: product.id,
+      sku: product.sku,
+    })
+      .then((res) => {
+        if (!cancelled) setAutoCompetitor(res);
+      })
+      .catch(() => {
+        if (!cancelled) setAutoCompetitor(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAutoCompetitorLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, product.id, product.sku]);
+
+  const effectiveCompetitorPrice =
+    scraped?.price ?? autoCompetitor?.price ?? undefined;
+
   const effectiveVelocity =
     velocity?.hasData ? velocity.avgWeeklySales : product.avgWeeklySales ?? 1.0;
   const usingRealVelocity = !!velocity?.hasData;

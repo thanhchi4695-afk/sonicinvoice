@@ -25,6 +25,7 @@ import Rules from "./pages/Rules.tsx";
 import RulesSetup from "./pages/RulesSetup.tsx";
 import { lazy, Suspense } from "react";
 const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleShoppingHub.tsx"));
+const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,14 @@ const App = () => (
                 element={
                   <Suspense fallback={null}>
                     <GoogleShoppingHub />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/pricing-intelligence"
+                element={
+                  <Suspense fallback={null}>
+                    <PricingIntelligence />
                   </Suspense>
                 }
               />

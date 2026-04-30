@@ -424,14 +424,13 @@ export default function BulkDiscountScheduler({ onBack }: Props) {
           reason: `Bulk ${strategy} ${discountValue}`,
         });
 
-        await supabase
-          .from("bulk_discount_schedules")
+        await (supabase.from("bulk_discount_schedules") as unknown as {
+          update: (v: unknown) => { eq: (col: string, val: string) => Promise<unknown> };
+        })
           .update({
             status: result.failed === 0 ? "active" : "failed",
             last_error:
-              result.failed > 0
-                ? `${result.failed} variants failed`
-                : null,
+              result.failed > 0 ? `${result.failed} variants failed` : null,
           })
           .eq("id", schedule!.id);
 

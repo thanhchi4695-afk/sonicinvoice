@@ -71,6 +71,20 @@ export default function PricingIntelligence() {
   const [skipAi, setSkipAi] = useState(false);
   const [page, setPage] = useState(0);
   const [whatIfRow, setWhatIfRow] = useState<RecRow | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [applyOpen, setApplyOpen] = useState(false);
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
 
   async function runReport() {
     setRunning(true);

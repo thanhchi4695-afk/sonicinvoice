@@ -16,7 +16,7 @@ import type { TemplateEntry } from './registry.ts'
 
 const SITE_NAME = 'Sonic Invoices'
 
-interface SupportRequestProps {
+topic?: string
   customerEmail?: string
   customerName?: string
   message?: string

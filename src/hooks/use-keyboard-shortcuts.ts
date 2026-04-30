@@ -3,6 +3,7 @@ import { useEffect, useCallback } from "react";
 export interface ShortcutDef {
   key: string;
   ctrl?: boolean;
+  shift?: boolean;
   label: string;
   description: string;
   action: () => void;

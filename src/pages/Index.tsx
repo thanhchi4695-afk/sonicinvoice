@@ -812,6 +812,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       {/* Global modals */}
       <KeyboardShortcutsModal open={showShortcuts} onOpenChange={setShowShortcuts} />
       <QuickSearchModal open={showQuickSearch} onOpenChange={setShowQuickSearch} onNavigate={handleStartFlow} />
+      <MobileKeyboardHint />
     </div>
   );
 };

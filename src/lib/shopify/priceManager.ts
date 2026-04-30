@@ -88,11 +88,14 @@ interface ProductRow {
  *
  * @param changes  list of products + new prices to push
  * @param onProgress  optional UI progress callback
+ * @param options  apply-time options (e.g. whether to set compareAtPrice)
  */
 export async function applyRecommendedPriceChanges(
   changes: RecommendedPriceChange[],
   onProgress?: (p: ApplyProgress) => void,
+  options: ApplyOptions = {},
 ): Promise<ApplyResult[]> {
+  const setCompareAt = options.setCompareAtPrice ?? true;
   if (changes.length === 0) return [];
 
   const productIds = changes.map((c) => c.productId);

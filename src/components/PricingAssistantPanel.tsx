@@ -101,7 +101,16 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
           phase: getPhase(days),
         };
       });
-      setRows(built);
+
+      // Bulk-fetch real velocity from sales_data (last 30d)
+      const velocityMap = await getVelocityMap(built.map((r) => r.id));
+      const enriched = built.map((r) => ({
+        ...r,
+        avgWeeklySales: velocityMap[r.id]?.hasData
+          ? velocityMap[r.id].avgWeeklySales
+          : undefined,
+      }));
+      setRows(enriched);
       setLoading(false);
     })();
     return () => {
@@ -138,6 +147,7 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
       unitCost: r.cost,
       stockOnHand: r.quantity,
       daysInInventory: r.daysInInventory,
+      avgWeeklySales: r.avgWeeklySales,
     });
   };
 

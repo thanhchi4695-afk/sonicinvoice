@@ -63,33 +63,53 @@ export default function NotificationBell({ notifications, unreadCount, onMarkRea
             ) : (
               notifications.slice(0, 20).map(n => {
                 const styles = SEVERITY_STYLES[n.severity] || SEVERITY_STYLES.info;
+                // Strip 'Unknown supplier' / 'Unknown vendor' literal strings — they leak through
+                // when the publisher couldn't resolve the supplier name. Show plain title instead.
+                const cleanTitle = (n.title || "").replace(/\s*[-—–]?\s*Unknown (supplier|vendor)\s*/gi, "").trim() || n.title;
                 return (
-                  <button
+                  <div
                     key={n.id}
-                    onClick={() => {
-                      onMarkRead(n.id);
-                      if (n.link && onNavigate) onNavigate(n.link);
-                    }}
-                    className={`w-full text-left px-4 py-3 border-l-4 ${styles.border} transition-colors hover:bg-accent/50 ${
+                    className={`group relative w-full text-left px-4 py-3 border-l-4 ${styles.border} transition-colors hover:bg-accent/50 ${
                       n.read ? "bg-muted/40" : "bg-popover"
                     }`}
                   >
-                    <div className="flex items-start gap-2">
-                      <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${styles.dot}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-xs leading-tight ${n.read ? "text-muted-foreground" : "text-foreground font-medium"}`}>
-                          {n.title}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
-                        <p className="text-[10px] text-muted-foreground/70 mt-1">
-                          {formatDistanceToNow(new Date(n.timestamp), { addSuffix: true })}
-                        </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onMarkRead(n.id);
+                        if (n.link && onNavigate) onNavigate(n.link);
+                      }}
+                      className="w-full text-left pr-6"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${styles.dot}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs leading-tight ${n.read ? "text-muted-foreground" : "text-foreground font-medium"}`}>
+                            {cleanTitle}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                          <div className="flex items-center justify-between mt-1">
+                            <p className="text-[10px] text-muted-foreground/70">
+                              {formatDistanceToNow(new Date(n.timestamp), { addSuffix: true })}
+                            </p>
+                            {n.link && (
+                              <span className="text-[10px] text-primary font-medium">Review →</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      {n.link && (
-                        <span className="text-[10px] text-primary shrink-0 mt-1">View →</span>
-                      )}
-                    </div>
-                  </button>
+                    </button>
+                    {onDismiss && (
+                      <button
+                        type="button"
+                        aria-label="Dismiss notification"
+                        onClick={(e) => { e.stopPropagation(); onDismiss(n.id); }}
+                        className="absolute top-2 right-2 p-1 rounded text-muted-foreground/60 opacity-0 group-hover:opacity-100 hover:bg-muted hover:text-foreground transition-opacity"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 );
               })
             )}

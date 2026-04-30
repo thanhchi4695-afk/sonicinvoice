@@ -22,6 +22,10 @@ import {
 } from "@/lib/pricing/lifecycleEngine";
 import { fetchCompetitorPrice, type CompetitorPriceResult } from "@/lib/pricing/competitorScraper";
 import {
+  resolveCompetitorPrice,
+  type ResolvedCompetitorPrice,
+} from "@/lib/pricing/resolveCompetitorPrice";
+import {
   getVelocityForVariant,
   refreshSalesData,
   type VelocityResult,

@@ -23,6 +23,8 @@ import Health from "./pages/Health.tsx";
 import AdminSecrets from "./pages/AdminSecrets.tsx";
 import Rules from "./pages/Rules.tsx";
 import RulesSetup from "./pages/RulesSetup.tsx";
+import { lazy, Suspense } from "react";
+const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleShoppingHub.tsx"));
 
 const queryClient = new QueryClient();
 

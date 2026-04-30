@@ -24,6 +24,7 @@ interface Row {
   created_at: string;
   daysInInventory: number;
   phase: LifecyclePhase;
+  avgWeeklySales?: number;
 }
 
 const PHASE_TONE: Record<LifecyclePhase, string> = {

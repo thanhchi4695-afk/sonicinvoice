@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import {
   recommendPrice,
@@ -20,6 +21,11 @@ import {
   type LifecyclePhase,
 } from "@/lib/pricing/lifecycleEngine";
 import { fetchCompetitorPrice, type CompetitorPriceResult } from "@/lib/pricing/competitorScraper";
+import {
+  getVelocityForVariant,
+  refreshSalesData,
+  type VelocityResult,
+} from "@/lib/pricing/salesVelocity";
 
 export interface PricingProduct {
   id: string;
@@ -54,7 +60,32 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
   const [scraping, setScraping] = useState(false);
   const [scraped, setScraped] = useState<CompetitorPriceResult | null>(null);
 
-  // Build initial recommendation (no competitor data yet)
+  // Real velocity from sales_data (last 30d). Falls back to product.avgWeeklySales prop.
+  const [velocity, setVelocity] = useState<VelocityResult | null>(null);
+  const [velocityLoading, setVelocityLoading] = useState(false);
+  const [refreshingSales, setRefreshingSales] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setVelocityLoading(true);
+    getVelocityForVariant(product.id)
+      .then((v) => {
+        if (!cancelled) setVelocity(v);
+      })
+      .finally(() => {
+        if (!cancelled) setVelocityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, product.id]);
+
+  const effectiveVelocity =
+    velocity?.hasData ? velocity.avgWeeklySales : product.avgWeeklySales ?? 1.0;
+  const usingRealVelocity = !!velocity?.hasData;
+
+  // Build initial recommendation (now informed by real velocity for sell-through pressure)
   const baseRec = useMemo(
     () =>
       recommendPrice({
@@ -62,10 +93,10 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
         unitCost: product.unitCost,
         daysInInventory: product.daysInInventory,
         stockOnHand: product.stockOnHand,
-        avgWeeklySales: product.avgWeeklySales,
+        avgWeeklySales: usingRealVelocity ? effectiveVelocity : product.avgWeeklySales,
         competitorPrice: scraped?.price ?? undefined,
       }),
-    [product, scraped],
+    [product, scraped, effectiveVelocity, usingRealVelocity],
   );
 
   // Editable discount — defaults to engine recommendation
@@ -75,21 +106,38 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
   }, [baseRec.recommendedDiscountPct]);
 
   // What-if simulator (Option B: simple elasticity model, default 2.0)
-  const placeholderVelocity = product.avgWeeklySales ?? 1.0;
   const [elasticity, setElasticity] = useState(2.0);
   const whatIf = useMemo(
     () =>
       simulateWhatIf({
         currentPrice: product.currentPrice,
         unitCost: product.unitCost,
-        avgWeeklySales: placeholderVelocity,
+        avgWeeklySales: effectiveVelocity,
         stockOnHand: product.stockOnHand,
         discountPct,
         elasticity,
         horizonDays: 7,
       }),
-    [product, placeholderVelocity, discountPct, elasticity],
+    [product, effectiveVelocity, discountPct, elasticity],
   );
+
+  const handleRefreshSales = async () => {
+    setRefreshingSales(true);
+    const ok = await refreshSalesData();
+    if (ok) {
+      const v = await getVelocityForVariant(product.id);
+      setVelocity(v);
+      toast.success(
+        v.hasData
+          ? `Synced — ${v.unitsLast30d} units sold in last 30 days`
+          : "Synced — no sales found for this variant in last 30 days",
+      );
+    } else {
+      toast.error("Could not sync orders. Check your Shopify connection.");
+    }
+    setRefreshingSales(false);
+  };
+
 
   const newPrice = +(product.currentPrice * (1 - discountPct)).toFixed(2);
   const belowFloor = newPrice < baseRec.marginFloorPrice;
@@ -279,6 +327,44 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
                 </div>
               </div>
             </div>
+
+            {/* Velocity source banner */}
+            <div className="flex items-center justify-between gap-2 rounded-md border bg-background/50 p-2 text-xs">
+              <div className="flex items-center gap-2">
+                {velocityLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                ) : usingRealVelocity ? (
+                  <Badge variant="outline" className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                    Real data
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/30">
+                    No sales yet
+                  </Badge>
+                )}
+                <span className="text-muted-foreground">
+                  {usingRealVelocity
+                    ? `${velocity!.unitsLast30d} units / 30d → ${effectiveVelocity.toFixed(2)} units/wk`
+                    : `Using fallback ${effectiveVelocity.toFixed(2)} units/wk`}
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleRefreshSales}
+                disabled={refreshingSales}
+                className="h-7"
+              >
+                {refreshingSales ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1" /> Sync Shopify orders
+                  </>
+                )}
+              </Button>
+            </div>
+
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>Price elasticity</span>
@@ -293,7 +379,6 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
               />
               <p className="text-[11px] text-muted-foreground">
                 Default 2.0 means every 10% discount drives 20% more units.
-                {!product.avgWeeklySales && " Using placeholder velocity of 1 unit/week — connect sales data for real projections."}
               </p>
             </div>
             {whatIf.weeksToClear !== null && (
@@ -303,6 +388,7 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
             )}
           </div>
         </div>
+
 
         <DialogFooter className="gap-2">
           <Button variant="ghost" onClick={onClose}>

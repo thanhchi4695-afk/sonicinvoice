@@ -7,6 +7,7 @@ import { ChevronLeft, Sparkles, Search, TrendingDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getPhase, type LifecyclePhase } from "@/lib/pricing/lifecycleEngine";
+import { getVelocityMap } from "@/lib/pricing/salesVelocity";
 import PricingRecommendationModal, {
   type PricingProduct,
 } from "./PricingRecommendationModal";
@@ -23,6 +24,7 @@ interface Row {
   created_at: string;
   daysInInventory: number;
   phase: LifecyclePhase;
+  avgWeeklySales?: number;
 }
 
 const PHASE_TONE: Record<LifecyclePhase, string> = {
@@ -99,7 +101,16 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
           phase: getPhase(days),
         };
       });
-      setRows(built);
+
+      // Bulk-fetch real velocity from sales_data (last 30d)
+      const velocityMap = await getVelocityMap(built.map((r) => r.id));
+      const enriched = built.map((r) => ({
+        ...r,
+        avgWeeklySales: velocityMap[r.id]?.hasData
+          ? velocityMap[r.id].avgWeeklySales
+          : undefined,
+      }));
+      setRows(enriched);
       setLoading(false);
     })();
     return () => {
@@ -136,6 +147,7 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
       unitCost: r.cost,
       stockOnHand: r.quantity,
       daysInInventory: r.daysInInventory,
+      avgWeeklySales: r.avgWeeklySales,
     });
   };
 
@@ -208,6 +220,7 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
                     <th className="text-right px-4 py-2">Price</th>
                     <th className="text-right px-4 py-2">Cost</th>
                     <th className="text-right px-4 py-2">Stock</th>
+                    <th className="text-right px-4 py-2" title="Avg units sold per week, last 30 days">Avg/wk</th>
                     <th className="text-right px-4 py-2">Action</th>
                   </tr>
                 </thead>
@@ -232,6 +245,11 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
                       <td className="px-4 py-1 text-right tabular-nums">${r.retail_price.toFixed(2)}</td>
                       <td className="px-4 py-1 text-right tabular-nums text-muted-foreground">${r.cost.toFixed(2)}</td>
                       <td className="px-4 py-1 text-right tabular-nums">{r.quantity}</td>
+                      <td className="px-4 py-1 text-right tabular-nums">
+                        {r.avgWeeklySales != null
+                          ? r.avgWeeklySales.toFixed(1)
+                          : <span className="text-muted-foreground">—</span>}
+                      </td>
                       <td className="px-4 py-1 text-right">
                         <Button size="sm" variant="secondary" onClick={() => openRecommendation(r)}>
                           <TrendingDown className="h-3.5 w-3.5 mr-1" />

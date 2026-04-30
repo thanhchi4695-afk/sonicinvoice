@@ -46,6 +46,11 @@ const SupportRequestEmail = ({
         </Text>
 
         <Section style={infoBox}>
+          {topic && (
+            <Text style={infoRow}>
+              <strong>Topic:</strong> {topic}
+            </Text>
+          )}
           {customerName && (
             <Text style={infoRow}>
               <strong>Name:</strong> {customerName}
@@ -110,7 +115,9 @@ const SupportRequestEmail = ({
 export const template = {
   component: SupportRequestEmail,
   subject: (data: Record<string, any>) =>
-    `Support request from ${data.customerEmail || 'a customer'}`,
+    data.topic
+      ? `[${data.topic}] Support request from ${data.customerEmail || 'a customer'}`
+      : `Support request from ${data.customerEmail || 'a customer'}`,
   displayName: 'Support request',
   to: 'thanhchi4695@gmail.com',
   previewData: {

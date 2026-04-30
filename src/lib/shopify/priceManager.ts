@@ -152,11 +152,16 @@ export async function applyRecommendedPriceChanges(
       continue;
     }
 
-    const variantsInput = variants.map((v) => ({
-      id: v.shopify_variant_id,
-      price: change.newPrice.toFixed(2),
-      compareAtPrice: change.originalPrice.toFixed(2),
-    }));
+    const variantsInput = variants.map((v) => {
+      const input: { id: string; price: string; compareAtPrice?: string } = {
+        id: v.shopify_variant_id as string,
+        price: change.newPrice.toFixed(2),
+      };
+      if (setCompareAt) {
+        input.compareAtPrice = change.originalPrice.toFixed(2);
+      }
+      return input;
+    });
 
     try {
       const { data, error } = await supabase.functions.invoke("shopify-proxy", {

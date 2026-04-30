@@ -462,6 +462,35 @@ export default function PricingIntelligence() {
 
         {/* ── What-if simulator ── */}
         <WhatIfModal row={whatIfRow} onClose={() => setWhatIfRow(null)} />
+
+        <ApplyDiscountsModal
+          open={applyOpen}
+          onClose={() => setApplyOpen(false)}
+          changes={
+            (report?.recommendations ?? [])
+              .filter(
+                (r) =>
+                  selectedIds.has(r.productId) && r.suggestedNewPrice != null,
+              )
+              .map<RecommendedPriceChange>((r) => ({
+                productId: r.productId,
+                title: r.title,
+                newPrice: r.suggestedNewPrice as number,
+                originalPrice: r.analysis.currentPrice,
+                reason: r.reason,
+                discountPercentage: r.discountPercentage,
+              }))
+          }
+          onApplied={(results) => {
+            // Drop successful ones from selection
+            const okIds = new Set(results.filter((r) => r.ok).map((r) => r.productId));
+            setSelectedIds((prev) => {
+              const next = new Set(prev);
+              okIds.forEach((id) => next.delete(id));
+              return next;
+            });
+          }}
+        />
       </div>
     </div>
   );

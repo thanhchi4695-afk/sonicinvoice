@@ -259,14 +259,62 @@ export default function PricingIntelligence() {
 
             {/* ── Table ── */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
                 <CardTitle className="text-base">Detailed recommendations</CardTitle>
+                <div className="flex items-center gap-2">
+                  {selectedIds.size > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {selectedIds.size} selected
+                    </span>
+                  )}
+                  {selectedIds.size > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={clearSelection}
+                      className="h-8"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    disabled={selectedIds.size === 0}
+                    onClick={() => setApplyOpen(true)}
+                    className="gap-2 h-8"
+                  >
+                    <Tag className="h-3.5 w-3.5" />
+                    Apply Selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm font-mono">
                     <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                       <tr>
+                        <th className="w-8 px-2 py-2">
+                          <Checkbox
+                            checked={
+                              pageRows.filter((r) => r.suggestedNewPrice != null).length > 0 &&
+                              pageRows
+                                .filter((r) => r.suggestedNewPrice != null)
+                                .every((r) => selectedIds.has(r.productId))
+                            }
+                            onCheckedChange={(checked) => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                const applicable = pageRows.filter(
+                                  (r) => r.suggestedNewPrice != null,
+                                );
+                                if (checked) applicable.forEach((r) => next.add(r.productId));
+                                else applicable.forEach((r) => next.delete(r.productId));
+                                return next;
+                              });
+                            }}
+                            aria-label="Select all on page"
+                          />
+                        </th>
                         <th className="text-left px-3 py-2 font-medium">Product</th>
                         <th className="text-left px-3 py-2 font-medium">Phase</th>
                         <th className="text-right px-3 py-2 font-medium">Days</th>

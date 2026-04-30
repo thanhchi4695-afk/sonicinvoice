@@ -730,6 +730,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
                 unreadCount={unreadCount}
                 onMarkRead={markRead}
                 onMarkAllRead={markAllRead}
+                onDismiss={dismiss}
                 onNavigate={(link) => {
                   if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
                     setActiveFlow(link as any);

@@ -40,6 +40,17 @@ export interface ApplyProgress {
   currentTitle: string;
 }
 
+export interface ApplyOptions {
+  /**
+   * When true (default), Shopify's `compareAtPrice` is set to the product's
+   * current price so storefronts render an "on-sale" badge / strike-through.
+   * When false, `compareAtPrice` is left untouched (Shopify keeps whatever
+   * value it currently holds — useful when the merchant manages strike-through
+   * pricing manually or doesn't want a sale badge).
+   */
+  setCompareAtPrice?: boolean;
+}
+
 const REQUEST_DELAY_MS = 500;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -77,11 +88,14 @@ interface ProductRow {
  *
  * @param changes  list of products + new prices to push
  * @param onProgress  optional UI progress callback
+ * @param options  apply-time options (e.g. whether to set compareAtPrice)
  */
 export async function applyRecommendedPriceChanges(
   changes: RecommendedPriceChange[],
   onProgress?: (p: ApplyProgress) => void,
+  options: ApplyOptions = {},
 ): Promise<ApplyResult[]> {
+  const setCompareAt = options.setCompareAtPrice ?? true;
   if (changes.length === 0) return [];
 
   const productIds = changes.map((c) => c.productId);
@@ -138,11 +152,16 @@ export async function applyRecommendedPriceChanges(
       continue;
     }
 
-    const variantsInput = variants.map((v) => ({
-      id: v.shopify_variant_id,
-      price: change.newPrice.toFixed(2),
-      compareAtPrice: change.originalPrice.toFixed(2),
-    }));
+    const variantsInput = variants.map((v) => {
+      const input: { id: string; price: string; compareAtPrice?: string } = {
+        id: v.shopify_variant_id as string,
+        price: change.newPrice.toFixed(2),
+      };
+      if (setCompareAt) {
+        input.compareAtPrice = change.originalPrice.toFixed(2);
+      }
+      return input;
+    });
 
     try {
       const { data, error } = await supabase.functions.invoke("shopify-proxy", {
@@ -200,7 +219,7 @@ export async function applyRecommendedPriceChanges(
             : "";
         addAuditEntry(
           "pricing.apply.success",
-          `${change.title}: $${change.originalPrice.toFixed(2)} → $${change.newPrice.toFixed(2)}${pctText}. Reason: ${change.reason}`,
+          `${change.title}: $${change.originalPrice.toFixed(2)} → $${change.newPrice.toFixed(2)}${pctText}${setCompareAt ? " [compareAt set]" : " [compareAt unchanged]"}. Reason: ${change.reason}`,
         );
       }
     } catch (e) {

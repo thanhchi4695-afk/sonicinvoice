@@ -1494,11 +1494,7 @@ function MetafieldsSection() {
 
 // ─── Wholesale Platform Connections ─────────────────────────────────
 const WHOLESALE_PLATFORMS = [
-  { id: "joor", name: "JOOR", icon: "🔗", desc: "Global wholesale fashion platform", credentialKey: "oauth_token", credentialLabel: "API Token" },
-  { id: "nuorder", name: "NuOrder", icon: "📦", desc: "Surf & action sports brands", credentialKey: "api_key", credentialLabel: "API Key" },
-  { id: "brandscope", name: "Brandscope", icon: "🌏", desc: "AU/NZ swim & surf wholesale", credentialKey: "api_key", credentialLabel: "API Key" },
-  { id: "brandboom", name: "Brandboom", icon: "💼", desc: "US fashion & independent brands", credentialKey: "api_key", credentialLabel: "API Key" },
-  { id: "faire", name: "Faire", icon: "🛒", desc: "Independent boutique marketplace", credentialKey: "api_key", credentialLabel: "API Key" },
+  { id: "joor", name: "JOOR", icon: "🔗", desc: "Global wholesale fashion platform", credentialKey: "oauth_token", credentialLabel: "API Token", comingSoon: true },
 ] as const;
 
 function WholesaleConnectionsSection() {

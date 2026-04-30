@@ -745,6 +745,66 @@ export type Database = {
         }
         Relationships: []
       }
+      bulk_discount_schedules: {
+        Row: {
+          affected_count: number
+          applied_at: string | null
+          created_at: string
+          discount_value: number | null
+          ends_at: string | null
+          filter_snapshot: Json
+          id: string
+          last_error: string | null
+          name: string
+          reverted_at: string | null
+          starts_at: string | null
+          status: string
+          strategy: string
+          updated_at: string
+          use_google_auto_pricing: boolean
+          user_id: string
+          variants_snapshot: Json
+        }
+        Insert: {
+          affected_count?: number
+          applied_at?: string | null
+          created_at?: string
+          discount_value?: number | null
+          ends_at?: string | null
+          filter_snapshot?: Json
+          id?: string
+          last_error?: string | null
+          name: string
+          reverted_at?: string | null
+          starts_at?: string | null
+          status?: string
+          strategy: string
+          updated_at?: string
+          use_google_auto_pricing?: boolean
+          user_id: string
+          variants_snapshot?: Json
+        }
+        Update: {
+          affected_count?: number
+          applied_at?: string | null
+          created_at?: string
+          discount_value?: number | null
+          ends_at?: string | null
+          filter_snapshot?: Json
+          id?: string
+          last_error?: string | null
+          name?: string
+          reverted_at?: string | null
+          starts_at?: string | null
+          status?: string
+          strategy?: string
+          updated_at?: string
+          use_google_auto_pricing?: boolean
+          user_id?: string
+          variants_snapshot?: Json
+        }
+        Relationships: []
+      }
       competitor_monitored_products: {
         Row: {
           created_at: string

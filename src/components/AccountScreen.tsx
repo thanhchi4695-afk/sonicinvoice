@@ -1628,6 +1628,8 @@ function WholesaleConnectionsSection() {
                     <span className="text-sm font-medium">{p.name}</span>
                     {conn ? (
                       <span className="text-[10px] bg-success/15 text-success px-1.5 py-0.5 rounded-full font-medium">Connected</span>
+                    ) : p.comingSoon ? (
+                      <span className="text-[10px] bg-amber-500/15 text-amber-500 px-1.5 py-0.5 rounded-full font-medium">Coming soon</span>
                     ) : (
                       <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">Not connected</span>
                     )}

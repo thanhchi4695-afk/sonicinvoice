@@ -99,11 +99,34 @@ export function ApplyDiscountsModal({
           </DialogTitle>
           <DialogDescription>
             We'll push these new prices to Shopify with{" "}
-            <code className="text-xs">productVariantsBulkUpdate</code>. The
-            previous price becomes <code className="text-xs">compareAtPrice</code>{" "}
-            so on-sale badges show up. All prices respect your margin floor.
+            <code className="text-xs">productVariantsBulkUpdate</code>. All
+            prices respect your margin floor.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Compare-at toggle */}
+        <div className="flex items-start justify-between gap-4 rounded-md border border-border bg-muted/30 px-3 py-2">
+          <div className="flex-1 min-w-0">
+            <Label
+              htmlFor="set-compare-at"
+              className="flex items-center gap-2 text-sm font-medium cursor-pointer"
+            >
+              <Tag className="h-3.5 w-3.5 text-primary" />
+              Show as on-sale (set <code className="text-xs">compareAtPrice</code>)
+            </Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {setCompareAt
+                ? "Current price will be saved as compareAtPrice → strike-through + sale badge on storefront."
+                : "compareAtPrice on Shopify will be left unchanged. Price updates silently with no sale badge."}
+            </p>
+          </div>
+          <Switch
+            id="set-compare-at"
+            checked={setCompareAt}
+            onCheckedChange={updateSetCompareAt}
+            disabled={running}
+          />
+        </div>
 
         {/* Summary bar */}
         <div className="grid grid-cols-3 gap-3 py-2">

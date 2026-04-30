@@ -79,14 +79,18 @@ export function buildSupplierDefaultMap(
  */
 export function resolveRestockStatus(args: {
   platformVariantId?: string | null;
+  /** Internal Supabase variants.id — used as fallback override key when no Shopify ID exists. */
+  internalVariantId?: string | null;
   vendor?: string | null;
   cacheStatus?: string | null;
   overrides: Map<string, RestockStatus>;
   supplierDefaults: Map<string, RestockStatus>;
 }): RestockStatus {
-  const { platformVariantId, vendor, cacheStatus, overrides, supplierDefaults } = args;
-  if (platformVariantId) {
-    const o = overrides.get(String(platformVariantId));
+  const { platformVariantId, internalVariantId, vendor, cacheStatus, overrides, supplierDefaults } = args;
+  // Check Shopify variant ID first, then internal variant ID as fallback
+  const keysToCheck = [platformVariantId, internalVariantId].filter(Boolean) as string[];
+  for (const key of keysToCheck) {
+    const o = overrides.get(String(key));
     if (o) return o;
   }
   if (isValidRestockStatus(cacheStatus)) return cacheStatus;

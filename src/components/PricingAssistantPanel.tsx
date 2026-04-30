@@ -220,6 +220,7 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
                     <th className="text-right px-4 py-2">Price</th>
                     <th className="text-right px-4 py-2">Cost</th>
                     <th className="text-right px-4 py-2">Stock</th>
+                    <th className="text-right px-4 py-2" title="Avg units sold per week, last 30 days">Avg/wk</th>
                     <th className="text-right px-4 py-2">Action</th>
                   </tr>
                 </thead>
@@ -244,6 +245,11 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
                       <td className="px-4 py-1 text-right tabular-nums">${r.retail_price.toFixed(2)}</td>
                       <td className="px-4 py-1 text-right tabular-nums text-muted-foreground">${r.cost.toFixed(2)}</td>
                       <td className="px-4 py-1 text-right tabular-nums">{r.quantity}</td>
+                      <td className="px-4 py-1 text-right tabular-nums">
+                        {r.avgWeeklySales != null
+                          ? r.avgWeeklySales.toFixed(1)
+                          : <span className="text-muted-foreground">—</span>}
+                      </td>
                       <td className="px-4 py-1 text-right">
                         <Button size="sm" variant="secondary" onClick={() => openRecommendation(r)}>
                           <TrendingDown className="h-3.5 w-3.5 mr-1" />

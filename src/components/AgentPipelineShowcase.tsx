@@ -78,6 +78,7 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
   const [s, setS] = useState<PipelineState | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
   const [activeTourId, setActiveTourId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     void load();

@@ -327,6 +327,9 @@ export default function DataGrid<T>({
             )}
           </tbody>
         </table>
+        </div>
+        {/* Right-edge scroll-shadow hint — gradient overlay shown when content overflows. */}
+        <div className="pointer-events-none absolute top-0 right-0 h-full w-6 bg-gradient-to-l from-background to-transparent rounded-r-md" />
       </div>
 
       {/* Pagination */}

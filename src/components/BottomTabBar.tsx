@@ -1,6 +1,5 @@
-import { Home, FileText, Wrench, CreditCard, User, Monitor, BookOpen, Rocket } from "lucide-react";
+import { Home, FileText, Wrench, CreditCard, User, BookOpen, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStoreMode } from "@/hooks/use-store-mode";
 import { useTranslation } from "react-i18next";
 
 interface BottomTabBarProps {
@@ -10,7 +9,6 @@ interface BottomTabBarProps {
 
 const BottomTabBar = ({ activeTab, onTabChange }: BottomTabBarProps) => {
   const { t } = useTranslation();
-  const mode = useStoreMode();
 
   const baseTabs = [
     { id: "start", label: t("nav.start", "Start"), icon: Rocket },
@@ -22,8 +20,8 @@ const BottomTabBar = ({ activeTab, onTabChange }: BottomTabBarProps) => {
     { id: "account", label: t("nav.account"), icon: User },
   ];
 
-  const guidTab = { id: "guide", label: t("nav.guide"), icon: Monitor };
-  const tabs = mode.isLightspeed ? [...baseTabs.slice(0, 3), guidTab, ...baseTabs.slice(3)] : baseTabs;
+  // "Guide" merged into "How To" — single entry in footer menu.
+  const tabs = baseTabs;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card safe-bottom">

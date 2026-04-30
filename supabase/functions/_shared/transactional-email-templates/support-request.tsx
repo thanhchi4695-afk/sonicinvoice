@@ -23,6 +23,7 @@ interface SupportRequestProps {
   screenshotUrl?: string
   pageUrl?: string
   submittedAt?: string
+  topic?: string
 }
 
 const SupportRequestEmail = ({
@@ -32,6 +33,7 @@ const SupportRequestEmail = ({
   screenshotUrl,
   pageUrl,
   submittedAt,
+  topic,
 }: SupportRequestProps) => (
   <Html lang="en" dir="ltr">
     <Head />
@@ -44,6 +46,11 @@ const SupportRequestEmail = ({
         </Text>
 
         <Section style={infoBox}>
+          {topic && (
+            <Text style={infoRow}>
+              <strong>Topic:</strong> {topic}
+            </Text>
+          )}
           {customerName && (
             <Text style={infoRow}>
               <strong>Name:</strong> {customerName}
@@ -108,7 +115,9 @@ const SupportRequestEmail = ({
 export const template = {
   component: SupportRequestEmail,
   subject: (data: Record<string, any>) =>
-    `Support request from ${data.customerEmail || 'a customer'}`,
+    data.topic
+      ? `[${data.topic}] Support request from ${data.customerEmail || 'a customer'}`
+      : `Support request from ${data.customerEmail || 'a customer'}`,
   displayName: 'Support request',
   to: 'thanhchi4695@gmail.com',
   previewData: {
@@ -118,6 +127,7 @@ export const template = {
     screenshotUrl: 'https://placehold.co/600x400',
     pageUrl: 'https://sonicinvoices.com/dashboard',
     submittedAt: new Date().toISOString(),
+    topic: 'Invoice processing',
   },
 } satisfies TemplateEntry
 

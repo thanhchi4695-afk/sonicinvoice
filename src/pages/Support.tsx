@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { Mail, Upload, X, Send, CheckCircle2, Loader2, ArrowLeft } from "lucide-react";
+import {
+  Mail, Upload, X, Send, CheckCircle2, Loader2, ArrowLeft,
+  FileText, ShoppingBag, Tag, Wand2, CreditCard, Bug, HelpCircle, Sparkles,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +18,103 @@ const supportSchema = z.object({
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"];
 
+type TopicId =
+  | "invoice" | "shopify" | "tags" | "enrichment"
+  | "billing" | "bug" | "feature" | "other";
+
+interface Topic {
+  id: TopicId;
+  label: string;
+  icon: React.ElementType;
+  template: string;
+}
+
+const TOPICS: Topic[] = [
+  {
+    id: "invoice",
+    label: "Invoice processing",
+    icon: FileText,
+    template:
+      "Topic: Invoice processing\n\n" +
+      "Supplier / brand: \n" +
+      "Invoice file type (PDF / Excel / photo): \n" +
+      "What I expected: \n" +
+      "What happened instead: \n",
+  },
+  {
+    id: "shopify",
+    label: "Shopify connection",
+    icon: ShoppingBag,
+    template:
+      "Topic: Shopify connection\n\n" +
+      "Store URL (e.g. mystore.myshopify.com): \n" +
+      "Connection type (App Store / Custom App): \n" +
+      "What I'm trying to do: \n" +
+      "Error message (if any): \n",
+  },
+  {
+    id: "tags",
+    label: "Tags & categorisation",
+    icon: Tag,
+    template:
+      "Topic: Tags & categorisation\n\n" +
+      "Industry profile: \n" +
+      "Product example (title or SKU): \n" +
+      "Tags I expected: \n" +
+      "Tags I actually got: \n",
+  },
+  {
+    id: "enrichment",
+    label: "RRP / AI enrichment",
+    icon: Wand2,
+    template:
+      "Topic: RRP / AI enrichment\n\n" +
+      "Brand: \n" +
+      "Product example: \n" +
+      "Issue (wrong RRP / missing data / low confidence): \n" +
+      "What the correct value should be: \n",
+  },
+  {
+    id: "billing",
+    label: "Billing & subscription",
+    icon: CreditCard,
+    template:
+      "Topic: Billing & subscription\n\n" +
+      "Current plan: \n" +
+      "What I'd like to change: \n" +
+      "Invoice / charge in question (if any): \n",
+  },
+  {
+    id: "bug",
+    label: "Report a bug",
+    icon: Bug,
+    template:
+      "Topic: Bug report\n\n" +
+      "Page / screen: \n" +
+      "Steps to reproduce:\n  1. \n  2. \n  3. \n" +
+      "What I expected: \n" +
+      "What happened: \n" +
+      "Browser / device: \n",
+  },
+  {
+    id: "feature",
+    label: "Feature request",
+    icon: Sparkles,
+    template:
+      "Topic: Feature request\n\n" +
+      "What I'd love to do: \n" +
+      "Why this would help: \n" +
+      "How I work around it today: \n",
+  },
+  {
+    id: "other",
+    label: "Something else",
+    icon: HelpCircle,
+    template: "",
+  },
+];
+
+
 const Support = () => {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -23,6 +123,16 @@ const Support = () => {
   const [preview, setPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [topic, setTopic] = useState<TopicId | null>(null);
+
+  const selectTopic = (t: Topic) => {
+    setTopic(t.id);
+    // Only overwrite the message if it's empty or matches an existing template
+    const isExistingTemplate = TOPICS.some((x) => x.template && message.trim() === x.template.trim());
+    if (!message.trim() || isExistingTemplate) {
+      setMessage(t.template);
+    }
+  };
 
   useEffect(() => {
     document.title = "Contact Support — Sonic Invoices";
@@ -84,6 +194,7 @@ const Support = () => {
           templateData: {
             customerEmail: parsed.data.email,
             customerName: parsed.data.name || "",
+            topic: topic ? TOPICS.find((t) => t.id === topic)?.label || "" : "",
             message: parsed.data.message,
             screenshotUrl: screenshotUrl || "",
             pageUrl: typeof window !== "undefined" ? window.location.href : "",
@@ -94,7 +205,7 @@ const Support = () => {
       if (fnErr) throw fnErr;
 
       setDone(true);
-      setEmail(""); setName(""); setMessage(""); setFile(null);
+      setEmail(""); setName(""); setMessage(""); setFile(null); setTopic(null);
       toast({ title: "Message sent", description: "We've received your question and will reply soon." });
     } catch (err) {
       console.error("Support submit failed", err);
@@ -155,6 +266,35 @@ const Support = () => {
                 placeholder="Jane Doe"
                 className="w-full h-10 rounded-lg bg-input border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-2">
+                What's this about? <span className="text-muted-foreground/60">(optional — pre-fills a template)</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {TOPICS.map((t) => {
+                  const Icon = t.icon;
+                  const active = topic === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => selectTopic(t)}
+                      className={
+                        "inline-flex items-center gap-1.5 h-8 px-3 rounded-full border text-xs transition-colors " +
+                        (active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground")
+                      }
+                      aria-pressed={active}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div>

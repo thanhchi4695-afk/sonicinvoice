@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell } from "lucide-react";
+import { Bell, X } from "lucide-react";
 import { AppNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from "date-fns";
 
@@ -15,6 +15,7 @@ interface Props {
   unreadCount: number;
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
+  onDismiss?: (id: string) => void;
   onNavigate?: (link: string) => void;
 }
 

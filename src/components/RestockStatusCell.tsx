@@ -44,7 +44,9 @@ export default function RestockStatusCell({
       return;
     }
     if (!platformVariantId) {
-      toast.error("This variant has no platform ID — sync from Shopify first");
+      // Should not happen — InventoryDashboard now passes internal variant UUID as fallback
+      toast.warning("Variant ID missing — status saved locally only");
+      onChange?.(next);
       return;
     }
     setSaving(true);
@@ -63,9 +65,16 @@ export default function RestockStatusCell({
           },
           { onConflict: "user_id,platform,platform_variant_id" },
         );
-      if (error) throw error;
+      if (error) {
+        console.error("[RestockStatusCell] upsert failed:", error);
+        toast.error(error.message || "Failed to save restock status");
+        return;
+      }
+      console.log("[RestockStatusCell] saved:", next, "for variant:", platformVariantId);
+      toast.success(`Restock status updated to ${RESTOCK_STATUS_LABEL[next]}`);
       onChange?.(next);
     } catch (e: any) {
+      console.error("[RestockStatusCell] unexpected error:", e);
       toast.error(e.message || "Failed to update restock status");
     } finally {
       setSaving(false);

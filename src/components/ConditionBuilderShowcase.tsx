@@ -14,7 +14,6 @@ import {
   Play,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 /**
  * Homepage showcase for the visual Condition Builder (Margin Guardian).

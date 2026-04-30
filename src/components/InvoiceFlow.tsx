@@ -1599,6 +1599,25 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         console.warn("[Sonic Invoice] recordPush failed:", e);
       }
 
+      // Record import run for idempotency (so re-pushing the same invoice is blocked).
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && success > 0) {
+          await supabase.from("inventory_import_runs").insert({
+            user_id: user.id,
+            source: "invoice_flow",
+            supplier_name: supplierName || null,
+            idempotency_key: idempotencyKey,
+            units_applied: success,
+            run_status: errors === 0 ? "success" : "partial",
+            started_at: new Date().toISOString(),
+            completed_at: new Date().toISOString(),
+          });
+        }
+      } catch (e) {
+        console.warn("[Sonic Invoice] Failed to record import run:", e);
+      }
+
       if (errors === 0) {
         toast.success(`Pushed ${success} product${success === 1 ? "" : "s"} to Shopify`, {
           id: toastId,

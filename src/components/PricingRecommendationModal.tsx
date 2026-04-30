@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   ShieldCheck,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import {
   recommendPrice,
@@ -20,6 +21,11 @@ import {
   type LifecyclePhase,
 } from "@/lib/pricing/lifecycleEngine";
 import { fetchCompetitorPrice, type CompetitorPriceResult } from "@/lib/pricing/competitorScraper";
+import {
+  getVelocityForVariant,
+  refreshSalesData,
+  type VelocityResult,
+} from "@/lib/pricing/salesVelocity";
 
 export interface PricingProduct {
   id: string;

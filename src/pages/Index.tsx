@@ -47,6 +47,7 @@ const ReorderPanel = lazy(() => import("@/components/ReorderPanel"));
 const SupplierPanel = lazy(() => import("@/components/SupplierPanel"));
 const HelpCentre = lazy(() => import("@/components/HelpCentre"));
 const HowToCatalog = lazy(() => import("@/components/HowToCatalog"));
+const HowToTabs = lazy(() => import("@/components/HowToTabs"));
 const AgentGuide = lazy(() => import("@/components/AgentGuide"));
 const AuditLogPanel = lazy(() => import("@/components/AuditLogPanel"));
 const CatalogMemoryPanel = lazy(() => import("@/components/CatalogMemoryPanel"));

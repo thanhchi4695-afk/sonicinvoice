@@ -66,6 +66,14 @@ const App = () => (
               <Route path="/admin/secrets" element={<AdminSecrets />} />
               <Route path="/rules" element={<Rules />} />
               <Route path="/rules/setup" element={<RulesSetup />} />
+              <Route
+                path="/google-shopping"
+                element={
+                  <Suspense fallback={null}>
+                    <GoogleShoppingHub />
+                  </Suspense>
+                }
+              />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

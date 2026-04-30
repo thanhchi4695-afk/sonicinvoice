@@ -6,6 +6,8 @@ import StoreModePill from "@/components/StoreModePill";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { useKeyboardShortcuts, type ShortcutDef } from "@/hooks/use-keyboard-shortcuts";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { cn } from "@/lib/utils";
+import { Wrench } from "lucide-react";
 
 // ── Eagerly loaded (critical path) ──
 import HomeWizard from "@/components/HomeWizard";
@@ -776,6 +778,22 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           <QuickActionsBar onAction={handleStartFlow} />
           {activeFlow ? renderFlow() : mainContent}
           <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+
+        {/* Tablet-only quick "Tools" pill — bottom bar gets crowded on tablet,
+            so surface Tools as a dedicated, always-visible shortcut. */}
+        <button
+          onClick={() => { setActiveFlow(null); setActiveTab("tools"); }}
+          className={cn(
+            "hidden md:flex lg:hidden fixed bottom-20 left-4 z-40 items-center gap-2 px-4 h-11 rounded-full shadow-lg active:scale-95 transition-all",
+            activeTab === "tools"
+              ? "bg-primary text-primary-foreground"
+              : "bg-card border border-border text-foreground hover:bg-muted"
+          )}
+          aria-label="Open Tools"
+        >
+          <Wrench className="w-4 h-4" />
+          <span className="text-sm font-medium">Tools</span>
+        </button>
 
         {/* Floating Quick Capture button — mobile only */}
         <button

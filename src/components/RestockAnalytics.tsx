@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Progress } from "@/components/ui/progress";
 import { parseInventoryFile, ParsedInventory } from "@/lib/inventory-parser";
 import {
@@ -292,28 +293,72 @@ const RestockAnalytics = ({ onBack, onStartFlow }: Props) => {
             </div>
 
             {/* ═══ FILTERS ═══ */}
-            <div className="flex flex-wrap gap-2 items-center">
-              <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}
-                className="h-8 rounded-md bg-input border border-border px-2 text-xs text-foreground">
-                <option value="">All brands</option>
-                {parsed.allBrands.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
-                className="h-8 rounded-md bg-input border border-border px-2 text-xs text-foreground">
-                <option value="">All types</option>
-                {parsed.allTypes.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <div className="flex gap-1">
-                {(["urgent", "soon", "monitor"] as const).map((u) => (
-                  <button key={u} onClick={() => setUrgencyFilter(urgencyFilter === u ? "" : u)}
-                    className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-colors ${
-                      urgencyFilter === u ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                    }`}>
-                    {urgencyIcon(u)} {u === "urgent" ? `${analytics.summary.urgentCount}` : u === "soon" ? `${analytics.summary.soonCount}` : `${analytics.summary.monitorCount}`}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {(() => {
+              const activeCount =
+                (brandFilter ? 1 : 0) + (typeFilter ? 1 : 0) + (urgencyFilter ? 1 : 0);
+              const FilterControls = (
+                <div className="flex flex-wrap gap-2 items-center">
+                  <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}
+                    className="h-9 lg:h-8 rounded-md bg-input border border-border px-2 text-xs text-foreground flex-1 min-w-[140px]">
+                    <option value="">All brands</option>
+                    {parsed.allBrands.map((b) => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                  <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+                    className="h-9 lg:h-8 rounded-md bg-input border border-border px-2 text-xs text-foreground flex-1 min-w-[140px]">
+                    <option value="">All types</option>
+                    {parsed.allTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <div className="flex gap-1 w-full lg:w-auto">
+                    {(["urgent", "soon", "monitor"] as const).map((u) => (
+                      <button key={u} onClick={() => setUrgencyFilter(urgencyFilter === u ? "" : u)}
+                        className={`flex-1 lg:flex-none px-2 py-1.5 lg:py-1 rounded-lg text-[11px] font-medium transition-colors ${
+                          urgencyFilter === u ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                        }`}>
+                        {urgencyIcon(u)} {u === "urgent" ? `${analytics.summary.urgentCount}` : u === "soon" ? `${analytics.summary.soonCount}` : `${analytics.summary.monitorCount}`}
+                      </button>
+                    ))}
+                  </div>
+                  {activeCount > 0 && (
+                    <button
+                      onClick={() => { setBrandFilter(""); setTypeFilter(""); setUrgencyFilter(""); }}
+                      className="text-[11px] text-primary hover:underline"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              );
+              return (
+                <>
+                  {/* Desktop ≥1024px: inline filter row */}
+                  <div className="hidden lg:block">{FilterControls}</div>
+                  {/* Mobile/tablet <1024px: bottom sheet */}
+                  <div className="lg:hidden">
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full justify-between h-9">
+                          <span className="flex items-center gap-2">
+                            <Filter className="w-3.5 h-3.5" />
+                            Filters
+                          </span>
+                          {activeCount > 0 && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-semibold">
+                              {activeCount}
+                            </span>
+                          )}
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+                        <SheetHeader>
+                          <SheetTitle>Filter restock list</SheetTitle>
+                        </SheetHeader>
+                        <div className="mt-4">{FilterControls}</div>
+                      </SheetContent>
+                    </Sheet>
+                  </div>
+                </>
+              );
+            })()}
 
             <Input placeholder="Search product name..." value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)} className="h-9 text-sm" />

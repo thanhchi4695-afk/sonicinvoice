@@ -194,7 +194,7 @@ const ConditionBuilderShowcase = () => {
           Try the Condition Builder free — connect JOOR in 2 minutes.
         </p>
         <Link
-          to="/rules"
+          to="/rules/setup"
           className="group inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
         >
           Start protecting margins

@@ -777,6 +777,22 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           {activeFlow ? renderFlow() : mainContent}
           <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
+        {/* Tablet-only quick "Tools" pill — bottom bar gets crowded on tablet,
+            so surface Tools as a dedicated, always-visible shortcut. */}
+        <button
+          onClick={() => { setActiveFlow(null); setActiveTab("tools"); }}
+          className={cn(
+            "hidden md:flex lg:hidden fixed bottom-20 left-4 z-40 items-center gap-2 px-4 h-11 rounded-full shadow-lg active:scale-95 transition-all",
+            activeTab === "tools"
+              ? "bg-primary text-primary-foreground"
+              : "bg-card border border-border text-foreground hover:bg-muted"
+          )}
+          aria-label="Open Tools"
+        >
+          <Wrench className="w-4 h-4" />
+          <span className="text-sm font-medium">Tools</span>
+        </button>
+
         {/* Floating Quick Capture button — mobile only */}
         <button
           onClick={() => setShowCapture(true)}

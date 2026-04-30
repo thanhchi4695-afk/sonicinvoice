@@ -327,6 +327,44 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
                 </div>
               </div>
             </div>
+
+            {/* Velocity source banner */}
+            <div className="flex items-center justify-between gap-2 rounded-md border bg-background/50 p-2 text-xs">
+              <div className="flex items-center gap-2">
+                {velocityLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                ) : usingRealVelocity ? (
+                  <Badge variant="outline" className="bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                    Real data
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-amber-500/15 text-amber-300 border-amber-500/30">
+                    No sales yet
+                  </Badge>
+                )}
+                <span className="text-muted-foreground">
+                  {usingRealVelocity
+                    ? `${velocity!.unitsLast30d} units / 30d → ${effectiveVelocity.toFixed(2)} units/wk`
+                    : `Using fallback ${effectiveVelocity.toFixed(2)} units/wk`}
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleRefreshSales}
+                disabled={refreshingSales}
+                className="h-7"
+              >
+                {refreshingSales ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1" /> Sync Shopify orders
+                  </>
+                )}
+              </Button>
+            </div>
+
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>Price elasticity</span>
@@ -341,7 +379,6 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
               />
               <p className="text-[11px] text-muted-foreground">
                 Default 2.0 means every 10% discount drives 20% more units.
-                {!product.avgWeeklySales && " Using placeholder velocity of 1 unit/week — connect sales data for real projections."}
               </p>
             </div>
             {whatIf.weeksToClear !== null && (
@@ -351,6 +388,7 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
             )}
           </div>
         </div>
+
 
         <DialogFooter className="gap-2">
           <Button variant="ghost" onClick={onClose}>

@@ -314,7 +314,24 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
 
           {/* Competitor URL */}
           <div className="space-y-2">
-            <Label className="text-sm">Competitor URL (optional)</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Competitor URL (optional)</Label>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 -mr-2"
+                onClick={() => loadAutoCompetitor(true)}
+                disabled={refreshingCompetitor || autoCompetitorLoading}
+                title="Re-scrape every active competitor for this product"
+              >
+                {refreshingCompetitor ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : (
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                )}
+                Refresh competitor prices
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Input
                 placeholder="https://competitor.com/products/similar-style"

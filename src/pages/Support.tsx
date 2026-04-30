@@ -269,6 +269,35 @@ const Support = () => {
             </div>
 
             <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-2">
+                What's this about? <span className="text-muted-foreground/60">(optional — pre-fills a template)</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {TOPICS.map((t) => {
+                  const Icon = t.icon;
+                  const active = topic === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => selectTopic(t)}
+                      className={
+                        "inline-flex items-center gap-1.5 h-8 px-3 rounded-full border text-xs transition-colors " +
+                        (active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground")
+                      }
+                      aria-pressed={active}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">
                 Your question * <span className="text-muted-foreground/60">({message.length}/2000)</span>
               </label>

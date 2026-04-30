@@ -1468,13 +1468,49 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     })();
     return () => { cancelled = true; };
   }, []);
-  const handlePushToShopify = async (): Promise<boolean> => {
+  const handlePushToShopify = async (skipIdempotency = false): Promise<boolean> => {
     if (pushingShopify) return false;
 
     const accepted = (validatedProducts || []).filter((p) => !p._rejected);
     if (accepted.length === 0) {
       toast.error("Nothing to push", { description: "No accepted products available." });
       return false;
+    }
+
+    // ── Idempotency check ──
+    // Build a key from supplier + line count + first few SKUs so the same
+    // invoice cannot be silently pushed twice.
+    const idempotencyKey = [
+      supplierName || "unknown",
+      String(accepted.length),
+      accepted.slice(0, 3).map((p) => p.sku || p.name || "").join("|"),
+    ].join("::");
+
+    if (!skipIdempotency) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: existingRun } = await supabase
+            .from("inventory_import_runs")
+            .select("id, started_at")
+            .eq("user_id", user.id)
+            .eq("idempotency_key", idempotencyKey)
+            .maybeSingle();
+          if (existingRun) {
+            toast.warning("Already pushed", {
+              description: `This invoice was pushed to Shopify on ${new Date(existingRun.started_at as string).toLocaleDateString("en-AU")}. Push again?`,
+              action: {
+                label: "Push again",
+                onClick: () => { void handlePushToShopify(true); },
+              },
+              duration: 8000,
+            });
+            return false;
+          }
+        }
+      } catch (e) {
+        console.warn("[Sonic Invoice] idempotency check failed:", e);
+      }
     }
 
     setPushingShopify(true);
@@ -1561,6 +1597,25 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         await recordPush(conn.store_url, success, 0, errors, `Invoice push: ${success} ok / ${errors} failed`, "invoice_flow");
       } catch (e) {
         console.warn("[Sonic Invoice] recordPush failed:", e);
+      }
+
+      // Record import run for idempotency (so re-pushing the same invoice is blocked).
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && success > 0) {
+          await supabase.from("inventory_import_runs").insert({
+            user_id: user.id,
+            source: "invoice_flow",
+            supplier_name: supplierName || null,
+            idempotency_key: idempotencyKey,
+            units_applied: success,
+            run_status: errors === 0 ? "success" : "partial",
+            started_at: new Date().toISOString(),
+            completed_at: new Date().toISOString(),
+          });
+        }
+      } catch (e) {
+        console.warn("[Sonic Invoice] Failed to record import run:", e);
       }
 
       if (errors === 0) {

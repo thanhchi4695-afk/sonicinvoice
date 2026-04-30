@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { ChevronRight, FileText, Search, Package, DollarSign, Upload, BarChart3 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export type PhaseId = "setup" | "capture" | "review" | "catalog" | "price" | "publish" | "analyse";
@@ -22,9 +23,9 @@ export interface Phase {
 export const PHASES: (Phase & { implemented: boolean })[] = [
   { id: "capture",  num: 1, label: "Capture",       shortLabel: "Capture",  icon: FileText,   description: "Upload invoice / scan goods", target: { type: "flow", id: "invoice" }, implemented: true  },
   { id: "review",   num: 2, label: "Review & Sync", shortLabel: "Review",   icon: Search,     description: "Verify lines & sync to catalog", target: { type: "flow", id: "invoice" }, implemented: true  },
-  { id: "catalog",  num: 3, label: "Enrich",        shortLabel: "Enrich",   icon: Package,    description: "Names, images, SEO, descriptions (coming soon)", target: { type: "flow", id: "invoice" }, implemented: false },
+  { id: "catalog",  num: 3, label: "Enrich",        shortLabel: "Enrich",   icon: Package,    description: "AI-generated names, images, SEO descriptions & pricing", target: { type: "flow", id: "invoice" }, implemented: true  },
   { id: "price",    num: 4, label: "Price",         shortLabel: "Price",    icon: DollarSign, description: "RRP, margins, markdowns", target: { type: "flow", id: "price_adjust" }, implemented: true  },
-  { id: "publish",  num: 5, label: "Publish",       shortLabel: "Publish",  icon: Upload,     description: "Push to Shopify / Lightspeed / CSV", target: { type: "flow", id: "invoice" }, implemented: true  },
+  { id: "publish",  num: 5, label: "Publish",       shortLabel: "Publish",  icon: Upload,     description: "Push to Shopify or export CSV — available after review", target: { type: "flow", id: "invoice" }, implemented: true  },
   { id: "analyse",  num: 6, label: "Analyse",       shortLabel: "Analyse",  icon: BarChart3,  description: "Reports, restock, performance", target: { type: "tab", id: "analytics" }, implemented: true  },
 ];
 
@@ -113,6 +114,13 @@ const PhaseProgressBar = ({ activeTab, activeFlow, onNavigate }: PhaseProgressBa
                     // Import invoice. They are inert until the dedicated
                     // screen is built.
                     if (disabled) return;
+                    // Publish panel is embedded in the invoice flow below the
+                    // review screen — only navigate if we're already inside
+                    // an active invoice session, otherwise show a hint.
+                    if (phase.id === "publish" && !(currentPhase && ["review","catalog","price","publish"].includes(currentPhase))) {
+                      toast.info("Upload an invoice first — Publish appears below the review screen after extraction.");
+                      return;
+                    }
                     onNavigate(phase.target);
                   }}
                   disabled={disabled}

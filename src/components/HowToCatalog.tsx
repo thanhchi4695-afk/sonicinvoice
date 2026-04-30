@@ -166,15 +166,17 @@ const HowToCatalog = ({
       </p>
 
       {/* Search */}
-      <div className="relative mb-5">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <input
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search features (e.g. 'invoice', 'seo', 'stock')..."
-          className="w-full h-10 rounded-lg bg-input border border-border pl-10 pr-3 text-sm"
-        />
-      </div>
+      {!hideSearchBar && (
+        <div className="relative mb-5">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search features (e.g. 'invoice', 'seo', 'stock')..."
+            className="w-full h-10 rounded-lg bg-input border border-border pl-10 pr-3 text-sm"
+          />
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-4 gap-2 mb-5">

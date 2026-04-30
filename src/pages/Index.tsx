@@ -6,6 +6,8 @@ import StoreModePill from "@/components/StoreModePill";
 import LoadingScreen from "@/components/ui/loading-screen";
 import { useKeyboardShortcuts, type ShortcutDef } from "@/hooks/use-keyboard-shortcuts";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { cn } from "@/lib/utils";
+import { Wrench } from "lucide-react";
 
 // ── Eagerly loaded (critical path) ──
 import HomeWizard from "@/components/HomeWizard";

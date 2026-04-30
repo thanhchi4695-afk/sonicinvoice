@@ -128,7 +128,7 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
         daysInInventory: product.daysInInventory,
         stockOnHand: product.stockOnHand,
         avgWeeklySales: usingRealVelocity ? effectiveVelocity : product.avgWeeklySales,
-        competitorPrice: scraped?.price ?? undefined,
+        competitorPrice: effectiveCompetitorPrice,
       }),
     [product, scraped, effectiveVelocity, usingRealVelocity],
   );

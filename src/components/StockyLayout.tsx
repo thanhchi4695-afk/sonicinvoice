@@ -20,7 +20,7 @@ import {
   History as HistoryIcon,
   CreditCard,
   Sparkles,
-  Wrench,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

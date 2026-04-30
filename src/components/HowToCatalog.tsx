@@ -13,10 +13,24 @@ import {
 interface HowToCatalogProps {
   onNavigateToFeature?: (flowKey: string) => void;
   onNavigateToTab?: (tab: string) => void;
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
+  hideSearchBar?: boolean;
 }
 
-const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProps) => {
-  const [searchQuery, setSearchQuery] = useState("");
+const HowToCatalog = ({
+  onNavigateToFeature,
+  onNavigateToTab,
+  searchQuery: searchQueryProp,
+  onSearchChange,
+  hideSearchBar = false,
+}: HowToCatalogProps) => {
+  const [internalQuery, setInternalQuery] = useState("");
+  const searchQuery = searchQueryProp ?? internalQuery;
+  const setSearchQuery = (q: string) => {
+    if (onSearchChange) onSearchChange(q);
+    else setInternalQuery(q);
+  };
   const [openFeature, setOpenFeature] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const featureRefs = useRef<Record<string, HTMLDivElement | null>>({});

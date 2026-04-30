@@ -139,6 +139,9 @@ const HomeWizard = ({
         </p>
       </div>
 
+      {/* ── Margin Guardian / Condition Builder showcase ─── */}
+      <ConditionBuilderShowcase />
+
       {/* ── Returning user: show chips ────────────────────────── */}
       {hasBothChoices && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">

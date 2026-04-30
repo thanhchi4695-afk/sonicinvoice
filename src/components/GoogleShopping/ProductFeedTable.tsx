@@ -32,7 +32,14 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { updateProductFeedAttributes } from "@/lib/shopify/productFeedEnricher";
+import {
+  getProductFeedAttributes,
+  updateProductFeedAttributes,
+} from "@/lib/shopify/productFeedEnricher";
+import {
+  FixAttributesModal,
+  type ProductFixInput,
+} from "./FixAttributesModal";
 
 // ───────────────────────── Types ─────────────────────────
 
@@ -129,6 +136,59 @@ export default function ProductFeedTable({ onBack, onFix }: Props) {
 
   // Selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Fix-attributes modal state
+  const [fixOpen, setFixOpen] = useState(false);
+  const [fixLoading, setFixLoading] = useState(false);
+  const [fixProducts, setFixProducts] = useState<ProductFixInput[]>([]);
+
+  const openFixModal = useCallback(
+    async (productIds: string[]) => {
+      if (productIds.length === 0) {
+        toast.error("Select at least one product");
+        return;
+      }
+      setFixOpen(true);
+      setFixLoading(true);
+      setFixProducts([]);
+      try {
+        const titleById = new Map(rows.map((r) => [r.id, r.title]));
+        const results: ProductFixInput[] = [];
+        for (const id of productIds) {
+          try {
+            const attrs = await getProductFeedAttributes(id);
+            results.push({
+              productId: attrs.productId,
+              title: titleById.get(id) ?? id,
+              gender: attrs.gender,
+              ageGroup: attrs.ageGroup,
+              color: attrs.color,
+              material: null,
+              pattern: null,
+              condition: null,
+              googleProductCategory: attrs.googleProductCategory,
+              variants: attrs.variants.map((v) => ({
+                variantId: v.variantId,
+                size: v.size,
+              })),
+            });
+          } catch (e) {
+            console.error("Failed to load attributes for", id, e);
+          }
+          await new Promise((r) => setTimeout(r, 500));
+        }
+        if (results.length === 0) {
+          toast.error("Could not load product attributes");
+          setFixOpen(false);
+        } else {
+          setFixProducts(results);
+        }
+      } finally {
+        setFixLoading(false);
+      }
+    },
+    [rows],
+  );
 
   // Debounce search input
   useEffect(() => {
@@ -324,13 +384,7 @@ export default function ProductFeedTable({ onBack, onFix }: Props) {
     });
 
   const bulkUpdateAttrs = () => {
-    if (selected.size === 0) {
-      toast.error("Select at least one product");
-      return;
-    }
-    toast.info(
-      `Open the Fix modal per product to apply attribute updates (${selected.size} selected). Bulk attribute editor coming next.`,
-    );
+    openFixModal(rows.filter((r) => selected.has(r.id)).map((r) => r.id));
   };
 
   // ── UI ──
@@ -615,7 +669,9 @@ export default function ProductFeedTable({ onBack, onFix }: Props) {
                               variant="ghost"
                               size="sm"
                               className="h-7 px-2"
-                              onClick={() => onFix?.(r.id)}
+                              onClick={() =>
+                                onFix ? onFix(r.id) : openFixModal([r.id])
+                              }
                             >
                               <Wrench className="w-3.5 h-3.5 mr-1" /> Fix
                             </Button>
@@ -679,6 +735,24 @@ export default function ProductFeedTable({ onBack, onFix }: Props) {
           </Button>
         </div>
       </div>
+
+      <FixAttributesModal
+        open={fixOpen}
+        onOpenChange={(o) => {
+          setFixOpen(o);
+          if (!o) setFixProducts([]);
+        }}
+        products={fixProducts}
+        onSaved={() => {
+          setSelected(new Set());
+          fetchPage(pages[pageIndex] ?? "");
+        }}
+      />
+      {fixOpen && fixLoading && (
+        <div className="fixed bottom-4 right-4 text-xs text-muted-foreground bg-background border rounded px-3 py-2 shadow z-50">
+          Loading attributes…
+        </div>
+      )}
     </div>
   );
 }

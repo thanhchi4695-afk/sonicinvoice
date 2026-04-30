@@ -39,6 +39,19 @@ export function ApplyDiscountsModal({
   const [progress, setProgress] = useState<ApplyProgress | null>(null);
   const [results, setResults] = useState<ApplyResult[] | null>(null);
 
+  // Persisted toggle: when ON, set compareAtPrice = current price (sale badge).
+  // When OFF, leave compareAtPrice unchanged on Shopify.
+  const STORAGE_KEY = "pricing.apply.setCompareAtPrice";
+  const [setCompareAt, setSetCompareAt] = useState<boolean>(true);
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored != null) setSetCompareAt(stored === "true");
+  }, []);
+  function updateSetCompareAt(v: boolean) {
+    setSetCompareAt(v);
+    localStorage.setItem(STORAGE_KEY, String(v));
+  }
+
   const totalImpactPerUnit = changes.reduce(
     (sum, c) => sum + (c.newPrice - c.originalPrice),
     0,
@@ -55,7 +68,9 @@ export function ApplyDiscountsModal({
     setRunning(true);
     setResults(null);
     try {
-      const res = await applyRecommendedPriceChanges(changes, setProgress);
+      const res = await applyRecommendedPriceChanges(changes, setProgress, {
+        setCompareAtPrice: setCompareAt,
+      });
       setResults(res);
       const okCount = res.filter((r) => r.ok).length;
       const failCount = res.length - okCount;

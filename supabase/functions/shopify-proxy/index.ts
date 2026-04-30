@@ -1378,6 +1378,55 @@ Deno.serve(async (req) => {
         break;
       }
 
+      case "graphql": {
+        // Generic GraphQL passthrough with retry on 429/5xx
+        if (!body.query) {
+          return new Response(JSON.stringify({ error: "Missing query" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const gqlUrl = `https://${store_url}/admin/api/${api_version}/graphql.json`;
+        const payload = JSON.stringify({ query: body.query, variables: body.variables ?? {} });
+        let attempt = 0;
+        let resp: Response | null = null;
+        let lastErr: unknown = null;
+        while (attempt < 3) {
+          try {
+            resp = await fetch(gqlUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Shopify-Access-Token": access_token,
+              },
+              body: payload,
+            });
+            if (resp.status === 429 || resp.status >= 500) {
+              await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)));
+              attempt++;
+              continue;
+            }
+            break;
+          } catch (e) {
+            lastErr = e;
+            await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)));
+            attempt++;
+          }
+        }
+        if (!resp) {
+          return new Response(JSON.stringify({ error: "Shopify GraphQL unreachable", details: String(lastErr) }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const gqlData = await resp.json();
+        if (gqlData.errors) {
+          return new Response(JSON.stringify({ error: "GraphQL errors", details: gqlData.errors }), {
+            status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = gqlData.data;
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Unknown action" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

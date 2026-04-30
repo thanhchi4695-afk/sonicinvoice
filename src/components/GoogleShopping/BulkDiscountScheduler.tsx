@@ -377,22 +377,27 @@ export default function BulkDiscountScheduler({ onBack }: Props) {
         customLabel,
       };
 
-      const { data: schedule, error: insertErr } = await supabase
-        .from("bulk_discount_schedules")
-        .insert({
-          user_id: user.id,
-          name: scheduleName.trim() || "Untitled sale",
-          status: scheduleNow ? "active" : "pending",
-          strategy,
-          discount_value: discountValue,
-          filter_snapshot: filterSnapshot,
-          variants_snapshot: updates as unknown as object[],
-          affected_count: updates.length,
-          starts_at: scheduleNow ? new Date().toISOString() : startsAt?.toISOString(),
-          ends_at: endsAt?.toISOString() ?? null,
-          applied_at: scheduleNow ? new Date().toISOString() : null,
-          use_google_auto_pricing: useGoogleAutoPricing,
+      const insertPayload = {
+        user_id: user.id,
+        name: scheduleName.trim() || "Untitled sale",
+        status: scheduleNow ? "active" : "pending",
+        strategy,
+        discount_value: discountValue,
+        filter_snapshot: filterSnapshot,
+        variants_snapshot: updates as unknown as object[],
+        affected_count: updates.length,
+        starts_at: scheduleNow ? new Date().toISOString() : startsAt?.toISOString(),
+        ends_at: endsAt?.toISOString() ?? null,
+        applied_at: scheduleNow ? new Date().toISOString() : null,
+        use_google_auto_pricing: useGoogleAutoPricing,
+      };
+      const { data: schedule, error: insertErr } = await (supabase
+        .from("bulk_discount_schedules") as unknown as {
+          insert: (v: unknown) => {
+            select: (cols: string) => { single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }> };
+          };
         })
+        .insert(insertPayload)
         .select("id")
         .single();
       if (insertErr) throw insertErr;

@@ -102,6 +102,12 @@ const StockyLayout = ({
   const getActiveId = () => activeFlow || activeTab;
 
   const handleClick = (item: StockyNavItem) => {
+    if (item.id === "support_chat") {
+      window.location.href =
+        "mailto:thanhchi4695@gmail.com?subject=Sonic%20Invoices%20Support%20Request&body=Hi%2C%0A%0AI%20need%20help%20with%3A%0A%0A";
+      setMobileOpen(false);
+      return;
+    }
     if (item.type === "tab") {
       onTabChange(item.id);
     } else {

@@ -366,6 +366,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     { key: "r", label: "R", description: "Receive Stock", action: () => setActiveFlow("quick_receive") },
     { key: "t", label: "T", description: "New Stocktake", action: () => setActiveFlow("stocktake_module") },
     { key: "s", label: "S", description: "Focus Barcode Scanner", action: () => setActiveFlow("scan_mode") },
+    { key: "t", shift: true, label: "⇧T", description: "Open Tools tab", action: () => { setActiveFlow(null); setActiveTab("tools"); } },
     { key: "k", ctrl: true, label: "⌘K", description: "Quick Search", action: () => setShowQuickSearch(true) },
     { key: "?", label: "?", description: "Keyboard Shortcuts", action: () => setShowShortcuts(true) },
   ], []);

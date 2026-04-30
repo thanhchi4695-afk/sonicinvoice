@@ -243,7 +243,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   }, []);
   
   const mode = useStoreMode();
-  const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, addNotification, markRead, markAllRead, dismiss } = useNotifications();
   const { isEmbedded, shop, authState: embeddedAuthState, authError: embeddedAuthError } = useShopifyEmbedded();
 
   // ── Standalone session management (non-embedded only) ──

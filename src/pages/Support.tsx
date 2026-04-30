@@ -123,6 +123,16 @@ const Support = () => {
   const [preview, setPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [topic, setTopic] = useState<TopicId | null>(null);
+
+  const selectTopic = (t: Topic) => {
+    setTopic(t.id);
+    // Only overwrite the message if it's empty or matches an existing template
+    const isExistingTemplate = TOPICS.some((x) => x.template && message.trim() === x.template.trim());
+    if (!message.trim() || isExistingTemplate) {
+      setMessage(t.template);
+    }
+  };
 
   useEffect(() => {
     document.title = "Contact Support — Sonic Invoices";
@@ -184,6 +194,7 @@ const Support = () => {
           templateData: {
             customerEmail: parsed.data.email,
             customerName: parsed.data.name || "",
+            topic: topic ? TOPICS.find((t) => t.id === topic)?.label || "" : "",
             message: parsed.data.message,
             screenshotUrl: screenshotUrl || "",
             pageUrl: typeof window !== "undefined" ? window.location.href : "",
@@ -194,7 +205,7 @@ const Support = () => {
       if (fnErr) throw fnErr;
 
       setDone(true);
-      setEmail(""); setName(""); setMessage(""); setFile(null);
+      setEmail(""); setName(""); setMessage(""); setFile(null); setTopic(null);
       toast({ title: "Message sent", description: "We've received your question and will reply soon." });
     } catch (err) {
       console.error("Support submit failed", err);

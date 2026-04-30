@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import AgentPipelineShowcase from "@/components/AgentPipelineShowcase";
 import EnrichmentAgentsShowcase from "@/components/EnrichmentAgentsShowcase";
+import ConditionBuilderShowcase from "@/components/ConditionBuilderShowcase";
 
 export type DocType = "invoice" | "packing_slip";
 export type PosChoice = "shopify" | "lightspeed";
@@ -137,6 +138,9 @@ const HomeWizard = ({
           Step 1 of 6 · Tell us what you're uploading and where it goes.
         </p>
       </div>
+
+      {/* ── Margin Guardian / Condition Builder showcase ─── */}
+      <ConditionBuilderShowcase />
 
       {/* ── Returning user: show chips ────────────────────────── */}
       {hasBothChoices && (

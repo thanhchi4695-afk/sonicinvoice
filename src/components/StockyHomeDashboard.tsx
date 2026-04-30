@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import ConditionBuilderShowcase from "@/components/ConditionBuilderShowcase";
 
 /* ─── Types ─── */
 
@@ -197,6 +198,9 @@ export default function StockyHomeDashboard({ onNavigate, onSwitchToClassic }: S
           <ToggleLeft className="w-4 h-4" /> Classic View
         </Button>
       </div>
+
+      {/* ── Margin Guardian / Condition Builder showcase ─── */}
+      <ConditionBuilderShowcase />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

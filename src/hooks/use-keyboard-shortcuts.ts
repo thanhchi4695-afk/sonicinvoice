@@ -50,6 +50,7 @@ export const SHORTCUT_DEFINITIONS: Omit<ShortcutDef, "action">[] = [
   { key: "r", label: "R", description: "Receive Stock" },
   { key: "t", label: "T", description: "New Stocktake" },
   { key: "s", label: "S", description: "Focus Barcode Scanner" },
+  { key: "t", shift: true, label: "⇧T", description: "Open Tools tab" },
   { key: "k", ctrl: true, label: "⌘K", description: "Quick Search" },
   { key: "?", label: "?", description: "Keyboard Shortcuts" },
 ];

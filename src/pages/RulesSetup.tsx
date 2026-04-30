@@ -28,7 +28,7 @@ const RulesSetup = () => {
 
   const [joorStatus, setJoorStatus] = useState<JoorStatus>("checking");
   const [joorLabel, setJoorLabel] = useState<string>("");
-  const [picked, setPicked] = useState<RuleTemplate | null>(null);
+  const [picked, setPicked] = useState<RuleTemplate["seed"] | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
   const [hadRulesAtStart] = useState(() => rules.length);

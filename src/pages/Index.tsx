@@ -759,14 +759,16 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               />
               <StoreModePill mode={mode} onOpenAccount={() => setActiveTab("account")} />
             </div>
-            <PhaseProgressBar
-              activeTab={activeTab}
-              activeFlow={activeFlow}
-              onNavigate={(t) => {
-                if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-                else { setActiveFlow(t.id as any); }
-              }}
-            />
+            {(activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) || (!activeFlow && PHASE_TABS.has(activeTab)) ? (
+              <PhaseProgressBar
+                activeTab={activeTab}
+                activeFlow={activeFlow}
+                onNavigate={(t) => {
+                  if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
+                  else { setActiveFlow(t.id as any); }
+                }}
+              />
+            ) : null}
             <QuickActionsBar onAction={handleStartFlow} />
             {activeFlow ? renderFlow() : mainContent}
           </StockyLayout>

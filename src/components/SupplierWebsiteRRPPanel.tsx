@@ -49,6 +49,7 @@ export default function SupplierWebsiteRRPPanel() {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [scrapingId, setScrapingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const load = async () => {
     setLoading(true);

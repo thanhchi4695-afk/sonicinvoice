@@ -137,6 +137,59 @@ export default function ProductFeedTable({ onBack, onFix }: Props) {
   // Selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // Fix-attributes modal state
+  const [fixOpen, setFixOpen] = useState(false);
+  const [fixLoading, setFixLoading] = useState(false);
+  const [fixProducts, setFixProducts] = useState<ProductFixInput[]>([]);
+
+  const openFixModal = useCallback(
+    async (productIds: string[]) => {
+      if (productIds.length === 0) {
+        toast.error("Select at least one product");
+        return;
+      }
+      setFixOpen(true);
+      setFixLoading(true);
+      setFixProducts([]);
+      try {
+        const titleById = new Map(rows.map((r) => [r.id, r.title]));
+        const results: ProductFixInput[] = [];
+        for (const id of productIds) {
+          try {
+            const attrs = await getProductFeedAttributes(id);
+            results.push({
+              productId: attrs.productId,
+              title: titleById.get(id) ?? id,
+              gender: attrs.gender,
+              ageGroup: attrs.ageGroup,
+              color: attrs.color,
+              material: null,
+              pattern: null,
+              condition: null,
+              googleProductCategory: attrs.googleProductCategory,
+              variants: attrs.variants.map((v) => ({
+                variantId: v.variantId,
+                size: v.size,
+              })),
+            });
+          } catch (e) {
+            console.error("Failed to load attributes for", id, e);
+          }
+          await new Promise((r) => setTimeout(r, 500));
+        }
+        if (results.length === 0) {
+          toast.error("Could not load product attributes");
+          setFixOpen(false);
+        } else {
+          setFixProducts(results);
+        }
+      } finally {
+        setFixLoading(false);
+      }
+    },
+    [rows],
+  );
+
   // Debounce search input
   useEffect(() => {
     const t = setTimeout(() => {

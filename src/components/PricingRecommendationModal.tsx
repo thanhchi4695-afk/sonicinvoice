@@ -301,7 +301,7 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
                 )}
               </Button>
             </div>
-            {scraped?.ok && scraped.price && (
+            {scraped?.ok && scraped.price ? (
               <div className="text-xs text-muted-foreground">
                 Competitor: <span className="font-mono">${scraped.price.toFixed(2)}</span>
                 {scraped.currency && <> {scraped.currency}</>} · source: {scraped.source}
@@ -309,7 +309,20 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
                   <> · gap: <span className="font-semibold">{baseRec.competitorGapPct}%</span></>
                 )}
               </div>
-            )}
+            ) : autoCompetitor?.price ? (
+              <div className="text-xs text-muted-foreground">
+                Auto: <span className="font-mono">${autoCompetitor.price.toFixed(2)}</span>
+                {autoCompetitor.competitorName && <> · {autoCompetitor.competitorName}</>}
+                {autoCompetitor.ageHours != null && <> · {autoCompetitor.ageHours}h ago</>}
+                {baseRec.competitorGapPct !== null && (
+                  <> · gap: <span className="font-semibold">{baseRec.competitorGapPct}%</span></>
+                )}
+              </div>
+            ) : autoCompetitorLoading ? (
+              <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" /> Checking monitored competitors…
+              </div>
+            ) : null}
           </div>
 
           {/* Discount slider */}

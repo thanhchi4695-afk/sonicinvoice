@@ -16,7 +16,7 @@ const KeyboardShortcutsModal = ({ open, onOpenChange }: Props) => (
       </DialogHeader>
       <div className="space-y-1">
         {SHORTCUT_DEFINITIONS.map((s) => (
-          <div key={s.key + (s.ctrl ? "ctrl" : "")} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+          <div key={s.key + (s.ctrl ? "ctrl" : "") + (s.shift ? "shift" : "")} className="flex items-center justify-between py-2 border-b border-border last:border-0">
             <span className="text-sm text-foreground">{s.description}</span>
             <kbd className="inline-flex items-center gap-0.5 px-2 py-1 rounded bg-muted text-muted-foreground text-xs font-mono border border-border">
               {s.label}

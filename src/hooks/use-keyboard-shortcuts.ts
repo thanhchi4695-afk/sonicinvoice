@@ -3,6 +3,7 @@ import { useEffect, useCallback } from "react";
 export interface ShortcutDef {
   key: string;
   ctrl?: boolean;
+  shift?: boolean;
   label: string;
   description: string;
   action: () => void;
@@ -26,6 +27,8 @@ export function useKeyboardShortcuts(shortcuts: ShortcutDef[]) {
         const wantCtrl = !!s.ctrl;
         const hasCtrl = e.metaKey || e.ctrlKey;
         if (wantCtrl !== hasCtrl) continue;
+        const wantShift = !!s.shift;
+        if (wantShift !== e.shiftKey) continue;
         if (e.key.toLowerCase() === s.key.toLowerCase()) {
           e.preventDefault();
           s.action();
@@ -47,6 +50,7 @@ export const SHORTCUT_DEFINITIONS: Omit<ShortcutDef, "action">[] = [
   { key: "r", label: "R", description: "Receive Stock" },
   { key: "t", label: "T", description: "New Stocktake" },
   { key: "s", label: "S", description: "Focus Barcode Scanner" },
+  { key: "t", shift: true, label: "⇧T", description: "Open Tools tab" },
   { key: "k", ctrl: true, label: "⌘K", description: "Quick Search" },
   { key: "?", label: "?", description: "Keyboard Shortcuts" },
 ];

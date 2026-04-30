@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Plus, Search, FileText, Loader2 } from "lucide-react";
+import { Plus, Search, FileText, Loader2, ChevronRight } from "lucide-react";
 import { getUnprocessedInboxCount } from "@/components/EmailInboxPanel";
 import { formatRelativeTime } from "@/lib/audit-log";
 

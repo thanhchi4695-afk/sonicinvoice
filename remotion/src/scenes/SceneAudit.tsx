@@ -83,25 +83,26 @@ export const SceneAudit = () => {
         </div>
       </div>
 
-      {/* Outro card */}
+      {/* Outro card — bottom right, sized to align with chart */}
       <div style={{
-        position: "absolute", right: 130, bottom: 140,
-        width: 620, padding: 40, borderRadius: 24,
+        position: "absolute", right: 130, top: 730,
+        width: 760, height: 240, padding: "32px 40px", borderRadius: 24,
         background: `linear-gradient(160deg, ${COLORS.primary}1a, ${COLORS.surface})`,
         border: `1px solid ${COLORS.primary}`,
         boxShadow: `0 0 60px ${COLORS.primary}33`,
         opacity: outroOp, transform: `translateY(${outroY}px)`,
+        display: "flex", flexDirection: "column", justifyContent: "center",
       }}>
-        <div style={{ fontFamily: fontMono, fontSize: 18, color: COLORS.primary, letterSpacing: 4, textTransform: "uppercase" }}>
+        <div style={{ fontFamily: fontMono, fontSize: 16, color: COLORS.primary, letterSpacing: 4, textTransform: "uppercase" }}>
           Sonic Invoices · AI Automation
         </div>
         <div style={{
-          fontFamily: fontDisplay, fontWeight: 800, fontSize: 70, lineHeight: 1,
-          color: COLORS.text, marginTop: 14,
+          fontFamily: fontDisplay, fontWeight: 800, fontSize: 60, lineHeight: 1,
+          color: COLORS.text, marginTop: 10,
         }}>
           Margin Guardian.
         </div>
-        <div style={{ marginTop: 18, fontFamily: fontMono, fontSize: 22, color: COLORS.textMuted, lineHeight: 1.5 }}>
+        <div style={{ marginTop: 12, fontFamily: fontMono, fontSize: 20, color: COLORS.textMuted, lineHeight: 1.4 }}>
           Plain-English rules. Real-time blocks. Zero lost margin.
         </div>
       </div>

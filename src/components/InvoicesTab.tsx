@@ -224,6 +224,29 @@ const InvoicesTab = (props: InvoicesTabProps) => {
         </Select>
       </div>
 
+      {/* Bulk action bar — appears when rows are selected */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md border border-primary/30 bg-primary/5">
+          <span className="text-xs font-medium">{selected.size} selected</span>
+          <span className="text-[10px] text-muted-foreground">
+            {selectedInView.length < selected.size && `${selected.size - selectedInView.length} hidden by filters`}
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={clearSelection}>
+              <X className="w-3 h-3 mr-1" /> Clear
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-7 px-2 text-[11px]"
+              onClick={() => setConfirmOpen(true)}
+            >
+              <Trash2 className="w-3 h-3 mr-1" /> Delete
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Body */}
       {loading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">

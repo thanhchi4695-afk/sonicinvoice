@@ -22,6 +22,10 @@ import {
 } from "@/lib/pricing/lifecycleEngine";
 import { fetchCompetitorPrice, type CompetitorPriceResult } from "@/lib/pricing/competitorScraper";
 import {
+  resolveCompetitorPrice,
+  type ResolvedCompetitorPrice,
+} from "@/lib/pricing/resolveCompetitorPrice";
+import {
   getVelocityForVariant,
   refreshSalesData,
   type VelocityResult,
@@ -81,6 +85,36 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
     };
   }, [open, product.id]);
 
+  // Auto-resolved competitor price from cache (the monitoring agent).
+  // Manual paste-URL scrape (`scraped`) takes precedence when present.
+  const [autoCompetitor, setAutoCompetitor] = useState<ResolvedCompetitorPrice | null>(null);
+  const [autoCompetitorLoading, setAutoCompetitorLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setAutoCompetitorLoading(true);
+    resolveCompetitorPrice({
+      shopifyProductId: product.id,
+      sku: product.sku,
+    })
+      .then((res) => {
+        if (!cancelled) setAutoCompetitor(res);
+      })
+      .catch(() => {
+        if (!cancelled) setAutoCompetitor(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAutoCompetitorLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, product.id, product.sku]);
+
+  const effectiveCompetitorPrice =
+    scraped?.price ?? autoCompetitor?.price ?? undefined;
+
   const effectiveVelocity =
     velocity?.hasData ? velocity.avgWeeklySales : product.avgWeeklySales ?? 1.0;
   const usingRealVelocity = !!velocity?.hasData;
@@ -94,9 +128,9 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
         daysInInventory: product.daysInInventory,
         stockOnHand: product.stockOnHand,
         avgWeeklySales: usingRealVelocity ? effectiveVelocity : product.avgWeeklySales,
-        competitorPrice: scraped?.price ?? undefined,
+        competitorPrice: effectiveCompetitorPrice,
       }),
-    [product, scraped, effectiveVelocity, usingRealVelocity],
+    [product, scraped, autoCompetitor, effectiveVelocity, usingRealVelocity, effectiveCompetitorPrice],
   );
 
   // Editable discount — defaults to engine recommendation
@@ -267,7 +301,7 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
                 )}
               </Button>
             </div>
-            {scraped?.ok && scraped.price && (
+            {scraped?.ok && scraped.price ? (
               <div className="text-xs text-muted-foreground">
                 Competitor: <span className="font-mono">${scraped.price.toFixed(2)}</span>
                 {scraped.currency && <> {scraped.currency}</>} · source: {scraped.source}
@@ -275,7 +309,20 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
                   <> · gap: <span className="font-semibold">{baseRec.competitorGapPct}%</span></>
                 )}
               </div>
-            )}
+            ) : autoCompetitor?.price ? (
+              <div className="text-xs text-muted-foreground">
+                Auto: <span className="font-mono">${autoCompetitor.price.toFixed(2)}</span>
+                {autoCompetitor.competitorName && <> · {autoCompetitor.competitorName}</>}
+                {autoCompetitor.ageHours != null && <> · {autoCompetitor.ageHours}h ago</>}
+                {baseRec.competitorGapPct !== null && (
+                  <> · gap: <span className="font-semibold">{baseRec.competitorGapPct}%</span></>
+                )}
+              </div>
+            ) : autoCompetitorLoading ? (
+              <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" /> Checking monitored competitors…
+              </div>
+            ) : null}
           </div>
 
           {/* Discount slider */}

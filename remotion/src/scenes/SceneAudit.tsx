@@ -54,7 +54,7 @@ export const SceneAudit = () => {
         position: "absolute", top: 410, left: 130, display: "flex", gap: 28,
       }}>
         <KpiCard label="Bad orders blocked · 30d" value={blocks.toString()} accent={COLORS.primary} />
-        <KpiCard label="Margin protected · 30d" value={`$${saved.toLocaleString()}`} accent={COLORS.accent} />
+        <KpiCard label="Margin saved · 30d" value={`$${(saved/1000).toFixed(1)}k`} accent={COLORS.accent} />
         <KpiCard label="Avg response time" value="0.4s" accent={COLORS.good} />
       </div>
 

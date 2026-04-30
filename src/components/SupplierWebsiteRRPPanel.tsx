@@ -182,8 +182,47 @@ export default function SupplierWebsiteRRPPanel() {
         </div>
       </Card>
 
+      <div className="relative">
+        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search suppliers or URLs…"
+          className="text-xs h-9 pl-8 pr-8"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {(() => {
+        const q = search.trim().toLowerCase();
+        const filtered = q
+          ? rows.filter(
+              (r) =>
+                r.supplier_name.toLowerCase().includes(q) ||
+                (r.website_url || "").toLowerCase().includes(q),
+            )
+          : rows;
+        if (filtered.length === 0) {
+          return (
+            <Card className="p-6 text-center">
+              <p className="text-xs text-muted-foreground">
+                No suppliers match "{search}".
+              </p>
+            </Card>
+          );
+        }
+        return (
       <div className="space-y-2">
-        {rows.map((r) => (
+        {filtered.map((r) => (
           <Card key={r.id} className="p-3 space-y-2.5">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">

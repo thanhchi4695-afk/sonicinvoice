@@ -1682,34 +1682,45 @@ function WholesaleConnectionsSection() {
                     </>
                   ) : (
                     <>
-                      <Input
-                        value={tokenInput}
-                        onChange={(e) => setTokenInput(e.target.value)}
-                        placeholder={`${p.credentialLabel}`}
-                        className="h-8 text-xs"
-                        type="password"
-                      />
-                      <Input
-                        value={labelInput}
-                        onChange={(e) => setLabelInput(e.target.value)}
-                        placeholder="Label (e.g. Splash Swimwear)"
-                        className="h-8 text-xs"
-                      />
-                      {testError && expanded === p.id && (
-                        <p className="text-xs text-destructive flex items-center gap-1">
-                          <X className="w-3 h-3" /> {testError}
-                        </p>
+                      {p.comingSoon ? (
+                        <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-600 dark:text-amber-400">
+                          <p className="font-medium mb-1">{p.name} integration is coming soon.</p>
+                          <p className="text-muted-foreground">
+                            Continue importing {p.name} orders manually via PDF upload in the meantime.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <Input
+                            value={tokenInput}
+                            onChange={(e) => setTokenInput(e.target.value)}
+                            placeholder={`${p.credentialLabel}`}
+                            className="h-8 text-xs"
+                            type="password"
+                          />
+                          <Input
+                            value={labelInput}
+                            onChange={(e) => setLabelInput(e.target.value)}
+                            placeholder="Label (e.g. Splash Swimwear)"
+                            className="h-8 text-xs"
+                          />
+                          {testError && expanded === p.id && (
+                            <p className="text-xs text-destructive flex items-center gap-1">
+                              <X className="w-3 h-3" /> {testError}
+                            </p>
+                          )}
+                          <Button
+                            variant="teal"
+                            size="sm"
+                            className="w-full h-8 text-xs"
+                            onClick={() => handleConnect(p.id, p.credentialKey)}
+                            disabled={connecting}
+                          >
+                            {connecting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />}
+                            Test & Connect
+                          </Button>
+                        </>
                       )}
-                      <Button
-                        variant="teal"
-                        size="sm"
-                        className="w-full h-8 text-xs"
-                        onClick={() => handleConnect(p.id, p.credentialKey)}
-                        disabled={connecting}
-                      >
-                        {connecting ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />}
-                        Test & Connect
-                      </Button>
                     </>
                   )}
                 </div>

@@ -40,6 +40,17 @@ export interface ApplyProgress {
   currentTitle: string;
 }
 
+export interface ApplyOptions {
+  /**
+   * When true (default), Shopify's `compareAtPrice` is set to the product's
+   * current price so storefronts render an "on-sale" badge / strike-through.
+   * When false, `compareAtPrice` is left untouched (Shopify keeps whatever
+   * value it currently holds — useful when the merchant manages strike-through
+   * pricing manually or doesn't want a sale badge).
+   */
+  setCompareAtPrice?: boolean;
+}
+
 const REQUEST_DELAY_MS = 500;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

@@ -88,20 +88,26 @@ const AgentPipelineShowcase = ({ onOpenGuide, onOpenAutomation, onStartInvoice, 
     const userId = userData?.user?.id;
     if (!userId) return;
 
-    const [gmail, settings, suppliers, prods, runs, platforms] = await Promise.all([
+    const [gmail, settings, supplierIntel, supplierProfiles, prods, runs, platforms] = await Promise.all([
       supabase.from("gmail_connections").select("id").eq("user_id", userId).maybeSingle(),
       supabase.from("user_settings").select("automation_email_monitoring,automation_auto_publish").eq("user_id", userId).maybeSingle(),
-      supabase.from("supplier_profiles").select("invoice_count,auto_publish_eligible").eq("user_id", userId),
+      // Trained supplier count + invoices learned come from supplier_intelligence
+      // (the AI learning table, same source as Supplier Brain), so the Dashboard
+      // counter matches the Supplier Brain list.
+      supabase.from("supplier_intelligence").select("invoice_count,confidence_score").eq("user_id", userId),
+      // auto_publish_eligible lives on supplier_profiles (operational settings).
+      supabase.from("supplier_profiles").select("auto_publish_eligible").eq("user_id", userId),
       supabase.from("products").select("id", { count: "exact", head: true }).eq("user_id", userId).not("description", "is", null),
       supabase.from("agent_runs").select("id", { count: "exact", head: true }).eq("user_id", userId),
       supabase.from("platform_connections").select("id").eq("user_id", userId).limit(1).maybeSingle(),
     ]);
 
-    const supRows = (suppliers.data ?? []) as { invoice_count: number; auto_publish_eligible: boolean | null }[];
-    const eligible = supRows.filter((r) => r.auto_publish_eligible).length;
-    const totalInv = supRows.reduce((n, r) => n + (r.invoice_count ?? 0), 0);
-    const trainedCount = supRows.length;
-    const hasTrained = supRows.some((r) => (r.invoice_count ?? 0) >= 10);
+    const intelRows = (supplierIntel.data ?? []) as { invoice_count: number; confidence_score: number | null }[];
+    const profileRows = (supplierProfiles.data ?? []) as { auto_publish_eligible: boolean | null }[];
+    const eligible = profileRows.filter((r) => r.auto_publish_eligible).length;
+    const totalInv = intelRows.reduce((n, r) => n + (r.invoice_count ?? 0), 0);
+    const trainedCount = intelRows.length;
+    const hasTrained = intelRows.some((r) => (r.invoice_count ?? 0) >= 10);
 
     setS({
       watchdogActive: !!gmail.data && !!settings.data?.automation_email_monitoring,

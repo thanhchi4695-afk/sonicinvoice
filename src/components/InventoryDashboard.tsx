@@ -196,6 +196,9 @@ export default function InventoryDashboard({ onBack }: Props) {
         const sumFromInventory = Object.values(byLocation).reduce((a, b) => a + b, 0);
         const baseQty = Object.keys(byLocation).length > 0 ? sumFromInventory : (v.quantity || 0);
         const platformVariantId = v.shopify_variant_id || null;
+        // Use Shopify variant ID if available, else fall back to internal UUID so
+        // restock_status_override always has a stable key per variant.
+        const effectiveOverrideKey = platformVariantId ?? v.id;
         return {
           variantId: v.id,
           productId: v.product_id,
@@ -209,9 +212,10 @@ export default function InventoryDashboard({ onBack }: Props) {
           retailPrice: Number(v.retail_price) || 0,
           quantity: baseQty,
           byLocation,
-          shopifyVariantId: platformVariantId,
+          shopifyVariantId: effectiveOverrideKey,
           restockStatus: resolveRestockStatus({
             platformVariantId,
+            internalVariantId: v.id,
             vendor: prod?.vendor || null,
             cacheStatus: platformVariantId ? cacheStatusByVariant.get(String(platformVariantId)) ?? null : null,
             overrides,

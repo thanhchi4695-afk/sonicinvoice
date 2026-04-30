@@ -669,7 +669,9 @@ export default function ProductFeedTable({ onBack, onFix }: Props) {
                               variant="ghost"
                               size="sm"
                               className="h-7 px-2"
-                              onClick={() => onFix?.(r.id)}
+                              onClick={() =>
+                                onFix ? onFix(r.id) : openFixModal([r.id])
+                              }
                             >
                               <Wrench className="w-3.5 h-3.5 mr-1" /> Fix
                             </Button>

@@ -644,7 +644,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         {activeTab === "google_ads" && <AdsGuideTabs />}
         {activeTab === "billing" && <BillingScreen />}
         {activeTab === "help" && <HelpCentre />}
-        {activeTab === "howto" && <HowToCatalog onNavigateToFeature={(f) => setActiveFlow(f as any)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
+        {activeTab === "howto" && <HowToTabs onNavigateToFeature={(f) => setActiveFlow(f as any)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
         {activeTab === "agent_guide" && <AgentGuide onBack={() => setActiveTab("home")} onOpenAutomation={() => setActiveTab("account")} />}
         {activeTab === "account" && <AccountScreen />}
       </Suspense>

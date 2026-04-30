@@ -246,6 +246,22 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const { notifications, unreadCount, addNotification, markRead, markAllRead, dismiss } = useNotifications();
   const { isEmbedded, shop, authState: embeddedAuthState, authError: embeddedAuthError } = useShopifyEmbedded();
 
+  // Phase breadcrumb is only meaningful while the user is inside the invoice
+  // pipeline. On Inventory / Suppliers / Billing / Account etc. it creates a
+  // false signal that an invoice is "in progress". Hide it everywhere else.
+  const INVOICE_PHASE_FLOWS = new Set([
+    "invoice", "scan_mode", "packing_slip", "email_inbox", "joor",
+    "wholesale_import", "lookbook_import", "order_form",
+    "catalog_memory", "supplier_intelligence", "stock_check", "reconciliation",
+    "product_descriptions", "smart_naming", "image_optimise", "collection_seo",
+    "collab_seo", "organic_seo", "geo_agentic", "style_grouping", "shopify_csv_seo", "csv_seo",
+    "price_adjust", "price_lookup", "price_match", "margin_protection",
+    "markdown_ladder", "competitor_intel", "sale",
+    "google_ads_setup", "meta_ads_setup", "ai_feed_optimise", "feed_health",
+    "google_ads", "social_media", "lightspeed_convert",
+  ]);
+  const PHASE_TABS = new Set(["analytics"]);
+
   // ── Standalone session management (non-embedded only) ──
   // Embedded auth is handled entirely by ShopifyEmbeddedProvider.
   useEffect(() => {

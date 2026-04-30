@@ -17,6 +17,7 @@ import ResetPassword from "./pages/ResetPassword.tsx";
 import AuthCallbackPage from "./pages/AuthCallback.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Support from "./pages/Support.tsx";
+import Unsubscribe from "./pages/Unsubscribe.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import Health from "./pages/Health.tsx";
 import AdminSecrets from "./pages/AdminSecrets.tsx";
@@ -57,6 +58,7 @@ const App = () => (
               <Route path="/auth/lightspeed-x/callback" element={<AuthCallbackPage />} />
               <Route path="/auth/lightspeed-r/callback" element={<AuthCallbackPage />} />
               <Route path="/support" element={<Support />} />
+              <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/health" element={<Health />} />
               <Route path="/admin/secrets" element={<AdminSecrets />} />

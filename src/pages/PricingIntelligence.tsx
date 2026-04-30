@@ -337,6 +337,14 @@ export default function PricingIntelligence() {
                             idx % 2 === 0 ? "" : "bg-muted/20"
                           }`}
                         >
+                          <td className="px-2 py-1 text-center">
+                            <Checkbox
+                              checked={selectedIds.has(r.productId)}
+                              disabled={r.suggestedNewPrice == null}
+                              onCheckedChange={() => toggleSelected(r.productId)}
+                              aria-label={`Select ${r.title}`}
+                            />
+                          </td>
                           <td className="px-3 py-1 font-sans truncate max-w-[260px]">
                             {r.title}
                             {r.vendor && (

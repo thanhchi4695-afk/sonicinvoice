@@ -54,7 +54,7 @@ const HowToTabs = ({ onNavigateToFeature, onNavigateToTab }: Props) => {
             onNavigateToTab={onNavigateToTab}
           />
         )}
-        {sub === "guide" && <LightspeedGuide />}
+        {sub === "guide" && <LightspeedGuide onBack={() => setSub("howto")} />}
       </Suspense>
     </div>
   );

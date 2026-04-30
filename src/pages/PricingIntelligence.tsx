@@ -10,7 +10,11 @@ import {
   ShieldCheck,
   Calculator,
   Info,
+  Tag,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ApplyDiscountsModal } from "@/components/pricing/ApplyDiscountsModal";
+import type { RecommendedPriceChange } from "@/lib/shopify/priceManager";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

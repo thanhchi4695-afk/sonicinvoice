@@ -12,7 +12,10 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "update_variant_price" | "adjust_inventory" | "set_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog" | "graphql_create_collection";
+  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "update_variant_price" | "adjust_inventory" | "set_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog" | "graphql_create_collection" | "graphql";
+  // For generic graphql passthrough
+  query?: string;
+  variables?: Record<string, unknown>;
   // For push_product / graphql_create_product
   product?: Record<string, unknown>;
   // For find_variant / find_by_barcode
@@ -1372,6 +1375,55 @@ Deno.serve(async (req) => {
           });
         }
         result = { collection: colData?.data?.collectionCreate?.collection };
+        break;
+      }
+
+      case "graphql": {
+        // Generic GraphQL passthrough with retry on 429/5xx
+        if (!body.query) {
+          return new Response(JSON.stringify({ error: "Missing query" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const gqlUrl = `https://${store_url}/admin/api/${api_version}/graphql.json`;
+        const payload = JSON.stringify({ query: body.query, variables: body.variables ?? {} });
+        let attempt = 0;
+        let resp: Response | null = null;
+        let lastErr: unknown = null;
+        while (attempt < 3) {
+          try {
+            resp = await fetch(gqlUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Shopify-Access-Token": access_token,
+              },
+              body: payload,
+            });
+            if (resp.status === 429 || resp.status >= 500) {
+              await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)));
+              attempt++;
+              continue;
+            }
+            break;
+          } catch (e) {
+            lastErr = e;
+            await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)));
+            attempt++;
+          }
+        }
+        if (!resp) {
+          return new Response(JSON.stringify({ error: "Shopify GraphQL unreachable", details: String(lastErr) }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const gqlData = await resp.json();
+        if (gqlData.errors) {
+          return new Response(JSON.stringify({ error: "GraphQL errors", details: gqlData.errors }), {
+            status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        result = gqlData.data;
         break;
       }
 

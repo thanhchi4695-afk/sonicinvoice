@@ -114,6 +114,13 @@ const PhaseProgressBar = ({ activeTab, activeFlow, onNavigate }: PhaseProgressBa
                     // Import invoice. They are inert until the dedicated
                     // screen is built.
                     if (disabled) return;
+                    // Publish panel is embedded in the invoice flow below the
+                    // review screen — only navigate if we're already inside
+                    // an active invoice session, otherwise show a hint.
+                    if (phase.id === "publish" && !(currentPhase && ["review","catalog","price","publish"].includes(currentPhase))) {
+                      toast.info("Upload an invoice first — Publish appears below the review screen after extraction.");
+                      return;
+                    }
                     onNavigate(phase.target);
                   }}
                   disabled={disabled}

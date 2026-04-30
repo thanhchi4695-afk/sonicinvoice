@@ -112,7 +112,7 @@ export const SceneAudit = () => {
 
 const KpiCard = ({ label, value, accent }: { label: string; value: string; accent: string }) => (
   <div style={{
-    width: 350, padding: 32, borderRadius: 22,
+    width: 400, padding: "28px 32px", borderRadius: 22,
     background: COLORS.surface, border: `1px solid ${COLORS.border}`,
     boxShadow: `0 20px 50px rgba(0,0,0,0.35)`,
   }}>
@@ -123,9 +123,10 @@ const KpiCard = ({ label, value, accent }: { label: string; value: string; accen
       {label}
     </div>
     <div style={{
-      fontFamily: fontDisplay, fontWeight: 800, fontSize: 88, lineHeight: 1, marginTop: 18,
+      fontFamily: fontDisplay, fontWeight: 800, fontSize: 76, lineHeight: 1, marginTop: 14,
       color: accent, letterSpacing: -2,
       textShadow: `0 0 30px ${accent}44`,
+      whiteSpace: "nowrap",
     }}>
       {value}
     </div>

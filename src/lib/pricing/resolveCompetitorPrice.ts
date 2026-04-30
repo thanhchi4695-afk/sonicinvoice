@@ -33,6 +33,65 @@ export interface ResolveCompetitorOptions {
   maxAgeHours?: number;
   /** Minimum confidence_score on the cached row (0–100, default 50). */
   minConfidence?: number;
+  /**
+   * If true, trigger a live re-scrape of every active competitor for the
+   * monitored product BEFORE reading cache. Used by the "force refresh"
+   * button in the pricing modal.
+   */
+  forceRefresh?: boolean;
+}
+
+/**
+ * Re-scrape every active competitor for a monitored product. Writes fresh
+ * rows into `competitor_prices`. Returns the number of competitors hit.
+ */
+export async function refreshCompetitorPricesForProduct(opts: {
+  shopifyProductId?: string | null;
+  sku?: string | null;
+}): Promise<{ refreshed: number; monitoredProductId: string | null }> {
+  let monitoredQuery = supabase
+    .from("competitor_monitored_products")
+    .select("id, user_id")
+    .limit(1);
+  if (opts.shopifyProductId) {
+    monitoredQuery = monitoredQuery.eq(
+      "shopify_product_id",
+      numericId(opts.shopifyProductId),
+    );
+  } else if (opts.sku) {
+    monitoredQuery = monitoredQuery.eq("product_sku", opts.sku);
+  } else {
+    return { refreshed: 0, monitoredProductId: null };
+  }
+  const { data: monitored } = await monitoredQuery.maybeSingle();
+  if (!monitored?.id) return { refreshed: 0, monitoredProductId: null };
+
+  const { data: comps } = await supabase
+    .from("competitors")
+    .select("id")
+    .eq("is_active", true);
+
+  if (!comps || comps.length === 0) {
+    return { refreshed: 0, monitoredProductId: monitored.id };
+  }
+
+  let hit = 0;
+  for (const c of comps) {
+    try {
+      const { error } = await supabase.functions.invoke("competitor-price-fetch", {
+        body: {
+          competitor_id: c.id,
+          monitored_product_ids: [monitored.id],
+        },
+      });
+      if (!error) hit += 1;
+    } catch (e) {
+      console.warn("[refreshCompetitorPricesForProduct] competitor failed", c.id, e);
+    }
+    // Polite spacing between competitors.
+    await new Promise((r) => setTimeout(r, 750));
+  }
+  return { refreshed: hit, monitoredProductId: monitored.id };
 }
 
 export interface ResolvedCompetitorPrice {
@@ -61,6 +120,18 @@ export async function resolveCompetitorPrice(
 ): Promise<ResolvedCompetitorPrice> {
   const maxAgeHours = opts.maxAgeHours ?? 48;
   const minConfidence = opts.minConfidence ?? 50;
+
+  // ── 0. Optional force refresh — re-scrape monitored competitors first.
+  if (opts.forceRefresh) {
+    try {
+      await refreshCompetitorPricesForProduct({
+        shopifyProductId: opts.shopifyProductId ?? null,
+        sku: opts.sku ?? null,
+      });
+    } catch (err) {
+      console.warn("[resolveCompetitorPrice] force refresh failed", err);
+    }
+  }
 
   // ── 1. Cache lookup ──
   if (opts.shopifyProductId || opts.sku) {

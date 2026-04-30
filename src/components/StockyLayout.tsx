@@ -20,6 +20,7 @@ import {
   History as HistoryIcon,
   CreditCard,
   Sparkles,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ const defaultNavItems: StockyNavItem[] = [
   { id: "stocktake_module", label: "Stocktakes", icon: ClipboardCheck, type: "flow" },
   { id: "reports_hub", label: "Reports", icon: BarChart3, type: "flow" },
   { id: "restock_suggestions", label: "Restock Suggestions", icon: Sparkles, type: "flow" },
+  { id: "tools", label: "Tools & Feeds", icon: Wrench, type: "tab" },
   { id: "billing", label: "Billing", icon: CreditCard, type: "tab" },
   { id: "account", label: "Settings", icon: Settings, type: "tab" },
 ];

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Plus, Search, FileText, Loader2 } from "lucide-react";
+import { Plus, Search, FileText, Loader2, ChevronRight } from "lucide-react";
 import { getUnprocessedInboxCount } from "@/components/EmailInboxPanel";
 import { formatRelativeTime } from "@/lib/audit-log";
 
@@ -24,6 +24,8 @@ interface InvoicesTabProps {
   onStartReorder: () => void;
   onStartSuppliers: () => void;
   onStartCatalogMemory: () => void;
+  /** Open Processing History — used as the row-click target until per-invoice detail screens exist. */
+  onOpenHistory?: (patternId?: string) => void;
 }
 
 interface InvoiceRow {
@@ -194,8 +196,20 @@ const InvoicesTab = (props: InvoicesTabProps) => {
           <div className="divide-y divide-border">
             {filtered.map(r => {
               const status = STATUS_BADGE[r.review_status ?? "draft"] ?? STATUS_BADGE.draft;
+              const isDraft = (r.review_status ?? "draft") === "draft" || (r.review_status ?? "") === "needs_review";
+              const actionLabel = isDraft ? "Resume" : "View";
+              const handleOpen = () => props.onOpenHistory?.(r.id);
               return (
-                <div key={r.id} className="px-3 py-2.5 flex items-center gap-3 hover:bg-muted/30">
+                <div
+                  key={r.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={handleOpen}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOpen(); }
+                  }}
+                  className="px-3 py-2.5 flex items-center gap-3 hover:bg-muted/40 cursor-pointer focus:outline-none focus:bg-muted/40"
+                >
                   <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -212,6 +226,15 @@ const InvoicesTab = (props: InvoicesTabProps) => {
                       {r.processing_duration_seconds ? ` · ${r.processing_duration_seconds}s` : ""}
                     </span>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-[11px] shrink-0"
+                    onClick={(e) => { e.stopPropagation(); handleOpen(); }}
+                  >
+                    {actionLabel}
+                  </Button>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" />
                 </div>
               );
             })}

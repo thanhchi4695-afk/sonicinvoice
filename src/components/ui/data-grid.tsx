@@ -258,9 +258,12 @@ export default function DataGrid<T>({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="border border-border rounded-md overflow-auto">
-        <table className="w-full text-xs" style={{ minWidth: table.getTotalSize() }}>
+      {/* Table — wrapped in a relative container with a right-edge scroll-shadow
+          so users notice they can scroll for hidden columns (off-screen "Action"
+          buttons were a major source of confusion). */}
+      <div className="relative">
+        <div className="border border-border rounded-md overflow-auto">
+          <table className="w-full text-xs" style={{ minWidth: table.getTotalSize() }}>
           <thead className="bg-muted/50 sticky top-0 z-10">
             {table.getHeaderGroups().map(headerGroup => (
               <tr key={headerGroup.id}>
@@ -324,6 +327,9 @@ export default function DataGrid<T>({
             )}
           </tbody>
         </table>
+        </div>
+        {/* Right-edge scroll-shadow hint — gradient overlay shown when content overflows. */}
+        <div className="pointer-events-none absolute top-0 right-0 h-full w-6 bg-gradient-to-l from-background to-transparent rounded-r-md" />
       </div>
 
       {/* Pagination */}

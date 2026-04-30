@@ -243,8 +243,24 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   }, []);
   
   const mode = useStoreMode();
-  const { notifications, unreadCount, addNotification, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, addNotification, markRead, markAllRead, dismiss } = useNotifications();
   const { isEmbedded, shop, authState: embeddedAuthState, authError: embeddedAuthError } = useShopifyEmbedded();
+
+  // Phase breadcrumb is only meaningful while the user is inside the invoice
+  // pipeline. On Inventory / Suppliers / Billing / Account etc. it creates a
+  // false signal that an invoice is "in progress". Hide it everywhere else.
+  const INVOICE_PHASE_FLOWS = new Set([
+    "invoice", "scan_mode", "packing_slip", "email_inbox", "joor",
+    "wholesale_import", "lookbook_import", "order_form",
+    "catalog_memory", "supplier_intelligence", "stock_check", "reconciliation",
+    "product_descriptions", "smart_naming", "image_optimise", "collection_seo",
+    "collab_seo", "organic_seo", "geo_agentic", "style_grouping", "shopify_csv_seo", "csv_seo",
+    "price_adjust", "price_lookup", "price_match", "margin_protection",
+    "markdown_ladder", "competitor_intel", "sale",
+    "google_ads_setup", "meta_ads_setup", "ai_feed_optimise", "feed_health",
+    "google_ads", "social_media", "lightspeed_convert",
+  ]);
+  const PHASE_TABS = new Set(["analytics"]);
 
   // ── Standalone session management (non-embedded only) ──
   // Embedded auth is handled entirely by ShopifyEmbeddedProvider.
@@ -643,6 +659,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             onStartReorder={() => setActiveFlow("reorder")}
             onStartSuppliers={() => setActiveFlow("suppliers")}
             onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
+            onOpenHistory={() => setActiveFlow("processing_history")}
           />
         )}
         {activeTab === "analytics" && <AnalyticsPanel />}
@@ -683,6 +700,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               unreadCount={unreadCount}
               onMarkRead={markRead}
               onMarkAllRead={markAllRead}
+              onDismiss={dismiss}
               onNavigate={(link) => {
                 if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
                   setActiveFlow(link as any);
@@ -692,14 +710,16 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               }}
             />
           </div>
-          <PhaseProgressBar
-            activeTab={activeTab}
-            activeFlow={activeFlow}
-            onNavigate={(t) => {
-              if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-              else { setActiveFlow(t.id as any); }
-            }}
-          />
+          {(activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) || (!activeFlow && PHASE_TABS.has(activeTab)) ? (
+            <PhaseProgressBar
+              activeTab={activeTab}
+              activeFlow={activeFlow}
+              onNavigate={(t) => {
+                if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
+                else { setActiveFlow(t.id as any); }
+              }}
+            />
+          ) : null}
           {activeFlow ? renderFlow() : mainContent}
         </div>
         {/* Mobile bottom tabs for embedded mode — conditional render to avoid duplicate DOM */}
@@ -729,6 +749,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
                 unreadCount={unreadCount}
                 onMarkRead={markRead}
                 onMarkAllRead={markAllRead}
+                onDismiss={dismiss}
                 onNavigate={(link) => {
                   if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
                     setActiveFlow(link as any);
@@ -739,14 +760,16 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               />
               <StoreModePill mode={mode} onOpenAccount={() => setActiveTab("account")} />
             </div>
-            <PhaseProgressBar
-              activeTab={activeTab}
-              activeFlow={activeFlow}
-              onNavigate={(t) => {
-                if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-                else { setActiveFlow(t.id as any); }
-              }}
-            />
+            {(activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) || (!activeFlow && PHASE_TABS.has(activeTab)) ? (
+              <PhaseProgressBar
+                activeTab={activeTab}
+                activeFlow={activeFlow}
+                onNavigate={(t) => {
+                  if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
+                  else { setActiveFlow(t.id as any); }
+                }}
+              />
+            ) : null}
             <QuickActionsBar onAction={handleStartFlow} />
             {activeFlow ? renderFlow() : mainContent}
           </StockyLayout>
@@ -762,6 +785,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               unreadCount={unreadCount}
               onMarkRead={markRead}
               onMarkAllRead={markAllRead}
+              onDismiss={dismiss}
               onNavigate={(link) => {
                 if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
                   setActiveFlow(link as any);
@@ -772,14 +796,16 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             />
             <StoreModePill mode={mode} onOpenAccount={() => setActiveTab("account")} />
           </div>
-          <PhaseProgressBar
-            activeTab={activeTab}
-            activeFlow={activeFlow}
-            onNavigate={(t) => {
-              if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-              else { setActiveFlow(t.id as any); }
-            }}
-          />
+          {(activeFlow && INVOICE_PHASE_FLOWS.has(activeFlow as string)) || (!activeFlow && PHASE_TABS.has(activeTab)) ? (
+            <PhaseProgressBar
+              activeTab={activeTab}
+              activeFlow={activeFlow}
+              onNavigate={(t) => {
+                if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
+                else { setActiveFlow(t.id as any); }
+              }}
+            />
+          ) : null}
           <QuickActionsBar onAction={handleStartFlow} />
           {activeFlow ? renderFlow() : mainContent}
           <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />

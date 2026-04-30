@@ -274,7 +274,8 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
                   {filtered.slice(0, 250).map((r, i) => (
                     <tr
                       key={r.id}
-                      className={`border-b ${i % 2 === 0 ? "bg-background" : "bg-muted/20"}`}
+                      onClick={() => openRecommendation(r)}
+                      className={`border-b cursor-pointer hover:bg-primary/5 ${i % 2 === 0 ? "bg-background" : "bg-muted/20"}`}
                       style={{ height: 32 }}
                     >
                       <td className="px-4 py-1 font-medium truncate max-w-[260px]">
@@ -297,9 +298,13 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
                           : <span className="text-muted-foreground">—</span>}
                       </td>
                       <td className="px-4 py-1 text-right">
-                        <Button size="sm" variant="secondary" onClick={() => openRecommendation(r)}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={(e) => { e.stopPropagation(); openRecommendation(r); }}
+                        >
                           <TrendingDown className="h-3.5 w-3.5 mr-1" />
-                          Get Recommendation
+                          Recommend
                         </Button>
                       </td>
                     </tr>

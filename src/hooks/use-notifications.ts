@@ -95,7 +95,17 @@ export function useNotifications() {
       timestamp: new Date().toISOString(),
       read: false,
     };
-    setNotifications(prev => [item, ...prev].slice(0, MAX_NOTIFICATIONS));
+    setNotifications(prev => {
+      // Dedupe: drop if an identical (title+message) notification was added in the last 5 minutes.
+      const cutoff = Date.now() - 5 * 60 * 1000;
+      const isDup = prev.some(p =>
+        p.title === item.title &&
+        p.message === item.message &&
+        new Date(p.timestamp).getTime() > cutoff
+      );
+      if (isDup) return prev;
+      return [item, ...prev].slice(0, MAX_NOTIFICATIONS);
+    });
   }, []);
 
   const markRead = useCallback((id: string) => {
@@ -106,7 +116,15 @@ export function useNotifications() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }, []);
 
+  const dismiss = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
+  const dismissAll = useCallback(() => {
+    setNotifications([]);
+  }, []);
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  return { notifications, unreadCount, addNotification, markRead, markAllRead };
+  return { notifications, unreadCount, addNotification, markRead, markAllRead, dismiss, dismissAll };
 }

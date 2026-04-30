@@ -267,12 +267,28 @@ const InvoicesTab = (props: InvoicesTabProps) => {
         </div>
       ) : (
         <div className="bg-card rounded-lg border border-border overflow-hidden">
+          {/* Select-all header */}
+          <div className="px-3 py-2 flex items-center gap-3 border-b border-border bg-muted/30 text-[11px] text-muted-foreground">
+            <Checkbox
+              checked={allInViewSelected ? true : someInViewSelected ? "indeterminate" : false}
+              onCheckedChange={toggleAllInView}
+              aria-label="Select all visible invoices"
+            />
+            <span>
+              {allInViewSelected
+                ? `All ${filteredIds.length} selected on this view`
+                : someInViewSelected
+                ? `${selectedInView.length} of ${filteredIds.length} selected`
+                : "Select all on this view"}
+            </span>
+          </div>
           <div className="divide-y divide-border">
             {filtered.map(r => {
               const status = STATUS_BADGE[r.review_status ?? "draft"] ?? STATUS_BADGE.draft;
               const isDraft = (r.review_status ?? "draft") === "draft" || (r.review_status ?? "") === "needs_review";
               const actionLabel = isDraft ? "Resume" : "View";
               const handleOpen = () => props.onOpenHistory?.(r.id);
+              const isChecked = selected.has(r.id);
               return (
                 <div
                   key={r.id}
@@ -282,8 +298,15 @@ const InvoicesTab = (props: InvoicesTabProps) => {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOpen(); }
                   }}
-                  className="px-3 py-2.5 flex items-center gap-3 hover:bg-muted/40 cursor-pointer focus:outline-none focus:bg-muted/40"
+                  className={`px-3 py-2.5 flex items-center gap-3 hover:bg-muted/40 cursor-pointer focus:outline-none focus:bg-muted/40 ${isChecked ? "bg-primary/5" : ""}`}
                 >
+                  <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                    <Checkbox
+                      checked={isChecked}
+                      onCheckedChange={() => toggleRow(r.id)}
+                      aria-label={`Select invoice ${r.original_filename ?? r.id}`}
+                    />
+                  </div>
                   <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -318,6 +341,29 @@ const InvoicesTab = (props: InvoicesTabProps) => {
           </div>
         </div>
       )}
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selected.size} invoice{selected.size === 1 ? "" : "s"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the invoice records and their extracted line data. Variants already
+              merged into your inventory will not be removed. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleBulkDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Deleting…</> : `Delete ${selected.size}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

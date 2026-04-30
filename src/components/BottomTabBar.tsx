@@ -9,7 +9,6 @@ interface BottomTabBarProps {
 
 const BottomTabBar = ({ activeTab, onTabChange }: BottomTabBarProps) => {
   const { t } = useTranslation();
-  const mode = useStoreMode();
 
   const baseTabs = [
     { id: "start", label: t("nav.start", "Start"), icon: Rocket },

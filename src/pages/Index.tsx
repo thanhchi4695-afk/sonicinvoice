@@ -19,6 +19,7 @@ import QuickActionsBar from "@/components/QuickActionsBar";
 import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import PhaseProgressBar from "@/components/PhaseProgressBar";
+import MobileKeyboardHint from "@/components/MobileKeyboardHint";
 // HomeScreen kept available (now lazy) — accessible from Tools as "Classic dashboard".
 const HomeScreen = lazy(() => import("@/components/HomeScreen"));
 

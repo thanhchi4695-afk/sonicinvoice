@@ -12,7 +12,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { useEffect, useState } from "react";
-import { Globe, Loader2, RefreshCw, ExternalLink } from "lucide-react";
+import { Globe, Loader2, RefreshCw, ExternalLink, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";

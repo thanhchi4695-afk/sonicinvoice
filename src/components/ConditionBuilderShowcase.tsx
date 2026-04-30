@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
  * Self-contained: drop into any home view. Uses /rules as the primary CTA.
  */
 const ConditionBuilderShowcase = () => {
+  const [videoOpen, setVideoOpen] = useState(false);
   return (
     <section
       aria-labelledby="condition-builder-heading"

@@ -130,7 +130,7 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
         avgWeeklySales: usingRealVelocity ? effectiveVelocity : product.avgWeeklySales,
         competitorPrice: effectiveCompetitorPrice,
       }),
-    [product, scraped, effectiveVelocity, usingRealVelocity],
+    [product, scraped, autoCompetitor, effectiveVelocity, usingRealVelocity, effectiveCompetitorPrice],
   );
 
   // Editable discount — defaults to engine recommendation

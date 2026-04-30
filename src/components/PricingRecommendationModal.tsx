@@ -89,6 +89,37 @@ export default function PricingRecommendationModal({ product, open, onClose }: P
   // Manual paste-URL scrape (`scraped`) takes precedence when present.
   const [autoCompetitor, setAutoCompetitor] = useState<ResolvedCompetitorPrice | null>(null);
   const [autoCompetitorLoading, setAutoCompetitorLoading] = useState(false);
+  const [refreshingCompetitor, setRefreshingCompetitor] = useState(false);
+
+  const loadAutoCompetitor = async (force = false) => {
+    if (force) setRefreshingCompetitor(true);
+    else setAutoCompetitorLoading(true);
+    try {
+      const res = await resolveCompetitorPrice({
+        shopifyProductId: product.id,
+        sku: product.sku,
+        forceRefresh: force,
+      });
+      setAutoCompetitor(res);
+      if (force) {
+        if (res.price) {
+          toast.success(
+            `Refreshed — lowest competitor $${res.price.toFixed(2)}${
+              res.competitorName ? ` (${res.competitorName})` : ""
+            }`,
+          );
+        } else {
+          toast.message("No competitor matches found for this product yet");
+        }
+      }
+    } catch (e) {
+      if (force) toast.error(e instanceof Error ? e.message : "Refresh failed");
+      setAutoCompetitor(null);
+    } finally {
+      setAutoCompetitorLoading(false);
+      setRefreshingCompetitor(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;

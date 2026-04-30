@@ -7,6 +7,7 @@ import { ChevronLeft, Sparkles, Search, TrendingDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getPhase, type LifecyclePhase } from "@/lib/pricing/lifecycleEngine";
+import { getVelocityMap } from "@/lib/pricing/salesVelocity";
 import PricingRecommendationModal, {
   type PricingProduct,
 } from "./PricingRecommendationModal";

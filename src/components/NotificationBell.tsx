@@ -19,7 +19,7 @@ interface Props {
   onNavigate?: (link: string) => void;
 }
 
-export default function NotificationBell({ notifications, unreadCount, onMarkRead, onMarkAllRead, onNavigate }: Props) {
+export default function NotificationBell({ notifications, unreadCount, onMarkRead, onMarkAllRead, onDismiss, onNavigate }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

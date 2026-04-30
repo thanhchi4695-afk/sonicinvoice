@@ -20,7 +20,7 @@ import {
   History as HistoryIcon,
   CreditCard,
   Sparkles,
-  Wrench,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +45,7 @@ const defaultNavItems: StockyNavItem[] = [
   { id: "stocktake_module", label: "Stocktakes", icon: ClipboardCheck, type: "flow" },
   { id: "reports_hub", label: "Reports", icon: BarChart3, type: "flow" },
   { id: "restock_suggestions", label: "Restock Suggestions", icon: Sparkles, type: "flow" },
-  { id: "tools", label: "Tools & Feeds", icon: Wrench, type: "tab" },
+  { id: "support_chat", label: "Chat with Support", icon: MessageCircle, type: "tab" },
   { id: "billing", label: "Billing", icon: CreditCard, type: "tab" },
   { id: "account", label: "Settings", icon: Settings, type: "tab" },
 ];
@@ -102,6 +102,12 @@ const StockyLayout = ({
   const getActiveId = () => activeFlow || activeTab;
 
   const handleClick = (item: StockyNavItem) => {
+    if (item.id === "support_chat") {
+      window.location.href =
+        "mailto:thanhchi4695@gmail.com?subject=Sonic%20Invoices%20Support%20Request&body=Hi%2C%0A%0AI%20need%20help%20with%3A%0A%0A";
+      setMobileOpen(false);
+      return;
+    }
     if (item.type === "tab") {
       onTabChange(item.id);
     } else {

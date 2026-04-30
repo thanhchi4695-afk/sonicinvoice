@@ -82,11 +82,12 @@ export const SceneConnect = () => {
         }}
       >
         {/* Left: JOOR logo block */}
-        <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 32, flexShrink: 0 }}>
           <div
             style={{
               width: 140,
               height: 140,
+              flexShrink: 0,
               borderRadius: 28,
               background: `linear-gradient(135deg, #1a1a1a, #2a2a2a)`,
               border: `1px solid ${COLORS.border}`,
@@ -95,7 +96,7 @@ export const SceneConnect = () => {
               justifyContent: "center",
               fontFamily: fontDisplay,
               fontWeight: 800,
-              fontSize: 44,
+              fontSize: 38,
               color: COLORS.text,
               letterSpacing: 2,
             }}

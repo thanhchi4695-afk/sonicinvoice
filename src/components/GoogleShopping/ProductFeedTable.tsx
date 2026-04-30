@@ -735,6 +735,24 @@ export default function ProductFeedTable({ onBack, onFix }: Props) {
           </Button>
         </div>
       </div>
+
+      <FixAttributesModal
+        open={fixOpen}
+        onOpenChange={(o) => {
+          setFixOpen(o);
+          if (!o) setFixProducts([]);
+        }}
+        products={fixProducts}
+        onSaved={() => {
+          setSelected(new Set());
+          fetchPage(pages[pageIndex] ?? "");
+        }}
+      />
+      {fixOpen && fixLoading && (
+        <div className="fixed bottom-4 right-4 text-xs text-muted-foreground bg-background border rounded px-3 py-2 shadow z-50">
+          Loading attributes…
+        </div>
+      )}
     </div>
   );
 }

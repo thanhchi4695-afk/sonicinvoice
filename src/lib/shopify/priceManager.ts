@@ -219,7 +219,7 @@ export async function applyRecommendedPriceChanges(
             : "";
         addAuditEntry(
           "pricing.apply.success",
-          `${change.title}: $${change.originalPrice.toFixed(2)} → $${change.newPrice.toFixed(2)}${pctText}. Reason: ${change.reason}`,
+          `${change.title}: $${change.originalPrice.toFixed(2)} → $${change.newPrice.toFixed(2)}${pctText}${setCompareAt ? " [compareAt set]" : " [compareAt unchanged]"}. Reason: ${change.reason}`,
         );
       }
     } catch (e) {

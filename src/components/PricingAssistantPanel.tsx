@@ -188,9 +188,55 @@ export default function PricingAssistantPanel({ onBack }: { onBack: () => void }
         ))}
       </div>
 
+      {/* Quick filter chips */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground mr-1">
+          Quick filter:
+        </span>
+        <button
+          onClick={() => setPhaseFilter("all")}
+          className={`px-3 py-1 rounded-full text-xs border transition ${
+            phaseFilter === "all"
+              ? "bg-foreground text-background border-foreground"
+              : "bg-background text-muted-foreground border-border hover:border-foreground/40"
+          }`}
+        >
+          All ({rows.length})
+        </button>
+        {([1, 2, 3, 4, 5] as LifecyclePhase[]).map((p) => {
+          const active = phaseFilter === p;
+          return (
+            <button
+              key={p}
+              onClick={() => setPhaseFilter(active ? "all" : p)}
+              className={`px-3 py-1 rounded-full text-xs border transition ${PHASE_TONE[p]} ${
+                active ? "ring-2 ring-offset-1 ring-offset-background ring-current" : "opacity-80 hover:opacity-100"
+              }`}
+            >
+              {PHASE_LABELS[p]} ({phaseCounts[p]})
+            </button>
+          );
+        })}
+        {phaseFilter !== "all" && (
+          <button
+            onClick={() => setPhaseFilter("all")}
+            className="px-2 py-1 rounded-full text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <CardTitle className="text-base">Catalog ({filtered.length})</CardTitle>
+          <CardTitle className="text-base">
+            Catalog ({filtered.length})
+            {phaseFilter !== "all" && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                · filtered to {PHASE_LABELS[phaseFilter as LifecyclePhase]}
+              </span>
+            )}
+          </CardTitle>
           <div className="flex items-center gap-2 w-full max-w-sm">
             <Search className="h-4 w-4 text-muted-foreground" />
             <Input

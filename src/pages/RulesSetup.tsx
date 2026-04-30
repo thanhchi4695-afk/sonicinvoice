@@ -260,8 +260,8 @@ const RulesSetup = () => {
       <RuleTemplatePicker
         open={showPicker}
         onOpenChange={setShowPicker}
-        onPick={(t) => {
-          setPicked(t);
+        onPick={(seed) => {
+          if (seed) setPicked(seed);
           setShowPicker(false);
           // Auto-open builder after pick for momentum.
           setTimeout(() => setShowBuilder(true), 150);

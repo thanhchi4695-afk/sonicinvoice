@@ -16,13 +16,14 @@ import type { TemplateEntry } from './registry.ts'
 
 const SITE_NAME = 'Sonic Invoices'
 
-topic?: string
+interface SupportRequestProps {
   customerEmail?: string
   customerName?: string
   message?: string
   screenshotUrl?: string
   pageUrl?: string
   submittedAt?: string
+  topic?: string
 }
 
 const SupportRequestEmail = ({
@@ -32,6 +33,7 @@ const SupportRequestEmail = ({
   screenshotUrl,
   pageUrl,
   submittedAt,
+  topic,
 }: SupportRequestProps) => (
   <Html lang="en" dir="ltr">
     <Head />

@@ -24,6 +24,8 @@ interface InvoicesTabProps {
   onStartReorder: () => void;
   onStartSuppliers: () => void;
   onStartCatalogMemory: () => void;
+  /** Open Processing History — used as the row-click target until per-invoice detail screens exist. */
+  onOpenHistory?: (patternId?: string) => void;
 }
 
 interface InvoiceRow {

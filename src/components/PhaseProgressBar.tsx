@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { ChevronRight, FileText, Search, Package, DollarSign, Upload, BarChart3 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export type PhaseId = "setup" | "capture" | "review" | "catalog" | "price" | "publish" | "analyse";

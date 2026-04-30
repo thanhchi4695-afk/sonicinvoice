@@ -13,10 +13,24 @@ import {
 interface HowToCatalogProps {
   onNavigateToFeature?: (flowKey: string) => void;
   onNavigateToTab?: (tab: string) => void;
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
+  hideSearchBar?: boolean;
 }
 
-const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProps) => {
-  const [searchQuery, setSearchQuery] = useState("");
+const HowToCatalog = ({
+  onNavigateToFeature,
+  onNavigateToTab,
+  searchQuery: searchQueryProp,
+  onSearchChange,
+  hideSearchBar = false,
+}: HowToCatalogProps) => {
+  const [internalQuery, setInternalQuery] = useState("");
+  const searchQuery = searchQueryProp ?? internalQuery;
+  const setSearchQuery = (q: string) => {
+    if (onSearchChange) onSearchChange(q);
+    else setInternalQuery(q);
+  };
   const [openFeature, setOpenFeature] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const featureRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -152,15 +166,17 @@ const HowToCatalog = ({ onNavigateToFeature, onNavigateToTab }: HowToCatalogProp
       </p>
 
       {/* Search */}
-      <div className="relative mb-5">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <input
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search features (e.g. 'invoice', 'seo', 'stock')..."
-          className="w-full h-10 rounded-lg bg-input border border-border pl-10 pr-3 text-sm"
-        />
-      </div>
+      {!hideSearchBar && (
+        <div className="relative mb-5">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search features (e.g. 'invoice', 'seo', 'stock')..."
+            className="w-full h-10 rounded-lg bg-input border border-border pl-10 pr-3 text-sm"
+          />
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-4 gap-2 mb-5">

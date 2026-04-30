@@ -384,13 +384,7 @@ export default function ProductFeedTable({ onBack, onFix }: Props) {
     });
 
   const bulkUpdateAttrs = () => {
-    if (selected.size === 0) {
-      toast.error("Select at least one product");
-      return;
-    }
-    toast.info(
-      `Open the Fix modal per product to apply attribute updates (${selected.size} selected). Bulk attribute editor coming next.`,
-    );
+    openFixModal(rows.filter((r) => selected.has(r.id)).map((r) => r.id));
   };
 
   // ── UI ──

@@ -57,6 +57,9 @@ const InvoicesTab = (props: InvoicesTabProps) => {
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const unread = getUnprocessedInboxCount();
 
   useEffect(() => {

@@ -4184,24 +4184,43 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               Appears prominently after upload. Supplier brain auto-loads
               any instructions saved from prior invoices of the same supplier
               (see CustomInstructionsField → getTemplates effect). */}
-          <div id="custom-requirements-panel" className={uploadedFile ? "mt-6 ring-2 ring-primary/30 rounded-lg" : "mt-6"}>
+          <div id="custom-requirements-panel" className="mt-6">
             {uploadedFile && (
-              <div className="bg-primary/10 border border-primary/30 rounded-t-lg px-4 py-2.5 flex items-center gap-2">
+              <div className="bg-primary/10 border border-primary/30 rounded-lg px-4 py-2.5 flex items-center gap-2 mb-2">
                 <FileText className="w-4 h-4 text-primary" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-primary truncate">📎 {uploadedFile.name}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    Add any custom requirements specific to this invoice below — sizing rules, vendor naming, abbreviations, anything the AI should know.
+                    Ready to process. Open Advanced below to add custom AI rules for this invoice.
                   </p>
                 </div>
               </div>
             )}
-            <CustomInstructionsField
-              value={customInstructions}
-              onChange={setCustomInstructions}
-              supplierName={supplierName}
-            />
-            <BrainModeToggle />
+            <button
+              type="button"
+              onClick={() => setShowAdvancedInstructions((v) => !v)}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 transition-colors"
+              aria-expanded={showAdvancedInstructions || !!customInstructions.trim()}
+            >
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <Settings className="w-4 h-4 text-muted-foreground" />
+                Advanced — Custom AI instructions
+                {customInstructions.trim() && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-semibold">Active</span>
+                )}
+              </span>
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${(showAdvancedInstructions || customInstructions.trim()) ? "rotate-180" : ""}`} />
+            </button>
+            {(showAdvancedInstructions || customInstructions.trim()) && (
+              <div className="mt-2 ring-2 ring-primary/20 rounded-lg">
+                <CustomInstructionsField
+                  value={customInstructions}
+                  onChange={setCustomInstructions}
+                  supplierName={supplierName}
+                />
+                <BrainModeToggle />
+              </div>
+            )}
           </div>
 
           {/* Start processing — only once a file has been chosen */}

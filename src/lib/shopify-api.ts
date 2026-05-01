@@ -37,6 +37,7 @@ export interface PushResult {
   status: "success" | "error" | "pending" | "pushing";
   error?: string;
   shopifyId?: string;
+  handle?: string;
 }
 
 async function callProxy(body: Record<string, unknown>) {

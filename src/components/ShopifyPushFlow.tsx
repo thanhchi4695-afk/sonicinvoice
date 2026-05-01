@@ -4,7 +4,8 @@ import { Progress } from "@/components/ui/progress";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from "@/components/ui/dialog";
-import { Check, X, Loader2, ExternalLink, Download, ShoppingBag, AlertTriangle, RotateCcw } from "lucide-react";
+import { Check, X, Loader2, ExternalLink, Download, ShoppingBag, AlertTriangle, RotateCcw, Copy } from "lucide-react";
+import { toast } from "sonner";
 import { PushProduct, PushResult, pushProducts, getConnection, recordPush, pushProductGraphQL } from "@/lib/shopify-api";
 
 interface ShopifyPushFlowProps {

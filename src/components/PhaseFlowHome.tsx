@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Package, ShoppingBag, Store, Mail, Briefcase, Upload, Check, Link as LinkIcon } from "lucide-react";
+import { FileText, Package, ShoppingBag, Store, Mail, Briefcase, Upload, Check, Link as LinkIcon, Code as CodeIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HomeWizard from "@/components/HomeWizard";
 import ProductUrlImporter, { type ImportedLineItem } from "@/components/ProductUrlImporter";
@@ -17,7 +17,7 @@ import { toast } from "sonner";
 // Scan) remain available — nothing is removed.
 // ─────────────────────────────────────────────────────────────
 
-export type UploadKind = "invoice" | "packing_slip";
+export type UploadKind = "invoice" | "packing_slip" | "html";
 export type PreferredPos = "shopify" | "lightspeed";
 
 interface PhaseFlowHomeProps {
@@ -62,7 +62,12 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
   const enterFlow = () => {
     if (!kind) return;
     if (kind === "invoice") props.onStartInvoice();
-    else props.onStartPackingSlip();
+    else if (kind === "html") {
+      // HTML uploads use the same downstream invoice flow; flag the source so
+      // the upload step can hint the parser (text/html instead of PDF/image).
+      localStorage.setItem("upload_source_kind", "html");
+      props.onStartInvoice();
+    } else props.onStartPackingSlip();
   };
 
   return (
@@ -114,7 +119,7 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
           </span>
           <h2 className="text-base font-semibold">What are you uploading?</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <TileButton
             active={kind === "invoice"}
             onClick={() => setKind("invoice")}
@@ -128,6 +133,13 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
             icon={<Package className="w-6 h-6" />}
             title="Packing slip"
             subtitle="Stock-check & qty update only"
+          />
+          <TileButton
+            active={kind === "html"}
+            onClick={() => setKind("html")}
+            icon={<CodeIcon className="w-6 h-6" />}
+            title="HTML file"
+            subtitle="Parse a saved web invoice (.html)"
           />
         </div>
       </section>
@@ -177,7 +189,7 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
         >
           <Upload className="w-5 h-5" />
           {ready
-            ? `Continue → upload ${kind === "invoice" ? "invoice" : "packing slip"}`
+            ? `Continue → upload ${kind === "invoice" ? "invoice" : kind === "html" ? "HTML file" : "packing slip"}`
             : "Choose both options to continue"}
         </button>
       </div>

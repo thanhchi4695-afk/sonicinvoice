@@ -65,7 +65,7 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
         try {
           const product = { ...products[i], status: productStatus };
           const { id, handle } = await pushProductGraphQL(product);
-          finalResults[i] = { title: products[i].title, status: "success", shopifyId: id };
+          finalResults[i] = { title: products[i].title, status: "success", shopifyId: id, handle };
         } catch (err) {
           finalResults[i] = {
             title: products[i].title,

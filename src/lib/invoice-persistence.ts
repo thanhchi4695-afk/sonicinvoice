@@ -7,6 +7,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import type { ValidatedProduct } from "./invoice-validator";
+import { expandLineBySize, isSizeRun } from "./size-run-expander";
 
 interface InvoiceMeta {
   supplier: string;

@@ -14,6 +14,8 @@ export const SHOPIFY_CSV_HEADERS = [
   "Published",
   "Option1 Name",
   "Option1 Value",
+  "Option2 Name",
+  "Option2 Value",
   "Variant SKU",
   "Variant Barcode",
   "Variant Price",

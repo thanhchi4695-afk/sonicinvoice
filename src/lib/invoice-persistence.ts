@@ -7,6 +7,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import type { ValidatedProduct } from "./invoice-validator";
+import { expandLineBySize, isSizeRun } from "./size-run-expander";
 
 interface InvoiceMeta {
   supplier: string;
@@ -63,7 +64,26 @@ export async function persistParsedInvoice(
   if (!session) return { documentId: null, supplierId: null, error: "Not authenticated" };
 
   const userId = session.user.id;
-  const accepted = products.filter(p => !p._rejected);
+  // ── Enrich phase: split size-run lines (e.g. size "8-16") into one
+  //    discrete variant per size BEFORE persisting. Without this, the
+  //    DB stores a single variant with size="8-16" and downstream
+  //    pricing / publishing tools can't address individual sizes.
+  //    Quantity is divided across the run; SKUs get a "-{size}" suffix.
+  //    See: src/lib/size-run-expander.ts (expandLineBySize).
+  const acceptedRaw = products.filter(p => !p._rejected);
+  let sizeRunsExpanded = 0;
+  const accepted: ValidatedProduct[] = acceptedRaw.flatMap((p) => {
+    if (!isSizeRun(p.size || "")) return [p];
+    const split = expandLineBySize(p);
+    if (split.length > 1) sizeRunsExpanded += split.length - 1;
+    // expandLineBySize preserves the spread, so the ValidatedProduct
+    // metadata (_confidence, _suggestedTitle, etc.) carries through.
+    return split as ValidatedProduct[];
+  });
+  if (sizeRunsExpanded > 0) {
+    console.log(`[invoice-persistence] enrich: expanded ${sizeRunsExpanded} extra size variants from runs`);
+  }
+
 
   // Calculate totals from products if not provided
   const subtotal = meta.subtotal ?? accepted.reduce((sum, p) => sum + (p.cost * p.qty), 0);

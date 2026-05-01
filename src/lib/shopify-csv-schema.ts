@@ -14,6 +14,8 @@ export const SHOPIFY_CSV_HEADERS = [
   "Published",
   "Option1 Name",
   "Option1 Value",
+  "Option2 Name",
+  "Option2 Value",
   "Variant SKU",
   "Variant Barcode",
   "Variant Price",
@@ -135,11 +137,33 @@ export interface ScannedProductForExport {
   description: string;
   tags: string;
   colour: string;
+  /** Optional size; populated when expandLineBySize splits a size run. */
+  size?: string;
   sku: string;
   barcode: string;
   price: number;
   quantity: number;
   costPerItem?: number;
+}
+
+/** Strip size and known colour tokens from a title so variants share the same base. */
+function baseTitleFor(title: string): string {
+  return (title || "")
+    .replace(/\b(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|5XL|\d{1,3})\b/gi, "")
+    .replace(/[·\-,|/]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Slugify a title into a Shopify handle (no per-title dedup — variants share the handle). */
+function slugifyHandle(title: string): string {
+  const h = (title || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return h || "product";
 }
 
 export function generateShopifyCSV(products: ScannedProductForExport[]): string {
@@ -151,42 +175,108 @@ export function generateShopifyCSV(products: ScannedProductForExport[]): string 
     } as ScannedProductForExport))
   );
 
-  const handles = generateHandles(expanded.map(p => p.title));
   const status = (typeof localStorage !== "undefined" && localStorage.getItem("sonic_invoice_publish_status") === "draft") ? "draft" : "active";
 
-  const rows = expanded.map((p, i) => {
-    const desc = p.description
-      ? (p.description.startsWith("<") ? p.description : `<p>${p.description}</p>`)
-      : fallbackDescription(p.title, p.type, p.colour);
-    const tags = buildTags(p);
-    const category = inferCategory(p.type);
+  // ── Group variants under one product per (vendor + base title). ──
+  // B4-12 fix: previously every row got a unique -2/-3 handle so Shopify saw
+  // N single-variant products instead of one product with N variants.
+  type Group = { base: ScannedProductForExport; variants: ScannedProductForExport[] };
+  const groups = new Map<string, Group>();
+  for (const p of expanded) {
+    const baseTitle = baseTitleFor(p.title) || p.title;
+    const key = `${(p.vendor || "").toLowerCase()}::${baseTitle.toLowerCase()}::${(p.type || "").toLowerCase()}`;
+    const g = groups.get(key);
+    if (g) g.variants.push(p);
+    else groups.set(key, { base: { ...p, title: baseTitle }, variants: [p] });
+  }
 
-    return [
-      handles[i],                          // Handle
-      p.title,                             // Title
-      desc,                                // Body (HTML)
-      p.vendor,                            // Vendor — propagated to every row
-      category,                            // Product Category
-      p.type,                              // Type
-      tags,                                // Tags
-      "TRUE",                              // Published
-      "Title",                             // Option1 Name
-      "Default Title",                     // Option1 Value
-      p.sku,                               // Variant SKU
-      p.barcode,                           // Variant Barcode
-      p.price.toFixed(2),                  // Variant Price
-      p.costPerItem ? p.costPerItem.toFixed(2) : "", // Cost per item
-      String(p.quantity ?? 0),             // Variant Inventory Qty (real, not hardcoded)
-      "shopify",                           // Variant Inventory Tracker
-      "deny",                              // Variant Inventory Policy
-      "manual",                            // Variant Fulfillment Service
-      status,                              // Status
-    ];
-  });
+  // Ensure handles are unique across DIFFERENT products (not across variants).
+  const handleCounts: Record<string, number> = {};
+  const groupHandles = new Map<string, string>();
+  for (const [key, g] of groups) {
+    let h = slugifyHandle(g.base.title);
+    if (handleCounts[h] !== undefined) {
+      handleCounts[h]++;
+      h = `${h}-${handleCounts[h]}`;
+    } else {
+      handleCounts[h] = 1;
+    }
+    groupHandles.set(key, h);
+  }
 
   const escape = (v: string) => `"${(v || "").replace(/"/g, '""')}"`;
+  const allRows: string[][] = [];
+
+  for (const [key, g] of groups) {
+    const handle = groupHandles.get(key)!;
+    const hasColour = g.variants.some((v) => !!v.colour);
+    const hasSize = g.variants.some((v) => !!v.size);
+
+    // Per project rule: Colour first, Size second.
+    const option1Name = hasColour ? "Colour" : hasSize ? "Size" : "Title";
+    const option2Name = hasColour && hasSize ? "Size" : "";
+
+    // Dedupe variants on the (option1, option2) pair Shopify actually keys on.
+    const seen = new Set<string>();
+    const rowsForGroup: ScannedProductForExport[] = [];
+    for (const v of g.variants) {
+      const o1 = hasColour ? (v.colour || "Default") : hasSize ? (v.size || "One Size") : "Default Title";
+      const o2 = option2Name ? (v.size || "One Size") : "";
+      const k = `${o1}||${o2}`.toLowerCase();
+      if (seen.has(k)) {
+        const existing = rowsForGroup.find((r) => {
+          const ro1 = hasColour ? (r.colour || "Default") : hasSize ? (r.size || "One Size") : "Default Title";
+          const ro2 = option2Name ? (r.size || "One Size") : "";
+          return `${ro1}||${ro2}`.toLowerCase() === k;
+        });
+        if (existing) existing.quantity = (existing.quantity ?? 0) + (v.quantity ?? 0);
+        continue;
+      }
+      seen.add(k);
+      rowsForGroup.push({ ...v });
+    }
+
+    const baseDesc = g.base.description
+      ? (g.base.description.startsWith("<") ? g.base.description : `<p>${g.base.description}</p>`)
+      : fallbackDescription(g.base.title, g.base.type, g.base.colour);
+    const baseTags = buildTags(g.base);
+    const baseCategory = inferCategory(g.base.type);
+
+    rowsForGroup.forEach((v, idx) => {
+      const isFirst = idx === 0;
+      const o1Value = hasColour ? (v.colour || "Default") : hasSize ? (v.size || "One Size") : "Default Title";
+      const o2Value = option2Name ? (v.size || "One Size") : "";
+
+      // Shopify convention: product-level columns (Title/Body/Vendor/Type/Tags/Category/Published)
+      // populate ONLY on the first row of each handle. Subsequent variant rows leave them blank.
+      allRows.push([
+        handle,                                                    // Handle
+        isFirst ? g.base.title : "",                               // Title
+        isFirst ? baseDesc : "",                                   // Body (HTML)
+        isFirst ? (g.base.vendor || "") : "",                      // Vendor
+        isFirst ? baseCategory : "",                               // Product Category
+        isFirst ? (g.base.type || "") : "",                        // Type
+        isFirst ? baseTags : "",                                   // Tags
+        isFirst ? "TRUE" : "",                                     // Published
+        isFirst ? option1Name : "",                                // Option1 Name
+        o1Value,                                                   // Option1 Value
+        isFirst ? option2Name : "",                                // Option2 Name
+        o2Value,                                                   // Option2 Value
+        v.sku || "",                                               // Variant SKU
+        v.barcode || "",                                           // Variant Barcode
+        (v.price ?? 0).toFixed(2),                                 // Variant Price
+        v.costPerItem ? v.costPerItem.toFixed(2) : "",             // Cost per item
+        String(v.quantity ?? 0),                                   // Variant Inventory Qty
+        "shopify",                                                 // Variant Inventory Tracker
+        "deny",                                                    // Variant Inventory Policy
+        "manual",                                                  // Variant Fulfillment Service
+        isFirst ? status : "",                                     // Status
+      ]);
+    });
+  }
+
   return [
     SHOPIFY_CSV_HEADERS.join(","),
-    ...rows.map(r => r.map(escape).join(",")),
+    ...allRows.map((r) => r.map(escape).join(",")),
   ].join("\n");
 }

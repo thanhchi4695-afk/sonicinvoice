@@ -25,7 +25,6 @@ import { useInvoiceSession } from "@/stores/invoice-session-store";
 import InvoiceSessionBanner from "@/components/InvoiceSessionBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { updateVariantPrice } from "@/lib/shopify-api";
-import { calculatePrice, getPricingRules } from "@/lib/pricing/priceRecommendation" as any;
 // B4-03: pull markup formula from saved pricing rules so invoice rows
 // without an explicit RRP are seeded from cost × markup instead of $0.
 import { calculatePrice as calcPriceFromCost, getPricingRules as getMarkupRules } from "@/lib/pricing-strategy";

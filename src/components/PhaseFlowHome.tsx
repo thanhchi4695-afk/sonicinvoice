@@ -17,7 +17,7 @@ import { toast } from "sonner";
 // Scan) remain available — nothing is removed.
 // ─────────────────────────────────────────────────────────────
 
-export type UploadKind = "invoice" | "packing_slip";
+export type UploadKind = "invoice" | "packing_slip" | "html";
 export type PreferredPos = "shopify" | "lightspeed";
 
 interface PhaseFlowHomeProps {

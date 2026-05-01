@@ -119,7 +119,7 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
           </span>
           <h2 className="text-base font-semibold">What are you uploading?</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <TileButton
             active={kind === "invoice"}
             onClick={() => setKind("invoice")}
@@ -133,6 +133,13 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
             icon={<Package className="w-6 h-6" />}
             title="Packing slip"
             subtitle="Stock-check & qty update only"
+          />
+          <TileButton
+            active={kind === "html"}
+            onClick={() => setKind("html")}
+            icon={<CodeIcon className="w-6 h-6" />}
+            title="HTML file"
+            subtitle="Parse a saved web invoice (.html)"
           />
         </div>
       </section>

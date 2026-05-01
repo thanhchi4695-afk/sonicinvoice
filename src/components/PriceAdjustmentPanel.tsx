@@ -25,6 +25,9 @@ import { useInvoiceSession } from "@/stores/invoice-session-store";
 import InvoiceSessionBanner from "@/components/InvoiceSessionBanner";
 import { supabase } from "@/integrations/supabase/client";
 import { updateVariantPrice } from "@/lib/shopify-api";
+// B4-03: pull markup formula from saved pricing rules so invoice rows
+// without an explicit RRP are seeded from cost × markup instead of $0.
+import { calculatePrice as calcPriceFromCost, getPricingRules as getMarkupRules } from "@/lib/pricing-strategy";
 import { toast } from "sonner";
 
 interface Props {
@@ -61,19 +64,35 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
   const [source, setSource] = useState<"invoice" | "catalog">(hasSession ? "invoice" : "catalog");
 
   // Map invoice session products → ProductForAdjustment shape
+  // B4-03: when invoice line has no RRP, derive one from cost × markup formula
+  // so the Price phase actually applies the merchant's pricing rules instead
+  // of leaving rows at $0.00.
+  const markupRules = useMemo(() => getMarkupRules(), []);
   const invoiceProducts: ProductForAdjustment[] = useMemo(
-    () => sessionProducts.map(p => ({
-      handle: (p.sku || p.product_title).toLowerCase().replace(/\s+/g, "-"),
-      title: p.product_title,
-      vendor: p.vendor || "Unknown",
-      type: "",
-      tags: [],
-      currentPrice: Number(p.rrp) || 0,
-      compareAtPrice: null,
-      costPrice: Number(p.unit_cost) || 0,
-      sku: p.sku || undefined,
-    })),
-    [sessionProducts],
+    () => sessionProducts.map(p => {
+      const cost = Number(p.unit_cost) || 0;
+      const explicitRrp = Number(p.rrp) || 0;
+      let seeded = explicitRrp;
+      if (seeded <= 0 && cost > 0) {
+        const calc = calcPriceFromCost(
+          { costPrice: cost, productType: (p as any).product_type || "general", vendor: p.vendor || undefined },
+          markupRules,
+        );
+        seeded = calc.recommended_price || 0;
+      }
+      return {
+        handle: (p.sku || p.product_title).toLowerCase().replace(/\s+/g, "-"),
+        title: p.product_title,
+        vendor: p.vendor || "Unknown",
+        type: (p as any).product_type || "",
+        tags: [],
+        currentPrice: seeded,
+        compareAtPrice: null,
+        costPrice: cost,
+        sku: p.sku || undefined,
+      };
+    }),
+    [sessionProducts, markupRules],
   );
 
   // Catalog products loaded from Supabase (variants joined to products).

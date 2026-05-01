@@ -156,7 +156,19 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
               {r.status === "error" && <X className="w-3 h-3 text-destructive shrink-0" />}
               {r.status === "pushing" && <Loader2 className="w-3 h-3 text-primary animate-spin shrink-0" />}
               {r.status === "pending" && <span className="w-3 h-3 rounded-full border border-muted-foreground shrink-0" />}
-              <span className="flex-1 truncate">{r.title}</span>
+              {r.status === "success" && r.shopifyId ? (
+                <a
+                  href={`https://${storeUrl}/admin/products/${r.shopifyId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 truncate text-primary hover:underline"
+                  title="Open in Shopify Admin"
+                >
+                  {r.title}
+                </a>
+              ) : (
+                <span className="flex-1 truncate">{r.title}</span>
+              )}
               {r.error && <span className="text-destructive truncate max-w-[120px]">{r.error}</span>}
             </div>
           ))}
@@ -172,6 +184,31 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
             >
               <ExternalLink className="w-3 h-3 mr-1" /> View in Shopify
             </Button>
+            {stats.created > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const urls = results
+                    .filter((r) => r.status === "success" && r.handle)
+                    .map((r) => `https://${storeUrl}/products/${r.handle}`)
+                    .join("\n");
+                  if (!urls) {
+                    toast.error("No product URLs available");
+                    return;
+                  }
+                  try {
+                    await navigator.clipboard.writeText(urls);
+                    toast.success(`Copied ${stats.created} product URL${stats.created === 1 ? "" : "s"}`);
+                  } catch {
+                    toast.error("Clipboard unavailable");
+                  }
+                }}
+                className="text-xs"
+              >
+                <Copy className="w-3 h-3 mr-1" /> Copy URLs ({stats.created})
+              </Button>
+            )}
             {stats.errors > 0 && (
               <Button variant="outline" size="sm" onClick={handleRetryFailed} className="text-xs">
                 <RotateCcw className="w-3 h-3 mr-1" /> Retry failed ({stats.errors})

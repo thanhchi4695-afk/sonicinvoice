@@ -62,7 +62,12 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
   const enterFlow = () => {
     if (!kind) return;
     if (kind === "invoice") props.onStartInvoice();
-    else props.onStartPackingSlip();
+    else if (kind === "html") {
+      // HTML uploads use the same downstream invoice flow; flag the source so
+      // the upload step can hint the parser (text/html instead of PDF/image).
+      localStorage.setItem("upload_source_kind", "html");
+      props.onStartInvoice();
+    } else props.onStartPackingSlip();
   };
 
   return (

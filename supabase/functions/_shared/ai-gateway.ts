@@ -25,6 +25,17 @@ const MODEL_FALLBACKS: Record<string, string[]> = {
     "google/gemini-3.1-pro-preview",
     "google/gemini-2.5-flash",
   ],
+  // Anthropic Claude — primary for invoice extraction (highest accuracy on
+  // structured tabular data). Falls back to Gemini if Anthropic is unreachable.
+  "anthropic/claude-sonnet-4-5": [
+    "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-haiku-4-5",
+    "google/gemini-2.5-flash",
+  ],
+  "anthropic/claude-haiku-4-5": [
+    "anthropic/claude-haiku-4-5",
+    "google/gemini-2.5-flash",
+  ],
 };
 
 function getFallbacks(model: string): string[] {

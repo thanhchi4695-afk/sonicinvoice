@@ -65,14 +65,47 @@ export async function loadSkillsForTask(
   }
 
   const parts = await Promise.all(tasks.map(t => fetchOne(userId, t)));
+  const loaded: string[] = [];
+  parts.forEach((p, i) => { if (p && p.length > 0) loaded.push(tasks[i]); });
   const joined = parts.filter(p => p && p.length > 0).join("\n\n---\n\n");
 
   if (joined.length > 0) {
     console.log(
       `[claude-skills] loaded for task=${taskType} supplier=${supplierName || "-"} (${joined.length} chars)`,
     );
+    // Fire-and-forget usage logging — never block extraction on this.
+    void recordUsage(userId, loaded, taskType, supplierName);
   }
   return joined;
+}
+
+const FEATURE_BY_TASK: Record<SkillTaskType, string> = {
+  extraction: "Invoice Extraction",
+  enrichment: "Product Enrichment",
+  seo: "SEO Writer",
+  pricing: "Pricing Engine",
+};
+
+async function recordUsage(
+  userId: string,
+  skillNames: string[],
+  taskType: SkillTaskType,
+  supplierName?: string | null,
+) {
+  try {
+    const feature = FEATURE_BY_TASK[taskType] || taskType;
+    const rows = skillNames.map((skill_name) => ({
+      user_id: userId,
+      skill_name,
+      feature,
+      task_type: taskType,
+      supplier_name: supplierName ?? null,
+    }));
+    if (rows.length === 0) return;
+    await admin().from("claude_skill_usage").insert(rows);
+  } catch (e) {
+    console.warn("[claude-skills] usage log failed:", e);
+  }
 }
 
 /**

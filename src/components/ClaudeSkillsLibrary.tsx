@@ -131,7 +131,7 @@ const FEATURE_USAGE: Record<string, string[]> = {
   pricing: ["Pricing Engine"],
 };
 
-function usedByLabels(skill: SkillRow): string[] {
+function defaultUsedBy(skill: SkillRow): string[] {
   if (skill.skill_name === "fashion-retail") {
     return ["Invoice Extraction", "Product Enrichment", "SEO Writer", "Pricing Engine"];
   }
@@ -143,10 +143,18 @@ function usedByLabels(skill: SkillRow): string[] {
   return Array.from(out);
 }
 
+interface UsageStat {
+  feature: string;
+  task_type: string | null;
+  count: number;
+  last_used_at: string;
+}
+
 export default function ClaudeSkillsLibrary() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [skills, setSkills] = useState<SkillRow[]>([]);
+  const [usageBySkill, setUsageBySkill] = useState<Record<string, UsageStat[]>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftContent, setDraftContent] = useState("");
@@ -192,6 +200,40 @@ export default function ClaudeSkillsLibrary() {
     }
 
     setLoading(false);
+    void loadUsage(user.id);
+  };
+
+  const loadUsage = async (userId: string) => {
+    const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * 90).toISOString();
+    const { data } = await supabase
+      .from("claude_skill_usage")
+      .select("skill_name, feature, task_type, used_at")
+      .eq("user_id", userId)
+      .gte("used_at", since)
+      .order("used_at", { ascending: false })
+      .limit(2000);
+    const rows = (data as Array<{ skill_name: string; feature: string; task_type: string | null; used_at: string }> | null) || [];
+    const map: Record<string, Record<string, UsageStat>> = {};
+    for (const r of rows) {
+      const key = `${r.feature}::${r.task_type || ""}`;
+      map[r.skill_name] = map[r.skill_name] || {};
+      const slot = map[r.skill_name][key];
+      if (slot) {
+        slot.count += 1;
+      } else {
+        map[r.skill_name][key] = {
+          feature: r.feature,
+          task_type: r.task_type,
+          count: 1,
+          last_used_at: r.used_at,
+        };
+      }
+    }
+    const out: Record<string, UsageStat[]> = {};
+    Object.entries(map).forEach(([k, v]) => {
+      out[k] = Object.values(v).sort((a, b) => b.count - a.count);
+    });
+    setUsageBySkill(out);
   };
 
   useEffect(() => { void load(); }, []);
@@ -326,7 +368,10 @@ export default function ClaudeSkillsLibrary() {
           ) : (
             <ul className="divide-y divide-border">
               {skills.map((s) => {
-                const used = usedByLabels(s);
+                const stats = usageBySkill[s.skill_name] || [];
+                const used = stats.length > 0
+                  ? Array.from(new Set(stats.map((u) => u.feature)))
+                  : defaultUsedBy(s);
                 return (
                   <li key={s.id}>
                     <button
@@ -384,6 +429,41 @@ export default function ClaudeSkillsLibrary() {
               })}
             </div>
           </div>
+
+          {selected && (() => {
+            const stats = usageBySkill[selected.skill_name] || [];
+            return (
+              <div className="rounded-md border border-border bg-muted/20 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Used by (last 90 days)
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground">
+                    {stats.reduce((n, s) => n + s.count, 0)} call{stats.reduce((n, s) => n + s.count, 0) === 1 ? "" : "s"}
+                  </span>
+                </div>
+                {stats.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Not consumed yet. Wired to: {defaultUsedBy(selected).join(", ") || "—"}
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {stats.map((u) => (
+                      <li key={`${u.feature}-${u.task_type}`} className="flex items-center justify-between text-[11px]">
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-medium">{u.feature}</span>
+                          {u.task_type && <Badge variant="outline" className="text-[9px]">{u.task_type}</Badge>}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {u.count}× · last {new Date(u.last_used_at).toLocaleDateString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })()}
 
           <div>
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Skill content (markdown)</Label>

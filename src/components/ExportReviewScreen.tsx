@@ -658,6 +658,13 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
             {!validationPassed ? (
               <PrePublishValidation
                 products={filtered}
+                onEditProduct={(productKey) => {
+                  // productKey is `${brand}::${name}` lowercased — split and
+                  // dispatch so PostParseReviewScreen can focus the row.
+                  const [brand, name] = productKey.split("::");
+                  window.dispatchEvent(new CustomEvent("sonic:edit-product", { detail: { brand, name } }));
+                  onBack(); // returns user to the Review step (step 3)
+                }}
                 onProceedToPublish={(withWarnings) => {
                   setPublishedWithWarnings(withWarnings);
                   setValidationPassed(true);

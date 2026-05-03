@@ -229,7 +229,24 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
             toast.success("Imported — opening invoice flow…");
             props.onStartInvoice();
           }}
-        />
+          />
+
+          {/* How-to mini guide */}
+          <aside className="rounded-lg border border-border bg-muted/30 p-4 text-xs">
+            <p className="font-semibold text-foreground mb-2 flex items-center gap-1">
+              <span aria-hidden>📋</span> How it works
+            </p>
+            <ol className="space-y-2 text-muted-foreground list-decimal list-inside">
+              <li><span className="text-foreground font-medium">Copy</span> a product URL from any brand or supplier site.</li>
+              <li><span className="text-foreground font-medium">Paste</span> it into the box on the left and hit Fetch.</li>
+              <li>We extract <span className="text-foreground">name, price, variants, description &amp; images</span>.</li>
+              <li>Review, then push straight to <span className="text-foreground">Shopify</span>.</li>
+            </ol>
+            <p className="mt-3 text-[11px] text-muted-foreground/80">
+              Tip: works best on Shopify-powered brand sites and most major retailers.
+            </p>
+          </aside>
+        </div>
       </section>
 
 

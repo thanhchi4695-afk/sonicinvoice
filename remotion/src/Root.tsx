@@ -27,5 +27,13 @@ export const RemotionRoot = () => (
       width={1920}
       height={1080}
     />
+    <Composition
+      id="howto-invoice-upload"
+      component={HowToInvoiceUpload}
+      durationInFrames={HOWTO_INVOICE_UPLOAD_FRAMES}
+      fps={30}
+      width={1920}
+      height={1080}
+    />
   </>
 );

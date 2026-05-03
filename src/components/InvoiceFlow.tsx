@@ -592,6 +592,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [preprocessResult, setPreprocessResult] = useState<PreprocessResult | null>(null);
   const [showPreprocessDebug, setShowPreprocessDebug] = useState(false);
 
+  // Post-parse agent summary dialog
+  const [agentSummary, setAgentSummary] = useState<{
+    open: boolean;
+    plan: AgentRunPlan[];
+    supplier?: string;
+    productCount?: number;
+    detail?: { agents: string[]; supplier?: string; productCount: number };
+  }>({ open: false, plan: [] });
+
   // Location state
   const storeLocations = getStoreLocations();
   const defaultLoc = storeLocations.find(l => l.isDefault) || storeLocations[0];

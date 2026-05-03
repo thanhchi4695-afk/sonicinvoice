@@ -3913,6 +3913,13 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         onConfirm={confirmRunAutoAgents}
         onSkip={skipRunAutoAgents}
       />
+      <LargePdfChunkDialog
+        open={largePdfPrompt.open}
+        fileName={largePdfPrompt.file?.name || ""}
+        fileSizeBytes={largePdfPrompt.file?.size || 0}
+        pageCount={largePdfPrompt.pageCount}
+        onChoose={handleLargePdfChoice}
+      />
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
         <div className="flex items-center gap-3 mb-3">

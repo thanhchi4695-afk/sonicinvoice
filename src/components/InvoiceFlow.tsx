@@ -2493,7 +2493,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       } catch {}
     }
 
-    let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = [];
+    let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = preParsedProducts && preParsedProducts.length ? (preParsedProducts as any) : [];
 
     // ── Rule-based extraction (DB template) — DISABLED ──
     // Previously short-circuited CSV/xlsx with a saved supplier_templates row,

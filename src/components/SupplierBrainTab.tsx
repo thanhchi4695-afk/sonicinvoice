@@ -27,6 +27,7 @@ import {
   setContributeShared,
 } from "@/lib/universal-classifier";
 import SupplierWebsiteRRPPanel from "@/components/SupplierWebsiteRRPPanel";
+import SupplierExtractionSkills from "@/components/SupplierExtractionSkills";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface SupplierRow {

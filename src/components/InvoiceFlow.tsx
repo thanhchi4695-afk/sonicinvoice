@@ -603,6 +603,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     detail?: { agents: string[]; supplier?: string; productCount: number };
   }>({ open: false, plan: [] });
 
+  // Large-PDF chunking dialog
+  const [largePdfPrompt, setLargePdfPrompt] = useState<{
+    open: boolean;
+    file: File | null;
+    pageCount: number | null;
+    resolve: ((c: LargePdfChoice) => void) | null;
+  }>({ open: false, file: null, pageCount: null, resolve: null });
+
   // Location state
   const storeLocations = getStoreLocations();
   const defaultLoc = storeLocations.find(l => l.isDefault) || storeLocations[0];

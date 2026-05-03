@@ -34,6 +34,7 @@ import { getMetafieldConfig, saveMetafieldConfig, type MetafieldDefinition } fro
 import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
 const TeamManagement = lazy(() => import("@/components/TeamManagement"));
 const AutomationSettings = lazy(() => import("@/components/AutomationSettings"));
+const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"));
 
 const AccountScreen = () => {
   const { isAdmin } = useUserRole();
@@ -272,6 +273,11 @@ const AccountScreen = () => {
           </Section>
           <Section title="🧠 Agent budget">
             <BudgetPill variant="full" />
+          </Section>
+          <Section title="🧠 Skills Library (Claude)">
+            <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+              <ClaudeSkillsLibrary />
+            </Suspense>
           </Section>
           <DefaultInstructionsSection />
           <SharedLearningSection />

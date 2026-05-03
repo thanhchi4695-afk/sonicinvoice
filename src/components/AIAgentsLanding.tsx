@@ -1,5 +1,6 @@
 import { Shield, Tags, Sparkles, Send, GraduationCap, ArrowRight, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
+import AutoAgentsSettingsPanel from "@/components/AutoAgentsSettingsPanel";
 
 interface AIAgentsLandingProps {
   onOpenAgentDashboard: () => void;

@@ -2244,6 +2244,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       if (data.supplier && !supplierName) {
         setSupplierName(data.supplier);
       }
+      // Capture extraction debug info (Azure layout vs LLM-only) for the per-invoice debug panel
+      setExtractionDebug({
+        extractor_used: data.extractor_used ?? data.extractor ?? null,
+        tables_found: data.tables_found ?? null,
+        azure_ms: data.azure_ms ?? null,
+        classification_source: data.classification_source ?? null,
+        raw_tables: Array.isArray(data.azure_raw_tables) ? data.azure_raw_tables : [],
+      });
       if (data.field_confidence && typeof data.field_confidence === "object") {
         setAiFieldConfidence(data.field_confidence as Record<string, number>);
       }

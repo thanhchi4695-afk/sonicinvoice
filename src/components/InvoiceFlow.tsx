@@ -2704,7 +2704,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       // Build a heuristic plan so the user sees mode + confidence + reason
       // BEFORE the agents actually run.
       const avgQuality = validatedProducts.length
-        ? validatedProducts.reduce((acc, p) => acc + (p._confidence?.score ?? 80), 0) /
+        ? validatedProducts.reduce((acc, p) => acc + (p._confidence ?? 80), 0) /
           validatedProducts.length / 100
         : 0.85;
       const plan = buildAgentPlan(enabled, s.modes, {

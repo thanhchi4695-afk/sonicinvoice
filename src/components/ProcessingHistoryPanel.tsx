@@ -240,7 +240,10 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }:
                   <>
                     <tr
                       key={r.id}
-                      className="border-t border-border hover:bg-muted/30 cursor-pointer"
+                      ref={(el) => { rowRefs.current[r.id] = el; }}
+                      className={`border-t border-border hover:bg-muted/30 cursor-pointer transition-colors ${
+                        highlightId === r.id ? "bg-primary/10 ring-1 ring-primary/40" : ""
+                      }`}
                       onClick={() => toggleExpand(r.id)}
                     >
                       <td className="px-3 py-2 text-muted-foreground">

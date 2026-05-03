@@ -248,6 +248,9 @@ export default function PricingIntelligence() {
               />
             </div>
 
+            {/* ── Charts ── */}
+            <ChartsSection report={report} />
+
             {/* ── Kanban ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <KanbanColumn

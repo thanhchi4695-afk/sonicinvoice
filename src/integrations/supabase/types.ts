@@ -4087,6 +4087,42 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_skills: {
+        Row: {
+          auto_generated_rules: Json
+          created_at: string
+          id: string
+          invoice_count: number
+          last_updated_at: string
+          manual_overrides: Json
+          skills_markdown: string
+          supplier_name: string
+          user_id: string
+        }
+        Insert: {
+          auto_generated_rules?: Json
+          created_at?: string
+          id?: string
+          invoice_count?: number
+          last_updated_at?: string
+          manual_overrides?: Json
+          skills_markdown?: string
+          supplier_name: string
+          user_id: string
+        }
+        Update: {
+          auto_generated_rules?: Json
+          created_at?: string
+          id?: string
+          invoice_count?: number
+          last_updated_at?: string
+          manual_overrides?: Json
+          skills_markdown?: string
+          supplier_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       supplier_templates: {
         Row: {
           column_mappings: Json

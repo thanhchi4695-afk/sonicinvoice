@@ -64,10 +64,11 @@ const AccountScreen = () => {
       <h1 className="text-2xl font-bold font-display mb-1">Account</h1>
       <p className="text-muted-foreground text-sm mb-4">Store settings & pricing rules</p>
 
-      <Tabs value={(() => {
-        const v = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("subtab") : null;
-        return v && ["store","connections","ai","catalog","team","system"].includes(v) ? v : undefined as any;
-      })()} defaultValue="store" className="w-full" onValueChange={(v) => {
+      <Tabs defaultValue={(() => {
+        if (typeof window === "undefined") return "store";
+        const v = new URLSearchParams(window.location.search).get("subtab");
+        return v && ["store","connections","ai","catalog","team","system"].includes(v) ? v : "store";
+      })()} className="w-full" onValueChange={(v) => {
         if (typeof window === "undefined") return;
         const url = new URL(window.location.href);
         if (v === "store") url.searchParams.delete("subtab"); else url.searchParams.set("subtab", v);

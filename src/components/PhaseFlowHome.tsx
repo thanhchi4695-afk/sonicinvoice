@@ -194,18 +194,23 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
         </button>
       </div>
 
-      {/* ── Import from URL — second-largest entry point, sits directly under Upload Invoice ── */}
-      <section className="mb-10">
-        <div className="flex items-center gap-2 mb-2">
+      {/* ── Import from URL — highlighted: paste a product link to prep it for Shopify ── */}
+      <section className="mb-10 rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card p-5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+            ⚡ Fastest way
+          </span>
           <LinkIcon className="w-5 h-5 text-primary" />
-          <h2 className="text-lg font-semibold">Import from URL</h2>
+          <h2 className="text-lg font-semibold">Paste a product URL → ready for Shopify</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
-          Paste a product link to pull name, description, price and images straight onto this invoice.
+          Drop in any brand or supplier product link. We auto-collect the <strong>name, price, variants, description and images</strong> — formatted to upload straight into Shopify.
         </p>
-        <ProductUrlImporter
-          className="border-2 border-primary/20"
-          onAddToInvoice={(item: ImportedLineItem) => {
+
+        <div className="grid gap-4 md:grid-cols-[1fr_240px]">
+          <ProductUrlImporter
+            className="border border-primary/20 bg-background"
+            onAddToInvoice={(item: ImportedLineItem) => {
             // Hand off to the same downstream flow as an extracted invoice.
             setSessionProducts(
               [
@@ -224,7 +229,24 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
             toast.success("Imported — opening invoice flow…");
             props.onStartInvoice();
           }}
-        />
+          />
+
+          {/* How-to mini guide */}
+          <aside className="rounded-lg border border-border bg-muted/30 p-4 text-xs">
+            <p className="font-semibold text-foreground mb-2 flex items-center gap-1">
+              <span aria-hidden>📋</span> How it works
+            </p>
+            <ol className="space-y-2 text-muted-foreground list-decimal list-inside">
+              <li><span className="text-foreground font-medium">Copy</span> a product URL from any brand or supplier site.</li>
+              <li><span className="text-foreground font-medium">Paste</span> it into the box on the left and hit Fetch.</li>
+              <li>We extract <span className="text-foreground">name, price, variants, description &amp; images</span>.</li>
+              <li>Review, then push straight to <span className="text-foreground">Shopify</span>.</li>
+            </ol>
+            <p className="mt-3 text-[11px] text-muted-foreground/80">
+              Tip: works best on Shopify-powered brand sites and most major retailers.
+            </p>
+          </aside>
+        </div>
       </section>
 
 

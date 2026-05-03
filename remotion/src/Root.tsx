@@ -8,6 +8,10 @@ import {
   HowToInvoiceUpload,
   HOWTO_INVOICE_UPLOAD_FRAMES,
 } from "./scenes/HowToInvoiceUpload";
+import {
+  HowToPriceLookup,
+  HOWTO_PRICE_LOOKUP_FRAMES,
+} from "./scenes/HowToPriceLookup";
 
 export const RemotionRoot = () => (
   <>

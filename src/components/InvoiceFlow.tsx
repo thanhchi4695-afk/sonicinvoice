@@ -63,6 +63,7 @@ import { persistParsedInvoice } from "@/lib/invoice-persistence";
 import DriveQueuePanel from "@/components/DriveQueuePanel";
 import LinePipelineProgress from "@/components/LinePipelineProgress";
 import AutoAgentsRunSummary, { buildAgentPlan, type AgentRunPlan } from "@/components/AutoAgentsRunSummary";
+import ExtractionDebugPanel from "@/components/ExtractionDebugPanel";
 import { LargePdfChunkDialog, getLargePdfDefault, setLargePdfDefault, type LargePdfChoice } from "@/components/LargePdfChunkDialog";
 import { isLargePdf, splitPdf, extractPdfPage, getPdfPageCount } from "@/lib/pdf-splitter";
 

@@ -63,6 +63,8 @@ import { persistParsedInvoice } from "@/lib/invoice-persistence";
 import DriveQueuePanel from "@/components/DriveQueuePanel";
 import LinePipelineProgress from "@/components/LinePipelineProgress";
 import AutoAgentsRunSummary, { buildAgentPlan, type AgentRunPlan } from "@/components/AutoAgentsRunSummary";
+import { LargePdfChunkDialog, getLargePdfDefault, setLargePdfDefault, type LargePdfChoice } from "@/components/LargePdfChunkDialog";
+import { isLargePdf, splitPdf, extractPdfPage, getPdfPageCount } from "@/lib/pdf-splitter";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 
@@ -600,6 +602,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     productCount?: number;
     detail?: { agents: string[]; supplier?: string; productCount: number };
   }>({ open: false, plan: [] });
+
+  // Large-PDF chunking dialog
+  const [largePdfPrompt, setLargePdfPrompt] = useState<{
+    open: boolean;
+    file: File | null;
+    pageCount: number | null;
+    resolve: ((c: LargePdfChoice) => void) | null;
+  }>({ open: false, file: null, pageCount: null, resolve: null });
 
   // Location state
   const storeLocations = getStoreLocations();
@@ -1728,13 +1738,74 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   };
 
 
-  const handleStartProcessingClick = () => {
+  const askLargePdfChoice = (file: File, pageCount: number | null): Promise<LargePdfChoice> => {
+    return new Promise((resolve) => {
+      setLargePdfPrompt({ open: true, file, pageCount, resolve });
+    });
+  };
+
+  const handleLargePdfChoice = async (choice: LargePdfChoice, remember: boolean) => {
+    const resolver = largePdfPrompt.resolve;
+    setLargePdfPrompt({ open: false, file: null, pageCount: null, resolve: null });
+    if (remember && choice !== "cancel") setLargePdfDefault(choice);
+    resolver?.(choice);
+  };
+
+  const handleStartProcessingClick = async () => {
     if (!uploadedFile) {
       toast.error("Please upload an invoice first");
       return;
     }
+
+    // ── Large-PDF guard ──
+    // Big PDFs (especially Gmail-printed forwards) frequently exceed the 150 s
+    // edge function idle limit. Offer to split or trim before parsing.
+    if (isLargePdf(uploadedFile)) {
+      let pageCount: number | null = null;
+      try { pageCount = await getPdfPageCount(uploadedFile); } catch { /* ignore */ }
+      const remembered = getLargePdfDefault();
+      const choice: LargePdfChoice = remembered ?? await askLargePdfChoice(uploadedFile, pageCount);
+
+      if (choice === "cancel") return;
+
+      if (choice === "first_page") {
+        try {
+          const trimmed = await extractPdfPage(uploadedFile, 1);
+          toast.message("Using page 1 only", { description: `Trimmed to ${(trimmed.size / 1024).toFixed(0)} KB.` });
+          startProcessing(trimmed);
+        } catch (err) {
+          console.error("[InvoiceFlow] extractPdfPage failed:", err);
+          toast.error("Could not trim PDF — sending full file instead");
+          startProcessing(uploadedFile);
+        }
+        return;
+      }
+
+      if (choice === "split") {
+        try {
+          const chunks = await splitPdf(uploadedFile, 1);
+          if (chunks.length <= 1) {
+            startProcessing(uploadedFile);
+            return;
+          }
+          toast.message(`Splitting into ${chunks.length} pages`, {
+            description: "Each page is parsed separately, then results are merged.",
+          });
+          await startProcessingSplit(uploadedFile, chunks.map(c => c.file));
+        } catch (err) {
+          console.error("[InvoiceFlow] splitPdf failed:", err);
+          toast.error("Could not split PDF — sending full file instead");
+          startProcessing(uploadedFile);
+        }
+        return;
+      }
+
+      // "continue" — fall through
+    }
+
     startProcessing(uploadedFile);
   };
+
 
   /**
    * Fire-and-forget upload of the original invoice file to the
@@ -2328,7 +2399,44 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }
   };
 
-  const startProcessing = async (file: File) => {
+  const startProcessingSplit = async (originalFile: File, chunks: File[]) => {
+    setFileName(originalFile.name);
+    setFileParseMode("pdf_text");
+    setProcessStartTime(Date.now());
+    setProcessingDone(false);
+    setProcessingCancelled(false);
+    setProcessingElapsed(0);
+    setShowCompletionSummary(false);
+    persistedRef.current = false;
+    cancelledRef.current = false;
+    setStep(2);
+    setInvoicePageImages([]);
+
+    const merged: any[] = [];
+    for (let i = 0; i < chunks.length; i++) {
+      if (cancelledRef.current) return;
+      setEnrichLines([{ name: `Reading page ${i + 1} of ${chunks.length}…`, status: "searching", action: "AI extracting products…", confidence: 0 }]);
+      try {
+        const partial = await parseWithAI(chunks[i]);
+        if (Array.isArray(partial) && partial.length) merged.push(...partial);
+        toast.message(`Page ${i + 1}/${chunks.length} parsed`, { description: `${partial?.length || 0} products so far: ${merged.length}` });
+      } catch (err) {
+        console.warn(`[InvoiceFlow] chunk ${i + 1} failed:`, err);
+      }
+    }
+
+    if (merged.length === 0) {
+      setEnrichLines([{ name: "No products found", status: "not_found", action: "All chunks returned empty. Try uploading the original supplier PDF.", confidence: 0 }]);
+      setProcessingDone(true);
+      setShowCompletionSummary(true);
+      return;
+    }
+
+    // Hand off merged products to startProcessing's downstream pipeline
+    await startProcessing(originalFile, merged);
+  };
+
+  const startProcessing = async (file: File, preParsedProducts?: any[]) => {
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
       // Honour the persisted "remember for this supplier" opt-in instead of
@@ -2385,7 +2493,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       } catch {}
     }
 
-    let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = [];
+    let products: Array<{ name: string; brand: string; sku: string; barcode: string; type: string; colour: string; size: string; qty: number; cost: number; rrp: number }> = preParsedProducts && preParsedProducts.length ? (preParsedProducts as any) : [];
 
     // ── Rule-based extraction (DB template) — DISABLED ──
     // Previously short-circuited CSV/xlsx with a saved supplier_templates row,
@@ -3804,6 +3912,13 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         productCount={agentSummary.productCount}
         onConfirm={confirmRunAutoAgents}
         onSkip={skipRunAutoAgents}
+      />
+      <LargePdfChunkDialog
+        open={largePdfPrompt.open}
+        fileName={largePdfPrompt.file?.name || ""}
+        fileSizeBytes={largePdfPrompt.file?.size || 0}
+        pageCount={largePdfPrompt.pageCount}
+        onChoose={handleLargePdfChoice}
       />
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">

@@ -5976,11 +5976,24 @@ const VariantGroupCard = ({ group, onSplit, onPreview, onQtyChange }: {
                       <td className="py-1.5 pr-3 font-medium">{colour}</td>
                       {option1Values.map(size => {
                         const qty = getQty(size, colour);
+                        const vIdx = getVariantIndex(size, colour);
                         return (
-                          <td key={size} className="text-center py-1.5 px-2">
-                            <span className={`inline-block min-w-[24px] rounded px-1 py-0.5 font-mono-data ${qty > 0 ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground/40"}`}>
-                              {qty > 0 ? qty : "—"}
-                            </span>
+                          <td key={size} className="text-center py-1.5 px-1">
+                            {vIdx >= 0 && onQtyChange ? (
+                              <input
+                                type="number"
+                                min={0}
+                                max={9999}
+                                value={qty}
+                                onChange={e => onQtyChange(vIdx, sanitiseQty(e.target.value))}
+                                onClick={e => e.stopPropagation()}
+                                className={`w-14 h-7 rounded px-1 text-center font-mono-data text-xs bg-input border ${qty > 0 ? "border-primary/30 text-primary font-medium" : "border-border text-muted-foreground"}`}
+                              />
+                            ) : (
+                              <span className={`inline-block min-w-[24px] rounded px-1 py-0.5 font-mono-data ${qty > 0 ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground/40"}`}>
+                                {qty > 0 ? qty : "—"}
+                              </span>
+                            )}
                           </td>
                         );
                       })}
@@ -5990,12 +6003,26 @@ const VariantGroupCard = ({ group, onSplit, onPreview, onQtyChange }: {
               </table>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               {variants.map((v, i) => (
-                <div key={i} className="px-2.5 py-1 rounded-md bg-muted text-xs font-mono-data">
-                  {v.option1Value}: <span className="font-medium">{v.qty}</span>
+                <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-xs font-mono-data">
+                  <span>{v.option1Value}:</span>
+                  {onQtyChange ? (
+                    <input
+                      type="number"
+                      min={0}
+                      max={9999}
+                      value={v.qty}
+                      onChange={e => onQtyChange(i, sanitiseQty(e.target.value))}
+                      onClick={e => e.stopPropagation()}
+                      className="w-14 h-6 rounded px-1 text-center bg-input border border-border"
+                    />
+                  ) : (
+                    <span className="font-medium">{v.qty}</span>
+                  )}
                 </div>
               ))}
+              <span className="text-[10px] text-muted-foreground ml-1">Total: {totalQty}</span>
             </div>
           )}
 

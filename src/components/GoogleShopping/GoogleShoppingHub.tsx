@@ -34,6 +34,8 @@ const ProductFeedTable = lazy(() => import("./ProductFeedTable"));
 const PromotionsFeedBuilder = lazy(() => import("./PromotionsFeedBuilder"));
 const BulkDiscountScheduler = lazy(() => import("./BulkDiscountScheduler"));
 
+import { BackButton } from "@/components/BackButton";
+
 type Tab = "overview" | "products" | "promotions" | "discounts";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -67,14 +69,7 @@ export default function GoogleShoppingHub() {
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/dashboard")}
-          className="-ml-2"
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back to dashboard
-        </Button>
+        <BackButton to="/dashboard" />
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>

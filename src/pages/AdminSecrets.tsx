@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { BackButton } from "@/components/BackButton";
 
 interface SecretItem {
   name: string;
@@ -145,8 +146,8 @@ const AdminSecrets = () => {
           );
         })}
 
-        <footer className="pt-4 border-t border-border text-xs text-muted-foreground">
-          <Link to="/dashboard" className="text-primary underline">← Back to dashboard</Link>
+          <footer className="pt-4 border-t border-border">
+          <BackButton to="/dashboard" />
         </footer>
       </div>
     </div>

@@ -19,6 +19,7 @@ import {
 import { ConditionBuilderDialog } from "@/components/guardian/ConditionBuilderDialog";
 import { useMarginRules } from "@/components/guardian/use-margin-rules";
 import { toast } from "sonner";
+import { BackButton } from "@/components/BackButton";
 
 type JoorStatus = "checking" | "connected" | "disconnected";
 
@@ -89,13 +90,7 @@ const RulesSetup = () => {
       {/* Header */}
       <header className="border-b border-border bg-card/40 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 lg:px-6">
-          <Link
-            to="/"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="Back to home"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+          <BackButton to="/dashboard" label="Back" />
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-primary" />
             <h1 className="font-display text-base font-semibold">

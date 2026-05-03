@@ -805,6 +805,39 @@ export type Database = {
         }
         Relationships: []
       }
+      claude_skills: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_global: boolean
+          skill_name: string
+          task_types: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_global?: boolean
+          skill_name: string
+          task_types?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_global?: boolean
+          skill_name?: string
+          task_types?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       competitor_monitored_products: {
         Row: {
           created_at: string

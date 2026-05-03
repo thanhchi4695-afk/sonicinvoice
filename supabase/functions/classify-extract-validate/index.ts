@@ -5,6 +5,7 @@
 // Also reuses saved supplier_profiles classification when confidence > 70.
 // ───────────────────────────────────────────────────────────────
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { loadSkillsForTask } from "../_shared/claude-skills.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -238,6 +239,29 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     }
   }
 
+  // ─────── Load Claude Skills Library (base + extraction + per-supplier) ───────
+  // These are user-curated markdown files from the `claude_skills` table.
+  // Cascade order: fashion-retail → extraction → supplier-<name>.
+  let claudeSkillsMarkdown = "";
+  try {
+    claudeSkillsMarkdown = await loadSkillsForTask(
+      userId,
+      "extraction",
+      detectedSupplierForSkills,
+    );
+    if (claudeSkillsMarkdown) {
+      console.log(`[classify-extract-validate] Loaded Claude skills (${claudeSkillsMarkdown.length} chars)`);
+    }
+  } catch (e) {
+    console.warn("[classify-extract-validate] claude_skills lookup failed:", e);
+  }
+
+  // Merge Claude Skills + per-supplier Extraction Skills into the single
+  // markdown block parse-invoice already injects at the top of the prompt.
+  const mergedSkills = [claudeSkillsMarkdown, supplierSkillsMarkdown]
+    .filter((s) => s && String(s).trim().length > 0)
+    .join("\n\n---\n\n");
+
   const parseBody = {
     ...rest,
     fileContent,
@@ -245,7 +269,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     fileType,
     supplierName: supplierName || classification?.supplier_name || undefined,
     invoice_classification: classification ?? undefined,
-    supplierSkillsMarkdown: supplierSkillsMarkdown ?? undefined,
+    supplierSkillsMarkdown: mergedSkills.length > 0 ? mergedSkills : undefined,
   };
 
   // ─────── STAGE 2A — Azure Document Intelligence Layout (PDF only) ───────

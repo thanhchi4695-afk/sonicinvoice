@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { loadSkillsForTask, asSkillsPreamble } from "../_shared/claude-skills.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +13,22 @@ serve(async (req) => {
 
   try {
     const { products, storeName, storeCity, locale, industry, freeShippingThreshold } = await req.json();
-    // LOVABLE_API_KEY checked by callAI
+
+    // Resolve current user (best-effort) so we can load their Claude Skills.
+    let userId: string | null = null;
+    try {
+      const auth = req.headers.get("Authorization") || "";
+      if (auth.startsWith("Bearer ")) {
+        const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+          global: { headers: { Authorization: auth } },
+        });
+        const { data } = await sb.auth.getUser();
+        userId = data.user?.id ?? null;
+      }
+    } catch { /* ignore */ }
+
+    const skillsMd = await loadSkillsForTask(userId, "seo");
+    const skillsPreamble = asSkillsPreamble(skillsMd, "SEO writing");
 
     if (!Array.isArray(products) || products.length === 0) {
       return new Response(JSON.stringify({ error: "No products provided" }), {
@@ -23,7 +40,7 @@ serve(async (req) => {
     const spelling = (locale || "AU").toUpperCase().startsWith("US") ? "American English" : "Australian/British English";
     const shippingLine = freeShippingThreshold ? `Mention free shipping over ${freeShippingThreshold} if relevant.` : "";
 
-    const systemPrompt = `You are an SEO copywriter for ${storeName || "a retail store"} in ${storeCity || "Australia"}.
+    const systemPrompt = skillsPreamble + `You are an SEO copywriter for ${storeName || "a retail store"} in ${storeCity || "Australia"}.
 Industry: ${industry || "fashion"}.
 
 TASK: For each product, generate SEO-optimized content for Shopify.

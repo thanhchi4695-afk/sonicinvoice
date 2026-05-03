@@ -1,6 +1,8 @@
 // Fetch a clean product description from supplier/retailer websites
 // Uses Lovable AI Gateway (google/gemini-2.5-pro) with web grounding.
 import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { loadSkillsForTask, asSkillsPreamble } from "../_shared/claude-skills.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -137,10 +139,25 @@ Search the brand's official website first, then Australian retailers as instruct
 Return ONLY the JSON object — no other text.`;
 
   try {
+    // Resolve user (best-effort) and load Claude Skills for enrichment.
+    let userId: string | null = null;
+    try {
+      const auth = req.headers.get("Authorization") || "";
+      if (auth.startsWith("Bearer ")) {
+        const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+          global: { headers: { Authorization: auth } },
+        });
+        const { data } = await sb.auth.getUser();
+        userId = data.user?.id ?? null;
+      }
+    } catch { /* ignore */ }
+    const skillsMd = await loadSkillsForTask(userId, "enrichment", body.brand);
+    const skillsPreamble = asSkillsPreamble(skillsMd, "product description research");
+
     const aiRes = await callAI({
       model: "google/gemini-2.5-pro",
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: skillsPreamble + SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
       temperature: 0.2,

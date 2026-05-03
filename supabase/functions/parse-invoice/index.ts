@@ -1490,12 +1490,13 @@ Return JSON only.`,
       ];
     }
 
-    // Use Flash for everything — Pro routinely exceeds the 150s edge-function
-    // idle timeout on multi-page PDFs/photos. Flash is vision-capable and ~3-5x faster.
-    // Detailed mode (user explicitly opted in to a slower, deeper pass) keeps Pro.
+    // Primary extraction uses Claude Sonnet 4.5 — highest accuracy on
+    // structured tabular invoice data. The shared AI gateway falls back to
+    // Claude Haiku then Gemini Flash if Anthropic is unreachable.
+    // Detailed mode (vision-heavy PDFs/photos) keeps Gemini Pro for now.
     const model = detailedMode && (isPdf || isImage)
       ? "google/gemini-2.5-pro"
-      : "google/gemini-2.5-flash";
+      : "anthropic/claude-sonnet-4-5";
 
     // Soft time budget so we can skip optional retry/OCR passes before the
     // hard 150s edge timeout kills the whole response.

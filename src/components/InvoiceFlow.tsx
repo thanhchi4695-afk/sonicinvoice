@@ -62,6 +62,7 @@ import { formatDuration, estimateEta, recordProcessingDuration } from "@/lib/pro
 import { persistParsedInvoice } from "@/lib/invoice-persistence";
 import DriveQueuePanel from "@/components/DriveQueuePanel";
 import LinePipelineProgress from "@/components/LinePipelineProgress";
+import AutoAgentsRunSummary, { buildAgentPlan, type AgentRunPlan } from "@/components/AutoAgentsRunSummary";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 
@@ -590,6 +591,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [showLowQualityWarning, setShowLowQualityWarning] = useState(false);
   const [preprocessResult, setPreprocessResult] = useState<PreprocessResult | null>(null);
   const [showPreprocessDebug, setShowPreprocessDebug] = useState(false);
+
+  // Post-parse agent summary dialog
+  const [agentSummary, setAgentSummary] = useState<{
+    open: boolean;
+    plan: AgentRunPlan[];
+    supplier?: string;
+    productCount?: number;
+    detail?: { agents: string[]; supplier?: string; productCount: number };
+  }>({ open: false, plan: [] });
 
   // Location state
   const storeLocations = getStoreLocations();
@@ -2690,20 +2700,43 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       if (!s.enabled) return;
       const enabled = (Object.keys(s.agents) as Array<keyof typeof s.agents>).filter((k) => s.agents[k]);
       if (enabled.length === 0) return;
-      const names = enabled.map((k) => AUTO_AGENT_LABELS[k].name).join(", ");
-      toast.success(`🤖 Auto-running agents: ${names}`, { duration: 4000 });
-      // Each agent triggers its own background work:
-      // - learning: already covered by trainSupplierPattern() above
-      // - classifier/enrichment/watchdog/publishing: dispatch a window event
-      //   the relevant tool screens listen for, so they pick up the latest
-      //   parsed products without forcing the user to navigate.
-      window.dispatchEvent(new CustomEvent("auto-agents:run", {
-        detail: { agents: enabled, supplier: supplierName, productCount: validatedProducts.length },
-      }));
+
+      // Build a heuristic plan so the user sees mode + confidence + reason
+      // BEFORE the agents actually run.
+      const avgQuality = validatedProducts.length
+        ? validatedProducts.reduce((acc, p) => acc + (p._confidence ?? 80), 0) /
+          validatedProducts.length / 100
+        : 0.85;
+      const plan = buildAgentPlan(enabled, s.modes, {
+        productCount: validatedProducts.length,
+        supplierKnown: !!matchedTemplate,
+        avgQuality,
+      });
+      const names = enabled.map((k) => AUTO_AGENT_LABELS[k].name);
+      setAgentSummary({
+        open: true,
+        plan,
+        supplier: supplierName,
+        productCount: validatedProducts.length,
+        detail: { agents: names, supplier: supplierName, productCount: validatedProducts.length },
+      });
     } catch (err) {
       console.warn("[auto-agents] failed to dispatch:", err);
     }
   };
+
+  const confirmRunAutoAgents = () => {
+    const detail = agentSummary.detail;
+    setAgentSummary((s) => ({ ...s, open: false }));
+    if (!detail) return;
+    toast.success(`🤖 Running agents: ${detail.agents.join(", ")}`, { duration: 4000 });
+    window.dispatchEvent(new CustomEvent("auto-agents:run", { detail }));
+  };
+
+  const skipRunAutoAgents = () => {
+    setAgentSummary((s) => ({ ...s, open: false }));
+  };
+
 
   const trainSupplierPattern = async () => {
     try {
@@ -3750,6 +3783,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
+      <AutoAgentsRunSummary
+        open={agentSummary.open}
+        plan={agentSummary.plan}
+        supplier={agentSummary.supplier}
+        productCount={agentSummary.productCount}
+        onConfirm={confirmRunAutoAgents}
+        onSkip={skipRunAutoAgents}
+      />
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
         <div className="flex items-center gap-3 mb-3">

@@ -9,6 +9,7 @@ import Papa from "papaparse";
 import { getEnabledMetafields } from "@/lib/metafields";
 import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed";
 import ShopifyPushFlow from "@/components/ShopifyPushFlow";
+import PrePublishValidation from "@/components/PrePublishValidation";
 import type { PushProduct } from "@/lib/shopify-api";
 import { generateShopifyCSV, generateLightspeedCSV, getVariantMode, setVariantMode, type VariantMode, type ValidationResult } from "@/lib/csv-export-engine";
 import { getPublishStatus, setPublishStatus, type PublishStatus } from "@/lib/publish-status";

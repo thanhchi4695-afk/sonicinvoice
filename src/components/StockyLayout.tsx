@@ -22,6 +22,7 @@ import {
   Sparkles,
   TrendingDown,
   MessageCircle,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,7 @@ const defaultNavItems: StockyNavItem[] = [
   { id: "reports_hub", label: "Reports", icon: BarChart3, type: "flow" },
   { id: "restock_suggestions", label: "Restock Suggestions", icon: Sparkles, type: "flow" },
   { id: "pricing_assistant", label: "Pricing", icon: TrendingDown, type: "flow" },
+  { id: "margin_guardian", label: "Margin Guardian", icon: Shield, type: "tab" },
   { id: "support_chat", label: "Chat with Support", icon: MessageCircle, type: "tab" },
   { id: "billing", label: "Billing", icon: CreditCard, type: "tab" },
   { id: "account", label: "Settings", icon: Settings, type: "tab" },
@@ -106,6 +108,11 @@ const StockyLayout = ({
   const handleClick = (item: StockyNavItem) => {
     if (item.id === "support_chat") {
       window.location.href = "/support";
+      setMobileOpen(false);
+      return;
+    }
+    if (item.id === "margin_guardian") {
+      window.location.href = "/rules";
       setMobileOpen(false);
       return;
     }

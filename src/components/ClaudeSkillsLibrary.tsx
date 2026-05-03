@@ -430,6 +430,41 @@ export default function ClaudeSkillsLibrary() {
             </div>
           </div>
 
+          {selected && (() => {
+            const stats = usageBySkill[selected.skill_name] || [];
+            return (
+              <div className="rounded-md border border-border bg-muted/20 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Used by (last 90 days)
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground">
+                    {stats.reduce((n, s) => n + s.count, 0)} call{stats.reduce((n, s) => n + s.count, 0) === 1 ? "" : "s"}
+                  </span>
+                </div>
+                {stats.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Not consumed yet. Wired to: {defaultUsedBy(selected).join(", ") || "—"}
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {stats.map((u) => (
+                      <li key={`${u.feature}-${u.task_type}`} className="flex items-center justify-between text-[11px]">
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-medium">{u.feature}</span>
+                          {u.task_type && <Badge variant="outline" className="text-[9px]">{u.task_type}</Badge>}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {u.count}× · last {new Date(u.last_used_at).toLocaleDateString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })()}
+
           <div>
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Skill content (markdown)</Label>
             <Textarea

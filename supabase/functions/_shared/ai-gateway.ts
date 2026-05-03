@@ -73,6 +73,14 @@ export async function callAI(options: AIRequestOptions): Promise<AIResponse> {
 
   for (const model of fallbacks) {
     try {
+      // Anthropic models go directly to api.anthropic.com (not the Lovable gateway).
+      if (model.startsWith("anthropic/")) {
+        const data = await callAnthropicAPI(model, options);
+        if (data.choices?.[0]) return data;
+        lastError = new Error(`Anthropic model ${model} returned no choices`);
+        continue;
+      }
+
       const body: Record<string, unknown> = {
         model,
         messages: options.messages,

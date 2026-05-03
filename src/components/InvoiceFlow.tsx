@@ -550,12 +550,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   // Initial export format honours the Phase 1 POS choice
   // (set in PhaseFlowHome → localStorage "preferred_pos").
   const [exportFormat, setExportFormat] = useState<'shopify' | 'lightspeed_x' | 'xlsx'>(() => {
-    return 'shopify';
-  });
-  const [csvPreviewOpen, setCsvPreviewOpen] = useState(false);
     const pos = typeof window !== 'undefined' ? localStorage.getItem('preferred_pos') : null;
     return pos === 'lightspeed' ? 'lightspeed_x' : 'shopify';
   });
+  const [csvPreviewOpen, setCsvPreviewOpen] = useState(false);
   const [showLsSettings, setShowLsSettings] = useState(false);
   const [lsSettings, setLsSettings] = useState<XSeriesSettings>(getXSeriesSettings);
   const [previewProduct, setPreviewProduct] = useState<any>(null);

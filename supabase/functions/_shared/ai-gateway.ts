@@ -166,3 +166,81 @@ export class AIGatewayError extends Error {
     this.detail = detail;
   }
 }
+
+// ─── Anthropic direct path ────────────────────────────────────────────────
+// Routes anthropic/* models to api.anthropic.com and normalises the response
+// back into the OpenAI shape that the rest of our code expects.
+async function callAnthropicAPI(model: string, options: AIRequestOptions): Promise<AIResponse> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) {
+    throw new AIGatewayError("ANTHROPIC_API_KEY is not configured", 500);
+  }
+
+  const modelId = model.replace(/^anthropic\//, "");
+
+  // Anthropic expects `system` as a top-level string and only user/assistant
+  // turns in `messages`. Coerce content arrays to a flat string.
+  const flatten = (c: unknown): string => {
+    if (typeof c === "string") return c;
+    if (Array.isArray(c)) {
+      return c.map((part: any) => {
+        if (typeof part === "string") return part;
+        if (part?.type === "text" && typeof part.text === "string") return part.text;
+        return "";
+      }).join("\n");
+    }
+    return String(c ?? "");
+  };
+
+  const systemMsg = options.messages.find((m) => m.role === "system");
+  const turns = options.messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: flatten(m.content),
+    }));
+
+  const body: Record<string, unknown> = {
+    model: modelId,
+    max_tokens: options.max_tokens ?? 4096,
+    messages: turns,
+  };
+  if (systemMsg) body.system = flatten(systemMsg.content);
+  if (options.temperature !== undefined) body.temperature = options.temperature;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (response.status === 429) {
+    throw new AIGatewayError("Rate limit exceeded (Anthropic). Please try again in a moment.", 429);
+  }
+  if (response.status === 402) {
+    throw new AIGatewayError("Anthropic credits exhausted.", 402);
+  }
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error(`Anthropic API error (${modelId}): ${response.status}`, errText);
+    throw new Error(`Anthropic returned ${response.status}: ${errText}`);
+  }
+
+  const data = await response.json() as {
+    content?: Array<{ type: string; text?: string }>;
+  };
+  const text = (data.content || [])
+    .filter((p) => p.type === "text")
+    .map((p) => p.text || "")
+    .join("");
+
+  return {
+    choices: [{
+      message: { content: text || null },
+    }],
+  };
+}

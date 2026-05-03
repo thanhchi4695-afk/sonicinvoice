@@ -35,7 +35,8 @@ export interface StockyNavItem {
 }
 
 const defaultNavItems: StockyNavItem[] = [
-  { id: "home", label: "Dashboard", icon: LayoutDashboard, type: "tab" },
+  { id: "home", label: "Home", icon: LayoutDashboard, type: "tab" },
+  { id: "ai_agents", label: "AI Agents", icon: Brain, type: "tab" },
   { id: "invoices", label: "Invoices", icon: FileText, type: "tab" },
   { id: "processing_history", label: "Processing History", icon: HistoryIcon, type: "flow" },
   { id: "purchase_orders", label: "Purchase Orders", icon: ClipboardList, type: "flow" },

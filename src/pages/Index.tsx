@@ -181,6 +181,7 @@ const FLOW_KEYS = {
   restock_suggestions: true,
   pricing_assistant: true,
   image_seo: true,
+  invoice_detail: true,
 } as const;
 
 export type ActiveFlow = keyof typeof FLOW_KEYS;

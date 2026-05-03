@@ -406,6 +406,36 @@ export default function PostParseReviewScreen({
     return Object.values(enrichmentMap).filter(e => e.description || e.image_url).length;
   }, [enrichmentMap]);
 
+  // Listen for "edit product" requests fired by the pre-publish validation
+  // screen. Payload `{ brand, name }` is matched against current products;
+  // we flip to the right tab, open inline edit, and scroll the row in.
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as { brand?: string; name?: string } | undefined;
+      if (!detail) return;
+      const brand = (detail.brand || "").trim().toLowerCase();
+      const name = (detail.name || "").trim().toLowerCase();
+      const match = products.find(
+        p => (p.brand || "").trim().toLowerCase() === brand
+          && (p.name || "").trim().toLowerCase() === name,
+      );
+      if (!match) {
+        toast.error("Couldn't find that line item to edit");
+        return;
+      }
+      const nextTab: ReviewTab = match._rejected ? "rejected" : match._confidenceLevel === "high" ? "accepted" : "review";
+      setActiveTab(nextTab);
+      setEditingRow(match._rowIndex);
+      // Scroll after the tab change paints
+      setTimeout(() => {
+        document.getElementById(`review-row-${match._rowIndex}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
+    };
+    window.addEventListener("sonic:edit-product", handler as EventListener);
+    return () => window.removeEventListener("sonic:edit-product", handler as EventListener);
+  }, [products]);
+
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
   const needsReview = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel !== "high"), [products]);

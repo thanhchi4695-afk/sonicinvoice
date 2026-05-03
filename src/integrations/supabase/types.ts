@@ -4679,6 +4679,48 @@ export type Database = {
         }
         Relationships: []
       }
+      validation_runs: {
+        Row: {
+          catalog_issues: number
+          details: Json | null
+          id: string
+          invoice_id: string | null
+          price_issues: number
+          published_with_warnings: boolean
+          run_at: string
+          sku_issues: number
+          total_lines: number
+          user_id: string
+          variant_issues: number
+        }
+        Insert: {
+          catalog_issues?: number
+          details?: Json | null
+          id?: string
+          invoice_id?: string | null
+          price_issues?: number
+          published_with_warnings?: boolean
+          run_at?: string
+          sku_issues?: number
+          total_lines?: number
+          user_id: string
+          variant_issues?: number
+        }
+        Update: {
+          catalog_issues?: number
+          details?: Json | null
+          id?: string
+          invoice_id?: string | null
+          price_issues?: number
+          published_with_warnings?: boolean
+          run_at?: string
+          sku_issues?: number
+          total_lines?: number
+          user_id?: string
+          variant_issues?: number
+        }
+        Relationships: []
+      }
       variants: {
         Row: {
           barcode: string | null

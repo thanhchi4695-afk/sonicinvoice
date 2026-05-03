@@ -161,6 +161,19 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }:
     });
   };
 
+  // Auto-scroll to & highlight the requested pattern after rows load.
+  useEffect(() => {
+    if (!initialPatternId || loading || didScrollRef.current) return;
+    const el = rowRefs.current[initialPatternId];
+    if (!el) return;
+    didScrollRef.current = true;
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = setTimeout(() => setHighlightId(null), 2400);
+    return () => clearTimeout(timer);
+  }, [initialPatternId, loading, rows]);
+
   return (
     <div className="px-4 pt-4 pb-24 animate-fade-in">
       <div className="flex items-center gap-3 mb-4">

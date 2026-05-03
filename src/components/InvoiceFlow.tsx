@@ -1738,13 +1738,74 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   };
 
 
-  const handleStartProcessingClick = () => {
+  const askLargePdfChoice = (file: File, pageCount: number | null): Promise<LargePdfChoice> => {
+    return new Promise((resolve) => {
+      setLargePdfPrompt({ open: true, file, pageCount, resolve });
+    });
+  };
+
+  const handleLargePdfChoice = async (choice: LargePdfChoice, remember: boolean) => {
+    const resolver = largePdfPrompt.resolve;
+    setLargePdfPrompt({ open: false, file: null, pageCount: null, resolve: null });
+    if (remember && choice !== "cancel") setLargePdfDefault(choice);
+    resolver?.(choice);
+  };
+
+  const handleStartProcessingClick = async () => {
     if (!uploadedFile) {
       toast.error("Please upload an invoice first");
       return;
     }
+
+    // ── Large-PDF guard ──
+    // Big PDFs (especially Gmail-printed forwards) frequently exceed the 150 s
+    // edge function idle limit. Offer to split or trim before parsing.
+    if (isLargePdf(uploadedFile)) {
+      let pageCount: number | null = null;
+      try { pageCount = await getPdfPageCount(uploadedFile); } catch { /* ignore */ }
+      const remembered = getLargePdfDefault();
+      const choice: LargePdfChoice = remembered ?? await askLargePdfChoice(uploadedFile, pageCount);
+
+      if (choice === "cancel") return;
+
+      if (choice === "first_page") {
+        try {
+          const trimmed = await extractPdfPage(uploadedFile, 1);
+          toast.message("Using page 1 only", { description: `Trimmed to ${(trimmed.size / 1024).toFixed(0)} KB.` });
+          startProcessing(trimmed);
+        } catch (err) {
+          console.error("[InvoiceFlow] extractPdfPage failed:", err);
+          toast.error("Could not trim PDF — sending full file instead");
+          startProcessing(uploadedFile);
+        }
+        return;
+      }
+
+      if (choice === "split") {
+        try {
+          const chunks = await splitPdf(uploadedFile, 1);
+          if (chunks.length <= 1) {
+            startProcessing(uploadedFile);
+            return;
+          }
+          toast.message(`Splitting into ${chunks.length} pages`, {
+            description: "Each page is parsed separately, then results are merged.",
+          });
+          await startProcessingSplit(uploadedFile, chunks.map(c => c.file));
+        } catch (err) {
+          console.error("[InvoiceFlow] splitPdf failed:", err);
+          toast.error("Could not split PDF — sending full file instead");
+          startProcessing(uploadedFile);
+        }
+        return;
+      }
+
+      // "continue" — fall through
+    }
+
     startProcessing(uploadedFile);
   };
+
 
   /**
    * Fire-and-forget upload of the original invoice file to the

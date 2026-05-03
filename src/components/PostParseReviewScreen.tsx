@@ -2021,7 +2021,7 @@ function ReviewRow({
     `text-[10px] mb-0.5 block ${lowConfFields?.has(field) ? "text-secondary font-medium" : "text-muted-foreground"}`;
 
   return (
-    <div className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""} ${qtyHeaderWarning ? "border-l-4 border-l-secondary bg-secondary/5" : ""}`}>
+    <div id={`review-row-${p._rowIndex}`} className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""} ${qtyHeaderWarning ? "border-l-4 border-l-secondary bg-secondary/5" : ""}`}>
       {qtyHeaderWarning && (
         <div className="px-4 pt-2 flex items-center gap-1.5 text-[10px] text-secondary">
           <Badge variant="outline" className="border-secondary/50 text-secondary text-[9px] px-1.5 py-0 h-4">⚠️ Qty mismatch</Badge>

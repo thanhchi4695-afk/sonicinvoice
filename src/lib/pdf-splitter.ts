@@ -74,6 +74,7 @@ export async function extractPdfPage(file: File, pageNumber: number): Promise<Fi
   const [page] = await out.copyPages(src, [pageNumber - 1]);
   out.addPage(page);
   const bytes = await out.save();
+  const blob = new Blob([bytes as BlobPart], { type: "application/pdf" });
   const baseName = file.name.replace(/\.pdf$/i, "");
-  return new File([bytes], `${baseName}_p${pageNumber}.pdf`, { type: "application/pdf" });
+  return new File([blob], `${baseName}_p${pageNumber}.pdf`, { type: "application/pdf" });
 }

@@ -580,6 +580,18 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         onOpenCatalogMemory={() => setActiveFlow("catalog_memory")}
       />; break;
       case "processing_history": flowEl = <ProcessingHistoryPanel onBack={() => { setActiveFlow(null); setHistoryPatternId(null); }} onOpenInvoiceFlow={() => setActiveFlow("invoice")} initialPatternId={historyPatternId ?? undefined} />; break;
+      case "invoice_detail":
+        flowEl = historyPatternId ? (
+          <InvoiceDetailScreen
+            patternId={historyPatternId}
+            onBack={() => { setActiveFlow(null); setHistoryPatternId(null); }}
+            onResume={() => setActiveFlow("invoice")}
+            onOpenHistory={(id) => { setHistoryPatternId(id); setActiveFlow("processing_history"); }}
+          />
+        ) : (
+          <div className="p-6 text-center text-sm text-muted-foreground">No invoice selected.</div>
+        );
+        break;
       case "stock_reconciliation":
         flowEl = reconciliationResult ? (
           <StockReconciliationPanel

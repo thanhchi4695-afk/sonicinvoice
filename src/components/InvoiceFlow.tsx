@@ -4998,6 +4998,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                         group={group}
                         onSplit={() => handleSplitGroup(i)}
                         onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
+                        onQtyChange={(vIdx, qty) => {
+                          setProductGroups(prev => prev.map((g, gi) => {
+                            if (gi !== i) return g;
+                            const newVariants = g.variants.map((v, vi) =>
+                              vi === vIdx ? { ...v, qty } : v
+                            );
+                            return { ...g, variants: newVariants };
+                          }));
+                        }}
                       />
                     ) : (
                       <div className="relative">

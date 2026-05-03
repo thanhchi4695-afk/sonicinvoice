@@ -154,6 +154,7 @@ export default function ClaudeSkillsLibrary() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [skills, setSkills] = useState<SkillRow[]>([]);
+  const [usageBySkill, setUsageBySkill] = useState<Record<string, UsageStat[]>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftContent, setDraftContent] = useState("");

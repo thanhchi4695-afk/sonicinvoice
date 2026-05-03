@@ -517,6 +517,117 @@ export default function PricingIntelligence() {
 
 // ── Sub-components ──────────────────────────────────────────────
 
+function ChartsSection({ report }: { report: PricingReport }) {
+  const recs = report.recommendations;
+
+  const phaseData = useMemo(() => {
+    const counts: Record<string, number> = { launch: 0, mid_life: 0, clearance: 0 };
+    for (const r of recs) counts[r.analysis.currentPhase] = (counts[r.analysis.currentPhase] ?? 0) + 1;
+    return [
+      { name: "Launch", value: counts.launch, fill: "hsl(var(--primary))" },
+      { name: "Mid-life", value: counts.mid_life, fill: "hsl(var(--chart-2, 38 92% 50%))" },
+      { name: "Clearance", value: counts.clearance, fill: "hsl(var(--destructive))" },
+    ];
+  }, [recs]);
+
+  const marginData = useMemo(() => {
+    const counts: Record<string, number> = { safe: 0, at_risk: 0, breached: 0 };
+    for (const r of recs) counts[r.analysis.marginStatus] = (counts[r.analysis.marginStatus] ?? 0) + 1;
+    return [
+      { status: "Safe", count: counts.safe, fill: "hsl(var(--primary))" },
+      { status: "At risk", count: counts.at_risk, fill: "hsl(var(--chart-2, 38 92% 50%))" },
+      { status: "Breached", count: counts.breached, fill: "hsl(var(--destructive))" },
+    ];
+  }, [recs]);
+
+  const actionData = useMemo(() => {
+    const c = report.summary.actionCounts;
+    return [
+      { action: "Hold", count: c.HOLD, fill: "hsl(var(--muted-foreground))" },
+      { action: "Discount", count: c.DISCOUNT, fill: "hsl(var(--chart-2, 38 92% 50%))" },
+      { action: "Deep", count: c.DEEP_DISCOUNT, fill: "hsl(var(--destructive))" },
+    ];
+  }, [report]);
+
+  const chartConfig: ChartConfig = {
+    value: { label: "Products" },
+    count: { label: "Products" },
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Lifecycle phase</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfig} className="h-[220px] w-full">
+            <PieChart>
+              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              <Pie data={phaseData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80}>
+                {phaseData.map((d) => (
+                  <Cell key={d.name} fill={d.fill} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ChartContainer>
+          <div className="flex justify-around text-xs mt-2">
+            {phaseData.map((d) => (
+              <div key={d.name} className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-sm" style={{ background: d.fill }} />
+                <span className="text-muted-foreground">{d.name}</span>
+                <span className="font-mono">{d.value}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Margin health</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfig} className="h-[220px] w-full">
+            <BarChart data={marginData}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis dataKey="status" tickLine={false} axisLine={false} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={28} />
+              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                {marginData.map((d) => (
+                  <Cell key={d.status} fill={d.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Recommended actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfig} className="h-[220px] w-full">
+            <BarChart data={actionData} layout="vertical">
+              <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+              <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} />
+              <YAxis type="category" dataKey="action" tickLine={false} axisLine={false} width={60} />
+              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+              <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                {actionData.map((d) => (
+                  <Cell key={d.action} fill={d.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function KpiCard({
   label,
   value,

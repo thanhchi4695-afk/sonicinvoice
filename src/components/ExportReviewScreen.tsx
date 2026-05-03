@@ -134,6 +134,8 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
   };
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [exportBlocked, setExportBlocked] = useState(false);
+  const [validationPassed, setValidationPassed] = useState(false);
+  const [publishedWithWarnings, setPublishedWithWarnings] = useState(false);
   const mode = useStoreMode();
 
   // Assign defaults

@@ -3,6 +3,7 @@ import { FileText, Package, ShoppingBag, Store, Mail, Briefcase, Upload, Check, 
 import { cn } from "@/lib/utils";
 import HomeWizard from "@/components/HomeWizard";
 import ProductUrlImporter, { type ImportedLineItem } from "@/components/ProductUrlImporter";
+import HowToVideoButton from "@/components/HowToVideoButton";
 import { setSessionProducts } from "@/stores/invoice-session-store";
 import { toast } from "sonner";
 
@@ -202,6 +203,12 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
           </span>
           <LinkIcon className="w-5 h-5 text-primary" />
           <h2 className="text-lg font-semibold">Paste a product URL → ready for Shopify</h2>
+          <HowToVideoButton
+            videoSrc="/howto/url-importer.mp4"
+            title="Paste product URL"
+            description="See how a single paste pulls name, price, variants, description and images — ready for Shopify."
+            label="Watch how the URL importer works"
+          />
         </div>
         <p className="text-sm text-muted-foreground mb-4">
           Drop in any brand or supplier product link. We auto-collect the <strong>name, price, variants, description and images</strong> — formatted to upload straight into Shopify.

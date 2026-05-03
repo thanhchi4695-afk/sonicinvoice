@@ -5,6 +5,10 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const compId = process.argv[2] || "main";
+const outName = process.argv[3] || `${compId}.mp4`;
+const outPath = outName.startsWith("/") ? outName : `/mnt/documents/${outName}`;
+
 const bundled = await bundle({
   entryPoint: path.resolve(__dirname, "../src/index.ts"),
   webpackOverride: (config) => config,
@@ -20,21 +24,21 @@ const browser = await openBrowser("chrome", {
 
 const composition = await selectComposition({
   serveUrl: bundled,
-  id: "main",
+  id: compId,
   puppeteerInstance: browser,
 });
 
-console.log(`Rendering ${composition.durationInFrames} frames @ ${composition.fps}fps...`);
+console.log(`Rendering '${compId}' — ${composition.durationInFrames} frames @ ${composition.fps}fps → ${outPath}`);
 
 await renderMedia({
   composition,
   serveUrl: bundled,
   codec: "h264",
-  outputLocation: "/mnt/documents/margin-guardian-tour.mp4",
+  outputLocation: outPath,
   puppeteerInstance: browser,
   muted: true,
   concurrency: 1,
 });
 
 await browser.close({ silent: false });
-console.log("Render complete: /mnt/documents/margin-guardian-tour.mp4");
+console.log(`Render complete: ${outPath}`);

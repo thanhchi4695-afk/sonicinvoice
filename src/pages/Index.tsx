@@ -105,6 +105,7 @@ const InventoryView = lazy(() => import("@/components/InventoryView"));
 const ShopifyCSVSEO = lazy(() => import("@/components/ShopifyCSVSEO"));
 const StockyHomeDashboard = lazy(() => import("@/components/StockyHomeDashboard"));
 const AIAgentsLanding = lazy(() => import("@/components/AIAgentsLanding"));
+const InvoiceDetailScreen = lazy(() => import("@/components/InvoiceDetailScreen"));
 const PriceMatchPanel = lazy(() => import("@/components/PriceMatchPanel"));
 const ProductDescriptionPanel = lazy(() => import("@/components/ProductDescriptionPanel"));
 const StockReconciliationPanel = lazy(() => import("@/components/StockReconciliationPanel").then(m => ({ default: m.StockReconciliationPanel })));

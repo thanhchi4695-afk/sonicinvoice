@@ -1193,6 +1193,26 @@ serve(async (req) => {
 
     let systemPrompt = SYSTEM_PROMPT;
 
+    // ── Supplier "Skills File" — highest-priority, user-curated rule book ──
+    // Injected at the TOP so the model treats it as authoritative. The skills
+    // file is edited inside Supplier Brain → Extraction Skills tab and grows
+    // automatically as staff make corrections.
+    if (typeof supplierSkillsMarkdown === "string" && supplierSkillsMarkdown.trim().length > 0) {
+      const skillsBlock = supplierSkillsMarkdown.trim();
+      console.log(`[parse-invoice] Skills file loaded for ${supplierName || "supplier"} (${skillsBlock.length} chars) — injected into system prompt`);
+      systemPrompt = `You are an invoice extraction specialist.
+
+Before extracting this invoice, READ AND APPLY the following supplier-specific rules for ${supplierName || "this supplier"}. These rules were curated by the merchant and override your defaults.
+
+--- BEGIN SUPPLIER SKILLS FILE ---
+${skillsBlock}
+--- END SUPPLIER SKILLS FILE ---
+
+Apply these rules EXACTLY. Do not guess — if a field is unclear, flag it for human review rather than inferring a value.
+
+` + systemPrompt;
+    }
+
     // Stage-1 (Orientation Agent) hint — when present, tells the extractor exactly
     // which supplier/layout/columns to expect so it doesn't have to re-derive them.
     if (invoice_classification && typeof invoice_classification === "object") {

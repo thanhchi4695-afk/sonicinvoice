@@ -210,6 +210,34 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
   }
 
   // ─────── STAGE 2 — extraction ───────
+  // Look up the user-edited "Extraction Skills" file for this supplier (if any)
+  // and pass it through to the extractor so it can be injected into the system
+  // prompt. This lets staff teach the model supplier-specific rules.
+  let supplierSkillsMarkdown: string | null = null;
+  const detectedSupplierForSkills = classification?.supplier_name || supplierName || null;
+  if (userId && detectedSupplierForSkills) {
+    try {
+      const { data: skills } = await admin
+        .from("supplier_skills")
+        .select("skills_markdown")
+        .eq("user_id", userId)
+        .ilike("supplier_name", String(detectedSupplierForSkills))
+        .maybeSingle();
+      if (skills?.skills_markdown && String(skills.skills_markdown).trim().length > 0) {
+        supplierSkillsMarkdown = String(skills.skills_markdown);
+        console.log(`[classify-extract-validate] Loaded supplier skills file for ${detectedSupplierForSkills} (${supplierSkillsMarkdown.length} chars)`);
+        // Increment invoice_count on the skills file (best-effort).
+        admin.from("supplier_skills")
+          .update({ invoice_count: (skills as any).invoice_count ? undefined : undefined })
+          .eq("user_id", userId)
+          .ilike("supplier_name", String(detectedSupplierForSkills))
+          .then(() => {});
+      }
+    } catch (e) {
+      console.warn("[classify-extract-validate] supplier_skills lookup failed:", e);
+    }
+  }
+
   const parseBody = {
     ...rest,
     fileContent,
@@ -217,6 +245,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     fileType,
     supplierName: supplierName || classification?.supplier_name || undefined,
     invoice_classification: classification ?? undefined,
+    supplierSkillsMarkdown: supplierSkillsMarkdown ?? undefined,
   };
 
   // ─────── STAGE 2A — Azure Document Intelligence Layout (PDF only) ───────

@@ -200,6 +200,40 @@ export default function ClaudeSkillsLibrary() {
     }
 
     setLoading(false);
+    void loadUsage(user.id);
+  };
+
+  const loadUsage = async (userId: string) => {
+    const since = new Date(Date.now() - 1000 * 60 * 60 * 24 * 90).toISOString();
+    const { data } = await supabase
+      .from("claude_skill_usage")
+      .select("skill_name, feature, task_type, used_at")
+      .eq("user_id", userId)
+      .gte("used_at", since)
+      .order("used_at", { ascending: false })
+      .limit(2000);
+    const rows = (data as Array<{ skill_name: string; feature: string; task_type: string | null; used_at: string }> | null) || [];
+    const map: Record<string, Record<string, UsageStat>> = {};
+    for (const r of rows) {
+      const key = `${r.feature}::${r.task_type || ""}`;
+      map[r.skill_name] = map[r.skill_name] || {};
+      const slot = map[r.skill_name][key];
+      if (slot) {
+        slot.count += 1;
+      } else {
+        map[r.skill_name][key] = {
+          feature: r.feature,
+          task_type: r.task_type,
+          count: 1,
+          last_used_at: r.used_at,
+        };
+      }
+    }
+    const out: Record<string, UsageStat[]> = {};
+    Object.entries(map).forEach(([k, v]) => {
+      out[k] = Object.values(v).sort((a, b) => b.count - a.count);
+    });
+    setUsageBySkill(out);
   };
 
   useEffect(() => { void load(); }, []);

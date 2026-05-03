@@ -1425,7 +1425,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   const pollInvoiceReadJob = async (jobId: string, label = "Reading invoice…"): Promise<Record<string, any> | null> => {
     const started = Date.now();
-    const MAX_MS = 12 * 60_000;
+    const MAX_MS = 6 * 60_000; // 6 min — beyond this the edge function has almost certainly hit IDLE_TIMEOUT
     const POLL_MS = 3_000;
     let lastStatus = "running";
 
@@ -1452,16 +1452,30 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       }
 
       if (job?.status === "failed") {
-        toast.error("Reading failed", { description: job.error_message || "The background reader could not finish this invoice." });
+        const msg = job.error_message || "The background reader could not finish this invoice.";
+        const isTimeout = /idle_?timeout|150s|timeout/i.test(msg);
+        toast.error(isTimeout ? "Invoice too large or complex to read in one pass" : "Reading failed", {
+          description: isTimeout
+            ? "This file took longer than the 150 s server limit. Try splitting the PDF, uploading just the invoice page, or re-saving as a smaller file."
+            : msg,
+          duration: 12000,
+        });
+        setEnrichLines([]);
+        setProcessStartTime(null);
         return null;
       }
 
       await new Promise((r) => setTimeout(r, POLL_MS));
     }
 
-    toast.error("Reading is still running", {
-      description: "Your phone can safely leave this screen and try again shortly; the upload is no longer tied to one long request.",
+    // Hard timeout — clear UI so the user is never stuck on a spinning screen
+    toast.error("Reading is taking too long", {
+      description: "The server is still working but didn't respond within 6 minutes. Try a smaller file or split this PDF and re-upload.",
+      duration: 12000,
     });
+    setEnrichLines([]);
+    setProcessStartTime(null);
+    return null;
   };
 
   // Push accepted invoice products to Shopify. Groups variants by SKU prefix /

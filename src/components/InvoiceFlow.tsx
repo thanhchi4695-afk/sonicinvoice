@@ -5047,6 +5047,29 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                           onEnrich={() => runEnrichment(i)}
                           onSetImage={(url) => setProductImage(i, url)}
                         />
+                        {/* Editable quantity for single-variant products */}
+                        <div className="flex items-center gap-2 mt-2 px-4 py-2 bg-muted/30 rounded-md">
+                          <span className="text-[11px] text-muted-foreground font-medium">Qty:</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={9999}
+                            value={group.variants[0]?.qty ?? 0}
+                            onChange={e => {
+                              const raw = parseInt(e.target.value, 10);
+                              const qty = isNaN(raw) || raw < 0 ? 0 : Math.min(9999, Math.floor(raw));
+                              setProductGroups(prev => prev.map((g, gi) => {
+                                if (gi !== i) return g;
+                                const variants = g.variants.length > 0
+                                  ? g.variants.map((v, vi) => vi === 0 ? { ...v, qty } : v)
+                                  : [{ sku: g.vendorCode || "", option1Name: "", option1Value: "", option2Name: "", option2Value: "", qty, price: g.price, rrp: g.rrp }];
+                                return { ...g, variants };
+                              }));
+                            }}
+                            className="w-20 h-7 rounded px-2 text-sm font-mono-data bg-input border border-border text-center"
+                          />
+                          <span className="text-[10px] text-muted-foreground">units (from invoice — edit if wrong)</span>
+                        </div>
                       </div>
                     )}
                   </div>

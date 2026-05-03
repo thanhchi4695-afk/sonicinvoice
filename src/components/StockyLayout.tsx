@@ -21,6 +21,7 @@ import {
   CreditCard,
   Sparkles,
   TrendingDown,
+  TrendingUp,
   MessageCircle,
   Shield,
 } from "lucide-react";
@@ -48,6 +49,7 @@ const defaultNavItems: StockyNavItem[] = [
   { id: "reports_hub", label: "Reports", icon: BarChart3, type: "flow" },
   { id: "restock_suggestions", label: "Restock Suggestions", icon: Sparkles, type: "flow" },
   { id: "pricing_assistant", label: "Pricing", icon: TrendingDown, type: "flow" },
+  { id: "pricing_intelligence", label: "Price Intelligence", icon: TrendingUp, type: "tab" },
   { id: "margin_guardian", label: "Margin Guardian", icon: Shield, type: "tab" },
   { id: "support_chat", label: "Chat with Support", icon: MessageCircle, type: "tab" },
   { id: "billing", label: "Billing", icon: CreditCard, type: "tab" },
@@ -113,6 +115,11 @@ const StockyLayout = ({
     }
     if (item.id === "margin_guardian") {
       window.location.href = "/rules";
+      setMobileOpen(false);
+      return;
+    }
+    if (item.id === "pricing_intelligence") {
+      window.location.href = "/pricing-intelligence";
       setMobileOpen(false);
       return;
     }

@@ -9,6 +9,7 @@ import Papa from "papaparse";
 import { getEnabledMetafields } from "@/lib/metafields";
 import { generateGoogleFeedXML, generateGoogleFeedTSV } from "@/lib/google-feed";
 import ShopifyPushFlow from "@/components/ShopifyPushFlow";
+import PrePublishValidation from "@/components/PrePublishValidation";
 import type { PushProduct } from "@/lib/shopify-api";
 import { generateShopifyCSV, generateLightspeedCSV, getVariantMode, setVariantMode, type VariantMode, type ValidationResult } from "@/lib/csv-export-engine";
 import { getPublishStatus, setPublishStatus, type PublishStatus } from "@/lib/publish-status";
@@ -133,6 +134,8 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
   };
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [exportBlocked, setExportBlocked] = useState(false);
+  const [validationPassed, setValidationPassed] = useState(false);
+  const [publishedWithWarnings, setPublishedWithWarnings] = useState(false);
   const mode = useStoreMode();
 
   // Assign defaults
@@ -650,34 +653,55 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
             {generateFilename(supplierName, selectedFormat)}
           </p>
 
-          {/* Push to Shopify */}
+          {/* Mandatory pre-publish validation gate */}
           <div className="mt-4">
-            <ShopifyPushFlow
-              products={filtered.map((p): PushProduct => ({
-                title: `${p.brand} ${p.name}`,
-                body_html: `<p>${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.</p>`,
-                vendor: p.brand,
-                product_type: p.type,
-                tags: `${p.brand}, ${p.type}, New Arrival`,
-                variants: [{
-                  price: p.rrp.toFixed(2),
-                  compare_at_price: p.price < p.rrp ? p.rrp.toFixed(2) : undefined,
-                  sku: p.sku || "",
-                  cost: p.cogs?.toFixed(2),
-                  inventory_management: "shopify",
-                  inventory_quantity: 1,
-                  option1: p.size || undefined,
-                  option2: p.colour || undefined,
-                }],
-                options: [
-                  ...(p.size ? [{ name: "Size" }] : []),
-                  ...(p.colour ? [{ name: "Colour" }] : []),
-                ],
-              }))}
-              source="invoice_export"
-              onFallbackCSV={handleExport}
-            />
+            {!validationPassed ? (
+              <PrePublishValidation
+                products={filtered}
+                onProceedToPublish={(withWarnings) => {
+                  setPublishedWithWarnings(withWarnings);
+                  setValidationPassed(true);
+                }}
+              />
+            ) : (
+              <>
+                <div className="mb-2 flex items-center justify-between bg-success/10 border border-success/30 rounded-md px-3 py-2">
+                  <span className="text-xs text-success font-medium">
+                    ✓ Validation passed{publishedWithWarnings ? " (with warnings)" : ""} — ready to publish
+                  </span>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setValidationPassed(false)}>
+                    Re-run
+                  </Button>
+                </div>
+                <ShopifyPushFlow
+                  products={filtered.map((p): PushProduct => ({
+                    title: `${p.brand} ${p.name}`,
+                    body_html: `<p>${p.name} by ${p.brand}. Premium ${p.type.toLowerCase()}.</p>`,
+                    vendor: p.brand,
+                    product_type: p.type,
+                    tags: `${p.brand}, ${p.type}, New Arrival`,
+                    variants: [{
+                      price: p.rrp.toFixed(2),
+                      compare_at_price: p.price < p.rrp ? p.rrp.toFixed(2) : undefined,
+                      sku: p.sku || "",
+                      cost: p.cogs?.toFixed(2),
+                      inventory_management: "shopify",
+                      inventory_quantity: 1,
+                      option1: p.size || undefined,
+                      option2: p.colour || undefined,
+                    }],
+                    options: [
+                      ...(p.size ? [{ name: "Size" }] : []),
+                      ...(p.colour ? [{ name: "Colour" }] : []),
+                    ],
+                  }))}
+                  source="invoice_export"
+                  onFallbackCSV={handleExport}
+                />
+              </>
+            )}
           </div>
+
 
           {onStartFlow && (
             <WhatsNextSuggestions

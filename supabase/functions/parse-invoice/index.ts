@@ -1162,7 +1162,7 @@ serve(async (req) => {
   }
 
   try {
-    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode, expectedProductCount, supplierProfile, inferredRules, invoice_classification } = await req.json();
+    const { fileContent, fileName, fileType, customInstructions, supplierName, forceMode, templateHint, detailedMode, expectedProductCount, supplierProfile, inferredRules, invoice_classification, supplierSkillsMarkdown } = await req.json();
 
     if (!fileContent) {
       return new Response(JSON.stringify({ error: "No file content provided" }), {

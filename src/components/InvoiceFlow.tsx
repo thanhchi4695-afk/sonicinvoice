@@ -3783,6 +3783,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
+      <AutoAgentsRunSummary
+        open={agentSummary.open}
+        plan={agentSummary.plan}
+        supplier={agentSummary.supplier}
+        productCount={agentSummary.productCount}
+        onConfirm={confirmRunAutoAgents}
+        onSkip={skipRunAutoAgents}
+      />
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
         <div className="flex items-center gap-3 mb-3">

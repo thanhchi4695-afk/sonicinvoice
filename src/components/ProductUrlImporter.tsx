@@ -242,7 +242,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
           description: "Connect a Shopify store under Connections, then try again.",
           action: {
             label: "Connect Shopify",
-            onClick: () => { window.location.href = "/dashboard?tab=connections"; },
+            onClick: () => { window.location.href = "/account?subtab=connections"; },
           },
         });
         return false;
@@ -915,7 +915,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                 </Button>
                 {shopifyConnected === false ? (
                   <Button size="sm" variant="outline" asChild>
-                    <a href="/dashboard?tab=connections">
+                     <a href="/account?subtab=connections">
                       <ShoppingBag className="w-4 h-4 mr-1.5" />
                       Connect Shopify to publish
                     </a>

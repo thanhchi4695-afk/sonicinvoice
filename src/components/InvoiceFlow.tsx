@@ -5900,10 +5900,11 @@ function LightspeedRestockSection({ products, supplierName }: {
   );
 }
 // ── Variant Group Card ────────────────────────────────────
-const VariantGroupCard = ({ group, onSplit, onPreview }: {
+const VariantGroupCard = ({ group, onSplit, onPreview, onQtyChange }: {
   group: { styleGroup: string; name: string; brand: string; type: string; price: number; rrp: number; status: string; variants: { sku: string; option1Name: string; option1Value: string; option2Name: string; option2Value: string; qty: number }[]; metafields: Record<string, string> };
   onSplit: () => void;
   onPreview?: () => void;
+  onQtyChange?: (variantIndex: number, qty: number) => void;
 }) => {
   const [expanded, setExpanded] = useState(false);
   const variants = group.variants;
@@ -5914,9 +5915,18 @@ const VariantGroupCard = ({ group, onSplit, onPreview }: {
   const option2Values = [...new Set(variants.filter(v => v.option2Value).map(v => v.option2Value))];
   const hasOption2 = option2Values.length > 0;
 
+  const getVariantIndex = (opt1: string, opt2: string) =>
+    variants.findIndex(v => v.option1Value === opt1 && v.option2Value === opt2);
   const getQty = (opt1: string, opt2: string) => {
     const v = variants.find(v => v.option1Value === opt1 && v.option2Value === opt2);
     return v?.qty ?? 0;
+  };
+
+  // Sanitise number input — clamp to 0..9999, integers only.
+  const sanitiseQty = (raw: string) => {
+    const n = parseInt(raw, 10);
+    if (isNaN(n) || n < 0) return 0;
+    return Math.min(9999, Math.floor(n));
   };
 
   return (

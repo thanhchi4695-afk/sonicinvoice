@@ -1261,20 +1261,36 @@ const ToolsScreen = ({ onStartFlow }: ToolsScreenProps = {}) => {
               <div className="grid grid-cols-2 gap-3">
                 {sectionTools.map((tool) => {
                   const Icon = tool.icon;
+                  const howto = TOOL_HOWTO[tool.id];
                   return (
-                    <button key={tool.id} onClick={() => {
-                      if (tool.id === "image_seo" && onStartFlow) { onStartFlow("image_seo"); return; }
-                      if (tool.id === "margin_guardian_rules" || tool.id === "margin_guardian_tokens") {
-                        navigate("/rules");
-                        return;
-                      }
-                      setActiveTool(tool.id);
-                    }}
-                      className="bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors">
-                      <Icon className={`w-6 h-6 ${tool.color} mb-3`} />
-                      <p className="text-sm font-semibold">{tool.label}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{tool.desc}</p>
-                    </button>
+                    <div key={tool.id} className="relative">
+                      <button onClick={() => {
+                        if (tool.id === "image_seo" && onStartFlow) { onStartFlow("image_seo"); return; }
+                        if (tool.id === "margin_guardian_rules" || tool.id === "margin_guardian_tokens") {
+                          navigate("/rules");
+                          return;
+                        }
+                        setActiveTool(tool.id);
+                      }}
+                        className="w-full bg-card rounded-lg border border-border p-4 text-left active:bg-muted transition-colors">
+                        <Icon className={`w-6 h-6 ${tool.color} mb-3`} />
+                        <p className="text-sm font-semibold pr-8">{tool.label}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{tool.desc}</p>
+                      </button>
+                      {howto && (
+                        <div
+                          className="absolute top-3 right-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <HowToVideoButton
+                            videoSrc={howto.src}
+                            title={howto.title}
+                            description={howto.description}
+                            label={`Watch how ${howto.title} works`}
+                          />
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>

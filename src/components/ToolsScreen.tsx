@@ -26,6 +26,16 @@ import {
   type BrandDirectoryEntry,
 } from "@/lib/brand-directory";
 import { usePromptDialog } from "@/hooks/use-prompt-dialog";
+import HowToVideoButton from "@/components/HowToVideoButton";
+
+// Tools that have a how-to video. Keep keys in sync with tool ids.
+const TOOL_HOWTO: Record<string, { src: string; title: string; description?: string }> = {
+  price_lookup: {
+    src: "/howto/price-lookup.mp4",
+    title: "Price lookup",
+    description: "Type a product, hit Lookup — see live prices from Google Shopping, the brand site and major retailers, plus a suggested RRP.",
+  },
+};
 
 const tools = [
   { id: "price_lookup", icon: DollarSign, label: "Price lookup", desc: "Look up retail prices via APIs", color: "text-success" },

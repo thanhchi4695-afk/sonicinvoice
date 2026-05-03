@@ -9,6 +9,7 @@ import { detectBrandFromSku } from "@/lib/sku-brand-prefix";
 import POSPickerDialog, { hasPickedPOS } from "@/components/POSPickerDialog";
 import FetchFromUrlDialog, { type ExtractedProduct } from "@/components/FetchFromUrlDialog";
 import ProductUrlImporter, { type ImportedLineItem } from "@/components/ProductUrlImporter";
+import CsvPreviewDialog from "@/components/CsvPreviewDialog";
 import { toast } from "sonner";
 import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag, CloudDownload } from "lucide-react";
@@ -552,6 +553,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     const pos = typeof window !== 'undefined' ? localStorage.getItem('preferred_pos') : null;
     return pos === 'lightspeed' ? 'lightspeed_x' : 'shopify';
   });
+  const [csvPreviewOpen, setCsvPreviewOpen] = useState(false);
   const [showLsSettings, setShowLsSettings] = useState(false);
   const [lsSettings, setLsSettings] = useState<XSeriesSettings>(getXSeriesSettings);
   const [previewProduct, setPreviewProduct] = useState<any>(null);
@@ -4949,6 +4951,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               <Button variant="outline" size="sm" onClick={() => setPreviewAll(true)} className="gap-1"><Eye className="w-3.5 h-3.5" /> Preview all</Button>
               <Button variant="outline" size="sm" onClick={() => setImageHelperActive(true)} className="gap-1"><ImageIcon className="w-3.5 h-3.5" /> Images</Button>
               <Button variant="outline" size="sm" onClick={() => setPriceMatchActive(true)} className="gap-1"><Tag className="w-3.5 h-3.5" /> Price Match</Button>
+              <Button variant="outline" size="sm" onClick={() => setCsvPreviewOpen(true)} className="gap-1">
+                <FileText className="w-3.5 h-3.5" /> Preview CSV
+              </Button>
               <Button variant="teal" size="sm" onClick={() => { finalizeQualityMetrics(); setStep(4); }}>Download <ChevronRight className="w-3.5 h-3.5 ml-1" /></Button>
             </div>
           </div>
@@ -5437,6 +5442,51 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           </div>
         </div>
       )}
+
+      {/* CSV Preview & Download dialog — uses live edited quantities */}
+      <CsvPreviewDialog
+        open={csvPreviewOpen}
+        onOpenChange={setCsvPreviewOpen}
+        products={productGroups.map(g => ({
+          name: g.name,
+          brand: g.brand,
+          type: g.type,
+          price: g.price,
+          rrp: g.rrp,
+          sku: g.vendorCode || g.variants[0]?.sku || "",
+          barcode: g.barcode,
+          colour: g.colour,
+          size: g.size,
+          qty: g.variants.reduce((s, v) => s + (v.qty || 0), 0),
+          bodyHtml: [
+            g.desc ? `<p>${g.desc}</p>` : "",
+            g.fabric ? `<p><strong>Fabric:</strong> ${g.fabric}</p>` : "",
+            g.care ? `<p><strong>Care:</strong> ${g.care}</p>` : "",
+          ].filter(Boolean).join("") || undefined,
+          vendorCode: g.vendorCode,
+          invoiceDate: new Date().toISOString().split("T")[0],
+          variants: g.variants.map(v => {
+            const o1n = (v.option1Name || "").toLowerCase();
+            const o2n = (v.option2Name || "").toLowerCase();
+            let colour = g.colour || "";
+            let size = g.size || "";
+            if (o1n.startsWith("colour") || o1n.startsWith("color")) colour = v.option1Value || colour;
+            else if (o1n === "size") size = v.option1Value || size;
+            if (o2n.startsWith("colour") || o2n.startsWith("color")) colour = v.option2Value || colour;
+            else if (o2n === "size") size = v.option2Value || size;
+            if (!o1n && !o2n && v.option1Value && !size) size = v.option1Value;
+            return {
+              sku: v.sku || g.vendorCode || "",
+              colour,
+              size,
+              qty: v.qty ?? 0,
+              price: v.price ?? g.price,
+              rrp: v.rrp ?? g.rrp,
+            };
+          }),
+        }))}
+        supplierName={supplierName}
+      />
 
       {/* Supplier Template Teach Modal */}
       <SupplierTemplateTeach

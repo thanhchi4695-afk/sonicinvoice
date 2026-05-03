@@ -1461,7 +1461,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           duration: 12000,
         });
         setEnrichLines([]);
-        setIsProcessing(false);
+        setProcessStartTime(null);
         return null;
       }
 

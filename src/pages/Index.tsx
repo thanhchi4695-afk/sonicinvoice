@@ -609,29 +609,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
 
   const mainContent = (
     <>
-      {activeTab === "home" && useStockyDashboard && (
-        <Suspense fallback={suspenseFallback}>
-          <StockyHomeDashboard
-            onNavigate={(f) => setActiveFlow(f as any)}
-            onSwitchToClassic={() => { setUseStockyDashboard(false); localStorage.setItem("stocky_dashboard_mode", "false"); }}
-          />
-        </Suspense>
-      )}
-      {activeTab === "home" && !useStockyDashboard && (
-        <HomeWizard
-          onStartInvoice={() => setActiveFlow("invoice")}
-          onStartPackingSlip={() => setActiveFlow("packing_slip")}
-          onStartEmailInbox={() => setActiveFlow("email_inbox")}
-          onStartJoor={() => setActiveFlow("joor")}
-          onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
-          onStartLookbookImport={() => setActiveFlow("lookbook_import")}
-          onStartScanMode={() => setActiveFlow("scan_mode")}
-          onOpenAgentGuide={() => setActiveTab("agent_guide")}
-          onOpenAutomation={() => setActiveTab("account")}
-          onOpenIntegrations={() => setActiveTab("account")}
-        />
-      )}
-      {activeTab === "start" && (
+      {(activeTab === "home" || activeTab === "start") && (
         <PhaseFlowHome
           onStartInvoice={() => setActiveFlow("invoice")}
           onStartPackingSlip={() => setActiveFlow("packing_slip")}
@@ -641,6 +619,29 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           onStartLookbookImport={() => setActiveFlow("lookbook_import")}
           onStartScanMode={() => setActiveFlow("scan_mode")}
         />
+      )}
+      {activeTab === "ai_agents" && (
+        <Suspense fallback={suspenseFallback}>
+          {useStockyDashboard ? (
+            <StockyHomeDashboard
+              onNavigate={(f) => setActiveFlow(f as any)}
+              onSwitchToClassic={() => { setUseStockyDashboard(false); localStorage.setItem("stocky_dashboard_mode", "false"); }}
+            />
+          ) : (
+            <HomeWizard
+              onStartInvoice={() => setActiveFlow("invoice")}
+              onStartPackingSlip={() => setActiveFlow("packing_slip")}
+              onStartEmailInbox={() => setActiveFlow("email_inbox")}
+              onStartJoor={() => setActiveFlow("joor")}
+              onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
+              onStartLookbookImport={() => setActiveFlow("lookbook_import")}
+              onStartScanMode={() => setActiveFlow("scan_mode")}
+              onOpenAgentGuide={() => setActiveTab("agent_guide")}
+              onOpenAutomation={() => setActiveTab("account")}
+              onOpenIntegrations={() => setActiveTab("account")}
+            />
+          )}
+        </Suspense>
       )}
       <Suspense fallback={suspenseFallback}>
         {activeTab === "invoices" && (

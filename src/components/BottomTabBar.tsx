@@ -1,4 +1,4 @@
-import { Home, FileText, Wrench, CreditCard, User, BookOpen, Rocket } from "lucide-react";
+import { Home, FileText, Wrench, CreditCard, User, BookOpen, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
@@ -11,9 +11,9 @@ const BottomTabBar = ({ activeTab, onTabChange }: BottomTabBarProps) => {
   const { t } = useTranslation();
 
   const baseTabs = [
-    { id: "start", label: t("nav.start", "Start"), icon: Rocket },
-    { id: "home", label: t("nav.home"), icon: Home },
+    { id: "home", label: t("nav.home", "Home"), icon: Home },
     { id: "invoices", label: t("nav.invoices"), icon: FileText },
+    { id: "ai_agents", label: t("nav.ai_agents", "AI Agents"), icon: Bot },
     { id: "tools", label: t("nav.tools"), icon: Wrench },
     { id: "billing", label: t("nav.billing", "Billing"), icon: CreditCard },
     { id: "howto", label: t("nav.howto", "How To"), icon: BookOpen },

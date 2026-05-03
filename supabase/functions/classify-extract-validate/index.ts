@@ -219,19 +219,68 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     invoice_classification: classification ?? undefined,
   };
 
-  const ext = await fetch(`${supabaseUrl}/functions/v1/parse-invoice`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: authHeader, apikey: anonKey },
-    body: JSON.stringify(parseBody),
-  });
+  // ─────── STAGE 2A — Azure Document Intelligence Layout (PDF only) ───────
+  // Two-stage hybrid: Azure gets every table cell with row/col preserved,
+  // then an LLM interprets the structured grid (no table-structure guessing).
+  let extraction: Record<string, unknown> | null = null;
+  let azureUsed = false;
 
-  if (!ext.ok) {
-    const errText = await ext.text();
-    const err = new Error(`Extraction failed (${ext.status}): ${errText.slice(0, 500)}`);
-    (err as Error & { status?: number }).status = ext.status;
-    throw err;
+  const isPdf = String(fileType || "").toLowerCase() === "pdf" ||
+    String(fileName || "").toLowerCase().endsWith(".pdf");
+  const hasAzure = !!Deno.env.get("AZURE_DOCUMENT_INTELLIGENCE_KEY") &&
+    !!Deno.env.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT");
+
+  if (isPdf && hasAzure) {
+    try {
+      const az = await fetch(`${supabaseUrl}/functions/v1/azure-table-extract`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({
+          fileContent,
+          fileName,
+          fileType,
+          supplierName: supplierName || classification?.supplier_name || undefined,
+        }),
+      });
+      if (az.ok) {
+        const azJson = await az.json();
+        const azProducts = Array.isArray(azJson?.products) ? azJson.products : [];
+        if (azProducts.length > 0) {
+          console.log(`[classify-extract-validate] Azure layout returned ${azProducts.length} line items in ${azJson.azure_ms}ms`);
+          extraction = {
+            products: azProducts,
+            supplier: supplierName || classification?.supplier_name || null,
+            extractor: "azure_layout+llm",
+            tables_found: azJson.tables_found,
+          };
+          azureUsed = true;
+        } else {
+          console.warn("[classify-extract-validate] Azure returned 0 products, falling back to parse-invoice");
+        }
+      } else {
+        console.warn("[classify-extract-validate] Azure call failed:", az.status, await az.text().catch(() => ""));
+      }
+    } catch (e) {
+      console.warn("[classify-extract-validate] Azure errored, falling back:", e);
+    }
   }
-  const extraction = await ext.json();
+
+  // ─────── STAGE 2B — Fallback / non-PDF — original parse-invoice agent ───────
+  if (!extraction) {
+    const ext = await fetch(`${supabaseUrl}/functions/v1/parse-invoice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: authHeader, apikey: anonKey },
+      body: JSON.stringify(parseBody),
+    });
+
+    if (!ext.ok) {
+      const errText = await ext.text();
+      const err = new Error(`Extraction failed (${ext.status}): ${errText.slice(0, 500)}`);
+      (err as Error & { status?: number }).status = ext.status;
+      throw err;
+    }
+    extraction = await ext.json();
+  }
 
   // ─────── STAGE 3 — validation ───────
   let validatedProducts = extraction?.products ?? [];

@@ -27,6 +27,7 @@ import {
   setContributeShared,
 } from "@/lib/universal-classifier";
 import SupplierWebsiteRRPPanel from "@/components/SupplierWebsiteRRPPanel";
+import SupplierExtractionSkills from "@/components/SupplierExtractionSkills";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
 interface SupplierRow {
@@ -592,6 +593,9 @@ export default function SupplierBrainTab() {
                       )}
                       <Button size="sm" variant="ghost" onClick={() => setViewing(null)} className="mt-2">Close</Button>
                     </div>
+
+                    <SupplierExtractionSkills supplierName={r.supplier_name} />
+                  </div>
                   </div>
                 )}
               </Card>

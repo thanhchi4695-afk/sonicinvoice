@@ -663,7 +663,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             onStartReorder={() => setActiveFlow("reorder")}
             onStartSuppliers={() => setActiveFlow("suppliers")}
             onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
-            onOpenHistory={(patternId) => { setHistoryPatternId(patternId ?? null); setActiveFlow("processing_history"); }}
+            onOpenHistory={(patternId) => { setHistoryPatternId(patternId ?? null); setActiveFlow(patternId ? "invoice_detail" : "processing_history"); }}
           />
         )}
         {activeTab === "analytics" && <AnalyticsPanel />}

@@ -119,6 +119,11 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
             1
           </span>
           <h2 className="text-base font-semibold">What are you uploading?</h2>
+          <HowToVideoButton
+            videoSrc="/howto/invoice-upload.mp4"
+            title="Upload an invoice"
+            description="Drop a PDF, JPG or PNG — Sonic extracts every line, cost and quantity, ready for your catalog."
+          />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <TileButton

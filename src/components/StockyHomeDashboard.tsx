@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Package, FileText, AlertTriangle, ClipboardCheck, DollarSign,
   Plus, ArrowDownToLine, ScanBarcode, TrendingUp, TrendingDown,
-  ArrowRight, Loader2, ToggleLeft, ToggleRight, GraduationCap,
+  ArrowRight, Loader2, ToggleLeft, ToggleRight, GraduationCap, Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -203,16 +203,23 @@ export default function StockyHomeDashboard({ onNavigate, onSwitchToClassic }: S
       <ConditionBuilderShowcase />
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {[
           { label: "New PO", icon: Plus, flow: "purchase_orders", color: "bg-primary/10 text-primary" },
           { label: "Receive Stock", icon: ArrowDownToLine, flow: "quick_receive", color: "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400" },
           { label: "New Stocktake", icon: ClipboardCheck, flow: "stocktake_module", color: "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400" },
           { label: "Scan Barcode", icon: ScanBarcode, flow: "scan_mode", color: "bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400" },
+          { label: "Guardian", icon: Shield, flow: "__route:/rules", color: "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400" },
         ].map((action) => (
           <button
             key={action.label}
-            onClick={() => onNavigate(action.flow)}
+            onClick={() => {
+              if (action.flow.startsWith("__route:")) {
+                window.location.href = action.flow.slice("__route:".length);
+              } else {
+                onNavigate(action.flow);
+              }
+            }}
             className={`flex items-center gap-2 p-3 rounded-xl ${action.color} font-medium text-sm transition-transform active:scale-95`}
           >
             <action.icon className="w-5 h-5" />

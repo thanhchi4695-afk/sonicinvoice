@@ -406,6 +406,36 @@ export default function PostParseReviewScreen({
     return Object.values(enrichmentMap).filter(e => e.description || e.image_url).length;
   }, [enrichmentMap]);
 
+  // Listen for "edit product" requests fired by the pre-publish validation
+  // screen. Payload `{ brand, name }` is matched against current products;
+  // we flip to the right tab, open inline edit, and scroll the row in.
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as { brand?: string; name?: string } | undefined;
+      if (!detail) return;
+      const brand = (detail.brand || "").trim().toLowerCase();
+      const name = (detail.name || "").trim().toLowerCase();
+      const match = products.find(
+        p => (p.brand || "").trim().toLowerCase() === brand
+          && (p.name || "").trim().toLowerCase() === name,
+      );
+      if (!match) {
+        toast.error("Couldn't find that line item to edit");
+        return;
+      }
+      const nextTab: ReviewTab = match._rejected ? "rejected" : match._confidenceLevel === "high" ? "accepted" : "review";
+      setActiveTab(nextTab);
+      setEditingRow(match._rowIndex);
+      // Scroll after the tab change paints
+      setTimeout(() => {
+        document.getElementById(`review-row-${match._rowIndex}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
+    };
+    window.addEventListener("sonic:edit-product", handler as EventListener);
+    return () => window.removeEventListener("sonic:edit-product", handler as EventListener);
+  }, [products]);
+
   // Categorize products
   const accepted = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel === "high"), [products]);
   const needsReview = useMemo(() => products.filter(p => !p._rejected && p._confidenceLevel !== "high"), [products]);
@@ -1991,7 +2021,7 @@ function ReviewRow({
     `text-[10px] mb-0.5 block ${lowConfFields?.has(field) ? "text-secondary font-medium" : "text-muted-foreground"}`;
 
   return (
-    <div className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""} ${qtyHeaderWarning ? "border-l-4 border-l-secondary bg-secondary/5" : ""}`}>
+    <div id={`review-row-${p._rowIndex}`} className={`transition-colors ${tab === "rejected" ? "opacity-60" : ""} ${isSelected ? "bg-primary/5" : ""} ${qtyHeaderWarning ? "border-l-4 border-l-secondary bg-secondary/5" : ""}`}>
       {qtyHeaderWarning && (
         <div className="px-4 pt-2 flex items-center gap-1.5 text-[10px] text-secondary">
           <Badge variant="outline" className="border-secondary/50 text-secondary text-[9px] px-1.5 py-0 h-4">⚠️ Qty mismatch</Badge>

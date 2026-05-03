@@ -4998,6 +4998,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                         group={group}
                         onSplit={() => handleSplitGroup(i)}
                         onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
+                        onQtyChange={(vIdx, qty) => {
+                          setProductGroups(prev => prev.map((g, gi) => {
+                            if (gi !== i) return g;
+                            const newVariants = g.variants.map((v, vi) =>
+                              vi === vIdx ? { ...v, qty } : v
+                            );
+                            return { ...g, variants: newVariants };
+                          }));
+                        }}
                       />
                     ) : (
                       <div className="relative">
@@ -5038,6 +5047,29 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                           onEnrich={() => runEnrichment(i)}
                           onSetImage={(url) => setProductImage(i, url)}
                         />
+                        {/* Editable quantity for single-variant products */}
+                        <div className="flex items-center gap-2 mt-2 px-4 py-2 bg-muted/30 rounded-md">
+                          <span className="text-[11px] text-muted-foreground font-medium">Qty:</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={9999}
+                            value={group.variants[0]?.qty ?? 0}
+                            onChange={e => {
+                              const raw = parseInt(e.target.value, 10);
+                              const qty = isNaN(raw) || raw < 0 ? 0 : Math.min(9999, Math.floor(raw));
+                              setProductGroups(prev => prev.map((g, gi) => {
+                                if (gi !== i) return g;
+                                const variants = g.variants.length > 0
+                                  ? g.variants.map((v, vi) => vi === 0 ? { ...v, qty } : v)
+                                  : [{ sku: g.vendorCode || "", option1Name: "", option1Value: "", option2Name: "", option2Value: "", qty, price: g.price, rrp: g.rrp }];
+                                return { ...g, variants };
+                              }));
+                            }}
+                            className="w-20 h-7 rounded px-2 text-sm font-mono-data bg-input border border-border text-center"
+                          />
+                          <span className="text-[10px] text-muted-foreground">units (from invoice — edit if wrong)</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -5900,10 +5932,11 @@ function LightspeedRestockSection({ products, supplierName }: {
   );
 }
 // ── Variant Group Card ────────────────────────────────────
-const VariantGroupCard = ({ group, onSplit, onPreview }: {
+const VariantGroupCard = ({ group, onSplit, onPreview, onQtyChange }: {
   group: { styleGroup: string; name: string; brand: string; type: string; price: number; rrp: number; status: string; variants: { sku: string; option1Name: string; option1Value: string; option2Name: string; option2Value: string; qty: number }[]; metafields: Record<string, string> };
   onSplit: () => void;
   onPreview?: () => void;
+  onQtyChange?: (variantIndex: number, qty: number) => void;
 }) => {
   const [expanded, setExpanded] = useState(false);
   const variants = group.variants;
@@ -5914,9 +5947,18 @@ const VariantGroupCard = ({ group, onSplit, onPreview }: {
   const option2Values = [...new Set(variants.filter(v => v.option2Value).map(v => v.option2Value))];
   const hasOption2 = option2Values.length > 0;
 
+  const getVariantIndex = (opt1: string, opt2: string) =>
+    variants.findIndex(v => v.option1Value === opt1 && v.option2Value === opt2);
   const getQty = (opt1: string, opt2: string) => {
     const v = variants.find(v => v.option1Value === opt1 && v.option2Value === opt2);
     return v?.qty ?? 0;
+  };
+
+  // Sanitise number input — clamp to 0..9999, integers only.
+  const sanitiseQty = (raw: string) => {
+    const n = parseInt(raw, 10);
+    if (isNaN(n) || n < 0) return 0;
+    return Math.min(9999, Math.floor(n));
   };
 
   return (
@@ -5966,11 +6008,24 @@ const VariantGroupCard = ({ group, onSplit, onPreview }: {
                       <td className="py-1.5 pr-3 font-medium">{colour}</td>
                       {option1Values.map(size => {
                         const qty = getQty(size, colour);
+                        const vIdx = getVariantIndex(size, colour);
                         return (
-                          <td key={size} className="text-center py-1.5 px-2">
-                            <span className={`inline-block min-w-[24px] rounded px-1 py-0.5 font-mono-data ${qty > 0 ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground/40"}`}>
-                              {qty > 0 ? qty : "—"}
-                            </span>
+                          <td key={size} className="text-center py-1.5 px-1">
+                            {vIdx >= 0 && onQtyChange ? (
+                              <input
+                                type="number"
+                                min={0}
+                                max={9999}
+                                value={qty}
+                                onChange={e => onQtyChange(vIdx, sanitiseQty(e.target.value))}
+                                onClick={e => e.stopPropagation()}
+                                className={`w-14 h-7 rounded px-1 text-center font-mono-data text-xs bg-input border ${qty > 0 ? "border-primary/30 text-primary font-medium" : "border-border text-muted-foreground"}`}
+                              />
+                            ) : (
+                              <span className={`inline-block min-w-[24px] rounded px-1 py-0.5 font-mono-data ${qty > 0 ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground/40"}`}>
+                                {qty > 0 ? qty : "—"}
+                              </span>
+                            )}
                           </td>
                         );
                       })}
@@ -5980,12 +6035,26 @@ const VariantGroupCard = ({ group, onSplit, onPreview }: {
               </table>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 items-center">
               {variants.map((v, i) => (
-                <div key={i} className="px-2.5 py-1 rounded-md bg-muted text-xs font-mono-data">
-                  {v.option1Value}: <span className="font-medium">{v.qty}</span>
+                <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted text-xs font-mono-data">
+                  <span>{v.option1Value}:</span>
+                  {onQtyChange ? (
+                    <input
+                      type="number"
+                      min={0}
+                      max={9999}
+                      value={v.qty}
+                      onChange={e => onQtyChange(i, sanitiseQty(e.target.value))}
+                      onClick={e => e.stopPropagation()}
+                      className="w-14 h-6 rounded px-1 text-center bg-input border border-border"
+                    />
+                  ) : (
+                    <span className="font-medium">{v.qty}</span>
+                  )}
                 </div>
               ))}
+              <span className="text-[10px] text-muted-foreground ml-1">Total: {totalQty}</span>
             </div>
           )}
 

@@ -131,7 +131,7 @@ const FEATURE_USAGE: Record<string, string[]> = {
   pricing: ["Pricing Engine"],
 };
 
-function usedByLabels(skill: SkillRow): string[] {
+function defaultUsedBy(skill: SkillRow): string[] {
   if (skill.skill_name === "fashion-retail") {
     return ["Invoice Extraction", "Product Enrichment", "SEO Writer", "Pricing Engine"];
   }
@@ -141,6 +141,13 @@ function usedByLabels(skill: SkillRow): string[] {
   const out = new Set<string>();
   (skill.task_types || []).forEach((t) => (FEATURE_USAGE[t] || []).forEach((f) => out.add(f)));
   return Array.from(out);
+}
+
+interface UsageStat {
+  feature: string;
+  task_type: string | null;
+  count: number;
+  last_used_at: string;
 }
 
 export default function ClaudeSkillsLibrary() {

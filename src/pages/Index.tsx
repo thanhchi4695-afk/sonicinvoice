@@ -622,25 +622,12 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       )}
       {activeTab === "ai_agents" && (
         <Suspense fallback={suspenseFallback}>
-          {useStockyDashboard ? (
-            <StockyHomeDashboard
-              onNavigate={(f) => setActiveFlow(f as any)}
-              onSwitchToClassic={() => { setUseStockyDashboard(false); localStorage.setItem("stocky_dashboard_mode", "false"); }}
-            />
-          ) : (
-            <HomeWizard
-              onStartInvoice={() => setActiveFlow("invoice")}
-              onStartPackingSlip={() => setActiveFlow("packing_slip")}
-              onStartEmailInbox={() => setActiveFlow("email_inbox")}
-              onStartJoor={() => setActiveFlow("joor")}
-              onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
-              onStartLookbookImport={() => setActiveFlow("lookbook_import")}
-              onStartScanMode={() => setActiveFlow("scan_mode")}
-              onOpenAgentGuide={() => setActiveTab("agent_guide")}
-              onOpenAutomation={() => setActiveTab("account")}
-              onOpenIntegrations={() => setActiveTab("account")}
-            />
-          )}
+          <AIAgentsLanding
+            onOpenAgentDashboard={() => setActiveFlow("stocky_dashboard")}
+            onOpenAgentGuide={() => setActiveTab("agent_guide")}
+            onNavigateTab={(t) => { setActiveFlow(null); setActiveTab(t); }}
+            onNavigateFlow={(f) => setActiveFlow(f as any)}
+          />
         </Suspense>
       )}
       <Suspense fallback={suspenseFallback}>

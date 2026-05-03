@@ -3529,7 +3529,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     };
     setProductGroups((prev) => [...prev, newGroup]);
     setParsedNames((prev) => [...prev, item.name]);
-    setSessionProducts(
+    setInvoiceSessionProducts(
       [
         {
           product_title: item.name,

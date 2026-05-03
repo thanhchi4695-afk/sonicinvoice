@@ -13,6 +13,22 @@ import {
   Tag,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { ApplyDiscountsModal } from "@/components/pricing/ApplyDiscountsModal";
 import type { RecommendedPriceChange } from "@/lib/shopify/priceManager";
 import { Button } from "@/components/ui/button";

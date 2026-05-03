@@ -62,6 +62,7 @@ import { formatDuration, estimateEta, recordProcessingDuration } from "@/lib/pro
 import { persistParsedInvoice } from "@/lib/invoice-persistence";
 import DriveQueuePanel from "@/components/DriveQueuePanel";
 import LinePipelineProgress from "@/components/LinePipelineProgress";
+import AutoAgentsRunSummary, { buildAgentPlan, type AgentRunPlan } from "@/components/AutoAgentsRunSummary";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 

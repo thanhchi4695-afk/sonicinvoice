@@ -2399,7 +2399,44 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }
   };
 
-  const startProcessing = async (file: File) => {
+  const startProcessingSplit = async (originalFile: File, chunks: File[]) => {
+    setFileName(originalFile.name);
+    setFileParseMode("pdf_text");
+    setProcessStartTime(Date.now());
+    setProcessingDone(false);
+    setProcessingCancelled(false);
+    setProcessingElapsed(0);
+    setShowCompletionSummary(false);
+    persistedRef.current = false;
+    cancelledRef.current = false;
+    setStep(2);
+    setInvoicePageImages([]);
+
+    const merged: any[] = [];
+    for (let i = 0; i < chunks.length; i++) {
+      if (cancelledRef.current) return;
+      setEnrichLines([{ name: `Reading page ${i + 1} of ${chunks.length}…`, status: "searching", action: "AI extracting products…", confidence: 0 }]);
+      try {
+        const partial = await parseWithAI(chunks[i]);
+        if (Array.isArray(partial) && partial.length) merged.push(...partial);
+        toast.message(`Page ${i + 1}/${chunks.length} parsed`, { description: `${partial?.length || 0} products so far: ${merged.length}` });
+      } catch (err) {
+        console.warn(`[InvoiceFlow] chunk ${i + 1} failed:`, err);
+      }
+    }
+
+    if (merged.length === 0) {
+      setEnrichLines([{ name: "No products found", status: "not_found", action: "All chunks returned empty. Try uploading the original supplier PDF.", confidence: 0 }]);
+      setProcessingDone(true);
+      setShowCompletionSummary(true);
+      return;
+    }
+
+    // Hand off merged products to startProcessing's downstream pipeline
+    await startProcessing(originalFile, merged);
+  };
+
+  const startProcessing = async (file: File, preParsedProducts?: any[]) => {
     if (customInstructions.trim()) {
       addHistory(customInstructions, supplierName);
       // Honour the persisted "remember for this supplier" opt-in instead of

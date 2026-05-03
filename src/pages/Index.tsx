@@ -105,6 +105,7 @@ const InventoryView = lazy(() => import("@/components/InventoryView"));
 const ShopifyCSVSEO = lazy(() => import("@/components/ShopifyCSVSEO"));
 const StockyHomeDashboard = lazy(() => import("@/components/StockyHomeDashboard"));
 const AIAgentsLanding = lazy(() => import("@/components/AIAgentsLanding"));
+const InvoiceDetailScreen = lazy(() => import("@/components/InvoiceDetailScreen"));
 const PriceMatchPanel = lazy(() => import("@/components/PriceMatchPanel"));
 const ProductDescriptionPanel = lazy(() => import("@/components/ProductDescriptionPanel"));
 const StockReconciliationPanel = lazy(() => import("@/components/StockReconciliationPanel").then(m => ({ default: m.StockReconciliationPanel })));
@@ -180,6 +181,7 @@ const FLOW_KEYS = {
   restock_suggestions: true,
   pricing_assistant: true,
   image_seo: true,
+  invoice_detail: true,
 } as const;
 
 export type ActiveFlow = keyof typeof FLOW_KEYS;
@@ -579,6 +581,18 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         onOpenCatalogMemory={() => setActiveFlow("catalog_memory")}
       />; break;
       case "processing_history": flowEl = <ProcessingHistoryPanel onBack={() => { setActiveFlow(null); setHistoryPatternId(null); }} onOpenInvoiceFlow={() => setActiveFlow("invoice")} initialPatternId={historyPatternId ?? undefined} />; break;
+      case "invoice_detail":
+        flowEl = historyPatternId ? (
+          <InvoiceDetailScreen
+            patternId={historyPatternId}
+            onBack={() => { setActiveFlow(null); setHistoryPatternId(null); }}
+            onResume={() => setActiveFlow("invoice")}
+            onOpenHistory={(id) => { setHistoryPatternId(id); setActiveFlow("processing_history"); }}
+          />
+        ) : (
+          <div className="p-6 text-center text-sm text-muted-foreground">No invoice selected.</div>
+        );
+        break;
       case "stock_reconciliation":
         flowEl = reconciliationResult ? (
           <StockReconciliationPanel
@@ -649,7 +663,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             onStartReorder={() => setActiveFlow("reorder")}
             onStartSuppliers={() => setActiveFlow("suppliers")}
             onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
-            onOpenHistory={(patternId) => { setHistoryPatternId(patternId ?? null); setActiveFlow("processing_history"); }}
+            onOpenHistory={(patternId) => { setHistoryPatternId(patternId ?? null); setActiveFlow(patternId ? "invoice_detail" : "processing_history"); }}
           />
         )}
         {activeTab === "analytics" && <AnalyticsPanel />}

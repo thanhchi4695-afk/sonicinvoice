@@ -3859,10 +3859,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           <div className="mt-3">
             <ProductUrlImporter
               onAddToInvoice={(item: ImportedLineItem) => {
-                console.log("[InvoiceFlow] URL product ready to add", item);
-                // Hand off to the active invoice draft. Wired here so the
-                // user stays in the flow; the consuming step will pick this
-                // up when it mounts (parsedNames / productGroups state).
+                addUrlItemToDraft(item);
               }}
             />
           </div>
@@ -3872,7 +3869,23 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             open={fetchUrlOpen}
             onClose={() => setFetchUrlOpen(false)}
             onExtracted={(product: ExtractedProduct) => {
-              console.log("[InvoiceFlow] product extracted from URL", product);
+              const price =
+                typeof product.priceNormalized === "number"
+                  ? product.priceNormalized
+                  : typeof product.price === "number"
+                    ? product.price
+                    : typeof product.price === "string"
+                      ? parseFloat(product.price) || 0
+                      : 0;
+              addUrlItemToDraft({
+                name: product.name || "Untitled product",
+                description: product.description,
+                price,
+                currency: product.currency,
+                imageUrls: (product.images || []).map((i) => i.storedUrl).filter(Boolean),
+                sourceUrl: product.sourceUrl || "",
+              });
+              setFetchUrlOpen(false);
             }}
           />
 

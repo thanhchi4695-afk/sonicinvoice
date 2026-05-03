@@ -5443,6 +5443,51 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         </div>
       )}
 
+      {/* CSV Preview & Download dialog — uses live edited quantities */}
+      <CsvPreviewDialog
+        open={csvPreviewOpen}
+        onOpenChange={setCsvPreviewOpen}
+        products={productGroups.map(g => ({
+          name: g.name,
+          brand: g.brand,
+          type: g.type,
+          price: g.price,
+          rrp: g.rrp,
+          sku: g.vendorCode || g.variants[0]?.sku || "",
+          barcode: g.barcode,
+          colour: g.colour,
+          size: g.size,
+          qty: g.variants.reduce((s, v) => s + (v.qty || 0), 0),
+          bodyHtml: [
+            g.desc ? `<p>${g.desc}</p>` : "",
+            g.fabric ? `<p><strong>Fabric:</strong> ${g.fabric}</p>` : "",
+            g.care ? `<p><strong>Care:</strong> ${g.care}</p>` : "",
+          ].filter(Boolean).join("") || undefined,
+          vendorCode: g.vendorCode,
+          invoiceDate: new Date().toISOString().split("T")[0],
+          variants: g.variants.map(v => {
+            const o1n = (v.option1Name || "").toLowerCase();
+            const o2n = (v.option2Name || "").toLowerCase();
+            let colour = g.colour || "";
+            let size = g.size || "";
+            if (o1n.startsWith("colour") || o1n.startsWith("color")) colour = v.option1Value || colour;
+            else if (o1n === "size") size = v.option1Value || size;
+            if (o2n.startsWith("colour") || o2n.startsWith("color")) colour = v.option2Value || colour;
+            else if (o2n === "size") size = v.option2Value || size;
+            if (!o1n && !o2n && v.option1Value && !size) size = v.option1Value;
+            return {
+              sku: v.sku || g.vendorCode || "",
+              colour,
+              size,
+              qty: v.qty ?? 0,
+              price: v.price ?? g.price,
+              rrp: v.rrp ?? g.rrp,
+            };
+          }),
+        }))}
+        supplierName={supplierName}
+      />
+
       {/* Supplier Template Teach Modal */}
       <SupplierTemplateTeach
         open={showTeachModal}

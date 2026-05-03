@@ -4,6 +4,10 @@ import {
   HowToUrlImporter,
   HOWTO_URL_IMPORTER_FRAMES,
 } from "./scenes/HowToUrlImporter";
+import {
+  HowToInvoiceUpload,
+  HOWTO_INVOICE_UPLOAD_FRAMES,
+} from "./scenes/HowToInvoiceUpload";
 
 export const RemotionRoot = () => (
   <>

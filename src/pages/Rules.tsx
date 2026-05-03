@@ -24,6 +24,7 @@ import {
 } from "@/components/guardian/RuleTemplatePicker";
 import { RuleListPage } from "@/components/guardian/RuleListPage";
 import { ExtensionTokensPanel } from "@/components/guardian/ExtensionTokensPanel";
+import { BackButton } from "@/components/BackButton";
 
 interface DecisionRow {
   id: string;
@@ -109,12 +110,7 @@ const Rules = () => {
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 p-6">
-      <Button asChild variant="ghost" size="sm" className="-ml-2">
-        <Link to="/dashboard">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to dashboard
-        </Link>
-      </Button>
+      <BackButton to="/dashboard" />
       {/* Hero / overview */}
       <header className="flex flex-col gap-4 rounded-lg border border-border bg-card p-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-4">

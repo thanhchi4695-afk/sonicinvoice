@@ -145,8 +145,8 @@ const AdminSecrets = () => {
           );
         })}
 
-        <footer className="pt-4 border-t border-border text-xs text-muted-foreground">
-          <Link to="/dashboard" className="text-primary underline">← Back to dashboard</Link>
+          <footer className="pt-4 border-t border-border">
+          <BackButton to="/dashboard" />
         </footer>
       </div>
     </div>

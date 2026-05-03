@@ -218,9 +218,9 @@ const Support = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-xl mx-auto px-6 py-12">
-        <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="w-4 h-4" /> Back to dashboard
-        </Link>
+        <div className="mb-6">
+          <BackButton to="/dashboard" />
+        </div>
 
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">

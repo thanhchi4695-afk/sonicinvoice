@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { BackButton } from "@/components/BackButton";
 import {
   ArrowLeft,
   RefreshCcw,
@@ -152,12 +153,7 @@ export default function PricingIntelligence() {
         {/* ── Header ── */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/dashboard">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Dashboard
-              </Link>
-            </Button>
+            <BackButton to="/dashboard" />
             <div>
               <h1 className="text-2xl font-bold tracking-tight font-syne flex items-center gap-2">
                 <Sparkles className="h-6 w-6 text-primary" />

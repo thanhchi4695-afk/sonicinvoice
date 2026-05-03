@@ -368,7 +368,10 @@ export default function ClaudeSkillsLibrary() {
           ) : (
             <ul className="divide-y divide-border">
               {skills.map((s) => {
-                const used = usedByLabels(s);
+                const stats = usageBySkill[s.skill_name] || [];
+                const used = stats.length > 0
+                  ? Array.from(new Set(stats.map((u) => u.feature)))
+                  : defaultUsedBy(s);
                 return (
                   <li key={s.id}>
                     <button

@@ -2679,6 +2679,30 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     }
     // Fire-and-forget: train the supplier intelligence engine in the background
     void trainSupplierPattern();
+    // Auto-run any AI agents the user has opted in to.
+    void runAutoAgentsAfterParse();
+  };
+
+  const runAutoAgentsAfterParse = async () => {
+    try {
+      const { getAutoAgentSettings, AUTO_AGENT_LABELS } = await import("@/lib/auto-agents-settings");
+      const s = getAutoAgentSettings();
+      if (!s.enabled) return;
+      const enabled = (Object.keys(s.agents) as Array<keyof typeof s.agents>).filter((k) => s.agents[k]);
+      if (enabled.length === 0) return;
+      const names = enabled.map((k) => AUTO_AGENT_LABELS[k].name).join(", ");
+      toast.success(`🤖 Auto-running agents: ${names}`, { duration: 4000 });
+      // Each agent triggers its own background work:
+      // - learning: already covered by trainSupplierPattern() above
+      // - classifier/enrichment/watchdog/publishing: dispatch a window event
+      //   the relevant tool screens listen for, so they pick up the latest
+      //   parsed products without forcing the user to navigate.
+      window.dispatchEvent(new CustomEvent("auto-agents:run", {
+        detail: { agents: enabled, supplier: supplierName, productCount: validatedProducts.length },
+      }));
+    } catch (err) {
+      console.warn("[auto-agents] failed to dispatch:", err);
+    }
   };
 
   const trainSupplierPattern = async () => {

@@ -1,5 +1,6 @@
 import { Shield, Tags, Sparkles, Send, GraduationCap, ArrowRight, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
+import AutoAgentsSettingsPanel from "@/components/AutoAgentsSettingsPanel";
 
 interface AIAgentsLandingProps {
   onOpenAgentDashboard: () => void;
@@ -120,6 +121,8 @@ const AIAgentsLanding = ({
           </button>
         </div>
       </header>
+
+      <AutoAgentsSettingsPanel className="mb-6" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {agents.map((agent) => {

@@ -63,6 +63,7 @@ import { persistParsedInvoice } from "@/lib/invoice-persistence";
 import DriveQueuePanel from "@/components/DriveQueuePanel";
 import LinePipelineProgress from "@/components/LinePipelineProgress";
 import AutoAgentsRunSummary, { buildAgentPlan, type AgentRunPlan } from "@/components/AutoAgentsRunSummary";
+import ExtractionDebugPanel from "@/components/ExtractionDebugPanel";
 import { LargePdfChunkDialog, getLargePdfDefault, setLargePdfDefault, type LargePdfChoice } from "@/components/LargePdfChunkDialog";
 import { isLargePdf, splitPdf, extractPdfPage, getPdfPageCount } from "@/lib/pdf-splitter";
 
@@ -631,6 +632,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
   const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
   const [aiExtractionNotes, setAiExtractionNotes] = useState<string | null>(null);
+  const [extractionDebug, setExtractionDebug] = useState<import("@/components/ExtractionDebugPanel").ExtractionDebugInfo | null>(null);
   // Per-product Qty header validator warnings from parse-invoice. Drives the
   // yellow banner + per-row flag on the review screen (Round 4 Walnut fix).
   const [qtyHeaderWarnings, setQtyHeaderWarnings] = useState<Array<{
@@ -2243,6 +2245,14 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       if (data.supplier && !supplierName) {
         setSupplierName(data.supplier);
       }
+      // Capture extraction debug info (Azure layout vs LLM-only) for the per-invoice debug panel
+      setExtractionDebug({
+        extractor_used: data.extractor_used ?? data.extractor ?? null,
+        tables_found: data.tables_found ?? null,
+        azure_ms: data.azure_ms ?? null,
+        classification_source: data.classification_source ?? null,
+        raw_tables: Array.isArray(data.azure_raw_tables) ? data.azure_raw_tables : [],
+      });
       if (data.field_confidence && typeof data.field_confidence === "object") {
         setAiFieldConfidence(data.field_confidence as Record<string, number>);
       }
@@ -4927,6 +4937,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 qtyHeaderWarnings={qtyHeaderWarnings}
                 watchdogRun={watchdogRun}
               />
+              <ExtractionDebugPanel info={extractionDebug} />
             </div>
           )}
 

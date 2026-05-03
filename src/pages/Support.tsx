@@ -8,6 +8,7 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { BackButton } from "@/components/BackButton";
 
 const supportSchema = z.object({
   email: z.string().trim().email("Please enter a valid email").max(255),

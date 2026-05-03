@@ -3493,6 +3493,60 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     setProductGroups(prev => [...prev.slice(0, idx), ...newProducts, ...prev.slice(idx + 1)]);
   };
 
+  // Add a URL-extracted product into the active invoice draft as a new line item.
+  // Mirrors PhaseFlowHome's session handoff and also seeds productGroups so the
+  // user lands on the review screen with the item already present.
+  const addUrlItemToDraft = (item: ImportedLineItem) => {
+    const price = typeof item.price === "number" ? item.price : 0;
+    const newGroup: ProductGroup = {
+      styleGroup: null as any,
+      name: item.name,
+      brand: "",
+      type: "",
+      colour: "",
+      size: "",
+      price: 0,
+      rrp: price,
+      status: "new",
+      metafields: {},
+      isGrouped: false,
+      variants: [
+        {
+          sku: "",
+          option1Name: "Size",
+          option1Value: "",
+          option2Name: "Colour",
+          option2Value: "",
+          qty: 1,
+          price: 0,
+          rrp: price,
+        },
+      ],
+      desc: item.description,
+      imageSrc: item.imageUrls?.[0],
+      imageUrls: item.imageUrls,
+      productPageUrl: item.sourceUrl,
+    };
+    setProductGroups((prev) => [...prev, newGroup]);
+    setParsedNames((prev) => [...prev, item.name]);
+    setInvoiceSessionProducts(
+      [
+        {
+          product_title: item.name,
+          sku: "",
+          vendor: "",
+          unit_cost: 0,
+          rrp: price,
+          margin_pct: 0,
+          qty: 1,
+        },
+      ],
+      supplierName || "",
+    );
+    toast.success(`Added "${item.name}" to invoice`);
+    setStep(3);
+  };
+
   // Merge selected standalone rows into a group
   const [mergeSelection, setMergeSelection] = useState<number[]>([]);
   const [showMergeForm, setShowMergeForm] = useState(false);
@@ -3859,10 +3913,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           <div className="mt-3">
             <ProductUrlImporter
               onAddToInvoice={(item: ImportedLineItem) => {
-                console.log("[InvoiceFlow] URL product ready to add", item);
-                // Hand off to the active invoice draft. Wired here so the
-                // user stays in the flow; the consuming step will pick this
-                // up when it mounts (parsedNames / productGroups state).
+                addUrlItemToDraft(item);
               }}
             />
           </div>
@@ -3872,7 +3923,23 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             open={fetchUrlOpen}
             onClose={() => setFetchUrlOpen(false)}
             onExtracted={(product: ExtractedProduct) => {
-              console.log("[InvoiceFlow] product extracted from URL", product);
+              const price =
+                typeof product.priceNormalized === "number"
+                  ? product.priceNormalized
+                  : typeof product.price === "number"
+                    ? product.price
+                    : typeof product.price === "string"
+                      ? parseFloat(product.price) || 0
+                      : 0;
+              addUrlItemToDraft({
+                name: product.name || "Untitled product",
+                description: product.description,
+                price,
+                currency: product.currency,
+                imageUrls: (product.images || []).map((i) => i.storedUrl).filter(Boolean),
+                sourceUrl: product.sourceUrl || "",
+              });
+              setFetchUrlOpen(false);
             }}
           />
 

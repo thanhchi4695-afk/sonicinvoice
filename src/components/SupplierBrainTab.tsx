@@ -596,7 +596,6 @@ export default function SupplierBrainTab() {
 
                     <SupplierExtractionSkills supplierName={r.supplier_name} />
                   </div>
-                  </div>
                 )}
               </Card>
             );

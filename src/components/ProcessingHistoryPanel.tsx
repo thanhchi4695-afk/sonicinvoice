@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft, ChevronDown, ChevronRight, Search, History as HistoryIcon,
   FileText, Sparkles, Brain, Fingerprint, ScrollText,
@@ -14,6 +14,8 @@ import { formatDuration } from "@/lib/processing-timing";
 interface Props {
   onBack: () => void;
   onOpenInvoiceFlow?: () => void;
+  /** When provided, auto-expand and scroll to this pattern row on mount. */
+  initialPatternId?: string;
 }
 
 /** Row sourced from invoice_patterns — Processing History is a derived view. */
@@ -82,13 +84,18 @@ const qualityBadge = (score: number | null, editCount: number) => {
   return { label: "Needs review", cls: "bg-destructive/15 text-destructive border-destructive/30" };
 };
 
-const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow }: Props) => {
+const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }: Props) => {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PatternRow[]>([]);
   const [supplierMap, setSupplierMap] = useState<Record<string, string>>({});
   const [corrByPattern, setCorrByPattern] = useState<Record<string, CorrectionRow[]>>({});
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => (initialPatternId ? new Set([initialPatternId]) : new Set())
+  );
+  const [highlightId, setHighlightId] = useState<string | null>(initialPatternId ?? null);
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const didScrollRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,6 +160,19 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow }: Props) => {
       return next;
     });
   };
+
+  // Auto-scroll to & highlight the requested pattern after rows load.
+  useEffect(() => {
+    if (!initialPatternId || loading || didScrollRef.current) return;
+    const el = rowRefs.current[initialPatternId];
+    if (!el) return;
+    didScrollRef.current = true;
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = setTimeout(() => setHighlightId(null), 2400);
+    return () => clearTimeout(timer);
+  }, [initialPatternId, loading, rows]);
 
   return (
     <div className="px-4 pt-4 pb-24 animate-fade-in">
@@ -220,7 +240,10 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow }: Props) => {
                   <>
                     <tr
                       key={r.id}
-                      className="border-t border-border hover:bg-muted/30 cursor-pointer"
+                      ref={(el) => { rowRefs.current[r.id] = el; }}
+                      className={`border-t border-border hover:bg-muted/30 cursor-pointer transition-colors ${
+                        highlightId === r.id ? "bg-primary/10 ring-1 ring-primary/40" : ""
+                      }`}
                       onClick={() => toggleExpand(r.id)}
                     >
                       <td className="px-3 py-2 text-muted-foreground">

@@ -208,6 +208,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showQuickSearch, setShowQuickSearch] = useState(false);
   const [reconciliationResult, setReconciliationResult] = useState<any>(null);
+  const [historyPatternId, setHistoryPatternId] = useState<string | null>(null);
 
   const handleReconciliationExport = useCallback((_sets: unknown) => {
     // Hand-off back to invoice flow's export step
@@ -576,7 +577,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         onOpenSupplierIntelligence={() => setActiveFlow("supplier_intelligence")}
         onOpenCatalogMemory={() => setActiveFlow("catalog_memory")}
       />; break;
-      case "processing_history": flowEl = <ProcessingHistoryPanel onBack={() => setActiveFlow(null)} onOpenInvoiceFlow={() => setActiveFlow("invoice")} />; break;
+      case "processing_history": flowEl = <ProcessingHistoryPanel onBack={() => { setActiveFlow(null); setHistoryPatternId(null); }} onOpenInvoiceFlow={() => setActiveFlow("invoice")} initialPatternId={historyPatternId ?? undefined} />; break;
       case "stock_reconciliation":
         flowEl = reconciliationResult ? (
           <StockReconciliationPanel
@@ -659,7 +660,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             onStartReorder={() => setActiveFlow("reorder")}
             onStartSuppliers={() => setActiveFlow("suppliers")}
             onStartCatalogMemory={() => setActiveFlow("catalog_memory")}
-            onOpenHistory={() => setActiveFlow("processing_history")}
+            onOpenHistory={(patternId) => { setHistoryPatternId(patternId ?? null); setActiveFlow("processing_history"); }}
           />
         )}
         {activeTab === "analytics" && <AnalyticsPanel />}

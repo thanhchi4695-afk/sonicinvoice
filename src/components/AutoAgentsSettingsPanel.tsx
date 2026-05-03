@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Bot } from "lucide-react";
+import { Bot, Info } from "lucide-react";
 import {
   AUTO_AGENT_LABELS,
+  type AgentMode,
   type AutoAgentId,
   type AutoAgentSettings,
   getAutoAgentSettings,
@@ -24,13 +25,11 @@ const AutoAgentsSettingsPanel = ({ className, compact }: Props) => {
   const toggleAgent = (id: AutoAgentId) =>
     setS((prev) => ({ ...prev, agents: { ...prev.agents, [id]: !prev.agents[id] } }));
 
+  const setMode = (id: AutoAgentId, mode: AgentMode) =>
+    setS((prev) => ({ ...prev, modes: { ...prev.modes, [id]: mode } }));
+
   return (
-    <section
-      className={cn(
-        "rounded-lg border border-border bg-card p-4",
-        className,
-      )}
-    >
+    <section className={cn("rounded-lg border border-border bg-card p-4", className)}>
       <header className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
           <Bot className="w-5 h-5 text-primary" />
@@ -38,7 +37,7 @@ const AutoAgentsSettingsPanel = ({ className, compact }: Props) => {
             <h3 className="text-sm font-semibold">Auto-run AI agents after parsing</h3>
             {!compact && (
               <p className="text-xs text-muted-foreground mt-0.5">
-                When a parse finishes, automatically run the agents you choose below.
+                Pick which agents run automatically and how cautious each one should be.
               </p>
             )}
           </div>
@@ -66,27 +65,85 @@ const AutoAgentsSettingsPanel = ({ className, compact }: Props) => {
         {(Object.keys(AUTO_AGENT_LABELS) as AutoAgentId[]).map((id) => {
           const meta = AUTO_AGENT_LABELS[id];
           const checked = s.agents[id];
+          const mode = s.modes[id];
           return (
-            <label
+            <div
               key={id}
-              className="flex items-start gap-3 p-2 rounded-md border border-border/60 hover:bg-muted/30 cursor-pointer"
+              className="p-2.5 rounded-md border border-border/60 hover:bg-muted/20 transition-colors"
             >
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 accent-primary"
-                checked={checked}
-                onChange={() => toggleAgent(id)}
-              />
-              <div className="min-w-0">
-                <div className="text-sm font-medium">{meta.name}</div>
-                <div className="text-xs text-muted-foreground">{meta.help}</div>
-              </div>
-            </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                  checked={checked}
+                  onChange={() => toggleAgent(id)}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium">{meta.name}</div>
+                  <div className="text-xs text-muted-foreground">{meta.help}</div>
+                </div>
+              </label>
+
+              {meta.hasMode && (
+                <div
+                  className={cn(
+                    "mt-2 ml-7 flex items-center gap-2",
+                    !checked && "opacity-40 pointer-events-none",
+                  )}
+                >
+                  <ModeChip
+                    active={mode === "strict"}
+                    label={meta.modeLabels?.strict || "Strict"}
+                    title={meta.modeHelp?.strict}
+                    onClick={() => setMode(id, "strict")}
+                  />
+                  <ModeChip
+                    active={mode === "relaxed"}
+                    label={meta.modeLabels?.relaxed || "Relaxed"}
+                    title={meta.modeHelp?.relaxed}
+                    onClick={() => setMode(id, "relaxed")}
+                  />
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"
+                    title={mode === "strict" ? meta.modeHelp?.strict : meta.modeHelp?.relaxed}
+                  >
+                    <Info className="w-3 h-3" />
+                    {mode === "strict" ? meta.modeHelp?.strict : meta.modeHelp?.relaxed}
+                  </span>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
     </section>
   );
 };
+
+const ModeChip = ({
+  active,
+  label,
+  title,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  title?: string;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title={title}
+    className={cn(
+      "px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors",
+      active
+        ? "bg-primary text-primary-foreground border-primary"
+        : "bg-card border-border text-muted-foreground hover:bg-muted",
+    )}
+  >
+    {label}
+  </button>
+);
 
 export default AutoAgentsSettingsPanel;

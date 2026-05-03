@@ -805,6 +805,36 @@ export type Database = {
         }
         Relationships: []
       }
+      claude_skill_usage: {
+        Row: {
+          feature: string
+          id: string
+          skill_name: string
+          supplier_name: string | null
+          task_type: string | null
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          feature: string
+          id?: string
+          skill_name: string
+          supplier_name?: string | null
+          task_type?: string | null
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          feature?: string
+          id?: string
+          skill_name?: string
+          supplier_name?: string | null
+          task_type?: string | null
+          used_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       claude_skills: {
         Row: {
           content: string

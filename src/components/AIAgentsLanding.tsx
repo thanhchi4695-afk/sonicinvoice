@@ -122,6 +122,8 @@ const AIAgentsLanding = ({
         </div>
       </header>
 
+      <AutoAgentsSettingsPanel className="mb-6" />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {agents.map((agent) => {
           const Icon = agent.icon;

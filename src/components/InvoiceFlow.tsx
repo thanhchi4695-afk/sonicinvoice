@@ -63,6 +63,8 @@ import { persistParsedInvoice } from "@/lib/invoice-persistence";
 import DriveQueuePanel from "@/components/DriveQueuePanel";
 import LinePipelineProgress from "@/components/LinePipelineProgress";
 import AutoAgentsRunSummary, { buildAgentPlan, type AgentRunPlan } from "@/components/AutoAgentsRunSummary";
+import { LargePdfChunkDialog, getLargePdfDefault, setLargePdfDefault, type LargePdfChoice } from "@/components/LargePdfChunkDialog";
+import { isLargePdf, splitPdf, extractPdfPage, getPdfPageCount } from "@/lib/pdf-splitter";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 

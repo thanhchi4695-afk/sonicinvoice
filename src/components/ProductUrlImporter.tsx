@@ -915,7 +915,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                 </Button>
                 {shopifyConnected === false ? (
                   <Button size="sm" variant="outline" asChild>
-                    <a href="/dashboard?tab=connections">
+                     <a href="/account?subtab=connections">
                       <ShoppingBag className="w-4 h-4 mr-1.5" />
                       Connect Shopify to publish
                     </a>

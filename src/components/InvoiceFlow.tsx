@@ -3493,6 +3493,60 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     setProductGroups(prev => [...prev.slice(0, idx), ...newProducts, ...prev.slice(idx + 1)]);
   };
 
+  // Add a URL-extracted product into the active invoice draft as a new line item.
+  // Mirrors PhaseFlowHome's session handoff and also seeds productGroups so the
+  // user lands on the review screen with the item already present.
+  const addUrlItemToDraft = (item: ImportedLineItem) => {
+    const price = typeof item.price === "number" ? item.price : 0;
+    const newGroup: ProductGroup = {
+      styleGroup: null as any,
+      name: item.name,
+      brand: "",
+      type: "",
+      colour: "",
+      size: "",
+      price: 0,
+      rrp: price,
+      status: "new",
+      metafields: {},
+      isGrouped: false,
+      variants: [
+        {
+          sku: "",
+          option1Name: "Size",
+          option1Value: "",
+          option2Name: "Colour",
+          option2Value: "",
+          qty: 1,
+          price: 0,
+          rrp: price,
+        },
+      ],
+      desc: item.description,
+      imageSrc: item.imageUrls?.[0],
+      imageUrls: item.imageUrls,
+      productPageUrl: item.sourceUrl,
+    };
+    setProductGroups((prev) => [...prev, newGroup]);
+    setParsedNames((prev) => [...prev, item.name]);
+    setSessionProducts(
+      [
+        {
+          product_title: item.name,
+          sku: "",
+          vendor: "",
+          unit_cost: 0,
+          rrp: price,
+          margin_pct: 0,
+          qty: 1,
+        },
+      ],
+      supplierName || "",
+    );
+    toast.success(`Added "${item.name}" to invoice`);
+    setStep(3);
+  };
+
   // Merge selected standalone rows into a group
   const [mergeSelection, setMergeSelection] = useState<number[]>([]);
   const [showMergeForm, setShowMergeForm] = useState(false);

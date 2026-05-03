@@ -168,13 +168,24 @@ Deno.serve(async (req) => {
     const tables = await runAzureLayout(fileContent);
     const tAzure = Date.now() - t0;
 
+    // Raw Azure table JSON — preserved exactly as returned by prebuilt-layout
+    // so any downstream LLM step (or audit) can re-interpret it.
+    const rawTables = tables.map((t, i) => ({
+      table_index: i,
+      row_count: t.rowCount,
+      column_count: t.columnCount,
+      cells: t.cells,
+      grid: tableToGrid(t),
+    }));
+
     if (!tables.length) {
-      return json({ products: [], tables_found: 0, azure_ms: tAzure, note: "no tables detected" }, 200);
+      return json({ products: [], raw_tables: [], tables_found: 0, azure_ms: tAzure, note: "no tables detected" }, 200);
     }
 
     const products = await interpretTablesWithLLM(tables, fileName, supplierName);
     return json({
       products,
+      raw_tables: rawTables,
       tables_found: tables.length,
       azure_ms: tAzure,
       total_ms: Date.now() - t0,

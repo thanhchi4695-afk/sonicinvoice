@@ -252,6 +252,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
             supplier: supplierName || classification?.supplier_name || null,
             extractor: "azure_layout+llm",
             tables_found: azJson.tables_found,
+            azure_raw_tables: azJson.raw_tables ?? [],
           };
           azureUsed = true;
         } else {

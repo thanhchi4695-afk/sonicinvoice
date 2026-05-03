@@ -39,5 +39,13 @@ export const RemotionRoot = () => (
       width={1920}
       height={1080}
     />
+    <Composition
+      id="howto-price-lookup"
+      component={HowToPriceLookup}
+      durationInFrames={HOWTO_PRICE_LOOKUP_FRAMES}
+      fps={30}
+      width={1920}
+      height={1080}
+    />
   </>
 );

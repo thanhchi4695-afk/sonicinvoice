@@ -2700,20 +2700,43 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       if (!s.enabled) return;
       const enabled = (Object.keys(s.agents) as Array<keyof typeof s.agents>).filter((k) => s.agents[k]);
       if (enabled.length === 0) return;
-      const names = enabled.map((k) => AUTO_AGENT_LABELS[k].name).join(", ");
-      toast.success(`🤖 Auto-running agents: ${names}`, { duration: 4000 });
-      // Each agent triggers its own background work:
-      // - learning: already covered by trainSupplierPattern() above
-      // - classifier/enrichment/watchdog/publishing: dispatch a window event
-      //   the relevant tool screens listen for, so they pick up the latest
-      //   parsed products without forcing the user to navigate.
-      window.dispatchEvent(new CustomEvent("auto-agents:run", {
-        detail: { agents: enabled, supplier: supplierName, productCount: validatedProducts.length },
-      }));
+
+      // Build a heuristic plan so the user sees mode + confidence + reason
+      // BEFORE the agents actually run.
+      const avgQuality = validatedProducts.length
+        ? validatedProducts.reduce((acc, p) => acc + (p._confidence?.score ?? 80), 0) /
+          validatedProducts.length / 100
+        : 0.85;
+      const plan = buildAgentPlan(enabled, s.modes, {
+        productCount: validatedProducts.length,
+        supplierKnown: !!matchedTemplate,
+        avgQuality,
+      });
+      const names = enabled.map((k) => AUTO_AGENT_LABELS[k].name);
+      setAgentSummary({
+        open: true,
+        plan,
+        supplier: supplierName,
+        productCount: validatedProducts.length,
+        detail: { agents: names, supplier: supplierName, productCount: validatedProducts.length },
+      });
     } catch (err) {
       console.warn("[auto-agents] failed to dispatch:", err);
     }
   };
+
+  const confirmRunAutoAgents = () => {
+    const detail = agentSummary.detail;
+    setAgentSummary((s) => ({ ...s, open: false }));
+    if (!detail) return;
+    toast.success(`🤖 Running agents: ${detail.agents.join(", ")}`, { duration: 4000 });
+    window.dispatchEvent(new CustomEvent("auto-agents:run", { detail }));
+  };
+
+  const skipRunAutoAgents = () => {
+    setAgentSummary((s) => ({ ...s, open: false }));
+  };
+
 
   const trainSupplierPattern = async () => {
     try {

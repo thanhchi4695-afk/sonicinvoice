@@ -425,7 +425,23 @@ export default function ClaudeSkillsLibrary() {
           <h3 className="text-sm font-semibold">Skills Library</h3>
           <Badge variant="outline" className="text-[10px]">Claude</Badge>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".md,text/markdown"
+            multiple
+            className="hidden"
+            onChange={(e) => handleImportFiles(e.target.files)}
+          />
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Upload className="w-3.5 h-3.5 mr-1" />}
+            Import skills files
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExportZip} disabled={exporting || skills.length === 0}>
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Download className="w-3.5 h-3.5 mr-1" />}
+            Download all as .zip
+          </Button>
           <Button size="sm" variant="ghost" onClick={handleResetStarters}>
             <RotateCcw className="w-3.5 h-3.5 mr-1" /> Restore starters
           </Button>
@@ -433,6 +449,13 @@ export default function ClaudeSkillsLibrary() {
             <Plus className="w-3.5 h-3.5 mr-1" /> New skill
           </Button>
         </div>
+      </div>
+
+      {importSummary && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground">
+          {importSummary}
+        </div>
+      )}
       </div>
 
       <p className="text-xs text-muted-foreground">

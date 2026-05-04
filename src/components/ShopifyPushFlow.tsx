@@ -179,7 +179,7 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(`https://${storeUrl}/admin/products`, "_blank")}
+              onClick={() => openShopifyAdmin(`https://${storeUrl}/admin/products`)}
               className="text-xs"
             >
               <ExternalLink className="w-3 h-3 mr-1" /> View in Shopify

@@ -12,6 +12,8 @@ import type { DbSupplier } from "@/lib/db-schema-types";
 import { isFuzzySupplierMatch } from "@/lib/invoice-persistence";
 import { normaliseVendor } from "@/lib/normalise-vendor";
 import { getCostHistory } from "@/components/InvoiceFlow";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/ui/empty-state";
 import SupplierCatalog from "@/components/SupplierCatalog";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 
@@ -1119,23 +1121,38 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
   // ── List view ───────────────────────────────────────────
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
-      <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={onBack} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
-            <h2 className="text-lg font-semibold font-display">📊 Suppliers</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={syncSpend} disabled={syncing} className="p-2 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-50">
-              <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+      <div className="sticky top-0 z-40 bg-card/85 backdrop-blur-md border-b border-border/60 px-4 py-3">
+        <PageHeader
+          className="mb-3"
+          eyebrow={
+            <button onClick={onBack} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+              <ChevronLeft className="w-3.5 h-3.5" /> Back
             </button>
-            <Button size="sm" onClick={() => { setForm({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" }); resetIntelligenceForm(); setAddMode(true); }}>
-              <Plus className="w-4 h-4 mr-1" /> Add
-            </Button>
-          </div>
-        </div>
+          }
+          title="Suppliers"
+          subtitle="Spend, margin and learning health for every vendor."
+          actions={
+            <>
+              <button
+                onClick={syncSpend}
+                disabled={syncing}
+                className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+                aria-label="Sync supplier spend"
+              >
+                <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
+              </button>
+              <Button
+                variant="teal"
+                size="sm"
+                onClick={() => { setForm({ name: "", email: "", rep: "", phone: "", currency: "AUD", notes: "" }); resetIntelligenceForm(); setAddMode(true); }}
+              >
+                <Plus className="w-4 h-4 mr-1" /> Add
+              </Button>
+            </>
+          }
+        />
         {/* Search */}
-        <div className="mt-3 relative">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             value={search}
@@ -1150,15 +1167,12 @@ const SupplierPanel = ({ onBack, onStartInvoice }: SupplierPanelProps) => {
         {loading ? (
           <div className="text-center py-12 text-sm text-muted-foreground">Loading suppliers…</div>
         ) : filtered.length === 0 ? (
-          <div className="bg-card border border-border rounded-lg p-8 text-center">
-            <p className="text-sm text-muted-foreground mb-2">{search ? "No matches found." : "No suppliers yet."}</p>
-            {!search && (
-              <>
-                <p className="text-xs text-muted-foreground mb-4">Add a supplier or process your first invoice.</p>
-                <Button onClick={onStartInvoice}>→ Upload first invoice</Button>
-              </>
-            )}
-          </div>
+          <EmptyState
+            icon={Package}
+            title={search ? "No matches" : "No suppliers yet"}
+            body={search ? "Try a different search term." : "Add a supplier or process your first invoice — Sonic will learn their layout automatically."}
+            cta={!search ? { label: "Upload first invoice", variant: "teal", onClick: onStartInvoice } : undefined}
+          />
         ) : (
           <div className="space-y-3">
             {/* Summary bar */}

@@ -8,9 +8,16 @@ export interface FeedHealthProduct {
   productType: string;
   tags: string[];
   imageUrl: string | null;
+  altText: string | null;
+  description: string | null;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  imageId?: number | null;
+  googleCategory?: string | null;
   variants: Array<{
     id: number;
     sku: string;
+    barcode?: string;
     selectedOptions?: Array<{ name: string; value: string }>;
     option1?: string;
     option2?: string;

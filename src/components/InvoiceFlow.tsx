@@ -5651,6 +5651,35 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             }))}
             supplierName={supplierName}
             multiBrandSplit={multiBrandSplit}
+            filenameMismatch={filenameMismatch}
+            onDismissFilenameMismatch={async () => {
+              if (filenameMismatch?.alert_id) {
+                try {
+                  await supabase
+                    .from("misclassification_alerts")
+                    .update({ resolved: true, resolved_at: new Date().toISOString(), resolution: "dismissed" })
+                    .eq("id", filenameMismatch.alert_id);
+                } catch (e) { console.warn("dismiss alert failed", e); }
+              }
+              setFilenameMismatch(null);
+            }}
+            onOverrideFilenameMismatch={async () => {
+              if (!filenameMismatch) return;
+              const overrideName = filenameMismatch.expected_from_filename;
+              setSupplierName(overrideName);
+              if (filenameMismatch.alert_id) {
+                try {
+                  await supabase
+                    .from("misclassification_alerts")
+                    .update({ resolved: true, resolved_at: new Date().toISOString(), resolution: `overridden_to_${overrideName}` })
+                    .eq("id", filenameMismatch.alert_id);
+                } catch (e) { console.warn("override alert failed", e); }
+              }
+              toast(`Supplier overridden to "${overrideName}"`, {
+                description: "Re-upload the invoice if you want the parser to re-process under this supplier.",
+              });
+              setFilenameMismatch(null);
+            }}
             onBack={() => setStep(3)}
           />
 

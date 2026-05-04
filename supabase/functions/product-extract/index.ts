@@ -141,6 +141,162 @@ function normalizeCurrency(price: string | null, currency: string | null): Norma
 }
 
 // ────────────────────────────────────────────────────────────────
+// Variant option scraping (colors / sizes) — shared between strategies.
+// Uses Shopify-style /products/<handle>.js where available, otherwise
+// falls back to scanning swatch / select DOM patterns.
+// ────────────────────────────────────────────────────────────────
+
+const COLOR_KEYS = ["colour", "color", "colours", "colors"];
+const SIZE_KEYS = ["size", "sizes"];
+
+function uniqClean(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of values) {
+    if (!v) continue;
+    const s = String(v).trim();
+    if (!s || s.length > 60) continue;
+    const key = s.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
+async function fetchShopifyProductJson(sourceUrl: string): Promise<{ colors: string[]; sizes: string[]; description: string | null } | null> {
+  try {
+    const u = new URL(sourceUrl);
+    const m = u.pathname.match(/\/products\/([^/?#]+)/i);
+    if (!m) return null;
+    const jsonUrl = `${u.origin}${u.pathname.split("/products/")[0]}/products/${m[1]}.js`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4_000);
+    let data: any;
+    try {
+      const r = await fetch(jsonUrl, { signal: ctrl.signal, headers: { Accept: "application/json" } });
+      if (!r.ok) return null;
+      data = await r.json();
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!data || typeof data !== "object") return null;
+
+    const optionNames: string[] = Array.isArray(data.options)
+      ? data.options.map((o: any) => (typeof o === "string" ? o : o?.name || "")).filter(Boolean)
+      : [];
+    const colorIdx = optionNames.findIndex((n) => COLOR_KEYS.includes(String(n).toLowerCase()));
+    const sizeIdx = optionNames.findIndex((n) => SIZE_KEYS.includes(String(n).toLowerCase()));
+
+    const colors: string[] = [];
+    const sizes: string[] = [];
+    if (Array.isArray(data.variants)) {
+      for (const v of data.variants) {
+        if (colorIdx >= 0) colors.push(v?.[`option${colorIdx + 1}`] ?? "");
+        if (sizeIdx >= 0) sizes.push(v?.[`option${sizeIdx + 1}`] ?? "");
+      }
+    }
+    // Strip HTML for the body description
+    const rawBody = typeof data.description === "string" ? data.description : null;
+    const description = rawBody ? rawBody.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : null;
+
+    return { colors: uniqClean(colors), sizes: uniqClean(sizes), description: description || null };
+  } catch {
+    return null;
+  }
+}
+
+function extractVariantsFromDom($: ReturnType<typeof cheerioLoad>): { colors: string[]; sizes: string[] } {
+  const colors: string[] = [];
+  const sizes: string[] = [];
+
+  const pushFromAttr = (sel: string, target: string[]) => {
+    $(sel).each((_, el) => {
+      const $el = $(el);
+      const v =
+        $el.attr("data-value") ||
+        $el.attr("data-option-value") ||
+        $el.attr("data-variant-option-value") ||
+        $el.attr("title") ||
+        $el.attr("aria-label") ||
+        $el.text();
+      if (v) target.push(String(v).trim());
+    });
+  };
+
+  // Generic swatch / chip patterns
+  pushFromAttr('[data-option-name="Color" i] [data-value], [data-option-name="Colour" i] [data-value]', colors);
+  pushFromAttr('[data-option-name="Size" i] [data-value]', sizes);
+  pushFromAttr('.swatch--color .swatch__item, .color-swatch, [class*="color-swatch"], [class*="ColorSwatch"]', colors);
+  pushFromAttr('.swatch--size .swatch__item, .size-swatch, [class*="size-swatch"], [class*="SizeSwatch"]', sizes);
+
+  // <select name="Color"><option>...</option></select>
+  const harvestSelect = (rx: RegExp, target: string[]) => {
+    $("select").each((_, el) => {
+      const name = ($(el).attr("name") || $(el).attr("id") || "").toString();
+      if (!rx.test(name)) return;
+      $(el).find("option").each((_, opt) => {
+        const txt = $(opt).text().trim();
+        const val = ($(opt).attr("value") || "").trim();
+        if (txt && !/^select|choose/i.test(txt)) target.push(txt);
+        else if (val) target.push(val);
+      });
+    });
+  };
+  harvestSelect(/colou?r/i, colors);
+  harvestSelect(/size/i, sizes);
+
+  // Fieldset/label inputs (radio swatches)
+  $("fieldset, .product-form__input").each((_, fs) => {
+    const legend = ($(fs).find("legend, .form__label, label").first().text() || "").toLowerCase();
+    const targets = legend.includes("colour") || legend.includes("color")
+      ? colors
+      : legend.includes("size")
+      ? sizes
+      : null;
+    if (!targets) return;
+    $(fs).find("input[type='radio']").each((_, inp) => {
+      const v = $(inp).attr("value") || $(inp).attr("data-value") || "";
+      if (v) targets.push(String(v).trim());
+    });
+    $(fs).find("label").each((_, lab) => {
+      const v = $(lab).text().trim();
+      if (v && v.length < 40) targets.push(v);
+    });
+  });
+
+  return { colors: uniqClean(colors), sizes: uniqClean(sizes) };
+}
+
+// ────────────────────────────────────────────────────────────────
+// Description extraction — pulls the *body* product copy, not the
+// SEO meta description (which is what we previously surfaced).
+// ────────────────────────────────────────────────────────────────
+function extractBodyDescription($: ReturnType<typeof cheerioLoad>): string | null {
+  const candidates = [
+    '[itemprop="description"]',
+    '.product__description',
+    '.product-single__description',
+    '.product-description',
+    '.product__text',
+    '.product-details__description',
+    '.product-details-description',
+    '.product-info__description',
+    '#product-description',
+    '[data-product-description]',
+    '.rte',
+    '.product__rte',
+  ];
+  for (const sel of candidates) {
+    const el = $(sel).first();
+    if (!el.length) continue;
+    const text = el.text().replace(/\s+/g, " ").trim();
+    if (text && text.length >= 30) return text.slice(0, 4000);
+  }
+  return null;
+}
+
+// ────────────────────────────────────────────────────────────────
 // Strategy 1 — JSON-LD / microdata Product schema
 // ────────────────────────────────────────────────────────────────
 function extractFromJsonLd($: ReturnType<typeof cheerioLoad>, sourceUrl: string): ExtractedProduct | null {
@@ -160,13 +316,17 @@ function extractFromJsonLd($: ReturnType<typeof cheerioLoad>, sourceUrl: string)
 
         const offer = Array.isArray(node.offers) ? node.offers[0] : node.offers;
         const images = Array.isArray(node.image) ? node.image : node.image ? [node.image] : [];
+        const jsonDesc = typeof node.description === "string" ? node.description.trim() : "";
+        const bodyDesc = extractBodyDescription($);
 
         return {
           name: node.name ?? null,
-          description: node.description ?? null,
+          description: bodyDesc || jsonDesc || null,
           price: offer?.price ? String(offer.price) : null,
           currency: offer?.priceCurrency ?? null,
           imageUrls: images.filter((x: unknown): x is string => typeof x === "string"),
+          colors: [],
+          sizes: [],
           sourceUrl,
         };
       }
@@ -191,10 +351,11 @@ function extractWithSelectors($: ReturnType<typeof cheerioLoad>, sourceUrl: stri
     $("h1").first().text().trim() ||
     null;
 
+  // Prefer the actual on-page body copy below the image; fall back to meta as a last resort.
   const description =
+    extractBodyDescription($) ||
     meta("og:description") ||
     meta("description") ||
-    $('[itemprop="description"]').first().text().trim() ||
     null;
 
   const price =
@@ -219,7 +380,7 @@ function extractWithSelectors($: ReturnType<typeof cheerioLoad>, sourceUrl: stri
 
   if (!name && !price && imageUrls.length === 0) return null;
 
-  return { name, description, price, currency, imageUrls, sourceUrl };
+  return { name, description, price, currency, imageUrls, colors: [], sizes: [], sourceUrl };
 }
 
 // ────────────────────────────────────────────────────────────────

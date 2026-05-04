@@ -651,6 +651,23 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
         {docConfidence > 0 && ` · ${docConfidence}% doc confidence`}
       </p>
 
+      {/* Pairing banner */}
+      {pairedInvoiceName && pairStats && (
+        <div className="mb-3 rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-start gap-2">
+          <Link2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <div className="text-xs flex-1">
+            <p className="font-medium">Paired with <span className="font-mono">{pairedInvoiceName}</span></p>
+            <p className="text-muted-foreground mt-0.5">
+              Qty: from packing list · Cost: from tax invoice ·{" "}
+              <span className="text-success">{pairStats.matched} matched</span>
+              {pairStats.unmatched > 0 && (
+                <> · <span className="text-secondary">{pairStats.unmatched} unmatched</span></>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Summary stats */}
       <div className="grid grid-cols-4 gap-2 mb-4">
         <div className="bg-success/10 border border-success/20 rounded-lg p-2 text-center">

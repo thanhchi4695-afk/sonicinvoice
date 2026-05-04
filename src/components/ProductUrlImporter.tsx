@@ -110,7 +110,7 @@ const PRODUCT_EXTRACT_TIMEOUT_MS = 45_000;
 
 async function invokeProductExtract(productUrl: string): Promise<ExtractedProduct> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const publishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string | undefined;
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
   if (!supabaseUrl || !publishableKey) {
     throw new Error("Product extraction is not configured.");
   }

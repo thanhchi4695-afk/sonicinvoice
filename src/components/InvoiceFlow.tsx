@@ -2262,6 +2262,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         classification_source: data.classification_source ?? null,
         raw_tables: Array.isArray(data.azure_raw_tables) ? data.azure_raw_tables : [],
       });
+      // Capture multi-brand split metadata (Skye → Jantzen+Sunseeker etc).
+      // When the edge function found a matching invoice_company_name and
+      // tagged at least one line item, applied=true.
+      if (data.multi_brand_split && typeof data.multi_brand_split === "object") {
+        setMultiBrandSplit(data.multi_brand_split);
+        if (data.multi_brand_split.applied) {
+          const brands = Object.keys(data.multi_brand_split.counts || {});
+          console.log(`[Sonic Invoice] Multi-brand split applied (${brands.length} brands):`, brands.join(", "));
+          toast(`Multi-brand invoice detected — ${brands.length} brands`, {
+            description: brands.map(b => `${b} (${data.multi_brand_split.counts[b]})`).join(" · "),
+          });
+        }
+      } else {
+        setMultiBrandSplit(null);
+      }
       if (data.field_confidence && typeof data.field_confidence === "object") {
         setAiFieldConfidence(data.field_confidence as Record<string, number>);
       }

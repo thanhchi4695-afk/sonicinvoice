@@ -175,8 +175,23 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multi
     if (p.isNew && !filterNew) return false;
     if (!p.isNew && !filterUpdates) return false;
     if (!p.hasImage && !filterMissingImages) return false;
+    if (brandFilter && (p.brand || "").toLowerCase() !== brandFilter.toLowerCase()) return false;
     return true;
   });
+
+  // Brand counts among ALL products (not the brand-filtered subset) so chips
+  // always show how many items belong to each brand.
+  const brandCounts: Record<string, number> = (() => {
+    if (!multiBrandSplit?.applied) return {};
+    const counts: Record<string, number> = {};
+    for (const p of enriched) {
+      const b = (p.brand || "").trim();
+      if (!b) continue;
+      counts[b] = (counts[b] || 0) + 1;
+    }
+    return counts;
+  })();
+  const brandList = Object.keys(brandCounts).sort();
 
   const avgConfidence = Math.round(
     (filtered.reduce((s, p) => s + (p.confidence === "high" ? 95 : p.confidence === "medium" ? 75 : 40), 0) / Math.max(filtered.length, 1))

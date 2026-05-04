@@ -330,19 +330,14 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
   const saveAltText = async (advance = false) => {
     if (!altEditRow) return;
     const text = altDraft.trim();
-    const imageId = altEditRow.product.imageId;
-    if (!imageId) {
-      toast.error("No image found on product");
-      return;
-    }
     setAltSaving(true);
     try {
-      // Update via Shopify image alt — uses REST update_image action; falls back gracefully
       await callProxy({
         action: "update_image_alt",
-        product_id: altEditRow.product.id.replace("gid://shopify/Product/", ""),
-        image_id: imageId,
-        alt: text,
+        image_updates: [{
+          shopify_product_id: altEditRow.product.id.replace("gid://shopify/Product/", ""),
+          alt_text: text,
+        }],
       });
       setRows(prev => prev.map(r => r.product.id === altEditRow.product.id
         ? { ...r, product: { ...r.product, altText: text }, edited: true }
@@ -363,6 +358,99 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
       toast.error(err instanceof Error ? err.message : "Failed to update alt text");
     } finally {
       setAltSaving(false);
+    }
+  };
+
+  // AI-powered alt text suggestion (uses generate-alt-text edge fn when description present)
+  const generateAltSuggestionAI = async (row: FeedHealthRow): Promise<string> => {
+    if (!row.product.description) return generateAltSuggestion(row);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-alt-text", {
+        body: {
+          title: row.product.title,
+          vendor: row.product.vendor,
+          colour: row.detected.color,
+          description: row.product.description,
+          store: directStore?.storeName || "",
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      return data?.altText || generateAltSuggestion(row);
+    } catch (err) {
+      console.warn("AI alt text fallback to template:", err);
+      return generateAltSuggestion(row);
+    }
+  };
+
+  const handleAltAiClick = async () => {
+    if (!altEditRow) return;
+    setAltAiLoading(true);
+    try {
+      const suggestion = await generateAltSuggestionAI(altEditRow);
+      setAltDraft(suggestion);
+    } finally {
+      setAltAiLoading(false);
+    }
+  };
+
+  // Bulk-fix all missing alt text (template-based, batched 50/req)
+  const missingAltCount = rows.filter(r => !r.product.altText).length;
+
+  const runBulkAltFix = async () => {
+    setBulkAltConfirmOpen(false);
+    const targets = rows.filter(r => !r.product.altText);
+    if (targets.length === 0) return;
+    setBulkAltRunning(true);
+    const BATCH = 50;
+    let done = 0;
+    let failed = 0;
+    const updatedIds = new Set<string>();
+    const altByProductId: Record<string, string> = {};
+
+    try {
+      for (let i = 0; i < targets.length; i += BATCH) {
+        const batch = targets.slice(i, i + BATCH);
+        const image_updates = batch.map(r => {
+          const text = generateAltSuggestion(r);
+          const numericId = r.product.id.replace("gid://shopify/Product/", "");
+          altByProductId[numericId] = text;
+          return { shopify_product_id: numericId, alt_text: text };
+        });
+        try {
+          const data = await callProxy({ action: "update_image_alt", image_updates });
+          const results: Array<{ shopify_product_id: string; status: string }> = data?.results || [];
+          for (const res of results) {
+            if (res.status === "success") {
+              updatedIds.add(res.shopify_product_id);
+              done++;
+            } else {
+              failed++;
+            }
+          }
+          // If proxy doesn't return per-row results, treat batch as success
+          if (results.length === 0) {
+            batch.forEach(r => updatedIds.add(r.product.id.replace("gid://shopify/Product/", "")));
+            done += batch.length;
+          }
+        } catch (err) {
+          console.error("bulk alt batch failed", err);
+          failed += batch.length;
+        }
+        toast.message(`Updating alt text… ${Math.min(i + BATCH, targets.length)} of ${targets.length}`);
+        if (i + BATCH < targets.length) await new Promise(r => setTimeout(r, 500));
+      }
+
+      setRows(prev => prev.map(r => {
+        const numericId = r.product.id.replace("gid://shopify/Product/", "");
+        if (updatedIds.has(numericId)) {
+          return { ...r, product: { ...r.product, altText: altByProductId[numericId] }, edited: true };
+        }
+        return r;
+      }));
+      toast.success(`Updated ${done} alt texts${failed > 0 ? `, ${failed} failed` : ""}`);
+    } finally {
+      setBulkAltRunning(false);
     }
   };
 

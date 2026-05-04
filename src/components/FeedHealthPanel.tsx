@@ -48,6 +48,9 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
   const [altEditRow, setAltEditRow] = useState<FeedHealthRow | null>(null);
   const [altDraft, setAltDraft] = useState("");
   const [altSaving, setAltSaving] = useState(false);
+  const [altAiLoading, setAltAiLoading] = useState(false);
+  const [bulkAltConfirmOpen, setBulkAltConfirmOpen] = useState(false);
+  const [bulkAltRunning, setBulkAltRunning] = useState(false);
 
   // Currency diagnostic state
   const [primaryCountry, setPrimaryCountry] = useState("Australia");
@@ -327,19 +330,14 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
   const saveAltText = async (advance = false) => {
     if (!altEditRow) return;
     const text = altDraft.trim();
-    const imageId = altEditRow.product.imageId;
-    if (!imageId) {
-      toast.error("No image found on product");
-      return;
-    }
     setAltSaving(true);
     try {
-      // Update via Shopify image alt — uses REST update_image action; falls back gracefully
       await callProxy({
         action: "update_image_alt",
-        product_id: altEditRow.product.id.replace("gid://shopify/Product/", ""),
-        image_id: imageId,
-        alt: text,
+        image_updates: [{
+          shopify_product_id: altEditRow.product.id.replace("gid://shopify/Product/", ""),
+          alt_text: text,
+        }],
       });
       setRows(prev => prev.map(r => r.product.id === altEditRow.product.id
         ? { ...r, product: { ...r.product, altText: text }, edited: true }
@@ -360,6 +358,99 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
       toast.error(err instanceof Error ? err.message : "Failed to update alt text");
     } finally {
       setAltSaving(false);
+    }
+  };
+
+  // AI-powered alt text suggestion (uses generate-alt-text edge fn when description present)
+  const generateAltSuggestionAI = async (row: FeedHealthRow): Promise<string> => {
+    if (!row.product.description) return generateAltSuggestion(row);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-alt-text", {
+        body: {
+          title: row.product.title,
+          vendor: row.product.vendor,
+          colour: row.detected.color,
+          description: row.product.description,
+          store: directStore?.storeName || "",
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      return data?.altText || generateAltSuggestion(row);
+    } catch (err) {
+      console.warn("AI alt text fallback to template:", err);
+      return generateAltSuggestion(row);
+    }
+  };
+
+  const handleAltAiClick = async () => {
+    if (!altEditRow) return;
+    setAltAiLoading(true);
+    try {
+      const suggestion = await generateAltSuggestionAI(altEditRow);
+      setAltDraft(suggestion);
+    } finally {
+      setAltAiLoading(false);
+    }
+  };
+
+  // Bulk-fix all missing alt text (template-based, batched 50/req)
+  const missingAltCount = rows.filter(r => !r.product.altText).length;
+
+  const runBulkAltFix = async () => {
+    setBulkAltConfirmOpen(false);
+    const targets = rows.filter(r => !r.product.altText);
+    if (targets.length === 0) return;
+    setBulkAltRunning(true);
+    const BATCH = 50;
+    let done = 0;
+    let failed = 0;
+    const updatedIds = new Set<string>();
+    const altByProductId: Record<string, string> = {};
+
+    try {
+      for (let i = 0; i < targets.length; i += BATCH) {
+        const batch = targets.slice(i, i + BATCH);
+        const image_updates = batch.map(r => {
+          const text = generateAltSuggestion(r);
+          const numericId = r.product.id.replace("gid://shopify/Product/", "");
+          altByProductId[numericId] = text;
+          return { shopify_product_id: numericId, alt_text: text };
+        });
+        try {
+          const data = await callProxy({ action: "update_image_alt", image_updates });
+          const results: Array<{ shopify_product_id: string; status: string }> = data?.results || [];
+          for (const res of results) {
+            if (res.status === "success") {
+              updatedIds.add(res.shopify_product_id);
+              done++;
+            } else {
+              failed++;
+            }
+          }
+          // If proxy doesn't return per-row results, treat batch as success
+          if (results.length === 0) {
+            batch.forEach(r => updatedIds.add(r.product.id.replace("gid://shopify/Product/", "")));
+            done += batch.length;
+          }
+        } catch (err) {
+          console.error("bulk alt batch failed", err);
+          failed += batch.length;
+        }
+        toast.message(`Updating alt text… ${Math.min(i + BATCH, targets.length)} of ${targets.length}`);
+        if (i + BATCH < targets.length) await new Promise(r => setTimeout(r, 500));
+      }
+
+      setRows(prev => prev.map(r => {
+        const numericId = r.product.id.replace("gid://shopify/Product/", "");
+        if (updatedIds.has(numericId)) {
+          return { ...r, product: { ...r.product, altText: altByProductId[numericId] }, edited: true };
+        }
+        return r;
+      }));
+      toast.success(`Updated ${done} alt texts${failed > 0 ? `, ${failed} failed` : ""}`);
+    } finally {
+      setBulkAltRunning(false);
     }
   };
 
@@ -799,6 +890,49 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
         </div>
       </div>
 
+      {/* Bulk alt-text fix banner */}
+      {missingAltCount > 0 && directStore && (
+        <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-3 mb-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-foreground">
+              {missingAltCount.toLocaleString()} products are missing image alt text
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Auto-generate accessible, SEO-friendly alt text from vendor + title + colour and push to Shopify in batches of 50.
+            </p>
+          </div>
+          <Button
+            variant="amber"
+            size="sm"
+            className="shrink-0 gap-1"
+            disabled={bulkAltRunning}
+            onClick={() => setBulkAltConfirmOpen(true)}
+          >
+            {bulkAltRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            Auto-fix {missingAltCount.toLocaleString()} missing alt texts →
+          </Button>
+        </div>
+      )}
+
+      {/* Bulk alt confirm dialog */}
+      <Dialog open={bulkAltConfirmOpen} onOpenChange={setBulkAltConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Auto-fix {missingAltCount} missing alt texts?</DialogTitle>
+            <DialogDescription className="text-xs">
+              Generate alt text for {missingAltCount.toLocaleString()} products using AI suggestions and update Shopify immediately.
+              This pushes changes live to your store.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="outline" size="sm" onClick={() => setBulkAltConfirmOpen(false)}>Cancel</Button>
+            <Button variant="amber" size="sm" onClick={runBulkAltFix}>
+              <Sparkles className="w-3.5 h-3.5" /> Generate & push
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Product table */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <PaginationBar
@@ -1013,10 +1147,19 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
                       <Sparkles className="w-3 h-3" /> AI suggestion
                     </p>
                     <p className="text-xs">{generateAltSuggestion(altEditRow)}</p>
-                    <Button size="sm" variant="ghost" className="text-[11px] h-7 mt-1"
-                      onClick={() => setAltDraft(generateAltSuggestion(altEditRow))}>
-                      Use AI suggestion
-                    </Button>
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      <Button size="sm" variant="ghost" className="text-[11px] h-7"
+                        onClick={() => setAltDraft(generateAltSuggestion(altEditRow))}
+                        disabled={altAiLoading}>
+                        Use template
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-[11px] h-7 gap-1"
+                        onClick={handleAltAiClick}
+                        disabled={altAiLoading}>
+                        {altAiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        {altEditRow.product.description ? "Generate with AI" : "Generate (no description)"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

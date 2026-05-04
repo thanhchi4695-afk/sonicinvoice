@@ -98,7 +98,7 @@ function groupItems(items: PackingSlipItem[], vendor: string): GroupedProduct[] 
     const sku = item.style_code
       ? `${item.style_code}-${(item.colour_code || "").replace(/[^a-zA-Z0-9]/g, "")}-${item.size}`
       : "";
-    g.variants.push({ size: item.size, qty: item.quantity, sku });
+    g.variants.push({ size: item.size, qty: item.quantity, sku, cost: item.unit_cost, rrp: item.rrp });
   }
 
   return Array.from(groups.values());

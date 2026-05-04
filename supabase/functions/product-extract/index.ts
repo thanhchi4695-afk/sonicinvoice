@@ -73,7 +73,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const TIMEOUT_MS = 20_000;
+const TIMEOUT_MS = 12_000;       // page fetch
+const LLM_TIMEOUT_MS = 15_000;   // LLM strategy ceiling
 
 interface ExtractedProduct {
   name: string | null;

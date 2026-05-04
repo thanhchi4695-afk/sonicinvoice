@@ -349,7 +349,9 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   const [newImageUrl, setNewImageUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
+  const [stepStartedAt, setStepStartedAt] = useState(() => Date.now());
   const stepTimers = useRef<number[]>([]);
+  const progressChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [pushingShopify, setPushingShopify] = useState(false);
   const [shopifyConnected, setShopifyConnected] = useState<boolean | null>(null);
 

@@ -2286,6 +2286,20 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       } else {
         setMultiBrandSplit(null);
       }
+      // Filename ≠ content supplier? Show a banner so staff can confirm
+      // or override (e.g. "Sea Level Lost Paradise.pdf" → Bond-Eye Australia).
+      if (data.filename_mismatch && data.filename_mismatch.detected) {
+        setFilenameMismatch(data.filename_mismatch);
+        console.warn(
+          `[Sonic Invoice] Filename mismatch — file "${data.filename_mismatch.filename}" suggests "${data.filename_mismatch.expected_from_filename}" but invoice is from "${data.filename_mismatch.detected_supplier}"`,
+        );
+        toast.warning(
+          `Filename says "${data.filename_mismatch.expected_from_filename}" but invoice is from "${data.filename_mismatch.detected_supplier}"`,
+          { description: "Using the supplier detected from the invoice content. Review on the export screen." },
+        );
+      } else {
+        setFilenameMismatch(null);
+      }
       if (data.field_confidence && typeof data.field_confidence === "object") {
         setAiFieldConfidence(data.field_confidence as Record<string, number>);
       }

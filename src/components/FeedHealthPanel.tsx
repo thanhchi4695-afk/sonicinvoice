@@ -42,6 +42,12 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
   const [namespace, setNamespace] = useState("custom");
   const [detailRow, setDetailRow] = useState<FeedHealthRow | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [altEditRow, setAltEditRow] = useState<FeedHealthRow | null>(null);
+  const [altDraft, setAltDraft] = useState("");
+  const [altSaving, setAltSaving] = useState(false);
 
   // Currency diagnostic state
   const [primaryCountry, setPrimaryCountry] = useState("Australia");

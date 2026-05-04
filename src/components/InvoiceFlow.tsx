@@ -642,6 +642,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     rules: Array<{ sku_prefix: string; brand: string }>;
     counts: Record<string, number>;
   } | null>(null);
+  // Filename ≠ content mismatch (e.g. "Sea Level Lost Paradise.pdf" → Bond-Eye).
+  // The user can dismiss the banner OR override and use the filename guess.
+  const [filenameMismatch, setFilenameMismatch] = useState<{
+    detected: boolean;
+    filename: string;
+    expected_from_filename: string;
+    detected_supplier: string;
+    alert_id: string | null;
+  } | null>(null);
   // Per-product Qty header validator warnings from parse-invoice. Drives the
   // yellow banner + per-row flag on the review screen (Round 4 Walnut fix).
   const [qtyHeaderWarnings, setQtyHeaderWarnings] = useState<Array<{

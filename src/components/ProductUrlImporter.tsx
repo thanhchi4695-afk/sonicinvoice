@@ -207,6 +207,115 @@ interface BulkRow {
 
 const MAX_BULK_URLS = 25;
 
+// ── VariantPicker ─────────────────────────────────────────────
+// Pill-style multi-select used for both colours and sizes. Shows
+// every option detected on the source page; user toggles which to
+// stock and can add custom values.
+function VariantPicker({
+  label,
+  available,
+  selected,
+  onChange,
+  addPlaceholder,
+  emptyHint,
+}: {
+  label: string;
+  available: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  addPlaceholder: string;
+  emptyHint: string;
+}) {
+  const [draft, setDraft] = useState("");
+  const isOn = (v: string) => selected.some((s) => s.toLowerCase() === v.toLowerCase());
+  const toggle = (v: string) => {
+    if (isOn(v)) onChange(selected.filter((s) => s.toLowerCase() !== v.toLowerCase()));
+    else onChange([...selected, v]);
+  };
+  const addCustom = () => {
+    const v = draft.trim();
+    if (!v) return;
+    if (!isOn(v)) onChange([...selected, v]);
+    setDraft("");
+  };
+  // Merge availability + any custom-added selections so user-added
+  // values stay visible as togglable pills.
+  const allOptions: string[] = [];
+  const seen = new Set<string>();
+  for (const v of [...available, ...selected]) {
+    const k = v.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    allOptions.push(v);
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">
+          {label} ({selected.length}
+          {available.length ? ` of ${available.length}` : ""})
+        </Label>
+        {selected.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {allOptions.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {allOptions.map((v) => {
+            const on = isOn(v);
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => toggle(v)}
+                className={cn(
+                  "px-2.5 py-1 rounded-full border text-xs transition-colors",
+                  on
+                    ? "border-primary bg-primary/15 text-foreground"
+                    : "border-border bg-background/40 text-muted-foreground hover:text-foreground hover:border-primary/50",
+                )}
+                aria-pressed={on}
+              >
+                {on && <Check className="inline w-3 h-3 mr-1 -mt-0.5" />}
+                {v}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-[11px] text-muted-foreground italic">{emptyHint}</p>
+      )}
+
+      <div className="flex gap-2">
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={addPlaceholder}
+          className="h-8 text-xs"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addCustom();
+            }
+          }}
+        />
+        <Button type="button" size="sm" variant="outline" disabled={!draft.trim()} onClick={addCustom}>
+          <Plus className="w-3.5 h-3.5 mr-1" />
+          Add
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** Parse a multi-URL textarea (newline / comma / space / tab separated). */
 function parseBulkUrls(raw: string): string[] {
   const seen = new Set<string>();

@@ -541,6 +541,8 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       currency: p.currency,
       imageUrls: (p.images ?? []).map((i) => i.storedUrl).filter(Boolean),
       sourceUrl: p.sourceUrl ?? fallbackUrl,
+      colors: p.colors?.length ? p.colors : undefined,
+      sizes: p.sizes?.length ? p.sizes : undefined,
     };
   };
 

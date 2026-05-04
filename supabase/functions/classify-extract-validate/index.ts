@@ -329,28 +329,91 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
   }
 
   // ─────── STAGE 2 — extraction ───────
-  // Look up the user-edited "Extraction Skills" file for this supplier (if any)
-  // and pass it through to the extractor so it can be injected into the system
-  // prompt. This lets staff teach the model supplier-specific rules.
+  // Look up the user-edited "Extraction Skills" file(s) for this supplier.
+  //
+  // MULTI-BRAND DISTRIBUTOR SUPPORT:
+  //   Some "suppliers" on the invoice are actually distributors that carry
+  //   multiple brands (e.g. Function Design Group → Lulalife + Rubyyaya;
+  //   HEAD Oceania → Zoggs; Senses Accessories → Italian Cartel). In that
+  //   case we load EVERY mapped brand's skill file and concatenate them so
+  //   the extractor sees rules for all possible brands on the invoice.
   let supplierSkillsMarkdown: string | null = null;
+  let distributorMatch: {
+    company_name: string;
+    brands_loaded: string[];
+    skill_files_loaded: number;
+  } | null = null;
   const detectedSupplierForSkills = classification?.supplier_name || supplierName || null;
+
   if (userId && detectedSupplierForSkills) {
     try {
-      const { data: skills } = await admin
-        .from("supplier_skills")
-        .select("skills_markdown")
-        .eq("user_id", userId)
-        .ilike("supplier_name", String(detectedSupplierForSkills))
-        .maybeSingle();
-      if (skills?.skills_markdown && String(skills.skills_markdown).trim().length > 0) {
-        supplierSkillsMarkdown = String(skills.skills_markdown);
-        console.log(`[classify-extract-validate] Loaded supplier skills file for ${detectedSupplierForSkills} (${supplierSkillsMarkdown.length} chars)`);
-        // Increment invoice_count on the skills file (best-effort).
-        admin.from("supplier_skills")
-          .update({ invoice_count: (skills as any).invoice_count ? undefined : undefined })
-          .eq("user_id", userId)
-          .ilike("supplier_name", String(detectedSupplierForSkills))
-          .then(() => {});
+      // Step 1 — is this a known multi-brand distributor?
+      const detectedLower = String(detectedSupplierForSkills).toLowerCase().trim();
+      const { data: mbRows } = await admin
+        .from("multi_brand_suppliers")
+        .select("invoice_company_name, brand_rules")
+        .eq("user_id", userId);
+
+      const distributor = (mbRows ?? []).find((r: any) => {
+        const name = String(r.invoice_company_name || "").toLowerCase().trim();
+        if (!name) return false;
+        return detectedLower === name
+          || detectedLower.includes(name)
+          || name.includes(detectedLower);
+      });
+
+      // Build the list of supplier_skills rows to load.
+      const skillTargets: string[] = [];
+      if (distributor && Array.isArray(distributor.brand_rules)) {
+        const brands = Array.from(
+          new Set(
+            (distributor.brand_rules as any[])
+              .map((r) => String(r?.brand || "").trim())
+              .filter((b) => b.length > 0),
+          ),
+        );
+        skillTargets.push(...brands);
+        // Also try the distributor's own name (in case they have their own skill file)
+        skillTargets.push(distributor.invoice_company_name);
+        console.log(
+          `[classify-extract-validate] Distributor "${distributor.invoice_company_name}" → loading skills for: ${brands.join(", ")}`,
+        );
+      } else {
+        skillTargets.push(detectedSupplierForSkills);
+      }
+
+      // Step 2 — load every targeted skill file in parallel
+      const loaded: { name: string; markdown: string }[] = [];
+      await Promise.all(
+        skillTargets.map(async (name) => {
+          try {
+            const { data: skills } = await admin
+              .from("supplier_skills")
+              .select("skills_markdown")
+              .eq("user_id", userId)
+              .ilike("supplier_name", name)
+              .maybeSingle();
+            const md = String(skills?.skills_markdown || "").trim();
+            if (md.length > 0) loaded.push({ name, markdown: md });
+          } catch (_e) { /* best-effort per-brand */ }
+        }),
+      );
+
+      if (loaded.length > 0) {
+        supplierSkillsMarkdown = loaded
+          .map((l) => `## Brand: ${l.name}\n\n${l.markdown}`)
+          .join("\n\n---\n\n");
+        console.log(
+          `[classify-extract-validate] Loaded ${loaded.length} supplier skill file(s) (${supplierSkillsMarkdown.length} chars)`,
+        );
+      }
+
+      if (distributor && loaded.length > 0) {
+        distributorMatch = {
+          company_name: distributor.invoice_company_name,
+          brands_loaded: loaded.map((l) => l.name),
+          skill_files_loaded: loaded.length,
+        };
       }
     } catch (e) {
       console.warn("[classify-extract-validate] supplier_skills lookup failed:", e);

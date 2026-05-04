@@ -332,6 +332,21 @@ function parseBulkUrls(raw: string): string[] {
   return out;
 }
 
+/** Tiny live counter shown next to the active step so users see progress. */
+function ElapsedTimer({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    setElapsed(0);
+    const id = window.setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [startedAt]);
+  return (
+    <span className="text-[10px] text-muted-foreground ml-1 font-mono">{elapsed}s</span>
+  );
+}
+
 export default function ProductUrlImporter({ onAddToInvoice, className }: Props) {
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [url, setUrl] = useState("");

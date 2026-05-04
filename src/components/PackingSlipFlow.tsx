@@ -24,6 +24,10 @@ interface PackingSlipItem {
   quantity: number;
   carton_number?: string;
   barcode?: string;
+  // Cost data (from paired tax invoice or markup formula)
+  unit_cost?: number;
+  rrp?: number;
+  _costSource?: "tax_invoice" | "markup" | "manual";
   // Computed fields
   _title: string;
   _confidence: number;
@@ -40,7 +44,7 @@ interface GroupedProduct {
   vendor: string;
   style_code: string;
   colour_code: string;
-  variants: { size: string; qty: number; sku: string }[];
+  variants: { size: string; qty: number; sku: string; cost?: number; rrp?: number }[];
 }
 
 type Step = "upload" | "processing" | "review";

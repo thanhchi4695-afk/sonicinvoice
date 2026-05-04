@@ -236,13 +236,16 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         setActiveTab(detail);
       }
     };
+    const onQuickSearch = () => setShowQuickSearch(true);
     window.addEventListener("sonic:reconciliation-ready", onReady as EventListener);
     window.addEventListener("sonic:navigate-flow", onNavFlow as EventListener);
     window.addEventListener("sonic:navigate-tab", onNavTab as EventListener);
+    window.addEventListener("sonic:open-quick-search", onQuickSearch);
     return () => {
       window.removeEventListener("sonic:reconciliation-ready", onReady as EventListener);
       window.removeEventListener("sonic:navigate-flow", onNavFlow as EventListener);
       window.removeEventListener("sonic:navigate-tab", onNavTab as EventListener);
+      window.removeEventListener("sonic:open-quick-search", onQuickSearch);
     };
   }, []);
   

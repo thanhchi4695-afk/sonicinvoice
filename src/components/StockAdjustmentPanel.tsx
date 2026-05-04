@@ -24,6 +24,8 @@ import {
 } from "@/lib/shopify-api";
 import { cn } from "@/lib/utils";
 import Papa from "papaparse";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const REASONS = [
   "Stocktake correction",
@@ -397,25 +399,25 @@ export default function StockAdjustmentPanel({ onBack }: Props) {
   if (view === "list") {
     return (
       <div className="p-4 lg:p-6 max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onBack}>
-              <ChevronLeft className="w-4 h-4 mr-1" /> Back
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold font-display">Stock Adjustments</h1>
-              <p className="text-sm text-muted-foreground">Manual inventory adjustments — Stocky replacement</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredRecords.length === 0}>
-              <Download className="w-4 h-4 mr-1.5" /> Export CSV
-            </Button>
-            <Button onClick={() => { resetForm(); setView("create"); }}>
-              <Plus className="w-4 h-4 mr-1.5" /> Create Adjustment
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          eyebrow={
+            <button onClick={onBack} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+              <ChevronLeft className="w-3.5 h-3.5" /> Back
+            </button>
+          }
+          title="Stock Adjustments"
+          subtitle="Manual inventory adjustments — record damage, theft, transfers and corrections."
+          actions={
+            <>
+              <Button variant="outline" size="sm" onClick={exportCsv} disabled={filteredRecords.length === 0}>
+                <Download className="w-4 h-4 mr-1.5" /> Export CSV
+              </Button>
+              <Button variant="teal" size="sm" onClick={() => { resetForm(); setView("create"); }}>
+                <Plus className="w-4 h-4 mr-1.5" /> Create Adjustment
+              </Button>
+            </>
+          }
+        />
 
         {/* Filters */}
         <Card className="p-4 mb-4">
@@ -469,10 +471,12 @@ export default function StockAdjustmentPanel({ onBack }: Props) {
               <Loader2 className="w-5 h-5 animate-spin inline mr-2" /> Loading…
             </div>
           ) : filteredRecords.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground">
-              <Package className="w-10 h-10 mx-auto mb-3 opacity-50" />
-              <p className="text-sm">No adjustments yet. Click "Create Adjustment" to start.</p>
-            </div>
+            <EmptyState
+              icon={Package}
+              title="No adjustments yet"
+              body="Track damage, theft, transfers and stocktake corrections in one place."
+              cta={{ label: "Create adjustment", variant: "teal", onClick: () => { resetForm(); setView("create"); } }}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

@@ -632,6 +632,7 @@ Deno.serve(async (req) => {
       killSwitchTripped: false,
       totalBytesIn: 0,
     }));
+    await broadcastStep(3, "Preparing Shopify-ready fields");
 
     // Step 4 — currency normalisation (stub until Task 6)
     const priceNormalized = normalizeCurrency(product.price, product.currency);

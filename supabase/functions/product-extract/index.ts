@@ -82,7 +82,7 @@ const LLM_TIMEOUT_MS = 15_000;   // LLM strategy ceiling
 const IMAGE_PIPELINE_TIMEOUT_MS = 13_000;
 const LOG_TIMEOUT_MS = 2_000;
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> {
   let timer: number | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);

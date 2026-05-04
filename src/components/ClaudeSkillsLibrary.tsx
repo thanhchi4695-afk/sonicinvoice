@@ -165,6 +165,10 @@ export default function ClaudeSkillsLibrary() {
   const [testing, setTesting] = useState(false);
   const [testOutput, setTestOutput] = useState<string | null>(null);
   const [testTaskType, setTestTaskType] = useState<string>("extraction");
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(() => skills.find((s) => s.id === selectedId) || null, [skills, selectedId]);
   const dirty = selected

@@ -104,7 +104,6 @@ const AIAgentsLanding = ({
           </div>
         </DialogContent>
       </Dialog>
-      </header>
 
       <AutoAgentsSettingsPanel className="mb-6" />
 

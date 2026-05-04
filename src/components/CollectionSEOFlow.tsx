@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createCollectionGraphQL, type GraphQLCollectionInput } from "@/lib/shopify-api";
 import { addAuditEntry } from "@/lib/audit-log";
 import { toast } from "sonner";
+import { openShopifyAdmin } from "@/lib/open-shopify-admin";
 
 interface CollectionSEOFlowProps {
   onBack: () => void;

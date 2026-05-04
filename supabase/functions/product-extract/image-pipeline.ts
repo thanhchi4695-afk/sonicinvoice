@@ -20,11 +20,12 @@ import { decode, Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 
 const BUCKET = "compressed-images";
 const MAX_TOTAL_BYTES = 10 * 1024 * 1024;       // 10 MB kill-switch
-const PER_IMAGE_TIMEOUT_MS = 8_000;
+const PER_IMAGE_TIMEOUT_MS = 5_000;              // tightened from 8s
 const MAX_IMAGES = 4;                            // CPU-time safety on Edge runtime
 const MAX_DIMENSION = 1600;                      // longest side
 const WEBP_QUALITY = 82;
 const SKIP_OPTIMISE_BYTES = 150 * 1024;          // <150KB → upload original, skip WASM decode
+const PIPELINE_BUDGET_MS = 12_000;               // total wall-clock budget for ALL images
 
 const UA = "Mozilla/5.0 (compatible; SonicInvoiceBot/1.0; +https://sonicinvoices.com)";
 
@@ -175,15 +176,60 @@ export async function downloadImages(
   }
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
+  const deadline = Date.now() + PIPELINE_BUDGET_MS;
   let totalBytesIn = 0;
   let killSwitchTripped = false;
 
-  for (let i = 0; i < urls.length; i++) {
-    const url = urls[i];
-    try {
-      const { bytes, contentType } = await fetchBytes(url);
-      totalBytesIn += bytes.byteLength;
+  // Phase 1 — fetch all candidates in parallel with the global deadline.
+  const fetched = await Promise.all(
+    urls.map(async (url, idx) => {
+      try {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw new Error("budget exhausted before fetch");
+        const perTimeout = Math.min(PER_IMAGE_TIMEOUT_MS, remaining);
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), perTimeout);
+        try {
+          const r = await fetch(url, {
+            signal: ctrl.signal,
+            headers: { "User-Agent": UA, Accept: "image/*" },
+            redirect: "follow",
+          });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const contentType = r.headers.get("content-type") ?? "";
+          if (!contentType.startsWith("image/")) {
+            throw new Error(`Non-image content-type: ${contentType || "unknown"}`);
+          }
+          const bytes = new Uint8Array(await r.arrayBuffer());
+          return { ok: true as const, idx, url, bytes, contentType };
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        return { ok: false as const, idx, url, error: msg };
+      }
+    }),
+  );
 
+  // Phase 2 — process+upload in original order, but bail on global deadline.
+  for (const item of fetched) {
+    if (!item.ok) {
+      warnings.push(`Image ${item.url} skipped: ${item.error}`);
+      console.warn("[image-pipeline] skip", item.url, item.error);
+      continue;
+    }
+
+    if (Date.now() >= deadline) {
+      warnings.push(
+        `Pipeline budget (${PIPELINE_BUDGET_MS}ms) reached — stopped after ${out.length} images.`,
+      );
+      break;
+    }
+
+    const { url, bytes, contentType, idx } = item;
+    try {
+      totalBytesIn += bytes.byteLength;
       if (totalBytesIn > MAX_TOTAL_BYTES) {
         killSwitchTripped = true;
         warnings.push(
@@ -192,9 +238,9 @@ export async function downloadImages(
         break;
       }
 
-      // Skip the WASM decode/encode for already-small images — saves
-      // significant CPU time on the Edge runtime (where the imagescript
-      // decode is the dominant cost).
+      // Skip the WASM decode/encode for already-small images, OR when budget is tight.
+      const remainingMs = deadline - Date.now();
+      const tightBudget = remainingMs < 3_000;
       const small = bytes.byteLength < SKIP_OPTIMISE_BYTES;
 
       let uploadBytes: Uint8Array;
@@ -204,11 +250,14 @@ export async function downloadImages(
       let optimised: boolean;
       let ext: string;
 
-      if (small) {
+      if (small || tightBudget) {
         uploadBytes = bytes;
         uploadContentType = contentType || "application/octet-stream";
         optimised = false;
         ext = mimeToExt(uploadContentType);
+        if (tightBudget && !small) {
+          warnings.push(`Image ${url} uploaded un-optimised (budget tight).`);
+        }
       } else {
         const opt = await optimise(bytes);
         uploadBytes = opt.webp;
@@ -219,7 +268,7 @@ export async function downloadImages(
         ext = "webp";
       }
 
-      const path = buildStoragePath(sourceUrl, i, ext);
+      const path = buildStoragePath(sourceUrl, idx, ext);
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
         .upload(path, uploadBytes, {
@@ -230,7 +279,6 @@ export async function downloadImages(
       if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
 
       const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-
       out.push({
         storedUrl: pub.publicUrl,
         originalUrl: url,
@@ -240,13 +288,10 @@ export async function downloadImages(
         contentType: uploadContentType,
         optimised,
       });
-
-      // Tiny breather to be polite to source servers (matches our Shopify cadence)
-      if (i < urls.length - 1) await new Promise((r) => setTimeout(r, 150));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       warnings.push(`Image ${url} skipped: ${msg}`);
-      console.warn("[image-pipeline] skip", url, msg);
+      console.warn("[image-pipeline] process-skip", url, msg);
     }
   }
 

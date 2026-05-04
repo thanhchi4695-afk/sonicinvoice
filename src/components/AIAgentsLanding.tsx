@@ -62,7 +62,7 @@ const AIAgentsLanding = ({
           to publishing. Tap any card to see its inputs, outputs and examples, or jump
           straight into its dashboard.
         </p>
-        <div className="flex gap-2 mt-4">
+        <div className="flex flex-wrap gap-2 mt-4">
           <button
             onClick={onOpenAgentDashboard}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
@@ -71,12 +71,39 @@ const AIAgentsLanding = ({
             <ArrowRight className="w-4 h-4" />
           </button>
           <button
+            onClick={() => setShowVideo(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted"
+          >
+            <PlayCircle className="w-4 h-4" />
+            How it works
+          </button>
+          <button
             onClick={onOpenAgentGuide}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted"
           >
             Read the agent guide
           </button>
         </div>
+      </header>
+
+      <Dialog open={showVideo} onOpenChange={setShowVideo}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>How it works — Claude integration</DialogTitle>
+          </DialogHeader>
+          <div className="aspect-video w-full overflow-hidden rounded-md bg-black">
+            {showVideo && (
+              <video
+                src="/videos/claude-integration.mp4"
+                className="w-full h-full"
+                controls
+                autoPlay
+                playsInline
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       </header>
 
       <AutoAgentsSettingsPanel className="mb-6" />

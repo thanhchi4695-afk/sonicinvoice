@@ -65,10 +65,13 @@ function shortlistUrls(urls: string[], base: string): string[] {
   const out: string[] = [];
   for (const raw of urls) {
     if (!raw) continue;
-    const abs = absolutise(raw.trim(), base);
+    const trimmed = raw.trim();
+    // Skip data: URIs (lazy-load placeholders, tracking pixels)
+    if (/^data:/i.test(trimmed)) continue;
+    const abs = absolutise(trimmed, base);
     if (!abs) continue;
-    // Skip obvious non-product assets
-    if (/sprite|icon|logo|placeholder|1x1|pixel/i.test(abs)) continue;
+    // Skip obvious non-product assets and tiny placeholder/spacer gifs
+    if (/sprite|icon|logo|placeholder|1x1|pixel|spacer|blank\.gif|transparent\.gif/i.test(abs)) continue;
     if (seen.has(abs)) continue;
     seen.add(abs);
     out.push(abs);

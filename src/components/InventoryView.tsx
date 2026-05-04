@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from "react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package, HeartPulse, Activity } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const InventoryDashboard = lazy(() => import("@/components/InventoryDashboard"));
 const ProductHealthPanel = lazy(() => import("@/components/ProductHealthPanel"));
@@ -21,28 +22,35 @@ export default function InventoryView({ onBack }: InventoryViewProps) {
 
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
-      <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
-        <h2 className="text-lg font-semibold font-display">📦 Inventory</h2>
-        <Tabs value={tab} onValueChange={setTab} className="mt-2">
-          <TabsList className="h-8 w-full justify-start bg-muted/50">
-            <TabsTrigger value="dashboard" className="text-xs gap-1 h-7">
-              <Package className="w-3.5 h-3.5" /> Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="health" className="text-xs gap-1 h-7">
-              <HeartPulse className="w-3.5 h-3.5" /> Health
-            </TabsTrigger>
-            <TabsTrigger value="monitor" className="text-xs gap-1 h-7">
-              <Activity className="w-3.5 h-3.5" /> Monitor
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <div className="sticky top-0 z-30 bg-background/85 backdrop-blur-md border-b border-border/70">
+        <div className="px-4 sm:px-6 pt-5 pb-3 max-w-[1600px] mx-auto">
+          <PageHeader
+            title="Inventory"
+            subtitle="Live stock health, monitoring and product diagnostics."
+          />
+          <Tabs value={tab} onValueChange={setTab} className="mt-3">
+            <TabsList className="h-9 bg-muted/50">
+              <TabsTrigger value="dashboard" className="text-xs gap-1.5 h-7">
+                <Package className="w-3.5 h-3.5" /> Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="health" className="text-xs gap-1.5 h-7">
+                <HeartPulse className="w-3.5 h-3.5" /> Health
+              </TabsTrigger>
+              <TabsTrigger value="monitor" className="text-xs gap-1.5 h-7">
+                <Activity className="w-3.5 h-3.5" /> Monitor
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
-      <Suspense fallback={fallback}>
-        {tab === "dashboard" && <InventoryDashboard onBack={onBack} />}
-        {tab === "health" && <ProductHealthPanel onBack={onBack} />}
-        {tab === "monitor" && <StockMonitorPanel onBack={onBack} />}
-      </Suspense>
+      <div className="px-4 sm:px-6 py-4 max-w-[1600px] mx-auto">
+        <Suspense fallback={fallback}>
+          {tab === "dashboard" && <InventoryDashboard onBack={onBack} />}
+          {tab === "health" && <ProductHealthPanel onBack={onBack} />}
+          {tab === "monitor" && <StockMonitorPanel onBack={onBack} />}
+        </Suspense>
+      </div>
     </div>
   );
 }

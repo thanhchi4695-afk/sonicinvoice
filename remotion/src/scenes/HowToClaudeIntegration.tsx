@@ -71,7 +71,7 @@ export const HowToClaudeIntegration: React.FC = () => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const invoiceX = interpolate(invoiceProg, [0, 1], [-260, 0]);
+  const invoiceX = interpolate(invoiceProg, [0, 1], [-60, 0]);
 
   // Supplier detect chip pops at ~95
   const detectSpring = spring({
@@ -85,7 +85,7 @@ export const HowToClaudeIntegration: React.FC = () => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const skillX = interpolate(skillProg, [0, 1], [320, 0]);
+  const skillX = interpolate(skillProg, [0, 1], [60, 0]);
   const skillOpacity = interpolate(skillProg, [0, 0.3], [0, 1], { extrapolateRight: "clamp" });
 
   // Skill line typewriter

@@ -7,6 +7,7 @@ import {
 import { Check, X, Loader2, ExternalLink, Download, ShoppingBag, AlertTriangle, RotateCcw, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { PushProduct, PushResult, pushProducts, getConnection, recordPush, pushProductGraphQL } from "@/lib/shopify-api";
+import { openShopifyAdmin } from "@/lib/open-shopify-admin";
 
 interface ShopifyPushFlowProps {
   products: PushProduct[];

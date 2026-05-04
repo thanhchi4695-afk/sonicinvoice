@@ -644,6 +644,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             onNavigateFlow={(f) => setActiveFlow(f as any)}
           />
         </Suspense>
+      )}
       {activeTab === "claude_integration" && (
         <div className="px-4 py-6 max-w-4xl mx-auto">
           <header className="mb-6">

@@ -515,7 +515,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: false, error: "Method not allowed" }, 405);
   }
 
-  let body: { url?: unknown };
+  let body: { url?: unknown; progressId?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -526,13 +526,40 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: false, error: "Body must include a valid http(s) `url`" }, 400);
   }
   const url = body.url;
+  const progressId = typeof body.progressId === "string" ? body.progressId : null;
   const userId = getUserIdFromAuth(req);
   const overall = AbortSignal.timeout(TIMEOUT_MS);
   const start = Date.now();
 
+  // Realtime progress broadcaster — best-effort, never blocks the response.
+  const progressClient = (() => {
+    if (!progressId) return null;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceKey) return null;
+    try {
+      return createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    } catch {
+      return null;
+    }
+  })();
+  const progressChannel = progressClient && progressId
+    ? progressClient.channel(`extract-${progressId}`, { config: { broadcast: { ack: false } } })
+    : null;
+  if (progressChannel) {
+    try { await progressChannel.subscribe(); } catch { /* ignore */ }
+  }
+  async function broadcastStep(step: number, label: string) {
+    if (!progressChannel) return;
+    try {
+      await progressChannel.send({ type: "broadcast", event: "progress", payload: { step, label } });
+    } catch { /* never block on progress */ }
+  }
+
   try {
     const html = await fetchHtml(url);
     const $ = cheerioLoad(html);
+    await broadcastStep(1, "Extracting product details");
 
     // Cascade — escalate only on null
     let product: ExtractedProduct | null = extractFromJsonLd($, url);
@@ -547,6 +574,7 @@ Deno.serve(async (req) => {
       product = await extractWithLLM(html, url);
       if (product) strategyUsed = "llm";
     }
+    await broadcastStep(2, "Downloading & optimising images");
 
     if (!product) {
       const ms = Date.now() - start;
@@ -604,6 +632,7 @@ Deno.serve(async (req) => {
       killSwitchTripped: false,
       totalBytesIn: 0,
     }));
+    await broadcastStep(3, "Preparing Shopify-ready fields");
 
     // Step 4 — currency normalisation (stub until Task 6)
     const priceNormalized = normalizeCurrency(product.price, product.currency);
@@ -627,6 +656,7 @@ Deno.serve(async (req) => {
       },
     });
 
+    await broadcastStep(4, "Done");
     return jsonResponse({
       success: true,
       product: {
@@ -661,6 +691,10 @@ Deno.serve(async (req) => {
     });
     const status = message.toLowerCase().includes("timeout") || message.includes("aborted") ? 504 : 500;
     return jsonResponse({ success: false, error: message }, status);
+  } finally {
+    if (progressChannel && progressClient) {
+      try { await progressClient.removeChannel(progressChannel); } catch { /* ignore */ }
+    }
   }
 });
 

@@ -108,7 +108,7 @@ function friendlyError(raw: string): string {
 
 const PRODUCT_EXTRACT_TIMEOUT_MS = 45_000;
 
-async function invokeProductExtract(productUrl: string): Promise<ExtractedProduct> {
+async function invokeProductExtract(productUrl: string, progressId?: string): Promise<ExtractedProduct> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
   if (!supabaseUrl || !publishableKey) {
@@ -129,7 +129,7 @@ async function invokeProductExtract(productUrl: string): Promise<ExtractedProduc
         apikey: publishableKey,
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ url: productUrl }),
+      body: JSON.stringify({ url: productUrl, progressId }),
     });
     const payload = await response.json().catch(() => null) as { success?: boolean; error?: string; product?: ExtractedProduct } | null;
     if (!response.ok) throw new Error(payload?.error || `Extraction failed (${response.status})`);
@@ -332,6 +332,21 @@ function parseBulkUrls(raw: string): string[] {
   return out;
 }
 
+/** Tiny live counter shown next to the active step so users see progress. */
+function ElapsedTimer({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    setElapsed(0);
+    const id = window.setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [startedAt]);
+  return (
+    <span className="text-[10px] text-muted-foreground ml-1 font-mono">{elapsed}s</span>
+  );
+}
+
 export default function ProductUrlImporter({ onAddToInvoice, className }: Props) {
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [url, setUrl] = useState("");
@@ -349,7 +364,9 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   const [newImageUrl, setNewImageUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
+  const [stepStartedAt, setStepStartedAt] = useState(() => Date.now());
   const stepTimers = useRef<number[]>([]);
+  const progressChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [pushingShopify, setPushingShopify] = useState(false);
   const [shopifyConnected, setShopifyConnected] = useState<boolean | null>(null);
 
@@ -512,7 +529,17 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     stepTimers.current = [];
   };
 
-  useEffect(() => () => clearStepTimers(), []);
+  const clearProgressChannel = () => {
+    if (progressChannelRef.current) {
+      try { supabase.removeChannel(progressChannelRef.current); } catch { /* ignore */ }
+      progressChannelRef.current = null;
+    }
+  };
+
+  useEffect(() => () => { clearStepTimers(); clearProgressChannel(); }, []);
+
+  // Reset elapsed-time clock whenever the active step changes.
+  useEffect(() => { setStepStartedAt(Date.now()); }, [stepIndex]);
 
   const reset = () => {
     setUrl("");
@@ -522,6 +549,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     setError(null);
     setStepIndex(0);
     clearStepTimers();
+    clearProgressChannel();
   };
 
   const handleFetch = async () => {
@@ -536,19 +564,35 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
 
     setLoading(true);
     setStepIndex(0);
+    setStepStartedAt(Date.now());
     clearStepTimers();
-    // Advance steps on a rough schedule so the UI feels alive even though the
-    // edge function is a single round-trip. The last step ("Preparing Shopify-ready
-    // fields") is reached quickly so users don't feel stuck if the page fetch is slow.
-    const schedule = [800, 2500, 5000]; // ms — advances to step 1, 2, 3
-    schedule.forEach((delay, i) => {
-      const id = window.setTimeout(() => setStepIndex(i + 1), delay);
-      stepTimers.current.push(id);
-    });
+    clearProgressChannel();
+
+    // Subscribe to real progress events broadcast by the edge function.
+    const progressId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const channel = supabase
+      .channel(`extract-${progressId}`)
+      .on("broadcast", { event: "progress" }, ({ payload }) => {
+        const step = Number((payload as { step?: number })?.step);
+        if (Number.isFinite(step)) {
+          setStepIndex((prev) => (step > prev ? Math.min(step, STEPS.length) : prev));
+        }
+      })
+      .subscribe();
+    progressChannelRef.current = channel;
+
+    // Single fallback so the UI never appears frozen on step 0 if Realtime is slow.
+    const fallbackTimer = window.setTimeout(() => {
+      setStepIndex((prev) => (prev < 1 ? 1 : prev));
+    }, 2000);
+    stepTimers.current.push(fallbackTimer);
 
     try {
-      const product = await invokeProductExtract(v.value);
+      const product = await invokeProductExtract(v.value, progressId);
       clearStepTimers();
+      clearProgressChannel();
       setStepIndex(STEPS.length); // mark all done
       setResult(product);
       const priceText =
@@ -885,6 +929,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                       )}
                     </span>
                     <span>{step.label}</span>
+                    {active && <ElapsedTimer startedAt={stepStartedAt} />}
                   </li>
                 );
               })}

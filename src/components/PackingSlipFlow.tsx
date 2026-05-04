@@ -300,6 +300,7 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
         }
       } catch (e) { /* non-fatal */ }
 
+      toast.success(`Extracted ${nonEmpty.length} items from packing slip`);
       if (isPackingListSupplier(detectedSupplier)) {
         setStep("pair_prompt");
       } else {
@@ -311,6 +312,98 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
       setStep("upload");
     }
   };
+
+  // ─── Pair with tax invoice ───
+  const handleTaxInvoiceUpload = async (file: File) => {
+    setStep("pairing");
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      let fileContent: string;
+      if (["pdf", "jpg", "jpeg", "png", "webp", "heic"].includes(ext)) {
+        const buf = await file.arrayBuffer();
+        fileContent = btoa(new Uint8Array(buf).reduce((s, b) => s + String.fromCharCode(b), ""));
+      } else {
+        fileContent = await file.text();
+      }
+      const { data, error } = await supabase.functions.invoke("parse-invoice", {
+        body: {
+          fileContent,
+          fileName: file.name,
+          fileType: ext,
+          supplierName: supplier || supplierInput || undefined,
+          forceMode: "invoice",
+        },
+      });
+      if (error) throw error;
+
+      const invoiceProducts = (data.products || []) as Record<string, unknown>[];
+      if (invoiceProducts.length === 0) {
+        toast.error("Couldn't read line items from the tax invoice.");
+        setStep("pair_prompt");
+        return;
+      }
+
+      // Build SKU + title lookups from the tax invoice
+      type CostRow = { cost?: number; rrp?: number };
+      const skuMap = new Map<string, CostRow>();
+      const titleMap = new Map<string, CostRow>();
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+      for (const p of invoiceProducts) {
+        const cost = Number(p.unit_cost ?? p.cost ?? p.wholesale_price ?? p.price) || undefined;
+        const rrp = Number(p.rrp ?? p.retail_price ?? p.suggested_retail) || undefined;
+        if (!cost && !rrp) continue;
+        const row: CostRow = { cost, rrp };
+        const sku = String(p.sku ?? p.style_code ?? "");
+        const title = String(p.product_name ?? p.title ?? p.style_description ?? "");
+        if (sku) skuMap.set(norm(sku), row);
+        if (title) titleMap.set(norm(title), row);
+      }
+
+      // Merge into packing list items
+      let matched = 0;
+      let unmatched = 0;
+      const merged = items.map((it) => {
+        const skuKey = norm(it.style_code);
+        const titleKey = norm(it.style_description);
+        const hit = (skuKey && skuMap.get(skuKey)) || (titleKey && titleMap.get(titleKey)) || null;
+        if (hit) {
+          matched += 1;
+          return { ...it, unit_cost: hit.cost, rrp: hit.rrp, _costSource: "tax_invoice" as const };
+        }
+        unmatched += 1;
+        return it;
+      });
+
+      setItems(merged);
+      setPairedInvoiceName(file.name);
+      setPairStats({ matched, unmatched });
+      toast.success(`Paired ${matched} of ${matched + unmatched} items with cost data`);
+      setStep("review");
+    } catch (err) {
+      console.error("Tax invoice pairing error:", err);
+      toast.error("Failed to parse the tax invoice.");
+      setStep("pair_prompt");
+    }
+  };
+
+  const handleSkipPairing = () => {
+    if (!markupMultiplier || markupMultiplier <= 0) {
+      toast.info("No markup multiplier set for this supplier — costs left blank. Add one in Supplier Settings.");
+      setStep("review");
+      return;
+    }
+    const merged = items.map((it) => {
+      if (it.rrp && it.rrp > 0) {
+        return { ...it, unit_cost: Math.round((it.rrp / markupMultiplier) * 100) / 100, _costSource: "markup" as const };
+      }
+      return it;
+    });
+    setItems(merged);
+    toast.success(`Applied markup formula (÷${markupMultiplier}) to estimate costs`);
+    setStep("review");
+  };
+
 
   // Categorize
   const accepted = items.filter((p) => !p._rejected && p._confidenceLevel === "high");

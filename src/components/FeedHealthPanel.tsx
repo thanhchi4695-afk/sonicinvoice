@@ -1134,3 +1134,58 @@ function DetailField({ label, value, confidence, reason, options, onSave }: {
     </div>
   );
 }
+
+// ── Status Dot ──────────────────────────────────
+function StatusDot({ status, label }: { status: "ok" | "warning" | "error"; label: string }) {
+  const colours: Record<string, string> = {
+    ok: "bg-success",
+    warning: "bg-secondary",
+    error: "bg-destructive",
+  };
+  return (
+    <div title={label} className="flex justify-center">
+      <span className={`w-3 h-3 rounded-full ${colours[status]}`} />
+    </div>
+  );
+}
+
+// ── Pagination Bar ──────────────────────────────
+function PaginationBar({ page, totalPages, total, pageSize, onChange }: {
+  page: number; totalPages: number; total: number; pageSize: number; onChange: (p: number) => void;
+}) {
+  if (total === 0) return null;
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/20 text-xs">
+      <span className="text-muted-foreground">
+        Showing {start.toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()} Products
+      </span>
+      <div className="flex items-center gap-1">
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+          onClick={() => onChange(1)} disabled={page === 1}>First</Button>
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+          onClick={() => onChange(Math.max(1, page - 1))} disabled={page === 1}>Prev</Button>
+        <span className="text-xs flex items-center gap-1">
+          Page
+          <Input
+            className="w-12 h-7 text-center text-xs"
+            type="number"
+            value={page}
+            min={1}
+            max={totalPages}
+            onChange={e => {
+              const n = parseInt(e.target.value, 10);
+              if (!isNaN(n)) onChange(Math.max(1, Math.min(totalPages, n)));
+            }}
+          />
+          of {totalPages}
+        </span>
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+          onClick={() => onChange(Math.min(totalPages, page + 1))} disabled={page === totalPages}>Next</Button>
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+          onClick={() => onChange(totalPages)} disabled={page === totalPages}>Last</Button>
+      </div>
+    </div>
+  );
+}

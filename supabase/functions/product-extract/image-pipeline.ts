@@ -232,6 +232,11 @@ export async function downloadImages(
 
     const { url, bytes, contentType, idx } = item;
     try {
+      // Drop tracking pixels / 1×1 spacers (anything < 1KB is not a product image)
+      if (bytes.byteLength < 1024) {
+        warnings.push(`Image ${url} skipped: too small (${bytes.byteLength}B — likely tracking pixel)`);
+        continue;
+      }
       totalBytesIn += bytes.byteLength;
       if (totalBytesIn > MAX_TOTAL_BYTES) {
         killSwitchTripped = true;

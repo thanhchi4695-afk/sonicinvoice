@@ -115,7 +115,7 @@ function generateFilename(supplier: string, format: ExportFormat): string {
   return `${tag}_${month}_${typeMap[format]}_${date}.${ext}`;
 }
 
-const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: ExportReviewScreenProps) => {
+const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multiBrandSplit }: ExportReviewScreenProps) => {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>("shopify_full");
   const [filterHigh, setFilterHigh] = useState(true);
   const [filterMedium, setFilterMedium] = useState(true);
@@ -123,6 +123,9 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
   const [filterNew, setFilterNew] = useState(true);
   const [filterUpdates, setFilterUpdates] = useState(true);
   const [filterMissingImages, setFilterMissingImages] = useState(true);
+  // Multi-brand: when null, show ALL brands. When set to a brand name,
+  // restrict the export + preview to only that brand's line items.
+  const [brandFilter, setBrandFilter] = useState<string | null>(null);
   const [variantMode, setVariantModeState] = useState<VariantMode>(getVariantMode());
   const [publishStatus, setPublishStatusState] = useState<PublishStatus>(getPublishStatus());
   // Stock quantity mode — "invoice": use qty parsed from invoice;

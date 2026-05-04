@@ -583,11 +583,21 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       .subscribe();
     progressChannelRef.current = channel;
 
-    // Single fallback so the UI never appears frozen on step 0 if Realtime is slow.
-    const fallbackTimer = window.setTimeout(() => {
-      setStepIndex((prev) => (prev < 1 ? 1 : prev));
-    }, 2000);
-    stepTimers.current.push(fallbackTimer);
+    // Per-step fallbacks — Realtime broadcast may not be received in time
+    // (channel join races the edge function). These ensure the UI never
+    // appears stuck. Realtime events still take precedence (we only advance,
+    // never go backwards).
+    const fallbackSchedule: Array<[number, number]> = [
+      [1, 2000],
+      [2, 5000],
+      [3, 9000],
+    ];
+    fallbackSchedule.forEach(([target, delay]) => {
+      const id = window.setTimeout(() => {
+        setStepIndex((prev) => (prev < target ? target : prev));
+      }, delay);
+      stepTimers.current.push(id);
+    });
 
     try {
       const product = await invokeProductExtract(v.value, progressId);

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ArrowRight, Bot, BookOpen } from "lucide-react";
+import { ArrowRight, Bot, BookOpen, PlayCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AutoAgentsSettingsPanel from "@/components/AutoAgentsSettingsPanel";
 import AgentLearnMore from "@/components/AgentLearnMore";
 import { AGENT_DETAILS, AGENT_ORDER, type AgentId } from "@/lib/agent-catalog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface AIAgentsLandingProps {
   onOpenAgentDashboard: () => void;

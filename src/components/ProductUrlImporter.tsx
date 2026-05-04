@@ -514,7 +514,17 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     stepTimers.current = [];
   };
 
-  useEffect(() => () => clearStepTimers(), []);
+  const clearProgressChannel = () => {
+    if (progressChannelRef.current) {
+      try { supabase.removeChannel(progressChannelRef.current); } catch { /* ignore */ }
+      progressChannelRef.current = null;
+    }
+  };
+
+  useEffect(() => () => { clearStepTimers(); clearProgressChannel(); }, []);
+
+  // Reset elapsed-time clock whenever the active step changes.
+  useEffect(() => { setStepStartedAt(Date.now()); }, [stepIndex]);
 
   const reset = () => {
     setUrl("");
@@ -524,6 +534,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     setError(null);
     setStepIndex(0);
     clearStepTimers();
+    clearProgressChannel();
   };
 
   const handleFetch = async () => {
@@ -538,19 +549,35 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
 
     setLoading(true);
     setStepIndex(0);
+    setStepStartedAt(Date.now());
     clearStepTimers();
-    // Advance steps on a rough schedule so the UI feels alive even though the
-    // edge function is a single round-trip. The last step ("Preparing Shopify-ready
-    // fields") is reached quickly so users don't feel stuck if the page fetch is slow.
-    const schedule = [800, 2500, 5000]; // ms — advances to step 1, 2, 3
-    schedule.forEach((delay, i) => {
-      const id = window.setTimeout(() => setStepIndex(i + 1), delay);
-      stepTimers.current.push(id);
-    });
+    clearProgressChannel();
+
+    // Subscribe to real progress events broadcast by the edge function.
+    const progressId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const channel = supabase
+      .channel(`extract-${progressId}`)
+      .on("broadcast", { event: "progress" }, ({ payload }) => {
+        const step = Number((payload as { step?: number })?.step);
+        if (Number.isFinite(step)) {
+          setStepIndex((prev) => (step > prev ? Math.min(step, STEPS.length) : prev));
+        }
+      })
+      .subscribe();
+    progressChannelRef.current = channel;
+
+    // Single fallback so the UI never appears frozen on step 0 if Realtime is slow.
+    const fallbackTimer = window.setTimeout(() => {
+      setStepIndex((prev) => (prev < 1 ? 1 : prev));
+    }, 2000);
+    stepTimers.current.push(fallbackTimer);
 
     try {
-      const product = await invokeProductExtract(v.value);
+      const product = await invokeProductExtract(v.value, progressId);
       clearStepTimers();
+      clearProgressChannel();
       setStepIndex(STEPS.length); // mark all done
       setResult(product);
       const priceText =

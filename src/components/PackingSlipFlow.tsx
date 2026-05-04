@@ -818,6 +818,29 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
                             <Badge variant="outline" className="text-[10px] h-5">Size {item.size}</Badge>
                           )}
                           <Badge variant="outline" className="text-[10px] h-5">Qty {item.quantity}</Badge>
+                          {item.unit_cost != null && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] h-5 ${
+                                item._costSource === "tax_invoice"
+                                  ? "border-primary/40 text-primary"
+                                  : item._costSource === "markup"
+                                  ? "border-secondary/40 text-secondary"
+                                  : ""
+                              }`}
+                              title={
+                                item._costSource === "tax_invoice"
+                                  ? "Cost from paired tax invoice"
+                                  : item._costSource === "markup"
+                                  ? "Cost calculated from RRP via markup formula"
+                                  : "Manually entered cost"
+                              }
+                            >
+                              Cost ${item.unit_cost.toFixed(2)}
+                              {item._costSource === "tax_invoice" && " · invoice"}
+                              {item._costSource === "markup" && " · markup"}
+                            </Badge>
+                          )}
                         </div>
                         {item._rejectReason && (
                           <p className="text-[10px] text-destructive mt-1">{item._rejectReason}</p>

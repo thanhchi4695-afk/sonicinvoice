@@ -5627,6 +5627,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               isNew: true,
             }))}
             supplierName={supplierName}
+            multiBrandSplit={multiBrandSplit}
             onBack={() => setStep(3)}
           />
 

@@ -432,9 +432,34 @@ Deno.serve(async (req) => {
           }),
         });
 
-        const graphqlData = await graphqlResp.json();
+        const rawText = await graphqlResp.text();
+        let graphqlData: Record<string, unknown> = {};
+        try {
+          graphqlData = rawText ? JSON.parse(rawText) : {};
+        } catch (parseErr) {
+          console.error("[shopify-proxy] graphql_create_product non-JSON response", {
+            status: graphqlResp.status,
+            statusText: graphqlResp.statusText,
+            bodyPreview: rawText.slice(0, 500),
+          });
+          return new Response(JSON.stringify({
+            error: `Shopify returned ${graphqlResp.status} ${graphqlResp.statusText}: ${rawText.slice(0, 200) || "empty body"}`,
+          }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
 
-        if (graphqlData.errors) {
+        if (!graphqlResp.ok) {
+          console.error("[shopify-proxy] graphql_create_product HTTP error", graphqlResp.status, graphqlData);
+          return new Response(JSON.stringify({
+            error: `Shopify HTTP ${graphqlResp.status}`,
+            details: graphqlData,
+          }), {
+            status: graphqlResp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if ((graphqlData as { errors?: unknown }).errors) {
           return new Response(JSON.stringify({
             error: "GraphQL errors",
             details: graphqlData.errors,

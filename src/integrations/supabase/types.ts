@@ -4135,10 +4135,12 @@ export type Database = {
           is_known_brand: boolean | null
           last_invoice_date: string | null
           lead_time_days: number | null
+          markup_multiplier: number | null
           payment_terms: string | null
           portal_url: string | null
           profile_data: Json
           restock_period_days: number | null
+          sends_packing_list_only: boolean
           supplier_email: string | null
           supplier_name: string
           supplier_name_variants: string[] | null
@@ -4167,10 +4169,12 @@ export type Database = {
           is_known_brand?: boolean | null
           last_invoice_date?: string | null
           lead_time_days?: number | null
+          markup_multiplier?: number | null
           payment_terms?: string | null
           portal_url?: string | null
           profile_data?: Json
           restock_period_days?: number | null
+          sends_packing_list_only?: boolean
           supplier_email?: string | null
           supplier_name: string
           supplier_name_variants?: string[] | null
@@ -4199,10 +4203,12 @@ export type Database = {
           is_known_brand?: boolean | null
           last_invoice_date?: string | null
           lead_time_days?: number | null
+          markup_multiplier?: number | null
           payment_terms?: string | null
           portal_url?: string | null
           profile_data?: Json
           restock_period_days?: number | null
+          sends_packing_list_only?: boolean
           supplier_email?: string | null
           supplier_name?: string
           supplier_name_variants?: string[] | null
@@ -4720,6 +4726,7 @@ export type Database = {
           automation_min_confidence: number
           brand_sync_url: string | null
           created_at: string
+          packing_list_suppliers: string[]
           updated_at: string
           user_id: string
         }
@@ -4730,6 +4737,7 @@ export type Database = {
           automation_min_confidence?: number
           brand_sync_url?: string | null
           created_at?: string
+          packing_list_suppliers?: string[]
           updated_at?: string
           user_id: string
         }
@@ -4740,6 +4748,7 @@ export type Database = {
           automation_min_confidence?: number
           brand_sync_url?: string | null
           created_at?: string
+          packing_list_suppliers?: string[]
           updated_at?: string
           user_id?: string
         }

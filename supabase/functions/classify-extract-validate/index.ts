@@ -361,6 +361,64 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     console.warn("[classify-extract-validate] Stage 3 errored:", e);
   }
 
+  // ─────── STAGE 3B — Multi-brand split (per-line vendor by SKU prefix) ───────
+  let multiBrandSplit: {
+    applied: boolean;
+    company_name: string | null;
+    rules: Array<{ sku_prefix: string; brand: string }>;
+    counts: Record<string, number>;
+  } = { applied: false, company_name: null, rules: [], counts: {} };
+
+  try {
+    const detectedCompany =
+      classification?.supplier_name || extraction?.supplier || supplierName || null;
+    if (userId && detectedCompany) {
+      const { data: mbRows } = await admin
+        .from("multi_brand_suppliers")
+        .select("invoice_company_name, brand_rules")
+        .eq("user_id", userId);
+
+      const lc = detectedCompany.toLowerCase();
+      const match = (mbRows ?? []).find((r: any) => {
+        const name = String(r.invoice_company_name || "").toLowerCase();
+        return name && (lc.includes(name) || name.includes(lc));
+      });
+
+      if (match && Array.isArray(match.brand_rules) && match.brand_rules.length > 0) {
+        const rules = (match.brand_rules as any[])
+          .filter((r) => r && typeof r.sku_prefix === "string" && typeof r.brand === "string")
+          .map((r) => ({ sku_prefix: String(r.sku_prefix).toUpperCase(), brand: String(r.brand) }))
+          // Longest prefix wins so "FKT" beats "F" if both existed
+          .sort((a, b) => b.sku_prefix.length - a.sku_prefix.length);
+
+        const counts: Record<string, number> = {};
+        for (const item of validatedProducts as any[]) {
+          const sku = String(item?.sku ?? item?.SKU ?? "").toUpperCase();
+          if (!sku) continue;
+          const rule = rules.find((r) => sku.startsWith(r.sku_prefix));
+          if (rule) {
+            item.vendor = rule.brand;
+            item.brand = rule.brand;
+            counts[rule.brand] = (counts[rule.brand] || 0) + 1;
+          }
+        }
+
+        multiBrandSplit = {
+          applied: Object.keys(counts).length > 0,
+          company_name: match.invoice_company_name,
+          rules,
+          counts,
+        };
+        console.log(
+          `[classify-extract-validate] multi-brand split for "${detectedCompany}":`,
+          JSON.stringify(counts),
+        );
+      }
+    }
+  } catch (e) {
+    console.warn("[classify-extract-validate] multi-brand split failed:", e);
+  }
+
   // ─────── Persist classification to supplier_profiles ───────
   const supplierFinal = classification?.supplier_name || extraction?.supplier || supplierName || null;
   if (userId && classification && !usedSavedProfile && supplierFinal) {
@@ -407,6 +465,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     classification_source: classification?._source ?? "missing",
     extractor_used: azureUsed ? "azure_layout+llm" : "parse-invoice",
     validation_summary: validationSummary,
+    multi_brand_split: multiBrandSplit,
   };
 }
 

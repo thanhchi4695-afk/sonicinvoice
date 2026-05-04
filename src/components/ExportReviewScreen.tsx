@@ -70,6 +70,15 @@ interface ExportReviewScreenProps {
   supplierName: string;
   onBack: () => void;
   onStartFlow?: (flow: string) => void;
+  /** Multi-brand split metadata from classify-extract-validate. When applied,
+   *  the screen shows a banner, per-brand chips, and a "Publish [brand] only"
+   *  button so each brand can be exported separately. */
+  multiBrandSplit?: {
+    applied: boolean;
+    company_name: string | null;
+    rules: Array<{ sku_prefix: string; brand: string }>;
+    counts: Record<string, number>;
+  } | null;
 }
 
 type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "lightspeed_full" | "tags_only" | "xlsx" | "summary_pdf" | "google_xml" | "google_tsv";
@@ -106,7 +115,7 @@ function generateFilename(supplier: string, format: ExportFormat): string {
   return `${tag}_${month}_${typeMap[format]}_${date}.${ext}`;
 }
 
-const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: ExportReviewScreenProps) => {
+const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multiBrandSplit }: ExportReviewScreenProps) => {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>("shopify_full");
   const [filterHigh, setFilterHigh] = useState(true);
   const [filterMedium, setFilterMedium] = useState(true);
@@ -114,6 +123,9 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
   const [filterNew, setFilterNew] = useState(true);
   const [filterUpdates, setFilterUpdates] = useState(true);
   const [filterMissingImages, setFilterMissingImages] = useState(true);
+  // Multi-brand: when null, show ALL brands. When set to a brand name,
+  // restrict the export + preview to only that brand's line items.
+  const [brandFilter, setBrandFilter] = useState<string | null>(null);
   const [variantMode, setVariantModeState] = useState<VariantMode>(getVariantMode());
   const [publishStatus, setPublishStatusState] = useState<PublishStatus>(getPublishStatus());
   // Stock quantity mode — "invoice": use qty parsed from invoice;
@@ -163,8 +175,23 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
     if (p.isNew && !filterNew) return false;
     if (!p.isNew && !filterUpdates) return false;
     if (!p.hasImage && !filterMissingImages) return false;
+    if (brandFilter && (p.brand || "").toLowerCase() !== brandFilter.toLowerCase()) return false;
     return true;
   });
+
+  // Brand counts among ALL products (not the brand-filtered subset) so chips
+  // always show how many items belong to each brand.
+  const brandCounts: Record<string, number> = (() => {
+    if (!multiBrandSplit?.applied) return {};
+    const counts: Record<string, number> = {};
+    for (const p of enriched) {
+      const b = (p.brand || "").trim();
+      if (!b) continue;
+      counts[b] = (counts[b] || 0) + 1;
+    }
+    return counts;
+  })();
+  const brandList = Object.keys(brandCounts).sort();
 
   const avgConfidence = Math.round(
     (filtered.reduce((s, p) => s + (p.confidence === "high" ? 95 : p.confidence === "medium" ? 75 : 40), 0) / Math.max(filtered.length, 1))
@@ -570,8 +597,59 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
                 {publishStatus === "draft" && <Check className="w-3.5 h-3.5 inline mr-1.5" />}Draft (hidden)
               </button>
             </div>
-          </div>
+      </div>
 
+      {multiBrandSplit?.applied && brandList.length > 1 && (
+        <div className="mb-4 rounded-lg border border-secondary/30 bg-secondary/10 p-3">
+          <div className="flex items-start gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 text-secondary mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-semibold">
+                Multi-brand invoice detected — items have been split by SKU prefix
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {multiBrandSplit.company_name
+                  ? `"${multiBrandSplit.company_name}" invoices ${brandList.length} brands. `
+                  : ""}
+                Pick one brand below to publish brands separately.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5 pl-6">
+            <button
+              type="button"
+              onClick={() => setBrandFilter(null)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                brandFilter === null
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background border-border hover:border-primary/50"
+              }`}
+            >
+              All brands ({enriched.length})
+            </button>
+            {brandList.map((b) => (
+              <button
+                key={b}
+                type="button"
+                onClick={() => setBrandFilter(b)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  brandFilter === b
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-border hover:border-primary/50"
+                }`}
+              >
+                {b} ({brandCounts[b]})
+              </button>
+            ))}
+          </div>
+          {brandFilter && (
+            <p className="text-xs text-muted-foreground mt-2 pl-6">
+              Showing <span className="font-semibold text-foreground">{brandFilter}</span> only —
+              export & push actions below will publish this brand alone. Click "All brands" to publish everything.
+            </p>
+          )}
+        </div>
+      )}
 
           <div className="bg-card rounded-lg border border-border p-4">
             <h3 className="text-sm font-semibold mb-3">Export format</h3>
@@ -644,7 +722,9 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow }: Exp
           {/* Download */}
           <Button variant="success" className="w-full h-14 text-base" onClick={handleExport} disabled={filtered.length === 0 || exportBlocked}>
             <Download className="w-5 h-5 mr-2" />
-            Download {FORMAT_CARDS.find(f => f.id === selectedFormat)?.label} — {filtered.length} products
+            {brandFilter
+              ? `Publish ${brandFilter} only — ${filtered.length} products`
+              : `Download ${FORMAT_CARDS.find(f => f.id === selectedFormat)?.label} — ${filtered.length} products`}
           </Button>
           {exportBlocked && (
             <p className="text-xs text-destructive text-center font-medium">Fix the errors above before exporting</p>

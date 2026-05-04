@@ -633,6 +633,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
   const [aiExtractionNotes, setAiExtractionNotes] = useState<string | null>(null);
   const [extractionDebug, setExtractionDebug] = useState<import("@/components/ExtractionDebugPanel").ExtractionDebugInfo | null>(null);
+  // Multi-brand split metadata returned by classify-extract-validate.
+  // When `applied` is true, the review screen shows a banner, per-brand chips,
+  // and lets the user publish a single brand at a time.
+  const [multiBrandSplit, setMultiBrandSplit] = useState<{
+    applied: boolean;
+    company_name: string | null;
+    rules: Array<{ sku_prefix: string; brand: string }>;
+    counts: Record<string, number>;
+  } | null>(null);
   // Per-product Qty header validator warnings from parse-invoice. Drives the
   // yellow banner + per-row flag on the review screen (Round 4 Walnut fix).
   const [qtyHeaderWarnings, setQtyHeaderWarnings] = useState<Array<{
@@ -2253,6 +2262,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         classification_source: data.classification_source ?? null,
         raw_tables: Array.isArray(data.azure_raw_tables) ? data.azure_raw_tables : [],
       });
+      // Capture multi-brand split metadata (Skye → Jantzen+Sunseeker etc).
+      // When the edge function found a matching invoice_company_name and
+      // tagged at least one line item, applied=true.
+      if (data.multi_brand_split && typeof data.multi_brand_split === "object") {
+        setMultiBrandSplit(data.multi_brand_split);
+        if (data.multi_brand_split.applied) {
+          const brands = Object.keys(data.multi_brand_split.counts || {});
+          console.log(`[Sonic Invoice] Multi-brand split applied (${brands.length} brands):`, brands.join(", "));
+          toast(`Multi-brand invoice detected — ${brands.length} brands`, {
+            description: brands.map(b => `${b} (${data.multi_brand_split.counts[b]})`).join(" · "),
+          });
+        }
+      } else {
+        setMultiBrandSplit(null);
+      }
       if (data.field_confidence && typeof data.field_confidence === "object") {
         setAiFieldConfidence(data.field_confidence as Record<string, number>);
       }
@@ -5603,6 +5627,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               isNew: true,
             }))}
             supplierName={supplierName}
+            multiBrandSplit={multiBrandSplit}
             onBack={() => setStep(3)}
           />
 

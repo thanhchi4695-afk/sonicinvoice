@@ -35,6 +35,7 @@ import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
 const TeamManagement = lazy(() => import("@/components/TeamManagement"));
 const AutomationSettings = lazy(() => import("@/components/AutomationSettings"));
 const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"));
+const MultiBrandSuppliersSection = lazy(() => import("@/components/MultiBrandSuppliersSection"));
 
 const AccountScreen = () => {
   const { isAdmin } = useUserRole();
@@ -277,6 +278,11 @@ const AccountScreen = () => {
           <Section title="🧠 Skills Library (Claude)">
             <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
               <ClaudeSkillsLibrary />
+            </Suspense>
+          </Section>
+          <Section title="🏷️ Multi-brand suppliers">
+            <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+              <MultiBrandSuppliersSection />
             </Suspense>
           </Section>
           <DefaultInstructionsSection />

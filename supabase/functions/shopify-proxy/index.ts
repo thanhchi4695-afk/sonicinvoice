@@ -462,7 +462,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        const gqlAny = graphqlData as { errors?: unknown; data?: { productCreate?: { product?: unknown; userErrors?: { field?: string[]; message: string }[] } } };
+        const gqlAny = graphqlData as { errors?: unknown; data?: { productSet?: { product?: unknown; userErrors?: { field?: string[]; message: string }[] } } };
         if (gqlAny.errors) {
           return new Response(JSON.stringify({
             error: "GraphQL errors",
@@ -472,7 +472,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        const productResult = gqlAny.data?.productCreate;
+        const productResult = gqlAny.data?.productSet;
         if (productResult?.userErrors && productResult.userErrors.length > 0) {
           return new Response(JSON.stringify({
             error: productResult.userErrors.map((e) => e.message).join(", "),

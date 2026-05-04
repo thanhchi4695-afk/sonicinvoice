@@ -380,9 +380,9 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     });
 
     try {
+      const product = await invokeProductExtract(v.value);
       clearStepTimers();
       setStepIndex(STEPS.length); // mark all done
-      const product = await invokeProductExtract(v.value);
       setResult(product);
       const priceText =
         typeof product.price === "number"

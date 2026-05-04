@@ -4817,7 +4817,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
       {/* Step 3: Review */}
       {step === 3 && (
-        <div className="px-4 pt-4">
+        <div className="px-4 pt-4 pb-24">{/* pb-24 keeps content clear of sticky approve bar */}
           {/* Template save prompt */}
           {showSaveTemplate && !savedTemplate && (
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-3">

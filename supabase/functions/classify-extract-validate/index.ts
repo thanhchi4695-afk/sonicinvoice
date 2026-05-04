@@ -157,8 +157,13 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
   let usedSavedProfile = false;
   const SAVED_PROFILE_MIN_CONFIDENCE = 20; // lowered from 70 — raise to 70 once 7+ invoices/supplier
 
-  // First try: saved profile by supplier hint OR filename token match
+  // First try: saved profile by supplier hint OR filename token match.
+  // We track WHICH signal matched so we can later detect filename-driven
+  // misclassification (e.g. "Sea Level Lost Paradise.pdf" is actually Bond-Eye).
   const hintSupplier = String(supplierName || "").trim();
+  let savedProfileMatchSource: "hint" | "filename" | null = null;
+  let filenameSupplierGuess: string | null = null;
+
   if (userId) {
     try {
       // Pull all candidate profiles meeting the confidence floor (cap 50 to be safe)
@@ -170,21 +175,47 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
         .limit(50);
 
       const fileLower = String(fileName || "").toLowerCase();
-      const matched = (profiles || []).find((p) => {
+
+      // Step A — try the supplier hint first (explicit user/UI input).
+      let matched = (profiles || []).find((p) => {
         const sName = (p.supplier_name || "").toLowerCase().trim();
-        if (!sName) return false;
-        if (hintSupplier && sName === hintSupplier.toLowerCase()) return true;
-        if (hintSupplier && (sName.includes(hintSupplier.toLowerCase()) || hintSupplier.toLowerCase().includes(sName))) return true;
-        // Filename hint: e.g. "jantzen_classifier_test.csv" matches "Jantzen"
-        if (fileLower.includes(sName)) return true;
-        return false;
+        if (!sName || !hintSupplier) return false;
+        return sName === hintSupplier.toLowerCase()
+          || sName.includes(hintSupplier.toLowerCase())
+          || hintSupplier.toLowerCase().includes(sName);
       });
+      if (matched) savedProfileMatchSource = "hint";
+
+      // Step B — fall back to filename token match, but REMEMBER it was
+      // filename-only so we can verify against invoice content later.
+      if (!matched) {
+        matched = (profiles || []).find((p) => {
+          const sName = (p.supplier_name || "").toLowerCase().trim();
+          if (!sName) return false;
+          return fileLower.includes(sName);
+        });
+        if (matched) {
+          savedProfileMatchSource = "filename";
+          filenameSupplierGuess = matched.supplier_name;
+        }
+      }
 
       const saved = matched?.profile_data?.classification as Classification | undefined;
       if (matched && saved) {
-        classification = { ...saved, _source: "saved", supplier_name: matched.supplier_name };
-        usedSavedProfile = true;
-        console.log(`[classify-extract-validate] Reusing saved classification for ${matched.supplier_name} (confidence ${matched.confidence_score})`);
+        // CRITICAL: when the match came from the filename only (not a hint
+        // and not yet verified against invoice content), we still kick off
+        // the orientation agent so it can override with the true supplier
+        // detected from header/ABN/SKU prefix/bank details. Filenames are
+        // unreliable (collection names, generic words like "Sea Level").
+        if (savedProfileMatchSource === "filename") {
+          console.log(`[classify-extract-validate] Filename hints "${matched.supplier_name}" — will verify against invoice content`);
+          // Do NOT short-circuit; let Stage 1 orientation run and
+          // override if it disagrees.
+        } else {
+          classification = { ...saved, _source: "saved", supplier_name: matched.supplier_name };
+          usedSavedProfile = true;
+          console.log(`[classify-extract-validate] Reusing saved classification for ${matched.supplier_name} (confidence ${matched.confidence_score})`);
+        }
       }
     } catch (e) {
       console.warn("[classify-extract-validate] saved-profile lookup failed:", e);
@@ -208,6 +239,93 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     } catch (e) {
       console.warn("[classify-extract-validate] Stage 1 errored:", e);
     }
+  }
+
+  // ─────── STAGE 1B — Filename-vs-content supplier mismatch detection ───────
+  // Some invoices are named after a collection or product line ("Sea Level
+  // Lost Paradise.pdf") but are actually issued by a different parent brand
+  // (Bond-Eye Australia). Stage 1 reads letterhead / ABN / bank details to
+  // determine the TRUE supplier — we now compare that to whatever the filename
+  // suggests, log a misclassification alert if they differ, and surface it to
+  // the review UI.
+  let filenameMismatch: {
+    detected: boolean;
+    filename: string;
+    expected_from_filename: string;
+    detected_supplier: string;
+    alert_id: string | null;
+  } | null = null;
+
+  try {
+    const detectedSupplier = classification?.supplier_name || null;
+    const fileLower = String(fileName || "").toLowerCase();
+
+    let guess = filenameSupplierGuess;
+    if (!guess && userId && detectedSupplier) {
+      try {
+        const { data: allProfiles } = await admin
+          .from("supplier_profiles")
+          .select("supplier_name")
+          .eq("user_id", userId)
+          .limit(200);
+        const detectedLower = detectedSupplier.toLowerCase().trim();
+        const candidate = (allProfiles ?? []).find((p) => {
+          const sName = (p.supplier_name || "").toLowerCase().trim();
+          if (!sName) return false;
+          if (sName === detectedLower) return false;
+          if (sName.length < 4) return false; // skip "s", "j", "el" — would false-positive
+          return fileLower.includes(sName);
+        });
+        if (candidate) guess = candidate.supplier_name;
+      } catch (_e) { /* best-effort */ }
+    }
+
+    const norm = (s: string) =>
+      s.toLowerCase()
+        .replace(/\b(pty|ltd|inc|llc|gmbh|australia|au|aus)\b/g, "")
+        .replace(/[^a-z0-9]+/g, "")
+        .trim();
+
+    if (
+      detectedSupplier &&
+      guess &&
+      norm(detectedSupplier) !== norm(guess) &&
+      !norm(detectedSupplier).includes(norm(guess)) &&
+      !norm(guess).includes(norm(detectedSupplier))
+    ) {
+      console.warn(
+        `[classify-extract-validate] FILENAME MISMATCH: file "${fileName}" suggests "${guess}" but content says "${detectedSupplier}"`,
+      );
+
+      let alertId: string | null = null;
+      if (userId) {
+        try {
+          const { data: alertRow } = await admin
+            .from("misclassification_alerts")
+            .insert({
+              user_id: userId,
+              filename: String(fileName),
+              detected_supplier: detectedSupplier,
+              expected_from_filename: guess,
+            })
+            .select("id")
+            .maybeSingle();
+          alertId = alertRow?.id ?? null;
+        } catch (e) {
+          console.warn("[classify-extract-validate] alert insert failed:", e);
+        }
+      }
+
+      filenameMismatch = {
+        detected: true,
+        filename: String(fileName),
+        expected_from_filename: guess,
+        detected_supplier: detectedSupplier,
+        alert_id: alertId,
+      };
+    }
+  } catch (e) {
+    console.warn("[classify-extract-validate] mismatch detection failed:", e);
   }
 
   // ─────── STAGE 2 — extraction ───────
@@ -466,6 +584,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     extractor_used: azureUsed ? "azure_layout+llm" : "parse-invoice",
     validation_summary: validationSummary,
     multi_brand_split: multiBrandSplit,
+    filename_mismatch: filenameMismatch,
   };
 }
 

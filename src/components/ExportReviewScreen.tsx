@@ -79,6 +79,18 @@ interface ExportReviewScreenProps {
     rules: Array<{ sku_prefix: string; brand: string }>;
     counts: Record<string, number>;
   } | null;
+  /** Filename ≠ content supplier mismatch (e.g. "Sea Level Lost Paradise.pdf"
+   *  but invoice is from Bond-Eye Australia). Banner lets staff dismiss
+   *  (keep detected supplier) or override (use the filename's supplier). */
+  filenameMismatch?: {
+    detected: boolean;
+    filename: string;
+    expected_from_filename: string;
+    detected_supplier: string;
+    alert_id: string | null;
+  } | null;
+  onDismissFilenameMismatch?: () => void;
+  onOverrideFilenameMismatch?: () => void;
 }
 
 type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "lightspeed_full" | "tags_only" | "xlsx" | "summary_pdf" | "google_xml" | "google_tsv";
@@ -115,7 +127,7 @@ function generateFilename(supplier: string, format: ExportFormat): string {
   return `${tag}_${month}_${typeMap[format]}_${date}.${ext}`;
 }
 
-const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multiBrandSplit }: ExportReviewScreenProps) => {
+const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multiBrandSplit, filenameMismatch, onDismissFilenameMismatch, onOverrideFilenameMismatch }: ExportReviewScreenProps) => {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>("shopify_full");
   const [filterHigh, setFilterHigh] = useState(true);
   const [filterMedium, setFilterMedium] = useState(true);
@@ -598,6 +610,30 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multi
               </button>
             </div>
       </div>
+
+      {filenameMismatch?.detected && (
+        <div className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+            <div className="flex-1 text-sm">
+              <p className="font-semibold">
+                ⚠️ Filename says "{filenameMismatch.expected_from_filename}" but invoice is from "{filenameMismatch.detected_supplier}". Using {filenameMismatch.detected_supplier}.
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                File: <span className="font-mono-data">{filenameMismatch.filename}</span>. The supplier was detected from the invoice header / ABN / SKU prefixes.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onDismissFilenameMismatch?.()}>
+                  Dismiss
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onOverrideFilenameMismatch?.()}>
+                  Override → use "{filenameMismatch.expected_from_filename}"
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {multiBrandSplit?.applied && brandList.length > 1 && (
         <div className="mb-4 rounded-lg border border-secondary/30 bg-secondary/10 p-3">

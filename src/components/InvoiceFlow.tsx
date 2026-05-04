@@ -642,6 +642,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     rules: Array<{ sku_prefix: string; brand: string }>;
     counts: Record<string, number>;
   } | null>(null);
+  // Filename ≠ content mismatch (e.g. "Sea Level Lost Paradise.pdf" → Bond-Eye).
+  // The user can dismiss the banner OR override and use the filename guess.
+  const [filenameMismatch, setFilenameMismatch] = useState<{
+    detected: boolean;
+    filename: string;
+    expected_from_filename: string;
+    detected_supplier: string;
+    alert_id: string | null;
+  } | null>(null);
   // Per-product Qty header validator warnings from parse-invoice. Drives the
   // yellow banner + per-row flag on the review screen (Round 4 Walnut fix).
   const [qtyHeaderWarnings, setQtyHeaderWarnings] = useState<Array<{
@@ -2276,6 +2285,20 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         }
       } else {
         setMultiBrandSplit(null);
+      }
+      // Filename ≠ content supplier? Show a banner so staff can confirm
+      // or override (e.g. "Sea Level Lost Paradise.pdf" → Bond-Eye Australia).
+      if (data.filename_mismatch && data.filename_mismatch.detected) {
+        setFilenameMismatch(data.filename_mismatch);
+        console.warn(
+          `[Sonic Invoice] Filename mismatch — file "${data.filename_mismatch.filename}" suggests "${data.filename_mismatch.expected_from_filename}" but invoice is from "${data.filename_mismatch.detected_supplier}"`,
+        );
+        toast.warning(
+          `Filename says "${data.filename_mismatch.expected_from_filename}" but invoice is from "${data.filename_mismatch.detected_supplier}"`,
+          { description: "Using the supplier detected from the invoice content. Review on the export screen." },
+        );
+      } else {
+        setFilenameMismatch(null);
       }
       if (data.field_confidence && typeof data.field_confidence === "object") {
         setAiFieldConfidence(data.field_confidence as Record<string, number>);
@@ -5628,6 +5651,35 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             }))}
             supplierName={supplierName}
             multiBrandSplit={multiBrandSplit}
+            filenameMismatch={filenameMismatch}
+            onDismissFilenameMismatch={async () => {
+              if (filenameMismatch?.alert_id) {
+                try {
+                  await supabase
+                    .from("misclassification_alerts")
+                    .update({ resolved: true, resolved_at: new Date().toISOString(), resolution: "dismissed" })
+                    .eq("id", filenameMismatch.alert_id);
+                } catch (e) { console.warn("dismiss alert failed", e); }
+              }
+              setFilenameMismatch(null);
+            }}
+            onOverrideFilenameMismatch={async () => {
+              if (!filenameMismatch) return;
+              const overrideName = filenameMismatch.expected_from_filename;
+              setSupplierName(overrideName);
+              if (filenameMismatch.alert_id) {
+                try {
+                  await supabase
+                    .from("misclassification_alerts")
+                    .update({ resolved: true, resolved_at: new Date().toISOString(), resolution: `overridden_to_${overrideName}` })
+                    .eq("id", filenameMismatch.alert_id);
+                } catch (e) { console.warn("override alert failed", e); }
+              }
+              toast(`Supplier overridden to "${overrideName}"`, {
+                description: "Re-upload the invoice if you want the parser to re-process under this supplier.",
+              });
+              setFilenameMismatch(null);
+            }}
             onBack={() => setStep(3)}
           />
 

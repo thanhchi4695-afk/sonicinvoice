@@ -2283,6 +2283,45 @@ export type Database = {
         }
         Relationships: []
       }
+      misclassification_alerts: {
+        Row: {
+          alerted_at: string
+          detected_supplier: string
+          expected_from_filename: string
+          filename: string
+          id: string
+          invoice_id: string | null
+          resolution: string | null
+          resolved: boolean
+          resolved_at: string | null
+          user_id: string
+        }
+        Insert: {
+          alerted_at?: string
+          detected_supplier: string
+          expected_from_filename: string
+          filename: string
+          id?: string
+          invoice_id?: string | null
+          resolution?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          user_id: string
+        }
+        Update: {
+          alerted_at?: string
+          detected_supplier?: string
+          expected_from_filename?: string
+          filename?: string
+          id?: string
+          invoice_id?: string | null
+          resolution?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       multi_brand_suppliers: {
         Row: {
           brand_rules: Json

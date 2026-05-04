@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createCollectionGraphQL, type GraphQLCollectionInput } from "@/lib/shopify-api";
 import { addAuditEntry } from "@/lib/audit-log";
 import { toast } from "sonner";
+import { openShopifyAdmin } from "@/lib/open-shopify-admin";
 
 interface CollectionSEOFlowProps {
   onBack: () => void;
@@ -895,14 +896,14 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
                               {r.error && <p className="text-xs text-destructive">{r.error}</p>}
                             </div>
                             {r.ok && (
-                              <a
-                                href={`https://admin.shopify.com/collections/${r.handle}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                type="button"
+                                onClick={() => openShopifyAdmin(`https://admin.shopify.com/collections/${r.handle}`)}
                                 className="text-primary"
+                                title="Open in Shopify Admin"
                               >
                                 <ExternalLink className="w-3.5 h-3.5" />
-                              </a>
+                              </button>
                             )}
                           </div>
                         ))}

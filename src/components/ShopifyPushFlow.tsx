@@ -7,6 +7,7 @@ import {
 import { Check, X, Loader2, ExternalLink, Download, ShoppingBag, AlertTriangle, RotateCcw, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { PushProduct, PushResult, pushProducts, getConnection, recordPush, pushProductGraphQL } from "@/lib/shopify-api";
+import { openShopifyAdmin } from "@/lib/open-shopify-admin";
 
 interface ShopifyPushFlowProps {
   products: PushProduct[];
@@ -157,15 +158,14 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
               {r.status === "pushing" && <Loader2 className="w-3 h-3 text-primary animate-spin shrink-0" />}
               {r.status === "pending" && <span className="w-3 h-3 rounded-full border border-muted-foreground shrink-0" />}
               {r.status === "success" && r.shopifyId ? (
-                <a
-                  href={`https://${storeUrl}/admin/products/${r.shopifyId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 truncate text-primary hover:underline"
+                <button
+                  type="button"
+                  onClick={() => openShopifyAdmin(`https://${storeUrl}/admin/products/${r.shopifyId}`)}
+                  className="flex-1 truncate text-primary hover:underline text-left"
                   title="Open in Shopify Admin"
                 >
                   {r.title}
-                </a>
+                </button>
               ) : (
                 <span className="flex-1 truncate">{r.title}</span>
               )}
@@ -179,7 +179,7 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(`https://${storeUrl}/admin/products`, "_blank")}
+              onClick={() => openShopifyAdmin(`https://${storeUrl}/admin/products`)}
               className="text-xs"
             >
               <ExternalLink className="w-3 h-3 mr-1" /> View in Shopify

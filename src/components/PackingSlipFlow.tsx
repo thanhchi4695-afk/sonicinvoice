@@ -1,9 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Upload, ChevronLeft, Loader2, Check, X, AlertTriangle,
   Download, Package, Search, Edit3, CheckCheck, FileText,
-  ChevronDown, ChevronRight, Zap, RotateCcw
+  ChevronDown, ChevronRight, Zap, RotateCcw, Receipt, Link2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,10 @@ interface PackingSlipItem {
   quantity: number;
   carton_number?: string;
   barcode?: string;
+  // Cost data (from paired tax invoice or markup formula)
+  unit_cost?: number;
+  rrp?: number;
+  _costSource?: "tax_invoice" | "markup" | "manual";
   // Computed fields
   _title: string;
   _confidence: number;
@@ -40,10 +44,10 @@ interface GroupedProduct {
   vendor: string;
   style_code: string;
   colour_code: string;
-  variants: { size: string; qty: number; sku: string }[];
+  variants: { size: string; qty: number; sku: string; cost?: number; rrp?: number }[];
 }
 
-type Step = "upload" | "processing" | "review";
+type Step = "upload" | "processing" | "pair_prompt" | "pairing" | "review";
 type ReviewTab = "accepted" | "review" | "rejected";
 type ProcessMode = "create" | "update" | "review_only";
 
@@ -94,7 +98,7 @@ function groupItems(items: PackingSlipItem[], vendor: string): GroupedProduct[] 
     const sku = item.style_code
       ? `${item.style_code}-${(item.colour_code || "").replace(/[^a-zA-Z0-9]/g, "")}-${item.size}`
       : "";
-    g.variants.push({ size: item.size, qty: item.quantity, sku });
+    g.variants.push({ size: item.size, qty: item.quantity, sku, cost: item.unit_cost, rrp: item.rrp });
   }
 
   return Array.from(groups.values());
@@ -114,8 +118,8 @@ function exportToShopifyCSV(groups: GroupedProduct[]) {
         "Option2 Value": v.size,
         "Variant SKU": v.sku,
         "Variant Inventory Qty": String(v.qty),
-        "Variant Price": "",
-        "Cost per item": "",
+        "Variant Price": v.rrp != null ? String(v.rrp) : "",
+        "Cost per item": v.cost != null ? String(v.cost) : "",
         Status: "draft",
         Published: "FALSE",
       });
@@ -165,8 +169,39 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [processMode, setProcessMode] = useState<ProcessMode>("create");
   const [docConfidence, setDocConfidence] = useState(0);
+  const [packingListSuppliers, setPackingListSuppliers] = useState<string[]>([
+    "Tigerlily", "Smelly Balls", "Sky Gazer",
+  ]);
+  const [markupMultiplier, setMarkupMultiplier] = useState<number | null>(null);
+  const [pairedInvoiceName, setPairedInvoiceName] = useState<string | null>(null);
+  const [pairStats, setPairStats] = useState<{ matched: number; unmatched: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const taxInvoiceInputRef = useRef<HTMLInputElement>(null);
   const mode = useStoreMode();
+
+  // Load packing-list suppliers list from user_settings
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("user_settings")
+        .select("packing_list_suppliers")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const pls = (data as { packing_list_suppliers?: string[] } | null)?.packing_list_suppliers;
+      if (Array.isArray(pls) && pls.length) setPackingListSuppliers(pls);
+    })();
+  }, []);
+
+  const isPackingListSupplier = (name: string): boolean => {
+    if (!name) return false;
+    const norm = name.toLowerCase().replace(/pty\s*ltd|australia|\bpty\b|\bltd\b/g, "").trim();
+    return packingListSuppliers.some((s) => {
+      const sNorm = s.toLowerCase().replace(/pty\s*ltd|australia|\bpty\b|\bltd\b/g, "").trim();
+      return sNorm && (norm.includes(sNorm) || sNorm.includes(norm));
+    });
+  };
 
   // Upload & parse
   const handleFileUpload = async (file: File) => {
@@ -248,14 +283,127 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
       }
 
       setItems(nonEmpty);
-      setStep("review");
+      const detectedSupplier = data.supplier || supplierInput || "";
+
+      // Look up supplier-specific markup multiplier and packing-list-only flag
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && detectedSupplier) {
+          const { data: profile } = await supabase
+            .from("supplier_profiles")
+            .select("markup_multiplier, sends_packing_list_only")
+            .eq("user_id", user.id)
+            .ilike("supplier_name", detectedSupplier)
+            .maybeSingle();
+          const prof = profile as { markup_multiplier?: number | null; sends_packing_list_only?: boolean } | null;
+          if (prof?.markup_multiplier) setMarkupMultiplier(Number(prof.markup_multiplier));
+        }
+      } catch (e) { /* non-fatal */ }
+
       toast.success(`Extracted ${nonEmpty.length} items from packing slip`);
+      if (isPackingListSupplier(detectedSupplier)) {
+        setStep("pair_prompt");
+      } else {
+        setStep("review");
+      }
     } catch (err) {
       console.error("Packing slip parse error:", err);
       toast.error("Failed to parse packing slip. Please try again.");
       setStep("upload");
     }
   };
+
+  // ─── Pair with tax invoice ───
+  const handleTaxInvoiceUpload = async (file: File) => {
+    setStep("pairing");
+    try {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      let fileContent: string;
+      if (["pdf", "jpg", "jpeg", "png", "webp", "heic"].includes(ext)) {
+        const buf = await file.arrayBuffer();
+        fileContent = btoa(new Uint8Array(buf).reduce((s, b) => s + String.fromCharCode(b), ""));
+      } else {
+        fileContent = await file.text();
+      }
+      const { data, error } = await supabase.functions.invoke("parse-invoice", {
+        body: {
+          fileContent,
+          fileName: file.name,
+          fileType: ext,
+          supplierName: supplier || supplierInput || undefined,
+          forceMode: "invoice",
+        },
+      });
+      if (error) throw error;
+
+      const invoiceProducts = (data.products || []) as Record<string, unknown>[];
+      if (invoiceProducts.length === 0) {
+        toast.error("Couldn't read line items from the tax invoice.");
+        setStep("pair_prompt");
+        return;
+      }
+
+      // Build SKU + title lookups from the tax invoice
+      type CostRow = { cost?: number; rrp?: number };
+      const skuMap = new Map<string, CostRow>();
+      const titleMap = new Map<string, CostRow>();
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+      for (const p of invoiceProducts) {
+        const cost = Number(p.unit_cost ?? p.cost ?? p.wholesale_price ?? p.price) || undefined;
+        const rrp = Number(p.rrp ?? p.retail_price ?? p.suggested_retail) || undefined;
+        if (!cost && !rrp) continue;
+        const row: CostRow = { cost, rrp };
+        const sku = String(p.sku ?? p.style_code ?? "");
+        const title = String(p.product_name ?? p.title ?? p.style_description ?? "");
+        if (sku) skuMap.set(norm(sku), row);
+        if (title) titleMap.set(norm(title), row);
+      }
+
+      // Merge into packing list items
+      let matched = 0;
+      let unmatched = 0;
+      const merged = items.map((it) => {
+        const skuKey = norm(it.style_code);
+        const titleKey = norm(it.style_description);
+        const hit = (skuKey && skuMap.get(skuKey)) || (titleKey && titleMap.get(titleKey)) || null;
+        if (hit) {
+          matched += 1;
+          return { ...it, unit_cost: hit.cost, rrp: hit.rrp, _costSource: "tax_invoice" as const };
+        }
+        unmatched += 1;
+        return it;
+      });
+
+      setItems(merged);
+      setPairedInvoiceName(file.name);
+      setPairStats({ matched, unmatched });
+      toast.success(`Paired ${matched} of ${matched + unmatched} items with cost data`);
+      setStep("review");
+    } catch (err) {
+      console.error("Tax invoice pairing error:", err);
+      toast.error("Failed to parse the tax invoice.");
+      setStep("pair_prompt");
+    }
+  };
+
+  const handleSkipPairing = () => {
+    if (!markupMultiplier || markupMultiplier <= 0) {
+      toast.info("No markup multiplier set for this supplier — costs left blank. Add one in Supplier Settings.");
+      setStep("review");
+      return;
+    }
+    const merged = items.map((it) => {
+      if (it.rrp && it.rrp > 0) {
+        return { ...it, unit_cost: Math.round((it.rrp / markupMultiplier) * 100) / 100, _costSource: "markup" as const };
+      }
+      return it;
+    });
+    setItems(merged);
+    toast.success(`Applied markup formula (÷${markupMultiplier}) to estimate costs`);
+    setStep("review");
+  };
+
 
   // Categorize
   const accepted = items.filter((p) => !p._rejected && p._confidenceLevel === "high");
@@ -401,6 +549,83 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
     );
   }
 
+  // ─── PAIR PROMPT STEP ───
+  if (step === "pair_prompt") {
+    return (
+      <div className="px-4 pt-2 pb-24 animate-fade-in">
+        <button onClick={() => setStep("upload")} className="flex items-center gap-1 text-sm text-muted-foreground mb-4 active:text-foreground">
+          <ChevronLeft className="w-4 h-4" /> Back
+        </button>
+
+        <div className="flex items-center gap-2 mb-1">
+          <Link2 className="w-5 h-5 text-primary" />
+          <h1 className="text-xl font-bold font-display">Pair with tax invoice?</h1>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          {supplier ? <><span className="font-medium">{supplier}</span> sends</> : "This supplier sends"} packing lists without cost data.
+          Upload the matching tax invoice to add pricing.
+        </p>
+
+        <div className="bg-card border border-border rounded-lg p-4 mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Package className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-semibold">Packing slip extracted</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {items.length} items · {grouped.length} grouped products · qty data ready
+          </p>
+        </div>
+
+        <Button
+          variant="teal"
+          className="w-full h-11 text-sm gap-2 mb-2"
+          onClick={() => taxInvoiceInputRef.current?.click()}
+        >
+          <Receipt className="w-4 h-4" /> Upload tax invoice
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full h-11 text-sm gap-2"
+          onClick={handleSkipPairing}
+        >
+          Skip — {markupMultiplier ? `use ÷${markupMultiplier} markup formula` : "no costs (set markup later)"}
+        </Button>
+
+        <input
+          ref={taxInvoiceInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.csv,.xlsx,.xls"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleTaxInvoiceUpload(file);
+          }}
+        />
+
+        <div className="mt-6 bg-muted/30 rounded-lg p-4">
+          <h3 className="text-xs font-semibold mb-2">How pairing works:</h3>
+          <ul className="text-xs text-muted-foreground space-y-1">
+            <li>1. We read cost &amp; RRP from the tax invoice</li>
+            <li>2. Match by SKU first, then by product title</li>
+            <li>3. Merge cost data into your packing-list line items</li>
+            <li>4. Source labels show where each value came from</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── PAIRING (loading) STEP ───
+  if (step === "pairing") {
+    return (
+      <div className="px-4 pt-2 pb-24 animate-fade-in flex flex-col items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+        <p className="text-sm font-medium">Reading tax invoice &amp; matching items…</p>
+        <p className="text-xs text-muted-foreground mt-1">Matching by SKU, then by product title</p>
+      </div>
+    );
+  }
+
   // ─── REVIEW STEP ───
   const tabs: { key: ReviewTab; label: string; count: number; icon: React.ReactNode; colorClass: string }[] = [
     { key: "accepted", label: "Accepted", count: accepted.length, icon: <Check className="w-3.5 h-3.5" />, colorClass: "text-success" },
@@ -425,6 +650,23 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
         {items.length} items · {grouped.length} grouped products
         {docConfidence > 0 && ` · ${docConfidence}% doc confidence`}
       </p>
+
+      {/* Pairing banner */}
+      {pairedInvoiceName && pairStats && (
+        <div className="mb-3 rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-start gap-2">
+          <Link2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <div className="text-xs flex-1">
+            <p className="font-medium">Paired with <span className="font-mono">{pairedInvoiceName}</span></p>
+            <p className="text-muted-foreground mt-0.5">
+              Qty: from packing list · Cost: from tax invoice ·{" "}
+              <span className="text-success">{pairStats.matched} matched</span>
+              {pairStats.unmatched > 0 && (
+                <> · <span className="text-secondary">{pairStats.unmatched} unmatched</span></>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Summary stats */}
       <div className="grid grid-cols-4 gap-2 mb-4">
@@ -576,6 +818,29 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
                             <Badge variant="outline" className="text-[10px] h-5">Size {item.size}</Badge>
                           )}
                           <Badge variant="outline" className="text-[10px] h-5">Qty {item.quantity}</Badge>
+                          {item.unit_cost != null && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] h-5 ${
+                                item._costSource === "tax_invoice"
+                                  ? "border-primary/40 text-primary"
+                                  : item._costSource === "markup"
+                                  ? "border-secondary/40 text-secondary"
+                                  : ""
+                              }`}
+                              title={
+                                item._costSource === "tax_invoice"
+                                  ? "Cost from paired tax invoice"
+                                  : item._costSource === "markup"
+                                  ? "Cost calculated from RRP via markup formula"
+                                  : "Manually entered cost"
+                              }
+                            >
+                              Cost ${item.unit_cost.toFixed(2)}
+                              {item._costSource === "tax_invoice" && " · invoice"}
+                              {item._costSource === "markup" && " · markup"}
+                            </Badge>
+                          )}
                         </div>
                         {item._rejectReason && (
                           <p className="text-[10px] text-destructive mt-1">{item._rejectReason}</p>

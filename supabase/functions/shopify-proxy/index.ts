@@ -358,24 +358,16 @@ Deno.serve(async (req) => {
           }`;
         });
 
+        // Shopify API 2025-01 removed `variants` from ProductInput.
+        // Use productSet which accepts productOptions + variants in one call.
         const mutation = `
-          mutation productCreate($input: ProductInput!, $media: [CreateMediaInput!]) {
-            productCreate(input: $input, media: $media) {
+          mutation productSet($input: ProductSetInput!) {
+            productSet(synchronous: true, input: $input) {
               product {
                 id
                 title
                 handle
                 status
-                onlineStoreUrl
-                variants(first: 10) {
-                  edges {
-                    node {
-                      id
-                      sku
-                      price
-                    }
-                  }
-                }
               }
               userErrors {
                 field
@@ -385,6 +377,35 @@ Deno.serve(async (req) => {
           }
         `;
 
+        // Build productOptions with explicit values (required by ProductSetInput)
+        const productOptionsInput = options.map((opt, idx) => {
+          const valuesSet = new Set<string>();
+          for (const v of variants) {
+            const ov = idx === 0 ? v.option1 : v.option2;
+            if (ov != null && String(ov).trim() !== "") valuesSet.add(String(ov));
+          }
+          // Must have at least one value
+          if (valuesSet.size === 0) valuesSet.add("Default");
+          return {
+            name: opt.name,
+            values: Array.from(valuesSet).map((name) => ({ name })),
+          };
+        });
+
+        const variantsInput = variants.map((v) => {
+          const variant: Record<string, unknown> = {
+            price: String(v.price || "0.00"),
+          };
+          if (v.compare_at_price) variant.compareAtPrice = String(v.compare_at_price);
+          if (v.sku) variant.sku = String(v.sku);
+          if (v.cost) variant.inventoryItem = { cost: String(v.cost) };
+          const optVals: { name: string; optionName: string }[] = [];
+          if (v.option1 && options[0]) optVals.push({ name: String(v.option1), optionName: options[0].name });
+          if (v.option2 && options[1]) optVals.push({ name: String(v.option2), optionName: options[1].name });
+          if (optVals.length > 0) variant.optionValues = optVals;
+          return variant;
+        });
+
         const productInput: Record<string, unknown> = {
           title: p.title || "",
           descriptionHtml: p.body_html || "",
@@ -393,31 +414,16 @@ Deno.serve(async (req) => {
           status: String(p.status || "DRAFT").toUpperCase(),
           tags: p.tags ? (p.tags as string).split(",").map((t: string) => t.trim()) : [],
         };
-
-        // Build variants for GraphQL input
-        if (variants.length > 0) {
-          productInput.variants = variants.map((v: Record<string, unknown>) => {
-            const variant: Record<string, unknown> = {
-              price: String(v.price || "0.00"),
-            };
-            if (v.compare_at_price) variant.compareAtPrice = String(v.compare_at_price);
-            if (v.sku) variant.sku = String(v.sku);
-            if (v.cost) variant.inventoryItem = { cost: String(v.cost) };
-            if (v.inventory_management === "shopify") variant.inventoryManagement = "SHOPIFY";
-            const optVals: { name: string; optionName: string }[] = [];
-            if (v.option1 && options[0]) optVals.push({ name: String(v.option1), optionName: options[0].name });
-            if (v.option2 && options[1]) optVals.push({ name: String(v.option2), optionName: options[1].name });
-            if (optVals.length > 0) variant.optionValues = optVals;
-            return variant;
-          });
+        if (productOptionsInput.length > 0) productInput.productOptions = productOptionsInput;
+        if (variantsInput.length > 0) productInput.variants = variantsInput;
+        if (images.length > 0) {
+          productInput.files = images.map((img) => ({
+            originalSource: img.src,
+            contentType: "IMAGE",
+          }));
         }
 
-        const mediaInput = images.map((img: { src: string }) => ({
-          originalSource: img.src,
-          mediaContentType: "IMAGE",
-        }));
-
-        const graphqlResp = await fetch(`${baseUrl.replace(`/api/${conn.api_version}`, "")}/admin/api/${conn.api_version}/graphql.json`, {
+        const graphqlResp = await fetch(`${baseUrl}/graphql.json`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -425,28 +431,51 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             query: mutation,
-            variables: {
-              input: productInput,
-              media: mediaInput.length > 0 ? mediaInput : undefined,
-            },
+            variables: { input: productInput },
           }),
         });
 
-        const graphqlData = await graphqlResp.json();
+        const rawText = await graphqlResp.text();
+        let graphqlData: Record<string, unknown> = {};
+        try {
+          graphqlData = rawText ? JSON.parse(rawText) : {};
+        } catch (parseErr) {
+          console.error("[shopify-proxy] graphql_create_product non-JSON response", {
+            status: graphqlResp.status,
+            statusText: graphqlResp.statusText,
+            bodyPreview: rawText.slice(0, 500),
+          });
+          return new Response(JSON.stringify({
+            error: `Shopify returned ${graphqlResp.status} ${graphqlResp.statusText}: ${rawText.slice(0, 200) || "empty body"}`,
+          }), {
+            status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
 
-        if (graphqlData.errors) {
+        if (!graphqlResp.ok) {
+          console.error("[shopify-proxy] graphql_create_product HTTP error", graphqlResp.status, graphqlData);
+          return new Response(JSON.stringify({
+            error: `Shopify HTTP ${graphqlResp.status}`,
+            details: graphqlData,
+          }), {
+            status: graphqlResp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const gqlAny = graphqlData as { errors?: unknown; data?: { productSet?: { product?: unknown; userErrors?: { field?: string[]; message: string }[] } } };
+        if (gqlAny.errors) {
           return new Response(JSON.stringify({
             error: "GraphQL errors",
-            details: graphqlData.errors,
+            details: gqlAny.errors,
           }), {
             status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        const productResult = graphqlData.data?.productCreate;
-        if (productResult?.userErrors?.length > 0) {
+        const productResult = gqlAny.data?.productSet;
+        if (productResult?.userErrors && productResult.userErrors.length > 0) {
           return new Response(JSON.stringify({
-            error: productResult.userErrors.map((e: { message: string }) => e.message).join(", "),
+            error: productResult.userErrors.map((e) => e.message).join(", "),
             details: productResult.userErrors,
           }), {
             status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -13,6 +13,8 @@ import CsvPreviewDialog from "@/components/CsvPreviewDialog";
 import { toast } from "sonner";
 import { usePromptDialog } from "@/hooks/use-prompt-dialog";
 import { Upload, ChevronDown, ChevronRight, Camera, FileText, Loader2, Check, ChevronLeft, RotateCcw, X, Download, Bot, Clock, Save, Monitor, Package, AlertTriangle, Search, Settings, Eye, Zap, DollarSign, Link, Scissors, PackagePlus, ArrowDown, Barcode, PackageCheck, Image as ImageIcon, Tag, CloudDownload } from "lucide-react";
+import { InvoiceStepper } from "@/components/invoice/InvoiceStepper";
+import { StickyActionBar } from "@/components/invoice/StickyActionBar";
 import ShopifyPreview from "@/components/ShopifyPreview";
 import ExportReviewScreen from "@/components/ExportReviewScreen";
 import { Button } from "@/components/ui/button";
@@ -208,11 +210,14 @@ interface InvoiceFlowProps {
 
 type Step = 1 | 2 | 3 | 4;
 
-// B4 #2 — Sub-step labels nest under the top phase bar. The first three
-// steps (Upload → Read → Review) are sub-stages of Phase 1: Capture; the
-// final step (Export) is the hand-off to Phase 5: Publish. Keeping the
-// vocabulary aligned avoids the "6 vs 4 step labels" mismatch.
-const stepLabels = ["1a · Upload", "1b · Read", "1c · Review", "5 · Export"];
+// Apple-style 4-step flow: Upload → Read → Review → Export.
+// Long descriptive labels for desktop, short labels for mobile.
+const stepperSteps = [
+  { label: "Upload", shortLabel: "Upload" },
+  { label: "Read", shortLabel: "Read" },
+  { label: "Review", shortLabel: "Review" },
+  { label: "Export", shortLabel: "Export" },
+];
 
 // ── Instruction snippets ───────────────────────────────────
 const quickInserts = [
@@ -3990,23 +3995,24 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         pageCount={largePdfPrompt.pageCount}
         onChoose={handleLargePdfChoice}
       />
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
+      {/* Header — Apple-style top bar with stepper */}
+      <div className="sticky top-0 z-40 bg-card/85 backdrop-blur-md border-b border-border/60 px-4 py-3">
         <div className="flex items-center gap-3 mb-3">
-          <button onClick={onBack} className="text-muted-foreground">
+          <button
+            onClick={onBack}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Back"
+          >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-lg font-semibold font-display">Import invoice</h2>
+          <h2 className="text-[18px] font-semibold font-display tracking-tight">Import invoice</h2>
         </div>
-        {/* Progress */}
-        <div className="flex items-center gap-1">
-          {stepLabels.map((label, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-1">
-              <div className={`h-1 w-full rounded-full transition-colors ${i + 1 <= step ? "bg-primary" : "bg-muted"}`} />
-              <span className={`text-[10px] ${i + 1 <= step ? "text-primary" : "text-muted-foreground"}`}>{label}</span>
-            </div>
-          ))}
-        </div>
+        <InvoiceStepper
+          steps={stepperSteps}
+          current={step}
+          furthest={step}
+          onStepClick={(n) => setStep(n as Step)}
+        />
       </div>
 
       {/* Full-screen drag overlay — appears whenever a file is dragged anywhere over the page on Step 1 */}

@@ -14,6 +14,7 @@ const navSections = [
     title: "Main",
     items: [
       { id: "home", label: "Dashboard", icon: Home, type: "tab" as const },
+      { id: "ai_agents", label: "AI Agents", icon: Bot, type: "tab" as const },
       { id: "analytics", label: "Analytics", icon: BarChart3, type: "tab" as const },
       { id: "history", label: "History", icon: FolderOpen, type: "tab" as const },
     ],
@@ -38,9 +39,15 @@ const navSections = [
     ],
   },
   {
-    title: "Settings",
+    title: "Tools",
     items: [
       { id: "tools", label: "Tools & Feeds", icon: Wrench, type: "tab" as const },
+      { id: "claude_integration", label: "Claude Integration", icon: Sparkle, type: "tab" as const },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
       { id: "google_ads", label: "Marketing", icon: Megaphone, type: "tab" as const },
       { id: "help", label: "Help Centre", icon: HelpCircle, type: "tab" as const },
       { id: "account", label: "Account", icon: User, type: "tab" as const },

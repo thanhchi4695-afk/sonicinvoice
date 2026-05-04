@@ -896,14 +896,14 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
                               {r.error && <p className="text-xs text-destructive">{r.error}</p>}
                             </div>
                             {r.ok && (
-                              <a
-                                href={`https://admin.shopify.com/collections/${r.handle}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                type="button"
+                                onClick={() => openShopifyAdmin(`https://admin.shopify.com/collections/${r.handle}`)}
                                 className="text-primary"
+                                title="Open in Shopify Admin"
                               >
                                 <ExternalLink className="w-3.5 h-3.5" />
-                              </a>
+                              </button>
                             )}
                           </div>
                         ))}

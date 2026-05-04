@@ -597,8 +597,59 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multi
                 {publishStatus === "draft" && <Check className="w-3.5 h-3.5 inline mr-1.5" />}Draft (hidden)
               </button>
             </div>
-          </div>
+      </div>
 
+      {multiBrandSplit?.applied && brandList.length > 1 && (
+        <div className="mb-4 rounded-lg border border-secondary/30 bg-secondary/10 p-3">
+          <div className="flex items-start gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 text-secondary mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-semibold">
+                Multi-brand invoice detected — items have been split by SKU prefix
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {multiBrandSplit.company_name
+                  ? `"${multiBrandSplit.company_name}" invoices ${brandList.length} brands. `
+                  : ""}
+                Pick one brand below to publish brands separately.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5 pl-6">
+            <button
+              type="button"
+              onClick={() => setBrandFilter(null)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                brandFilter === null
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background border-border hover:border-primary/50"
+              }`}
+            >
+              All brands ({enriched.length})
+            </button>
+            {brandList.map((b) => (
+              <button
+                key={b}
+                type="button"
+                onClick={() => setBrandFilter(b)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  brandFilter === b
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-border hover:border-primary/50"
+                }`}
+              >
+                {b} ({brandCounts[b]})
+              </button>
+            ))}
+          </div>
+          {brandFilter && (
+            <p className="text-xs text-muted-foreground mt-2 pl-6">
+              Showing <span className="font-semibold text-foreground">{brandFilter}</span> only —
+              export & push actions below will publish this brand alone. Click "All brands" to publish everything.
+            </p>
+          )}
+        </div>
+      )}
 
           <div className="bg-card rounded-lg border border-border p-4">
             <h3 className="text-sm font-semibold mb-3">Export format</h3>

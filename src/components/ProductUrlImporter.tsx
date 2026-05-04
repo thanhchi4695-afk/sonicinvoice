@@ -86,7 +86,7 @@ function validateProductUrl(raw: string): { ok: true; value: string } | { ok: fa
 function friendlyError(raw: string): string {
   const msg = (raw || "").toLowerCase();
   if (msg.includes("timeout") || msg.includes("timed out")) {
-    return "The site took too long to respond. Try again, or paste a different product page.";
+    return "The site took too long to respond, so we stopped the import. Try again, or paste a different product page.";
   }
   if (msg.includes("403") || msg.includes("forbidden") || msg.includes("blocked")) {
     return "This site blocked our request. Try the brand's own page rather than a marketplace listing.";
@@ -104,6 +104,45 @@ function friendlyError(raw: string): string {
     return "We're being rate-limited by that site. Please wait a minute and try again.";
   }
   return raw || "Something went wrong fetching that product.";
+}
+
+const PRODUCT_EXTRACT_TIMEOUT_MS = 45_000;
+
+async function invokeProductExtract(productUrl: string): Promise<ExtractedProduct> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const publishableKey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string | undefined;
+  if (!supabaseUrl || !publishableKey) {
+    throw new Error("Product extraction is not configured.");
+  }
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), PRODUCT_EXTRACT_TIMEOUT_MS);
+
+  try {
+    const { data: authData } = await supabase.auth.getSession();
+    const token = authData.session?.access_token || publishableKey;
+    const response = await fetch(`${supabaseUrl}/functions/v1/product-extract`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        apikey: publishableKey,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ url: productUrl }),
+    });
+    const payload = await response.json().catch(() => null) as { success?: boolean; error?: string; product?: ExtractedProduct } | null;
+    if (!response.ok) throw new Error(payload?.error || `Extraction failed (${response.status})`);
+    if (!payload?.success) throw new Error(payload?.error || "Could not extract product details");
+    return payload.product ?? {};
+  } catch (err) {
+    if (err && typeof err === "object" && "name" in err && err.name === "AbortError") {
+      throw new Error("Product extraction timed out after 45 seconds");
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 export interface ImportedLineItem {
@@ -341,18 +380,9 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     });
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("product-extract", {
-        body: { url: v.value },
-      });
-
-      if (fnError) throw new Error(fnError.message || "Extraction failed");
-      if (!data?.success) {
-        throw new Error(data?.error || "Could not extract product details");
-      }
-
       clearStepTimers();
       setStepIndex(STEPS.length); // mark all done
-      const product: ExtractedProduct = data.product ?? {};
+      const product = await invokeProductExtract(v.value);
       setResult(product);
       const priceText =
         typeof product.price === "number"
@@ -483,12 +513,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       setBulkRows((rows) => rows.map((r, idx) => (idx === i ? { ...r, status: "fetching" } : r)));
 
       try {
-        const { data, error: fnError } = await supabase.functions.invoke("product-extract", {
-          body: { url: initial[i].url },
-        });
-        if (fnError) throw new Error(fnError.message || "Extraction failed");
-        if (!data?.success) throw new Error(data?.error || "Could not extract product details");
-        const product: ExtractedProduct = data.product ?? {};
+        const product = await invokeProductExtract(initial[i].url);
         setBulkRows((rows) =>
           rows.map((r, idx) => (idx === i ? { ...r, status: "success", product } : r)),
         );
@@ -542,12 +567,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     if (!row || bulkRunning) return;
     setBulkRows((rows) => rows.map((r, i) => (i === idx ? { ...r, status: "fetching", error: undefined } : r)));
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("product-extract", {
-        body: { url: row.url },
-      });
-      if (fnError) throw new Error(fnError.message || "Extraction failed");
-      if (!data?.success) throw new Error(data?.error || "Could not extract product details");
-      const product: ExtractedProduct = data.product ?? {};
+      const product = await invokeProductExtract(row.url);
       setBulkRows((rows) => rows.map((r, i) => (i === idx ? { ...r, status: "success", product } : r)));
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Something went wrong";

@@ -11,10 +11,12 @@
 //
 // Pre-populates 3 starter files on first open if the user has none.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Brain, Plus, Save, Trash2, Loader2, FlaskConical, BookOpen, FileText, RotateCcw,
+  Upload, Download,
 } from "lucide-react";
+import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -163,6 +165,10 @@ export default function ClaudeSkillsLibrary() {
   const [testing, setTesting] = useState(false);
   const [testOutput, setTestOutput] = useState<string | null>(null);
   const [testTaskType, setTestTaskType] = useState<string>("extraction");
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(() => skills.find((s) => s.id === selectedId) || null, [skills, selectedId]);
   const dirty = selected
@@ -318,6 +324,86 @@ export default function ClaudeSkillsLibrary() {
     }
   };
 
+  const handleImportFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setImporting(true);
+    setImportSummary(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { toast.error("Not signed in"); return; }
+
+      const mdFiles = Array.from(files).filter((f) => /\.md$/i.test(f.name));
+      if (mdFiles.length === 0) {
+        toast.error("No .md files found", { description: "Drop or select markdown skill files." });
+        return;
+      }
+
+      const rows = await Promise.all(mdFiles.map(async (f) => {
+        const content = await f.text();
+        const slug = f.name
+          .replace(/\.md$/i, "")
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "");
+        return {
+          user_id: user.id,
+          skill_name: slug,
+          content,
+          task_types: ["extraction"],
+          is_global: false,
+        };
+      }));
+
+      const { error } = await supabase
+        .from("claude_skills")
+        .upsert(rows as never, { onConflict: "user_id,skill_name" });
+
+      if (error) {
+        toast.error("Import failed", { description: error.message });
+        return;
+      }
+
+      const summary = `${rows.length} skill file${rows.length === 1 ? "" : "s"} imported — click any supplier to review`;
+      setImportSummary(summary);
+      toast.success(summary);
+      await load();
+    } catch (err) {
+      toast.error("Import failed", { description: err instanceof Error ? err.message : "Unknown" });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleExportZip = async () => {
+    if (skills.length === 0) {
+      toast.error("Nothing to export");
+      return;
+    }
+    setExporting(true);
+    try {
+      const zip = new JSZip();
+      for (const s of skills) {
+        zip.file(`${s.skill_name}.md`, s.content || "");
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `claude-skills-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${skills.length} skill file${skills.length === 1 ? "" : "s"}`);
+    } catch (err) {
+      toast.error("Export failed", { description: err instanceof Error ? err.message : "Unknown" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleResetStarters = async () => {
     if (!confirm("Re-create the starter skill files? Existing ones with the same name will be updated.")) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -339,7 +425,23 @@ export default function ClaudeSkillsLibrary() {
           <h3 className="text-sm font-semibold">Skills Library</h3>
           <Badge variant="outline" className="text-[10px]">Claude</Badge>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".md,text/markdown"
+            multiple
+            className="hidden"
+            onChange={(e) => handleImportFiles(e.target.files)}
+          />
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Upload className="w-3.5 h-3.5 mr-1" />}
+            Import skills files
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleExportZip} disabled={exporting || skills.length === 0}>
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Download className="w-3.5 h-3.5 mr-1" />}
+            Download all as .zip
+          </Button>
           <Button size="sm" variant="ghost" onClick={handleResetStarters}>
             <RotateCcw className="w-3.5 h-3.5 mr-1" /> Restore starters
           </Button>
@@ -348,6 +450,12 @@ export default function ClaudeSkillsLibrary() {
           </Button>
         </div>
       </div>
+
+      {importSummary && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-foreground">
+          {importSummary}
+        </div>
+      )}
 
       <p className="text-xs text-muted-foreground">
         Skill files are merchant-curated markdown rule books that get injected at the top of every Claude prompt. Use them to teach Claude your store's vocabulary, sizing, brands, and conventions.

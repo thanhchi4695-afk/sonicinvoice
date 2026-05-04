@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
-import { ChevronLeft, Activity, Check, AlertTriangle, Loader2, Eye, ShoppingCart, Pencil, Store, Download, Upload, ExternalLink, Copy, ChevronDown, ChevronUp, Globe } from "lucide-react";
+import { ChevronLeft, Activity, Check, AlertTriangle, Loader2, Eye, ShoppingCart, Pencil, Store, Download, Upload, ExternalLink, Copy, ChevronDown, ChevronUp, Globe, Image as ImageIcon, CheckCircle2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +9,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getActiveDirectStore } from "@/lib/shopify-direct";

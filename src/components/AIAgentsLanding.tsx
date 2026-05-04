@@ -20,6 +20,7 @@ const AIAgentsLanding = ({
   onNavigateFlow,
 }: AIAgentsLandingProps) => {
   const [active, setActive] = useState<AgentId | null>(null);
+  const [showVideo, setShowVideo] = useState(false);
 
   // Map each agent to its primary quick-start action.
   const quickStartFor = (id: AgentId): { label: string; onClick: () => void } => {

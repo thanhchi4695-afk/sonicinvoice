@@ -188,7 +188,7 @@ const BottomTabBar = ({ activeTab, onTabChange }: BottomTabBarProps) => {
             className="fixed inset-0 z-50 bg-black/60 lg:hidden animate-fade-in"
             onClick={() => setOpenGroup(null)}
           />
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border rounded-t-2xl pb-safe lg:hidden animate-slide-in-up">
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border rounded-t-2xl pb-safe lg:hidden animate-fade-in">
             <div className="flex items-center justify-between px-5 pt-4 pb-2">
               <h3 className="text-base font-semibold text-foreground">{openGroup.label}</h3>
               <button

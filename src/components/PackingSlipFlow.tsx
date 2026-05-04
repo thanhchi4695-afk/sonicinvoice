@@ -549,6 +549,83 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
     );
   }
 
+  // ─── PAIR PROMPT STEP ───
+  if (step === "pair_prompt") {
+    return (
+      <div className="px-4 pt-2 pb-24 animate-fade-in">
+        <button onClick={() => setStep("upload")} className="flex items-center gap-1 text-sm text-muted-foreground mb-4 active:text-foreground">
+          <ChevronLeft className="w-4 h-4" /> Back
+        </button>
+
+        <div className="flex items-center gap-2 mb-1">
+          <Link2 className="w-5 h-5 text-primary" />
+          <h1 className="text-xl font-bold font-display">Pair with tax invoice?</h1>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          {supplier ? <><span className="font-medium">{supplier}</span> sends</> : "This supplier sends"} packing lists without cost data.
+          Upload the matching tax invoice to add pricing.
+        </p>
+
+        <div className="bg-card border border-border rounded-lg p-4 mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Package className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-semibold">Packing slip extracted</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {items.length} items · {grouped.length} grouped products · qty data ready
+          </p>
+        </div>
+
+        <Button
+          variant="teal"
+          className="w-full h-11 text-sm gap-2 mb-2"
+          onClick={() => taxInvoiceInputRef.current?.click()}
+        >
+          <Receipt className="w-4 h-4" /> Upload tax invoice
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full h-11 text-sm gap-2"
+          onClick={handleSkipPairing}
+        >
+          Skip — {markupMultiplier ? `use ÷${markupMultiplier} markup formula` : "no costs (set markup later)"}
+        </Button>
+
+        <input
+          ref={taxInvoiceInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.csv,.xlsx,.xls"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleTaxInvoiceUpload(file);
+          }}
+        />
+
+        <div className="mt-6 bg-muted/30 rounded-lg p-4">
+          <h3 className="text-xs font-semibold mb-2">How pairing works:</h3>
+          <ul className="text-xs text-muted-foreground space-y-1">
+            <li>1. We read cost &amp; RRP from the tax invoice</li>
+            <li>2. Match by SKU first, then by product title</li>
+            <li>3. Merge cost data into your packing-list line items</li>
+            <li>4. Source labels show where each value came from</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── PAIRING (loading) STEP ───
+  if (step === "pairing") {
+    return (
+      <div className="px-4 pt-2 pb-24 animate-fade-in flex flex-col items-center justify-center min-h-[50vh]">
+        <Loader2 className="w-8 h-8 text-primary animate-spin mb-4" />
+        <p className="text-sm font-medium">Reading tax invoice &amp; matching items…</p>
+        <p className="text-xs text-muted-foreground mt-1">Matching by SKU, then by product title</p>
+      </div>
+    );
+  }
+
   // ─── REVIEW STEP ───
   const tabs: { key: ReviewTab; label: string; count: number; icon: React.ReactNode; colorClass: string }[] = [
     { key: "accepted", label: "Accepted", count: accepted.length, icon: <Check className="w-3.5 h-3.5" />, colorClass: "text-success" },

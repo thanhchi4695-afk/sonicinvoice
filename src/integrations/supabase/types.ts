@@ -2283,6 +2283,33 @@ export type Database = {
         }
         Relationships: []
       }
+      multi_brand_suppliers: {
+        Row: {
+          brand_rules: Json
+          created_at: string
+          id: string
+          invoice_company_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_rules?: Json
+          created_at?: string
+          id?: string
+          invoice_company_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_rules?: Json
+          created_at?: string
+          id?: string
+          invoice_company_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_connections: {
         Row: {
           access_token: string | null

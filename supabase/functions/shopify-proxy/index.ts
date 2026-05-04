@@ -459,19 +459,20 @@ Deno.serve(async (req) => {
           });
         }
 
-        if ((graphqlData as { errors?: unknown }).errors) {
+        const gqlAny = graphqlData as { errors?: unknown; data?: { productCreate?: { product?: unknown; userErrors?: { field?: string[]; message: string }[] } } };
+        if (gqlAny.errors) {
           return new Response(JSON.stringify({
             error: "GraphQL errors",
-            details: graphqlData.errors,
+            details: gqlAny.errors,
           }), {
             status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        const productResult = graphqlData.data?.productCreate;
-        if (productResult?.userErrors?.length > 0) {
+        const productResult = gqlAny.data?.productCreate;
+        if (productResult?.userErrors && productResult.userErrors.length > 0) {
           return new Response(JSON.stringify({
-            error: productResult.userErrors.map((e: { message: string }) => e.message).join(", "),
+            error: productResult.userErrors.map((e) => e.message).join(", "),
             details: productResult.userErrors,
           }), {
             status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

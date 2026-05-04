@@ -457,14 +457,14 @@ export default function ClaudeSkillsLibrary() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".md,text/markdown"
+            accept=".md,text/markdown,.zip,application/zip,application/x-zip-compressed"
             multiple
             className="hidden"
             onChange={(e) => handleImportFiles(e.target.files)}
           />
-          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing} title="Select .md files or a .zip containing them">
             {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Upload className="w-3.5 h-3.5 mr-1" />}
-            Import skills files
+            Import .md or .zip
           </Button>
           <Button size="sm" variant="outline" onClick={handleExportZip} disabled={exporting || skills.length === 0}>
             {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Download className="w-3.5 h-3.5 mr-1" />}

@@ -1147,10 +1147,19 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
                       <Sparkles className="w-3 h-3" /> AI suggestion
                     </p>
                     <p className="text-xs">{generateAltSuggestion(altEditRow)}</p>
-                    <Button size="sm" variant="ghost" className="text-[11px] h-7 mt-1"
-                      onClick={() => setAltDraft(generateAltSuggestion(altEditRow))}>
-                      Use AI suggestion
-                    </Button>
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      <Button size="sm" variant="ghost" className="text-[11px] h-7"
+                        onClick={() => setAltDraft(generateAltSuggestion(altEditRow))}
+                        disabled={altAiLoading}>
+                        Use template
+                      </Button>
+                      <Button size="sm" variant="ghost" className="text-[11px] h-7 gap-1"
+                        onClick={handleAltAiClick}
+                        disabled={altAiLoading}>
+                        {altAiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        {altEditRow.product.description ? "Generate with AI" : "Generate (no description)"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

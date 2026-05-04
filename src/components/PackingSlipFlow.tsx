@@ -169,8 +169,39 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [processMode, setProcessMode] = useState<ProcessMode>("create");
   const [docConfidence, setDocConfidence] = useState(0);
+  const [packingListSuppliers, setPackingListSuppliers] = useState<string[]>([
+    "Tigerlily", "Smelly Balls", "Sky Gazer",
+  ]);
+  const [markupMultiplier, setMarkupMultiplier] = useState<number | null>(null);
+  const [pairedInvoiceName, setPairedInvoiceName] = useState<string | null>(null);
+  const [pairStats, setPairStats] = useState<{ matched: number; unmatched: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const taxInvoiceInputRef = useRef<HTMLInputElement>(null);
   const mode = useStoreMode();
+
+  // Load packing-list suppliers list from user_settings
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("user_settings")
+        .select("packing_list_suppliers")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const pls = (data as { packing_list_suppliers?: string[] } | null)?.packing_list_suppliers;
+      if (Array.isArray(pls) && pls.length) setPackingListSuppliers(pls);
+    })();
+  }, []);
+
+  const isPackingListSupplier = (name: string): boolean => {
+    if (!name) return false;
+    const norm = name.toLowerCase().replace(/pty\s*ltd|australia|\bpty\b|\bltd\b/g, "").trim();
+    return packingListSuppliers.some((s) => {
+      const sNorm = s.toLowerCase().replace(/pty\s*ltd|australia|\bpty\b|\bltd\b/g, "").trim();
+      return sNorm && (norm.includes(sNorm) || sNorm.includes(norm));
+    });
+  };
 
   // Upload & parse
   const handleFileUpload = async (file: File) => {

@@ -801,10 +801,18 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
 
       {/* Product table */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          total={current.length}
+          pageSize={PAGE_SIZE}
+          onChange={setPage}
+        />
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-8">
+              <TableHead className="w-10">
                 <Checkbox
                   checked={selected.size === current.length && current.length > 0}
                   onCheckedChange={() => {
@@ -813,44 +821,143 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
                   }}
                 />
               </TableHead>
-              <TableHead className="text-xs">Product</TableHead>
-              <TableHead className="text-xs hidden sm:table-cell">Gender</TableHead>
-              <TableHead className="text-xs hidden sm:table-cell">Age</TableHead>
-              <TableHead className="text-xs">Color</TableHead>
+              <TableHead className="text-xs w-[320px]">Product</TableHead>
+              <TableHead className="text-xs w-[200px] hidden md:table-cell">Alt Text</TableHead>
+              <TableHead className="text-xs w-[160px] hidden md:table-cell">Gender / Age / Colour</TableHead>
+              <TableHead className="text-xs w-12 text-center">Google</TableHead>
+              <TableHead className="text-xs w-12 text-center hidden md:table-cell">Meta</TableHead>
+              <TableHead className="text-xs w-12 text-center hidden md:table-cell">Pinterest</TableHead>
+              <TableHead className="text-xs w-[280px]">Merchant Center Errors</TableHead>
               <TableHead className="text-xs w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {current.slice(0, 100).map(r => (
+            {paginatedRows.map(r => {
+              const warnings = getMerchantCenterWarnings(r);
+              const productUrl = directStore?.storeUrl
+                ? `https://${directStore.storeUrl}/products/${r.product.handle}`
+                : "#";
+              return (
               <TableRow key={r.product.id}>
                 <TableCell>
                   <Checkbox checked={selected.has(r.product.id)} onCheckedChange={() => toggleSelect(r.product.id)} />
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    {r.product.imageUrl && (
-                      <img src={r.product.imageUrl} alt="" className="w-7 h-7 rounded object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                    )}
+                  <div className="flex items-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => r.product.imageUrl && setLightboxUrl(r.product.imageUrl)}
+                      className="w-16 h-16 rounded-lg border border-border overflow-hidden shrink-0 bg-muted hover:opacity-90 transition-opacity"
+                      aria-label="Preview product image"
+                    >
+                      {r.product.imageUrl ? (
+                        <img
+                          src={r.product.imageUrl}
+                          alt={r.product.altText || ""}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                          <ImageIcon className="w-6 h-6" />
+                        </div>
+                      )}
+                    </button>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium truncate max-w-[180px]">{r.product.title}</p>
-                      <p className="text-[10px] text-muted-foreground">{r.product.vendor}</p>
+                      <a
+                        href={productUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-medium text-primary hover:underline line-clamp-2"
+                      >
+                        {r.product.title}
+                      </a>
+                      <p className="text-xs text-muted-foreground mt-0.5">{r.product.vendor}</p>
+                      {r.product.variants?.[0]?.sku && (
+                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">SKU: {r.product.variants[0].sku}</p>
+                      )}
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="hidden sm:table-cell">
-                  <InlineEdit value={r.detected.gender} confidence={r.detected.genderConf} options={["female", "male", "unisex"]}
-                    onSave={v => updateDetected(r.product.id, "gender", v)} />
+                <TableCell className="hidden md:table-cell align-top">
+                  <div className="max-w-[200px]">
+                    {r.product.altText ? (
+                      <div className="group relative">
+                        <p className="text-xs text-foreground line-clamp-2 group-hover:line-clamp-none transition-all">
+                          {r.product.altText}
+                        </p>
+                        <button onClick={() => openAltTextEdit(r)} className="text-[10px] text-primary hover:underline mt-1">
+                          Edit
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge variant="destructive" className="text-[10px]">Missing alt text</Badge>
+                        <button onClick={() => openAltTextEdit(r)} className="text-[10px] text-primary hover:underline">
+                          Add
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </TableCell>
-                <TableCell className="hidden sm:table-cell">
-                  <InlineEdit value={r.detected.ageGroup} confidence={r.detected.ageConf} options={["adult", "kids", "toddler", "infant", "newborn"]}
-                    onSave={v => updateDetected(r.product.id, "ageGroup", v)} />
+                <TableCell className="hidden md:table-cell align-top">
+                  <div className="space-y-1">
+                    <InlineEdit value={r.detected.gender} confidence={r.detected.genderConf} options={["female", "male", "unisex"]}
+                      onSave={v => updateDetected(r.product.id, "gender", v)} />
+                    <InlineEdit value={r.detected.ageGroup} confidence={r.detected.ageConf} options={["adult", "kids", "toddler", "infant", "newborn"]}
+                      onSave={v => updateDetected(r.product.id, "ageGroup", v)} />
+                    {r.detected.color ? (
+                      <InlineEdit value={r.detected.color} confidence={r.detected.colorConf}
+                        onSave={v => updateDetected(r.product.id, "color", v)} />
+                    ) : (
+                      <Badge variant="destructive" className="text-[10px]">No colour</Badge>
+                    )}
+                  </div>
                 </TableCell>
-                <TableCell>
-                  {r.detected.color ? (
-                    <InlineEdit value={r.detected.color} confidence={r.detected.colorConf}
-                      onSave={v => updateDetected(r.product.id, "color", v)} />
+                <TableCell className="text-center align-middle">
+                  <StatusDot status={getChannelStatus(r, "google")} label="Google Shopping" />
+                </TableCell>
+                <TableCell className="text-center align-middle hidden md:table-cell">
+                  <StatusDot status={getChannelStatus(r, "meta")} label="Meta Catalog" />
+                </TableCell>
+                <TableCell className="text-center align-middle hidden md:table-cell">
+                  <StatusDot status={getChannelStatus(r, "pinterest")} label="Pinterest" />
+                </TableCell>
+                <TableCell className="align-top">
+                  {warnings.length === 0 ? (
+                    <div className="flex items-center gap-1 text-success text-[11px]">
+                      <CheckCircle2 className="w-4 h-4" /> All good
+                    </div>
                   ) : (
-                    <Badge variant="destructive" className="text-[10px]">Missing</Badge>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="space-y-1 text-left w-full">
+                          {warnings.slice(0, 2).map((w, i) => (
+                            <div key={i} className="flex items-start gap-1">
+                              <AlertTriangle className="w-3 h-3 text-secondary shrink-0 mt-0.5" />
+                              <span className="text-[10px] text-foreground leading-tight">{w}</span>
+                            </div>
+                          ))}
+                          {warnings.length > 2 && (
+                            <span className="text-[10px] text-primary hover:underline">
+                              +{warnings.length - 2} more
+                            </span>
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80">
+                        <p className="text-xs font-semibold mb-2">Merchant Center issues</p>
+                        <ul className="space-y-1.5">
+                          {warnings.map((w, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs">
+                              <AlertTriangle className="w-3.5 h-3.5 text-secondary shrink-0 mt-0.5" />
+                              <span>{w}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </TableCell>
                 <TableCell>
@@ -859,15 +966,73 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
                   </button>
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
           </TableBody>
         </Table>
-        {current.length > 100 && (
-          <div className="p-2 text-center text-xs text-muted-foreground border-t border-border">
-            Showing first 100 of {current.length.toLocaleString()} products
-          </div>
-        )}
+        </div>
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          total={current.length}
+          pageSize={PAGE_SIZE}
+          onChange={setPage}
+        />
       </div>
+
+      {/* Lightbox for product image */}
+      <Dialog open={!!lightboxUrl} onOpenChange={open => { if (!open) setLightboxUrl(null); }}>
+        <DialogContent className="max-w-md p-2">
+          {lightboxUrl && (
+            <img src={lightboxUrl} alt="Product preview" className="w-full h-auto rounded-md" />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Alt text editor */}
+      <Dialog open={!!altEditRow} onOpenChange={open => { if (!open) setAltEditRow(null); }}>
+        <DialogContent className="max-w-lg">
+          {altEditRow && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-sm">Edit image alt text</DialogTitle>
+                <DialogDescription className="text-xs truncate">{altEditRow.product.title}</DialogDescription>
+              </DialogHeader>
+              <div className="flex gap-3">
+                {altEditRow.product.imageUrl && (
+                  <img src={altEditRow.product.imageUrl} alt="" className="w-24 h-24 rounded-md border border-border object-cover shrink-0" />
+                )}
+                <div className="flex-1 space-y-2">
+                  <Textarea
+                    value={altDraft}
+                    onChange={e => setAltDraft(e.target.value)}
+                    placeholder="Describe the image (used for SEO and accessibility)"
+                    className="text-xs min-h-[80px]"
+                  />
+                  <div className="bg-muted/40 rounded p-2">
+                    <p className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> AI suggestion
+                    </p>
+                    <p className="text-xs">{generateAltSuggestion(altEditRow)}</p>
+                    <Button size="sm" variant="ghost" className="text-[11px] h-7 mt-1"
+                      onClick={() => setAltDraft(generateAltSuggestion(altEditRow))}>
+                      Use AI suggestion
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-2">
+                <Button variant="outline" size="sm" onClick={() => setAltEditRow(null)} disabled={altSaving}>Cancel</Button>
+                <Button variant="outline" size="sm" onClick={() => saveAltText(true)} disabled={altSaving || !altDraft.trim()}>
+                  Save & next
+                </Button>
+                <Button variant="teal" size="sm" onClick={() => saveAltText(false)} disabled={altSaving || !altDraft.trim()}>
+                  {altSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Detail modal */}
       <Dialog open={!!detailRow} onOpenChange={open => { if (!open) setDetailRow(null); }}>

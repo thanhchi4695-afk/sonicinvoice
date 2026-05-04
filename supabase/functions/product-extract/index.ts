@@ -414,7 +414,7 @@ async function extractWithLLM(html: string, sourceUrl: string): Promise<Extracte
           {
             role: "system",
             content:
-              "Extract product info from raw HTML. Return strictly via the provided tool. Use the page's stated currency; do not guess.",
+              "Extract product info from raw HTML. Use the *body product description shown beneath the product image*, NOT the SEO meta description. Capture all selectable colour and size options. Return strictly via the provided tool. Use the page's stated currency; do not guess.",
           },
           { role: "user", content: `URL: ${sourceUrl}\n\nHTML:\n${trimmed}` },
         ],
@@ -428,10 +428,12 @@ async function extractWithLLM(html: string, sourceUrl: string): Promise<Extracte
                 type: "object",
                 properties: {
                   name: { type: "string" },
-                  description: { type: "string" },
+                  description: { type: "string", description: "On-page body description below the product image (not the meta SEO description)." },
                   price: { type: "string", description: "Numeric price as string, no currency symbol" },
                   currency: { type: "string", description: "ISO 4217 code if known" },
                   imageUrls: { type: "array", items: { type: "string" } },
+                  colors: { type: "array", items: { type: "string" }, description: "Distinct colour option labels available on this product page" },
+                  sizes: { type: "array", items: { type: "string" }, description: "Distinct size option labels available on this product page" },
                 },
                 required: ["name", "imageUrls"],
                 additionalProperties: false,
@@ -464,6 +466,8 @@ async function extractWithLLM(html: string, sourceUrl: string): Promise<Extracte
       price: parsed.price ?? null,
       currency: parsed.currency ?? null,
       imageUrls: Array.isArray(parsed.imageUrls) ? parsed.imageUrls : [],
+      colors: Array.isArray(parsed.colors) ? uniqClean(parsed.colors) : [],
+      sizes: Array.isArray(parsed.sizes) ? uniqClean(parsed.sizes) : [],
       sourceUrl,
     };
   } catch (e) {

@@ -656,6 +656,7 @@ Deno.serve(async (req) => {
       },
     });
 
+    await broadcastStep(4, "Done");
     return jsonResponse({
       success: true,
       product: {
@@ -690,6 +691,10 @@ Deno.serve(async (req) => {
     });
     const status = message.toLowerCase().includes("timeout") || message.includes("aborted") ? 504 : 500;
     return jsonResponse({ success: false, error: message }, status);
+  } finally {
+    if (progressChannel && progressClient) {
+      try { await progressClient.removeChannel(progressChannel); } catch { /* ignore */ }
+    }
   }
 });
 

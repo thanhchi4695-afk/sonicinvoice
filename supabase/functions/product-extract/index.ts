@@ -98,6 +98,8 @@ interface ExtractedProduct {
   price: string | null;          // raw price string as found on page
   currency: string | null;       // ISO 4217 code if known, else raw symbol
   imageUrls: string[];           // raw image URLs prior to download/optimise
+  colors: string[];              // distinct colour option values found on page
+  sizes: string[];               // distinct size option values found on page
   sourceUrl: string;
 }
 

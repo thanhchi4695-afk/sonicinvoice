@@ -15,6 +15,8 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getLocations, findVariantBySKU, setInventory } from "@/lib/shopify-api";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/ui/empty-state";
 
 /* ─── Types ─── */
 interface StocktakeRow {
@@ -491,29 +493,32 @@ export default function StocktakeModule({ onBack }: { onBack: () => void }) {
   if (screen === "list") {
     return (
       <div className="p-6 max-w-7xl mx-auto space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onBack}>
-              <ArrowLeft className="w-4 h-4 mr-1" /> Back
+        <PageHeader
+          eyebrow={
+            <button onClick={onBack} className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back
+            </button>
+          }
+          title="Stocktakes"
+          subtitle="Count physical inventory and reconcile variance back to your store."
+          actions={
+            <Button variant="teal" size="sm" onClick={openNew}>
+              <Plus className="w-4 h-4 mr-1" /> New Stocktake
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <ClipboardCheck className="w-6 h-6 text-primary" /> Stocktakes
-              </h1>
-              <p className="text-sm text-muted-foreground">Count physical inventory and reconcile with Shopify</p>
-            </div>
-          </div>
-          <Button onClick={openNew}>
-            <Plus className="w-4 h-4 mr-1" /> New Stocktake
-          </Button>
-        </div>
+          }
+        />
 
         <Card>
           <CardContent className="p-0">
             {loading ? (
               <div className="p-12 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
             ) : stocktakes.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">No stocktakes yet — create your first one</div>
+              <EmptyState
+                icon={ClipboardCheck}
+                title="No stocktakes yet"
+                body="Create your first count to reconcile physical stock with your store."
+                cta={{ label: "Start a stocktake", variant: "teal", onClick: openNew }}
+              />
             ) : (
               <Table>
                 <TableHeader>

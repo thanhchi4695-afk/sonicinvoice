@@ -417,7 +417,7 @@ Deno.serve(async (req) => {
           mediaContentType: "IMAGE",
         }));
 
-        const graphqlResp = await fetch(`${baseUrl.replace(`/api/${conn.api_version}`, "")}/admin/api/${conn.api_version}/graphql.json`, {
+        const graphqlResp = await fetch(`${baseUrl}/graphql.json`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

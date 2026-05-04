@@ -2300,6 +2300,19 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       } else {
         setFilenameMismatch(null);
       }
+      // Multi-brand DISTRIBUTOR detected (e.g. Function Design Group → Lulalife
+      // + Rubyyaya). The classifier loaded skill files for every mapped brand.
+      if (data.distributor_match && data.distributor_match.skill_files_loaded > 0) {
+        const brands: string[] = Array.isArray(data.distributor_match.brands_loaded)
+          ? data.distributor_match.brands_loaded
+          : [];
+        console.log(
+          `[Sonic Invoice] Distributor "${data.distributor_match.company_name}" — loaded ${data.distributor_match.skill_files_loaded} brand skill file(s): ${brands.join(", ")}`,
+        );
+        toast(`Distributor: ${data.distributor_match.company_name}`, {
+          description: `Loaded ${data.distributor_match.skill_files_loaded} brand skill file${data.distributor_match.skill_files_loaded === 1 ? "" : "s"}: ${brands.join(", ")}`,
+        });
+      }
       if (data.field_confidence && typeof data.field_confidence === "object") {
         setAiFieldConfidence(data.field_confidence as Record<string, number>);
       }

@@ -257,20 +257,69 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
   useEffect(() => { void refreshShopifyConnection(); }, []);
 
   // Build a Shopify draft product payload from an ImportedLineItem.
-  const lineItemToPushProduct = (item: ImportedLineItem): PushProduct => ({
-    title: item.name || "Imported product",
-    body_html: item.description || "",
-    status: "draft",
-    images: (item.imageUrls || []).filter(Boolean).map((src) => ({ src })),
-    variants: [
-      {
-        price: item.price !== undefined && Number.isFinite(item.price) ? String(item.price) : "0",
-        sku: "",
-        inventory_management: "shopify",
-        inventory_quantity: 0,
-      },
-    ],
-  });
+  // Honors Colour-first / Size-second ordering per project rules.
+  const lineItemToPushProduct = (item: ImportedLineItem): PushProduct => {
+    const colors = (item.colors ?? []).filter(Boolean);
+    const sizes = (item.sizes ?? []).filter(Boolean);
+    const priceStr =
+      item.price !== undefined && Number.isFinite(item.price) ? String(item.price) : "0";
+
+    const options: { name: string }[] = [];
+    if (colors.length) options.push({ name: "Colour" });
+    if (sizes.length) options.push({ name: "Size" });
+
+    const variants =
+      colors.length && sizes.length
+        ? colors.flatMap((c) =>
+            sizes.map((s) => ({
+              option1: c,
+              option2: s,
+              price: priceStr,
+              sku: "",
+              inventory_management: "shopify",
+              inventory_quantity: 0,
+            })),
+          )
+        : colors.length
+          ? colors.map((c) => ({
+              option1: c,
+              price: priceStr,
+              sku: "",
+              inventory_management: "shopify",
+              inventory_quantity: 0,
+            }))
+          : sizes.length
+            ? sizes.map((s) => ({
+                option1: s,
+                price: priceStr,
+                sku: "",
+                inventory_management: "shopify",
+                inventory_quantity: 0,
+              }))
+            : [
+                {
+                  price: priceStr,
+                  sku: "",
+                  inventory_management: "shopify",
+                  inventory_quantity: 0,
+                },
+              ];
+
+    // When only sizes are present, the single option must be named "Size"
+    if (!colors.length && sizes.length) {
+      options.length = 0;
+      options.push({ name: "Size" });
+    }
+
+    return {
+      title: item.name || "Imported product",
+      body_html: item.description || "",
+      status: "draft",
+      images: (item.imageUrls || []).filter(Boolean).map((src) => ({ src })),
+      ...(options.length ? { options } : {}),
+      variants,
+    };
+  };
 
   // Push one or many imported items to Shopify as draft products.
   const pushItemsToShopify = async (items: ImportedLineItem[]): Promise<boolean> => {

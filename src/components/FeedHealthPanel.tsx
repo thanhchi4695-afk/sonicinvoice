@@ -276,6 +276,94 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
   const current = filtered();
   const autoReady = rows.filter(r => r.detected.genderConf !== "low" && r.detected.ageConf !== "low" && r.detected.color).length;
 
+  // Reset page when tab changes
+  useEffect(() => { setPage(1); }, [tab]);
+  const totalPages = Math.max(1, Math.ceil(current.length / PAGE_SIZE));
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return current.slice(start, start + PAGE_SIZE);
+  }, [current, page]);
+
+  // Merchant Center warnings derived from detected attributes
+  const getMerchantCenterWarnings = (row: FeedHealthRow): string[] => {
+    const w: string[] = [];
+    if (!row.detected.gender) w.push("gender field required for apparel category");
+    if (!row.detected.ageGroup) w.push("age_group required for apparel targeting");
+    if (!row.detected.color) w.push("color field is invalid or missing");
+    const hasGtin = row.product.variants?.some(v => v.barcode && v.barcode.length >= 8);
+    if (!hasGtin) w.push("Missing identifier: Brand + GTIN or Brand + MPN required");
+    if (row.product.imageUrl && row.product.imageWidth && row.product.imageWidth < 250) {
+      w.push("Image too small — minimum 250×250px for Shopping");
+    }
+    if (!row.product.altText) w.push("Image alt text missing — required for accessibility");
+    return w;
+  };
+
+  const getChannelStatus = (row: FeedHealthRow, channel: "google" | "meta" | "pinterest"): "ok" | "warning" | "error" => {
+    const w = getMerchantCenterWarnings(row);
+    const critical = w.filter(x => x.includes("required"));
+    if (channel === "google") {
+      if (critical.length > 0) return "error";
+      if (w.length > 0) return "warning";
+      return "ok";
+    }
+    if (channel === "meta") {
+      if (!row.product.description) return "warning";
+      return w.length > 0 ? "warning" : "ok";
+    }
+    return w.length > 0 ? "warning" : "ok";
+  };
+
+  const generateAltSuggestion = (row: FeedHealthRow): string => {
+    const parts = [row.product.vendor, row.product.title, row.detected.color].filter(Boolean);
+    return parts.join(" ").trim();
+  };
+
+  const openAltTextEdit = (row: FeedHealthRow) => {
+    setAltEditRow(row);
+    setAltDraft(row.product.altText || "");
+  };
+
+  const saveAltText = async (advance = false) => {
+    if (!altEditRow) return;
+    const text = altDraft.trim();
+    const imageId = altEditRow.product.imageId;
+    if (!imageId) {
+      toast.error("No image found on product");
+      return;
+    }
+    setAltSaving(true);
+    try {
+      // Update via Shopify image alt — uses REST update_image action; falls back gracefully
+      await callProxy({
+        action: "update_image_alt",
+        product_id: altEditRow.product.id.replace("gid://shopify/Product/", ""),
+        image_id: imageId,
+        alt: text,
+      });
+      setRows(prev => prev.map(r => r.product.id === altEditRow.product.id
+        ? { ...r, product: { ...r.product, altText: text }, edited: true }
+        : r));
+      toast.success("Alt text updated");
+      if (advance) {
+        const nextMissing = current.find(r =>
+          r.product.id !== altEditRow.product.id && !r.product.altText
+        );
+        if (nextMissing) {
+          setAltEditRow(nextMissing);
+          setAltDraft("");
+          return;
+        }
+      }
+      setAltEditRow(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update alt text");
+    } finally {
+      setAltSaving(false);
+    }
+  };
+
+
   // ── CURRENCY HELPERS ──────────────────────────
   const addSecondaryCountry = () => setSecondaryCountries(prev => [...prev, { country: "United States", currency: "USD" }]);
   const removeSecondaryCountry = (i: number) => setSecondaryCountries(prev => prev.filter((_, idx) => idx !== i));

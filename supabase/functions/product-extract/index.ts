@@ -574,6 +574,25 @@ Deno.serve(async (req) => {
       mergedUrls.push(u);
     }
 
+    // Enrich variants (colours / sizes) + body description.
+    // Try Shopify-style /products/<handle>.js first (fast, deterministic),
+    // then fall back to scraping swatch/select DOM patterns.
+    const shopifyJson = await fetchShopifyProductJson(url).catch(() => null);
+    const domVariants = extractVariantsFromDom($);
+    const colors = uniqClean([
+      ...(product.colors ?? []),
+      ...(shopifyJson?.colors ?? []),
+      ...domVariants.colors,
+    ]);
+    const sizes = uniqClean([
+      ...(product.sizes ?? []),
+      ...(shopifyJson?.sizes ?? []),
+      ...domVariants.sizes,
+    ]);
+    if (shopifyJson?.description && (!product.description || product.description.length < 30)) {
+      product.description = shopifyJson.description;
+    }
+
     // Step 5 — stream → optimise → store in `compressed-images`
     const imageResult = await withTimeout(
       downloadImages(mergedUrls, url),

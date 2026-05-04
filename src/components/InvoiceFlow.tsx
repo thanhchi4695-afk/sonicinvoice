@@ -5456,6 +5456,42 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         </div>
       )}
 
+      {/* Sticky approve bar — visible during Review step */}
+      {step === 3 && (
+        <StickyActionBar
+          leading={
+            <Button variant="ghost" size="sm" onClick={() => setStep(2)} className="gap-1">
+              <ChevronLeft className="w-3.5 h-3.5" /> Back
+            </Button>
+          }
+          center={
+            <span>
+              <span className="text-success font-medium">{confCounts.high} ready</span>
+              {" · "}
+              <span className="text-warning">{confCounts.medium} review</span>
+              {confCounts.low > 0 && (
+                <>
+                  {" · "}
+                  <span className="text-destructive">{confCounts.low} fix</span>
+                </>
+              )}
+              {" · "}
+              {productGroups.length} products
+            </span>
+          }
+          trailing={
+            <Button
+              variant="teal"
+              size="sm"
+              onClick={() => { finalizeQualityMetrics(); setStep(4); }}
+              className="gap-1"
+            >
+              Approve & continue <ChevronRight className="w-3.5 h-3.5" />
+            </Button>
+          }
+        />
+      )}
+
       {/* Step 4: Export Review */}
       {step === 4 && (
         <div className="px-4 pt-4 pb-24 animate-fade-in">

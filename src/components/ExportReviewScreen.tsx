@@ -611,6 +611,30 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multi
             </div>
       </div>
 
+      {filenameMismatch?.detected && (
+        <div className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+            <div className="flex-1 text-sm">
+              <p className="font-semibold">
+                ⚠️ Filename says "{filenameMismatch.expected_from_filename}" but invoice is from "{filenameMismatch.detected_supplier}". Using {filenameMismatch.detected_supplier}.
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                File: <span className="font-mono-data">{filenameMismatch.filename}</span>. The supplier was detected from the invoice header / ABN / SKU prefixes.
+              </p>
+              <div className="flex gap-2 mt-2">
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onDismissFilenameMismatch?.()}>
+                  Dismiss
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onOverrideFilenameMismatch?.()}>
+                  Override → use "{filenameMismatch.expected_from_filename}"
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {multiBrandSplit?.applied && brandList.length > 1 && (
         <div className="mb-4 rounded-lg border border-secondary/30 bg-secondary/10 p-3">
           <div className="flex items-start gap-2 mb-2">

@@ -152,6 +152,8 @@ export interface ImportedLineItem {
   currency?: string;
   imageUrls: string[];
   sourceUrl: string;
+  colors?: string[];
+  sizes?: string[];
 }
 
 export interface ExtractedProduct {
@@ -163,6 +165,8 @@ export interface ExtractedProduct {
   images?: Array<{ storedUrl: string; originalUrl?: string }>;
   sourceUrl?: string;
   extractedAt?: string;
+  colors?: string[];
+  sizes?: string[];
 }
 
 interface Props {
@@ -187,6 +191,10 @@ interface EditState {
   currency: string;
   images: Array<{ storedUrl: string; originalUrl?: string }>;
   primaryIndex: number;
+  availableColors: string[];   // all options found on the source page
+  availableSizes: string[];
+  selectedColors: string[];    // user-picked subset to stock
+  selectedSizes: string[];
 }
 
 type BulkStatus = "pending" | "fetching" | "success" | "error";

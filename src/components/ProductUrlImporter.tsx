@@ -538,8 +538,9 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     setStepIndex(0);
     clearStepTimers();
     // Advance steps on a rough schedule so the UI feels alive even though the
-    // edge function is a single round-trip. Last step waits for completion.
-    const schedule = [1500, 4000, 8000]; // ms — advances to step 1, 2, 3
+    // edge function is a single round-trip. The last step ("Preparing Shopify-ready
+    // fields") is reached quickly so users don't feel stuck if the page fetch is slow.
+    const schedule = [800, 2500, 5000]; // ms — advances to step 1, 2, 3
     schedule.forEach((delay, i) => {
       const id = window.setTimeout(() => setStepIndex(i + 1), delay);
       stepTimers.current.push(id);

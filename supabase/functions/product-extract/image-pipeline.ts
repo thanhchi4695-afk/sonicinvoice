@@ -20,12 +20,12 @@ import { decode, Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 
 const BUCKET = "compressed-images";
 const MAX_TOTAL_BYTES = 10 * 1024 * 1024;       // 10 MB kill-switch
-const PER_IMAGE_TIMEOUT_MS = 5_000;              // tightened from 8s
-const MAX_IMAGES = 4;                            // CPU-time safety on Edge runtime
+const PER_IMAGE_TIMEOUT_MS = 4_000;              // tightened from 5s
+const MAX_IMAGES = 3;                            // CPU-time safety on Edge runtime (was 4)
 const MAX_DIMENSION = 1600;                      // longest side
 const WEBP_QUALITY = 82;
 const SKIP_OPTIMISE_BYTES = 150 * 1024;          // <150KB → upload original, skip WASM decode
-const PIPELINE_BUDGET_MS = 12_000;               // total wall-clock budget for ALL images
+const PIPELINE_BUDGET_MS = 8_000;                // total wall-clock budget for ALL images (was 12s)
 
 const UA = "Mozilla/5.0 (compatible; SonicInvoiceBot/1.0; +https://sonicinvoices.com)";
 
@@ -65,10 +65,13 @@ function shortlistUrls(urls: string[], base: string): string[] {
   const out: string[] = [];
   for (const raw of urls) {
     if (!raw) continue;
-    const abs = absolutise(raw.trim(), base);
+    const trimmed = raw.trim();
+    // Skip data: URIs (lazy-load placeholders, tracking pixels)
+    if (/^data:/i.test(trimmed)) continue;
+    const abs = absolutise(trimmed, base);
     if (!abs) continue;
-    // Skip obvious non-product assets
-    if (/sprite|icon|logo|placeholder|1x1|pixel/i.test(abs)) continue;
+    // Skip obvious non-product assets and tiny placeholder/spacer gifs
+    if (/sprite|icon|logo|placeholder|1x1|pixel|spacer|blank\.gif|transparent\.gif/i.test(abs)) continue;
     if (seen.has(abs)) continue;
     seen.add(abs);
     out.push(abs);
@@ -229,6 +232,11 @@ export async function downloadImages(
 
     const { url, bytes, contentType, idx } = item;
     try {
+      // Drop tracking pixels / 1×1 spacers (anything < 1KB is not a product image)
+      if (bytes.byteLength < 1024) {
+        warnings.push(`Image ${url} skipped: too small (${bytes.byteLength}B — likely tracking pixel)`);
+        continue;
+      }
       totalBytesIn += bytes.byteLength;
       if (totalBytesIn > MAX_TOTAL_BYTES) {
         killSwitchTripped = true;

@@ -15,7 +15,8 @@ export default {
     extend: {
       fontFamily: {
         display: ["Syne", "sans-serif"],
-        body: ["Syne", "sans-serif"],
+        body: ["Inter", "system-ui", "sans-serif"],
+        sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["IBM Plex Mono", "monospace"],
       },
       colors: {
@@ -65,12 +66,43 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+          item: "hsl(var(--sidebar-item))",
+          "item-hover": "hsl(var(--sidebar-item-hover))",
+          "item-active": "hsl(var(--sidebar-item-active))",
         },
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          elevated: "hsl(var(--surface-elevated))",
+          sunken: "hsl(var(--surface-sunken))",
+        },
+        "accent-teal": "hsl(var(--accent-teal))",
+        "accent-amber": "hsl(var(--accent-amber))",
+        "accent-warning": "hsl(var(--accent-warning))",
+        "accent-danger": "hsl(var(--accent-danger))",
+        "accent-info": "hsl(var(--accent-info))",
+      },
+      spacing: {
+        "s1": "var(--space-1)",
+        "s2": "var(--space-2)",
+        "s3": "var(--space-3)",
+        "s4": "var(--space-4)",
+        "s5": "var(--space-5)",
+        "s6": "var(--space-6)",
+        "s7": "var(--space-7)",
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        "r-sm": "var(--radius-sm)",
+        "r-md": "var(--radius-md)",
+        "r-lg": "var(--radius-lg)",
+        pill: "var(--radius-pill)",
+      },
+      boxShadow: {
+        card: "var(--shadow-card)",
+        modal: "var(--shadow-modal)",
+        toast: "var(--shadow-toast)",
       },
       keyframes: {
         "accordion-down": {

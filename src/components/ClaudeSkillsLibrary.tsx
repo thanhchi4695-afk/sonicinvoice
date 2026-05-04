@@ -456,7 +456,6 @@ export default function ClaudeSkillsLibrary() {
           {importSummary}
         </div>
       )}
-      </div>
 
       <p className="text-xs text-muted-foreground">
         Skill files are merchant-curated markdown rule books that get injected at the top of every Claude prompt. Use them to teach Claude your store's vocabulary, sizing, brands, and conventions.

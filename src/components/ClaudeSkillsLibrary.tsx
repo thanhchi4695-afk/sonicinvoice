@@ -324,6 +324,86 @@ export default function ClaudeSkillsLibrary() {
     }
   };
 
+  const handleImportFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setImporting(true);
+    setImportSummary(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { toast.error("Not signed in"); return; }
+
+      const mdFiles = Array.from(files).filter((f) => /\.md$/i.test(f.name));
+      if (mdFiles.length === 0) {
+        toast.error("No .md files found", { description: "Drop or select markdown skill files." });
+        return;
+      }
+
+      const rows = await Promise.all(mdFiles.map(async (f) => {
+        const content = await f.text();
+        const slug = f.name
+          .replace(/\.md$/i, "")
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, "-")
+          .replace(/[^a-z0-9-]/g, "");
+        return {
+          user_id: user.id,
+          skill_name: slug,
+          content,
+          task_types: ["extraction"],
+          is_global: false,
+        };
+      }));
+
+      const { error } = await supabase
+        .from("claude_skills")
+        .upsert(rows as never, { onConflict: "user_id,skill_name" });
+
+      if (error) {
+        toast.error("Import failed", { description: error.message });
+        return;
+      }
+
+      const summary = `${rows.length} skill file${rows.length === 1 ? "" : "s"} imported — click any supplier to review`;
+      setImportSummary(summary);
+      toast.success(summary);
+      await load();
+    } catch (err) {
+      toast.error("Import failed", { description: err instanceof Error ? err.message : "Unknown" });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleExportZip = async () => {
+    if (skills.length === 0) {
+      toast.error("Nothing to export");
+      return;
+    }
+    setExporting(true);
+    try {
+      const zip = new JSZip();
+      for (const s of skills) {
+        zip.file(`${s.skill_name}.md`, s.content || "");
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `claude-skills-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${skills.length} skill file${skills.length === 1 ? "" : "s"}`);
+    } catch (err) {
+      toast.error("Export failed", { description: err instanceof Error ? err.message : "Unknown" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleResetStarters = async () => {
     if (!confirm("Re-create the starter skill files? Existing ones with the same name will be updated.")) return;
     const { data: { user } } = await supabase.auth.getUser();

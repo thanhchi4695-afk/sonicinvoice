@@ -157,8 +157,13 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
   let usedSavedProfile = false;
   const SAVED_PROFILE_MIN_CONFIDENCE = 20; // lowered from 70 — raise to 70 once 7+ invoices/supplier
 
-  // First try: saved profile by supplier hint OR filename token match
+  // First try: saved profile by supplier hint OR filename token match.
+  // We track WHICH signal matched so we can later detect filename-driven
+  // misclassification (e.g. "Sea Level Lost Paradise.pdf" is actually Bond-Eye).
   const hintSupplier = String(supplierName || "").trim();
+  let savedProfileMatchSource: "hint" | "filename" | null = null;
+  let filenameSupplierGuess: string | null = null;
+
   if (userId) {
     try {
       // Pull all candidate profiles meeting the confidence floor (cap 50 to be safe)
@@ -170,21 +175,47 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
         .limit(50);
 
       const fileLower = String(fileName || "").toLowerCase();
-      const matched = (profiles || []).find((p) => {
+
+      // Step A — try the supplier hint first (explicit user/UI input).
+      let matched = (profiles || []).find((p) => {
         const sName = (p.supplier_name || "").toLowerCase().trim();
-        if (!sName) return false;
-        if (hintSupplier && sName === hintSupplier.toLowerCase()) return true;
-        if (hintSupplier && (sName.includes(hintSupplier.toLowerCase()) || hintSupplier.toLowerCase().includes(sName))) return true;
-        // Filename hint: e.g. "jantzen_classifier_test.csv" matches "Jantzen"
-        if (fileLower.includes(sName)) return true;
-        return false;
+        if (!sName || !hintSupplier) return false;
+        return sName === hintSupplier.toLowerCase()
+          || sName.includes(hintSupplier.toLowerCase())
+          || hintSupplier.toLowerCase().includes(sName);
       });
+      if (matched) savedProfileMatchSource = "hint";
+
+      // Step B — fall back to filename token match, but REMEMBER it was
+      // filename-only so we can verify against invoice content later.
+      if (!matched) {
+        matched = (profiles || []).find((p) => {
+          const sName = (p.supplier_name || "").toLowerCase().trim();
+          if (!sName) return false;
+          return fileLower.includes(sName);
+        });
+        if (matched) {
+          savedProfileMatchSource = "filename";
+          filenameSupplierGuess = matched.supplier_name;
+        }
+      }
 
       const saved = matched?.profile_data?.classification as Classification | undefined;
       if (matched && saved) {
-        classification = { ...saved, _source: "saved", supplier_name: matched.supplier_name };
-        usedSavedProfile = true;
-        console.log(`[classify-extract-validate] Reusing saved classification for ${matched.supplier_name} (confidence ${matched.confidence_score})`);
+        // CRITICAL: when the match came from the filename only (not a hint
+        // and not yet verified against invoice content), we still kick off
+        // the orientation agent so it can override with the true supplier
+        // detected from header/ABN/SKU prefix/bank details. Filenames are
+        // unreliable (collection names, generic words like "Sea Level").
+        if (savedProfileMatchSource === "filename") {
+          console.log(`[classify-extract-validate] Filename hints "${matched.supplier_name}" — will verify against invoice content`);
+          // Do NOT short-circuit; let Stage 1 orientation run and
+          // override if it disagrees.
+        } else {
+          classification = { ...saved, _source: "saved", supplier_name: matched.supplier_name };
+          usedSavedProfile = true;
+          console.log(`[classify-extract-validate] Reusing saved classification for ${matched.supplier_name} (confidence ${matched.confidence_score})`);
+        }
       }
     } catch (e) {
       console.warn("[classify-extract-validate] saved-profile lookup failed:", e);

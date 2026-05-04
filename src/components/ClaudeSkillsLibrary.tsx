@@ -11,10 +11,12 @@
 //
 // Pre-populates 3 starter files on first open if the user has none.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Brain, Plus, Save, Trash2, Loader2, FlaskConical, BookOpen, FileText, RotateCcw,
+  Upload, Download,
 } from "lucide-react";
+import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

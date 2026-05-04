@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Search, ExternalLink, Check, X, Loader2, ChevronDown, ChevronUp, Plug } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 /* ── Connector registry ─────────────────────────────────────── */
 
@@ -139,28 +140,26 @@ export default function ConnectorsMarketplace({ onBack }: Props) {
 
   return (
     <div className="space-y-4 pb-32">
-      {onBack && (
-        <button onClick={onBack} className="text-xs text-muted-foreground hover:text-foreground mb-2">
-          ← Back
-        </button>
-      )}
-
-      <div className="flex items-center gap-2">
-        <Plug className="w-5 h-5 text-primary" />
-        <h2 className="text-lg font-semibold">Connectors Marketplace</h2>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Browse and install integrations to connect your wholesale platforms, accounting, shipping, marketplaces and POS systems.
-      </p>
-
-      {/* Installed count */}
-      {installed.length > 0 && (
-        <div className="flex items-center gap-2">
-          <Badge className="bg-primary/15 text-primary border-primary/30 text-xs">
-            {installed.length} installed
-          </Badge>
-        </div>
-      )}
+      <PageHeader
+        eyebrow={
+          onBack ? (
+            <button onClick={onBack} className="hover:text-foreground transition-colors">← Back</button>
+          ) : undefined
+        }
+        title={
+          <span className="flex items-center gap-2">
+            <Plug className="w-5 h-5 text-primary" /> Connectors Marketplace
+          </span>
+        }
+        subtitle="Browse and install integrations for wholesale, accounting, shipping, marketplaces and POS."
+        actions={
+          installed.length > 0 ? (
+            <Badge className="bg-primary/15 text-primary border-primary/30 text-xs">
+              {installed.length} installed
+            </Badge>
+          ) : undefined
+        }
+      />
 
       {/* Search */}
       <div className="relative">

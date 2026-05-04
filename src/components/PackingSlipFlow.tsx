@@ -1,9 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Upload, ChevronLeft, Loader2, Check, X, AlertTriangle,
   Download, Package, Search, Edit3, CheckCheck, FileText,
-  ChevronDown, ChevronRight, Zap, RotateCcw
+  ChevronDown, ChevronRight, Zap, RotateCcw, Receipt, Link2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -633,6 +633,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
   const [aiExtractionNotes, setAiExtractionNotes] = useState<string | null>(null);
   const [extractionDebug, setExtractionDebug] = useState<import("@/components/ExtractionDebugPanel").ExtractionDebugInfo | null>(null);
+  // Multi-brand split metadata returned by classify-extract-validate.
+  // When `applied` is true, the review screen shows a banner, per-brand chips,
+  // and lets the user publish a single brand at a time.
+  const [multiBrandSplit, setMultiBrandSplit] = useState<{
+    applied: boolean;
+    company_name: string | null;
+    rules: Array<{ sku_prefix: string; brand: string }>;
+    counts: Record<string, number>;
+  } | null>(null);
   // Per-product Qty header validator warnings from parse-invoice. Drives the
   // yellow banner + per-row flag on the review screen (Round 4 Walnut fix).
   const [qtyHeaderWarnings, setQtyHeaderWarnings] = useState<Array<{

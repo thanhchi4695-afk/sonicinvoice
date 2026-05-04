@@ -36,18 +36,22 @@ async function logProcessingHistory(entry: {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !serviceKey) return;
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-    await supabase.from("processing_history").insert({
-      user_id: entry.userId,
-      source: "product-extract",
-      url: entry.url,
-      status: entry.status,
-      product_name: entry.productName ?? null,
-      error_message: entry.errorMessage ?? null,
-      images_count: entry.imagesCount ?? 0,
-      extraction_strategy: entry.extractionStrategy ?? null,
-      processing_time_ms: entry.processingTimeMs,
-      metadata: entry.metadata ?? {},
-    });
+    await withTimeout(
+      supabase.from("processing_history").insert({
+        user_id: entry.userId,
+        source: "product-extract",
+        url: entry.url,
+        status: entry.status,
+        product_name: entry.productName ?? null,
+        error_message: entry.errorMessage ?? null,
+        images_count: entry.imagesCount ?? 0,
+        extraction_strategy: entry.extractionStrategy ?? null,
+        processing_time_ms: entry.processingTimeMs,
+        metadata: entry.metadata ?? {},
+      }),
+      LOG_TIMEOUT_MS,
+      "Processing history logging",
+    );
   } catch (e) {
     console.warn("[product-extract] failed to log processing_history:", (e as Error).message);
   }
@@ -75,6 +79,18 @@ const corsHeaders = {
 
 const TIMEOUT_MS = 12_000;       // page fetch
 const LLM_TIMEOUT_MS = 15_000;   // LLM strategy ceiling
+const IMAGE_PIPELINE_TIMEOUT_MS = 13_000;
+const LOG_TIMEOUT_MS = 2_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
 
 interface ExtractedProduct {
   name: string | null;
@@ -392,7 +408,16 @@ Deno.serve(async (req) => {
     }
 
     // Step 5 — stream → optimise → store in `compressed-images`
-    const imageResult = await downloadImages(mergedUrls, url);
+    const imageResult = await withTimeout(
+      downloadImages(mergedUrls, url),
+      IMAGE_PIPELINE_TIMEOUT_MS,
+      "Image preparation",
+    ).catch((e) => ({
+      images: [],
+      warnings: [`Image preparation skipped: ${(e as Error).message}`],
+      killSwitchTripped: false,
+      totalBytesIn: 0,
+    }));
 
     // Step 4 — currency normalisation (stub until Task 6)
     const priceNormalized = normalizeCurrency(product.price, product.currency);

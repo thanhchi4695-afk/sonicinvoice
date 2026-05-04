@@ -332,27 +332,55 @@ export default function ClaudeSkillsLibrary() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { toast.error("Not signed in"); return; }
 
-      const mdFiles = Array.from(files).filter((f) => /\.md$/i.test(f.name));
-      if (mdFiles.length === 0) {
-        toast.error("No .md files found", { description: "Drop or select markdown skill files." });
+      // Collect { name, content } from .md files AND from .md entries inside any .zip files
+      const collected: { name: string; content: string }[] = [];
+
+      for (const f of Array.from(files)) {
+        if (/\.md$/i.test(f.name)) {
+          collected.push({ name: f.name, content: await f.text() });
+        } else if (/\.zip$/i.test(f.name)) {
+          try {
+            const zip = await JSZip.loadAsync(await f.arrayBuffer());
+            const entries = Object.values(zip.files).filter(
+              (e: any) => !e.dir && /\.md$/i.test(e.name) && !/(^|\/)__MACOSX\//.test(e.name),
+            );
+            for (const entry of entries as any[]) {
+              const content = await entry.async("string");
+              // Strip any folder path inside the zip — keep just the filename
+              const baseName = entry.name.split("/").pop() || entry.name;
+              collected.push({ name: baseName, content });
+            }
+          } catch (zipErr) {
+            toast.error(`Could not read ${f.name}`, {
+              description: zipErr instanceof Error ? zipErr.message : "Invalid zip",
+            });
+          }
+        }
+      }
+
+      if (collected.length === 0) {
+        toast.error("No .md files found", { description: "Drop .md files or a .zip containing them." });
         return;
       }
 
-      const rows = await Promise.all(mdFiles.map(async (f) => {
-        const content = await f.text();
-        const slug = f.name
+      // De-dupe by slug (last one wins)
+      const bySlug = new Map<string, { name: string; content: string }>();
+      for (const item of collected) {
+        const slug = item.name
           .replace(/\.md$/i, "")
           .toLowerCase()
           .trim()
           .replace(/\s+/g, "-")
           .replace(/[^a-z0-9-]/g, "");
-        return {
-          user_id: user.id,
-          skill_name: slug,
-          content,
-          task_types: ["extraction"],
-          is_global: false,
-        };
+        if (slug) bySlug.set(slug, item);
+      }
+
+      const rows = Array.from(bySlug.entries()).map(([slug, item]) => ({
+        user_id: user.id,
+        skill_name: slug,
+        content: item.content,
+        task_types: ["extraction"],
+        is_global: false,
       }));
 
       const { error } = await supabase

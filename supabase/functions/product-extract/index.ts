@@ -77,9 +77,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const TIMEOUT_MS = 12_000;       // page fetch
-const LLM_TIMEOUT_MS = 15_000;   // LLM strategy ceiling
-const IMAGE_PIPELINE_TIMEOUT_MS = 13_000;
+const TIMEOUT_MS = 10_000;       // page fetch
+const LLM_TIMEOUT_MS = 12_000;   // LLM strategy ceiling
+const IMAGE_PIPELINE_TIMEOUT_MS = 9_000;
 const LOG_TIMEOUT_MS = 2_000;
 
 function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> {

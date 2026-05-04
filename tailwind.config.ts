@@ -15,7 +15,8 @@ export default {
     extend: {
       fontFamily: {
         display: ["Syne", "sans-serif"],
-        body: ["Syne", "sans-serif"],
+        body: ["Inter", "system-ui", "sans-serif"],
+        sans: ["Inter", "system-ui", "sans-serif"],
         mono: ["IBM Plex Mono", "monospace"],
       },
       colors: {

@@ -465,6 +465,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     classification_source: classification?._source ?? "missing",
     extractor_used: azureUsed ? "azure_layout+llm" : "parse-invoice",
     validation_summary: validationSummary,
+    multi_brand_split: multiBrandSplit,
   };
 }
 

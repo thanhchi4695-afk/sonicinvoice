@@ -493,23 +493,38 @@ const ReportsHub = ({ onBack }: ReportsHubProps) => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 space-y-4">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>
-        <h1 className="text-xl font-bold">Reports</h1>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-8">
+          <ArrowLeft className="h-4 w-4 mr-1" />Back
+        </Button>
+      </div>
+      <div>
+        <h1 className="text-page-title font-display">Reports</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Operational and financial views across your inventory, suppliers and sales.
+        </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {REPORT_CARDS.map(card => {
           const Icon = card.icon;
           return (
-            <Card key={card.id} className="cursor-pointer hover:border-primary/40 transition-colors" onClick={() => setActiveReport(card.id)}>
+            <Card
+              key={card.id}
+              className="group cursor-pointer border-border/70 hover:border-accent-teal/50 hover:shadow-card transition-all"
+              onClick={() => setActiveReport(card.id)}
+            >
               <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <Icon className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-sm">{card.title}</CardTitle>
+                <div className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted/60 text-foreground group-hover:bg-accent-teal/10 group-hover:text-accent-teal transition-colors">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <CardTitle className="text-sm font-semibold">{card.title}</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent><CardDescription>{card.desc}</CardDescription></CardContent>
+              <CardContent className="pt-0">
+                <CardDescription className="text-xs leading-relaxed">{card.desc}</CardDescription>
+              </CardContent>
             </Card>
           );
         })}

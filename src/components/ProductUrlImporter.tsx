@@ -407,6 +407,10 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
         currency: product.currency ?? "",
         images: (product.images ?? []).filter((i) => !!i?.storedUrl),
         primaryIndex: 0,
+        availableColors: product.colors ?? [],
+        availableSizes: product.sizes ?? [],
+        selectedColors: product.colors ?? [],
+        selectedSizes: product.sizes ?? [],
       });
       toast.success("Product details fetched — review and edit before adding");
     } catch (err) {

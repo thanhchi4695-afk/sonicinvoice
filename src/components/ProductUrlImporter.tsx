@@ -872,6 +872,24 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
               />
             </div>
 
+            {/* Variants — Colours / Sizes pickers */}
+            <VariantPicker
+              label="Colours"
+              available={edit.availableColors}
+              selected={edit.selectedColors}
+              onChange={(next) => setEdit({ ...edit, selectedColors: next })}
+              addPlaceholder="Add a colour (e.g. Sage)"
+              emptyHint="No colours detected on the page — add any you'd like to stock."
+            />
+            <VariantPicker
+              label="Sizes"
+              available={edit.availableSizes}
+              selected={edit.selectedSizes}
+              onChange={(next) => setEdit({ ...edit, selectedSizes: next })}
+              addPlaceholder="Add a size (e.g. M)"
+              emptyHint="No sizes detected on the page — add any you'd like to stock."
+            />
+
             {/* Images */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">

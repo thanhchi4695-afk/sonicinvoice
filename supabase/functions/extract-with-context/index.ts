@@ -128,7 +128,9 @@ Deno.serve(async (req) => {
       `Build the context_map, then extract every product applying RULES 1-4. Return ONLY the JSON shape.`;
 
     const data = await callAI({
-      model: "google/gemini-2.5-pro", // accuracy first — extraction is the heavy stage
+      // Claude Sonnet 4.5 is the most accurate on structured tabular invoice
+      // data. Falls back to Claude Haiku → Gemini 2.5 Flash via ai-gateway.
+      model: "anthropic/claude-sonnet-4-5",
       temperature: 0.05,
       messages: [
         { role: "system", content: EXTRACT_PROMPT },

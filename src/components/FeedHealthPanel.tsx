@@ -890,6 +890,49 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
         </div>
       </div>
 
+      {/* Bulk alt-text fix banner */}
+      {missingAltCount > 0 && directStore && (
+        <div className="bg-secondary/10 border border-secondary/30 rounded-lg p-3 mb-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-foreground">
+              {missingAltCount.toLocaleString()} products are missing image alt text
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Auto-generate accessible, SEO-friendly alt text from vendor + title + colour and push to Shopify in batches of 50.
+            </p>
+          </div>
+          <Button
+            variant="amber"
+            size="sm"
+            className="shrink-0 gap-1"
+            disabled={bulkAltRunning}
+            onClick={() => setBulkAltConfirmOpen(true)}
+          >
+            {bulkAltRunning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            Auto-fix {missingAltCount.toLocaleString()} missing alt texts →
+          </Button>
+        </div>
+      )}
+
+      {/* Bulk alt confirm dialog */}
+      <Dialog open={bulkAltConfirmOpen} onOpenChange={setBulkAltConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Auto-fix {missingAltCount} missing alt texts?</DialogTitle>
+            <DialogDescription className="text-xs">
+              Generate alt text for {missingAltCount.toLocaleString()} products using AI suggestions and update Shopify immediately.
+              This pushes changes live to your store.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-2">
+            <Button variant="outline" size="sm" onClick={() => setBulkAltConfirmOpen(false)}>Cancel</Button>
+            <Button variant="amber" size="sm" onClick={runBulkAltFix}>
+              <Sparkles className="w-3.5 h-3.5" /> Generate & push
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Product table */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <PaginationBar

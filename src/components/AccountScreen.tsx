@@ -35,6 +35,7 @@ import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
 const TeamManagement = lazy(() => import("@/components/TeamManagement"));
 const AutomationSettings = lazy(() => import("@/components/AutomationSettings"));
 const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"));
+const MultiBrandSuppliersSection = lazy(() => import("@/components/MultiBrandSuppliersSection"));
 
 const AccountScreen = () => {
   const { isAdmin } = useUserRole();

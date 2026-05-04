@@ -929,6 +929,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                       )}
                     </span>
                     <span>{step.label}</span>
+                    {active && <ElapsedTimer startedAt={stepStartedAt} />}
                   </li>
                 );
               })}

@@ -283,8 +283,28 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
       }
 
       setItems(nonEmpty);
-      setStep("review");
-      toast.success(`Extracted ${nonEmpty.length} items from packing slip`);
+      const detectedSupplier = data.supplier || supplierInput || "";
+
+      // Look up supplier-specific markup multiplier and packing-list-only flag
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && detectedSupplier) {
+          const { data: profile } = await supabase
+            .from("supplier_profiles")
+            .select("markup_multiplier, sends_packing_list_only")
+            .eq("user_id", user.id)
+            .ilike("supplier_name", detectedSupplier)
+            .maybeSingle();
+          const prof = profile as { markup_multiplier?: number | null; sends_packing_list_only?: boolean } | null;
+          if (prof?.markup_multiplier) setMarkupMultiplier(Number(prof.markup_multiplier));
+        }
+      } catch (e) { /* non-fatal */ }
+
+      if (isPackingListSupplier(detectedSupplier)) {
+        setStep("pair_prompt");
+      } else {
+        setStep("review");
+      }
     } catch (err) {
       console.error("Packing slip parse error:", err);
       toast.error("Failed to parse packing slip. Please try again.");

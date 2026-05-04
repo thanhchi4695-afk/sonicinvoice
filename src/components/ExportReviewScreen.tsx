@@ -70,6 +70,15 @@ interface ExportReviewScreenProps {
   supplierName: string;
   onBack: () => void;
   onStartFlow?: (flow: string) => void;
+  /** Multi-brand split metadata from classify-extract-validate. When applied,
+   *  the screen shows a banner, per-brand chips, and a "Publish [brand] only"
+   *  button so each brand can be exported separately. */
+  multiBrandSplit?: {
+    applied: boolean;
+    company_name: string | null;
+    rules: Array<{ sku_prefix: string; brand: string }>;
+    counts: Record<string, number>;
+  } | null;
 }
 
 type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "lightspeed_full" | "tags_only" | "xlsx" | "summary_pdf" | "google_xml" | "google_tsv";

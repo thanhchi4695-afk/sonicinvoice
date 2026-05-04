@@ -127,7 +127,7 @@ function generateFilename(supplier: string, format: ExportFormat): string {
   return `${tag}_${month}_${typeMap[format]}_${date}.${ext}`;
 }
 
-const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multiBrandSplit }: ExportReviewScreenProps) => {
+const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multiBrandSplit, filenameMismatch, onDismissFilenameMismatch, onOverrideFilenameMismatch }: ExportReviewScreenProps) => {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>("shopify_full");
   const [filterHigh, setFilterHigh] = useState(true);
   const [filterMedium, setFilterMedium] = useState(true);

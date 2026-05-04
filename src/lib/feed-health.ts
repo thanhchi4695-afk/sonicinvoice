@@ -8,8 +8,8 @@ export interface FeedHealthProduct {
   productType: string;
   tags: string[];
   imageUrl: string | null;
-  altText: string | null;
-  description: string | null;
+  altText?: string | null;
+  description?: string | null;
   imageWidth?: number | null;
   imageHeight?: number | null;
   imageId?: number | null;

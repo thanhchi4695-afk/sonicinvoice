@@ -218,46 +218,57 @@ async function extractWithLLM(html: string, sourceUrl: string): Promise<Extracte
   // Trim HTML to keep prompt cost down — body text + first 60KB
   const trimmed = html.length > 60_000 ? html.slice(0, 60_000) : html;
 
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [
-        {
-          role: "system",
-          content:
-            "Extract product info from raw HTML. Return strictly via the provided tool. Use the page's stated currency; do not guess.",
-        },
-        { role: "user", content: `URL: ${sourceUrl}\n\nHTML:\n${trimmed}` },
-      ],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "return_product",
-            description: "Return the extracted product data.",
-            parameters: {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                description: { type: "string" },
-                price: { type: "string", description: "Numeric price as string, no currency symbol" },
-                currency: { type: "string", description: "ISO 4217 code if known" },
-                imageUrls: { type: "array", items: { type: "string" } },
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), LLM_TIMEOUT_MS);
+  let resp: Response;
+  try {
+    resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Extract product info from raw HTML. Return strictly via the provided tool. Use the page's stated currency; do not guess.",
+          },
+          { role: "user", content: `URL: ${sourceUrl}\n\nHTML:\n${trimmed}` },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "return_product",
+              description: "Return the extracted product data.",
+              parameters: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  description: { type: "string" },
+                  price: { type: "string", description: "Numeric price as string, no currency symbol" },
+                  currency: { type: "string", description: "ISO 4217 code if known" },
+                  imageUrls: { type: "array", items: { type: "string" } },
+                },
+                required: ["name", "imageUrls"],
+                additionalProperties: false,
               },
-              required: ["name", "imageUrls"],
-              additionalProperties: false,
             },
           },
-        },
-      ],
-      tool_choice: { type: "function", function: { name: "return_product" } },
-    }),
-  });
+        ],
+        tool_choice: { type: "function", function: { name: "return_product" } },
+      }),
+    });
+  } catch (e) {
+    console.warn("[product-extract] LLM fetch failed/timeout", (e as Error).message);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!resp.ok) {
     console.warn("[product-extract] LLM gateway error", resp.status, await resp.text());

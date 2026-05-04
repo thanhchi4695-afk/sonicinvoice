@@ -640,6 +640,8 @@ Deno.serve(async (req) => {
           killSwitchTripped: imageResult.killSwitchTripped,
           totalBytesIn: imageResult.totalBytesIn,
         },
+        colors,
+        sizes,
         sourceUrl: url,
         extractedAt: new Date().toISOString(),
         strategyUsed,

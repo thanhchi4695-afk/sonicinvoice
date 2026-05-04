@@ -241,6 +241,93 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     }
   }
 
+  // ─────── STAGE 1B — Filename-vs-content supplier mismatch detection ───────
+  // Some invoices are named after a collection or product line ("Sea Level
+  // Lost Paradise.pdf") but are actually issued by a different parent brand
+  // (Bond-Eye Australia). Stage 1 reads letterhead / ABN / bank details to
+  // determine the TRUE supplier — we now compare that to whatever the filename
+  // suggests, log a misclassification alert if they differ, and surface it to
+  // the review UI.
+  let filenameMismatch: {
+    detected: boolean;
+    filename: string;
+    expected_from_filename: string;
+    detected_supplier: string;
+    alert_id: string | null;
+  } | null = null;
+
+  try {
+    const detectedSupplier = classification?.supplier_name || null;
+    const fileLower = String(fileName || "").toLowerCase();
+
+    let guess = filenameSupplierGuess;
+    if (!guess && userId && detectedSupplier) {
+      try {
+        const { data: allProfiles } = await admin
+          .from("supplier_profiles")
+          .select("supplier_name")
+          .eq("user_id", userId)
+          .limit(200);
+        const detectedLower = detectedSupplier.toLowerCase().trim();
+        const candidate = (allProfiles ?? []).find((p) => {
+          const sName = (p.supplier_name || "").toLowerCase().trim();
+          if (!sName) return false;
+          if (sName === detectedLower) return false;
+          if (sName.length < 4) return false; // skip "s", "j", "el" — would false-positive
+          return fileLower.includes(sName);
+        });
+        if (candidate) guess = candidate.supplier_name;
+      } catch (_e) { /* best-effort */ }
+    }
+
+    const norm = (s: string) =>
+      s.toLowerCase()
+        .replace(/\b(pty|ltd|inc|llc|gmbh|australia|au|aus)\b/g, "")
+        .replace(/[^a-z0-9]+/g, "")
+        .trim();
+
+    if (
+      detectedSupplier &&
+      guess &&
+      norm(detectedSupplier) !== norm(guess) &&
+      !norm(detectedSupplier).includes(norm(guess)) &&
+      !norm(guess).includes(norm(detectedSupplier))
+    ) {
+      console.warn(
+        `[classify-extract-validate] FILENAME MISMATCH: file "${fileName}" suggests "${guess}" but content says "${detectedSupplier}"`,
+      );
+
+      let alertId: string | null = null;
+      if (userId) {
+        try {
+          const { data: alertRow } = await admin
+            .from("misclassification_alerts")
+            .insert({
+              user_id: userId,
+              filename: String(fileName),
+              detected_supplier: detectedSupplier,
+              expected_from_filename: guess,
+            })
+            .select("id")
+            .maybeSingle();
+          alertId = alertRow?.id ?? null;
+        } catch (e) {
+          console.warn("[classify-extract-validate] alert insert failed:", e);
+        }
+      }
+
+      filenameMismatch = {
+        detected: true,
+        filename: String(fileName),
+        expected_from_filename: guess,
+        detected_supplier: detectedSupplier,
+        alert_id: alertId,
+      };
+    }
+  } catch (e) {
+    console.warn("[classify-extract-validate] mismatch detection failed:", e);
+  }
+
   // ─────── STAGE 2 — extraction ───────
   // Look up the user-edited "Extraction Skills" file for this supplier (if any)
   // and pass it through to the extractor so it can be injected into the system

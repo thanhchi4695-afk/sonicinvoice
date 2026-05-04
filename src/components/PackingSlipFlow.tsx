@@ -47,7 +47,7 @@ interface GroupedProduct {
   variants: { size: string; qty: number; sku: string; cost?: number; rrp?: number }[];
 }
 
-type Step = "upload" | "processing" | "review";
+type Step = "upload" | "processing" | "pair_prompt" | "pairing" | "review";
 type ReviewTab = "accepted" | "review" | "rejected";
 type ProcessMode = "create" | "update" | "review_only";
 

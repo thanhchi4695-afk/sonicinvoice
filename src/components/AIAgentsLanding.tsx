@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ArrowRight, Bot, BookOpen } from "lucide-react";
+import { ArrowRight, Bot, BookOpen, PlayCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AutoAgentsSettingsPanel from "@/components/AutoAgentsSettingsPanel";
 import AgentLearnMore from "@/components/AgentLearnMore";
 import { AGENT_DETAILS, AGENT_ORDER, type AgentId } from "@/lib/agent-catalog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface AIAgentsLandingProps {
   onOpenAgentDashboard: () => void;
@@ -19,6 +20,7 @@ const AIAgentsLanding = ({
   onNavigateFlow,
 }: AIAgentsLandingProps) => {
   const [active, setActive] = useState<AgentId | null>(null);
+  const [showVideo, setShowVideo] = useState(false);
 
   // Map each agent to its primary quick-start action.
   const quickStartFor = (id: AgentId): { label: string; onClick: () => void } => {
@@ -60,13 +62,20 @@ const AIAgentsLanding = ({
           to publishing. Tap any card to see its inputs, outputs and examples, or jump
           straight into its dashboard.
         </p>
-        <div className="flex gap-2 mt-4">
+        <div className="flex flex-wrap gap-2 mt-4">
           <button
             onClick={onOpenAgentDashboard}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
           >
             Open agent dashboard
             <ArrowRight className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setShowVideo(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted"
+          >
+            <PlayCircle className="w-4 h-4" />
+            How it works
           </button>
           <button
             onClick={onOpenAgentGuide}
@@ -76,6 +85,25 @@ const AIAgentsLanding = ({
           </button>
         </div>
       </header>
+
+      <Dialog open={showVideo} onOpenChange={setShowVideo}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>How it works — Claude integration</DialogTitle>
+          </DialogHeader>
+          <div className="aspect-video w-full overflow-hidden rounded-md bg-black">
+            {showVideo && (
+              <video
+                src="/videos/claude-integration.mp4"
+                className="w-full h-full"
+                controls
+                autoPlay
+                playsInline
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AutoAgentsSettingsPanel className="mb-6" />
 

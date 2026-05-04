@@ -79,6 +79,18 @@ interface ExportReviewScreenProps {
     rules: Array<{ sku_prefix: string; brand: string }>;
     counts: Record<string, number>;
   } | null;
+  /** Filename ≠ content supplier mismatch (e.g. "Sea Level Lost Paradise.pdf"
+   *  but invoice is from Bond-Eye Australia). Banner lets staff dismiss
+   *  (keep detected supplier) or override (use the filename's supplier). */
+  filenameMismatch?: {
+    detected: boolean;
+    filename: string;
+    expected_from_filename: string;
+    detected_supplier: string;
+    alert_id: string | null;
+  } | null;
+  onDismissFilenameMismatch?: () => void;
+  onOverrideFilenameMismatch?: () => void;
 }
 
 type ExportFormat = "shopify_full" | "shopify_inventory" | "shopify_price" | "lightspeed_full" | "tags_only" | "xlsx" | "summary_pdf" | "google_xml" | "google_tsv";

@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import WhatsNextSuggestions from "@/components/WhatsNextSuggestions";
-import { ChevronLeft, Activity, Check, AlertTriangle, Loader2, Eye, ShoppingCart, Pencil, Store, Download, Upload, ExternalLink, Copy, ChevronDown, ChevronUp, Globe } from "lucide-react";
+import { ChevronLeft, Activity, Check, AlertTriangle, Loader2, Eye, ShoppingCart, Pencil, Store, Download, Upload, ExternalLink, Copy, ChevronDown, ChevronUp, Globe, Image as ImageIcon, CheckCircle2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -9,6 +9,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getActiveDirectStore } from "@/lib/shopify-direct";
@@ -40,6 +42,12 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
   const [namespace, setNamespace] = useState("custom");
   const [detailRow, setDetailRow] = useState<FeedHealthRow | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [altEditRow, setAltEditRow] = useState<FeedHealthRow | null>(null);
+  const [altDraft, setAltDraft] = useState("");
+  const [altSaving, setAltSaving] = useState(false);
 
   // Currency diagnostic state
   const [primaryCountry, setPrimaryCountry] = useState("Australia");
@@ -267,6 +275,94 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
 
   const current = filtered();
   const autoReady = rows.filter(r => r.detected.genderConf !== "low" && r.detected.ageConf !== "low" && r.detected.color).length;
+
+  // Reset page when tab changes
+  useEffect(() => { setPage(1); }, [tab]);
+  const totalPages = Math.max(1, Math.ceil(current.length / PAGE_SIZE));
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return current.slice(start, start + PAGE_SIZE);
+  }, [current, page]);
+
+  // Merchant Center warnings derived from detected attributes
+  const getMerchantCenterWarnings = (row: FeedHealthRow): string[] => {
+    const w: string[] = [];
+    if (!row.detected.gender) w.push("gender field required for apparel category");
+    if (!row.detected.ageGroup) w.push("age_group required for apparel targeting");
+    if (!row.detected.color) w.push("color field is invalid or missing");
+    const hasGtin = row.product.variants?.some(v => v.barcode && v.barcode.length >= 8);
+    if (!hasGtin) w.push("Missing identifier: Brand + GTIN or Brand + MPN required");
+    if (row.product.imageUrl && row.product.imageWidth && row.product.imageWidth < 250) {
+      w.push("Image too small — minimum 250×250px for Shopping");
+    }
+    if (!row.product.altText) w.push("Image alt text missing — required for accessibility");
+    return w;
+  };
+
+  const getChannelStatus = (row: FeedHealthRow, channel: "google" | "meta" | "pinterest"): "ok" | "warning" | "error" => {
+    const w = getMerchantCenterWarnings(row);
+    const critical = w.filter(x => x.includes("required"));
+    if (channel === "google") {
+      if (critical.length > 0) return "error";
+      if (w.length > 0) return "warning";
+      return "ok";
+    }
+    if (channel === "meta") {
+      if (!row.product.description) return "warning";
+      return w.length > 0 ? "warning" : "ok";
+    }
+    return w.length > 0 ? "warning" : "ok";
+  };
+
+  const generateAltSuggestion = (row: FeedHealthRow): string => {
+    const parts = [row.product.vendor, row.product.title, row.detected.color].filter(Boolean);
+    return parts.join(" ").trim();
+  };
+
+  const openAltTextEdit = (row: FeedHealthRow) => {
+    setAltEditRow(row);
+    setAltDraft(row.product.altText || "");
+  };
+
+  const saveAltText = async (advance = false) => {
+    if (!altEditRow) return;
+    const text = altDraft.trim();
+    const imageId = altEditRow.product.imageId;
+    if (!imageId) {
+      toast.error("No image found on product");
+      return;
+    }
+    setAltSaving(true);
+    try {
+      // Update via Shopify image alt — uses REST update_image action; falls back gracefully
+      await callProxy({
+        action: "update_image_alt",
+        product_id: altEditRow.product.id.replace("gid://shopify/Product/", ""),
+        image_id: imageId,
+        alt: text,
+      });
+      setRows(prev => prev.map(r => r.product.id === altEditRow.product.id
+        ? { ...r, product: { ...r.product, altText: text }, edited: true }
+        : r));
+      toast.success("Alt text updated");
+      if (advance) {
+        const nextMissing = current.find(r =>
+          r.product.id !== altEditRow.product.id && !r.product.altText
+        );
+        if (nextMissing) {
+          setAltEditRow(nextMissing);
+          setAltDraft("");
+          return;
+        }
+      }
+      setAltEditRow(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update alt text");
+    } finally {
+      setAltSaving(false);
+    }
+  };
+
 
   // ── CURRENCY HELPERS ──────────────────────────
   const addSecondaryCountry = () => setSecondaryCountries(prev => [...prev, { country: "United States", currency: "USD" }]);
@@ -705,10 +801,18 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
 
       {/* Product table */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          total={current.length}
+          pageSize={PAGE_SIZE}
+          onChange={setPage}
+        />
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-8">
+              <TableHead className="w-10">
                 <Checkbox
                   checked={selected.size === current.length && current.length > 0}
                   onCheckedChange={() => {
@@ -717,44 +821,143 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
                   }}
                 />
               </TableHead>
-              <TableHead className="text-xs">Product</TableHead>
-              <TableHead className="text-xs hidden sm:table-cell">Gender</TableHead>
-              <TableHead className="text-xs hidden sm:table-cell">Age</TableHead>
-              <TableHead className="text-xs">Color</TableHead>
+              <TableHead className="text-xs w-[320px]">Product</TableHead>
+              <TableHead className="text-xs w-[200px] hidden md:table-cell">Alt Text</TableHead>
+              <TableHead className="text-xs w-[160px] hidden md:table-cell">Gender / Age / Colour</TableHead>
+              <TableHead className="text-xs w-12 text-center">Google</TableHead>
+              <TableHead className="text-xs w-12 text-center hidden md:table-cell">Meta</TableHead>
+              <TableHead className="text-xs w-12 text-center hidden md:table-cell">Pinterest</TableHead>
+              <TableHead className="text-xs w-[280px]">Merchant Center Errors</TableHead>
               <TableHead className="text-xs w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {current.slice(0, 100).map(r => (
+            {paginatedRows.map(r => {
+              const warnings = getMerchantCenterWarnings(r);
+              const productUrl = directStore?.storeUrl
+                ? `https://${directStore.storeUrl}/products/${r.product.handle}`
+                : "#";
+              return (
               <TableRow key={r.product.id}>
                 <TableCell>
                   <Checkbox checked={selected.has(r.product.id)} onCheckedChange={() => toggleSelect(r.product.id)} />
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    {r.product.imageUrl && (
-                      <img src={r.product.imageUrl} alt="" className="w-7 h-7 rounded object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                    )}
+                  <div className="flex items-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => r.product.imageUrl && setLightboxUrl(r.product.imageUrl)}
+                      className="w-16 h-16 rounded-lg border border-border overflow-hidden shrink-0 bg-muted hover:opacity-90 transition-opacity"
+                      aria-label="Preview product image"
+                    >
+                      {r.product.imageUrl ? (
+                        <img
+                          src={r.product.imageUrl}
+                          alt={r.product.altText || ""}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                          <ImageIcon className="w-6 h-6" />
+                        </div>
+                      )}
+                    </button>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium truncate max-w-[180px]">{r.product.title}</p>
-                      <p className="text-[10px] text-muted-foreground">{r.product.vendor}</p>
+                      <a
+                        href={productUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-medium text-primary hover:underline line-clamp-2"
+                      >
+                        {r.product.title}
+                      </a>
+                      <p className="text-xs text-muted-foreground mt-0.5">{r.product.vendor}</p>
+                      {r.product.variants?.[0]?.sku && (
+                        <p className="text-[10px] text-muted-foreground font-mono mt-0.5">SKU: {r.product.variants[0].sku}</p>
+                      )}
                     </div>
                   </div>
                 </TableCell>
-                <TableCell className="hidden sm:table-cell">
-                  <InlineEdit value={r.detected.gender} confidence={r.detected.genderConf} options={["female", "male", "unisex"]}
-                    onSave={v => updateDetected(r.product.id, "gender", v)} />
+                <TableCell className="hidden md:table-cell align-top">
+                  <div className="max-w-[200px]">
+                    {r.product.altText ? (
+                      <div className="group relative">
+                        <p className="text-xs text-foreground line-clamp-2 group-hover:line-clamp-none transition-all">
+                          {r.product.altText}
+                        </p>
+                        <button onClick={() => openAltTextEdit(r)} className="text-[10px] text-primary hover:underline mt-1">
+                          Edit
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge variant="destructive" className="text-[10px]">Missing alt text</Badge>
+                        <button onClick={() => openAltTextEdit(r)} className="text-[10px] text-primary hover:underline">
+                          Add
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </TableCell>
-                <TableCell className="hidden sm:table-cell">
-                  <InlineEdit value={r.detected.ageGroup} confidence={r.detected.ageConf} options={["adult", "kids", "toddler", "infant", "newborn"]}
-                    onSave={v => updateDetected(r.product.id, "ageGroup", v)} />
+                <TableCell className="hidden md:table-cell align-top">
+                  <div className="space-y-1">
+                    <InlineEdit value={r.detected.gender} confidence={r.detected.genderConf} options={["female", "male", "unisex"]}
+                      onSave={v => updateDetected(r.product.id, "gender", v)} />
+                    <InlineEdit value={r.detected.ageGroup} confidence={r.detected.ageConf} options={["adult", "kids", "toddler", "infant", "newborn"]}
+                      onSave={v => updateDetected(r.product.id, "ageGroup", v)} />
+                    {r.detected.color ? (
+                      <InlineEdit value={r.detected.color} confidence={r.detected.colorConf}
+                        onSave={v => updateDetected(r.product.id, "color", v)} />
+                    ) : (
+                      <Badge variant="destructive" className="text-[10px]">No colour</Badge>
+                    )}
+                  </div>
                 </TableCell>
-                <TableCell>
-                  {r.detected.color ? (
-                    <InlineEdit value={r.detected.color} confidence={r.detected.colorConf}
-                      onSave={v => updateDetected(r.product.id, "color", v)} />
+                <TableCell className="text-center align-middle">
+                  <StatusDot status={getChannelStatus(r, "google")} label="Google Shopping" />
+                </TableCell>
+                <TableCell className="text-center align-middle hidden md:table-cell">
+                  <StatusDot status={getChannelStatus(r, "meta")} label="Meta Catalog" />
+                </TableCell>
+                <TableCell className="text-center align-middle hidden md:table-cell">
+                  <StatusDot status={getChannelStatus(r, "pinterest")} label="Pinterest" />
+                </TableCell>
+                <TableCell className="align-top">
+                  {warnings.length === 0 ? (
+                    <div className="flex items-center gap-1 text-success text-[11px]">
+                      <CheckCircle2 className="w-4 h-4" /> All good
+                    </div>
                   ) : (
-                    <Badge variant="destructive" className="text-[10px]">Missing</Badge>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="space-y-1 text-left w-full">
+                          {warnings.slice(0, 2).map((w, i) => (
+                            <div key={i} className="flex items-start gap-1">
+                              <AlertTriangle className="w-3 h-3 text-secondary shrink-0 mt-0.5" />
+                              <span className="text-[10px] text-foreground leading-tight">{w}</span>
+                            </div>
+                          ))}
+                          {warnings.length > 2 && (
+                            <span className="text-[10px] text-primary hover:underline">
+                              +{warnings.length - 2} more
+                            </span>
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80">
+                        <p className="text-xs font-semibold mb-2">Merchant Center issues</p>
+                        <ul className="space-y-1.5">
+                          {warnings.map((w, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs">
+                              <AlertTriangle className="w-3.5 h-3.5 text-secondary shrink-0 mt-0.5" />
+                              <span>{w}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </TableCell>
                 <TableCell>
@@ -763,15 +966,73 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
                   </button>
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
           </TableBody>
         </Table>
-        {current.length > 100 && (
-          <div className="p-2 text-center text-xs text-muted-foreground border-t border-border">
-            Showing first 100 of {current.length.toLocaleString()} products
-          </div>
-        )}
+        </div>
+        <PaginationBar
+          page={page}
+          totalPages={totalPages}
+          total={current.length}
+          pageSize={PAGE_SIZE}
+          onChange={setPage}
+        />
       </div>
+
+      {/* Lightbox for product image */}
+      <Dialog open={!!lightboxUrl} onOpenChange={open => { if (!open) setLightboxUrl(null); }}>
+        <DialogContent className="max-w-md p-2">
+          {lightboxUrl && (
+            <img src={lightboxUrl} alt="Product preview" className="w-full h-auto rounded-md" />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Alt text editor */}
+      <Dialog open={!!altEditRow} onOpenChange={open => { if (!open) setAltEditRow(null); }}>
+        <DialogContent className="max-w-lg">
+          {altEditRow && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-sm">Edit image alt text</DialogTitle>
+                <DialogDescription className="text-xs truncate">{altEditRow.product.title}</DialogDescription>
+              </DialogHeader>
+              <div className="flex gap-3">
+                {altEditRow.product.imageUrl && (
+                  <img src={altEditRow.product.imageUrl} alt="" className="w-24 h-24 rounded-md border border-border object-cover shrink-0" />
+                )}
+                <div className="flex-1 space-y-2">
+                  <Textarea
+                    value={altDraft}
+                    onChange={e => setAltDraft(e.target.value)}
+                    placeholder="Describe the image (used for SEO and accessibility)"
+                    className="text-xs min-h-[80px]"
+                  />
+                  <div className="bg-muted/40 rounded p-2">
+                    <p className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> AI suggestion
+                    </p>
+                    <p className="text-xs">{generateAltSuggestion(altEditRow)}</p>
+                    <Button size="sm" variant="ghost" className="text-[11px] h-7 mt-1"
+                      onClick={() => setAltDraft(generateAltSuggestion(altEditRow))}>
+                      Use AI suggestion
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-2">
+                <Button variant="outline" size="sm" onClick={() => setAltEditRow(null)} disabled={altSaving}>Cancel</Button>
+                <Button variant="outline" size="sm" onClick={() => saveAltText(true)} disabled={altSaving || !altDraft.trim()}>
+                  Save & next
+                </Button>
+                <Button variant="teal" size="sm" onClick={() => saveAltText(false)} disabled={altSaving || !altDraft.trim()}>
+                  {altSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Detail modal */}
       <Dialog open={!!detailRow} onOpenChange={open => { if (!open) setDetailRow(null); }}>
@@ -870,6 +1131,61 @@ function DetailField({ label, value, confidence, reason, options, onSave }: {
       </div>
       <InlineEdit value={value} confidence={confidence} options={options} onSave={onSave} />
       <p className="text-[10px] text-muted-foreground mt-1">{reason}</p>
+    </div>
+  );
+}
+
+// ── Status Dot ──────────────────────────────────
+function StatusDot({ status, label }: { status: "ok" | "warning" | "error"; label: string }) {
+  const colours: Record<string, string> = {
+    ok: "bg-success",
+    warning: "bg-secondary",
+    error: "bg-destructive",
+  };
+  return (
+    <div title={label} className="flex justify-center">
+      <span className={`w-3 h-3 rounded-full ${colours[status]}`} />
+    </div>
+  );
+}
+
+// ── Pagination Bar ──────────────────────────────
+function PaginationBar({ page, totalPages, total, pageSize, onChange }: {
+  page: number; totalPages: number; total: number; pageSize: number; onChange: (p: number) => void;
+}) {
+  if (total === 0) return null;
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/20 text-xs">
+      <span className="text-muted-foreground">
+        Showing {start.toLocaleString()}–{end.toLocaleString()} of {total.toLocaleString()} Products
+      </span>
+      <div className="flex items-center gap-1">
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+          onClick={() => onChange(1)} disabled={page === 1}>First</Button>
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+          onClick={() => onChange(Math.max(1, page - 1))} disabled={page === 1}>Prev</Button>
+        <span className="text-xs flex items-center gap-1">
+          Page
+          <Input
+            className="w-12 h-7 text-center text-xs"
+            type="number"
+            value={page}
+            min={1}
+            max={totalPages}
+            onChange={e => {
+              const n = parseInt(e.target.value, 10);
+              if (!isNaN(n)) onChange(Math.max(1, Math.min(totalPages, n)));
+            }}
+          />
+          of {totalPages}
+        </span>
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+          onClick={() => onChange(Math.min(totalPages, page + 1))} disabled={page === totalPages}>Next</Button>
+        <Button size="sm" variant="outline" className="h-7 px-2 text-xs"
+          onClick={() => onChange(totalPages)} disabled={page === totalPages}>Last</Button>
+      </div>
     </div>
   );
 }

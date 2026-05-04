@@ -8,9 +8,16 @@ export interface FeedHealthProduct {
   productType: string;
   tags: string[];
   imageUrl: string | null;
+  altText?: string | null;
+  description?: string | null;
+  imageWidth?: number | null;
+  imageHeight?: number | null;
+  imageId?: number | null;
+  googleCategory?: string | null;
   variants: Array<{
     id: number;
     sku: string;
+    barcode?: string;
     selectedOptions?: Array<{ name: string; value: string }>;
     option1?: string;
     option2?: string;
@@ -171,11 +178,17 @@ export function parseShopifyProduct(raw: any): FeedHealthProduct {
     ? raw.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
     : Array.isArray(raw.tags) ? raw.tags : [];
 
-  const imageUrl = raw.images?.[0]?.src || raw.image?.src || null;
+  const firstImage = raw.images?.[0] || raw.image || null;
+  const imageUrl = firstImage?.src || null;
+  const altText = firstImage?.alt || null;
+  const imageWidth = firstImage?.width || null;
+  const imageHeight = firstImage?.height || null;
+  const imageId = firstImage?.id || null;
 
   const variants = (raw.variants || []).map((v: any) => ({
     id: v.id,
     sku: v.sku || "",
+    barcode: v.barcode || "",
     option1: v.option1,
     option2: v.option2,
     option3: v.option3,
@@ -189,6 +202,11 @@ export function parseShopifyProduct(raw: any): FeedHealthProduct {
     productType: raw.product_type || "",
     tags,
     imageUrl,
+    altText,
+    description: raw.body_html ? String(raw.body_html).replace(/<[^>]*>/g, "").trim() : null,
+    imageWidth,
+    imageHeight,
+    imageId,
     variants,
   };
 }

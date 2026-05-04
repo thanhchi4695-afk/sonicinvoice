@@ -118,8 +118,8 @@ function exportToShopifyCSV(groups: GroupedProduct[]) {
         "Option2 Value": v.size,
         "Variant SKU": v.sku,
         "Variant Inventory Qty": String(v.qty),
-        "Variant Price": "",
-        "Cost per item": "",
+        "Variant Price": v.rrp != null ? String(v.rrp) : "",
+        "Cost per item": v.cost != null ? String(v.cost) : "",
         Status: "draft",
         Published: "FALSE",
       });

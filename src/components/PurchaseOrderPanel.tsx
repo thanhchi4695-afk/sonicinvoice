@@ -19,6 +19,9 @@ import { CatalogPicker, type CatalogItem } from "@/components/SupplierCatalog";
 import BulkInventoryActions from "@/components/BulkInventoryActions";
 import RoleGate from "@/components/RoleGate";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ClipboardList } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────
 interface POLine {
@@ -631,32 +634,30 @@ const PurchaseOrderPanel = ({ onBack }: Props) => {
       {/* ── LIST VIEW ─────────────────────────────────────── */}
       {view === "list" && (
         <>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold font-display">📋 Purchase Orders</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">{orders.length} orders</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <BulkInventoryActions mode="po" onComplete={loadOrders} />
-              <RoleGate permission="create_po" fallback={null}>
-                <Button variant="teal" size="sm" onClick={() => { resetForm(); setView("create"); }}>
-                  <Plus className="w-4 h-4 mr-1" /> New PO
-                </Button>
-              </RoleGate>
-            </div>
-          </div>
+          <PageHeader
+            title="Purchase Orders"
+            subtitle={`${orders.length} order${orders.length === 1 ? "" : "s"} — track expected stock and match invoices on arrival`}
+            actions={
+              <>
+                <BulkInventoryActions mode="po" onComplete={loadOrders} />
+                <RoleGate permission="create_po" fallback={null}>
+                  <Button variant="teal" size="sm" onClick={() => { resetForm(); setView("create"); }}>
+                    <Plus className="w-4 h-4 mr-1" /> New PO
+                  </Button>
+                </RoleGate>
+              </>
+            }
+          />
 
           {loading ? (
             <div className="text-center py-16 text-sm text-muted-foreground">Loading…</div>
           ) : orders.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-4xl mb-3">📋</p>
-              <p className="text-sm font-medium">No purchase orders yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Create a PO before goods arrive, then match the invoice when it comes in.</p>
-              <Button variant="teal" className="mt-4" onClick={() => { resetForm(); setView("create"); }}>
-                <Plus className="w-4 h-4 mr-1" /> Create first PO
-              </Button>
-            </div>
+            <EmptyState
+              icon={ClipboardList}
+              title="No purchase orders yet"
+              body="Create a PO before goods arrive, then match the invoice when it comes in."
+              cta={{ label: "Create first PO", variant: "teal", onClick: () => { resetForm(); setView("create"); } }}
+            />
           ) : (
             <div className="space-y-2">
               {/* Summary */}

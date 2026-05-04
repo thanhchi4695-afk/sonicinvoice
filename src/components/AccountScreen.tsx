@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES } from "@/i18n/config";
+import { PageHeader } from "@/components/layout/PageHeader";
 const ConnectorsMarketplace = lazy(() => import("@/components/ConnectorsMarketplace"));
 import POSConnectionPanel from "@/components/POSConnectionPanel";
 import PlatformConnectionsSection from "@/components/PlatformConnectionsSection";
@@ -63,8 +64,10 @@ const AccountScreen = () => {
 
   return (
     <div className="px-4 pt-6 pb-24 animate-fade-in">
-      <h1 className="text-2xl font-bold font-display mb-1">Account</h1>
-      <p className="text-muted-foreground text-sm mb-4">Store settings & pricing rules</p>
+      <PageHeader
+        title="Account"
+        subtitle="Store settings, connectors, AI behaviour and team."
+      />
 
       <Tabs defaultValue={(() => {
         if (typeof window === "undefined") return "store";

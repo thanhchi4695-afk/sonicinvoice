@@ -280,6 +280,11 @@ const AccountScreen = () => {
               <ClaudeSkillsLibrary />
             </Suspense>
           </Section>
+          <Section title="🏷️ Multi-brand suppliers">
+            <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+              <MultiBrandSuppliersSection />
+            </Suspense>
+          </Section>
           <DefaultInstructionsSection />
           <SharedLearningSection />
         </TabsContent>

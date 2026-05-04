@@ -722,7 +722,9 @@ const ExportReviewScreen = ({ products, supplierName, onBack, onStartFlow, multi
           {/* Download */}
           <Button variant="success" className="w-full h-14 text-base" onClick={handleExport} disabled={filtered.length === 0 || exportBlocked}>
             <Download className="w-5 h-5 mr-2" />
-            Download {FORMAT_CARDS.find(f => f.id === selectedFormat)?.label} — {filtered.length} products
+            {brandFilter
+              ? `Publish ${brandFilter} only — ${filtered.length} products`
+              : `Download ${FORMAT_CARDS.find(f => f.id === selectedFormat)?.label} — ${filtered.length} products`}
           </Button>
           {exportBlocked && (
             <p className="text-xs text-destructive text-center font-medium">Fix the errors above before exporting</p>

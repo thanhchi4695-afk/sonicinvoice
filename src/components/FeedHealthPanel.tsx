@@ -48,6 +48,9 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
   const [altEditRow, setAltEditRow] = useState<FeedHealthRow | null>(null);
   const [altDraft, setAltDraft] = useState("");
   const [altSaving, setAltSaving] = useState(false);
+  const [altAiLoading, setAltAiLoading] = useState(false);
+  const [bulkAltConfirmOpen, setBulkAltConfirmOpen] = useState(false);
+  const [bulkAltRunning, setBulkAltRunning] = useState(false);
 
   // Currency diagnostic state
   const [primaryCountry, setPrimaryCountry] = useState("Australia");

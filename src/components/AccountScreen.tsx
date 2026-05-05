@@ -33,6 +33,7 @@ import { Switch } from "@/components/ui/switch";
 import { getFormatTemplates, deleteFormatTemplate, getTemplateQuality, getTemplateList, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
 import { getMetafieldConfig, saveMetafieldConfig, type MetafieldDefinition } from "@/lib/metafields";
 import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
+import { toast } from "sonner";
 const TeamManagement = lazy(() => import("@/components/TeamManagement"));
 const AutomationSettings = lazy(() => import("@/components/AutomationSettings"));
 const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"));

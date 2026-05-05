@@ -68,6 +68,7 @@ import AutoAgentsRunSummary, { buildAgentPlan, type AgentRunPlan } from "@/compo
 import ExtractionDebugPanel from "@/components/ExtractionDebugPanel";
 import { LargePdfChunkDialog, getLargePdfDefault, setLargePdfDefault, type LargePdfChoice } from "@/components/LargePdfChunkDialog";
 import { isLargePdf, splitPdf, extractPdfPage, getPdfPageCount } from "@/lib/pdf-splitter";
+import PostPublishHero from "@/components/PostPublishHero";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 

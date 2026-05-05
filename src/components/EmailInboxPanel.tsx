@@ -343,6 +343,31 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     onProcessInvoice?.(supplierName.charAt(0).toUpperCase() + supplierName.slice(1));
   };
 
+  // Smart bulk: auto-process new High-confidence items 1s after they appear
+  useEffect(() => {
+    if (!smartBulk) return;
+    const candidates = gmailItems.filter(
+      i =>
+        (i.confidence ?? computeConfidence(i)) === "high" &&
+        i.status !== "done" &&
+        i.status !== "processing" &&
+        !autoProcessedIds.has(i.id),
+    );
+    if (candidates.length === 0) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    setAutoProcessedIds(prev => {
+      const next = new Set(prev);
+      candidates.forEach(c => next.add(c.id));
+      return next;
+    });
+    candidates.forEach((item, idx) => {
+      timers.push(setTimeout(() => {
+        handleProcess(item).catch(err => console.warn("Smart bulk auto-process failed", err));
+      }, 1000 + idx * 500));
+    });
+    return () => { timers.forEach(clearTimeout); };
+  }, [gmailItems, smartBulk, autoProcessedIds]);
+
   const handleProcessAllKnown = async () => {
     const targets = [...gmailItems, ...simItems].filter(
       i =>

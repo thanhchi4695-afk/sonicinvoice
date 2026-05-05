@@ -382,6 +382,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       attachmentPages: 1,
       attachmentType: guessType(fileName),
       status: "queued",
+      confidence: "low",
     };
     const updated = [newItem, ...simItems];
     setSimItems(updated);

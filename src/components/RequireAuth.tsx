@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useShopifyEmbedded } from "@/lib/shopify-embedded";
+import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
 
 /**
  * Route guard. Redirects to /login when there is no Supabase session.

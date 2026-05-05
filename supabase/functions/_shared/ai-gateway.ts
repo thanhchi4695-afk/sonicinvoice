@@ -49,6 +49,22 @@ interface AIRequestOptions {
   max_tokens?: number;
   tools?: unknown[];
   tool_choice?: unknown;
+  /** Per-call timeout in ms. Defaults to 60_000. Pass an AbortSignal for full control. */
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+/** Returns a signal that aborts when either the caller signal aborts or `ms` elapses. */
+function buildSignal(ms: number, external?: AbortSignal): { signal: AbortSignal; cancel: () => void } {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(new Error(`AI request timed out after ${ms}ms`)), ms);
+  if (external) {
+    if (external.aborted) ctl.abort(external.reason);
+    else external.addEventListener("abort", () => ctl.abort(external.reason), { once: true });
+  }
+  return { signal: ctl.signal, cancel: () => clearTimeout(timer) };
 }
 
 interface AIResponse {

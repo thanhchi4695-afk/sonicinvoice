@@ -141,6 +141,14 @@ export default function ProductCollectionDecomposer({
   const [collections, setCollections] = useState<DecomposedCollection[]>([]);
   const [selectedHandle, setSelectedHandle] = useState<string | null>(null);
 
+  // Rule method preferences (per collection type)
+  const storeName = (() => {
+    try { return JSON.parse(localStorage.getItem("store_config_sonic_invoice") || "{}")?.store_name || "Splash Swimwear"; }
+    catch { return "Splash Swimwear"; }
+  })();
+  const [methodPrefs, setMethodPrefs] = useState<MethodPreferences>(() => loadStoredPrefs(storeName));
+  const [previewCounts, setPreviewCounts] = useState<Record<string, { count: number; titles: string[]; loading?: boolean; error?: string }>>({});
+
   // Catalog-scan state
   const [scanMode, setScanMode] = useState<"full" | "brand" | "type">("full");
   const [scanVendor, setScanVendor] = useState("");

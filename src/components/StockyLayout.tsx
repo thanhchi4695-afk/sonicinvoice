@@ -302,7 +302,7 @@ const StockyLayout = ({
 
       {/* Grouped nav */}
       <nav className="flex-1 px-2 py-3 space-y-3 overflow-y-auto">
-        {groups.map((group) => {
+        {groups.map((group, gIdx) => {
           const GroupIcon = group.icon;
           const isOpen = collapsed ? true : openGroups[group.id] ?? false;
           const groupHasActive = group.items.some((it) => it.id === activeId);

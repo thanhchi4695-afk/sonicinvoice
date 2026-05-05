@@ -334,6 +334,18 @@ async function refreshAccessToken(
   });
   if (!resp.ok) {
     const t = await resp.text();
+    // If Google says the refresh token is dead (revoked/expired/changed
+    // password), mark the connection inactive so the UI prompts to reconnect
+    // instead of silently failing on every scan.
+    if (resp.status === 400 && /invalid_grant/i.test(t)) {
+      await admin
+        .from("gmail_connections")
+        .update({ is_active: false })
+        .eq("user_id", conn.user_id);
+      const err: any = new Error("Gmail authorisation expired — please reconnect.");
+      err.code = "reauth_required";
+      throw err;
+    }
     throw new Error(`Token refresh failed: ${t.slice(0, 200)}`);
   }
   const tokens = await resp.json() as { access_token: string; expires_in: number };

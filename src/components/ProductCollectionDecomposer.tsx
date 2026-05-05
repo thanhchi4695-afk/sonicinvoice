@@ -875,9 +875,17 @@ export default function ProductCollectionDecomposer({
                         <label className="text-xs text-muted-foreground">Meta description ({selected.meta_description.length}/155)</label>
                         <Textarea rows={3} value={selected.meta_description} onChange={(e) => updateSelected({ meta_description: e.target.value })} />
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Rule: products where <b>{selected.rule_column}</b> {selected.rule_relation} <b>"{selected.rule_condition}"</b>
-                      </div>
+                      <RulePreviewPanel
+                        collection={selected}
+                        onUpdate={updateSelected}
+                        onPreview={() => previewMatching(selected)}
+                        previewState={previewCounts[selected.handle]}
+                      />
+                      <MethodChangeRow
+                        levelLabel={selected.level_label}
+                        prefs={methodPrefs}
+                        onChangePrefs={setMethodPrefs}
+                      />
                       <div className="text-xs">
                         <div className="text-muted-foreground mb-1">Matching products ({selected.product_ids.length})</div>
                         <ul className="list-disc pl-5 space-y-0.5">

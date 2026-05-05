@@ -369,6 +369,17 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   };
 
   const items = [...gmailItems, ...simItems];
+  const filteredItems = items.filter(i => {
+    if (filter === "known" && !i.knownSupplier) return false;
+    if (filter === "unknown" && i.knownSupplier) return false;
+    if (filter === "processed" && i.status !== "done") return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const hay = `${i.from ?? ""} ${i.subject ?? ""} ${i.supplierName ?? ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
   const queuedCount = items.filter(i => i.status === "queued" || i.status === "ready").length;
 
   return (

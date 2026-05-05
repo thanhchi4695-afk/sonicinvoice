@@ -21,6 +21,7 @@ import QuickSearchModal from "@/components/QuickSearchModal";
 import PhaseProgressBar from "@/components/PhaseProgressBar";
 import MobileKeyboardHint from "@/components/MobileKeyboardHint";
 import InputSelector from "@/components/InputSelector";
+const FlywheelDashboard = lazy(() => import("@/components/FlywheelDashboard"));
 // HomeScreen kept available (now lazy) — accessible from Tools as "Classic dashboard".
 const HomeScreen = lazy(() => import("@/components/HomeScreen"));
 
@@ -722,6 +723,11 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         )}
         {activeTab === "analytics" && <AnalyticsPanel />}
         {activeTab === "history" && <HistoryScreen />}
+        {activeTab === "flywheel" && (
+          <Suspense fallback={suspenseFallback}>
+            <FlywheelDashboard />
+          </Suspense>
+        )}
         {activeTab === "tools" && <ToolsScreen onStartFlow={handleStartFlow} />}
         {activeTab === "guide" && <HowToCatalog onNavigateToFeature={(f) => setActiveFlow(f as any)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
         {activeTab === "google_ads" && <AdsGuideTabs />}

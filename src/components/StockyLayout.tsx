@@ -39,6 +39,7 @@ import {
   ShoppingCart,
   Download,
   User,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CollectionAutopilotWidget from "@/components/CollectionAutopilotWidget";
@@ -72,6 +73,7 @@ const defaultGroups: NavGroup[] = [
       { id: "ai_agents", label: "AI Agents", icon: Brain, type: "tab" },
       { id: "invoices", label: "Invoices", icon: FileText, type: "tab" },
       { id: "processing_history", label: "Processing History", icon: HistoryIcon, type: "flow" },
+      { id: "flywheel", label: "Flywheel", icon: Zap, type: "tab" },
     ],
   },
   {

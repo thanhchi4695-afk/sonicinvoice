@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Loader2, Bot, CheckCircle2, XCircle, Eye, History, Settings as SettingsIcon, Inbox } from "lucide-react";
 import { createCollectionGraphQL } from "@/lib/shopify-api";
+import HowToVideoButton from "@/components/HowToVideoButton";
 
 type Settings = {
   weekly_health_check: boolean;

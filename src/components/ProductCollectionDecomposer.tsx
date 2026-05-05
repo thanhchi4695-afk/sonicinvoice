@@ -645,9 +645,14 @@ export default function ProductCollectionDecomposer({
             </div>
           )}
 
-          <div className="flex justify-end">
-            <Button onClick={analyse} disabled={products.length === 0}>
-              Analyse collections <ArrowRight className="w-4 h-4 ml-2" />
+          {products.length > 0 && tab !== "catalog" && (
+            <CollectionRuleMethodChooser
+              storeName={storeName}
+              products={products}
+              value={methodPrefs}
+              onChange={setMethodPrefs}
+            />
+          )}
             </Button>
           </div>
         </div>

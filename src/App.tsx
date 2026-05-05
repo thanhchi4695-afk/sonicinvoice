@@ -87,9 +87,11 @@ const App = () => (
               <Route
                 path="/tools/feed-health"
                 element={
-                  <Suspense fallback={null}>
-                    <FeedHealthPanel onBack={() => window.history.back()} />
-                  </Suspense>
+                  <RequireAuth>
+                    <Suspense fallback={null}>
+                      <FeedHealthPanel onBack={() => window.history.back()} />
+                    </Suspense>
+                  </RequireAuth>
                 }
               />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -71,7 +71,7 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
       )}
     </div>
     <nav className="px-2 pb-4 space-y-4">
-      {navSections.map((section) => (
+      {navSections.map((section, sIdx) => (
         <div key={section.title}>
           <p className="px-2 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
             {section.title}
@@ -102,6 +102,17 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
               );
             })}
           </div>
+          {section.title === "Workflows" && (
+            <div className="mt-2 -mx-2">
+              <CollectionAutopilotWidget
+                onOpen={() => {
+                  try { localStorage.setItem("collection_open_tab", "autopilot"); } catch {}
+                  onFlowChange("collection_decomposer");
+                  onClose?.();
+                }}
+              />
+            </div>
+          )}
         </div>
       ))}
     </nav>

@@ -241,7 +241,7 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
           <Upload className="w-5 h-5" />
           {ready
             ? `Continue → upload ${kind === "invoice" ? "invoice" : kind === "html" ? "HTML file" : "packing slip"}`
-            : "Choose both options to continue"}
+            : "Choose all three options to continue"}
         </button>
       </div>
 

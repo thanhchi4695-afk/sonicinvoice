@@ -1712,6 +1712,16 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         }
       }
 
+      if (success > 0) {
+        try {
+          setPushResult({
+            count: success,
+            shopName: (conn as any).shop_name || conn.store_url,
+            storeUrl: conn.store_url,
+          });
+        } catch { /* noop */ }
+      }
+
       if (errors === 0) {
         toast.success(`Pushed ${success} product${success === 1 ? "" : "s"} to Shopify`, {
           id: toastId,

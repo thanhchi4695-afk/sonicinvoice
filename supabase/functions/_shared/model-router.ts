@@ -81,12 +81,46 @@ export interface JobCallOptions extends Omit<AIRequestOptions, "model"> {
   modelOverride?: string;
 }
 
+// ── DB-backed overrides (cached) ─────────────────────────────────────────
+// Admins can flip a job's model in the `ai_model_overrides` table without
+// redeploying. Cached in-memory per worker for 60s to avoid hot-path DB hits.
+const OVERRIDE_TTL_MS = 60_000;
+let overrideCache: Record<string, string> = {};
+let overrideCacheAt = 0;
+let overrideInflight: Promise<void> | null = null;
+
+async function refreshOverrides(): Promise<void> {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return;
+  try {
+    const res = await fetch(`${url}/rest/v1/ai_model_overrides?select=job,model`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) return;
+    const rows = await res.json() as Array<{ job: string; model: string }>;
+    overrideCache = Object.fromEntries(rows.map((r) => [r.job, r.model]));
+    overrideCacheAt = Date.now();
+  } catch (e) {
+    console.warn("[model-router] override fetch failed:", e);
+  }
+}
+
+async function getOverride(job: AIJob): Promise<string | undefined> {
+  if (Date.now() - overrideCacheAt > OVERRIDE_TTL_MS) {
+    if (!overrideInflight) overrideInflight = refreshOverrides().finally(() => { overrideInflight = null; });
+    await overrideInflight;
+  }
+  return overrideCache[job];
+}
+
 /**
  * Run an AI call for a named job. Looks up the configured model + timeout
- * and delegates to the shared gateway helper.
+ * (with optional admin DB override) and delegates to the shared gateway helper.
  */
-export function callAIForJob(job: AIJob, options: JobCallOptions) {
-  const model = options.modelOverride ?? JOB_MODEL[job];
+export async function callAIForJob(job: AIJob, options: JobCallOptions) {
+  const dbOverride = await getOverride(job);
+  const model = options.modelOverride ?? dbOverride ?? JOB_MODEL[job];
   const timeoutMs = options.timeoutMs ?? JOB_TIMEOUT_MS[job] ?? 60_000;
   const { modelOverride: _omit, ...rest } = options;
   return callAI({ ...rest, model, timeoutMs });

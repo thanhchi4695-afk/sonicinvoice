@@ -515,6 +515,36 @@ export type Database = {
           },
         ]
       }
+      ai_model_overrides: {
+        Row: {
+          created_at: string
+          id: string
+          job: string
+          model: string
+          notes: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job: string
+          model: string
+          notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job?: string
+          model?: string
+          notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           brand_sync_last_run_at: string | null

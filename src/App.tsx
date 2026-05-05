@@ -22,6 +22,7 @@ import Unsubscribe from "./pages/Unsubscribe.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import Health from "./pages/Health.tsx";
 import AdminSecrets from "./pages/AdminSecrets.tsx";
+import AdminAIModels from "./pages/AdminAIModels.tsx";
 import Rules from "./pages/Rules.tsx";
 import RulesSetup from "./pages/RulesSetup.tsx";
 import { lazy, Suspense } from "react";
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/health" element={<Health />} />
               <Route path="/admin/secrets" element={<AdminSecrets />} />
+              <Route path="/admin/ai-models" element={<AdminAIModels />} />
               <Route path="/rules" element={<Rules />} />
               <Route path="/rules/setup" element={<RulesSetup />} />
               <Route

@@ -246,6 +246,52 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   };
 
   const handleProcess = async (item: InboxItem) => {
+    // Auto-learn: if this is an unknown Gmail sender, ask whether to save the
+    // domain to a supplier profile so future emails are tagged KNOWN.
+    let resolvedSupplier = item.supplierName ?? null;
+    if (item.source === "gmail" && !item.knownSupplier && item.fromEmail) {
+      const domain = item.fromEmail.split("@")[1]?.toLowerCase();
+      if (domain) {
+        const guess = domain.split(".")[0].replace(/^./, c => c.toUpperCase());
+        const supplierName = window.prompt(
+          `Save ${domain} as a supplier so future emails auto-tag KNOWN?\n\nEnter supplier name (or cancel to skip):`,
+          guess,
+        );
+        if (supplierName && supplierName.trim()) {
+          const trimmed = supplierName.trim();
+          try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const userId = sessionData?.session?.user?.id;
+            if (userId) {
+              const { data: existing } = await supabase
+                .from("supplier_profiles")
+                .select("id, email_domains")
+                .eq("user_id", userId)
+                .eq("supplier_name", trimmed)
+                .maybeSingle();
+              if (existing) {
+                const domains = Array.from(new Set([...(existing.email_domains ?? []), domain]));
+                await supabase.from("supplier_profiles").update({ email_domains: domains }).eq("id", existing.id);
+              } else {
+                await supabase.from("supplier_profiles").insert({
+                  user_id: userId,
+                  supplier_name: trimmed,
+                  email_domains: [domain],
+                  is_active: true,
+                });
+              }
+              resolvedSupplier = trimmed;
+              addAuditEntry("Email", `Learned supplier ${trimmed} from ${domain}`);
+              toast({ title: "Supplier learned", description: `${domain} → ${trimmed}. Future emails will auto-tag KNOWN.` });
+            }
+          } catch (err: any) {
+            console.warn("Auto-learn failed", err);
+            toast({ title: "Couldn't save supplier", description: err?.message ?? String(err), variant: "destructive" });
+          }
+        }
+      }
+    }
+
     if (item.source === "gmail") {
       // Mark processed in DB so it disappears from the queue and call into invoice flow
       await supabase
@@ -259,7 +305,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       saveSimItems(updated);
     }
     addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
-    const supplierName = item.supplierName
+    const supplierName = resolvedSupplier
       || (item.fromEmail.split("@")[1]?.split(".")[0] ?? "Supplier");
     onProcessInvoice?.(supplierName.charAt(0).toUpperCase() + supplierName.slice(1));
   };

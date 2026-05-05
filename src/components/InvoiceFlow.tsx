@@ -69,6 +69,7 @@ import ExtractionDebugPanel from "@/components/ExtractionDebugPanel";
 import { LargePdfChunkDialog, getLargePdfDefault, setLargePdfDefault, type LargePdfChoice } from "@/components/LargePdfChunkDialog";
 import { isLargePdf, splitPdf, extractPdfPage, getPdfPageCount } from "@/lib/pdf-splitter";
 import PostPublishHero from "@/components/PostPublishHero";
+import CollectionAutopilotOnboarding from "@/components/CollectionAutopilotOnboarding";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 
@@ -1520,6 +1521,23 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [pushingShopify, setPushingShopify] = useState(false);
   const [shopifyConnected, setShopifyConnected] = useState<boolean | null>(null);
   const [pushResult, setPushResult] = useState<{ count: number; shopName: string; storeUrl: string } | null>(null);
+  const [showAutopilotOnboarding, setShowAutopilotOnboarding] = useState(false);
+  useEffect(() => {
+    if (!pushResult) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { shouldShowAutopilotOnboarding } = await import("@/components/CollectionAutopilotOnboarding");
+        if (!shouldShowAutopilotOnboarding()) return;
+        const { count, error } = await supabase
+          .from("collection_workflows")
+          .select("id", { count: "exact", head: true });
+        if (cancelled) return;
+        if (!error && (count ?? 0) === 0) setShowAutopilotOnboarding(true);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [pushResult]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -5592,6 +5610,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               }}
             />
           )}
+          <CollectionAutopilotOnboarding
+            open={showAutopilotOnboarding}
+            onClose={() => setShowAutopilotOnboarding(false)}
+          />
 
           {/* Pre-publish: jump into Collection Builder for these products */}
           {!pushResult && validatedProducts.length > 0 && (

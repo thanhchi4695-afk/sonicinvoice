@@ -92,7 +92,7 @@ const groups: BottomGroup[] = [
     icon: Wrench,
     items: [
       { id: "tools", label: "Tools & Feeds", icon: Wrench, type: "tab" },
-      { id: "feed_health", label: "Google Feed Health", icon: HeartPulse, type: "flow" },
+      { id: "feed_health", label: "Feed Health", icon: HeartPulse, type: "route", href: "/tools/feed-health" },
       { id: "ai_agents", label: "AI Agents", icon: Bot, type: "tab" },
       { id: "margin_guardian", label: "Margin Guardian", icon: Shield, type: "route", href: "/rules" },
       { id: "howto", label: "How To", icon: BookOpen, type: "tab" },

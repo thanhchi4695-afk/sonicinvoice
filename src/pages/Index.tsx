@@ -142,6 +142,7 @@ const FLOW_KEYS = {
   style_grouping: true,
   competitor_intel: true,
   collection_seo: true,
+  collection_decomposer: true,
   collection_seo_export: true,
   geo_agentic: true,
   organic_seo: true,

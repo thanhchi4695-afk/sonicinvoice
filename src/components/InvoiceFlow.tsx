@@ -5610,6 +5610,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               }}
             />
           )}
+          <CollectionAutopilotOnboarding
+            open={showAutopilotOnboarding}
+            onClose={() => setShowAutopilotOnboarding(false)}
+          />
 
           {/* Pre-publish: jump into Collection Builder for these products */}
           {!pushResult && validatedProducts.length > 0 && (

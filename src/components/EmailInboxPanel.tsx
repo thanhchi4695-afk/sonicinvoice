@@ -337,10 +337,13 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
 
   const handleProcessAllKnown = async () => {
     const targets = [...gmailItems, ...simItems].filter(
-      i => i.knownSupplier === true && i.status !== "done" && i.status !== "processing",
+      i =>
+        (i.confidence ?? computeConfidence(i)) === "high" &&
+        i.status !== "done" &&
+        i.status !== "processing",
     );
     if (targets.length === 0) {
-      toast({ title: "Nothing to process", description: "No queued invoices from known suppliers." });
+      toast({ title: "Nothing to process", description: "No High-confidence invoices ready. Medium and Low items need manual review." });
       return;
     }
     setBulkProgress({ current: 0, total: targets.length });

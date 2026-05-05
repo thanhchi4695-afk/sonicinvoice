@@ -17,11 +17,18 @@ interface InProduct {
   product_id: string;
 }
 
+interface MethodPreferences {
+  category?: "type" | "tag" | "tag_or_type";
+  brand_category?: "vendor_tag" | "vendor_type" | "title_prefix";
+  sub_category?: "title" | "tag";
+}
+
 interface ReqBody {
   products: InProduct[];
   store_name?: string;
   store_city?: string;
   existing_collection_handles?: string[];
+  method_preferences?: MethodPreferences;
 }
 
 const SYSTEM = `You are a Shopify collection architect for an Australian swimwear retail store.

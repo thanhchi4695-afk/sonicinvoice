@@ -196,6 +196,15 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const shopDomain = (connRow as { shop_domain?: string } | null)?.shop_domain || "";
 
+    if (!shopDomain) {
+      return new Response(JSON.stringify({
+        error: "No Shopify store connected. Go to Account → Connections to connect your store before running the Collection Builder.",
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ── STEP A: fetch existing collections via shopify-proxy ──
     const proxyUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/shopify-proxy`;
     const callProxy = async (action: string) => {

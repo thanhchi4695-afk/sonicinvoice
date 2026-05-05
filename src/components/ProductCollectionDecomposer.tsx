@@ -11,6 +11,13 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { supabase } from "@/integrations/supabase/client";
 import { createCollectionGraphQL } from "@/lib/shopify-api";
 import { toast } from "sonner";
+import CollectionRuleMethodChooser, { loadStoredPrefs } from "@/components/CollectionRuleMethodChooser";
+import {
+  MethodPreferences,
+  getCollectionTypeConfig,
+  prefKeyToMethodLabel,
+} from "@/lib/collection-rule-methods";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type LevelLabel =
   | "brand" | "brand_story" | "category" | "sub_category"

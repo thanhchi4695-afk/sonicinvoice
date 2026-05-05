@@ -16,6 +16,10 @@ import {
   HowToClaudeIntegration,
   HOWTO_CLAUDE_INTEGRATION_FRAMES,
 } from "./scenes/HowToClaudeIntegration";
+import {
+  HowToCollectionAutopilot,
+  HOWTO_COLLECTION_AUTOPILOT_FRAMES,
+} from "./scenes/HowToCollectionAutopilot";
 
 export const RemotionRoot = () => (
   <>

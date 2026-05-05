@@ -131,7 +131,15 @@ export default function ProductCollectionDecomposer({
   onBack, initialProducts, invoiceLabel, onOpenCollectionSEO,
 }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [tab, setTab] = useState<"invoice" | "paste" | "catalog">(initialProducts?.length ? "invoice" : "invoice");
+  const [tab, setTab] = useState<"invoice" | "paste" | "catalog" | "autopilot">(() => {
+    try {
+      if (typeof localStorage !== "undefined" && localStorage.getItem("collection_open_tab") === "autopilot") {
+        localStorage.removeItem("collection_open_tab");
+        return "autopilot";
+      }
+    } catch {}
+    return "invoice";
+  });
   const [products, setProducts] = useState<InProduct[]>(initialProducts ?? []);
   const [pasteText, setPasteText] = useState("");
   const [pasteVendor, setPasteVendor] = useState("");

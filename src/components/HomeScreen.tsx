@@ -1,4 +1,5 @@
 import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock, Brain } from "lucide-react";
+import HomeAutopilotCard from "@/components/HomeAutopilotCard";
 import MigrationChecklist from "@/components/MigrationChecklist";
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -291,6 +292,14 @@ const HomeScreen = ({
         </div>
         <button onClick={onStartPipelineChooser} className="text-[11px] text-primary hover:underline">View all pipelines →</button>
       </div>
+
+      {/* Collection Autopilot widget */}
+      <HomeAutopilotCard
+        onOpenAutopilot={() => {
+          try { localStorage.setItem("collection_open_tab", "autopilot"); } catch {}
+          window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "collection_decomposer" }));
+        }}
+      />
 
       {/* ── HERO ACTIONS ── */}
       <div className="space-y-2 mb-4">

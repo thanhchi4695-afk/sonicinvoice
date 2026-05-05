@@ -29,6 +29,9 @@ interface InboxItem {
   attachmentId?: string;
   attachmentMime?: string;
   parseJobId?: string;
+  parsedVariantCount?: number;
+  importing?: boolean;
+  imported?: boolean;
 }
 
 const computeConfidence = (item: Pick<InboxItem, "knownSupplier" | "supplierName">): "high" | "medium" | "low" => {

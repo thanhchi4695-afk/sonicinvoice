@@ -399,8 +399,12 @@ Deno.serve(async (req) => {
   const jobId = jobRow.id;
 
   try {
+    // Strategy 1 Step 4 — load known patterns for this brand
+    const brandPattern = await loadBrandPattern(admin, userId, supplierName);
+    const brandHints = brandHintsBlock(brandPattern);
+
     // Stage 1
-    const stage1Rows = await stage1Gemini(fileBase64, mimeType, supplierName);
+    const stage1Rows = await stage1Gemini(fileBase64, mimeType, supplierName, brandHints);
     const { level: confidence, completeness } = computeConfidence(stage1Rows);
     await admin
       .from("parse_jobs")
@@ -425,6 +429,13 @@ Deno.serve(async (req) => {
         status: "done",
       })
       .eq("id", jobId);
+
+    // Strategy 1 Step 2 — auto-save brand pattern + stats (best-effort, never fail the job)
+    try {
+      await upsertBrandLearning(admin, userId, supplierName, stage1Rows, completeness);
+    } catch (learnErr) {
+      console.warn("brand learning upsert failed:", (learnErr as Error)?.message);
+    }
 
     return new Response(
       JSON.stringify({

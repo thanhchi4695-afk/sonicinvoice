@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Package, ShoppingBag, Store, Mail, Briefcase, Upload, Check, Link as LinkIcon, Code as CodeIcon } from "lucide-react";
+import { FileText, Package, ShoppingBag, Store, Mail, Briefcase, Upload, Check, Link as LinkIcon, Code as CodeIcon, RefreshCw, Sparkles, Shuffle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HomeWizard from "@/components/HomeWizard";
 import ProductUrlImporter, { type ImportedLineItem } from "@/components/ProductUrlImporter";
@@ -20,6 +20,7 @@ import { toast } from "sonner";
 
 export type UploadKind = "invoice" | "packing_slip" | "html";
 export type PreferredPos = "shopify" | "lightspeed";
+export type ProductMix = "refill" | "new" | "mixed";
 
 interface PhaseFlowHomeProps {
   onStartInvoice: () => void;
@@ -43,11 +44,14 @@ const PHASES = [
 const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
   const [kind, setKind] = useState<UploadKind | null>(null);
   const [pos, setPos] = useState<PreferredPos | null>(null);
+  const [mix, setMix] = useState<ProductMix | null>(null);
 
   // Restore POS choice on mount.
   useEffect(() => {
     const saved = localStorage.getItem("preferred_pos") as PreferredPos | null;
     if (saved === "shopify" || saved === "lightspeed") setPos(saved);
+    const savedMix = localStorage.getItem("product_mix") as ProductMix | null;
+    if (savedMix === "refill" || savedMix === "new" || savedMix === "mixed") setMix(savedMix);
   }, []);
 
   const choosePos = (p: PreferredPos) => {
@@ -55,10 +59,13 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
     localStorage.setItem("preferred_pos", p);
   };
 
-  // When both questions answered, fire the matching flow.
-  // We only auto-advance for invoice — for packing slip we still
-  // require explicit click so the user can pick an alternate entry.
-  const ready = !!kind && !!pos;
+  const chooseMix = (m: ProductMix) => {
+    setMix(m);
+    localStorage.setItem("product_mix", m);
+  };
+
+  // When all questions answered, fire the matching flow.
+  const ready = !!kind && !!pos && !!mix;
 
   const enterFlow = () => {
     if (!kind) return;
@@ -181,6 +188,44 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
         </div>
       </section>
 
+      {/* ── Q3 — What kind of products? ── */}
+      <section className="mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+            3
+          </span>
+          <h2 className="text-base font-semibold">What kind of products are on this invoice?</h2>
+          {mix && (
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              Saved as default
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <TileButton
+            active={mix === "refill"}
+            onClick={() => chooseMix("refill")}
+            icon={<RefreshCw className="w-6 h-6" />}
+            title="Refill / re-entered"
+            subtitle="Existing products — qty & cost update only"
+          />
+          <TileButton
+            active={mix === "new"}
+            onClick={() => chooseMix("new")}
+            icon={<Sparkles className="w-6 h-6" />}
+            title="Brand new products"
+            subtitle="All new — full enrich & create"
+          />
+          <TileButton
+            active={mix === "mixed"}
+            onClick={() => chooseMix("mixed")}
+            icon={<Shuffle className="w-6 h-6" />}
+            title="Mixed"
+            subtitle="Stock-check splits refills vs new"
+          />
+        </div>
+      </section>
+
       {/* ── Continue CTA ── */}
       <div className="mb-6">
         <button
@@ -196,7 +241,7 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
           <Upload className="w-5 h-5" />
           {ready
             ? `Continue → upload ${kind === "invoice" ? "invoice" : kind === "html" ? "HTML file" : "packing slip"}`
-            : "Choose both options to continue"}
+            : "Choose all three options to continue"}
         </button>
       </div>
 

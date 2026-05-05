@@ -973,3 +973,139 @@ export default function ProductCollectionDecomposer({
     </div>
   );
 }
+
+// ────────────────────────────────────────────────────────────
+// Helpers used in Step 2 right panel
+// ────────────────────────────────────────────────────────────
+
+const RULE_COLUMNS: { value: string; label: string }[] = [
+  { value: "tag", label: "tag" },
+  { value: "title", label: "title" },
+  { value: "vendor", label: "vendor" },
+  { value: "type", label: "type" },
+  { value: "variant_price", label: "variant_price" },
+];
+const RULE_RELATIONS: { value: string; label: string }[] = [
+  { value: "equals", label: "equals" },
+  { value: "contains", label: "contains" },
+  { value: "starts_with", label: "starts with" },
+  { value: "ends_with", label: "ends with" },
+  { value: "greater_than", label: "greater than" },
+  { value: "less_than", label: "less than" },
+  { value: "not_equals", label: "not equals" },
+];
+
+function RulePreviewPanel({
+  collection, onUpdate, onPreview, previewState,
+}: {
+  collection: DecomposedCollection;
+  onUpdate: (patch: Partial<DecomposedCollection>) => void;
+  onPreview: () => void;
+  previewState?: { count: number; titles: string[]; loading?: boolean; error?: string };
+}) {
+  const [editing, setEditing] = useState(false);
+  const rules = collection.rules && collection.rules.length > 0
+    ? collection.rules
+    : [{ column: collection.rule_column, relation: collection.rule_relation, condition: collection.rule_condition }];
+  const conjunction = collection.disjunctive ? "OR" : "AND";
+
+  const updateRule = (idx: number, patch: Partial<CollectionRule>) => {
+    const next = rules.map((r, i) => i === idx ? { ...r, ...patch } : r);
+    if (idx === 0 && (!collection.rules || collection.rules.length === 0)) {
+      onUpdate({
+        rules: next,
+        rule_column: next[0].column,
+        rule_relation: next[0].relation,
+        rule_condition: next[0].condition,
+      });
+    } else {
+      onUpdate({ rules: next });
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
+      <div className="text-xs font-semibold text-muted-foreground">Shopify Smart Collection Rule</div>
+      <div className="rounded border border-border bg-background p-2 space-y-1 text-xs font-mono">
+        {rules.map((r, i) => (
+          <div key={i}>
+            {i > 0 && <div className="text-muted-foreground italic font-sans">{conjunction}</div>}
+            {editing ? (
+              <div className="flex flex-wrap gap-1 items-center">
+                <Select value={r.column} onValueChange={(v) => updateRule(i, { column: v })}>
+                  <SelectTrigger className="h-7 w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>{RULE_COLUMNS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <Select value={r.relation} onValueChange={(v) => updateRule(i, { relation: v })}>
+                  <SelectTrigger className="h-7 w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>{RULE_RELATIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input className="h-7 flex-1 min-w-[140px]" value={r.condition} onChange={(e) => updateRule(i, { condition: e.target.value })} />
+              </div>
+            ) : (
+              <div><b>{r.column}</b> {r.relation} <span className="text-primary">"{r.condition}"</span></div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => setEditing(v => !v)}>{editing ? "Done editing" : "Edit rule"}</Button>
+        <Button size="sm" variant="outline" onClick={onPreview} disabled={previewState?.loading}>
+          {previewState?.loading ? "Checking…" : "Preview matching products"}
+        </Button>
+      </div>
+      {previewState && !previewState.loading && !previewState.error && (
+        <div className="text-xs text-muted-foreground">
+          <div className="text-foreground"><b>{previewState.count}</b> products match this rule</div>
+          {previewState.titles.length > 0 && (
+            <ul className="list-disc pl-5 mt-1">
+              {previewState.titles.slice(0, 5).map((t, i) => <li key={i} className="truncate">{t}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+      {previewState?.error && <div className="text-xs text-destructive">{previewState.error}</div>}
+    </div>
+  );
+}
+
+function MethodChangeRow({
+  levelLabel, prefs, onChangePrefs,
+}: {
+  levelLabel: string;
+  prefs: MethodPreferences;
+  onChangePrefs: (p: MethodPreferences) => void;
+}) {
+  const cfg = getCollectionTypeConfig(levelLabel);
+  if (!cfg) return null;
+  if (!cfg.choice_required) {
+    return (
+      <div className="text-[11px] text-muted-foreground">
+        ℹ️ Fixed method: {cfg.fixed_method?.label} — cannot be changed.
+      </div>
+    );
+  }
+  const key = levelLabel as keyof MethodPreferences;
+  const current = prefKeyToMethodLabel(levelLabel, prefs[key]) || "";
+  return (
+    <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-2">
+      ℹ️ Using: <b className="text-foreground">{current}</b>
+      <Select
+        value={prefs[key]}
+        onValueChange={(v) => onChangePrefs({ ...prefs, [key]: v } as MethodPreferences)}
+      >
+        <SelectTrigger className="h-6 w-44 text-[11px]"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {cfg.available_methods!.map(m => {
+            const k = (() => {
+              if (levelLabel === "category") return { "By product type": "type", "By tag": "tag", "By tag OR type (broadest)": "tag_or_type" }[m.label]!;
+              if (levelLabel === "brand_category") return { "By vendor AND tag": "vendor_tag", "By vendor AND type": "vendor_type", "By title prefix": "title_prefix" }[m.label]!;
+              return { "By title keyword": "title", "By tag": "tag" }[m.label]!;
+            })();
+            return <SelectItem key={k} value={k}>{m.label}</SelectItem>;
+          })}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}

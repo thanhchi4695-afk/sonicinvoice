@@ -112,6 +112,7 @@ export async function logCorrection(input: LogCorrectionInput): Promise<void> {
       supplier_profile_id: profile?.id ?? null,
       invoice_pattern_id: invoicePatternId,
       supplier_name: supplierName,
+      brand_name: supplierName, // Strategy 1: brand-level rollups
       invoice_id: input.invoiceId ?? null,
       field_corrected: field,
       original_value: originalValue.slice(0, 500),
@@ -122,6 +123,12 @@ export async function logCorrection(input: LogCorrectionInput): Promise<void> {
       auto_detected: input.autoDetected ?? false,
       session_invoice_index: input.sessionInvoiceIndex ?? null,
     } as never);
+
+    // Strategy 1 Step 3 — visible flywheel feedback
+    toast.success("Improvement saved", {
+      description: `${field}: "${originalValue.slice(0, 30)}" → "${correctedValue.slice(0, 30)}"`,
+      duration: 1800,
+    });
 
     // Mirror to learning log so the chronological "Learning Log" tab on the
     // Supplier Intelligence Panel sees every correction in real time.

@@ -41,6 +41,7 @@ import {
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import CollectionAutopilotWidget from "@/components/CollectionAutopilotWidget";
 
 export interface StockyNavItem {
   id: string;

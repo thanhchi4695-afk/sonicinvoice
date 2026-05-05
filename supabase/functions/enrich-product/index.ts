@@ -67,8 +67,7 @@ RESPOND WITH JSON ONLY, no other text:
   "note": "any issue encountered or empty string"
 }`;
 
-    const data = await callAI({
-      model: "google/gemini-2.5-flash",
+    const data = await callAIForJob("product.enrich", {
       messages: [
         { role: "system", content: "You are a product data enrichment assistant. Always respond with valid JSON only." },
         { role: "user", content: prompt },

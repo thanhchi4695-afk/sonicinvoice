@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { callAIForJob } from "../_shared/model-router.ts";
 import { loadSkillsForTask, asSkillsPreamble } from "../_shared/claude-skills.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -87,8 +88,7 @@ RESPOND WITH A JSON ARRAY matching input order.`;
       `Item ${i + 1}: title="${p.title || ""}" | type="${p.type || ""}" | vendor="${p.vendor || ""}" | colour="${p.colour || ""}" | tags="${p.tags || ""}" | pattern="${p.pattern || ""}"`
     ).join("\n");
 
-    const data = await callAI({
-      model: "google/gemini-3-flash-preview",
+    const data = await callAIForJob("seo.description", {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },

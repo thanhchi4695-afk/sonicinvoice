@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { callAIForJob } from "../_shared/model-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,8 +67,7 @@ RESPOND WITH JSON ONLY, no other text:
   "note": "any issue encountered or empty string"
 }`;
 
-    const data = await callAI({
-      model: "google/gemini-2.5-flash",
+    const data = await callAIForJob("product.enrich", {
       messages: [
         { role: "system", content: "You are a product data enrichment assistant. Always respond with valid JSON only." },
         { role: "user", content: prompt },

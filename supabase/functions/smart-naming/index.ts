@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { callAIForJob } from "../_shared/model-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,8 +63,7 @@ RESPOND WITH A JSON ARRAY matching the input order:
       `Item ${i + 1}: "${p.title || p.raw || ""}" | vendor_hint: "${p.vendor || ""}" | sku: "${p.sku || ""}" | barcode: "${p.barcode || ""}" | colour: "${p.colour || ""}" | type_hint: "${p.type || ""}"`
     ).join("\n");
 
-    const data = await callAI({
-      model: "google/gemini-3-flash-preview",
+    const data = await callAIForJob("product.naming", {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },

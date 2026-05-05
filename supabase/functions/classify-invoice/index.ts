@@ -3,7 +3,8 @@
 // Looks at the document and answers metadata-only questions.
 // Does NOT extract any product data.
 // ───────────────────────────────────────────────────────────────
-import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { callAIForJob } from "../_shared/model-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,8 +78,7 @@ Deno.serve(async (req) => {
       userContent.push({ type: "text", text: `File: ${filename}\nClassify this document per the schema above. JSON only.` });
     }
 
-    const data = await callAI({
-      model: "google/gemini-2.5-flash",
+    const data = await callAIForJob("invoice.classify", {
       temperature: 0.0,
       max_tokens: 800,
       messages: [

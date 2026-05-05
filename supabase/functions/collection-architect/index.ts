@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { callAI, getContent } from "../_shared/ai-gateway.ts";
+import { getContent } from "../_shared/ai-gateway.ts";
+import { callAIForJob } from "../_shared/model-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -80,8 +81,7 @@ Your job: Given products from a supplier invoice, generate a complete, scalable 
       return `Product ${i + 1}: title="${p.title || ""}" | brand="${p.vendor || p.brand || ""}" | type="${p.product_type || p.type || ""}" | colour="${p.colour || p.color || ""}" | tags="${tags}" | price=${p.price || p.retail_price || 0} | style_number="${p.style_number || ""}" | description="${(p.description || "").slice(0, 200)}"`;
     }).join("\n");
 
-    const data = await callAI({
-      model: "google/gemini-2.5-flash",
+    const data = await callAIForJob("collection.architect", {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },

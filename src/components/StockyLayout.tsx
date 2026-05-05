@@ -113,7 +113,6 @@ const defaultGroups: NavGroup[] = [
     items: [
       { id: "tools", label: "All Tools", icon: Wrench, type: "tab" },
       { id: "margin_guardian", label: "Margin Guardian", icon: Shield, type: "tab" },
-      { id: "collection_decomposer", label: "Collection Builder", icon: Layers, type: "flow" },
       { id: "collection_seo", label: "Collection SEO AI", icon: Globe, type: "flow" },
       { id: "feed_health", label: "Feed Health", icon: HeartPulse, type: "flow" },
       { id: "feed_optimise", label: "AI Feed Optimisation", icon: Sparkles, type: "flow" },

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Loader2, Layers, Sparkles, ExternalLink, RefreshCw, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Layers, Sparkles, ExternalLink, RefreshCw, Check, Search, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,11 +80,42 @@ function loadProductsFromLocalStorage(): InProduct[] {
   return [];
 }
 
+interface CatalogSuggestion {
+  title: string;
+  handle: string;
+  level: "brand" | "brand_story" | "category" | "brand_category" | "feature";
+  priority: "high" | "medium" | "low";
+  estimated_products: number;
+  rule_column: "tag" | "vendor" | "title" | "product_type";
+  rule_relation: "equals" | "contains" | "starts_with";
+  rule_condition: string;
+  seo_title: string;
+  meta_description: string;
+  rationale: string;
+  selected: boolean;
+}
+
+interface EmptyCollection {
+  id: string | number;
+  title: string;
+  handle: string;
+  kind: "custom" | "smart";
+  products_count: number;
+  recommendation: "delete" | "keep" | "fix_rules";
+}
+
+interface GapStats {
+  brands_without_collection?: number;
+  style_lines_without_collection?: number;
+  feature_gaps?: string[];
+  total_products_uncollected?: number;
+}
+
 export default function ProductCollectionDecomposer({
   onBack, initialProducts, invoiceLabel, onOpenCollectionSEO,
 }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [tab, setTab] = useState<"invoice" | "paste">(initialProducts?.length ? "invoice" : "invoice");
+  const [tab, setTab] = useState<"invoice" | "paste" | "catalog">(initialProducts?.length ? "invoice" : "invoice");
   const [products, setProducts] = useState<InProduct[]>(initialProducts ?? []);
   const [pasteText, setPasteText] = useState("");
   const [pasteVendor, setPasteVendor] = useState("");
@@ -94,6 +125,19 @@ export default function ProductCollectionDecomposer({
   const [analysing, setAnalysing] = useState(false);
   const [collections, setCollections] = useState<DecomposedCollection[]>([]);
   const [selectedHandle, setSelectedHandle] = useState<string | null>(null);
+
+  // Catalog-scan state
+  const [scanMode, setScanMode] = useState<"full" | "brand" | "type">("full");
+  const [scanVendor, setScanVendor] = useState("");
+  const [scanType, setScanType] = useState("");
+  const [scanProgress, setScanProgress] = useState<string[]>([]);
+  const [isCatalogScan, setIsCatalogScan] = useState(false);
+  const [catalogSuggestions, setCatalogSuggestions] = useState<CatalogSuggestion[]>([]);
+  const [emptyCollections, setEmptyCollections] = useState<EmptyCollection[]>([]);
+  const [gapStats, setGapStats] = useState<GapStats>({});
+  const [scanStats, setScanStats] = useState<{ total_existing_collections?: number; unique_products?: number; unique_brands?: number }>({});
+  const [priorityFilter, setPriorityFilter] = useState<"all" | "high" | "medium" | "low" | "feature" | "brand">("all");
+  const [deletingEmpty, setDeletingEmpty] = useState(false);
 
   const [pushing, setPushing] = useState(false);
   const [pushProgress, setPushProgress] = useState(0);
@@ -183,7 +227,174 @@ export default function ProductCollectionDecomposer({
     }
   };
 
-  // ── Step 2 grouping ──
+  // ── Catalog gap scan (Mode: full / brand / type) ──
+  const runCatalogScan = async () => {
+    setIsCatalogScan(true);
+    setAnalysing(true);
+    setStep(2);
+    setCatalogSuggestions([]);
+    setEmptyCollections([]);
+    setGapStats({});
+    setScanStats({});
+    setScanProgress(["Fetching existing collections…"]);
+
+    const storeConfig = (() => {
+      try { return JSON.parse(localStorage.getItem("store_config_sonic_invoice") || "{}"); }
+      catch { return {}; }
+    })();
+
+    try {
+      // Animate progress steps while AI runs
+      const steps = [
+        "Fetching existing collections…",
+        "Loading in-stock products…",
+        "Identifying style lines…",
+        "AI gap analysis…",
+        "Building suggestions…",
+      ];
+      let stepIdx = 0;
+      const interval = setInterval(() => {
+        stepIdx = Math.min(stepIdx + 1, steps.length - 1);
+        setScanProgress(steps.slice(0, stepIdx + 1));
+      }, 6000);
+
+      const { data, error } = await supabase.functions.invoke("catalog-collection-audit", {
+        body: {
+          store_name: storeConfig.store_name || "Splash Swimwear",
+          store_city: storeConfig.store_city || "Darwin",
+          mode: scanMode,
+          filter_vendor: scanMode === "brand" ? scanVendor : undefined,
+          filter_type: scanMode === "type" ? scanType : undefined,
+          max_products: 800,
+        },
+      });
+      clearInterval(interval);
+      setScanProgress(steps);
+
+      if (error) throw error;
+
+      const suggestions: CatalogSuggestion[] = (data?.suggested_collections ?? []).map((s: any) => ({
+        ...s,
+        selected: s.priority === "high",
+      }));
+      setCatalogSuggestions(suggestions);
+      setEmptyCollections(data?.empty_collections ?? []);
+      setGapStats(data?.gap_analysis ?? {});
+      setScanStats(data?.stats ?? {});
+      try {
+        localStorage.setItem("catalog_audit_last_run", new Date().toISOString());
+        localStorage.setItem("catalog_audit_last_count", String(suggestions.length));
+      } catch { /* */ }
+      toast.success(`${suggestions.length} collection gaps identified`);
+    } catch (e: any) {
+      toast.error(e?.message || "Catalog scan failed");
+      setStep(1);
+      setIsCatalogScan(false);
+    } finally {
+      setAnalysing(false);
+    }
+  };
+
+  const toggleSuggestion = (handle: string, value: boolean) => {
+    setCatalogSuggestions(prev => prev.map(s => s.handle === handle ? { ...s, selected: value } : s));
+  };
+
+  const filteredSuggestions = useMemo(() => {
+    if (priorityFilter === "all") return catalogSuggestions;
+    if (priorityFilter === "feature") return catalogSuggestions.filter(s => s.level === "feature");
+    if (priorityFilter === "brand") return catalogSuggestions.filter(s => s.level === "brand" || s.level === "brand_story" || s.level === "brand_category");
+    return catalogSuggestions.filter(s => s.priority === priorityFilter);
+  }, [catalogSuggestions, priorityFilter]);
+
+  const selectedSuggestionCount = catalogSuggestions.filter(s => s.selected).length;
+
+  const pushCatalogSuggestions = async () => {
+    const toPush = catalogSuggestions.filter(s => s.selected);
+    if (toPush.length === 0) {
+      toast.error("No suggestions selected.");
+      return;
+    }
+    setStep(3);
+    setPushing(true);
+    setPushProgress(0);
+    const results: typeof pushResults = [];
+    const { data: { user } } = await supabase.auth.getUser();
+    let shopDomain = "";
+    try {
+      if (user) {
+        const { data } = await supabase
+          .from("platform_connections")
+          .select("shop_domain")
+          .eq("user_id", user.id)
+          .eq("platform", "shopify")
+          .eq("is_active", true)
+          .maybeSingle();
+        shopDomain = (data as { shop_domain?: string } | null)?.shop_domain || "";
+      }
+    } catch { /* */ }
+
+    for (let i = 0; i < toPush.length; i++) {
+      const s = toPush[i];
+      try {
+        const result = await createCollectionGraphQL({
+          title: s.title,
+          handle: s.handle,
+          seo: { title: s.seo_title, description: s.meta_description },
+          ruleSet: {
+            appliedDisjunctively: false,
+            rules: [{ column: s.rule_column, relation: s.rule_relation, condition: s.rule_condition }],
+          },
+        });
+        const shopifyId = result?.id || result?.admin_graphql_api_id || "";
+        results.push({ handle: s.handle, title: s.title, ok: true, shopifyId });
+        if (user && shopDomain) {
+          await supabase.from("collection_memory").upsert({
+            user_id: user.id,
+            shop_domain: shopDomain,
+            collection_title: s.title,
+            collection_handle: s.handle,
+            shopify_collection_id: String(shopifyId || ""),
+            level: s.level,
+            source_invoice: "catalog_audit",
+          }, { onConflict: "user_id,shop_domain,collection_handle" });
+        }
+      } catch (e: any) {
+        results.push({ handle: s.handle, title: s.title, ok: false, error: e?.message || "Failed" });
+      }
+      setPushProgress(Math.round(((i + 1) / toPush.length) * 100));
+      setPushResults([...results]);
+      await new Promise(r => setTimeout(r, 500));
+    }
+    setPushing(false);
+    toast.success(`${results.filter(r => r.ok).length} collections created`);
+  };
+
+  const deleteEmptyCollection = async (e: EmptyCollection) => {
+    if (!confirm(`Delete collection "${e.title}" from Shopify? This cannot be undone.`)) return;
+    setDeletingEmpty(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("shopify-proxy", {
+        body: { action: "delete_collection", collection_id: e.id, collection_type: e.kind },
+      });
+      if (error) throw error;
+      if ((data as any)?.success) {
+        setEmptyCollections(prev => prev.filter(x => x.handle !== e.handle));
+        toast.success(`Deleted ${e.title}`);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from("collection_memory").delete()
+            .eq("user_id", user.id)
+            .eq("collection_handle", e.handle);
+        }
+      } else {
+        throw new Error((data as any)?.error || "Delete failed");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete collection");
+    } finally {
+      setDeletingEmpty(false);
+    }
+  };
   const grouped = useMemo(() => {
     const byLabel: Record<string, DecomposedCollection[]> = {};
     for (const c of collections) {
@@ -298,6 +509,9 @@ export default function ProductCollectionDecomposer({
             <TabsList>
               <TabsTrigger value="invoice">From invoice</TabsTrigger>
               <TabsTrigger value="paste">Paste titles</TabsTrigger>
+              <TabsTrigger value="catalog">
+                <Search className="w-3.5 h-3.5 mr-1" /> Scan full catalog
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="invoice" className="space-y-3 pt-3">
               <p className="text-sm text-muted-foreground">
@@ -319,6 +533,74 @@ export default function ProductCollectionDecomposer({
                 <Input placeholder="Product type (e.g. Bikini Bottoms)" value={pasteType} onChange={(e) => setPasteType(e.target.value)} />
               </div>
               <Button onClick={loadFromPaste} variant="secondary">Load pasted titles</Button>
+            </TabsContent>
+            <TabsContent value="catalog" className="space-y-4 pt-3">
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Search className="w-5 h-5 text-primary mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-semibold">Full Catalog Gap Analysis</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Scan all your Shopify products and collections to find what's missing.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  <label className="text-xs font-medium text-muted-foreground">Scope</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="scanMode" checked={scanMode === "full"} onChange={() => setScanMode("full")} />
+                      <span>All brands (full catalog)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="scanMode" checked={scanMode === "brand"} onChange={() => setScanMode("brand")} />
+                      <span>One brand only</span>
+                      <Input
+                        className="h-7 w-44 ml-1"
+                        placeholder="e.g. Seafolly"
+                        value={scanVendor}
+                        onChange={(e) => { setScanVendor(e.target.value); setScanMode("brand"); }}
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="scanMode" checked={scanMode === "type"} onChange={() => setScanMode("type")} />
+                      <span>One category</span>
+                      <Input
+                        className="h-7 w-44 ml-1"
+                        placeholder="e.g. Bikini Bottoms"
+                        value={scanType}
+                        onChange={(e) => { setScanType(e.target.value); setScanMode("type"); }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {(() => {
+                  let lastRun = "never";
+                  let lastCount: string | null = null;
+                  try {
+                    const ts = localStorage.getItem("catalog_audit_last_run");
+                    if (ts) lastRun = new Date(ts).toLocaleString();
+                    lastCount = localStorage.getItem("catalog_audit_last_count");
+                  } catch { /* */ }
+                  return (
+                    <div className="rounded border border-border bg-card/50 p-2 text-xs text-muted-foreground space-y-0.5">
+                      <div>📊 Last scan: <span className="text-foreground">{lastRun}</span></div>
+                      <div>Gaps identified: <span className="text-foreground">{lastCount ?? "—"}</span></div>
+                    </div>
+                  );
+                })()}
+
+                <Button
+                  onClick={runCatalogScan}
+                  disabled={analysing || (scanMode === "brand" && !scanVendor.trim()) || (scanMode === "type" && !scanType.trim())}
+                  className="w-full"
+                >
+                  <Search className="w-4 h-4 mr-2" />
+                  Scan now — analyse full catalog
+                </Button>
+              </div>
             </TabsContent>
           </Tabs>
 
@@ -348,9 +630,146 @@ export default function ProductCollectionDecomposer({
       {step === 2 && (
         <div className="space-y-4">
           {analysing ? (
-            <div className="flex items-center gap-3 text-sm text-muted-foreground py-12 justify-center">
-              <Loader2 className="w-5 h-5 animate-spin" /> AI is analysing {products.length} products…
+            <div className="py-8 max-w-md mx-auto space-y-3">
+              <div className="flex items-center gap-3 text-sm text-foreground justify-center mb-2">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                {isCatalogScan ? "Running full catalog audit…" : `AI is analysing ${products.length} products…`}
+              </div>
+              {isCatalogScan && (
+                <ul className="space-y-1 text-sm">
+                  {["Fetching existing collections…","Loading in-stock products…","Identifying style lines…","AI gap analysis…","Building suggestions…"].map((label, idx) => {
+                    const done = idx < scanProgress.length - 1;
+                    const active = idx === scanProgress.length - 1;
+                    return (
+                      <li key={idx} className={`flex items-center gap-2 ${active ? "text-foreground" : done ? "text-muted-foreground" : "text-muted-foreground/50"}`}>
+                        {done ? <Check className="w-4 h-4 text-primary" /> : active ? <Loader2 className="w-4 h-4 animate-spin" /> : <span className="w-4 h-4 inline-block">○</span>}
+                        {label}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
+          ) : isCatalogScan ? (
+            <>
+              {/* SECTION A — Gap summary */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                  <div className="text-2xl font-bold text-destructive">{gapStats.brands_without_collection ?? 0}</div>
+                  <div className="text-xs text-muted-foreground">brands without collection</div>
+                </div>
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="text-2xl font-bold text-amber-500">{gapStats.style_lines_without_collection ?? 0}</div>
+                  <div className="text-xs text-muted-foreground">style lines without collection</div>
+                </div>
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+                  <div className="text-2xl font-bold text-primary">{(gapStats.feature_gaps ?? []).length}</div>
+                  <div className="text-xs text-muted-foreground">feature collections missing</div>
+                </div>
+                <div className="rounded-md border border-border bg-card p-3">
+                  <div className="text-2xl font-bold">{emptyCollections.length}</div>
+                  <div className="text-xs text-muted-foreground">existing collections empty/stale</div>
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                Scanned {scanStats.unique_products ?? 0} products across {scanStats.unique_brands ?? 0} brands · {scanStats.total_existing_collections ?? 0} existing collections
+              </div>
+
+              {/* SECTION B — Suggested new collections */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold flex-1">Suggested new collections ({catalogSuggestions.length})</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {(["all","high","medium","low","feature","brand"] as const).map(p => (
+                      <Button key={p} size="sm" variant={priorityFilter === p ? "default" : "outline"} onClick={() => setPriorityFilter(p)}>
+                        {p === "all" ? "All" : p === "feature" ? "Feature only" : p === "brand" ? "Brand only" : `${p[0].toUpperCase()}${p.slice(1)} priority`}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border border-border rounded-md bg-card overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-2 py-2 text-left w-8"></th>
+                        <th className="px-2 py-2 text-left">Title</th>
+                        <th className="px-2 py-2 text-left">Level</th>
+                        <th className="px-2 py-2 text-left">Priority</th>
+                        <th className="px-2 py-2 text-right">Est. products</th>
+                        <th className="px-2 py-2 text-left">Rule</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSuggestions.length === 0 && (
+                        <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground text-xs">No suggestions match this filter.</td></tr>
+                      )}
+                      {filteredSuggestions.map(s => (
+                        <tr key={s.handle} className="border-t border-border hover:bg-muted/30">
+                          <td className="px-2 py-1.5">
+                            <Checkbox checked={s.selected} onCheckedChange={(v) => toggleSuggestion(s.handle, !!v)} />
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <div className="font-medium">{s.title}</div>
+                            <div className="text-[10px] text-muted-foreground italic truncate max-w-md">{s.rationale}</div>
+                          </td>
+                          <td className="px-2 py-1.5"><Badge variant="outline" className="text-[10px]">{s.level}</Badge></td>
+                          <td className="px-2 py-1.5">
+                            <Badge className={`text-[10px] ${s.priority === "high" ? "bg-destructive/20 text-destructive" : s.priority === "medium" ? "bg-amber-500/20 text-amber-600" : "bg-muted"}`}>
+                              {s.priority}
+                            </Badge>
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono text-xs">{s.estimated_products}</td>
+                          <td className="px-2 py-1.5 text-xs text-muted-foreground">
+                            {s.rule_column} {s.rule_relation} "{s.rule_condition}"
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* SECTION C — Empty / stale collections */}
+              {emptyCollections.length > 0 && (
+                <Accordion type="single" collapsible>
+                  <AccordionItem value="empty">
+                    <AccordionTrigger className="text-sm">
+                      <span className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        Empty / stale collections ({emptyCollections.length})
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <ul className="space-y-1">
+                        {emptyCollections.map(e => (
+                          <li key={e.handle} className="flex items-center gap-2 px-2 py-1.5 rounded border border-border text-sm">
+                            <span className="flex-1 truncate">
+                              <b>{e.title}</b>
+                              <span className="text-xs text-muted-foreground ml-2">— {e.products_count} products</span>
+                            </span>
+                            <Badge variant="outline" className="text-[10px]">{e.kind}</Badge>
+                            <Button size="sm" variant="destructive" disabled={deletingEmpty} onClick={() => deleteEmptyCollection(e)}>
+                              <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              )}
+
+              <div className="flex justify-between sticky bottom-0 bg-background pt-3 pb-1 border-t border-border">
+                <Button variant="ghost" onClick={() => { setStep(1); setIsCatalogScan(false); }}>
+                  <ArrowLeft className="w-4 h-4 mr-1" /> Back
+                </Button>
+                <Button onClick={pushCatalogSuggestions} disabled={selectedSuggestionCount === 0}>
+                  <Sparkles className="w-4 h-4 mr-2" /> Create {selectedSuggestionCount} collections in Shopify
+                </Button>
+              </div>
+            </>
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2">
@@ -422,7 +841,7 @@ export default function ProductCollectionDecomposer({
                         <Textarea rows={3} value={selected.meta_description} onChange={(e) => updateSelected({ meta_description: e.target.value })} />
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Rule: products where <b>{selected.rule_column}</b> {selected.rule_relation} <b>“{selected.rule_condition}”</b>
+                        Rule: products where <b>{selected.rule_column}</b> {selected.rule_relation} <b>"{selected.rule_condition}"</b>
                       </div>
                       <div className="text-xs">
                         <div className="text-muted-foreground mb-1">Matching products ({selected.product_ids.length})</div>

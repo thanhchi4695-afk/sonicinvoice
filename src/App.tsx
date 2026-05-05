@@ -26,6 +26,7 @@ import RulesSetup from "./pages/RulesSetup.tsx";
 import { lazy, Suspense } from "react";
 const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleShoppingHub.tsx"));
 const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx"));
+const FeedHealthPanel = lazy(() => import("./components/FeedHealthPanel.tsx"));
 
 const queryClient = new QueryClient();
 

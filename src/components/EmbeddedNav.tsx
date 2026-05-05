@@ -1,4 +1,4 @@
-import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight, X, Users, Brain, History, Sparkles, Bot, Sparkle } from "lucide-react";
+import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight, X, Users, Brain, History, Sparkles, Bot, Sparkle, HeartPulse, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EmbeddedNavProps {
@@ -42,6 +42,7 @@ const navSections = [
     title: "Tools",
     items: [
       { id: "tools", label: "Tools & Feeds", icon: Wrench, type: "tab" as const },
+      { id: "feed_health", label: "Google Feed Health", icon: HeartPulse, type: "flow" as const },
       { id: "claude_integration", label: "Claude Integration", icon: Sparkle, type: "tab" as const },
     ],
   },

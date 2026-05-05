@@ -64,6 +64,7 @@ const MetaAdsSetupWizard = lazy(() => import("@/components/MetaAdsSetupWizard"))
 const PerformanceDashboard = lazy(() => import("@/components/PerformanceDashboard"));
 const AIFeedOptimisation = lazy(() => import("@/components/AIFeedOptimisation"));
 const FeedHealthPanel = lazy(() => import("@/components/FeedHealthPanel"));
+const ProductCollectionDecomposer = lazy(() => import("@/components/ProductCollectionDecomposer"));
 const GoogleColourFlow = lazy(() => import("@/components/GoogleColourFlow"));
 const GoogleAdsFlow = lazy(() => import("@/components/GoogleAdsFlow"));
 const StyleGroupingFlow = lazy(() => import("@/components/StyleGroupingFlow"));
@@ -141,6 +142,7 @@ const FLOW_KEYS = {
   style_grouping: true,
   competitor_intel: true,
   collection_seo: true,
+  collection_decomposer: true,
   collection_seo_export: true,
   geo_agentic: true,
   organic_seo: true,
@@ -511,6 +513,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       case "style_grouping": flowEl = <StyleGroupingFlow onBack={() => setActiveFlow(null)} />; break;
       case "competitor_intel": flowEl = <CompetitorIntelFlow onBack={() => setActiveFlow(null)} />; break;
       case "collection_seo": flowEl = <CollectionSEOFlow onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
+      case "collection_decomposer": flowEl = <ProductCollectionDecomposer onBack={() => setActiveFlow(null)} onOpenCollectionSEO={() => handleStartFlow("collection_seo")} />; break;
       case "collection_seo_export": flowEl = <CollectionSEOExport onBack={() => setActiveFlow(null)} />; break;
       case "geo_agentic": flowEl = <GeoAgenticFlow onBack={() => setActiveFlow(null)} />; break;
       case "organic_seo": flowEl = <OrganicSEOFlow onBack={() => setActiveFlow(null)} />; break;

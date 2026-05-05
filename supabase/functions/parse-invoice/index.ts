@@ -324,6 +324,83 @@ async function stage3Perplexity(rows: any[], supplierName: string) {
   return rows;
 }
 
+// Strategy 1 Step 2 — upsert brand_patterns + brand_stats after a successful parse
+async function upsertBrandLearning(
+  admin: any,
+  userId: string,
+  brandName: string,
+  stage1Rows: ParsedRow[],
+  completeness: number,
+) {
+  const brand = (brandName || "").trim();
+  if (!brand) return;
+
+  const skuSamples = stage1Rows.map(r => r.styleNumber).filter(Boolean) as string[];
+  const sizeSamples = stage1Rows.map(r => r.size).filter(Boolean) as string[];
+  const prices = stage1Rows.map(r => r.rrp ?? r.costPrice).filter((n): n is number => typeof n === "number" && n > 0);
+  const skuFormat = skuSamples[0] ? skuSamples[0].replace(/[A-Z]/g, "A").replace(/[a-z]/g, "a").replace(/\d/g, "9") : null;
+  const sizeSchema = (() => {
+    if (sizeSamples.some(s => /^(XS|S|M|L|XL|XXL)$/i.test(s))) return "AU-alpha";
+    if (sizeSamples.some(s => /^\d{1,2}$/.test(s))) return "AU-numeric";
+    return null;
+  })();
+  const priceMin = prices.length ? Math.min(...prices) : null;
+  const priceMax = prices.length ? Math.max(...prices) : null;
+
+  const { data: existingPat } = await admin
+    .from("brand_patterns")
+    .select("id, sample_count, accuracy_rate")
+    .eq("user_id", userId)
+    .ilike("brand_name", brand)
+    .maybeSingle();
+
+  if (existingPat) {
+    const n = (existingPat.sample_count ?? 0) + 1;
+    const newAccuracy = ((existingPat.accuracy_rate ?? 1) * (n - 1) + completeness) / n;
+    await admin.from("brand_patterns").update({
+      sample_count: n,
+      accuracy_rate: newAccuracy,
+      updated_at: new Date().toISOString(),
+    }).eq("id", existingPat.id);
+  } else {
+    await admin.from("brand_patterns").insert({
+      user_id: userId,
+      brand_name: brand,
+      supplier_sku_format: skuFormat,
+      size_schema: sizeSchema,
+      price_band_min: priceMin,
+      price_band_max: priceMax,
+      sample_count: 1,
+      accuracy_rate: completeness,
+    });
+  }
+
+  const { data: existingStat } = await admin
+    .from("brand_stats")
+    .select("id, total_invoices_parsed, avg_accuracy")
+    .eq("user_id", userId)
+    .ilike("brand_name", brand)
+    .maybeSingle();
+
+  if (existingStat) {
+    const n = (existingStat.total_invoices_parsed ?? 0) + 1;
+    const avg = ((existingStat.avg_accuracy ?? 1) * (n - 1) + completeness) / n;
+    await admin.from("brand_stats").update({
+      total_invoices_parsed: n,
+      avg_accuracy: avg,
+      last_seen_at: new Date().toISOString(),
+    }).eq("id", existingStat.id);
+  } else {
+    await admin.from("brand_stats").insert({
+      user_id: userId,
+      brand_name: brand,
+      total_invoices_parsed: 1,
+      avg_accuracy: completeness,
+      last_seen_at: new Date().toISOString(),
+    });
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 

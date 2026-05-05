@@ -778,8 +778,8 @@ export default function ProductCollectionDecomposer({
                             </Badge>
                           </td>
                           <td className="px-2 py-1.5 text-right font-mono text-xs">{s.estimated_products}</td>
-                          <td className="px-2 py-1.5 text-xs text-muted-foreground">
-                            {s.rule_column} {s.rule_relation} "{s.rule_condition}"
+                          <td className="px-2 py-1.5">
+                            <RulePill column={s.rule_column} relation={s.rule_relation} condition={s.rule_condition} />
                           </td>
                         </tr>
                       ))}

@@ -1518,6 +1518,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   // matches the variant-grouping rules used elsewhere in the app.
   const [pushingShopify, setPushingShopify] = useState(false);
   const [shopifyConnected, setShopifyConnected] = useState<boolean | null>(null);
+  const [pushResult, setPushResult] = useState<{ count: number; shopName: string; storeUrl: string } | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {

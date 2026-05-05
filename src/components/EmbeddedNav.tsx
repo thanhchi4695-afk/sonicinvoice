@@ -43,7 +43,6 @@ const navSections = [
     items: [
       { id: "tools", label: "Tools & Feeds", icon: Wrench, type: "tab" as const },
       { id: "feed_health", label: "Google Feed Health", icon: HeartPulse, type: "flow" as const },
-      { id: "margin_guardian", label: "Margin Guardian", icon: Shield, type: "tab" as const },
       { id: "claude_integration", label: "Claude Integration", icon: Sparkle, type: "tab" as const },
     ],
   },

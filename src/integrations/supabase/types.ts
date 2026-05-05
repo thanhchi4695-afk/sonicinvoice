@@ -5261,6 +5261,18 @@ export type Database = {
         Returns: number
       }
       get_brand_rules_text: { Args: { _supplier: string }; Returns: string }
+      get_public_brand_guide: {
+        Args: never
+        Returns: {
+          avg_accuracy: number
+          brand_name: string
+          invoices_parsed: number
+          last_seen_at: string
+          retailers: number
+          size_schema: string
+          supplier_sku_format: string
+        }[]
+      }
       get_supplier_hints: {
         Args: { _limit?: number; _supplier: string; _user_id: string }
         Returns: string

@@ -410,7 +410,42 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     }
   };
 
-  // Smart bulk: auto-process new High-confidence items 1s after they appear
+  const handleImportToShopify = async (item: InboxItem) => {
+    if (!item.parseJobId) {
+      toast({ title: "No parse job", description: "Process the invoice first.", variant: "destructive" });
+      return;
+    }
+    setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, importing: true } : i));
+    toast({ title: "Importing to Shopify…", description: `${item.parsedVariantCount ?? ""} variant${item.parsedVariantCount === 1 ? "" : "s"} from ${item.from}` });
+    try {
+      const { data, error } = await supabase.functions.invoke("shopify-import", {
+        body: { jobId: item.parseJobId },
+      });
+      if (error) throw error;
+      const result = data as { created: number; updated: number; failed: number; errors?: Array<{ message: string }> };
+      const created = result?.created ?? 0;
+      const updated = result?.updated ?? 0;
+      const failed = result?.failed ?? 0;
+      if (failed > 0 && created + updated === 0) {
+        throw new Error(result?.errors?.[0]?.message ?? "All products failed");
+      }
+      setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, importing: false, imported: true } : i));
+      toast({
+        title: "Imported to Shopify",
+        description: `${created} created, ${updated} updated${failed > 0 ? `, ${failed} failed` : ""}`,
+      });
+      addAuditEntry("Shopify", `Imported parse job ${item.parseJobId} — ${created} created, ${updated} updated, ${failed} failed`);
+    } catch (err: any) {
+      console.error("shopify-import failed", err);
+      setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, importing: false } : i));
+      toast({
+        title: "Shopify import failed",
+        description: err?.message ?? String(err),
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     if (!smartBulk) return;
     const candidates = gmailItems.filter(

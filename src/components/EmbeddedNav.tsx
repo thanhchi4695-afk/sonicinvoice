@@ -42,7 +42,7 @@ const navSections = [
     title: "Tools",
     items: [
       { id: "tools", label: "Tools & Feeds", icon: Wrench, type: "tab" as const },
-      { id: "feed_health", label: "Google Feed Health", icon: HeartPulse, type: "flow" as const },
+      { id: "feed_health", label: "Feed Health", icon: HeartPulse, type: "route" as const, href: "/tools/feed-health" },
       { id: "claude_integration", label: "Claude Integration", icon: Sparkle, type: "tab" as const },
     ],
   },
@@ -84,6 +84,7 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
                   key={item.id}
                   onClick={() => {
                     if (item.type === "tab") onTabChange(item.id);
+                    else if ((item as any).type === "route" && (item as any).href) window.location.href = (item as any).href;
                     else onFlowChange(item.id);
                     onClose?.();
                   }}

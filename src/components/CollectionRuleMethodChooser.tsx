@@ -14,6 +14,15 @@ import {
   prefKeyToMethodLabel,
 } from "@/lib/collection-rule-methods";
 
+// Per-fixed-type lock reason — shown in tooltip with 🔒
+const LOCK_REASONS: Record<string, string> = {
+  brand: "Vendor field is always the most reliable signal for brand collections.",
+  brand_story: "Style/print names only exist in the product title. Tags and product types never contain story names like 'Mayflower' or 'Bandwave'. This cannot be changed.",
+  feature: "Feature tags (chlorine resist, underwire, d-g, tummy control) are explicitly applied and are the definitive signal.",
+  colour: "Colour tags are applied per the tag system — most reliable signal for colour collections.",
+  new_arrivals: "The 'new arrivals' tag is set explicitly when products are received.",
+};
+
 interface Props {
   storeName?: string;
   /** Loaded products — used to compute tag/type quality. */

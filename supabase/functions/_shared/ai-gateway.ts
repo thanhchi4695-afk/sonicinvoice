@@ -49,6 +49,22 @@ interface AIRequestOptions {
   max_tokens?: number;
   tools?: unknown[];
   tool_choice?: unknown;
+  /** Per-call timeout in ms. Defaults to 60_000. Pass an AbortSignal for full control. */
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+/** Returns a signal that aborts when either the caller signal aborts or `ms` elapses. */
+function buildSignal(ms: number, external?: AbortSignal): { signal: AbortSignal; cancel: () => void } {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(new Error(`AI request timed out after ${ms}ms`)), ms);
+  if (external) {
+    if (external.aborted) ctl.abort(external.reason);
+    else external.addEventListener("abort", () => ctl.abort(external.reason), { once: true });
+  }
+  return { signal: ctl.signal, cancel: () => clearTimeout(timer) };
 }
 
 interface AIResponse {
@@ -69,13 +85,15 @@ export async function callAI(options: AIRequestOptions): Promise<AIResponse> {
   }
 
   const fallbacks = getFallbacks(options.model);
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   let lastError: Error | null = null;
 
   for (const model of fallbacks) {
+    const { signal, cancel } = buildSignal(timeoutMs, options.signal);
     try {
       // Anthropic models go directly to api.anthropic.com (not the Lovable gateway).
       if (model.startsWith("anthropic/")) {
-        const data = await callAnthropicAPI(model, options);
+        const data = await callAnthropicAPI(model, options, signal);
         if (data.choices?.[0]) return data;
         lastError = new Error(`Anthropic model ${model} returned no choices`);
         continue;
@@ -97,6 +115,7 @@ export async function callAI(options: AIRequestOptions): Promise<AIResponse> {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
+        signal,
       });
 
       // Retryable model errors — try next fallback
@@ -132,8 +151,11 @@ export async function callAI(options: AIRequestOptions): Promise<AIResponse> {
       return data;
     } catch (err) {
       if (err instanceof AIGatewayError) throw err; // Don't retry user-facing errors
-      console.warn(`Model ${model} failed:`, err);
+      const isAbort = (err as any)?.name === "AbortError" || /aborted|timed out/i.test(String((err as any)?.message ?? ""));
+      console.warn(`Model ${model} failed${isAbort ? " (timeout/abort)" : ""}:`, err);
       lastError = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      cancel();
     }
   }
 
@@ -170,7 +192,7 @@ export class AIGatewayError extends Error {
 // ─── Anthropic direct path ────────────────────────────────────────────────
 // Routes anthropic/* models to api.anthropic.com and normalises the response
 // back into the OpenAI shape that the rest of our code expects.
-async function callAnthropicAPI(model: string, options: AIRequestOptions): Promise<AIResponse> {
+async function callAnthropicAPI(model: string, options: AIRequestOptions, signal?: AbortSignal): Promise<AIResponse> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) {
     throw new AIGatewayError("ANTHROPIC_API_KEY is not configured", 500);
@@ -216,6 +238,7 @@ async function callAnthropicAPI(model: string, options: AIRequestOptions): Promi
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (response.status === 429) {

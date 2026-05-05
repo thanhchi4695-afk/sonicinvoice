@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { callAIForJob } from "../_shared/model-router.ts";
 import { loadSkillsForTask, asSkillsPreamble } from "../_shared/claude-skills.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 

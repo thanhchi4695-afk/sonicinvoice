@@ -1,7 +1,9 @@
-import { useState } from "react";
-import { ChevronLeft, Copy, Check, Upload, Mail, Paperclip, ChevronDown, Loader2, FileText, Image, Clock } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { ChevronLeft, Copy, Check, Upload, Mail, Paperclip, ChevronDown, Loader2, FileText, Image, RefreshCw, LogOut, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { addAuditEntry } from "@/lib/audit-log";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface EmailInboxPanelProps {
   onBack: () => void;
@@ -10,6 +12,7 @@ interface EmailInboxPanelProps {
 
 interface InboxItem {
   id: string;
+  source: "gmail" | "sim";
   from: string;
   fromEmail: string;
   subject: string;
@@ -19,48 +22,31 @@ interface InboxItem {
   attachmentPages: number;
   attachmentType: "pdf" | "xlsx" | "csv" | "image";
   status: "queued" | "processing" | "ready" | "done";
+  supplierName?: string | null;
+  knownSupplier?: boolean;
 }
 
-const INBOX_KEY = "email_inbox";
-
-// Demo mode is opt-in only via ?demo=1 — production never seeds fake data.
-const isDemoMode = (): boolean => {
-  if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).get("demo") === "1";
-};
-
-function getInboxItems(): InboxItem[] {
-  try { return JSON.parse(localStorage.getItem(INBOX_KEY) || "[]"); } catch { return []; }
+interface GmailConnection {
+  email_address: string;
+  last_checked_at: string | null;
+  is_active: boolean;
 }
 
-function saveInboxItems(items: InboxItem[]) {
-  localStorage.setItem(INBOX_KEY, JSON.stringify(items));
-}
+const SIM_KEY = "email_inbox_sim";
+const isDemoMode = () =>
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("demo") === "1";
 
-// Optional demo seed — only runs when ?demo=1 is in the URL.
-(function seedInboxIfDemo() {
-  if (!isDemoMode()) return;
-  const existing = getInboxItems();
-  if (existing.length > 0) return;
-  const seed: InboxItem[] = [
-    {
-      id: "inbox-demo-1",
-      from: "Demo Supplier",
-      fromEmail: "demo@supplier.example",
-      subject: "Demo invoice DEMO-001",
-      received: "Just now",
-      receivedDate: new Date(),
-      attachmentName: "DEMO-001.pdf",
-      attachmentPages: 1,
-      attachmentType: "pdf",
-      status: "queued",
-    },
-  ];
-  saveInboxItems(seed);
-})();
+function getSimItems(): InboxItem[] {
+  try { return JSON.parse(localStorage.getItem(SIM_KEY) || "[]"); } catch { return []; }
+}
+function saveSimItems(items: InboxItem[]) {
+  localStorage.setItem(SIM_KEY, JSON.stringify(items));
+}
 
 export function getUnprocessedInboxCount(): number {
-  return getInboxItems().filter(i => i.status === "queued" || i.status === "ready").length;
+  // Sim-only count for the home badge — real Gmail count is fetched on-demand.
+  return getSimItems().filter(i => i.status === "queued" || i.status === "ready").length;
 }
 
 const attachmentIcon = (type: InboxItem["attachmentType"]) => {
@@ -80,66 +66,192 @@ const statusBadge = (status: InboxItem["status"]) => {
   }
 };
 
+const relTime = (d: Date) => {
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 60) return "Just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+};
+
+const guessType = (filename: string): InboxItem["attachmentType"] => {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "pdf";
+  if (["jpg", "jpeg", "png", "heic", "webp"].includes(ext)) return "image";
+  if (ext === "xlsx") return "xlsx";
+  if (ext === "csv") return "csv";
+  return "pdf";
+};
+
 const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => {
-  const [items, setItems] = useState<InboxItem[]>(getInboxItems);
+  const { toast } = useToast();
+  const [connection, setConnection] = useState<GmailConnection | null>(null);
+  const [loadingConn, setLoadingConn] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [gmailItems, setGmailItems] = useState<InboxItem[]>([]);
+  const [simItems, setSimItems] = useState<InboxItem[]>(getSimItems);
   const [showSimulator, setShowSimulator] = useState(false);
   const [simFrom, setSimFrom] = useState("");
   const [simSubject, setSimSubject] = useState("");
   const [simFile, setSimFile] = useState<string | null>(null);
-
   const demo = isDemoMode();
 
-  const handleProcess = (item: InboxItem) => {
-    const updated = items.map(i => i.id === item.id ? { ...i, status: "processing" as const } : i);
-    setItems(updated);
-    saveInboxItems(updated);
+  const loadConnection = useCallback(async () => {
+    setLoadingConn(true);
+    const { data, error } = await supabase
+      .from("gmail_connections")
+      .select("email_address, last_checked_at, is_active")
+      .eq("is_active", true)
+      .maybeSingle();
+    if (!error) setConnection(data as GmailConnection | null);
+    setLoadingConn(false);
+  }, []);
+
+  const loadFoundInvoices = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("gmail_found_invoices")
+      .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed")
+      .order("received_at", { ascending: false })
+      .limit(50);
+    if (error) return;
+    const items: InboxItem[] = [];
+    for (const row of data ?? []) {
+      const atts = (row.attachments as any[]) ?? [];
+      const first = atts[0];
+      if (!first) continue;
+      const recDate = row.received_at ? new Date(row.received_at) : new Date();
+      items.push({
+        id: row.id,
+        source: "gmail",
+        from: row.supplier_name || row.from_email?.split("@")[0] || "(unknown)",
+        fromEmail: row.from_email ?? "",
+        subject: row.subject ?? "(no subject)",
+        received: relTime(recDate),
+        receivedDate: recDate,
+        attachmentName: first.filename,
+        attachmentPages: 1,
+        attachmentType: guessType(first.filename),
+        status: row.processed ? "done" : "ready",
+        supplierName: row.supplier_name,
+        knownSupplier: row.known_supplier,
+      });
+    }
+    setGmailItems(items);
+  }, []);
+
+  // On mount + handle ?gmail=connected redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gParam = params.get("gmail");
+    if (gParam === "connected") {
+      toast({ title: "Gmail connected", description: params.get("email") ?? "" });
+      addAuditEntry("Email", `Connected Gmail: ${params.get("email") ?? ""}`);
+      params.delete("gmail"); params.delete("email");
+      const url = window.location.pathname + (params.toString() ? `?${params}` : "");
+      window.history.replaceState({}, "", url);
+    } else if (gParam === "error") {
+      toast({ title: "Gmail connection failed", description: params.get("reason") ?? "", variant: "destructive" });
+    }
+    loadConnection();
+    loadFoundInvoices();
+  }, [loadConnection, loadFoundInvoices, toast]);
+
+  const handleConnectGmail = async () => {
+    setConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gmail-oauth-start");
+      if (error) throw error;
+      const url = (data as any)?.url;
+      if (!url) throw new Error("No OAuth URL returned");
+      window.location.href = url;
+    } catch (err: any) {
+      toast({ title: "Couldn't start Gmail connect", description: err?.message ?? String(err), variant: "destructive" });
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm("Disconnect Gmail? You can reconnect any time.")) return;
+    const { error } = await supabase
+      .from("gmail_connections")
+      .update({ is_active: false })
+      .eq("is_active", true);
+    if (error) { toast({ title: "Failed", description: error.message, variant: "destructive" }); return; }
+    addAuditEntry("Email", "Disconnected Gmail");
+    setConnection(null);
+    setGmailItems([]);
+    toast({ title: "Gmail disconnected" });
+  };
+
+  const handleScanNow = async () => {
+    setScanning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("scan-gmail-inbox", {
+        body: {},
+      });
+      if (error) throw error;
+      const found = (data as any)?.invoices_found?.length ?? 0;
+      addAuditEntry("Email", `Scanned Gmail inbox — ${found} invoice email(s) found`);
+      toast({ title: "Scan complete", description: `${found} invoice email${found === 1 ? "" : "s"} found` });
+      await Promise.all([loadConnection(), loadFoundInvoices()]);
+    } catch (err: any) {
+      toast({ title: "Scan failed", description: err?.message ?? String(err), variant: "destructive" });
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleProcess = async (item: InboxItem) => {
+    if (item.source === "gmail") {
+      // Mark processed in DB so it disappears from the queue and call into invoice flow
+      await supabase
+        .from("gmail_found_invoices")
+        .update({ processed: true })
+        .eq("id", item.id);
+      setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, status: "done" } : i));
+    } else {
+      const updated = simItems.map(i => i.id === item.id ? { ...i, status: "processing" as const } : i);
+      setSimItems(updated);
+      saveSimItems(updated);
+    }
     addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
-    const domain = item.fromEmail.split("@")[1] || "";
-    const supplierName = domain.split(".")[0].charAt(0).toUpperCase() + domain.split(".")[0].slice(1);
-    onProcessInvoice?.(supplierName);
+    const supplierName = item.supplierName
+      || (item.fromEmail.split("@")[1]?.split(".")[0] ?? "Supplier");
+    onProcessInvoice?.(supplierName.charAt(0).toUpperCase() + supplierName.slice(1));
   };
 
   const handleSimulateSend = () => {
     if (!simFrom.trim()) return;
     const fileName = simFile || "invoice.pdf";
-    const ext = fileName.split(".").pop()?.toLowerCase() || "pdf";
-    const attachType: InboxItem["attachmentType"] = ["jpg", "jpeg", "png", "heic", "webp"].includes(ext) ? "image" : ext === "xlsx" ? "xlsx" : ext === "csv" ? "csv" : "pdf";
-
     const newItem: InboxItem = {
-      id: `inbox-${Date.now()}`,
+      id: `sim-${Date.now()}`,
+      source: "sim",
       from: simFrom.includes("@") ? simFrom.split("@")[0] : simFrom,
       fromEmail: simFrom.includes("@") ? simFrom : `${simFrom.toLowerCase().replace(/\s+/g, "")}@supplier.com`,
       subject: simSubject || `Invoice from ${simFrom}`,
       received: "Just now",
       receivedDate: new Date(),
       attachmentName: fileName,
-      attachmentPages: Math.floor(Math.random() * 4) + 1,
-      attachmentType: attachType,
+      attachmentPages: 1,
+      attachmentType: guessType(fileName),
       status: "queued",
     };
-    const updated = [newItem, ...items];
-    setItems(updated);
-    saveInboxItems(updated);
+    const updated = [newItem, ...simItems];
+    setSimItems(updated);
+    saveSimItems(updated);
     addAuditEntry("Email", `Received simulated email from ${newItem.fromEmail}: ${newItem.subject}`);
-    setSimFrom("");
-    setSimSubject("");
-    setSimFile(null);
-    setShowSimulator(false);
+    setSimFrom(""); setSimSubject(""); setSimFile(null); setShowSimulator(false);
   };
 
+  const items = [...gmailItems, ...simItems];
   const queuedCount = items.filter(i => i.status === "queued" || i.status === "ready").length;
 
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
-      {/* Header */}
       <div className="sticky top-0 z-40 bg-background border-b border-border px-4 py-3">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-muted-foreground">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div className="flex-1">
-            <h2 className="text-lg font-semibold font-display">📥 Email Inbox</h2>
-          </div>
+          <button onClick={onBack} className="text-muted-foreground"><ChevronLeft className="w-5 h-5" /></button>
+          <div className="flex-1"><h2 className="text-lg font-semibold font-display">📥 Email Inbox</h2></div>
           {queuedCount > 0 && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary text-primary-foreground">{queuedCount} unprocessed</span>
           )}
@@ -147,27 +259,64 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       </div>
 
       <div className="px-4 pt-4 space-y-4">
-        {/* Honest "coming soon" notice — replaces fake address while backend is being built */}
-        <div className="bg-muted/40 border border-border rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5 text-muted-foreground" />
+        {/* Gmail connection card */}
+        <div className="bg-card rounded-lg border border-border p-4">
+          {loadingConn ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Checking Gmail connection…
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold mb-1">Email forwarding — coming soon</p>
-              <p className="text-xs text-muted-foreground">
-                We're setting up a dedicated <span className="font-mono-data">@inbox.sonicinvoices.com</span> address
-                so suppliers can email invoices straight into your queue. Until then, please use the upload
-                or Drive flow on the dashboard.
-              </p>
+          ) : connection ? (
+            <div>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-success/15 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-success" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold">Connected: {connection.email_address}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {connection.last_checked_at
+                      ? `Last scanned ${relTime(new Date(connection.last_checked_at))}`
+                      : "Not scanned yet"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <Button size="sm" variant="teal" className="flex-1 h-9" onClick={handleScanNow} disabled={scanning}>
+                  {scanning
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Scanning…</>
+                    : <><RefreshCw className="w-4 h-4 mr-2" /> Scan now</>}
+                </Button>
+                <Button size="sm" variant="outline" className="h-9" onClick={handleDisconnect}>
+                  <LogOut className="w-4 h-4 mr-1" /> Disconnect
+                </Button>
+              </div>
               <p className="text-[11px] text-muted-foreground mt-2">
-                Want early access? Reply to your latest update email and we'll add you to the pilot list.
+                Looks for the last 7 days of emails with attachments matching invoice / PO / packing slip.
               </p>
             </div>
-          </div>
+          ) : (
+            <div>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                  <Mail className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold mb-1">Connect Gmail to auto-pull invoices</p>
+                  <p className="text-xs text-muted-foreground">
+                    Read-only access. Sonic Invoices scans your inbox for supplier invoices and queues them here.
+                  </p>
+                </div>
+              </div>
+              <Button variant="teal" className="w-full h-10 mt-3" onClick={handleConnectGmail} disabled={connecting}>
+                {connecting
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening Google…</>
+                  : <><Mail className="w-4 h-4 mr-2" /> Connect Gmail</>}
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Inbox queue — only shows entries the user creates via the simulator */}
+        {/* Inbox queue */}
         <div>
           <h3 className="text-sm font-semibold mb-2">Inbox queue</h3>
           {items.length === 0 ? (
@@ -177,8 +326,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
               </div>
               <p className="text-sm font-medium">No invoices yet</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Once email forwarding is live, supplier emails will appear here automatically. Use the
-                simulator below to preview the flow.
+                {connection ? "Hit Scan now to check your inbox." : "Connect Gmail or use the simulator below to preview the flow."}
               </p>
             </div>
           ) : (
@@ -191,8 +339,14 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="text-sm font-medium truncate">{item.from}</p>
                           <span className="text-[10px] text-muted-foreground shrink-0">{item.received}</span>
-                          {demo && (
+                          {item.source === "gmail" && (
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-success/15 text-success border border-success/20 shrink-0">GMAIL</span>
+                          )}
+                          {item.source === "sim" && demo && (
                             <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning border border-warning/20 shrink-0">DEMO</span>
+                          )}
+                          {item.knownSupplier && (
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-primary/15 text-primary border border-primary/20 shrink-0">KNOWN</span>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{item.subject}</p>
@@ -201,7 +355,6 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                             {attachmentIcon(item.attachmentType)}
                             <Paperclip className="w-2.5 h-2.5" />
                             {item.attachmentName}
-                            {item.attachmentType === "pdf" && <span className="text-muted-foreground/60">· {item.attachmentPages} pg</span>}
                           </span>
                           {statusBadge(item.status)}
                         </div>
@@ -213,7 +366,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                           </Button>
                         )}
                         {item.status === "done" && (
-                          <span className="text-[10px] text-muted-foreground">📧 Email</span>
+                          <span className="text-[10px] text-muted-foreground">✓ Done</span>
                         )}
                       </div>
                     </div>
@@ -224,12 +377,9 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
           )}
         </div>
 
-        {/* Simulate incoming email — labelled clearly as a preview tool */}
+        {/* Simulator (still useful for demos / testing flow without Gmail) */}
         <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <button
-            onClick={() => setShowSimulator(!showSimulator)}
-            className="w-full flex items-center justify-between px-4 py-3 text-left"
-          >
+          <button onClick={() => setShowSimulator(!showSimulator)} className="w-full flex items-center justify-between px-4 py-3 text-left">
             <span className="text-xs font-medium flex items-center gap-2">
               <Mail className="w-3.5 h-3.5 text-muted-foreground" />
               Preview the flow — simulate an incoming email
@@ -238,41 +388,22 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
           </button>
           {showSimulator && (
             <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-              <p className="text-[11px] text-muted-foreground">
-                For previewing only — no real email is sent. Use this to see how a supplier email will appear once forwarding is live.
-              </p>
+              <p className="text-[11px] text-muted-foreground">For previewing only — no real email is sent.</p>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">From</label>
-                <input
-                  value={simFrom}
-                  onChange={e => setSimFrom(e.target.value)}
-                  placeholder="orders@jantzen.com.au"
-                  className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm"
-                />
+                <input value={simFrom} onChange={e => setSimFrom(e.target.value)} placeholder="orders@jantzen.com.au" className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm" />
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Subject</label>
-                <input
-                  value={simSubject}
-                  onChange={e => setSimSubject(e.target.value)}
-                  placeholder="Invoice JAN-2847"
-                  className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm"
-                />
+                <input value={simSubject} onChange={e => setSimSubject(e.target.value)} placeholder="Invoice JAN-2847" className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm" />
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground mb-1 block">Attachment</label>
-                <div className="flex items-center gap-2">
-                  <label className="flex-1 h-9 rounded-md bg-input border border-border px-3 text-sm flex items-center gap-2 cursor-pointer text-muted-foreground">
-                    <Upload className="w-3.5 h-3.5" />
-                    {simFile || "Choose file..."}
-                    <input
-                      type="file"
-                      accept=".pdf,.xlsx,.csv,.jpg,.jpeg,.png"
-                      className="hidden"
-                      onChange={e => setSimFile(e.target.files?.[0]?.name || null)}
-                    />
-                  </label>
-                </div>
+                <label className="flex-1 h-9 rounded-md bg-input border border-border px-3 text-sm flex items-center gap-2 cursor-pointer text-muted-foreground">
+                  <Upload className="w-3.5 h-3.5" />
+                  {simFile || "Choose file..."}
+                  <input type="file" accept=".pdf,.xlsx,.csv,.jpg,.jpeg,.png" className="hidden" onChange={e => setSimFile(e.target.files?.[0]?.name || null)} />
+                </label>
               </div>
               <Button variant="teal" className="w-full h-10" onClick={handleSimulateSend} disabled={!simFrom.trim()}>
                 <Mail className="w-4 h-4 mr-2" /> Add to preview queue

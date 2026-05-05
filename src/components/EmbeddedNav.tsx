@@ -1,5 +1,6 @@
 import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight, X, Users, Brain, History, Sparkles, Bot, Sparkle, HeartPulse, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
+import CollectionAutopilotWidget from "@/components/CollectionAutopilotWidget";
 
 interface EmbeddedNavProps {
   activeTab: string;
@@ -43,7 +44,6 @@ const navSections = [
     items: [
       { id: "tools", label: "Tools & Feeds", icon: Wrench, type: "tab" as const },
       { id: "feed_health", label: "Feed Health", icon: HeartPulse, type: "route" as const, href: "/tools/feed-health" },
-      { id: "collection_decomposer", label: "Collection Builder", icon: Layers, type: "flow" as const },
       { id: "claude_integration", label: "Claude Integration", icon: Sparkle, type: "tab" as const },
     ],
   },
@@ -71,7 +71,7 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
       )}
     </div>
     <nav className="px-2 pb-4 space-y-4">
-      {navSections.map((section) => (
+      {navSections.map((section, sIdx) => (
         <div key={section.title}>
           <p className="px-2 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
             {section.title}
@@ -102,6 +102,17 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
               );
             })}
           </div>
+          {section.title === "Workflows" && (
+            <div className="mt-2 -mx-2">
+              <CollectionAutopilotWidget
+                onOpen={() => {
+                  try { localStorage.setItem("collection_open_tab", "autopilot"); } catch {}
+                  onFlowChange("collection_decomposer");
+                  onClose?.();
+                }}
+              />
+            </div>
+          )}
         </div>
       ))}
     </nav>

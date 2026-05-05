@@ -41,6 +41,7 @@ import {
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import CollectionAutopilotWidget from "@/components/CollectionAutopilotWidget";
 
 export interface StockyNavItem {
   id: string;
@@ -113,7 +114,6 @@ const defaultGroups: NavGroup[] = [
     items: [
       { id: "tools", label: "All Tools", icon: Wrench, type: "tab" },
       { id: "margin_guardian", label: "Margin Guardian", icon: Shield, type: "tab" },
-      { id: "collection_decomposer", label: "Collection Builder", icon: Layers, type: "flow" },
       { id: "collection_seo", label: "Collection SEO AI", icon: Globe, type: "flow" },
       { id: "feed_health", label: "Feed Health", icon: HeartPulse, type: "flow" },
       { id: "feed_optimise", label: "AI Feed Optimisation", icon: Sparkles, type: "flow" },
@@ -302,7 +302,7 @@ const StockyLayout = ({
 
       {/* Grouped nav */}
       <nav className="flex-1 px-2 py-3 space-y-3 overflow-y-auto">
-        {groups.map((group) => {
+        {groups.map((group, gIdx) => {
           const GroupIcon = group.icon;
           const isOpen = collapsed ? true : openGroups[group.id] ?? false;
           const groupHasActive = group.items.some((it) => it.id === activeId);
@@ -361,7 +361,23 @@ const StockyLayout = ({
                 })}
             </div>
           );
-        })}
+        }).reduce<React.ReactNode[]>((acc, node, idx) => {
+          acc.push(node);
+          if (groups[idx]?.id === "stock") {
+            acc.push(
+              <CollectionAutopilotWidget
+                key="autopilot-widget"
+                collapsed={collapsed}
+                onOpen={() => {
+                  try { localStorage.setItem("collection_open_tab", "autopilot"); } catch {}
+                  onFlowChange("collection_decomposer");
+                  setMobileOpen(false);
+                }}
+              />,
+            );
+          }
+          return acc;
+        }, [])}
       </nav>
 
       {/* Persistent Account pinned at bottom — always visible */}

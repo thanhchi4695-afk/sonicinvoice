@@ -544,6 +544,20 @@ export default function CollectionSEOFlow({ onBack, onStartFlow, products: propP
         {/* ───── STEP 0: SOURCE ───── */}
         {step === 0 && (
           <div className="space-y-4">
+            <div className="bg-card rounded-lg border border-border p-3 flex items-center gap-3">
+              <Sparkles className="w-4 h-4 text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold">Prefer the bottom-up approach?</p>
+                <p className="text-[11px] text-muted-foreground">Decompose individual product titles into every collection they belong to (brand, story, category, sub-category, feature).</p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "collection_decomposer" }))}
+              >
+                Break down from invoice <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </div>
             {/* Mode toggle */}
             <div className="grid grid-cols-3 gap-2">
               <button

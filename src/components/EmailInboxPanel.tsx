@@ -332,22 +332,79 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       }
     }
 
+    const supplierName = (resolvedSupplier
+      || (item.fromEmail.split("@")[1]?.split(".")[0] ?? "Supplier"));
+    const niceSupplier = supplierName.charAt(0).toUpperCase() + supplierName.slice(1);
+
     if (item.source === "gmail") {
-      // Mark processed in DB so it disappears from the queue and call into invoice flow
-      await supabase
-        .from("gmail_found_invoices")
-        .update({ processed: true })
-        .eq("id", item.id);
-      setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, status: "done" } : i));
+      // Mark as processing in UI immediately
+      setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, status: "processing" } : i));
+      addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
+
+      try {
+        if (!item.messageId || !item.attachmentId) {
+          throw new Error("Missing Gmail attachment reference");
+        }
+
+        // 1. Fetch attachment bytes (base64) via existing edge function
+        const { data: attData, error: attErr } = await supabase.functions.invoke(
+          "gmail-fetch-attachment",
+          { body: { message_id: item.messageId, attachment_id: item.attachmentId } },
+        );
+        if (attErr) throw attErr;
+        const fileBase64 = (attData as any)?.data_base64;
+        if (!fileBase64) throw new Error("Attachment fetch returned no data");
+
+        // 2. Run 3-stage parse pipeline
+        const { data: parseData, error: parseErr } = await supabase.functions.invoke(
+          "parse-invoice",
+          {
+            body: {
+              fileBase64,
+              supplierName: niceSupplier,
+              mimeType: item.attachmentMime || "application/pdf",
+              inputFilename: item.attachmentName,
+              source: "gmail",
+            },
+          },
+        );
+        if (parseErr) throw parseErr;
+        const parsed = parseData as any;
+        const newConfidence: "high" | "medium" | "low" = parsed?.confidence ?? "low";
+        const rowCount = Array.isArray(parsed?.rows) ? parsed.rows.length : 0;
+
+        // 3. Mark processed in DB and update UI with real confidence
+        await supabase
+          .from("gmail_found_invoices")
+          .update({ processed: true })
+          .eq("id", item.id);
+        setGmailItems(prev => prev.map(i => i.id === item.id
+          ? { ...i, status: "done", confidence: newConfidence, parseJobId: parsed?.jobId }
+          : i));
+
+        const confLabel = newConfidence.charAt(0).toUpperCase() + newConfidence.slice(1);
+        toast({
+          title: "Parsed successfully",
+          description: `${rowCount} variant${rowCount === 1 ? "" : "s"} from ${niceSupplier} — confidence: ${confLabel}`,
+        });
+        addAuditEntry("Email", `Parsed ${rowCount} variants from ${niceSupplier} (${confLabel})`);
+        onProcessInvoice?.(niceSupplier);
+      } catch (err: any) {
+        console.error("parse-invoice failed", err);
+        setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, status: "ready" } : i));
+        toast({
+          title: "Parse failed",
+          description: err?.message ?? String(err),
+          variant: "destructive",
+        });
+      }
     } else {
       const updated = simItems.map(i => i.id === item.id ? { ...i, status: "processing" as const } : i);
       setSimItems(updated);
       saveSimItems(updated);
+      addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
+      onProcessInvoice?.(niceSupplier);
     }
-    addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
-    const supplierName = resolvedSupplier
-      || (item.fromEmail.split("@")[1]?.split(".")[0] ?? "Supplier");
-    onProcessInvoice?.(supplierName.charAt(0).toUpperCase() + supplierName.slice(1));
   };
 
   // Smart bulk: auto-process new High-confidence items 1s after they appear

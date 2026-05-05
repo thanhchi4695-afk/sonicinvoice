@@ -462,7 +462,28 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
 
         {/* Inbox queue */}
         <div>
-          <h3 className="text-sm font-semibold mb-2">Inbox queue</h3>
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <h3 className="text-sm font-semibold">Inbox queue</h3>
+            {(() => {
+              const knownQueued = items.filter(i => i.knownSupplier && i.status !== "done" && i.status !== "processing").length;
+              if (bulkProgress) {
+                return (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Processing {bulkProgress.current} of {bulkProgress.total} known invoices…
+                  </span>
+                );
+              }
+              if (knownQueued > 0) {
+                return (
+                  <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown}>
+                    Process all known ({knownQueued})
+                  </Button>
+                );
+              }
+              return null;
+            })()}
+          </div>
           {items.length === 0 ? (
             <div className="bg-card rounded-lg border border-border p-8 text-center">
               <div className="w-14 h-14 rounded-full bg-muted mx-auto flex items-center justify-center mb-3">

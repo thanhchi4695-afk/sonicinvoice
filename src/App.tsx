@@ -84,6 +84,14 @@ const App = () => (
                   </Suspense>
                 }
               />
+              <Route
+                path="/tools/feed-health"
+                element={
+                  <Suspense fallback={null}>
+                    <FeedHealthPanel onBack={() => window.history.back()} />
+                  </Suspense>
+                }
+              />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               {/* Phase slugs aren't standalone routes — Review/Enrich/Publish live
                   inside the invoice flow on the dashboard. Redirect deep links so

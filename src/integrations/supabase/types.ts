@@ -2558,6 +2558,66 @@ export type Database = {
         }
         Relationships: []
       }
+      parse_jobs: {
+        Row: {
+          confidence: string | null
+          created_at: string
+          error_message: string | null
+          field_completeness: number | null
+          id: string
+          input_file_ref: string | null
+          input_filename: string | null
+          input_mime_type: string | null
+          output_rows: Json | null
+          source: string | null
+          stage1_output: Json | null
+          stage2_output: Json | null
+          stage3_output: Json | null
+          status: string
+          supplier_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: string | null
+          created_at?: string
+          error_message?: string | null
+          field_completeness?: number | null
+          id?: string
+          input_file_ref?: string | null
+          input_filename?: string | null
+          input_mime_type?: string | null
+          output_rows?: Json | null
+          source?: string | null
+          stage1_output?: Json | null
+          stage2_output?: Json | null
+          stage3_output?: Json | null
+          status?: string
+          supplier_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: string | null
+          created_at?: string
+          error_message?: string | null
+          field_completeness?: number | null
+          id?: string
+          input_file_ref?: string | null
+          input_filename?: string | null
+          input_mime_type?: string | null
+          output_rows?: Json | null
+          source?: string | null
+          stage1_output?: Json | null
+          stage2_output?: Json | null
+          stage3_output?: Json | null
+          status?: string
+          supplier_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_connections: {
         Row: {
           access_token: string | null

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Loader2, Layers, Sparkles, ExternalLink, RefreshCw, Check, Search, Trash2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Layers, Sparkles, ExternalLink, RefreshCw, Check, Search, Trash2, AlertTriangle, Bot } from "lucide-react";
+import { CollectionAutomationPanel } from "@/components/CollectionAutomationPanel";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";

@@ -311,7 +311,38 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     onProcessInvoice?.(supplierName.charAt(0).toUpperCase() + supplierName.slice(1));
   };
 
-  const handleSimulateSend = () => {
+  const handleProcessAllKnown = async () => {
+    const targets = [...gmailItems, ...simItems].filter(
+      i => i.knownSupplier === true && i.status !== "done" && i.status !== "processing",
+    );
+    if (targets.length === 0) {
+      toast({ title: "Nothing to process", description: "No queued invoices from known suppliers." });
+      return;
+    }
+    setBulkProgress({ current: 0, total: targets.length });
+    let success = 0;
+    let failed = 0;
+    for (let i = 0; i < targets.length; i++) {
+      setBulkProgress({ current: i + 1, total: targets.length });
+      try {
+        await handleProcess(targets[i]);
+        success++;
+      } catch (err) {
+        console.warn("Bulk process failed for", targets[i].id, err);
+        failed++;
+      }
+      if (i < targets.length - 1) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+    setBulkProgress(null);
+    toast({
+      title: "Bulk processing complete",
+      description: `${success} processed${failed ? `, ${failed} failed` : ""} from known suppliers.`,
+    });
+    addAuditEntry("Email", `Bulk processed ${success} known-supplier invoices${failed ? ` (${failed} failed)` : ""}`);
+  };
+
     if (!simFrom.trim()) return;
     const fileName = simFile || "invoice.pdf";
     const newItem: InboxItem = {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bot, ChevronRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import HowToVideoButton from "@/components/HowToVideoButton";
 
 function relTime(iso: string | null): string {
   if (!iso) return "";
@@ -102,14 +103,22 @@ const HomeAutopilotCard = ({ onOpenAutopilot }: Props) => {
           <Bot className="w-4 h-4 text-indigo-300" />
           <span className="text-sm font-semibold text-foreground">Collection Autopilot</span>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-[11px] text-indigo-300 hover:text-indigo-200 hover:bg-indigo-500/10"
-          onClick={onOpenAutopilot}
-        >
-          {hasRun ? "Configure" : "Set up"} <ChevronRight className="w-3 h-3 ml-0.5" />
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <HowToVideoButton
+            videoSrc="/howto/collection-autopilot.mp4"
+            title="Collection Autopilot"
+            description="See how Autopilot detects new brands & style lines, drafts SEO, and queues approvals."
+            label="Watch how Collection Autopilot works"
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-[11px] text-indigo-300 hover:text-indigo-200 hover:bg-indigo-500/10"
+            onClick={onOpenAutopilot}
+          >
+            {hasRun ? "Configure" : "Set up"} <ChevronRight className="w-3 h-3 ml-0.5" />
+          </Button>
+        </div>
       </div>
 
       {hasRun ? (

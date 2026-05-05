@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Loader2, Bot, CheckCircle2, XCircle, Eye, History, Settings as SettingsIcon, Inbox } from "lucide-react";
 import { createCollectionGraphQL } from "@/lib/shopify-api";
+import HowToVideoButton from "@/components/HowToVideoButton";
 
 type Settings = {
   weekly_health_check: boolean;
@@ -208,6 +209,19 @@ export function CollectionAutomationPanel() {
 
   return (
     <Tabs defaultValue="settings" className="w-full">
+      <div className="flex items-center justify-between mb-3 gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Bot className="w-4 h-4 text-indigo-300" />
+          <span>Collection Autopilot — automated brand & style-line collections</span>
+        </div>
+        <HowToVideoButton
+          videoSrc="/howto/collection-autopilot.mp4"
+          title="Collection Autopilot"
+          description="Detects new brands & style lines after every Shopify push, drafts SEO, and queues approvals."
+          label="Watch how Collection Autopilot works"
+          size="md"
+        />
+      </div>
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="settings"><SettingsIcon className="w-4 h-4 mr-2" />Autopilot</TabsTrigger>
         <TabsTrigger value="queue">
@@ -216,6 +230,7 @@ export function CollectionAutomationPanel() {
         </TabsTrigger>
         <TabsTrigger value="history"><History className="w-4 h-4 mr-2" />History</TabsTrigger>
       </TabsList>
+
 
       {/* SETTINGS */}
       <TabsContent value="settings">

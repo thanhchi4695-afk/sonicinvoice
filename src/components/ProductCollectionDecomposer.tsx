@@ -290,6 +290,7 @@ export default function ProductCollectionDecomposer({
           filter_vendor: scanMode === "brand" ? scanVendor : undefined,
           filter_type: scanMode === "type" ? scanType : undefined,
           max_products: 800,
+          method_preferences: methodPrefs,
         },
       });
       clearInterval(interval);

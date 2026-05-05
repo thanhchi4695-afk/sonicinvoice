@@ -3,7 +3,8 @@
 // Looks at the document and answers metadata-only questions.
 // Does NOT extract any product data.
 // ───────────────────────────────────────────────────────────────
-import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { callAIForJob } from "../_shared/model-router.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

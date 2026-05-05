@@ -20,6 +20,10 @@ import {
   HowToCollectionAutopilot,
   HOWTO_COLLECTION_AUTOPILOT_FRAMES,
 } from "./scenes/HowToCollectionAutopilot";
+import {
+  HowToCollectionWorkflows,
+  HOWTO_COLLECTION_WORKFLOWS_FRAMES,
+} from "./scenes/HowToCollectionWorkflows";
 
 export const RemotionRoot = () => (
   <>
@@ -67,6 +71,14 @@ export const RemotionRoot = () => (
       id="howto-collection-autopilot"
       component={HowToCollectionAutopilot}
       durationInFrames={HOWTO_COLLECTION_AUTOPILOT_FRAMES}
+      fps={30}
+      width={1920}
+      height={1080}
+    />
+    <Composition
+      id="howto-collection-workflows"
+      component={HowToCollectionWorkflows}
+      durationInFrames={HOWTO_COLLECTION_WORKFLOWS_FRAMES}
       fps={30}
       width={1920}
       height={1080}

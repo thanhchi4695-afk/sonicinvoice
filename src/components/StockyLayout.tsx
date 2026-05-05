@@ -38,6 +38,7 @@ import {
   DollarSign,
   ShoppingCart,
   Download,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

@@ -227,7 +227,174 @@ export default function ProductCollectionDecomposer({
     }
   };
 
-  // ── Step 2 grouping ──
+  // ── Catalog gap scan (Mode: full / brand / type) ──
+  const runCatalogScan = async () => {
+    setIsCatalogScan(true);
+    setAnalysing(true);
+    setStep(2);
+    setCatalogSuggestions([]);
+    setEmptyCollections([]);
+    setGapStats({});
+    setScanStats({});
+    setScanProgress(["Fetching existing collections…"]);
+
+    const storeConfig = (() => {
+      try { return JSON.parse(localStorage.getItem("store_config_sonic_invoice") || "{}"); }
+      catch { return {}; }
+    })();
+
+    try {
+      // Animate progress steps while AI runs
+      const steps = [
+        "Fetching existing collections…",
+        "Loading in-stock products…",
+        "Identifying style lines…",
+        "AI gap analysis…",
+        "Building suggestions…",
+      ];
+      let stepIdx = 0;
+      const interval = setInterval(() => {
+        stepIdx = Math.min(stepIdx + 1, steps.length - 1);
+        setScanProgress(steps.slice(0, stepIdx + 1));
+      }, 6000);
+
+      const { data, error } = await supabase.functions.invoke("catalog-collection-audit", {
+        body: {
+          store_name: storeConfig.store_name || "Splash Swimwear",
+          store_city: storeConfig.store_city || "Darwin",
+          mode: scanMode,
+          filter_vendor: scanMode === "brand" ? scanVendor : undefined,
+          filter_type: scanMode === "type" ? scanType : undefined,
+          max_products: 800,
+        },
+      });
+      clearInterval(interval);
+      setScanProgress(steps);
+
+      if (error) throw error;
+
+      const suggestions: CatalogSuggestion[] = (data?.suggested_collections ?? []).map((s: any) => ({
+        ...s,
+        selected: s.priority === "high",
+      }));
+      setCatalogSuggestions(suggestions);
+      setEmptyCollections(data?.empty_collections ?? []);
+      setGapStats(data?.gap_analysis ?? {});
+      setScanStats(data?.stats ?? {});
+      try {
+        localStorage.setItem("catalog_audit_last_run", new Date().toISOString());
+        localStorage.setItem("catalog_audit_last_count", String(suggestions.length));
+      } catch { /* */ }
+      toast.success(`${suggestions.length} collection gaps identified`);
+    } catch (e: any) {
+      toast.error(e?.message || "Catalog scan failed");
+      setStep(1);
+      setIsCatalogScan(false);
+    } finally {
+      setAnalysing(false);
+    }
+  };
+
+  const toggleSuggestion = (handle: string, value: boolean) => {
+    setCatalogSuggestions(prev => prev.map(s => s.handle === handle ? { ...s, selected: value } : s));
+  };
+
+  const filteredSuggestions = useMemo(() => {
+    if (priorityFilter === "all") return catalogSuggestions;
+    if (priorityFilter === "feature") return catalogSuggestions.filter(s => s.level === "feature");
+    if (priorityFilter === "brand") return catalogSuggestions.filter(s => s.level === "brand" || s.level === "brand_story" || s.level === "brand_category");
+    return catalogSuggestions.filter(s => s.priority === priorityFilter);
+  }, [catalogSuggestions, priorityFilter]);
+
+  const selectedSuggestionCount = catalogSuggestions.filter(s => s.selected).length;
+
+  const pushCatalogSuggestions = async () => {
+    const toPush = catalogSuggestions.filter(s => s.selected);
+    if (toPush.length === 0) {
+      toast.error("No suggestions selected.");
+      return;
+    }
+    setStep(3);
+    setPushing(true);
+    setPushProgress(0);
+    const results: typeof pushResults = [];
+    const { data: { user } } = await supabase.auth.getUser();
+    let shopDomain = "";
+    try {
+      if (user) {
+        const { data } = await supabase
+          .from("platform_connections")
+          .select("shop_domain")
+          .eq("user_id", user.id)
+          .eq("platform", "shopify")
+          .eq("is_active", true)
+          .maybeSingle();
+        shopDomain = (data as { shop_domain?: string } | null)?.shop_domain || "";
+      }
+    } catch { /* */ }
+
+    for (let i = 0; i < toPush.length; i++) {
+      const s = toPush[i];
+      try {
+        const result = await createCollectionGraphQL({
+          title: s.title,
+          handle: s.handle,
+          seo: { title: s.seo_title, description: s.meta_description },
+          ruleSet: {
+            appliedDisjunctively: false,
+            rules: [{ column: s.rule_column, relation: s.rule_relation, condition: s.rule_condition }],
+          },
+        });
+        const shopifyId = result?.id || result?.admin_graphql_api_id || "";
+        results.push({ handle: s.handle, title: s.title, ok: true, shopifyId });
+        if (user && shopDomain) {
+          await supabase.from("collection_memory").upsert({
+            user_id: user.id,
+            shop_domain: shopDomain,
+            collection_title: s.title,
+            collection_handle: s.handle,
+            shopify_collection_id: String(shopifyId || ""),
+            level: s.level,
+            source_invoice: "catalog_audit",
+          }, { onConflict: "user_id,shop_domain,collection_handle" });
+        }
+      } catch (e: any) {
+        results.push({ handle: s.handle, title: s.title, ok: false, error: e?.message || "Failed" });
+      }
+      setPushProgress(Math.round(((i + 1) / toPush.length) * 100));
+      setPushResults([...results]);
+      await new Promise(r => setTimeout(r, 500));
+    }
+    setPushing(false);
+    toast.success(`${results.filter(r => r.ok).length} collections created`);
+  };
+
+  const deleteEmptyCollection = async (e: EmptyCollection) => {
+    if (!confirm(`Delete collection "${e.title}" from Shopify? This cannot be undone.`)) return;
+    setDeletingEmpty(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("shopify-proxy", {
+        body: { action: "delete_collection", collection_id: e.id, collection_type: e.kind },
+      });
+      if (error) throw error;
+      if ((data as any)?.success) {
+        setEmptyCollections(prev => prev.filter(x => x.handle !== e.handle));
+        toast.success(`Deleted ${e.title}`);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from("collection_memory").delete()
+            .eq("user_id", user.id)
+            .eq("collection_handle", e.handle);
+        }
+      } else {
+        throw new Error((data as any)?.error || "Delete failed");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete collection");
+    } finally {
+      setDeletingEmpty(false);
+    }
+  };
   const grouped = useMemo(() => {
     const byLabel: Record<string, DecomposedCollection[]> = {};
     for (const c of collections) {

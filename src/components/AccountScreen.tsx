@@ -242,7 +242,7 @@ const AccountScreen = () => {
 
           <LocationsSection />
 
-          <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); }}>Save settings</Button>
+          <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); toast.success("Settings saved"); }}>Save settings</Button>
         </TabsContent>
 
         {/* ─── CONNECTIONS ───────────────────────────────────── */}

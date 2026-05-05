@@ -1,5 +1,6 @@
 import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight, X, Users, Brain, History, Sparkles, Bot, Sparkle, HeartPulse, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
+import CollectionAutopilotWidget from "@/components/CollectionAutopilotWidget";
 
 interface EmbeddedNavProps {
   activeTab: string;

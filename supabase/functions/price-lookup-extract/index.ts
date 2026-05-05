@@ -343,8 +343,7 @@ PAGE CONTENT (markdown):
 ${pageMarkdown}
 ---`;
 
-    const data = await callAI({
-      model: "google/gemini-2.5-flash",
+    const data = await callAIForJob("price.lookup", {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },

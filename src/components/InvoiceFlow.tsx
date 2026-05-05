@@ -5526,6 +5526,36 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             </div>
           )}
 
+          {/* Post-publish: jump into Collection Builder for these products */}
+          {validatedProducts.length > 0 && (
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4 flex items-center gap-3">
+              <Layers className="w-4 h-4 text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold">Build collections from this invoice</p>
+                <p className="text-[11px] text-muted-foreground">Auto-detect brand, story, category and feature collections for the {validatedProducts.length} products you just processed.</p>
+              </div>
+              <Button
+                size="sm"
+                variant="teal"
+                onClick={() => {
+                  try {
+                    localStorage.setItem("invoice_lines", JSON.stringify(validatedProducts.map((p: any, i: number) => ({
+                      title: p.title || p.product_title || p.name || "",
+                      vendor: p.vendor || supplierName || "",
+                      product_type: p.product_type || p.type || "",
+                      tags: Array.isArray(p.tags) ? p.tags.join(", ") : (p.tags || ""),
+                      handle: p.handle || "",
+                      product_id: String(p.product_id || p.id || `inv-${i}`),
+                    }))));
+                  } catch {}
+                  window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "collection_decomposer" }));
+                }}
+              >
+                Build collections <ChevronRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </div>
+          )}
+
           {/* Stock reconciliation status (auto-runs when entering export step) */}
           {connectedPlatformLabel && (reconciling || reconcileResult || reconcileError) && (
             <div className="bg-card border border-primary/20 rounded-lg p-4 mb-4">

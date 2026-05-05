@@ -68,6 +68,7 @@ import AutoAgentsRunSummary, { buildAgentPlan, type AgentRunPlan } from "@/compo
 import ExtractionDebugPanel from "@/components/ExtractionDebugPanel";
 import { LargePdfChunkDialog, getLargePdfDefault, setLargePdfDefault, type LargePdfChoice } from "@/components/LargePdfChunkDialog";
 import { isLargePdf, splitPdf, extractPdfPage, getPdfPageCount } from "@/lib/pdf-splitter";
+import PostPublishHero from "@/components/PostPublishHero";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 
@@ -1518,6 +1519,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   // matches the variant-grouping rules used elsewhere in the app.
   const [pushingShopify, setPushingShopify] = useState(false);
   const [shopifyConnected, setShopifyConnected] = useState<boolean | null>(null);
+  const [pushResult, setPushResult] = useState<{ count: number; shopName: string; storeUrl: string } | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -1709,6 +1711,16 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         } catch (e) {
           console.warn("Autopilot trigger check failed:", e);
         }
+      }
+
+      if (success > 0) {
+        try {
+          setPushResult({
+            count: success,
+            shopName: (conn as any).shop_name || conn.store_url,
+            storeUrl: conn.store_url,
+          });
+        } catch { /* noop */ }
       }
 
       if (errors === 0) {
@@ -5557,8 +5569,32 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             </div>
           )}
 
-          {/* Post-publish: jump into Collection Builder for these products */}
-          {validatedProducts.length > 0 && (
+          {/* Post-publish hero — Collection Autopilot */}
+          {pushResult && (
+            <PostPublishHero
+              count={pushResult.count}
+              shopName={pushResult.shopName}
+              storeUrl={pushResult.storeUrl}
+              products={validatedProducts as any}
+              onProcessAnother={() => { setPushResult(null); setStep(1); }}
+              onBuildCollections={() => {
+                try {
+                  localStorage.setItem("invoice_lines", JSON.stringify(validatedProducts.map((p: any, i: number) => ({
+                    title: p.title || p.product_title || p.name || "",
+                    vendor: p.vendor || supplierName || "",
+                    product_type: p.product_type || p.type || "",
+                    tags: Array.isArray(p.tags) ? p.tags.join(", ") : (p.tags || ""),
+                    handle: p.handle || "",
+                    product_id: String(p.product_id || p.id || `inv-${i}`),
+                  }))));
+                } catch {}
+                window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "collection_decomposer" }));
+              }}
+            />
+          )}
+
+          {/* Pre-publish: jump into Collection Builder for these products */}
+          {!pushResult && validatedProducts.length > 0 && (
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-4 flex items-center gap-3">
               <Layers className="w-4 h-4 text-primary shrink-0" />
               <div className="flex-1 min-w-0">

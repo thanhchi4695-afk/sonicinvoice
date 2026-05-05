@@ -757,7 +757,24 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                           </Button>
                         )}
                         {item.status === "done" && (
-                          <span className="text-[10px] text-muted-foreground">✓ Done</span>
+                          item.imported ? (
+                            <span className="text-[10px] text-success font-medium">✓ Imported to Shopify</span>
+                          ) : item.parseJobId ? (
+                            <Button
+                              size="sm"
+                              variant="teal"
+                              className="h-7 text-xs"
+                              disabled={item.importing}
+                              onClick={() => handleImportToShopify(item)}
+                              title="Push parsed variants to your Shopify store"
+                            >
+                              {item.importing
+                                ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Importing…</>
+                                : <>Import to Shopify{item.parsedVariantCount ? ` (${item.parsedVariantCount})` : ""}</>}
+                            </Button>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">✓ Done</span>
+                          )
                         )}
                       </div>
                     </div>

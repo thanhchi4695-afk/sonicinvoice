@@ -587,6 +587,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                           {item.knownSupplier && (
                             <span className="text-[9px] px-1 py-0.5 rounded bg-primary/15 text-primary border border-primary/20 shrink-0">KNOWN</span>
                           )}
+                          {confidenceBadge(item.confidence ?? computeConfidence(item))}
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{item.subject}</p>
                         <div className="flex items-center gap-2 mt-1.5">

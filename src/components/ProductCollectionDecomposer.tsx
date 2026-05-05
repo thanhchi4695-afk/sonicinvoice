@@ -630,9 +630,146 @@ export default function ProductCollectionDecomposer({
       {step === 2 && (
         <div className="space-y-4">
           {analysing ? (
-            <div className="flex items-center gap-3 text-sm text-muted-foreground py-12 justify-center">
-              <Loader2 className="w-5 h-5 animate-spin" /> AI is analysing {products.length} products…
+            <div className="py-8 max-w-md mx-auto space-y-3">
+              <div className="flex items-center gap-3 text-sm text-foreground justify-center mb-2">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                {isCatalogScan ? "Running full catalog audit…" : `AI is analysing ${products.length} products…`}
+              </div>
+              {isCatalogScan && (
+                <ul className="space-y-1 text-sm">
+                  {["Fetching existing collections…","Loading in-stock products…","Identifying style lines…","AI gap analysis…","Building suggestions…"].map((label, idx) => {
+                    const done = idx < scanProgress.length - 1;
+                    const active = idx === scanProgress.length - 1;
+                    return (
+                      <li key={idx} className={`flex items-center gap-2 ${active ? "text-foreground" : done ? "text-muted-foreground" : "text-muted-foreground/50"}`}>
+                        {done ? <Check className="w-4 h-4 text-primary" /> : active ? <Loader2 className="w-4 h-4 animate-spin" /> : <span className="w-4 h-4 inline-block">○</span>}
+                        {label}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
+          ) : isCatalogScan ? (
+            <>
+              {/* SECTION A — Gap summary */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                  <div className="text-2xl font-bold text-destructive">{gapStats.brands_without_collection ?? 0}</div>
+                  <div className="text-xs text-muted-foreground">brands without collection</div>
+                </div>
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="text-2xl font-bold text-amber-500">{gapStats.style_lines_without_collection ?? 0}</div>
+                  <div className="text-xs text-muted-foreground">style lines without collection</div>
+                </div>
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+                  <div className="text-2xl font-bold text-primary">{(gapStats.feature_gaps ?? []).length}</div>
+                  <div className="text-xs text-muted-foreground">feature collections missing</div>
+                </div>
+                <div className="rounded-md border border-border bg-card p-3">
+                  <div className="text-2xl font-bold">{emptyCollections.length}</div>
+                  <div className="text-xs text-muted-foreground">existing collections empty/stale</div>
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                Scanned {scanStats.unique_products ?? 0} products across {scanStats.unique_brands ?? 0} brands · {scanStats.total_existing_collections ?? 0} existing collections
+              </div>
+
+              {/* SECTION B — Suggested new collections */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold flex-1">Suggested new collections ({catalogSuggestions.length})</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {(["all","high","medium","low","feature","brand"] as const).map(p => (
+                      <Button key={p} size="sm" variant={priorityFilter === p ? "default" : "outline"} onClick={() => setPriorityFilter(p)}>
+                        {p === "all" ? "All" : p === "feature" ? "Feature only" : p === "brand" ? "Brand only" : `${p[0].toUpperCase()}${p.slice(1)} priority`}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border border-border rounded-md bg-card overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-2 py-2 text-left w-8"></th>
+                        <th className="px-2 py-2 text-left">Title</th>
+                        <th className="px-2 py-2 text-left">Level</th>
+                        <th className="px-2 py-2 text-left">Priority</th>
+                        <th className="px-2 py-2 text-right">Est. products</th>
+                        <th className="px-2 py-2 text-left">Rule</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSuggestions.length === 0 && (
+                        <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground text-xs">No suggestions match this filter.</td></tr>
+                      )}
+                      {filteredSuggestions.map(s => (
+                        <tr key={s.handle} className="border-t border-border hover:bg-muted/30">
+                          <td className="px-2 py-1.5">
+                            <Checkbox checked={s.selected} onCheckedChange={(v) => toggleSuggestion(s.handle, !!v)} />
+                          </td>
+                          <td className="px-2 py-1.5">
+                            <div className="font-medium">{s.title}</div>
+                            <div className="text-[10px] text-muted-foreground italic truncate max-w-md">{s.rationale}</div>
+                          </td>
+                          <td className="px-2 py-1.5"><Badge variant="outline" className="text-[10px]">{s.level}</Badge></td>
+                          <td className="px-2 py-1.5">
+                            <Badge className={`text-[10px] ${s.priority === "high" ? "bg-destructive/20 text-destructive" : s.priority === "medium" ? "bg-amber-500/20 text-amber-600" : "bg-muted"}`}>
+                              {s.priority}
+                            </Badge>
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono text-xs">{s.estimated_products}</td>
+                          <td className="px-2 py-1.5 text-xs text-muted-foreground">
+                            {s.rule_column} {s.rule_relation} "{s.rule_condition}"
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* SECTION C — Empty / stale collections */}
+              {emptyCollections.length > 0 && (
+                <Accordion type="single" collapsible>
+                  <AccordionItem value="empty">
+                    <AccordionTrigger className="text-sm">
+                      <span className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        Empty / stale collections ({emptyCollections.length})
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <ul className="space-y-1">
+                        {emptyCollections.map(e => (
+                          <li key={e.handle} className="flex items-center gap-2 px-2 py-1.5 rounded border border-border text-sm">
+                            <span className="flex-1 truncate">
+                              <b>{e.title}</b>
+                              <span className="text-xs text-muted-foreground ml-2">— {e.products_count} products</span>
+                            </span>
+                            <Badge variant="outline" className="text-[10px]">{e.kind}</Badge>
+                            <Button size="sm" variant="destructive" disabled={deletingEmpty} onClick={() => deleteEmptyCollection(e)}>
+                              <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              )}
+
+              <div className="flex justify-between sticky bottom-0 bg-background pt-3 pb-1 border-t border-border">
+                <Button variant="ghost" onClick={() => { setStep(1); setIsCatalogScan(false); }}>
+                  <ArrowLeft className="w-4 h-4 mr-1" /> Back
+                </Button>
+                <Button onClick={pushCatalogSuggestions} disabled={selectedSuggestionCount === 0}>
+                  <Sparkles className="w-4 h-4 mr-2" /> Create {selectedSuggestionCount} collections in Shopify
+                </Button>
+              </div>
+            </>
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2">
@@ -704,7 +841,7 @@ export default function ProductCollectionDecomposer({
                         <Textarea rows={3} value={selected.meta_description} onChange={(e) => updateSelected({ meta_description: e.target.value })} />
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Rule: products where <b>{selected.rule_column}</b> {selected.rule_relation} <b>“{selected.rule_condition}”</b>
+                        Rule: products where <b>{selected.rule_column}</b> {selected.rule_relation} <b>"{selected.rule_condition}"</b>
                       </div>
                       <div className="text-xs">
                         <div className="text-muted-foreground mb-1">Matching products ({selected.product_ids.length})</div>

@@ -499,7 +499,15 @@ export default function FeedHealthPanel({ onBack, onStartFlow }: { onBack: () =>
         ) : (
           <div className="bg-secondary/10 border border-secondary/20 rounded-lg p-3 mb-4">
             <p className="text-xs text-muted-foreground">
-              <span className="font-semibold text-secondary">No store connected.</span> Go to Account → Connected Shopify stores to connect one, or use the CSV upload below.
+              <span className="font-semibold text-secondary">No store connected.</span> Go to{" "}
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent("sonic:navigate-tab", { detail: "account" }))}
+                className="underline text-primary hover:text-primary/80 font-medium"
+              >
+                Account
+              </button>{" "}
+              → Connected Shopify stores to connect one, or use the CSV upload below.
             </p>
           </div>
         )}

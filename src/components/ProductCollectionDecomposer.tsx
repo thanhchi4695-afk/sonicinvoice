@@ -11,19 +11,34 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { supabase } from "@/integrations/supabase/client";
 import { createCollectionGraphQL } from "@/lib/shopify-api";
 import { toast } from "sonner";
+import CollectionRuleMethodChooser, { loadStoredPrefs } from "@/components/CollectionRuleMethodChooser";
+import {
+  MethodPreferences,
+  getCollectionTypeConfig,
+  prefKeyToMethodLabel,
+} from "@/lib/collection-rule-methods";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type LevelLabel =
   | "brand" | "brand_story" | "category" | "sub_category"
   | "modified_sub_category" | "feature" | "cross_reference";
+
+interface CollectionRule {
+  column: string;
+  relation: string;
+  condition: string;
+}
 
 interface DecomposedCollection {
   title: string;
   handle: string;
   level: 1 | 2 | 3 | 4 | 5 | 6;
   level_label: LevelLabel;
-  rule_column: "tag" | "title" | "vendor" | "product_type";
-  rule_relation: "equals" | "contains" | "starts_with";
+  rule_column: string;
+  rule_relation: string;
   rule_condition: string;
+  rules?: CollectionRule[];      // optional: for AND/OR multi-rule
+  disjunctive?: boolean;
   is_new: boolean;
   seo_title: string;
   meta_description: string;
@@ -126,6 +141,14 @@ export default function ProductCollectionDecomposer({
   const [collections, setCollections] = useState<DecomposedCollection[]>([]);
   const [selectedHandle, setSelectedHandle] = useState<string | null>(null);
 
+  // Rule method preferences (per collection type)
+  const storeName = (() => {
+    try { return JSON.parse(localStorage.getItem("store_config_sonic_invoice") || "{}")?.store_name || "Splash Swimwear"; }
+    catch { return "Splash Swimwear"; }
+  })();
+  const [methodPrefs, setMethodPrefs] = useState<MethodPreferences>(() => loadStoredPrefs(storeName));
+  const [previewCounts, setPreviewCounts] = useState<Record<string, { count: number; titles: string[]; loading?: boolean; error?: string }>>({});
+
   // Catalog-scan state
   const [scanMode, setScanMode] = useState<"full" | "brand" | "type">("full");
   const [scanVendor, setScanVendor] = useState("");
@@ -210,6 +233,7 @@ export default function ProductCollectionDecomposer({
           store_name: storeConfig.store_name || "Splash Swimwear",
           store_city: storeConfig.store_city || "Darwin",
           existing_collection_handles: existing,
+          method_preferences: methodPrefs,
         },
       });
       if (error) throw error;
@@ -420,7 +444,28 @@ export default function ProductCollectionDecomposer({
     setCollections(prev => prev.map(c => c.handle === selected.handle ? { ...c, ...patch } : c));
   };
 
-  // ── Step 3 push ──
+  const previewMatching = async (c: DecomposedCollection) => {
+    setPreviewCounts(prev => ({ ...prev, [c.handle]: { ...(prev[c.handle] || { count: 0, titles: [] }), loading: true, error: undefined } }));
+    try {
+      // Use first rule for the preview (good signal even when AND-rule).
+      const rule = (c.rules && c.rules[0]) || { column: c.rule_column, relation: c.rule_relation, condition: c.rule_condition };
+      // Build a Shopify search query string
+      const colKey = rule.column === "type" || rule.column === "product_type" ? "product_type"
+        : rule.column === "vendor" ? "vendor"
+        : rule.column === "tag" ? "tag"
+        : "title";
+      const q = `${colKey}:'${(rule.condition || "").replace(/'/g, "\\'")}'`;
+      const { data, error } = await supabase.functions.invoke("shopify-proxy", {
+        body: { action: "graphql", query: `query($q:String!){ products(first: 250, query:$q){ edges{ node{ title } } } }`, variables: { q } },
+      });
+      if (error) throw error;
+      const edges = (data as any)?.data?.products?.edges || [];
+      const titles = edges.map((e: any) => e.node?.title).filter(Boolean);
+      setPreviewCounts(prev => ({ ...prev, [c.handle]: { count: edges.length, titles, loading: false } }));
+    } catch (e: any) {
+      setPreviewCounts(prev => ({ ...prev, [c.handle]: { count: 0, titles: [], loading: false, error: e?.message || "Preview failed" } }));
+    }
+  };
   const pushSelected = async () => {
     const toPush = collections.filter(c => c.selected && c.is_new);
     if (toPush.length === 0) {
@@ -456,8 +501,10 @@ export default function ProductCollectionDecomposer({
           handle: c.handle,
           seo: { title: c.seo_title, description: c.meta_description },
           ruleSet: {
-            appliedDisjunctively: false,
-            rules: [{ column: c.rule_column, relation: c.rule_relation, condition: c.rule_condition }],
+            appliedDisjunctively: !!c.disjunctive,
+            rules: (c.rules && c.rules.length > 0)
+              ? c.rules
+              : [{ column: c.rule_column, relation: c.rule_relation, condition: c.rule_condition }],
           },
         });
         const shopifyId = result?.id || result?.admin_graphql_api_id || "";
@@ -617,6 +664,15 @@ export default function ProductCollectionDecomposer({
                 </div>
               )}
             </div>
+          )}
+
+          {products.length > 0 && tab !== "catalog" && (
+            <CollectionRuleMethodChooser
+              storeName={storeName}
+              products={products}
+              value={methodPrefs}
+              onChange={setMethodPrefs}
+            />
           )}
 
           <div className="flex justify-end">
@@ -840,9 +896,17 @@ export default function ProductCollectionDecomposer({
                         <label className="text-xs text-muted-foreground">Meta description ({selected.meta_description.length}/155)</label>
                         <Textarea rows={3} value={selected.meta_description} onChange={(e) => updateSelected({ meta_description: e.target.value })} />
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Rule: products where <b>{selected.rule_column}</b> {selected.rule_relation} <b>"{selected.rule_condition}"</b>
-                      </div>
+                      <RulePreviewPanel
+                        collection={selected}
+                        onUpdate={updateSelected}
+                        onPreview={() => previewMatching(selected)}
+                        previewState={previewCounts[selected.handle]}
+                      />
+                      <MethodChangeRow
+                        levelLabel={selected.level_label}
+                        prefs={methodPrefs}
+                        onChangePrefs={setMethodPrefs}
+                      />
                       <div className="text-xs">
                         <div className="text-muted-foreground mb-1">Matching products ({selected.product_ids.length})</div>
                         <ul className="list-disc pl-5 space-y-0.5">
@@ -901,6 +965,142 @@ export default function ProductCollectionDecomposer({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Helpers used in Step 2 right panel
+// ────────────────────────────────────────────────────────────
+
+const RULE_COLUMNS: { value: string; label: string }[] = [
+  { value: "tag", label: "tag" },
+  { value: "title", label: "title" },
+  { value: "vendor", label: "vendor" },
+  { value: "type", label: "type" },
+  { value: "variant_price", label: "variant_price" },
+];
+const RULE_RELATIONS: { value: string; label: string }[] = [
+  { value: "equals", label: "equals" },
+  { value: "contains", label: "contains" },
+  { value: "starts_with", label: "starts with" },
+  { value: "ends_with", label: "ends with" },
+  { value: "greater_than", label: "greater than" },
+  { value: "less_than", label: "less than" },
+  { value: "not_equals", label: "not equals" },
+];
+
+function RulePreviewPanel({
+  collection, onUpdate, onPreview, previewState,
+}: {
+  collection: DecomposedCollection;
+  onUpdate: (patch: Partial<DecomposedCollection>) => void;
+  onPreview: () => void;
+  previewState?: { count: number; titles: string[]; loading?: boolean; error?: string };
+}) {
+  const [editing, setEditing] = useState(false);
+  const rules = collection.rules && collection.rules.length > 0
+    ? collection.rules
+    : [{ column: collection.rule_column, relation: collection.rule_relation, condition: collection.rule_condition }];
+  const conjunction = collection.disjunctive ? "OR" : "AND";
+
+  const updateRule = (idx: number, patch: Partial<CollectionRule>) => {
+    const next = rules.map((r, i) => i === idx ? { ...r, ...patch } : r);
+    if (idx === 0 && (!collection.rules || collection.rules.length === 0)) {
+      onUpdate({
+        rules: next,
+        rule_column: next[0].column,
+        rule_relation: next[0].relation,
+        rule_condition: next[0].condition,
+      });
+    } else {
+      onUpdate({ rules: next });
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
+      <div className="text-xs font-semibold text-muted-foreground">Shopify Smart Collection Rule</div>
+      <div className="rounded border border-border bg-background p-2 space-y-1 text-xs font-mono">
+        {rules.map((r, i) => (
+          <div key={i}>
+            {i > 0 && <div className="text-muted-foreground italic font-sans">{conjunction}</div>}
+            {editing ? (
+              <div className="flex flex-wrap gap-1 items-center">
+                <Select value={r.column} onValueChange={(v) => updateRule(i, { column: v })}>
+                  <SelectTrigger className="h-7 w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>{RULE_COLUMNS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <Select value={r.relation} onValueChange={(v) => updateRule(i, { relation: v })}>
+                  <SelectTrigger className="h-7 w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>{RULE_RELATIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input className="h-7 flex-1 min-w-[140px]" value={r.condition} onChange={(e) => updateRule(i, { condition: e.target.value })} />
+              </div>
+            ) : (
+              <div><b>{r.column}</b> {r.relation} <span className="text-primary">"{r.condition}"</span></div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => setEditing(v => !v)}>{editing ? "Done editing" : "Edit rule"}</Button>
+        <Button size="sm" variant="outline" onClick={onPreview} disabled={previewState?.loading}>
+          {previewState?.loading ? "Checking…" : "Preview matching products"}
+        </Button>
+      </div>
+      {previewState && !previewState.loading && !previewState.error && (
+        <div className="text-xs text-muted-foreground">
+          <div className="text-foreground"><b>{previewState.count}</b> products match this rule</div>
+          {previewState.titles.length > 0 && (
+            <ul className="list-disc pl-5 mt-1">
+              {previewState.titles.slice(0, 5).map((t, i) => <li key={i} className="truncate">{t}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+      {previewState?.error && <div className="text-xs text-destructive">{previewState.error}</div>}
+    </div>
+  );
+}
+
+function MethodChangeRow({
+  levelLabel, prefs, onChangePrefs,
+}: {
+  levelLabel: string;
+  prefs: MethodPreferences;
+  onChangePrefs: (p: MethodPreferences) => void;
+}) {
+  const cfg = getCollectionTypeConfig(levelLabel);
+  if (!cfg) return null;
+  if (!cfg.choice_required) {
+    return (
+      <div className="text-[11px] text-muted-foreground">
+        ℹ️ Fixed method: {cfg.fixed_method?.label} — cannot be changed.
+      </div>
+    );
+  }
+  const key = levelLabel as keyof MethodPreferences;
+  const current = prefKeyToMethodLabel(levelLabel, prefs[key]) || "";
+  return (
+    <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-2">
+      ℹ️ Using: <b className="text-foreground">{current}</b>
+      <Select
+        value={prefs[key]}
+        onValueChange={(v) => onChangePrefs({ ...prefs, [key]: v } as MethodPreferences)}
+      >
+        <SelectTrigger className="h-6 w-44 text-[11px]"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {cfg.available_methods!.map(m => {
+            const k = (() => {
+              if (levelLabel === "category") return { "By product type": "type", "By tag": "tag", "By tag OR type (broadest)": "tag_or_type" }[m.label]!;
+              if (levelLabel === "brand_category") return { "By vendor AND tag": "vendor_tag", "By vendor AND type": "vendor_type", "By title prefix": "title_prefix" }[m.label]!;
+              return { "By title keyword": "title", "By tag": "tag" }[m.label]!;
+            })();
+            return <SelectItem key={k} value={k}>{m.label}</SelectItem>;
+          })}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

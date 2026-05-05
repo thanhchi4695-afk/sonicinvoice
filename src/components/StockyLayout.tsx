@@ -39,6 +39,7 @@ import {
   ShoppingCart,
   Download,
   User,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CollectionAutopilotWidget from "@/components/CollectionAutopilotWidget";

@@ -84,6 +84,7 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
                   key={item.id}
                   onClick={() => {
                     if (item.type === "tab") onTabChange(item.id);
+                    else if ((item as any).type === "route" && (item as any).href) window.location.href = (item as any).href;
                     else onFlowChange(item.id);
                     onClose?.();
                   }}

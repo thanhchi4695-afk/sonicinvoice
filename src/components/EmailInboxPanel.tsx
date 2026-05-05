@@ -94,6 +94,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [simFrom, setSimFrom] = useState("");
   const [simSubject, setSimSubject] = useState("");
   const [simFile, setSimFile] = useState<string | null>(null);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
   const demo = isDemoMode();
 
   const loadConnection = useCallback(async () => {

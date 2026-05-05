@@ -2569,6 +2569,7 @@ export type Database = {
           input_filename: string | null
           input_mime_type: string | null
           output_rows: Json | null
+          shopify_import_result: Json | null
           source: string | null
           stage1_output: Json | null
           stage2_output: Json | null
@@ -2588,6 +2589,7 @@ export type Database = {
           input_filename?: string | null
           input_mime_type?: string | null
           output_rows?: Json | null
+          shopify_import_result?: Json | null
           source?: string | null
           stage1_output?: Json | null
           stage2_output?: Json | null
@@ -2607,6 +2609,7 @@ export type Database = {
           input_filename?: string | null
           input_mime_type?: string | null
           output_rows?: Json | null
+          shopify_import_result?: Json | null
           source?: string | null
           stage1_output?: Json | null
           stage2_output?: Json | null

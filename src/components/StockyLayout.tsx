@@ -361,7 +361,23 @@ const StockyLayout = ({
                 })}
             </div>
           );
-        })}
+        }).reduce<React.ReactNode[]>((acc, node, idx) => {
+          acc.push(node);
+          if (groups[idx]?.id === "stock") {
+            acc.push(
+              <CollectionAutopilotWidget
+                key="autopilot-widget"
+                collapsed={collapsed}
+                onOpen={() => {
+                  try { localStorage.setItem("collection_open_tab", "autopilot"); } catch {}
+                  onFlowChange("collection_decomposer");
+                  setMobileOpen(false);
+                }}
+              />,
+            );
+          }
+          return acc;
+        }, [])}
       </nav>
 
       {/* Persistent Account pinned at bottom — always visible */}

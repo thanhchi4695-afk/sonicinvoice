@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Info, Sparkles } from "lucide-react";
+import { Info, Lock, Sparkles, RotateCcw } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {

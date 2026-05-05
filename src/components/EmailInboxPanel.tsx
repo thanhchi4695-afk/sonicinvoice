@@ -504,19 +504,19 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
           <div className="flex items-center justify-between mb-2 gap-2">
             <h3 className="text-sm font-semibold">Inbox queue</h3>
             {(() => {
-              const knownQueued = items.filter(i => i.knownSupplier && i.status !== "done" && i.status !== "processing").length;
+              const highQueued = items.filter(i => (i.confidence ?? computeConfidence(i)) === "high" && i.status !== "done" && i.status !== "processing").length;
               if (bulkProgress) {
                 return (
                   <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    Processing {bulkProgress.current} of {bulkProgress.total} known invoices…
+                    Processing {bulkProgress.current} of {bulkProgress.total} High-confidence invoices…
                   </span>
                 );
               }
-              if (knownQueued > 0) {
+              if (highQueued > 0) {
                 return (
-                  <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown}>
-                    Process all known ({knownQueued})
+                  <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown} title="Auto-processes High confidence only. Medium and Low stay for manual review.">
+                    Process all High ({highQueued})
                   </Button>
                 );
               }

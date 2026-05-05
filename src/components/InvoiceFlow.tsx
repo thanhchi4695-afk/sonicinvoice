@@ -1680,6 +1680,37 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         console.warn("[Sonic Invoice] Failed to record import run:", e);
       }
 
+      // Fire Collection Autopilot if enabled (non-blocking)
+      if (success > 0) {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: settings } = await supabase
+              .from("collection_automation_settings")
+              .select("auto_approve_brand_collections, auto_approve_brand_stories")
+              .eq("user_id", user.id)
+              .maybeSingle();
+            if (settings?.auto_approve_brand_collections || settings?.auto_approve_brand_stories) {
+              supabase.functions.invoke("collection-agent-orchestrator", {
+                body: {
+                  trigger_type: "invoice_complete",
+                  invoice_products: validatedProducts.map((p: any) => ({
+                    title: p.title,
+                    vendor: p.vendor || supplierName,
+                    product_type: p.product_type || "",
+                    tags: Array.isArray(p.tags) ? p.tags.join(", ") : (p.tags || ""),
+                  })),
+                  invoice_label: `${supplierName} invoice`,
+                },
+              }).catch((e) => console.warn("Collection agent fire failed:", e));
+              toast.info("🤖 Collection Autopilot is checking for new collections...", { duration: 4000 });
+            }
+          }
+        } catch (e) {
+          console.warn("Autopilot trigger check failed:", e);
+        }
+      }
+
       if (errors === 0) {
         toast.success(`Pushed ${success} product${success === 1 ? "" : "s"} to Shopify`, {
           id: toastId,

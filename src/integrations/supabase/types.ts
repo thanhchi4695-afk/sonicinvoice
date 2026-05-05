@@ -868,6 +868,42 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_memory: {
+        Row: {
+          collection_handle: string
+          collection_title: string
+          created_at: string
+          id: string
+          level: string
+          shop_domain: string
+          shopify_collection_id: string | null
+          source_invoice: string | null
+          user_id: string
+        }
+        Insert: {
+          collection_handle: string
+          collection_title: string
+          created_at?: string
+          id?: string
+          level: string
+          shop_domain: string
+          shopify_collection_id?: string | null
+          source_invoice?: string | null
+          user_id: string
+        }
+        Update: {
+          collection_handle?: string
+          collection_title?: string
+          created_at?: string
+          id?: string
+          level?: string
+          shop_domain?: string
+          shopify_collection_id?: string | null
+          source_invoice?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       competitor_monitored_products: {
         Row: {
           created_at: string

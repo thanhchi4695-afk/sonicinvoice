@@ -44,11 +44,14 @@ const PHASES = [
 const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
   const [kind, setKind] = useState<UploadKind | null>(null);
   const [pos, setPos] = useState<PreferredPos | null>(null);
+  const [mix, setMix] = useState<ProductMix | null>(null);
 
   // Restore POS choice on mount.
   useEffect(() => {
     const saved = localStorage.getItem("preferred_pos") as PreferredPos | null;
     if (saved === "shopify" || saved === "lightspeed") setPos(saved);
+    const savedMix = localStorage.getItem("product_mix") as ProductMix | null;
+    if (savedMix === "refill" || savedMix === "new" || savedMix === "mixed") setMix(savedMix);
   }, []);
 
   const choosePos = (p: PreferredPos) => {
@@ -56,10 +59,13 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
     localStorage.setItem("preferred_pos", p);
   };
 
-  // When both questions answered, fire the matching flow.
-  // We only auto-advance for invoice — for packing slip we still
-  // require explicit click so the user can pick an alternate entry.
-  const ready = !!kind && !!pos;
+  const chooseMix = (m: ProductMix) => {
+    setMix(m);
+    localStorage.setItem("product_mix", m);
+  };
+
+  // When all questions answered, fire the matching flow.
+  const ready = !!kind && !!pos && !!mix;
 
   const enterFlow = () => {
     if (!kind) return;

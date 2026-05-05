@@ -534,28 +534,44 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
 
         {/* Inbox queue */}
         <div>
-          <div className="flex items-center justify-between mb-2 gap-2">
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
             <h3 className="text-sm font-semibold">Inbox queue</h3>
-            {(() => {
-              const highQueued = items.filter(i => (i.confidence ?? computeConfidence(i)) === "high" && i.status !== "done" && i.status !== "processing").length;
-              if (bulkProgress) {
-                return (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Processing {bulkProgress.current} of {bulkProgress.total} High-confidence invoices…
-                  </span>
-                );
-              }
-              if (highQueued > 0) {
-                return (
-                  <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown} title="Auto-processes High confidence only. Medium and Low stay for manual review.">
-                    Process all High ({highQueued})
-                  </Button>
-                );
-              }
-              return null;
-            })()}
+            <div className="flex items-center gap-2">
+              {(() => {
+                const highQueued = items.filter(i => (i.confidence ?? computeConfidence(i)) === "high" && i.status !== "done" && i.status !== "processing").length;
+                if (bulkProgress) {
+                  return (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Processing {bulkProgress.current} of {bulkProgress.total} High-confidence invoices…
+                    </span>
+                  );
+                }
+                if (highQueued > 0) {
+                  return (
+                    <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown} title="Auto-processes High confidence only. Medium and Low stay for manual review.">
+                      Process all High ({highQueued})
+                    </Button>
+                  );
+                }
+                return null;
+              })()}
+              <label className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none" title="Auto-process newly arrived High-confidence invoices">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-primary cursor-pointer"
+                  checked={smartBulk}
+                  onChange={(e) => setSmartBulk(e.target.checked)}
+                />
+                Auto-process new
+              </label>
+            </div>
           </div>
+          {smartBulk && (
+            <div className="mb-2 rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning">
+              Auto-processing High-confidence invoices. Medium and Low items need manual review.
+            </div>
+          )}
           {items.length > 0 && (
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <div className="flex items-center gap-1">

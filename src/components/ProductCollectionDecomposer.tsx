@@ -561,7 +561,13 @@ export default function ProductCollectionDecomposer({
               <TabsTrigger value="catalog">
                 <Search className="w-3.5 h-3.5 mr-1" /> Scan full catalog
               </TabsTrigger>
+              <TabsTrigger value="autopilot">
+                <Bot className="w-3.5 h-3.5 mr-1" /> Autopilot
+              </TabsTrigger>
             </TabsList>
+            <TabsContent value="autopilot" className="pt-3">
+              <CollectionAutomationPanel />
+            </TabsContent>
             <TabsContent value="invoice" className="space-y-3 pt-3">
               <p className="text-sm text-muted-foreground">
                 Load products from the most recent invoice session in this browser.

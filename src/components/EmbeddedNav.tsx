@@ -44,7 +44,6 @@ const navSections = [
     items: [
       { id: "tools", label: "Tools & Feeds", icon: Wrench, type: "tab" as const },
       { id: "feed_health", label: "Feed Health", icon: HeartPulse, type: "route" as const, href: "/tools/feed-health" },
-      { id: "collection_decomposer", label: "Collection Builder", icon: Layers, type: "flow" as const },
       { id: "claude_integration", label: "Claude Integration", icon: Sparkle, type: "tab" as const },
     ],
   },

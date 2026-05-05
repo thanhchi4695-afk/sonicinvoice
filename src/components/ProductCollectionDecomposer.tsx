@@ -456,17 +456,12 @@ export default function ProductCollectionDecomposer({
         : "title";
       const q = `${colKey}:'${(rule.condition || "").replace(/'/g, "\\'")}'`;
       const { data, error } = await supabase.functions.invoke("shopify-proxy", {
-        body: { action: "graphql", query: `query($q:String!){ products(first:5, query:$q){ edges{ node{ title } } } productsCount: products(query:$q){ edges{ node{ id } } } }`, variables: { q } },
+        body: { action: "graphql", query: `query($q:String!){ products(first: 250, query:$q){ edges{ node{ title } } } }`, variables: { q } },
       });
       if (error) throw error;
       const edges = (data as any)?.data?.products?.edges || [];
       const titles = edges.map((e: any) => e.node?.title).filter(Boolean);
-      // Count: do a second cheap query — fall back to length if needed
-      const countQ = await supabase.functions.invoke("shopify-proxy", {
-        body: { action: "graphql", query: `query($q:String!){ products(first: 250, query:$q){ edges{ node{ id } } } }`, variables: { q } },
-      });
-      const count = ((countQ.data as any)?.data?.products?.edges || []).length;
-      setPreviewCounts(prev => ({ ...prev, [c.handle]: { count, titles, loading: false } }));
+      setPreviewCounts(prev => ({ ...prev, [c.handle]: { count: edges.length, titles, loading: false } }));
     } catch (e: any) {
       setPreviewCounts(prev => ({ ...prev, [c.handle]: { count: 0, titles: [], loading: false, error: e?.message || "Preview failed" } }));
     }

@@ -24,7 +24,28 @@ interface InboxItem {
   status: "queued" | "processing" | "ready" | "done";
   supplierName?: string | null;
   knownSupplier?: boolean;
+  confidence?: "high" | "medium" | "low";
 }
+
+const computeConfidence = (item: Pick<InboxItem, "knownSupplier" | "supplierName">): "high" | "medium" | "low" => {
+  if (item.knownSupplier && item.supplierName) return "high";
+  if (item.knownSupplier) return "medium";
+  return "low";
+};
+
+const confidenceBadge = (c: "high" | "medium" | "low") => {
+  const map = {
+    high: { label: "High", cls: "bg-success/15 text-success border-success/20" },
+    medium: { label: "Medium", cls: "bg-warning/15 text-warning border-warning/20" },
+    low: { label: "Low", cls: "bg-destructive/15 text-destructive border-destructive/20" },
+  } as const;
+  const m = map[c];
+  return (
+    <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${m.cls}`} title={`Confidence: ${m.label}`}>
+      {m.label}
+    </span>
+  );
+};
 
 interface GmailConnection {
   email_address: string;
@@ -137,6 +158,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
         status: row.processed ? "done" : "ready",
         supplierName: row.supplier_name,
         knownSupplier: row.known_supplier,
+        confidence: computeConfidence({ knownSupplier: row.known_supplier, supplierName: row.supplier_name }),
       });
     }
     setGmailItems(items);
@@ -315,10 +337,13 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
 
   const handleProcessAllKnown = async () => {
     const targets = [...gmailItems, ...simItems].filter(
-      i => i.knownSupplier === true && i.status !== "done" && i.status !== "processing",
+      i =>
+        (i.confidence ?? computeConfidence(i)) === "high" &&
+        i.status !== "done" &&
+        i.status !== "processing",
     );
     if (targets.length === 0) {
-      toast({ title: "Nothing to process", description: "No queued invoices from known suppliers." });
+      toast({ title: "Nothing to process", description: "No High-confidence invoices ready. Medium and Low items need manual review." });
       return;
     }
     setBulkProgress({ current: 0, total: targets.length });
@@ -360,6 +385,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       attachmentPages: 1,
       attachmentType: guessType(fileName),
       status: "queued",
+      confidence: "low",
     };
     const updated = [newItem, ...simItems];
     setSimItems(updated);
@@ -478,19 +504,19 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
           <div className="flex items-center justify-between mb-2 gap-2">
             <h3 className="text-sm font-semibold">Inbox queue</h3>
             {(() => {
-              const knownQueued = items.filter(i => i.knownSupplier && i.status !== "done" && i.status !== "processing").length;
+              const highQueued = items.filter(i => (i.confidence ?? computeConfidence(i)) === "high" && i.status !== "done" && i.status !== "processing").length;
               if (bulkProgress) {
                 return (
                   <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    Processing {bulkProgress.current} of {bulkProgress.total} known invoices…
+                    Processing {bulkProgress.current} of {bulkProgress.total} High-confidence invoices…
                   </span>
                 );
               }
-              if (knownQueued > 0) {
+              if (highQueued > 0) {
                 return (
-                  <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown}>
-                    Process all known ({knownQueued})
+                  <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown} title="Auto-processes High confidence only. Medium and Low stay for manual review.">
+                    Process all High ({highQueued})
                   </Button>
                 );
               }
@@ -561,6 +587,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                           {item.knownSupplier && (
                             <span className="text-[9px] px-1 py-0.5 rounded bg-primary/15 text-primary border border-primary/20 shrink-0">KNOWN</span>
                           )}
+                          {confidenceBadge(item.confidence ?? computeConfidence(item))}
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{item.subject}</p>
                         <div className="flex items-center gap-2 mt-1.5">

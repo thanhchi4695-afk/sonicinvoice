@@ -444,7 +444,33 @@ export default function ProductCollectionDecomposer({
     setCollections(prev => prev.map(c => c.handle === selected.handle ? { ...c, ...patch } : c));
   };
 
-  // ── Step 3 push ──
+  const previewMatching = async (c: DecomposedCollection) => {
+    setPreviewCounts(prev => ({ ...prev, [c.handle]: { ...(prev[c.handle] || { count: 0, titles: [] }), loading: true, error: undefined } }));
+    try {
+      // Use first rule for the preview (good signal even when AND-rule).
+      const rule = (c.rules && c.rules[0]) || { column: c.rule_column, relation: c.rule_relation, condition: c.rule_condition };
+      // Build a Shopify search query string
+      const colKey = rule.column === "type" || rule.column === "product_type" ? "product_type"
+        : rule.column === "vendor" ? "vendor"
+        : rule.column === "tag" ? "tag"
+        : "title";
+      const q = `${colKey}:'${(rule.condition || "").replace(/'/g, "\\'")}'`;
+      const { data, error } = await supabase.functions.invoke("shopify-proxy", {
+        body: { action: "graphql", query: `query($q:String!){ products(first:5, query:$q){ edges{ node{ title } } } productsCount: products(query:$q){ edges{ node{ id } } } }`, variables: { q } },
+      });
+      if (error) throw error;
+      const edges = (data as any)?.data?.products?.edges || [];
+      const titles = edges.map((e: any) => e.node?.title).filter(Boolean);
+      // Count: do a second cheap query — fall back to length if needed
+      const countQ = await supabase.functions.invoke("shopify-proxy", {
+        body: { action: "graphql", query: `query($q:String!){ products(first: 250, query:$q){ edges{ node{ id } } } }`, variables: { q } },
+      });
+      const count = ((countQ.data as any)?.data?.products?.edges || []).length;
+      setPreviewCounts(prev => ({ ...prev, [c.handle]: { count, titles, loading: false } }));
+    } catch (e: any) {
+      setPreviewCounts(prev => ({ ...prev, [c.handle]: { count: 0, titles: [], loading: false, error: e?.message || "Preview failed" } }));
+    }
+  };
   const pushSelected = async () => {
     const toPush = collections.filter(c => c.selected && c.is_new);
     if (toPush.length === 0) {

@@ -190,9 +190,27 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
         body: {},
       });
       if (error) throw error;
+      // The function returns 200 with { error } on reauth required, so check the body too
+      if (data && (data as any).error) {
+        const msg = String((data as any).error);
+        if (/reauth|authoris|invalid_grant/i.test(msg)) {
+          toast({
+            title: "Reconnect Gmail",
+            description: "Your Gmail authorisation expired. Please connect again.",
+            variant: "destructive",
+          });
+          await loadConnection();
+          return;
+        }
+        throw new Error(msg);
+      }
       const found = (data as any)?.invoices_found?.length ?? 0;
-      addAuditEntry("Email", `Scanned Gmail inbox — ${found} invoice email(s) found`);
-      toast({ title: "Scan complete", description: `${found} invoice email${found === 1 ? "" : "s"} found` });
+      const scanned = (data as any)?.emails_scanned ?? 0;
+      addAuditEntry("Email", `Scanned Gmail inbox — ${scanned} email(s), ${found} with invoice attachments`);
+      toast({
+        title: "Scan complete",
+        description: `Scanned ${scanned} email${scanned === 1 ? "" : "s"}, ${found} with invoice attachment${found === 1 ? "" : "s"}`,
+      });
       await Promise.all([loadConnection(), loadFoundInvoices()]);
     } catch (err: any) {
       toast({ title: "Scan failed", description: err?.message ?? String(err), variant: "destructive" });
@@ -291,7 +309,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                 </Button>
               </div>
               <p className="text-[11px] text-muted-foreground mt-2">
-                Looks for the last 7 days of emails with attachments matching invoice / PO / packing slip.
+                Scans the last 30 days for emails with PDF / XLSX / CSV / image attachments matching invoice, PO, packing slip, receipt, statement or bill.
               </p>
             </div>
           ) : (

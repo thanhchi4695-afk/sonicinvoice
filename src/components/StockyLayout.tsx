@@ -248,7 +248,9 @@ const StockyLayout = ({
   };
 
   const openQuickSearch = () => {
-    window.dispatchEvent(new CustomEvent("sonic:open-quick-search"));
+    const fn = (window as any).__sonicOpenQuickSearch;
+    if (typeof fn === "function") fn();
+    else window.dispatchEvent(new CustomEvent("sonic:open-quick-search"));
   };
 
   const sidebarContent = (

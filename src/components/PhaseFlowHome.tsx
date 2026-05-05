@@ -20,6 +20,7 @@ import { toast } from "sonner";
 
 export type UploadKind = "invoice" | "packing_slip" | "html";
 export type PreferredPos = "shopify" | "lightspeed";
+export type ProductMix = "refill" | "new" | "mixed";
 
 interface PhaseFlowHomeProps {
   onStartInvoice: () => void;

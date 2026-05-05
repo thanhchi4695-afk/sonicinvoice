@@ -156,9 +156,13 @@ export default function ProductCollectionDecomposer({
         catch { return {}; }
       })();
 
+      // Only send first 30 products to AI — enough to detect all collection
+      // patterns. The AI extrapolates the pattern from a sample, not from
+      // every variant. Keeps us under the 60s Gemini gateway timeout.
+      const sampleProducts = products.slice(0, 30);
       const { data, error } = await supabase.functions.invoke("decompose-product-collections", {
         body: {
-          products,
+          products: sampleProducts,
           store_name: storeConfig.store_name || "Splash Swimwear",
           store_city: storeConfig.store_city || "Darwin",
           existing_collection_handles: existing,
@@ -325,6 +329,11 @@ export default function ProductCollectionDecomposer({
                 {products.slice(0, 5).map((p, i) => <li key={i}>{p.title}</li>)}
                 {products.length > 5 && <li>…and {products.length - 5} more</li>}
               </ul>
+              {products.length > 0 && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Note: AI analyses the first 30 products to detect collection patterns — this covers all style lines.
+                </div>
+              )}
             </div>
           )}
 

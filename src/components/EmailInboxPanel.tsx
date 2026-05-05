@@ -309,7 +309,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                 </Button>
               </div>
               <p className="text-[11px] text-muted-foreground mt-2">
-                Looks for the last 7 days of emails with attachments matching invoice / PO / packing slip.
+                Scans the last 30 days for emails with PDF / XLSX / CSV / image attachments matching invoice, PO, packing slip, receipt, statement or bill.
               </p>
             </div>
           ) : (

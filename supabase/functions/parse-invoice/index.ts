@@ -60,11 +60,39 @@ function computeConfidence(rows: ParsedRow[]): {
   return { level, completeness };
 }
 
+// Brand-pattern context — Strategy 1 Step 4 (Flywheel)
+interface BrandPattern {
+  supplier_sku_format?: string | null;
+  size_schema?: string | null;
+  invoice_layout_fingerprint?: unknown;
+  sample_count?: number | null;
+  accuracy_rate?: number | null;
+}
+async function loadBrandPattern(admin: any, userId: string, brandName: string): Promise<BrandPattern | null> {
+  if (!brandName?.trim()) return null;
+  const { data } = await admin
+    .from("brand_patterns")
+    .select("supplier_sku_format, size_schema, invoice_layout_fingerprint, sample_count, accuracy_rate")
+    .eq("user_id", userId)
+    .ilike("brand_name", brandName.trim())
+    .maybeSingle();
+  return data ?? null;
+}
+function brandHintsBlock(p: BrandPattern | null): string {
+  if (!p) return "";
+  const lines: string[] = ["", "KNOWN BRAND PATTERNS (use as priors, but trust the document if it disagrees):"];
+  if (p.supplier_sku_format) lines.push(`- SKU format: ${p.supplier_sku_format}`);
+  if (p.size_schema) lines.push(`- Size schema: ${p.size_schema}`);
+  if (p.invoice_layout_fingerprint) lines.push(`- Layout fingerprint: ${JSON.stringify(p.invoice_layout_fingerprint).slice(0, 400)}`);
+  if (p.sample_count) lines.push(`- Learned from ${p.sample_count} prior invoice(s) (accuracy ${Math.round((p.accuracy_rate ?? 1) * 100)}%)`);
+  return lines.join("\n");
+}
+
 // Stage 1 — Gemini 2.5 Flash via Lovable AI Gateway
-async function stage1Gemini(fileBase64: string, mimeType: string, supplierName: string) {
+async function stage1Gemini(fileBase64: string, mimeType: string, supplierName: string, brandHints = "") {
   const systemPrompt = `You are a precise invoice parser. Extract every line item from the supplied invoice. Return ONLY a JSON object matching the provided schema. Numbers must be plain numbers (no currency symbols). Use null for any field you cannot confidently extract.`;
 
-  const userPrompt = `Supplier: ${supplierName}\n\nExtract every product line item. For each item return: productName, styleNumber, colour, size, quantity, costPrice (unit cost ex-tax), rrp (recommended retail price if shown).`;
+  const userPrompt = `Supplier: ${supplierName}${brandHints}\n\nExtract every product line item. For each item return: productName, styleNumber, colour, size, quantity, costPrice (unit cost ex-tax), rrp (recommended retail price if shown).`;
 
   const tools = [
     {

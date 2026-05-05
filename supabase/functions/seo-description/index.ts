@@ -88,8 +88,7 @@ RESPOND WITH A JSON ARRAY matching input order.`;
       `Item ${i + 1}: title="${p.title || ""}" | type="${p.type || ""}" | vendor="${p.vendor || ""}" | colour="${p.colour || ""}" | tags="${p.tags || ""}" | pattern="${p.pattern || ""}"`
     ).join("\n");
 
-    const data = await callAI({
-      model: "google/gemini-3-flash-preview",
+    const data = await callAIForJob("seo.description", {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },

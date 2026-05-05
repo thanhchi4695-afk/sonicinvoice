@@ -1,4 +1,5 @@
 import { ChevronRight, X, Monitor, ClipboardList, Mail, MapPin, Zap, Clock, Brain } from "lucide-react";
+import HomeAutopilotCard from "@/components/HomeAutopilotCard";
 import MigrationChecklist from "@/components/MigrationChecklist";
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";

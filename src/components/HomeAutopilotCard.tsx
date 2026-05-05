@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bot, ChevronRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import HowToVideoButton from "@/components/HowToVideoButton";
 
 function relTime(iso: string | null): string {
   if (!iso) return "";

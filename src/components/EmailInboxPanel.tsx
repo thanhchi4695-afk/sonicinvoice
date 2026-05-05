@@ -24,7 +24,28 @@ interface InboxItem {
   status: "queued" | "processing" | "ready" | "done";
   supplierName?: string | null;
   knownSupplier?: boolean;
+  confidence?: "high" | "medium" | "low";
 }
+
+const computeConfidence = (item: Pick<InboxItem, "knownSupplier" | "supplierName">): "high" | "medium" | "low" => {
+  if (item.knownSupplier && item.supplierName) return "high";
+  if (item.knownSupplier) return "medium";
+  return "low";
+};
+
+const confidenceBadge = (c: "high" | "medium" | "low") => {
+  const map = {
+    high: { label: "High", cls: "bg-success/15 text-success border-success/20" },
+    medium: { label: "Medium", cls: "bg-warning/15 text-warning border-warning/20" },
+    low: { label: "Low", cls: "bg-destructive/15 text-destructive border-destructive/20" },
+  } as const;
+  const m = map[c];
+  return (
+    <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${m.cls}`} title={`Confidence: ${m.label}`}>
+      {m.label}
+    </span>
+  );
+};
 
 interface GmailConnection {
   email_address: string;

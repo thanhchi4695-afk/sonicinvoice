@@ -3560,6 +3560,36 @@ export type Database = {
         }
         Relationships: []
       }
+      retailer_waitlist: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          notes: string | null
+          source: string | null
+          store_name: string | null
+          store_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          notes?: string | null
+          source?: string | null
+          store_name?: string | null
+          store_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          notes?: string | null
+          source?: string | null
+          store_name?: string | null
+          store_url?: string | null
+        }
+        Relationships: []
+      }
       sales_data: {
         Row: {
           cost_of_goods: number

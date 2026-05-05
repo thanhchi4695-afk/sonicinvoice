@@ -33,6 +33,7 @@ import { Switch } from "@/components/ui/switch";
 import { getFormatTemplates, deleteFormatTemplate, getTemplateQuality, getTemplateList, COLUMN_LABELS, type InvoiceTemplate, type ColumnMapping } from "@/lib/invoice-templates";
 import { getMetafieldConfig, saveMetafieldConfig, type MetafieldDefinition } from "@/lib/metafields";
 import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
+import { toast } from "sonner";
 const TeamManagement = lazy(() => import("@/components/TeamManagement"));
 const AutomationSettings = lazy(() => import("@/components/AutomationSettings"));
 const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"));
@@ -241,7 +242,7 @@ const AccountScreen = () => {
 
           <LocationsSection />
 
-          <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); }}>Save settings</Button>
+          <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); toast.success("Settings saved"); }}>Save settings</Button>
         </TabsContent>
 
         {/* ─── CONNECTIONS ───────────────────────────────────── */}

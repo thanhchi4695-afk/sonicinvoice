@@ -22,6 +22,7 @@ import Unsubscribe from "./pages/Unsubscribe.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import Health from "./pages/Health.tsx";
 import AdminSecrets from "./pages/AdminSecrets.tsx";
+import AdminAIModels from "./pages/AdminAIModels.tsx";
 import Rules from "./pages/Rules.tsx";
 import RulesSetup from "./pages/RulesSetup.tsx";
 import { lazy, Suspense } from "react";

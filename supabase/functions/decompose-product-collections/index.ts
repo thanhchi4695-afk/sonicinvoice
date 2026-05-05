@@ -195,8 +195,29 @@ Deno.serve(async (req) => {
       } catch { /* ignore */ }
     }
 
+    const prefs = body.method_preferences ?? {};
+    const catKey = prefs.category ?? "type";
+    const bcKey = prefs.brand_category ?? "vendor_type";
+    const subKey = prefs.sub_category ?? "title";
+    const prefBlock = `RULE METHOD PREFERENCES (use these EXACTLY):
+- brand: ALWAYS use rule_column='vendor', rule_relation='equals'. Never title, never tag.
+- brand_story: ALWAYS use rule_column='title', rule_relation='contains'. Never tag, never type.
+- feature: ALWAYS use rule_column='tag', rule_relation='equals'.
+- colour: ALWAYS use rule_column='tag', rule_relation='contains'.
+- category: use ${catKey === "tag_or_type" ? "TWO rules with disjunctive=true: {column:'tag',relation:'equals',condition:CATEGORY_TAG} OR {column:'type',relation:'equals',condition:CATEGORY}" : catKey === "tag" ? "rule_column='tag', rule_relation='equals'" : "rule_column='type', rule_relation='equals'"}.
+- brand_category / cross_reference: ${
+  bcKey === "vendor_tag"
+    ? "ALWAYS emit TWO rules connected by AND (disjunctive=false): Rule1 {column:'vendor',relation:'equals',condition:BRAND}, Rule2 {column:'tag',relation:'equals',condition:CATEGORY_TAG}. Populate the 'rules' array AND set rule_column='vendor', rule_relation='equals', rule_condition=BRAND."
+    : bcKey === "vendor_type"
+      ? "ALWAYS emit TWO rules connected by AND (disjunctive=false): Rule1 {column:'vendor',relation:'equals',condition:BRAND}, Rule2 {column:'type',relation:'equals',condition:CATEGORY}. Populate 'rules' AND set rule_column='vendor'."
+      : "use rule_column='title', rule_relation='starts_with', condition=BRAND. Single rule."
+}
+- sub_category / modified_sub_category: use ${subKey === "tag" ? "rule_column='tag', rule_relation='equals'" : "rule_column='title', rule_relation='contains'"}.`;
+
     const userPrompt = `Store: ${body.store_name ?? "Splash Swimwear"} (${body.store_city ?? "Darwin"})
 Existing collection handles (mark is_new=false for these): ${JSON.stringify(existingHandles)}
+
+${prefBlock}
 
 Products (${body.products.length}):
 ${JSON.stringify(body.products, null, 2)}

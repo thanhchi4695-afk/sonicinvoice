@@ -23,14 +23,22 @@ type LevelLabel =
   | "brand" | "brand_story" | "category" | "sub_category"
   | "modified_sub_category" | "feature" | "cross_reference";
 
+interface CollectionRule {
+  column: string;
+  relation: string;
+  condition: string;
+}
+
 interface DecomposedCollection {
   title: string;
   handle: string;
   level: 1 | 2 | 3 | 4 | 5 | 6;
   level_label: LevelLabel;
-  rule_column: "tag" | "title" | "vendor" | "product_type";
-  rule_relation: "equals" | "contains" | "starts_with";
+  rule_column: string;
+  rule_relation: string;
   rule_condition: string;
+  rules?: CollectionRule[];      // optional: for AND/OR multi-rule
+  disjunctive?: boolean;
   is_new: boolean;
   seo_title: string;
   meta_description: string;

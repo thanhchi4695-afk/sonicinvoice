@@ -118,6 +118,14 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
   const [filter, setFilter] = useState<"all" | "known" | "unknown" | "processed">("all");
   const [search, setSearch] = useState("");
+  const [smartBulk, setSmartBulk] = useState<boolean>(() => {
+    try { return localStorage.getItem("sonic_smart_bulk_enabled") === "1"; } catch { return false; }
+  });
+  const [autoProcessedIds, setAutoProcessedIds] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    try { localStorage.setItem("sonic_smart_bulk_enabled", smartBulk ? "1" : "0"); } catch {}
+  }, [smartBulk]);
   const demo = isDemoMode();
 
   const loadConnection = useCallback(async () => {

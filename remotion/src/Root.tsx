@@ -63,5 +63,13 @@ export const RemotionRoot = () => (
       width={1920}
       height={1080}
     />
+    <Composition
+      id="howto-collection-autopilot"
+      component={HowToCollectionAutopilot}
+      durationInFrames={HOWTO_COLLECTION_AUTOPILOT_FRAMES}
+      fps={30}
+      width={1920}
+      height={1080}
+    />
   </>
 );

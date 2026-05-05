@@ -91,6 +91,26 @@ const HomeScreen = ({
 }: HomeScreenProps) => {
   const mode = useStoreMode();
   const unreadCount = getUnprocessedInboxCount();
+  const [gmailLastScan, setGmailLastScan] = useState<Date | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData?.session?.user?.id;
+        if (!userId) return;
+        const { data } = await supabase
+          .from("gmail_connections")
+          .select("last_checked_at")
+          .eq("user_id", userId)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (!cancelled && data?.last_checked_at) setGmailLastScan(new Date(data.last_checked_at));
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const gmailHealthy = gmailLastScan ? (Date.now() - gmailLastScan.getTime()) / 60000 < 10 : false;
   const [learnedSupplierCount, setLearnedSupplierCount] = useState<number | null>(null);
 
   // Fetch the count of learned supplier profiles for the "Supplier Brain" badge

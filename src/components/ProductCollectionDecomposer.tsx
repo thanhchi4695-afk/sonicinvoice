@@ -80,11 +80,42 @@ function loadProductsFromLocalStorage(): InProduct[] {
   return [];
 }
 
+interface CatalogSuggestion {
+  title: string;
+  handle: string;
+  level: "brand" | "brand_story" | "category" | "brand_category" | "feature";
+  priority: "high" | "medium" | "low";
+  estimated_products: number;
+  rule_column: "tag" | "vendor" | "title" | "product_type";
+  rule_relation: "equals" | "contains" | "starts_with";
+  rule_condition: string;
+  seo_title: string;
+  meta_description: string;
+  rationale: string;
+  selected: boolean;
+}
+
+interface EmptyCollection {
+  id: string | number;
+  title: string;
+  handle: string;
+  kind: "custom" | "smart";
+  products_count: number;
+  recommendation: "delete" | "keep" | "fix_rules";
+}
+
+interface GapStats {
+  brands_without_collection?: number;
+  style_lines_without_collection?: number;
+  feature_gaps?: string[];
+  total_products_uncollected?: number;
+}
+
 export default function ProductCollectionDecomposer({
   onBack, initialProducts, invoiceLabel, onOpenCollectionSEO,
 }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [tab, setTab] = useState<"invoice" | "paste">(initialProducts?.length ? "invoice" : "invoice");
+  const [tab, setTab] = useState<"invoice" | "paste" | "catalog">(initialProducts?.length ? "invoice" : "invoice");
   const [products, setProducts] = useState<InProduct[]>(initialProducts ?? []);
   const [pasteText, setPasteText] = useState("");
   const [pasteVendor, setPasteVendor] = useState("");
@@ -94,6 +125,19 @@ export default function ProductCollectionDecomposer({
   const [analysing, setAnalysing] = useState(false);
   const [collections, setCollections] = useState<DecomposedCollection[]>([]);
   const [selectedHandle, setSelectedHandle] = useState<string | null>(null);
+
+  // Catalog-scan state
+  const [scanMode, setScanMode] = useState<"full" | "brand" | "type">("full");
+  const [scanVendor, setScanVendor] = useState("");
+  const [scanType, setScanType] = useState("");
+  const [scanProgress, setScanProgress] = useState<string[]>([]);
+  const [isCatalogScan, setIsCatalogScan] = useState(false);
+  const [catalogSuggestions, setCatalogSuggestions] = useState<CatalogSuggestion[]>([]);
+  const [emptyCollections, setEmptyCollections] = useState<EmptyCollection[]>([]);
+  const [gapStats, setGapStats] = useState<GapStats>({});
+  const [scanStats, setScanStats] = useState<{ total_existing_collections?: number; unique_products?: number; unique_brands?: number }>({});
+  const [priorityFilter, setPriorityFilter] = useState<"all" | "high" | "medium" | "low" | "feature" | "brand">("all");
+  const [deletingEmpty, setDeletingEmpty] = useState(false);
 
   const [pushing, setPushing] = useState(false);
   const [pushProgress, setPushProgress] = useState(0);

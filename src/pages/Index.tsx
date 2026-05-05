@@ -20,6 +20,7 @@ import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
 import QuickSearchModal from "@/components/QuickSearchModal";
 import PhaseProgressBar from "@/components/PhaseProgressBar";
 import MobileKeyboardHint from "@/components/MobileKeyboardHint";
+import InputSelector from "@/components/InputSelector";
 // HomeScreen kept available (now lazy) — accessible from Tools as "Classic dashboard".
 const HomeScreen = lazy(() => import("@/components/HomeScreen"));
 
@@ -633,15 +634,24 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const mainContent = (
     <>
       {(activeTab === "home" || activeTab === "start") && (
-        <PhaseFlowHome
-          onStartInvoice={() => setActiveFlow("invoice")}
-          onStartPackingSlip={() => setActiveFlow("packing_slip")}
-          onStartEmailInbox={() => setActiveFlow("email_inbox")}
-          onStartJoor={() => setActiveFlow("joor")}
-          onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
-          onStartLookbookImport={() => setActiveFlow("lookbook_import")}
-          onStartScanMode={() => setActiveFlow("scan_mode")}
-        />
+        <>
+          <InputSelector
+            onSelect={(kind) => {
+              if (kind === "pdf" || kind === "excel") setActiveFlow("invoice");
+              else if (kind === "photo") setActiveFlow("packing_slip");
+              else if (kind === "email") setActiveFlow("email_inbox");
+            }}
+          />
+          <PhaseFlowHome
+            onStartInvoice={() => setActiveFlow("invoice")}
+            onStartPackingSlip={() => setActiveFlow("packing_slip")}
+            onStartEmailInbox={() => setActiveFlow("email_inbox")}
+            onStartJoor={() => setActiveFlow("joor")}
+            onStartWholesaleImport={() => setActiveFlow("wholesale_import")}
+            onStartLookbookImport={() => setActiveFlow("lookbook_import")}
+            onStartScanMode={() => setActiveFlow("scan_mode")}
+          />
+        </>
       )}
       {activeTab === "ai_agents" && (
         <Suspense fallback={suspenseFallback}>

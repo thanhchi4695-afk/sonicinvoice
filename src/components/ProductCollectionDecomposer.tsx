@@ -509,6 +509,9 @@ export default function ProductCollectionDecomposer({
             <TabsList>
               <TabsTrigger value="invoice">From invoice</TabsTrigger>
               <TabsTrigger value="paste">Paste titles</TabsTrigger>
+              <TabsTrigger value="catalog">
+                <Search className="w-3.5 h-3.5 mr-1" /> Scan full catalog
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="invoice" className="space-y-3 pt-3">
               <p className="text-sm text-muted-foreground">
@@ -530,6 +533,74 @@ export default function ProductCollectionDecomposer({
                 <Input placeholder="Product type (e.g. Bikini Bottoms)" value={pasteType} onChange={(e) => setPasteType(e.target.value)} />
               </div>
               <Button onClick={loadFromPaste} variant="secondary">Load pasted titles</Button>
+            </TabsContent>
+            <TabsContent value="catalog" className="space-y-4 pt-3">
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Search className="w-5 h-5 text-primary mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-semibold">Full Catalog Gap Analysis</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Scan all your Shopify products and collections to find what's missing.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  <label className="text-xs font-medium text-muted-foreground">Scope</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="scanMode" checked={scanMode === "full"} onChange={() => setScanMode("full")} />
+                      <span>All brands (full catalog)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="scanMode" checked={scanMode === "brand"} onChange={() => setScanMode("brand")} />
+                      <span>One brand only</span>
+                      <Input
+                        className="h-7 w-44 ml-1"
+                        placeholder="e.g. Seafolly"
+                        value={scanVendor}
+                        onChange={(e) => { setScanVendor(e.target.value); setScanMode("brand"); }}
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="scanMode" checked={scanMode === "type"} onChange={() => setScanMode("type")} />
+                      <span>One category</span>
+                      <Input
+                        className="h-7 w-44 ml-1"
+                        placeholder="e.g. Bikini Bottoms"
+                        value={scanType}
+                        onChange={(e) => { setScanType(e.target.value); setScanMode("type"); }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {(() => {
+                  let lastRun = "never";
+                  let lastCount: string | null = null;
+                  try {
+                    const ts = localStorage.getItem("catalog_audit_last_run");
+                    if (ts) lastRun = new Date(ts).toLocaleString();
+                    lastCount = localStorage.getItem("catalog_audit_last_count");
+                  } catch { /* */ }
+                  return (
+                    <div className="rounded border border-border bg-card/50 p-2 text-xs text-muted-foreground space-y-0.5">
+                      <div>📊 Last scan: <span className="text-foreground">{lastRun}</span></div>
+                      <div>Gaps identified: <span className="text-foreground">{lastCount ?? "—"}</span></div>
+                    </div>
+                  );
+                })()}
+
+                <Button
+                  onClick={runCatalogScan}
+                  disabled={analysing || (scanMode === "brand" && !scanVendor.trim()) || (scanMode === "type" && !scanType.trim())}
+                  className="w-full"
+                >
+                  <Search className="w-4 h-4 mr-2" />
+                  Scan now — analyse full catalog
+                </Button>
+              </div>
             </TabsContent>
           </Tabs>
 

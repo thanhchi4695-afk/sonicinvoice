@@ -343,6 +343,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     addAuditEntry("Email", `Bulk processed ${success} known-supplier invoices${failed ? ` (${failed} failed)` : ""}`);
   };
 
+  const handleSimulateSend = () => {
     if (!simFrom.trim()) return;
     const fileName = simFile || "invoice.pdf";
     const newItem: InboxItem = {

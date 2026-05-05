@@ -91,11 +91,23 @@ export default function CollectionRuleMethodChooser({ storeName, products = [], 
         </p>
       </div>
 
-      {isSplash && (
-        <div className="rounded border border-primary/40 bg-primary/5 p-2 text-xs text-primary">
-          ✨ Smart defaults applied for Splash Swimwear (tags + vendor are highly reliable here).
-        </div>
-      )}
+      <div className="flex items-center gap-2 flex-wrap">
+        {isSplash && (
+          <span className="rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] px-2 py-1">
+            ✓ Splash Swimwear smart defaults applied
+          </span>
+        )}
+        <Button
+          size="sm" variant="ghost" className="h-6 px-2 text-[11px] ml-auto"
+          onClick={() => onChange(getSmartDefaults(storeName))}
+        >
+          <RotateCcw className="w-3 h-3 mr-1" /> Reset to defaults
+        </Button>
+      </div>
+
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border pb-1">
+        Requires your choice
+      </div>
 
       {/* Choice cards */}
       <div className="space-y-3">

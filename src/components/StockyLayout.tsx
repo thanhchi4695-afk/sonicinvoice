@@ -38,6 +38,7 @@ import {
   DollarSign,
   ShoppingCart,
   Download,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -129,9 +130,16 @@ const defaultGroups: NavGroup[] = [
       { id: "performance", label: "Ad Performance", icon: BarChart3, type: "flow" },
       { id: "lightspeed_convert", label: "Lightspeed Converter", icon: Download, type: "flow" },
       { id: "accounting", label: "Accounting", icon: FileText, type: "flow" },
-      { id: "support_chat", label: "Chat with Support", icon: MessageCircle, type: "tab" },
+    ],
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: Settings,
+    items: [
+      { id: "account", label: "Account", icon: User, type: "tab" },
       { id: "billing", label: "Billing", icon: CreditCard, type: "tab" },
-      { id: "account", label: "Settings", icon: Settings, type: "tab" },
+      { id: "support_chat", label: "Chat with Support", icon: MessageCircle, type: "tab" },
     ],
   },
 ];

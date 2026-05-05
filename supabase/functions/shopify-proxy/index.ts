@@ -150,27 +150,25 @@ Deno.serve(async (req) => {
     const { storeUrl: store_url, accessToken: access_token, apiVersion: api_version } = validToken;
     const baseUrl = `https://${store_url}/admin/api/${api_version}`;
 
+    const SHOPIFY_TIMEOUT_MS = 30_000;
+    const fetchWithTimeout = (url: string, init: RequestInit) => {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(new Error(`Shopify request timed out after ${SHOPIFY_TIMEOUT_MS}ms`)), SHOPIFY_TIMEOUT_MS);
+      return fetch(url, { ...init, signal: ctl.signal }).finally(() => clearTimeout(timer));
+    };
+
     const shopifyFetch = async (path: string, options: RequestInit = {}) => {
-      const resp = await fetch(`${baseUrl}${path}`, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          "X-Shopify-Access-Token": access_token,
-          ...((options.headers as Record<string, string>) || {}),
-        },
-      });
+      const headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": access_token,
+        ...((options.headers as Record<string, string>) || {}),
+      };
+      const resp = await fetchWithTimeout(`${baseUrl}${path}`, { ...options, headers });
 
       if (resp.status === 429) {
         // Rate limited — wait and retry once
         await new Promise((r) => setTimeout(r, 2000));
-        return fetch(`${baseUrl}${path}`, {
-          ...options,
-          headers: {
-            "Content-Type": "application/json",
-            "X-Shopify-Access-Token": access_token,
-            ...((options.headers as Record<string, string>) || {}),
-          },
-        });
+        return fetchWithTimeout(`${baseUrl}${path}`, { ...options, headers });
       }
 
       return resp;

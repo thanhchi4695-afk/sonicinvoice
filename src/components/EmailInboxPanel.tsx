@@ -156,6 +156,12 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     loadFoundInvoices();
   }, [loadConnection, loadFoundInvoices, toast]);
 
+  const isInAppBrowser = (() => {
+    if (typeof navigator === "undefined") return false;
+    const ua = navigator.userAgent || "";
+    return /FBAN|FBAV|FB_IAB|Messenger|Instagram|Line\/|MicroMessenger|WeChat|TikTok|Snapchat|Twitter|LinkedInApp|GSA\//i.test(ua);
+  })();
+
   const handleConnectGmail = async () => {
     setConnecting(true);
     try {
@@ -163,6 +169,26 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       if (error) throw error;
       const url = (data as any)?.url;
       if (!url) throw new Error("No OAuth URL returned");
+
+      if (isInAppBrowser) {
+        // Google blocks OAuth in embedded webviews ("disallowed_useragent").
+        // Copy the link and prompt the user to open it in Safari/Chrome.
+        try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
+        toast({
+          title: "Open in Safari or Chrome",
+          description: "Google blocks sign-in inside Messenger/Instagram. The link is copied — paste it into your browser.",
+        });
+        // Best-effort escape attempts (iOS Safari & Android Chrome intent)
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        if (isAndroid) {
+          window.location.href = `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
+        } else {
+          window.open(url, "_blank");
+        }
+        setConnecting(false);
+        return;
+      }
+
       window.location.href = url;
     } catch (err: any) {
       toast({ title: "Couldn't start Gmail connect", description: err?.message ?? String(err), variant: "destructive" });

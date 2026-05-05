@@ -653,6 +653,10 @@ export default function ProductCollectionDecomposer({
               onChange={setMethodPrefs}
             />
           )}
+
+          <div className="flex justify-end">
+            <Button onClick={analyse} disabled={products.length === 0}>
+              Analyse collections <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>

@@ -377,15 +377,18 @@ Deno.serve(async (req) => {
           }
         `;
 
-        // Build productOptions with explicit values (required by ProductSetInput)
-        const productOptionsInput = options.map((opt, idx) => {
+        // Build productOptions with explicit values (required by ProductSetInput).
+        // ProductSetInput also requires every variant to include optionValues;
+        // Shopify's default single-variant product still needs Title / Default Title.
+        const effectiveOptions = options.length > 0 ? options : [{ name: "Title" }];
+        const productOptionsInput = effectiveOptions.map((opt, idx) => {
           const valuesSet = new Set<string>();
           for (const v of variants) {
-            const ov = idx === 0 ? v.option1 : v.option2;
+            const ov = idx === 0 ? v.option1 : idx === 1 ? v.option2 : undefined;
             if (ov != null && String(ov).trim() !== "") valuesSet.add(String(ov));
           }
           // Must have at least one value
-          if (valuesSet.size === 0) valuesSet.add("Default");
+          if (valuesSet.size === 0) valuesSet.add(opt.name === "Title" ? "Default Title" : "Default");
           return {
             name: opt.name,
             values: Array.from(valuesSet).map((name) => ({ name })),
@@ -400,9 +403,10 @@ Deno.serve(async (req) => {
           if (v.sku) variant.sku = String(v.sku);
           if (v.cost) variant.inventoryItem = { cost: String(v.cost) };
           const optVals: { name: string; optionName: string }[] = [];
-          if (v.option1 && options[0]) optVals.push({ name: String(v.option1), optionName: options[0].name });
-          if (v.option2 && options[1]) optVals.push({ name: String(v.option2), optionName: options[1].name });
-          if (optVals.length > 0) variant.optionValues = optVals;
+          if (v.option1 && effectiveOptions[0]) optVals.push({ name: String(v.option1), optionName: effectiveOptions[0].name });
+          if (v.option2 && effectiveOptions[1]) optVals.push({ name: String(v.option2), optionName: effectiveOptions[1].name });
+          if (optVals.length === 0) optVals.push({ name: "Default Title", optionName: "Title" });
+          variant.optionValues = optVals;
           return variant;
         });
 

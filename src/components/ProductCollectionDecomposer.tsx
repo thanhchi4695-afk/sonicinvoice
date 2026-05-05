@@ -329,6 +329,11 @@ export default function ProductCollectionDecomposer({
                 {products.slice(0, 5).map((p, i) => <li key={i}>{p.title}</li>)}
                 {products.length > 5 && <li>…and {products.length - 5} more</li>}
               </ul>
+              {products.length > 0 && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Note: AI analyses the first 30 products to detect collection patterns — this covers all style lines.
+                </div>
+              )}
             </div>
           )}
 

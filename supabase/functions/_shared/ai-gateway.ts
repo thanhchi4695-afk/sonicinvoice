@@ -192,7 +192,7 @@ export class AIGatewayError extends Error {
 // ─── Anthropic direct path ────────────────────────────────────────────────
 // Routes anthropic/* models to api.anthropic.com and normalises the response
 // back into the OpenAI shape that the rest of our code expects.
-async function callAnthropicAPI(model: string, options: AIRequestOptions): Promise<AIResponse> {
+async function callAnthropicAPI(model: string, options: AIRequestOptions, signal?: AbortSignal): Promise<AIResponse> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) {
     throw new AIGatewayError("ANTHROPIC_API_KEY is not configured", 500);
@@ -238,6 +238,7 @@ async function callAnthropicAPI(model: string, options: AIRequestOptions): Promi
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (response.status === 429) {

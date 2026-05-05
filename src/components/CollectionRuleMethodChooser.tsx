@@ -162,18 +162,35 @@ export default function CollectionRuleMethodChooser({ storeName, products = [], 
         })}
       </div>
 
-      {/* Fixed types */}
-      <div className="rounded-md border border-border/60 bg-muted/30 p-3">
-        <div className="text-xs font-semibold text-muted-foreground mb-2">✅ Fixed automatically (no choice needed)</div>
-        <ul className="space-y-1 text-xs text-muted-foreground">
-          {fixedConfigs.map(cfg => (
-            <li key={cfg.level_label}>
-              <span className="mr-1">{cfg.icon}</span>
-              <b className="text-foreground">{cfg.display_name}</b> — {cfg.fixed_method!.label.toLowerCase()} ({cfg.fixed_method!.rule_column} {cfg.fixed_method!.rule_relation} {cfg.fixed_method!.condition_template})
-            </li>
-          ))}
-        </ul>
+      {/* Fixed types — locked, with tooltip explaining why */}
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border pb-1">
+        Set automatically (no choice needed)
       </div>
+      <TooltipProvider delayDuration={150}>
+        <ul className="space-y-1.5">
+          {fixedConfigs.map(cfg => {
+            const m = cfg.fixed_method!;
+            const reason = LOCK_REASONS[cfg.level_label] || cfg.note || "Fixed by design — most reliable signal for this collection type.";
+            return (
+              <li key={cfg.level_label} className="flex items-center gap-2 rounded border border-border/60 bg-muted/20 px-2 py-1.5 text-xs">
+                <span>{cfg.icon}</span>
+                <b className="text-foreground">{cfg.display_name}</b>
+                <span className="text-muted-foreground">→ {m.rule_column} {m.rule_relation} {m.condition_template}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="ml-auto text-muted-foreground hover:text-foreground" aria-label="Why is this locked?">
+                      <Lock className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs text-xs">
+                    {reason}
+                  </TooltipContent>
+                </Tooltip>
+              </li>
+            );
+          })}
+        </ul>
+      </TooltipProvider>
 
       <div className="flex items-center justify-between border-t border-border pt-3">
         <span className="text-xs text-muted-foreground">Remember my choices for next time</span>

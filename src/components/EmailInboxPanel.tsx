@@ -25,6 +25,10 @@ interface InboxItem {
   supplierName?: string | null;
   knownSupplier?: boolean;
   confidence?: "high" | "medium" | "low";
+  messageId?: string;
+  attachmentId?: string;
+  attachmentMime?: string;
+  parseJobId?: string;
 }
 
 const computeConfidence = (item: Pick<InboxItem, "knownSupplier" | "supplierName">): "high" | "medium" | "low" => {

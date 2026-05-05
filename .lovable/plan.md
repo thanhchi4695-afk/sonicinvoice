@@ -1,181 +1,86 @@
-# Sonic Invoices — Apple-Inspired Redesign Plan
-_Scope: every screen **except** the homepage. Zero functions removed — all 55 flows preserved._
+# Sola Strategy for Collections — Composable Agent Pipeline
 
-> Source: `sonic_invoices_redesign_plan.docx` (May 2026 audit) + Apple HIG 2025.
-> Project memory still applies (dark theme, teal/amber accents, Syne/IBM Plex Mono, 32px DataGrid rows, Colour-first/Size-second variants, Shopify embedded sidebar ≥1024 / bottom bar <1024).
+Status: PLAN ONLY — not yet implemented. User will send the build prompt later.
 
----
+## Vision
+Turn the Collection Builder from a one-off tool into a continuously running,
+composable agent pipeline (Sola-style):
+1. Every trigger creates a workflow (not just a button click).
+2. Every decision is logged with reasoning (auditable).
+3. Workflows adapt when stock changes (self-healing).
+4. Human approval gates are first-class.
+5. The system learns from every correction.
 
-## 0. Guiding principles
+## Workflows to Build
 
-| Apple HIG | Applied to Sonic Invoices |
-|---|---|
-| **Clarity** | One obvious primary action per screen. Secondary actions present but quieter. |
-| **Deference** | Chrome (sidebar, headers) recedes; data is the hero. |
-| **Depth** | Progressive disclosure — surface simple, complexity on demand. |
-| **Consistency** | One spacing scale, one type scale, one semantic colour map. |
-| **Feedback** | Every action gets a toast or inline confirmation within 200 ms. |
+### W1 — Invoice Arrival → Auto-Create Collections
+- Trigger: invoice processed successfully (existing watchdog).
+- Diff against `collection_memory` to find new brands / style lines.
+- Propose new brand-story / sub-category collections.
+- Send approval (email + Slack): "Walnut Marrakesh — create collection?"
+- On approve → create in Shopify; on deny → log + never re-ask for that style.
 
-**Non-negotiables**
-- Keep every existing route, edge function, and feature.
-- Keep dark theme + teal/amber accents (memory rule); the doc's light palette is mapped into our existing semantic tokens, not replacing them.
-- Touch targets ≥ 44 px (iPad in-store usage).
-- Respect Shopify embedded layout: sidebar ≥1024 px, bottom bar <1024 px.
+### W2 — Weekly Collection Health Check
+- Trigger: Supabase pg_cron, Mondays 08:00 Darwin.
+- Scan all Shopify collections; flag:
+  - 0-product collections (sold out / season ended)
+  - +10 product growth (suggest splitting)
+  - Missing SEO description
+- Email Lisa a weekly digest: Needs Attention / New Opportunities / Top Performers.
 
----
+### W3 — Stock Change → Membership Update
+- Trigger: inventory drop to 0 (existing adjust-inventory hook).
+- Sold-out product → drop from "New Arrivals", remove `new` tag.
+- Whole style line empty → archive the collection (hide, don't delete).
+- Stock replenished from new invoice → restore archived collections, refresh New Arrivals tag rules.
 
-## 1. Design system refresh (foundation — do first)
+### W4 — Auto-SEO for New Collections
+- Trigger: new Shopify collection with empty body_html.
+- Read smart rule → fetch 5 sample products from `product_catalog_cache`.
+- Claude generates 250–350 word body, internal links, meta title ≤65, meta desc ≤155.
+- Push via `update_collection_seo`; log to new `seo_generation_log` table.
+- Promotes existing CollectionSEOFlow from manual → automatic.
 
-Edit `src/index.css` + `tailwind.config.ts` only — no component changes yet.
+### W5 — Seasonal Collection Lifecycle
+- **Start (Oct / Apr):** create "Summer 25/26 Arrivals" with `tag = Summer 25/26`, generate SEO, publish.
+- **Mid-season (+45d):** detect low sales velocity → feed `lifecycleEngine.ts`, propose markdown ladder, suggest move to Sale collection.
+- **End-of-season (+90d):** archive seasonal collection, create Clearance collection, tag remaining stock `clearance`.
 
-**Tokens to formalise (HSL, semantic):**
-- `--surface`, `--surface-elevated`, `--surface-sunken` (replace ad-hoc `bg-card/50` etc.)
-- `--accent-teal`, `--accent-amber`, `--accent-success`, `--accent-warning`, `--accent-danger`, `--accent-info` — single source of truth for status pills, toasts, badges.
-- `--sidebar-bg`, `--sidebar-item`, `--sidebar-item-hover`, `--sidebar-item-active`.
-- Spacing scale: `--space-1..7` = 4 / 8 / 12 / 16 / 24 / 32 / 48 px.
-- Type scale (Syne for h1–h3, Inter for body, IBM Plex Mono for data):
-  - Page title 28/600, Section 20/600, Card 16/600, Body 14/400, Caption 12/500, Mono-data 13/500.
-- Radii: `--radius-sm 6`, `--radius-md 10`, `--radius-lg 14`, `--radius-pill 999`.
-- Shadows: `--shadow-card`, `--shadow-modal`, `--shadow-toast` (subtle, single source).
+### W6 — Performance Monitoring + Auto-Optimise
+- Trigger: weekly (after GA refresh).
+- Read collection pageview data (GA API or Shopify Analytics).
+- High views + low CTR → regenerate SEO with new keyword angle.
+- 0 views → check sitemap inclusion, add internal links from related pages.
+- Report: "3 collections got 0 visits this week."
 
-**Buttons** — extend existing `buttonVariants` with strict semantic variants: `primary` (action), `secondary` (passive), `ghost` (low-emphasis), `destructive`, `teal` (already used). Remove ad-hoc `bg-blue-*` / `bg-navy-*` usage.
+## Architecture Notes (reuse existing scaffolding)
+- Reuse the existing 5-step agent orchestrator (retry + step tracking) used by invoice processing.
+- New tables likely needed:
+  - `collection_workflow_runs` (run id, workflow_id, trigger, status, steps[], started_at, finished_at)
+  - `collection_workflow_decisions` (run_id, decision, rationale, approved_by, approved_at)
+  - `seo_generation_log`
+  - `collection_archive_log` (handle, archived_at, reason, restored_at)
+- New edge functions:
+  - `collections-workflow-w1-invoice-arrival`
+  - `collections-workflow-w2-weekly-health` (pg_cron)
+  - `collections-workflow-w3-stock-change`
+  - `collections-workflow-w4-auto-seo`
+  - `collections-workflow-w5-seasonal-lifecycle` (pg_cron daily)
+  - `collections-workflow-w6-performance` (pg_cron weekly)
+- Approval surface: reuse Slack + email infra; add an in-app "Workflow inbox" UI.
 
-**Acceptance:** rg shows zero raw colour classes (`bg-blue-`, `text-white`, `bg-slate-`) in `src/components/**` after migration prompts run.
+## Open Questions for the User (when build starts)
+1. Approval channel preference: Slack only, email only, or both?
+2. Season start dates — fixed (Oct 1 / Apr 1) or configurable per store?
+3. GA connector vs Shopify Analytics for W6?
+4. Should W3 auto-archive immediately, or always require approval first?
+5. Auto-publish W4 SEO content, or send to draft for review?
 
----
-
-## 2. Navigation overhaul (highest user-impact)
-
-**Problem:** 17 flat sidebar items at equal weight; no mental model.
-
-**Fix: grouped sidebar with 4 sections** (`src/components/EmbeddedNav.tsx` + dashboard sidebar):
-
-1. **Stock** — Inventory, Stock Adjustments, Stocktakes, Transfers
-2. **Suppliers** — Invoices, Purchase Orders, Suppliers, Brand Rules
-3. **Reports** — Reports Hub, Forecasting, Margins, Sales Velocity
-4. **Tools** — Paste Link, Tag Rules, Tools, Claude Integration, Connectors, Settings
-
-Rules:
-- Group label is small caps 11/600 muted.
-- Group containing the active route stays expanded (`defaultOpen` based on `useLocation`).
-- Collapsible to icon-only rail (`collapsible="icon"`); `SidebarTrigger` lives in the top header so it stays visible.
-- On Shopify embedded mobile (<1024 px), the existing bottom bar gets the same 4 group icons; tapping opens a sheet with the group's items (preserve current routes).
-- Active state uses `--sidebar-item-active` + a 2 px left teal accent bar.
-- Add a persistent **Quick Search (⌘K)** trigger pinned at the top of the sidebar — opens existing global search.
-
-**Acceptance:** every existing route is still reachable in ≤2 clicks; sidebar item count visible at any time ≤ 8.
-
----
-
-## 3. App shell & top bar
-
-- New top bar (h-14): SidebarTrigger · breadcrumb · environment chip (Test/Live) · notifications · user avatar.
-- Breadcrumbs auto-generated from route — replaces ad-hoc page titles.
-- Page header pattern (every screen): `<PageHeader title subtitle actions />` component — title 28/600, subtitle 14/muted, primary action right-aligned. Build once in `src/components/layout/PageHeader.tsx`, replace ad-hoc headers screen-by-screen.
-
----
-
-## 4. Invoice flow (Upload → Extract → Review → Enrich → Publish)
-
-| Screen | Change |
-|---|---|
-| **Phase progress bar** | Replace 6 disabled/“Soon” pills with a single linear stepper (4 active steps). Hidden `Soon` items go behind a “More” menu. Clicking a future step is disabled (not navigation). |
-| **Review (line items)** | Sticky bottom action bar: `Approve N items →` always visible. Inline edit on cell click. Confidence chips: HIGH (green), MEDIUM (amber), LOW (red) — already in confidence-export-gate memory. |
-| **Enrich** | Two-column layout: source data (left, read-only) vs Shopify-ready (right, editable). Differences highlighted in amber. |
-| **Publish** | Single hero card: store name, product count, location, status. One large primary `Publish to Shopify →`. Success: green check + toast + “View in Shopify” link (uses existing `openShopifyAdmin` helper). |
-
----
-
-## 5. Per-screen redesigns (preserve every feature)
-
-**Inventory**
-- Default to a curated 6-column view (Image · SKU · Title · Stock · Price · Status); column picker reveals the rest.
-- Sticky first column (image+title) on horizontal scroll for iPad.
-- Filter bar: search + 3 chip filters (Status, Location, Brand). “More filters” opens a sheet.
-- Bulk-action bar slides up from bottom when rows selected.
-
-**Purchase Orders**
-- List shows status pills: Draft / Sent / Partial / Received / Overdue (semantic colours).
-- “Needs action” quick filter at top.
-- Form is split into 3 collapsible sections: Supplier · Line items · Delivery.
-
-**Stock Adjustments**
-- Progressive form: Location + Reason → Product search → Quantity → Notes.
-- Recent adjustments preview rail on the right.
-
-**Stocktakes**
-- Scan mode: full-screen on mobile, 64 px input, audio + vibration feedback.
-- Variance summary card at top: counted / expected / variance %.
-
-**Reports hub**
-- Replace dense widget grid with a card grid (3-up desktop, 1-up mobile). Each card: title, 1 KPI, sparkline, “Open report →”.
-- Inside each report: 3 KPI cards above the table.
-
-**Suppliers**
-- Confidence chip + last-trained date on each card.
-- “Needs training” filter (<10 invoices or <80% confidence) — one-click upload for that supplier.
-
-**Settings / Connectors / Account**
-- Move from tabs-only to grouped left rail inside the page (Account · Connections · Billing · Notifications · Team).
-
----
-
-## 6. Components — global standards
-
-**Modals**
-- Widths: sm 480 / md 640 / lg 800 / full-screen on mobile.
-- Header: title 18/600 + close ✕. Footer: secondary left, primary right. ESC + backdrop click closes.
-
-**Tables (DataGrids)**
-- Keep TanStack + 32 px row height (memory rule).
-- Header: muted bg, semibold, uppercase tracking-wide.
-- Zebra striping, no vertical borders, hover bg, sticky header.
-- Empty state: centred illustration + 16/600 message + 14/muted helper + single CTA.
-
-**Forms**
-- Label above input (13/medium). Helper text below (12/muted).
-- Focus ring: 2 px teal + 1 px offset.
-- Error: red border + red helper.
-- All inputs ≥ 44 px tall on touch.
-- Custom Select component everywhere (no native).
-
-**Toasts**
-- All saves/publishes/errors → toast top-right, 4 s auto-dismiss, icon + message.
-- One source: extend existing `sonner` config.
-
-**Empty states**
-- One reusable `<EmptyState icon title body cta />`.
-
----
-
-## 7. Mobile / iPad
-
-- All tables: horizontal scroll with sticky first column, never crammed.
-- Stocktake scan: full-screen takeover.
-- Bottom action bars on long forms (Approve, Save, Publish).
-- Min tap target 44 px.
-
----
-
-## 8. Execution order (8 prompts, ~15–18 h total)
-
-Send one prompt per round; verify before next.
-
-1. **Design tokens** — `index.css` + `tailwind.config.ts` + extended `buttonVariants`. _Foundation, blocks all others._
-2. **App shell** — `PageHeader`, top bar, breadcrumbs.
-3. **Grouped sidebar** — `EmbeddedNav.tsx` + dashboard sidebar (incl. mobile bottom bar groups).
-4. **Tables & EmptyState standards** — shared `<DataTableShell>` + `<EmptyState>`; migrate 2 reference screens (Inventory, Reports).
-5. **Modal & Form standards** — shared primitives + migrate Invoice modals.
-6. **Invoice flow** — stepper, sticky approve bar, two-column enrich, hero publish.
-7. **Per-screen pass A** — Inventory, Purchase Orders, Stock Adjustments, Stocktakes.
-8. **Per-screen pass B** — Reports hub + each report, Suppliers, Settings/Connectors, remaining tools.
-
-**Acceptance per prompt:** build clean, all routes reachable, no removed functionality, semantic-token-only colours in changed files.
-
----
-
-## 9. Out of scope (this plan)
-
-- Homepage (`/`) — explicitly excluded.
-- Backend / edge function changes — UI-only.
-- New features — discoverability only.
+## Build Order (recommended)
+1. Workflow run/decision tables + base orchestrator wrapper.
+2. W4 (Auto-SEO) — highest immediate value, lowest blast radius.
+3. W1 (Invoice → collections) — extends existing decomposer.
+4. W3 (Stock-driven membership) — builds on inventory hooks.
+5. W2 (Weekly health digest).
+6. W5 (Seasonal lifecycle).
+7. W6 (Performance + auto-optimise) — needs analytics data source.

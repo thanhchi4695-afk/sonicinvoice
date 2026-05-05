@@ -85,13 +85,15 @@ export async function callAI(options: AIRequestOptions): Promise<AIResponse> {
   }
 
   const fallbacks = getFallbacks(options.model);
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   let lastError: Error | null = null;
 
   for (const model of fallbacks) {
+    const { signal, cancel } = buildSignal(timeoutMs, options.signal);
     try {
       // Anthropic models go directly to api.anthropic.com (not the Lovable gateway).
       if (model.startsWith("anthropic/")) {
-        const data = await callAnthropicAPI(model, options);
+        const data = await callAnthropicAPI(model, options, signal);
         if (data.choices?.[0]) return data;
         lastError = new Error(`Anthropic model ${model} returned no choices`);
         continue;
@@ -113,6 +115,7 @@ export async function callAI(options: AIRequestOptions): Promise<AIResponse> {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
+        signal,
       });
 
       // Retryable model errors — try next fallback
@@ -148,8 +151,11 @@ export async function callAI(options: AIRequestOptions): Promise<AIResponse> {
       return data;
     } catch (err) {
       if (err instanceof AIGatewayError) throw err; // Don't retry user-facing errors
-      console.warn(`Model ${model} failed:`, err);
+      const isAbort = (err as any)?.name === "AbortError" || /aborted|timed out/i.test(String((err as any)?.message ?? ""));
+      console.warn(`Model ${model} failed${isAbort ? " (timeout/abort)" : ""}:`, err);
       lastError = err instanceof Error ? err : new Error(String(err));
+    } finally {
+      cancel();
     }
   }
 

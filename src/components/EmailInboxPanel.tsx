@@ -171,6 +171,9 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
         supplierName: row.supplier_name,
         knownSupplier: row.known_supplier,
         confidence: computeConfidence({ knownSupplier: row.known_supplier, supplierName: row.supplier_name }),
+        messageId: row.message_id,
+        attachmentId: first.attachment_id,
+        attachmentMime: first.mime_type,
       });
     }
     setGmailItems(items);

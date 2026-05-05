@@ -1,86 +1,141 @@
-# Sola Strategy for Collections — Composable Agent Pipeline
+# Macaron's AI Business Scaling Strategy — Sonic Invoices
 
-Status: PLAN ONLY — not yet implemented. User will send the build prompt later.
+Status: PLAN ONLY — not yet implemented. Saved 2026-05-05.
+Supersedes the previous Sola/Collections plan (archived in chat history).
 
-## Vision
-Turn the Collection Builder from a one-off tool into a continuously running,
-composable agent pipeline (Sola-style):
-1. Every trigger creates a workflow (not just a button click).
-2. Every decision is logged with reasoning (auditable).
-3. Workflows adapt when stock changes (self-healing).
-4. Human approval gates are first-class.
-5. The system learns from every correction.
+The plan is structured as 4 parallel strategies delivered over a 12-week build
+order. Each strategy maps to a Macaron-style growth lesson.
 
-## Workflows to Build
+---
 
-### W1 — Invoice Arrival → Auto-Create Collections
-- Trigger: invoice processed successfully (existing watchdog).
-- Diff against `collection_memory` to find new brands / style lines.
-- Propose new brand-story / sub-category collections.
-- Send approval (email + Slack): "Walnut Marrakesh — create collection?"
-- On approve → create in Shopify; on deny → log + never re-ask for that style.
+## Strategy 1 — Brand Intelligence Flywheel
+**Lesson:** every user interaction trains a better model.
 
-### W2 — Weekly Collection Health Check
-- Trigger: Supabase pg_cron, Mondays 08:00 Darwin.
-- Scan all Shopify collections; flag:
-  - 0-product collections (sold out / season ended)
-  - +10 product growth (suggest splitting)
-  - Missing SEO description
-- Email Lisa a weekly digest: Needs Attention / New Opportunities / Top Performers.
+### Step 1 — Supabase tables
+- `brand_patterns` — brand_name, supplier_sku_format, size_schema,
+  price_band_min, price_band_max, invoice_layout_fingerprint, sample_count,
+  accuracy_rate, updated_at
+- `parsing_corrections` — invoice_id, original_value, corrected_value,
+  field_name, brand_name, created_at
+- `brand_stats` — brand_name, total_invoices_parsed, avg_accuracy, last_seen_at
 
-### W3 — Stock Change → Membership Update
-- Trigger: inventory drop to 0 (existing adjust-inventory hook).
-- Sold-out product → drop from "New Arrivals", remove `new` tag.
-- Whole style line empty → archive the collection (hide, don't delete).
-- Stock replenished from new invoice → restore archived collections, refresh New Arrivals tag rules.
+### Step 2 — Auto-save patterns after every successful parse
+Upsert brand into `brand_patterns` after user confirms output. Increment
+`sample_count`, recalculate `avg_accuracy` from `parsing_corrections`, update
+`last_seen_at` in `brand_stats`.
 
-### W4 — Auto-SEO for New Collections
-- Trigger: new Shopify collection with empty body_html.
-- Read smart rule → fetch 5 sample products from `product_catalog_cache`.
-- Claude generates 250–350 word body, internal links, meta title ≤65, meta desc ≤155.
-- Push via `update_collection_seo`; log to new `seo_generation_log` table.
-- Promotes existing CollectionSEOFlow from manual → automatic.
+### Step 3 — Correction feedback UI
+Inline edit mode on parsed invoice screen. On any field change, save
+original + corrected values to `parsing_corrections`. Show "improvement saved"
+toast.
 
-### W5 — Seasonal Collection Lifecycle
-- **Start (Oct / Apr):** create "Summer 25/26 Arrivals" with `tag = Summer 25/26`, generate SEO, publish.
-- **Mid-season (+45d):** detect low sales velocity → feed `lifecycleEngine.ts`, propose markdown ladder, suggest move to Sale collection.
-- **End-of-season (+90d):** archive seasonal collection, create Clearance collection, tag remaining stock `clearance`.
+### Step 4 — Use saved patterns to pre-fill future parses
+On new invoice upload, detect brand → query `brand_patterns` → pass stored
+`invoice_layout_fingerprint` and `size_schema` as additional context to the AI
+parsing prompt (extends existing `parse-invoice` edge function).
 
-### W6 — Performance Monitoring + Auto-Optimise
-- Trigger: weekly (after GA refresh).
-- Read collection pageview data (GA API or Shopify Analytics).
-- High views + low CTR → regenerate SEO with new keyword angle.
-- 0 views → check sitemap inclusion, add internal links from related pages.
-- Report: "3 collections got 0 visits this week."
+---
 
-## Architecture Notes (reuse existing scaffolding)
-- Reuse the existing 5-step agent orchestrator (retry + step tracking) used by invoice processing.
-- New tables likely needed:
-  - `collection_workflow_runs` (run id, workflow_id, trigger, status, steps[], started_at, finished_at)
-  - `collection_workflow_decisions` (run_id, decision, rationale, approved_by, approved_at)
-  - `seo_generation_log`
-  - `collection_archive_log` (handle, archived_at, reason, restored_at)
-- New edge functions:
-  - `collections-workflow-w1-invoice-arrival`
-  - `collections-workflow-w2-weekly-health` (pg_cron)
-  - `collections-workflow-w3-stock-change`
-  - `collections-workflow-w4-auto-seo`
-  - `collections-workflow-w5-seasonal-lifecycle` (pg_cron daily)
-  - `collections-workflow-w6-performance` (pg_cron weekly)
-- Approval surface: reuse Slack + email infra; add an in-app "Workflow inbox" UI.
+## Strategy 2 — Open-Source Brand Guide (Credibility Play)
+**Lesson:** give away something valuable to attract the customers you want.
 
-## Open Questions for the User (when build starts)
-1. Approval channel preference: Slack only, email only, or both?
-2. Season start dates — fixed (Oct 1 / Apr 1) or configurable per store?
-3. GA connector vs Shopify Analytics for W6?
-4. Should W3 auto-archive immediately, or always require approval first?
-5. Auto-publish W4 SEO content, or send to draft for review?
+### Step 1 — Public `/brand-guide` page
+No login required. Searchable, filterable table:
+Brand · Invoice format (PDF/Excel/Email) · Size schema (AU/US/EU/numeric) ·
+SKU pattern example · Common categories. Seed with 20+ AU brands. Filter
+chips: swimwear / footwear / clothing / accessories.
 
-## Build Order (recommended)
-1. Workflow run/decision tables + base orchestrator wrapper.
-2. W4 (Auto-SEO) — highest immediate value, lowest blast radius.
-3. W1 (Invoice → collections) — extends existing decomposer.
-4. W3 (Stock-driven membership) — builds on inventory hooks.
-5. W2 (Weekly health digest).
-6. W5 (Seasonal lifecycle).
-7. W6 (Performance + auto-optimise) — needs analytics data source.
+### Step 2 — SEO metadata
+- Title: *Australian Wholesale Fashion Brand Invoice Guide — Sonic Invoices*
+- Description: *Free reference guide covering invoice formats, size schemas,
+  and SKU patterns for 40+ Australian fashion wholesale brands including
+  Seafolly, Baku, Jantzen, and more.*
+
+### Step 3 — "Suggest a brand" form
+Form at bottom of brand guide → `brand_suggestions` table. Edge function
+emails admin on new submission.
+
+---
+
+## Strategy 3 — Category Creation: "Stock Intake Automation"
+**Lesson:** name a category before competitors do.
+
+### Step 1 — Homepage hero rewrite
+- Headline: *The stock intake layer your Shopify store is missing.*
+- Subhead: *Sonic Invoices turns supplier invoices into Shopify-ready CSV in
+  minutes — not hours. The first Stock Intake Automation tool built for
+  Australian independent retail.*
+- CTA: *See how it works*
+
+### Step 2 — "The gap no tool was filling" comparison
+3-column section: Selling tools (Shopify, Klaviyo, Google Ads) · Marketing
+tools (Meta Ads, SEO, Email) · **Stock intake — the missing piece**
+(highlighted teal border: Supplier invoices, Manual data entry, Hours of
+re-keying).
+
+### Step 3 — Consistent category language
+Use "Stock Intake Automation" in footer, meta descriptions, about section.
+Add a "What is Stock Intake Automation?" explainer block.
+
+---
+
+## Strategy 4 — Multi-Format Input
+**Lesson:** each new input type widens the moat. (Email already partly built.)
+
+### Step 1 — Email forwarding intake (highest impact)
+Edge function as inbound webhook (Resend/Postmark). Extract PDF/image
+attachments → Supabase storage → trigger `parse-invoice`. Each user gets a
+unique address like `chi@parse.sonicinvoices.com`. Dashboard shows their
+forwarding address with copy button.
+
+### Step 2 — Mobile photo capture
+Photo upload tab. Mobile uses `accept="image/*" capture="environment"`.
+Desktop = drag-and-drop. Pass image to parse-invoice with packing-slip prompt.
+
+### Step 3 — Excel / CSV price list upload
+Accept .xlsx/.xls/.csv. Use SheetJS to convert client-side. Send first 5 rows
+as sample to AI for column mapping (SKU, name, colour, size, RRP, wholesale).
+Then parse all rows → Shopify CSV.
+
+### Step 4 — Unified input selector UI
+Four large tap cards as the first post-login screen:
+📄 PDF Invoice · 📧 Email Forward · 📷 Photo / Packing slip · 📊 Excel / Price list.
+Selected card highlights teal.
+
+---
+
+## Build Order (12 weeks)
+
+| Week | Task | Strategy |
+|------|------|----------|
+| 1 | Supabase tables + auto-save brand patterns | Flywheel |
+| 2 | Correction feedback UI on parse output | Flywheel |
+| 3 | Public brand guide page + SEO | Open-source |
+| 4 | Homepage category language redesign | Category creation |
+| 5 | Email forwarding intake (edge function) | Multi-format |
+| 6 | Mobile photo capture | Multi-format |
+| 7 | Excel / CSV price list upload | Multi-format |
+| 8 | Unified input selector UI | Multi-format |
+| 9 | Flywheel dashboard (brand accuracy scores) | Flywheel |
+| 10–12 | Splash case study page + retailer waitlist | Open-source + social proof |
+
+---
+
+## Notes / Reuse from Existing Codebase
+- `parse-invoice` edge function already does Gemini → Claude → Perplexity;
+  Strategy 1 Step 4 just adds brand-pattern context to its prompt.
+- `gmail-fetch-attachment` + `scan-gmail-inbox` already cover Gmail-based
+  intake; Strategy 4 Step 1 is the *generic* forwarding-address version
+  (Resend/Postmark), not a replacement.
+- `supplier_profiles` and `correction_log` tables already exist — reconcile
+  vs new `brand_patterns` / `parsing_corrections` before migrating to avoid
+  duplicate state.
+- Existing `brand-directory.ts` and `sku-brand-prefix.ts` can seed the
+  public `/brand-guide` table.
+
+## Open Questions (resolve before Week 1 build)
+1. Inbound email provider: Resend vs Postmark?
+2. Reuse `supplier_profiles` or create fresh `brand_patterns`?
+3. Brand guide — fully public or gated behind email capture?
+4. Forwarding address format: `chi@parse.sonicinvoices.com` requires MX on
+   `parse.sonicinvoices.com` — is the user prepared to add the DNS record?

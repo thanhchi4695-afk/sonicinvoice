@@ -314,8 +314,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    const prefs = (body as any).method_preferences ?? {};
+    const catKey = prefs.category ?? "tag";
+    const bcKey = prefs.brand_category ?? "vendor_tag";
+    const subKey = prefs.sub_category ?? "title";
+    const methodInstructions = `RULE METHOD PREFERENCES (follow exactly — do not override):
+- brand: ALWAYS rule_column='vendor', rule_relation='equals'. Never title, never tag.
+- brand_story: ALWAYS rule_column='title', rule_relation='contains'. Never tag, never type.
+- feature: ALWAYS rule_column='tag', rule_relation='equals'.
+- category: ${catKey === "tag_or_type" ? "TWO rules with disjunctive=true: tag equals CATEGORY_TAG OR product_type equals CATEGORY" : catKey === "type" ? "rule_column='product_type', rule_relation='equals'" : "rule_column='tag', rule_relation='equals'"}.
+- brand_category: ${bcKey === "vendor_tag" ? "TWO rules connected by AND: vendor equals BRAND AND tag equals CATEGORY_TAG (set rule_column='vendor', plus rules array of both)" : bcKey === "vendor_type" ? "TWO rules connected by AND: vendor equals BRAND AND product_type equals CATEGORY" : "rule_column='title', rule_relation='starts_with', condition=BRAND"}.
+- sub_category: ${subKey === "tag" ? "rule_column='tag', rule_relation='equals'" : "rule_column='title', rule_relation='contains'"}.`;
+
     const userPrompt = `Store: ${body.store_name ?? "Splash Swimwear"} (${body.store_city ?? "Darwin"})
 Mode: ${mode}${body.filter_vendor ? ` (brand: ${body.filter_vendor})` : ""}${body.filter_type ? ` (type: ${body.filter_type})` : ""}
+
+${methodInstructions}
 
 EXISTING COLLECTIONS (${allCollections.length}):
 ${JSON.stringify(allCollections.map((c) => ({ title: c.title, handle: c.handle, count: c.products_count ?? 0 })), null, 1)}

@@ -290,6 +290,7 @@ export default function ProductCollectionDecomposer({
           filter_vendor: scanMode === "brand" ? scanVendor : undefined,
           filter_type: scanMode === "type" ? scanType : undefined,
           max_products: 800,
+          method_preferences: methodPrefs,
         },
       });
       clearInterval(interval);
@@ -666,7 +667,7 @@ export default function ProductCollectionDecomposer({
             </div>
           )}
 
-          {products.length > 0 && tab !== "catalog" && (
+          {(products.length > 0 || tab === "catalog") && (
             <CollectionRuleMethodChooser
               storeName={storeName}
               products={products}
@@ -777,8 +778,8 @@ export default function ProductCollectionDecomposer({
                             </Badge>
                           </td>
                           <td className="px-2 py-1.5 text-right font-mono text-xs">{s.estimated_products}</td>
-                          <td className="px-2 py-1.5 text-xs text-muted-foreground">
-                            {s.rule_column} {s.rule_relation} "{s.rule_condition}"
+                          <td className="px-2 py-1.5">
+                            <RulePill column={s.rule_column} relation={s.rule_relation} condition={s.rule_condition} />
                           </td>
                         </tr>
                       ))}
@@ -1102,5 +1103,24 @@ function MethodChangeRow({
         </SelectContent>
       </Select>
     </div>
+  );
+}
+
+function RulePill({ column, relation, condition }: { column: string; relation: string; condition: string }) {
+  // Use semantic-friendly Tailwind classes; ok to use literal palette here for distinct rule columns.
+  const colourMap: Record<string, string> = {
+    vendor: "bg-blue-500/15 text-blue-500 border-blue-500/30",
+    tag: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
+    title: "bg-purple-500/15 text-purple-500 border-purple-500/30",
+    product_type: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+    type: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+  };
+  const cls = colourMap[column] || "bg-muted text-muted-foreground border-border";
+  return (
+    <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-mono ${cls}`}>
+      <span className="font-semibold">{column}</span>
+      <span className="opacity-60">{relation}</span>
+      <span>"{condition}"</span>
+    </span>
   );
 }

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Info, Sparkles } from "lucide-react";
+import { Info, Lock, Sparkles, RotateCcw } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -11,6 +13,15 @@ import {
   methodLabelToPrefKey,
   prefKeyToMethodLabel,
 } from "@/lib/collection-rule-methods";
+
+// Per-fixed-type lock reason — shown in tooltip with 🔒
+const LOCK_REASONS: Record<string, string> = {
+  brand: "Vendor field is always the most reliable signal for brand collections.",
+  brand_story: "Style/print names only exist in the product title. Tags and product types never contain story names like 'Mayflower' or 'Bandwave'. This cannot be changed.",
+  feature: "Feature tags (chlorine resist, underwire, d-g, tummy control) are explicitly applied and are the definitive signal.",
+  colour: "Colour tags are applied per the tag system — most reliable signal for colour collections.",
+  new_arrivals: "The 'new arrivals' tag is set explicitly when products are received.",
+};
 
 interface Props {
   storeName?: string;
@@ -80,11 +91,23 @@ export default function CollectionRuleMethodChooser({ storeName, products = [], 
         </p>
       </div>
 
-      {isSplash && (
-        <div className="rounded border border-primary/40 bg-primary/5 p-2 text-xs text-primary">
-          ✨ Smart defaults applied for Splash Swimwear (tags + vendor are highly reliable here).
-        </div>
-      )}
+      <div className="flex items-center gap-2 flex-wrap">
+        {isSplash && (
+          <span className="rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] px-2 py-1">
+            ✓ Splash Swimwear smart defaults applied
+          </span>
+        )}
+        <Button
+          size="sm" variant="ghost" className="h-6 px-2 text-[11px] ml-auto"
+          onClick={() => onChange(getSmartDefaults(storeName))}
+        >
+          <RotateCcw className="w-3 h-3 mr-1" /> Reset to defaults
+        </Button>
+      </div>
+
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border pb-1">
+        Requires your choice
+      </div>
 
       {/* Choice cards */}
       <div className="space-y-3">
@@ -139,18 +162,35 @@ export default function CollectionRuleMethodChooser({ storeName, products = [], 
         })}
       </div>
 
-      {/* Fixed types */}
-      <div className="rounded-md border border-border/60 bg-muted/30 p-3">
-        <div className="text-xs font-semibold text-muted-foreground mb-2">✅ Fixed automatically (no choice needed)</div>
-        <ul className="space-y-1 text-xs text-muted-foreground">
-          {fixedConfigs.map(cfg => (
-            <li key={cfg.level_label}>
-              <span className="mr-1">{cfg.icon}</span>
-              <b className="text-foreground">{cfg.display_name}</b> — {cfg.fixed_method!.label.toLowerCase()} ({cfg.fixed_method!.rule_column} {cfg.fixed_method!.rule_relation} {cfg.fixed_method!.condition_template})
-            </li>
-          ))}
-        </ul>
+      {/* Fixed types — locked, with tooltip explaining why */}
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border pb-1">
+        Set automatically (no choice needed)
       </div>
+      <TooltipProvider delayDuration={150}>
+        <ul className="space-y-1.5">
+          {fixedConfigs.map(cfg => {
+            const m = cfg.fixed_method!;
+            const reason = LOCK_REASONS[cfg.level_label] || cfg.note || "Fixed by design — most reliable signal for this collection type.";
+            return (
+              <li key={cfg.level_label} className="flex items-center gap-2 rounded border border-border/60 bg-muted/20 px-2 py-1.5 text-xs">
+                <span>{cfg.icon}</span>
+                <b className="text-foreground">{cfg.display_name}</b>
+                <span className="text-muted-foreground">→ {m.rule_column} {m.rule_relation} {m.condition_template}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="ml-auto text-muted-foreground hover:text-foreground" aria-label="Why is this locked?">
+                      <Lock className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs text-xs">
+                    {reason}
+                  </TooltipContent>
+                </Tooltip>
+              </li>
+            );
+          })}
+        </ul>
+      </TooltipProvider>
 
       <div className="flex items-center justify-between border-t border-border pt-3">
         <span className="text-xs text-muted-foreground">Remember my choices for next time</span>

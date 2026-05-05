@@ -68,6 +68,7 @@ const App = () => (
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/health" element={<Health />} />
               <Route path="/admin/secrets" element={<AdminSecrets />} />
+              <Route path="/admin/ai-models" element={<AdminAIModels />} />
               <Route path="/rules" element={<Rules />} />
               <Route path="/rules/setup" element={<RulesSetup />} />
               <Route

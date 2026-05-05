@@ -293,6 +293,14 @@ const HomeScreen = ({
         <button onClick={onStartPipelineChooser} className="text-[11px] text-primary hover:underline">View all pipelines →</button>
       </div>
 
+      {/* Collection Autopilot widget */}
+      <HomeAutopilotCard
+        onOpenAutopilot={() => {
+          try { localStorage.setItem("collection_open_tab", "autopilot"); } catch {}
+          window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "collection_decomposer" }));
+        }}
+      />
+
       {/* ── HERO ACTIONS ── */}
       <div className="space-y-2 mb-4">
         <button

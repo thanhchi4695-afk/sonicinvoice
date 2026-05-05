@@ -322,6 +322,22 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                       ? `Last scanned ${relTime(new Date(connection.last_checked_at))}`
                       : "Not scanned yet"}
                   </p>
+                  {(() => {
+                    if (!connection.last_checked_at) return null;
+                    const ageMin = (Date.now() - new Date(connection.last_checked_at).getTime()) / 60000;
+                    const healthy = ageMin < 10;
+                    return (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="relative flex h-2 w-2">
+                          {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
+                          <span className={`relative inline-flex rounded-full h-2 w-2 ${healthy ? "bg-success" : "bg-muted-foreground"}`} />
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {healthy ? "Auto-scan active · every 5 min" : `Auto-scan idle (${Math.round(ageMin)}m since last run)`}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="flex gap-2 mt-3">

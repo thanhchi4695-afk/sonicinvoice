@@ -75,5 +75,13 @@ export const RemotionRoot = () => (
       width={1920}
       height={1080}
     />
+    <Composition
+      id="howto-collection-workflows"
+      component={HowToCollectionWorkflows}
+      durationInFrames={HOWTO_COLLECTION_WORKFLOWS_FRAMES}
+      fps={30}
+      width={1920}
+      height={1080}
+    />
   </>
 );

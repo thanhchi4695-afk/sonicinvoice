@@ -480,8 +480,10 @@ export default function ProductCollectionDecomposer({
           handle: c.handle,
           seo: { title: c.seo_title, description: c.meta_description },
           ruleSet: {
-            appliedDisjunctively: false,
-            rules: [{ column: c.rule_column, relation: c.rule_relation, condition: c.rule_condition }],
+            appliedDisjunctively: !!c.disjunctive,
+            rules: (c.rules && c.rules.length > 0)
+              ? c.rules
+              : [{ column: c.rule_column, relation: c.rule_relation, condition: c.rule_condition }],
           },
         });
         const shopifyId = result?.id || result?.admin_graphql_api_id || "";

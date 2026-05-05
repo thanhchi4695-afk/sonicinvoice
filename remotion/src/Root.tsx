@@ -20,6 +20,10 @@ import {
   HowToCollectionAutopilot,
   HOWTO_COLLECTION_AUTOPILOT_FRAMES,
 } from "./scenes/HowToCollectionAutopilot";
+import {
+  HowToCollectionWorkflows,
+  HOWTO_COLLECTION_WORKFLOWS_FRAMES,
+} from "./scenes/HowToCollectionWorkflows";
 
 export const RemotionRoot = () => (
   <>

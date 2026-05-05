@@ -91,6 +91,26 @@ const HomeScreen = ({
 }: HomeScreenProps) => {
   const mode = useStoreMode();
   const unreadCount = getUnprocessedInboxCount();
+  const [gmailLastScan, setGmailLastScan] = useState<Date | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData?.session?.user?.id;
+        if (!userId) return;
+        const { data } = await supabase
+          .from("gmail_connections")
+          .select("last_checked_at")
+          .eq("user_id", userId)
+          .eq("is_active", true)
+          .maybeSingle();
+        if (!cancelled && data?.last_checked_at) setGmailLastScan(new Date(data.last_checked_at));
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const gmailHealthy = gmailLastScan ? (Date.now() - gmailLastScan.getTime()) / 60000 < 10 : false;
   const [learnedSupplierCount, setLearnedSupplierCount] = useState<number | null>(null);
 
   // Fetch the count of learned supplier profiles for the "Supplier Brain" badge
@@ -332,7 +352,19 @@ const HomeScreen = ({
           <span className="text-xl">📧</span>
           <div className="flex-1 text-left">
             <p className="text-sm font-semibold text-foreground">Email inbox</p>
-            <p className="text-[11px] text-muted-foreground">Process supplier invoices from email</p>
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+              {gmailLastScan ? (
+                <>
+                  <span className="relative flex h-1.5 w-1.5">
+                    {gmailHealthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
+                    <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${gmailHealthy ? "bg-success" : "bg-muted-foreground"}`} />
+                  </span>
+                  {gmailHealthy ? "Auto-scan active" : `Last scan ${Math.round((Date.now() - gmailLastScan.getTime()) / 60000)}m ago`}
+                </>
+              ) : (
+                "Process supplier invoices from email"
+              )}
+            </p>
           </div>
           {unreadCount > 0 && (
             <span className="bg-primary text-primary-foreground text-[10px] rounded-full px-1.5 min-w-[18px] text-center font-semibold">

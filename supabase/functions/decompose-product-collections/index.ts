@@ -104,6 +104,20 @@ const TOOL = {
                 enum: ["equals", "contains", "starts_with"],
               },
               rule_condition: { type: "string" },
+              disjunctive: { type: "boolean" },
+              rules: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    column: { type: "string" },
+                    relation: { type: "string" },
+                    condition: { type: "string" },
+                  },
+                  required: ["column", "relation", "condition"],
+                  additionalProperties: false,
+                },
+              },
               is_new: { type: "boolean" },
               seo_title: { type: "string" },
               meta_description: { type: "string" },

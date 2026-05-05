@@ -89,19 +89,9 @@ export const CollectionAutopilotWidget = ({ collapsed, onOpen }: Props) => {
         <span className="text-xs font-semibold truncate">Collection Autopilot</span>
       </div>
       <div className="flex items-center gap-1.5 mt-1">
-        <span className="relative flex w-2 h-2 shrink-0">
-          {pending > 0 && (
-            <span className="absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75 animate-ping" />
-          )}
-          <span
-            className={cn(
-              "relative inline-flex rounded-full h-2 w-2",
-              pending > 0 ? "bg-orange-400" : "bg-slate-500",
-            )}
-          />
-        </span>
-        <span className={cn("text-[11px]", pending > 0 ? "text-orange-300" : "text-slate-400")}>
-          {pending > 0 ? `${pending} pending approval${pending === 1 ? "" : "s"}` : "No pending approvals"}
+        <span className={pending > 0 ? "dot-pending" : "dot-active"} />
+        <span className={cn("text-[11px]", pending > 0 ? "text-orange-300" : "text-emerald-300")}>
+          {pending > 0 ? `${pending} pending approval${pending === 1 ? "" : "s"}` : "All clear"}
         </span>
       </div>
       <p className="text-[10px] text-slate-500 mt-0.5 truncate">

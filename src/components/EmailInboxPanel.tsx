@@ -351,6 +351,11 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                   </p>
                 </div>
               </div>
+              {isInAppBrowser && (
+                <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] text-amber-200">
+                  <strong>Open in Safari or Chrome.</strong> Google blocks sign-in inside Messenger, Instagram, TikTok and other in-app browsers. Tap the <span className="font-mono">•••</span> menu → "Open in browser".
+                </div>
+              )}
               <Button variant="teal" className="w-full h-10 mt-3" onClick={handleConnectGmail} disabled={connecting}>
                 {connecting
                   ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening Google…</>

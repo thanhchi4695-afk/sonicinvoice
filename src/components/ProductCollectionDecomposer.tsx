@@ -667,7 +667,7 @@ export default function ProductCollectionDecomposer({
             </div>
           )}
 
-          {products.length > 0 && tab !== "catalog" && (
+          {(products.length > 0 || tab === "catalog") && (
             <CollectionRuleMethodChooser
               storeName={storeName}
               products={products}

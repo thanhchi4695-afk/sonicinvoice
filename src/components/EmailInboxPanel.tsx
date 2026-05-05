@@ -497,6 +497,37 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
               return null;
             })()}
           </div>
+          {items.length > 0 && (
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                {(["all", "known", "unknown", "processed"] as const).map(f => {
+                  const active = filter === f;
+                  const label = f.charAt(0).toUpperCase() + f.slice(1);
+                  return (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setFilter(f)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted text-muted-foreground border-border hover:bg-muted/70"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search sender, subject, supplier…"
+                className="flex-1 min-w-[160px] h-7 px-2.5 text-xs rounded-md bg-muted border border-border placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          )}
           {items.length === 0 ? (
             <div className="bg-card rounded-lg border border-border p-8 text-center">
               <div className="w-14 h-14 rounded-full bg-muted mx-auto flex items-center justify-center mb-3">
@@ -507,10 +538,14 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                 {connection ? "Hit Scan now to check your inbox." : "Connect Gmail or use the simulator below to preview the flow."}
               </p>
             </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="bg-card rounded-lg border border-border p-6 text-center">
+              <p className="text-xs text-muted-foreground">No invoices match this filter.</p>
+            </div>
           ) : (
             <div className="bg-card rounded-lg border border-border overflow-hidden">
               <div className="divide-y divide-border">
-                {items.map(item => (
+                {filteredItems.map(item => (
                   <div key={item.id} className="px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">

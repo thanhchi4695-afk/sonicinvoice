@@ -144,6 +144,13 @@ export default function BrandGuide() {
         <p className="mt-6 text-xs text-muted-foreground">
           Aggregated, anonymised data. No invoice contents or retailer identities are exposed.
         </p>
+
+        <div className="mt-12 rounded-xl border border-border bg-muted/20 p-6 text-center">
+          <p className="font-[Syne] text-xl">Run a boutique? See it in action.</p>
+          <Link to="/case-study" className="mt-3 inline-block text-primary underline">
+            Read the case study & join the waitlist →
+          </Link>
+        </div>
       </section>
     </main>
   );

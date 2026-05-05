@@ -364,8 +364,31 @@ const StockyLayout = ({
         })}
       </nav>
 
+      {/* Persistent Account pinned at bottom — always visible */}
+      <div className={cn("border-t border-border/60 mt-auto", collapsed ? "px-1 py-2" : "px-2 py-2")}>
+        <button
+          onClick={() => { onTabChange("account"); setMobileOpen(false); }}
+          title={collapsed ? "Account" : undefined}
+          className={cn(
+            "flex items-center gap-2.5 w-full rounded-md text-sm transition-colors",
+            collapsed ? "justify-center px-2 py-2" : "px-2.5 py-2",
+            activeId === "account"
+              ? "bg-primary/10 text-primary font-medium"
+              : "text-foreground hover:bg-muted",
+          )}
+        >
+          <User className="w-[18px] h-[18px] shrink-0" />
+          {!collapsed && (
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm font-medium truncate">Account</p>
+              <p className="text-[10px] text-muted-foreground truncate">Profile · Sign out</p>
+            </div>
+          )}
+        </button>
+      </div>
+
       {!collapsed && (
-        <div className="px-3 py-3 border-t border-border/60 mt-auto">
+        <div className="px-3 py-2 border-t border-border/60">
           <p className="text-[9px] text-muted-foreground">Sonic Invoice v1.0</p>
           <p className="text-[9px] text-muted-foreground">Apple-clean layout</p>
         </div>

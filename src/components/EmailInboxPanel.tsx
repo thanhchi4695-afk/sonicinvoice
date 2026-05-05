@@ -382,7 +382,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
           .update({ processed: true })
           .eq("id", item.id);
         setGmailItems(prev => prev.map(i => i.id === item.id
-          ? { ...i, status: "done", confidence: newConfidence, parseJobId: parsed?.jobId }
+          ? { ...i, status: "done", confidence: newConfidence, parseJobId: parsed?.jobId, parsedVariantCount: rowCount }
           : i));
 
         const confLabel = newConfidence.charAt(0).toUpperCase() + newConfidence.slice(1);

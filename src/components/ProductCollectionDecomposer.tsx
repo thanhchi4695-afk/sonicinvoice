@@ -233,6 +233,7 @@ export default function ProductCollectionDecomposer({
           store_name: storeConfig.store_name || "Splash Swimwear",
           store_city: storeConfig.store_city || "Darwin",
           existing_collection_handles: existing,
+          method_preferences: methodPrefs,
         },
       });
       if (error) throw error;

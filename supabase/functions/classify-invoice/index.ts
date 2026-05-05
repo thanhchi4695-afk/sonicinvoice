@@ -78,8 +78,7 @@ Deno.serve(async (req) => {
       userContent.push({ type: "text", text: `File: ${filename}\nClassify this document per the schema above. JSON only.` });
     }
 
-    const data = await callAI({
-      model: "google/gemini-2.5-flash",
+    const data = await callAIForJob("invoice.classify", {
       temperature: 0.0,
       max_tokens: 800,
       messages: [

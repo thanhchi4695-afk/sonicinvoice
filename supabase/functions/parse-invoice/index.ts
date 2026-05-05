@@ -60,11 +60,39 @@ function computeConfidence(rows: ParsedRow[]): {
   return { level, completeness };
 }
 
+// Brand-pattern context — Strategy 1 Step 4 (Flywheel)
+interface BrandPattern {
+  supplier_sku_format?: string | null;
+  size_schema?: string | null;
+  invoice_layout_fingerprint?: unknown;
+  sample_count?: number | null;
+  accuracy_rate?: number | null;
+}
+async function loadBrandPattern(admin: any, userId: string, brandName: string): Promise<BrandPattern | null> {
+  if (!brandName?.trim()) return null;
+  const { data } = await admin
+    .from("brand_patterns")
+    .select("supplier_sku_format, size_schema, invoice_layout_fingerprint, sample_count, accuracy_rate")
+    .eq("user_id", userId)
+    .ilike("brand_name", brandName.trim())
+    .maybeSingle();
+  return data ?? null;
+}
+function brandHintsBlock(p: BrandPattern | null): string {
+  if (!p) return "";
+  const lines: string[] = ["", "KNOWN BRAND PATTERNS (use as priors, but trust the document if it disagrees):"];
+  if (p.supplier_sku_format) lines.push(`- SKU format: ${p.supplier_sku_format}`);
+  if (p.size_schema) lines.push(`- Size schema: ${p.size_schema}`);
+  if (p.invoice_layout_fingerprint) lines.push(`- Layout fingerprint: ${JSON.stringify(p.invoice_layout_fingerprint).slice(0, 400)}`);
+  if (p.sample_count) lines.push(`- Learned from ${p.sample_count} prior invoice(s) (accuracy ${Math.round((p.accuracy_rate ?? 1) * 100)}%)`);
+  return lines.join("\n");
+}
+
 // Stage 1 — Gemini 2.5 Flash via Lovable AI Gateway
-async function stage1Gemini(fileBase64: string, mimeType: string, supplierName: string) {
+async function stage1Gemini(fileBase64: string, mimeType: string, supplierName: string, brandHints = "") {
   const systemPrompt = `You are a precise invoice parser. Extract every line item from the supplied invoice. Return ONLY a JSON object matching the provided schema. Numbers must be plain numbers (no currency symbols). Use null for any field you cannot confidently extract.`;
 
-  const userPrompt = `Supplier: ${supplierName}\n\nExtract every product line item. For each item return: productName, styleNumber, colour, size, quantity, costPrice (unit cost ex-tax), rrp (recommended retail price if shown).`;
+  const userPrompt = `Supplier: ${supplierName}${brandHints}\n\nExtract every product line item. For each item return: productName, styleNumber, colour, size, quantity, costPrice (unit cost ex-tax), rrp (recommended retail price if shown).`;
 
   const tools = [
     {
@@ -296,6 +324,83 @@ async function stage3Perplexity(rows: any[], supplierName: string) {
   return rows;
 }
 
+// Strategy 1 Step 2 — upsert brand_patterns + brand_stats after a successful parse
+async function upsertBrandLearning(
+  admin: any,
+  userId: string,
+  brandName: string,
+  stage1Rows: ParsedRow[],
+  completeness: number,
+) {
+  const brand = (brandName || "").trim();
+  if (!brand) return;
+
+  const skuSamples = stage1Rows.map(r => r.styleNumber).filter(Boolean) as string[];
+  const sizeSamples = stage1Rows.map(r => r.size).filter(Boolean) as string[];
+  const prices = stage1Rows.map(r => r.rrp ?? r.costPrice).filter((n): n is number => typeof n === "number" && n > 0);
+  const skuFormat = skuSamples[0] ? skuSamples[0].replace(/[A-Z]/g, "A").replace(/[a-z]/g, "a").replace(/\d/g, "9") : null;
+  const sizeSchema = (() => {
+    if (sizeSamples.some(s => /^(XS|S|M|L|XL|XXL)$/i.test(s))) return "AU-alpha";
+    if (sizeSamples.some(s => /^\d{1,2}$/.test(s))) return "AU-numeric";
+    return null;
+  })();
+  const priceMin = prices.length ? Math.min(...prices) : null;
+  const priceMax = prices.length ? Math.max(...prices) : null;
+
+  const { data: existingPat } = await admin
+    .from("brand_patterns")
+    .select("id, sample_count, accuracy_rate")
+    .eq("user_id", userId)
+    .ilike("brand_name", brand)
+    .maybeSingle();
+
+  if (existingPat) {
+    const n = (existingPat.sample_count ?? 0) + 1;
+    const newAccuracy = ((existingPat.accuracy_rate ?? 1) * (n - 1) + completeness) / n;
+    await admin.from("brand_patterns").update({
+      sample_count: n,
+      accuracy_rate: newAccuracy,
+      updated_at: new Date().toISOString(),
+    }).eq("id", existingPat.id);
+  } else {
+    await admin.from("brand_patterns").insert({
+      user_id: userId,
+      brand_name: brand,
+      supplier_sku_format: skuFormat,
+      size_schema: sizeSchema,
+      price_band_min: priceMin,
+      price_band_max: priceMax,
+      sample_count: 1,
+      accuracy_rate: completeness,
+    });
+  }
+
+  const { data: existingStat } = await admin
+    .from("brand_stats")
+    .select("id, total_invoices_parsed, avg_accuracy")
+    .eq("user_id", userId)
+    .ilike("brand_name", brand)
+    .maybeSingle();
+
+  if (existingStat) {
+    const n = (existingStat.total_invoices_parsed ?? 0) + 1;
+    const avg = ((existingStat.avg_accuracy ?? 1) * (n - 1) + completeness) / n;
+    await admin.from("brand_stats").update({
+      total_invoices_parsed: n,
+      avg_accuracy: avg,
+      last_seen_at: new Date().toISOString(),
+    }).eq("id", existingStat.id);
+  } else {
+    await admin.from("brand_stats").insert({
+      user_id: userId,
+      brand_name: brand,
+      total_invoices_parsed: 1,
+      avg_accuracy: completeness,
+      last_seen_at: new Date().toISOString(),
+    });
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -371,8 +476,12 @@ Deno.serve(async (req) => {
   const jobId = jobRow.id;
 
   try {
+    // Strategy 1 Step 4 — load known patterns for this brand
+    const brandPattern = await loadBrandPattern(admin, userId, supplierName);
+    const brandHints = brandHintsBlock(brandPattern);
+
     // Stage 1
-    const stage1Rows = await stage1Gemini(fileBase64, mimeType, supplierName);
+    const stage1Rows = await stage1Gemini(fileBase64, mimeType, supplierName, brandHints);
     const { level: confidence, completeness } = computeConfidence(stage1Rows);
     await admin
       .from("parse_jobs")
@@ -397,6 +506,13 @@ Deno.serve(async (req) => {
         status: "done",
       })
       .eq("id", jobId);
+
+    // Strategy 1 Step 2 — auto-save brand pattern + stats (best-effort, never fail the job)
+    try {
+      await upsertBrandLearning(admin, userId, supplierName, stage1Rows, completeness);
+    } catch (learnErr) {
+      console.warn("brand learning upsert failed:", (learnErr as Error)?.message);
+    }
 
     return new Response(
       JSON.stringify({

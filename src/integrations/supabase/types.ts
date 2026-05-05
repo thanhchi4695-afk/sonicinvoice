@@ -658,42 +658,66 @@ export type Database = {
       }
       brand_patterns: {
         Row: {
+          accuracy_rate: number
           brand_name: string | null
           colour_column_name: string | null
           created_at: string
           id: string
+          invoice_layout_fingerprint: Json | null
+          price_band_max: number | null
+          price_band_min: number | null
           product_type_keywords: Json
+          sample_count: number
           size_scale_examples: Json
+          size_schema: string | null
           sku_format_regex: string | null
           sku_prefix_pattern: string | null
           special_rules: Json
           supplier_profile_id: string | null
+          supplier_sku_format: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
+          accuracy_rate?: number
           brand_name?: string | null
           colour_column_name?: string | null
           created_at?: string
           id?: string
+          invoice_layout_fingerprint?: Json | null
+          price_band_max?: number | null
+          price_band_min?: number | null
           product_type_keywords?: Json
+          sample_count?: number
           size_scale_examples?: Json
+          size_schema?: string | null
           sku_format_regex?: string | null
           sku_prefix_pattern?: string | null
           special_rules?: Json
           supplier_profile_id?: string | null
+          supplier_sku_format?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
+          accuracy_rate?: number
           brand_name?: string | null
           colour_column_name?: string | null
           created_at?: string
           id?: string
+          invoice_layout_fingerprint?: Json | null
+          price_band_max?: number | null
+          price_band_min?: number | null
           product_type_keywords?: Json
+          sample_count?: number
           size_scale_examples?: Json
+          size_schema?: string | null
           sku_format_regex?: string | null
           sku_prefix_pattern?: string | null
           special_rules?: Json
           supplier_profile_id?: string | null
+          supplier_sku_format?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -733,6 +757,39 @@ export type Database = {
           rule_data?: Json
           rule_type?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      brand_stats: {
+        Row: {
+          avg_accuracy: number
+          brand_name: string
+          created_at: string
+          id: string
+          last_seen_at: string
+          total_invoices_parsed: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_accuracy?: number
+          brand_name: string
+          created_at?: string
+          id?: string
+          last_seen_at?: string
+          total_invoices_parsed?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_accuracy?: number
+          brand_name?: string
+          created_at?: string
+          id?: string
+          last_seen_at?: string
+          total_invoices_parsed?: number
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1280,6 +1337,7 @@ export type Database = {
       correction_log: {
         Row: {
           auto_detected: boolean
+          brand_name: string | null
           corrected_value: string | null
           correction_reason: string | null
           correction_reason_detail: string | null
@@ -1297,6 +1355,7 @@ export type Database = {
         }
         Insert: {
           auto_detected?: boolean
+          brand_name?: string | null
           corrected_value?: string | null
           correction_reason?: string | null
           correction_reason_detail?: string | null
@@ -1314,6 +1373,7 @@ export type Database = {
         }
         Update: {
           auto_detected?: boolean
+          brand_name?: string | null
           corrected_value?: string | null
           correction_reason?: string | null
           correction_reason_detail?: string | null

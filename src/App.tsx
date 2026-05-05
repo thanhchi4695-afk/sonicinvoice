@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ShopifyEmbeddedProvider from "@/components/ShopifyEmbeddedProvider";
 import EmbeddedAuthHealthCheck from "@/components/EmbeddedAuthHealthCheck";
+import RequireAuth from "@/components/RequireAuth";
 import InstallAppBanner from "@/components/InstallAppBanner";
 import StockyAnnouncementBar from "@/components/StockyAnnouncementBar";
 import BarcodeProvider from "@/components/BarcodeProvider";
@@ -87,9 +88,11 @@ const App = () => (
               <Route
                 path="/tools/feed-health"
                 element={
-                  <Suspense fallback={null}>
-                    <FeedHealthPanel onBack={() => window.history.back()} />
-                  </Suspense>
+                  <RequireAuth>
+                    <Suspense fallback={null}>
+                      <FeedHealthPanel onBack={() => window.history.back()} />
+                    </Suspense>
+                  </RequireAuth>
                 }
               />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -348,22 +348,37 @@ ${JSON.stringify(brandSummary, null, 1)}
 
 Find collection gaps and emit suggestions via emit_audit. Skip any whose handle is already in EXISTING COLLECTIONS.`;
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [TOOL],
-        tool_choice: { type: "function", function: { name: "emit_audit" } },
-      }),
-    });
+    const aiCtrl = new AbortController();
+    const aiTimer = setTimeout(() => aiCtrl.abort(), 90_000);
+    let aiResp: Response;
+    try {
+      aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        signal: aiCtrl.signal,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: SYSTEM },
+            { role: "user", content: userPrompt },
+          ],
+          tools: [TOOL],
+          tool_choice: { type: "function", function: { name: "emit_audit" } },
+        }),
+      });
+    } catch (err) {
+      clearTimeout(aiTimer);
+      const aborted = (err as any)?.name === "AbortError";
+      return new Response(JSON.stringify({
+        error: aborted
+          ? "AI gap analysis timed out after 90s. Try a smaller scope (single brand) or retry."
+          : `AI gateway request failed: ${err instanceof Error ? err.message : String(err)}`,
+      }), { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    clearTimeout(aiTimer);
 
     if (!aiResp.ok) {
       const t = await aiResp.text();

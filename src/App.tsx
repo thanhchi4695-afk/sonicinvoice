@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ShopifyEmbeddedProvider from "@/components/ShopifyEmbeddedProvider";
 import EmbeddedAuthHealthCheck from "@/components/EmbeddedAuthHealthCheck";
+import RequireAuth from "@/components/RequireAuth";
 import InstallAppBanner from "@/components/InstallAppBanner";
 import StockyAnnouncementBar from "@/components/StockyAnnouncementBar";
 import BarcodeProvider from "@/components/BarcodeProvider";

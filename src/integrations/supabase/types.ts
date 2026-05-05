@@ -868,6 +868,104 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_approval_queue: {
+        Row: {
+          approval_type: string
+          auto_approve_at: string | null
+          collection_handle: string | null
+          collection_title: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          preview_data: Json | null
+          rationale: string | null
+          status: string
+          user_id: string
+          workflow_id: string | null
+        }
+        Insert: {
+          approval_type: string
+          auto_approve_at?: string | null
+          collection_handle?: string | null
+          collection_title?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          preview_data?: Json | null
+          rationale?: string | null
+          status?: string
+          user_id: string
+          workflow_id?: string | null
+        }
+        Update: {
+          approval_type?: string
+          auto_approve_at?: string | null
+          collection_handle?: string | null
+          collection_title?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          preview_data?: Json | null
+          rationale?: string | null
+          status?: string
+          user_id?: string
+          workflow_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_approval_queue_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "collection_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collection_automation_settings: {
+        Row: {
+          auto_approve_brand_collections: boolean
+          auto_approve_brand_stories: boolean
+          auto_approve_threshold_hours: number
+          auto_archive_empty: boolean
+          seasonal_lifecycle: boolean
+          seo_auto_generate: boolean
+          slack_webhook_url: string | null
+          updated_at: string
+          user_id: string
+          weekly_digest_email: string | null
+          weekly_health_check: boolean
+        }
+        Insert: {
+          auto_approve_brand_collections?: boolean
+          auto_approve_brand_stories?: boolean
+          auto_approve_threshold_hours?: number
+          auto_archive_empty?: boolean
+          seasonal_lifecycle?: boolean
+          seo_auto_generate?: boolean
+          slack_webhook_url?: string | null
+          updated_at?: string
+          user_id: string
+          weekly_digest_email?: string | null
+          weekly_health_check?: boolean
+        }
+        Update: {
+          auto_approve_brand_collections?: boolean
+          auto_approve_brand_stories?: boolean
+          auto_approve_threshold_hours?: number
+          auto_archive_empty?: boolean
+          seasonal_lifecycle?: boolean
+          seo_auto_generate?: boolean
+          slack_webhook_url?: string | null
+          updated_at?: string
+          user_id?: string
+          weekly_digest_email?: string | null
+          weekly_health_check?: boolean
+        }
+        Relationships: []
+      }
       collection_memory: {
         Row: {
           collection_handle: string
@@ -901,6 +999,51 @@ export type Database = {
           shopify_collection_id?: string | null
           source_invoice?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      collection_workflows: {
+        Row: {
+          actions_taken: Json
+          completed_at: string | null
+          created_at: string
+          decisions: Json
+          id: string
+          next_run_at: string | null
+          status: string
+          summary: string | null
+          trigger_data: Json | null
+          trigger_source: string | null
+          user_id: string
+          workflow_type: string
+        }
+        Insert: {
+          actions_taken?: Json
+          completed_at?: string | null
+          created_at?: string
+          decisions?: Json
+          id?: string
+          next_run_at?: string | null
+          status?: string
+          summary?: string | null
+          trigger_data?: Json | null
+          trigger_source?: string | null
+          user_id: string
+          workflow_type: string
+        }
+        Update: {
+          actions_taken?: Json
+          completed_at?: string | null
+          created_at?: string
+          decisions?: Json
+          id?: string
+          next_run_at?: string | null
+          status?: string
+          summary?: string | null
+          trigger_data?: Json | null
+          trigger_source?: string | null
+          user_id?: string
+          workflow_type?: string
         }
         Relationships: []
       }

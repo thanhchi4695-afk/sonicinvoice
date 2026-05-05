@@ -188,6 +188,44 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
         </div>
       </section>
 
+      {/* ── Q3 — What kind of products? ── */}
+      <section className="mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+            3
+          </span>
+          <h2 className="text-base font-semibold">What kind of products are on this invoice?</h2>
+          {mix && (
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              Saved as default
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <TileButton
+            active={mix === "refill"}
+            onClick={() => chooseMix("refill")}
+            icon={<RefreshCw className="w-6 h-6" />}
+            title="Refill / re-entered"
+            subtitle="Existing products — qty & cost update only"
+          />
+          <TileButton
+            active={mix === "new"}
+            onClick={() => chooseMix("new")}
+            icon={<Sparkles className="w-6 h-6" />}
+            title="Brand new products"
+            subtitle="All new — full enrich & create"
+          />
+          <TileButton
+            active={mix === "mixed"}
+            onClick={() => chooseMix("mixed")}
+            icon={<Shuffle className="w-6 h-6" />}
+            title="Mixed"
+            subtitle="Stock-check splits refills vs new"
+          />
+        </div>
+      </section>
+
       {/* ── Continue CTA ── */}
       <div className="mb-6">
         <button

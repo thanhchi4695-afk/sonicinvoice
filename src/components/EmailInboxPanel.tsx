@@ -158,6 +158,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
         status: row.processed ? "done" : "ready",
         supplierName: row.supplier_name,
         knownSupplier: row.known_supplier,
+        confidence: computeConfidence({ knownSupplier: row.known_supplier, supplierName: row.supplier_name }),
       });
     }
     setGmailItems(items);

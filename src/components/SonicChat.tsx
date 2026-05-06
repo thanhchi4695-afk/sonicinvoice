@@ -801,6 +801,22 @@ export default function SonicChat() {
           </Button>
         </form>
       </div>
+
+      <AlertDialog open={!!pendingPipeline} onOpenChange={(o) => !o && setPendingPipeline(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Run full pipeline?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will launch the <span className="font-mono">{pendingPipeline}</span> pipeline,
+              which can perform multiple bulk updates across your catalogue. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPipelineLaunch}>Run pipeline</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

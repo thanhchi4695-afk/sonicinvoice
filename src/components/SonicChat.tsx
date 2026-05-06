@@ -5,6 +5,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import SupplierEmailCard from "@/components/SupplierEmailCard";
 import ProductDescriptionCard, { type ProductDescription } from "@/components/ProductDescriptionCard";
@@ -82,6 +92,7 @@ export default function SonicChat() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [hasActiveParse, setHasActiveParse] = useState(false);
+  const [pendingPipeline, setPendingPipeline] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Track auth
@@ -392,9 +403,15 @@ export default function SonicChat() {
   }
 
   function handlePipelineLaunch(pipelineKey: string) {
+    setPendingPipeline(pipelineKey);
+  }
+
+  function confirmPipelineLaunch() {
+    if (!pendingPipeline) return;
     window.dispatchEvent(
-      new CustomEvent("sonic:launch-pipeline", { detail: { pipeline: pipelineKey } }),
+      new CustomEvent("sonic:launch-pipeline", { detail: { pipeline: pendingPipeline } }),
     );
+    setPendingPipeline(null);
     setOpen(false);
   }
 
@@ -784,6 +801,22 @@ export default function SonicChat() {
           </Button>
         </form>
       </div>
+
+      <AlertDialog open={!!pendingPipeline} onOpenChange={(o) => !o && setPendingPipeline(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Run full pipeline?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will launch the <span className="font-mono">{pendingPipeline}</span> pipeline,
+              which can perform multiple bulk updates across your catalogue. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPipelineLaunch}>Run pipeline</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

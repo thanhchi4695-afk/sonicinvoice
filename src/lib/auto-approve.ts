@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { executeChatAction } from "./sonic-chat-actions";
+import { executeChatAction, type SonicDecision } from "./sonic-chat-actions";
 
 // Tasks that can be auto-approved (low risk, reversible)
 export const AUTO_APPROVABLE_TASKS = [

@@ -5,6 +5,54 @@
 import { generateTags, type TagInput } from "@/lib/tag-engine";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  applyTagsAndSeo,
+  buildShopifyCsv,
+  csvDownloadUrl,
+  type ParsedRow,
+} from "@/lib/parse-from-chat";
+
+export type StatusEmitter = (line: string) => void | Promise<void>;
+
+export interface ParseFromChatResult {
+  csvUrl: string;
+  rowCount: number;
+  brand: string;
+}
+
+/**
+ * Sequential pipeline executed when the user confirms `parse_from_chat`.
+ * Calls the parse-chat-invoice edge function, then enriches + builds CSV locally,
+ * emitting a status line after each step via `onStatus`.
+ */
+export async function runParseFromChat(
+  invoiceText: string,
+  supplierHint: string | undefined,
+  onStatus: StatusEmitter,
+): Promise<ParseFromChatResult> {
+  const brand = (supplierHint || "Unknown Brand").trim();
+
+  const { data, error } = await supabase.functions.invoke("parse-chat-invoice", {
+    body: { text: invoiceText, supplier: brand },
+  });
+  if (error) throw new Error(error.message ?? "Parse failed");
+  if (data?.error) throw new Error(data.error);
+  const rows: ParsedRow[] = Array.isArray(data?.rows) ? data.rows : [];
+  await onStatus(`✓ Extracted ${rows.length} product line${rows.length === 1 ? "" : "s"}`);
+  if (rows.length === 0) throw new Error("No product lines found in that text.");
+
+  await onStatus(`✓ Applied ${brand} rules`);
+
+  const enriched = applyTagsAndSeo(rows, brand);
+  await onStatus(`✓ Tags generated (${enriched.reduce((n, r) => n + r.tags.length, 0)} total)`);
+  await onStatus(`✓ SEO titles written for ${enriched.length} products`);
+
+  const csv = buildShopifyCsv(enriched);
+  const csvUrl = csvDownloadUrl(csv);
+  await onStatus("✓ Shopify CSV prepared");
+
+  return { csvUrl, rowCount: enriched.length, brand };
+}
 
 export type SonicAction =
   | "navigate_tab"

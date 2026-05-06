@@ -9,6 +9,7 @@ import {
   executeChatAction,
   executeGatedAction,
   runInlineAction,
+  runParseFromChat,
   type SonicDecision,
 } from "@/lib/sonic-chat-actions";
 
@@ -22,6 +23,7 @@ interface ChatMessage {
   action_data?: Record<string, unknown> | null;
   pending?: boolean;
   resolved?: "confirmed" | "cancelled" | null;
+  download?: { url: string; filename: string; label: string } | null;
 }
 
 const FALLBACK_REPLY =
@@ -182,10 +184,47 @@ export default function SonicChat() {
     setMessages((m) =>
       m.map((x) => (x.id === msg.id ? { ...x, pending: false, resolved: "confirmed" } : x)),
     );
+
+    if (decision.action === "parse_from_chat") {
+      // Find the most recent user message — that's the pasted invoice text.
+      const lastUser = [...messages].reverse().find((x) => x.role === "user");
+      const text =
+        (decision.params?.invoice_text as string | undefined) ?? lastUser?.content ?? "";
+      const supplier = (decision.params?.supplier as string | undefined) ?? undefined;
+      try {
+        const result = await runParseFromChat(text, supplier, async (line) => {
+          await postAssistantNote(line);
+        });
+        const filename = `${(result.brand || "shopify").toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.csv`;
+        await postAssistantDownload(
+          `Done — your CSV is ready (${result.rowCount} products).`,
+          { url: result.csvUrl, filename, label: "Download CSV" },
+        );
+      } catch (e: any) {
+        await postAssistantNote(`✕ ${e?.message ?? "Pipeline failed"}`);
+      }
+      return;
+    }
+
     const ran = executeGatedAction(decision);
     await postAssistantNote(
       ran ? "Done — running that now." : "I couldn't run that action. Try again.",
     );
+  }
+
+  async function postAssistantDownload(
+    text: string,
+    download: { url: string; filename: string; label: string },
+  ) {
+    if (!userId) return;
+    const { data } = await supabase
+      .from("chat_messages")
+      .insert([{ user_id: userId, role: "assistant", content: text } as never])
+      .select("id, role, content, created_at")
+      .single();
+    if (data) {
+      setMessages((m) => [...m, { ...(data as ChatMessage), download }]);
+    }
   }
 
   async function handleCancel(msg: ChatMessage) {
@@ -266,6 +305,15 @@ export default function SonicChat() {
                       Cancel
                     </Button>
                   </div>
+                )}
+                {m.role === "assistant" && m.download && (
+                  <a
+                    href={m.download.url}
+                    download={m.download.filename}
+                    className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                  >
+                    ⬇ {m.download.label}
+                  </a>
                 )}
                 {m.role === "assistant" && m.resolved && (
                   <div className="text-xs text-muted-foreground">

@@ -352,8 +352,9 @@ const AccountScreen = () => {
               <span className="text-xs text-muted-foreground">Works with Shopify</span>
             </div>
             <p className="text-[10px] text-muted-foreground mt-2">
-              This app will be available on the Shopify App Store. When installed from the App Store, your store connects automatically — no manual token entry needed.
             </p>
+          </Section>
+
           <SonicAssistantSettings />
 
 

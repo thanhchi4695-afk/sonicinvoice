@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { executeChatAction, type SonicDecision } from "@/lib/sonic-chat-actions";
 
 type ChatRole = "user" | "assistant";
 interface ChatMessage {
@@ -119,6 +120,28 @@ export default function SonicChat() {
 
     if (asstRow) setMessages((m) => [...m, asstRow as ChatMessage]);
     setSending(false);
+
+    // Sprint 3: execute the action if it's safe (not permission-gated)
+    if (actionData) {
+      const decision = actionData as SonicDecision;
+      const ran = executeChatAction(decision);
+      // Auto-close the panel on navigation-style actions so the user sees the result
+      const closeOn = new Set([
+        "navigate_tab",
+        "open_case_study",
+        "open_brand_guide",
+        "open_file_picker",
+        "show_last_invoice",
+        "show_brand_accuracy",
+        "show_flywheel_summary",
+        "list_trained_brands",
+        "open_correction_ui",
+        "scan_email_inbox",
+      ]);
+      if (ran && decision.action && closeOn.has(decision.action)) {
+        setTimeout(() => setOpen(false), 400);
+      }
+    }
   }
 
   return (

@@ -75,7 +75,7 @@ export async function checkAndAutoApprove(
       .update({
         status: "completed",
         completed_at: new Date().toISOString(),
-        result_summary: `Auto-completed: ${taskType}`,
+        result_summary: `Auto-completed via ${triggerPref} preference`,
       })
       .eq("id", taskId);
   } catch (e) {

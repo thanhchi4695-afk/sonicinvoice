@@ -185,6 +185,21 @@ const SonicAssistantSettings = () => {
                 />
               </div>
 
+              <div className="flex items-center justify-between">
+                <div className="pr-4">
+                  <p className="text-sm font-medium">Auto-run stock checks</p>
+                  <p className="text-xs text-muted-foreground">
+                    Sonic will silently run low-stock scans when triggered, instead
+                    of asking each time. Reorder drafts still require your approval.
+                  </p>
+                </div>
+                <Switch
+                  checked={prefs.auto_approve_stock_check}
+                  onCheckedChange={(v) => save({ auto_approve_stock_check: v })}
+                  disabled={!prefs.proactive_mode_enabled}
+                />
+              </div>
+
               <p className="text-[11px] text-muted-foreground bg-muted/40 rounded-md p-2 border border-border">
                 Auto-approved tasks still appear in your chat history and can be
                 reviewed or undone before Shopify import.

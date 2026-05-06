@@ -888,5 +888,103 @@ export async function runInlineAction(
     }
   }
 
+  if (decision.action === "write_product_description") {
+    const brandName =
+      String(params.brand_name ?? params.brand ?? "").trim() ||
+      detectBrand(userMessage) ||
+      "";
+    const colour =
+      String(params.colour ?? params.color ?? "").trim() ||
+      detectColour(userMessage) ||
+      "";
+    const productType =
+      String(params.product_type ?? params.type ?? "").trim() ||
+      detectProductType(userMessage) ||
+      "";
+    const productName =
+      String(params.product_name ?? params.style_name ?? params.style ?? params.title ?? "").trim() ||
+      detectProductName(userMessage, brandName, colour, productType) ||
+      "";
+
+    if (!brandName && !productName) {
+      return {
+        text: "Give me a brand and product name — e.g. 'description for Seafolly Mar26 in Black'.",
+      };
+    }
+
+    // Features: from params or detected from message
+    let features: string[] = [];
+    if (Array.isArray(params.features)) {
+      features = (params.features as unknown[]).map((f) => String(f)).filter(Boolean);
+    }
+    if (features.length === 0) {
+      const lower = userMessage.toLowerCase();
+      const featureMap: Array<[RegExp, string]> = [
+        [/\bunderwire\b/, "underwire"],
+        [/\bchlorine\s*resist(ant)?\b/, brandName.toLowerCase() === "funkita" ? "chlorine resistant" : "chlorine resist"],
+        [/\bupf\b|\bsun\s*protection\b/, "UPF sun protection"],
+        [/\breversible\b/, "reversible"],
+        [/\btummy\s*control\b/, "tummy control"],
+        [/\bplus\s*size\b|\b18\+\b/, "plus size"],
+        [/\bmastectomy\b/, "mastectomy-friendly"],
+        [/\b(swim ?dress)\b/, "swimdress silhouette"],
+        [/\bd[-/]?g\b|\bfuller cup\b/, "D–G cup support"],
+        [/\bremovable cups?\b/, "removable cups"],
+        [/\badjustable straps?\b/, "adjustable straps"],
+        [/\bhigh waist(ed)?\b/, "high-waisted"],
+        [/\bhigh leg\b/, "high-leg cut"],
+      ];
+      for (const [re, label] of featureMap) {
+        if (re.test(lower)) features.push(label);
+      }
+    }
+
+    const lengthVariant: "default" | "shorter" | "longer" =
+      params.length_variant === "shorter" || params.length_variant === "longer"
+        ? (params.length_variant as "shorter" | "longer")
+        : "default";
+
+    try {
+      const { data, error } = await supabase.functions.invoke("sonic-product-description", {
+        body: {
+          brand_name: brandName,
+          product_name: productName,
+          colour,
+          product_type: productType,
+          features,
+          length_variant: lengthVariant,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const description = String(data?.description ?? "").trim();
+
+      const heading = [brandName, productName].filter(Boolean).join(" ").trim();
+      const headingLine = colour ? `${heading} — ${colour}` : heading;
+
+      return {
+        text: [
+          `**${headingLine || "Product description"}**`,
+          "──────────────────────────────────",
+          description,
+          "",
+          `Character count: ${description.length} chars`,
+        ].join("\n"),
+        description: {
+          brandName,
+          productName,
+          colour,
+          productType,
+          features,
+          text: description,
+          lengthVariant,
+        },
+      };
+    } catch (e) {
+      console.error("sonic-product-description failed:", e);
+      return { text: "Couldn't reach the description writer — try again in a moment." };
+    }
+  }
+
   return null;
 }

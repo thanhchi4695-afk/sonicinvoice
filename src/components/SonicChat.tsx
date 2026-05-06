@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { executeChatAction, type SonicDecision } from "@/lib/sonic-chat-actions";
+import { executeChatAction, executeGatedAction, type SonicDecision } from "@/lib/sonic-chat-actions";
 
 type ChatRole = "user" | "assistant";
 interface ChatMessage {
@@ -13,6 +13,10 @@ interface ChatMessage {
   role: ChatRole;
   content: string;
   created_at: string;
+  action_taken?: string | null;
+  action_data?: Record<string, unknown> | null;
+  pending?: boolean;
+  resolved?: "confirmed" | "cancelled" | null;
 }
 
 const FALLBACK_REPLY =

@@ -52,7 +52,7 @@ interface CsvPreviewDialogProps {
 }
 
 // ── Build Shopify CSV (matches LightspeedExportDownload.handleShopifyDownload) ──
-function buildShopifyCsv(products: PreviewProduct[]): string {
+export function buildShopifyCsv(products: PreviewProduct[]): string {
   const headers = [
     "Handle", "Title", "Body (HTML)", "Vendor", "Type", "Tags",
     "Variant SKU", "Variant Price", "Cost per item", "Variant Inventory Qty",

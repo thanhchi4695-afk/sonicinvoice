@@ -574,6 +574,7 @@ export default function SonicChat() {
                   <div className="text-xs text-muted-foreground">
                     {m.resolved === "confirmed" ? "Confirmed" : "Cancelled"}
                   </div>
+                )}
                 {m.role === "assistant" && m.quickReplies && m.quickReplies.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {m.quickReplies.map((q) => (

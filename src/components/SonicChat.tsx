@@ -103,11 +103,11 @@ export default function SonicChat() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, open]);
 
-  async function handleSend() {
-    const text = input.trim();
+  async function handleSend(override?: string) {
+    const text = (override ?? input).trim();
     if (!text || sending || !userId) return;
     setSending(true);
-    setInput("");
+    if (!override) setInput("");
 
     const optimisticUser: ChatMessage = {
       id: `tmp-${Date.now()}`,

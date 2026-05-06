@@ -51,7 +51,7 @@ const SonicAssistantSettings = () => {
     (async () => {
       const { data } = await supabase
         .from("user_preferences")
-        .select("morning_briefing_enabled, briefing_hour_utc, proactive_mode_enabled")
+        .select("morning_briefing_enabled, briefing_hour_utc, proactive_mode_enabled, auto_approve_tags, auto_approve_seo")
         .eq("user_id", userId)
         .maybeSingle();
       if (data) {
@@ -59,6 +59,8 @@ const SonicAssistantSettings = () => {
           morning_briefing_enabled: data.morning_briefing_enabled ?? true,
           briefing_hour_utc: data.briefing_hour_utc ?? 22,
           proactive_mode_enabled: data.proactive_mode_enabled ?? true,
+          auto_approve_tags: data.auto_approve_tags ?? false,
+          auto_approve_seo: data.auto_approve_seo ?? false,
         });
       }
       setLoading(false);

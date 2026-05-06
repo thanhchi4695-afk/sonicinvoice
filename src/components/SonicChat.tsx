@@ -574,6 +574,21 @@ export default function SonicChat() {
                   <div className="text-xs text-muted-foreground">
                     {m.resolved === "confirmed" ? "Confirmed" : "Cancelled"}
                   </div>
+                {m.role === "assistant" && m.quickReplies && m.quickReplies.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {m.quickReplies.map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        disabled={sending}
+                        onClick={() => handleSend(q)}
+                        className="rounded-full border border-border bg-background px-3 py-1 text-xs text-foreground hover:bg-muted disabled:opacity-50"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 )}
               </div>
             ))}

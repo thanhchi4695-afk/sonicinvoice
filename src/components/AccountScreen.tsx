@@ -448,7 +448,7 @@ function BillingSection() {
         <div className="bg-muted/30 rounded-xl p-4 space-y-2">
           <div className="flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-primary" />
-            <span className="text-sm font-semibold">{billingStatus.plan_name || "Starter"}</span>
+            <span className="text-sm font-semibold">{billingStatus.plan_name || "Essentials"}</span>
           </div>
           <p className="text-xs text-muted-foreground">
             Status: <span className="text-foreground font-medium capitalize">{billingStatus.status}</span>
@@ -461,9 +461,9 @@ function BillingSection() {
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">Choose a plan to get started. All plans include a 14-day free trial.</p>
           {[
-            { key: "starter", name: "Starter", price: 29, highlight: false },
-            { key: "pro", name: "Pro", price: 59, highlight: true },
-            { key: "growth", name: "Growth", price: 99, highlight: false },
+            { key: "essentials", name: "Essentials", price: 49, highlight: false },
+            { key: "pro", name: "Pro", price: 99, highlight: true },
+            { key: "agent", name: "Agent", price: 179, highlight: false },
           ].map((plan) => (
             <div
               key={plan.key}

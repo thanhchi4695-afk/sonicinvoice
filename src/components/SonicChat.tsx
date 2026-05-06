@@ -403,9 +403,15 @@ export default function SonicChat() {
   }
 
   function handlePipelineLaunch(pipelineKey: string) {
+    setPendingPipeline(pipelineKey);
+  }
+
+  function confirmPipelineLaunch() {
+    if (!pendingPipeline) return;
     window.dispatchEvent(
-      new CustomEvent("sonic:launch-pipeline", { detail: { pipeline: pipelineKey } }),
+      new CustomEvent("sonic:launch-pipeline", { detail: { pipeline: pendingPipeline } }),
     );
+    setPendingPipeline(null);
     setOpen(false);
   }
 

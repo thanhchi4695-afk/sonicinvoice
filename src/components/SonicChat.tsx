@@ -82,6 +82,7 @@ interface ChatMessage {
     pipeline_to_run: string | null;
     resolved?: "approved" | "dismissed" | null;
   } | null;
+  isStreaming?: boolean;
 }
 
 const FALLBACK_REPLY =
@@ -298,35 +299,93 @@ export default function SonicChat() {
         console.warn("chat_messages user insert failed:", e);
       }
 
-      // Call Sonic intent classifier — race against a 30s timeout so the
-      // spinner can never hang indefinitely on a stalled fetch.
+      // Call Sonic intent classifier — streamed via SSE so tokens arrive
+      // word-by-word for snappy perceived latency.
       let assistantText = FALLBACK_REPLY;
       let actionTaken: string | null = "none";
+      const streamingId = `stream-${Date.now()}`;
+      let streamingBubbleAdded = false;
+
       try {
         const history = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }));
-        const invokePromise = supabase.functions.invoke("sonic-chat", {
-          body: { message: text, history, state: {} },
+        const { data: { session } } = await supabase.auth.getSession();
+        const authHeader = session?.access_token ? `Bearer ${session.access_token}` : "";
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+        const ac = new AbortController();
+        const timeoutId = setTimeout(() => ac.abort(), 30000);
+
+        const resp = await fetch(`${supabaseUrl}/functions/v1/sonic-chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: authHeader,
+            apikey: anonKey,
+          },
+          body: JSON.stringify({ message: text, history, state: {} }),
+          signal: ac.signal,
         });
-        const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
-          setTimeout(
-            () => resolve({ data: null, error: new Error("Sonic took too long to respond. Try again.") }),
-            30000,
-          ),
-        );
-        const { data, error } = (await Promise.race([invokePromise, timeoutPromise])) as {
-          data: { response_text?: string; action?: string; error?: string } | null;
-          error: Error | null;
-        };
-        if (error) throw error;
-        if (data?.response_text) {
-          assistantText = data.response_text;
-          actionTaken = data.action ?? "none";
-          actionData = data as Record<string, unknown>;
-        } else if (data?.error) {
-          assistantText = data.error;
+
+        if (!resp.ok || !resp.body) {
+          clearTimeout(timeoutId);
+          let errMsg = FALLBACK_REPLY;
+          try {
+            const j = await resp.json();
+            if (j?.error) errMsg = j.error;
+          } catch { /* ignore */ }
+          assistantText = errMsg;
+        } else {
+          // Add an optimistic streaming bubble that we fill in as tokens arrive.
+          setMessages((m) => [
+            ...m,
+            {
+              id: streamingId,
+              role: "assistant",
+              content: "",
+              created_at: new Date().toISOString(),
+              isStreaming: true,
+            },
+          ]);
+          streamingBubbleAdded = true;
+
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let streamedText = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split("\n\n");
+            buffer = events.pop() ?? "";
+            for (const evt of events) {
+              if (!evt.startsWith("data: ")) continue;
+              try {
+                const json = JSON.parse(evt.slice(6));
+                if (json.done) {
+                  assistantText = json.response_text ?? streamedText;
+                  actionTaken = json.action ?? "none";
+                  actionData = json as Record<string, unknown>;
+                } else if (json.token) {
+                  streamedText += json.token;
+                  setMessages((m) =>
+                    m.map((x) =>
+                      x.id === streamingId ? { ...x, content: streamedText } : x,
+                    ),
+                  );
+                }
+              } catch {
+                // skip malformed line
+              }
+            }
+          }
+          clearTimeout(timeoutId);
+          if (!actionData && streamedText) assistantText = streamedText;
         }
       } catch (e) {
-        console.error("sonic-chat invoke failed:", e);
+        console.error("sonic-chat stream failed:", e);
         assistantText = e instanceof Error ? e.message : FALLBACK_REPLY;
       }
 
@@ -366,7 +425,11 @@ export default function SonicChat() {
             action_data: actionData ?? undefined,
             pending: isGated,
           };
-      setMessages((m) => [...m, enriched]);
+      // Replace the streaming placeholder bubble with the persisted/enriched one.
+      setMessages((m) => {
+        const filtered = streamingBubbleAdded ? m.filter((x) => x.id !== streamingId) : m;
+        return [...filtered, enriched];
+      });
     } finally {
       // ALWAYS clear the spinner so the chat can never get stuck "loading".
       setSending(false);
@@ -661,6 +724,9 @@ export default function SonicChat() {
                       )}
                     >
                       {m.content}
+                      {m.isStreaming && (
+                        <span className="sonic-blink ml-px inline-block h-[1em] w-[2px] align-text-bottom bg-current" />
+                      )}
                     </div>
                   )
                 )}

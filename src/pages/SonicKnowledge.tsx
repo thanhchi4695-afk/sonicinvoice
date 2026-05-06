@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Trash2, Plus, Save } from "lucide-react";
+import { Trash2, Plus, Save, Search, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 
 interface Entry {
@@ -21,6 +22,8 @@ export default function SonicKnowledge() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [draft, setDraft] = useState({ category: "clients", key: "", value: "" });
   const [loading, setLoading] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -72,10 +75,22 @@ export default function SonicKnowledge() {
     void load();
   }
 
-  const grouped = entries.reduce<Record<string, Entry[]>>((acc, e) => {
+  const allCategories = Array.from(new Set(entries.map((e) => e.category))).sort();
+  const q = query.trim().toLowerCase();
+  const filtered = entries.filter((e) => {
+    if (activeCategory && e.category !== activeCategory) return false;
+    if (!q) return true;
+    return (
+      e.category.toLowerCase().includes(q) ||
+      e.key.toLowerCase().includes(q) ||
+      e.value.toLowerCase().includes(q)
+    );
+  });
+  const grouped = filtered.reduce<Record<string, Entry[]>>((acc, e) => {
     (acc[e.category] ??= []).push(e);
     return acc;
   }, {});
+  const hasFilters = !!activeCategory || !!q;
 
   return (
     <div className="container max-w-4xl py-8">

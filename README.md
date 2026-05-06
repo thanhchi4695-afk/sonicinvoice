@@ -18,8 +18,8 @@ The following optional secrets can be set in Lovable Cloud → Backend → Secre
 | `XERO_AUTH_URL` | `https://login.xero.com/identity/connect/authorize` | Xero OAuth |
 | `XERO_CONNECTIONS_URL` | `https://api.xero.com/connections` | Xero connections |
 | `MYOB_BASE_URL` | `https://api.myob.com/accountright` | MYOB API base |
-| `MYOB_TOKEN_URL` | `https://secure.myob.com/oauth2/v1/authorize` | MYOB token |
-| `MYOB_AUTH_URL` | `https://secure.myob.com/oauth2/v1/authorize` | MYOB OAuth |
+| `MYOB_TOKEN_URL` | `https://secure.myob.com/oauth2/v1/token` | MYOB token exchange |
+| `MYOB_AUTH_URL` | `https://secure.myob.com/oauth2/account/authorize` | MYOB OAuth authorise |
 
 ### Required runtime secrets
 

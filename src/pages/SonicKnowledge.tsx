@@ -134,6 +134,59 @@ export default function SonicKnowledge() {
             </Button>
           </Card>
 
+          {entries.length > 0 && (
+            <div className="mt-8 space-y-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(ev) => setQuery(ev.target.value)}
+                  placeholder="Search by category, key, or value…"
+                  className="pl-9 pr-9"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {allCategories.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <Badge
+                    variant={activeCategory === null ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => setActiveCategory(null)}
+                  >
+                    All ({entries.length})
+                  </Badge>
+                  {allCategories.map((cat) => {
+                    const count = entries.filter((e) => e.category === cat).length;
+                    return (
+                      <Badge
+                        key={cat}
+                        variant={activeCategory === cat ? "default" : "outline"}
+                        className="cursor-pointer capitalize"
+                        onClick={() =>
+                          setActiveCategory((c) => (c === cat ? null : cat))
+                        }
+                      >
+                        {cat} ({count})
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground">
+                Showing {filtered.length} of {entries.length}
+              </div>
+            </div>
+          )}
+
           {Object.entries(grouped).map(([cat, items]) => (
             <div key={cat} className="mt-8">
               <h2 className="font-heading text-xl font-semibold capitalize">{cat}</h2>
@@ -176,6 +229,11 @@ export default function SonicKnowledge() {
           {entries.length === 0 && (
             <div className="mt-8 rounded-lg bg-muted/40 p-6 text-center text-muted-foreground">
               No entries yet. Add your first piece of context above.
+            </div>
+          )}
+          {entries.length > 0 && filtered.length === 0 && (
+            <div className="mt-8 rounded-lg bg-muted/40 p-6 text-center text-muted-foreground">
+              No entries match {hasFilters ? "your filters" : "your search"}.
             </div>
           )}
         </>

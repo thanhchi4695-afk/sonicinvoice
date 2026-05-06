@@ -244,6 +244,7 @@ export default function SonicChat() {
         (decision.params?.invoice_text as string | undefined) ?? lastUser?.content ?? "";
       const supplier = (decision.params?.supplier as string | undefined) ?? undefined;
       try {
+        setHasActiveParse(true);
         const result = await runParseFromChat(text, supplier, async (line) => {
           await postAssistantNote(line);
         });
@@ -254,6 +255,7 @@ export default function SonicChat() {
         );
       } catch (e: any) {
         await postAssistantNote(`✕ ${e?.message ?? "Pipeline failed"}`);
+        setHasActiveParse(false);
       }
       return;
     }

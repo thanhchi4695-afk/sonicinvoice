@@ -16,7 +16,7 @@ import {
   type SonicDecision,
 } from "@/lib/sonic-chat-actions";
 
-type ChatRole = "user" | "assistant";
+type ChatRole = "user" | "assistant" | "proactive";
 interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -60,6 +60,16 @@ interface ChatMessage {
   } | null;
   description?: ProductDescription | null;
   quickReplies?: string[] | null;
+  // Proactive (auto-injected by the brain via realtime)
+  proactive?: {
+    task_id: string;
+    observation: string;
+    proposed_action: string;
+    permission_question: string | null;
+    requires_permission: boolean;
+    pipeline_to_run: string | null;
+    resolved?: "approved" | "dismissed" | null;
+  } | null;
 }
 
 const FALLBACK_REPLY =
@@ -82,6 +92,48 @@ export default function SonicChat() {
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Realtime: inject proactive-brain tasks into the chat the moment they appear
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`proactive-tasks-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "agent_tasks",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const t = payload.new as Record<string, any>;
+          if (t.status !== "permission_requested" && t.status !== "suggested") return;
+          const msg: ChatMessage = {
+            id: `proactive-${t.id}`,
+            role: "proactive",
+            content: t.observation ?? "Sonic noticed something.",
+            created_at: t.created_at ?? new Date().toISOString(),
+            proactive: {
+              task_id: t.id,
+              observation: t.observation ?? "",
+              proposed_action: t.proposed_action ?? "",
+              permission_question: t.permission_question ?? null,
+              requires_permission: t.status === "permission_requested",
+              pipeline_to_run: t.pipeline_id ?? null,
+              resolved: null,
+            },
+          };
+          setMessages((m) => (m.some((x) => x.id === msg.id) ? m : [...m, msg]));
+          // Auto-open the panel so the user actually sees the suggestion
+          setOpen(true);
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   // Load history when opened
   useEffect(() => {
@@ -291,6 +343,61 @@ export default function SonicChat() {
     await postAssistantNote("Got it, cancelled.");
   }
 
+  // ── Proactive task handlers ────────────────────────────────────────
+  async function handleProactiveApprove(taskId: string, taskType?: string) {
+    setMessages((arr) =>
+      arr.map((x) =>
+        x.proactive?.task_id === taskId
+          ? { ...x, proactive: { ...x.proactive, resolved: "approved" } }
+          : x,
+      ),
+    );
+    try {
+      await supabase
+        .from("agent_tasks")
+        .update({ status: "approved", approved_at: new Date().toISOString() })
+        .eq("id", taskId);
+      // Best-effort: kick off the matching action via the existing chat action runner.
+      const action = taskType ?? "none";
+      if (action && action !== "none") {
+        try {
+          await executeChatAction(action as never);
+        } catch (e) {
+          console.warn("[proactive] executeChatAction failed:", e);
+        }
+      }
+    } catch (e) {
+      console.warn("[proactive] approve update failed:", e);
+    }
+    await postAssistantNote("On it.");
+  }
+
+  async function handleProactiveDismiss(taskId: string) {
+    setMessages((arr) =>
+      arr.map((x) =>
+        x.proactive?.task_id === taskId
+          ? { ...x, proactive: { ...x.proactive, resolved: "dismissed" } }
+          : x,
+      ),
+    );
+    try {
+      await supabase
+        .from("agent_tasks")
+        .update({ status: "skipped", dismissed_at: new Date().toISOString() })
+        .eq("id", taskId);
+    } catch (e) {
+      console.warn("[proactive] dismiss update failed:", e);
+    }
+    await postAssistantNote("Got it, skipping.");
+  }
+
+  function handlePipelineLaunch(pipelineKey: string) {
+    window.dispatchEvent(
+      new CustomEvent("sonic:launch-pipeline", { detail: { pipeline: pipelineKey } }),
+    );
+    setOpen(false);
+  }
+
   return (
     <>
       {/* Floating button */}
@@ -343,17 +450,69 @@ export default function SonicChat() {
             )}
             {messages.map((m) => (
               <div key={m.id} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
-                {!m.seo && !m.margin && !m.email && !m.description && (
-                  <div
-                    className={cn(
-                      "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                      m.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground",
+                {m.role === "proactive" && m.proactive ? (
+                  <div className="w-full max-w-[90%] space-y-2 rounded-r-xl border-l-2 border-teal-400 bg-muted/60 px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-teal-500">
+                      <span className="rounded bg-teal-500/15 px-1.5 py-0.5 font-semibold">Sonic</span>
+                      <span>noticed</span>
+                    </div>
+                    <div className="text-foreground">{m.proactive.observation}</div>
+                    {m.proactive.proposed_action && (
+                      <div className="text-xs text-muted-foreground">{m.proactive.proposed_action}</div>
                     )}
-                  >
-                    {m.content}
+                    {m.proactive.permission_question && !m.proactive.resolved && (
+                      <div className="text-sm text-foreground">{m.proactive.permission_question}</div>
+                    )}
+                    {m.proactive.requires_permission && !m.proactive.resolved && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            handleProactiveApprove(
+                              m.proactive!.task_id,
+                              (m.action_data as Record<string, unknown> | null)?.task_type as string | undefined,
+                            )
+                          }
+                        >
+                          Yes, go ahead
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleProactiveDismiss(m.proactive!.task_id)}
+                        >
+                          Not now
+                        </Button>
+                        {m.proactive.pipeline_to_run && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handlePipelineLaunch(m.proactive!.pipeline_to_run!)}
+                          >
+                            Run full pipeline instead
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    {m.proactive.resolved && (
+                      <div className="text-xs text-muted-foreground">
+                        {m.proactive.resolved === "approved" ? "Approved" : "Dismissed"}
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  !m.seo && !m.margin && !m.email && !m.description && (
+                    <div
+                      className={cn(
+                        "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
+                        m.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground",
+                      )}
+                    >
+                      {m.content}
+                    </div>
+                  )
                 )}
                 {m.role === "assistant" && m.description && (
                   <ProductDescriptionCard

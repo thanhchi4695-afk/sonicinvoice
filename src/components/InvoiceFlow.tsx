@@ -70,6 +70,7 @@ import { LargePdfChunkDialog, getLargePdfDefault, setLargePdfDefault, type Large
 import { isLargePdf, splitPdf, extractPdfPage, getPdfPageCount } from "@/lib/pdf-splitter";
 import PostPublishHero from "@/components/PostPublishHero";
 import CollectionAutopilotOnboarding from "@/components/CollectionAutopilotOnboarding";
+import { triggerAfterInvoiceParse } from "@/lib/proactive-brain-trigger";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 
@@ -2525,6 +2526,23 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           }
           console.warn("[InvoiceFlow] OCR upgrade polling timed out for job", jobId);
         })();
+      }
+
+      // Fire-and-forget: notify the proactive brain that a parse just completed.
+      try {
+        const products = Array.isArray(data.products) ? data.products : [];
+        const { data: sess } = await supabase.auth.getSession();
+        const uid = sess.session?.user?.id;
+        if (uid && products.length > 0) {
+          triggerAfterInvoiceParse(
+            uid,
+            String(data.job_id ?? data.invoice_id ?? `parse_${Date.now()}`),
+            String(data.supplier ?? supplierName ?? "Unknown"),
+            products.length,
+          );
+        }
+      } catch (e) {
+        console.warn("[proactive-brain] post-parse trigger skipped:", e);
       }
 
       return data.products || [];

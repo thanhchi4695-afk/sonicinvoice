@@ -862,7 +862,63 @@ export default function SonicChat() {
                   </Button>
                 )}
                 {m.role === "assistant" && m.autoApproved?.undone && (
-                  <div className="text-[11px] text-muted-foreground">Undone — task marked skipped.</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-[11px] text-muted-foreground">Undone — task marked skipped.</div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        const { taskType } = m.autoApproved!;
+                        const actionMap: Record<string, string> = {
+                          generate_tags: "open_tag_engine",
+                          generate_seo: "open_seo_writer",
+                          stock_check: "open_stock_monitor",
+                        };
+                        const action = actionMap[taskType];
+                        if (!action) {
+                          toast.error("Can't re-run this task type");
+                          return;
+                        }
+                        try {
+                          const { data: u } = await supabase.auth.getUser();
+                          if (u.user?.id) {
+                            await supabase.from("agent_tasks").insert({
+                              user_id: u.user.id,
+                              task_type: taskType,
+                              status: "approved",
+                              observation: "Re-run from Sonic after undo",
+                              trigger_source: "user_rerun",
+                              approved_at: new Date().toISOString(),
+                            });
+                          }
+                          executeChatAction({
+                            action,
+                            params: {},
+                            requires_permission: false,
+                            intent: "action",
+                            confidence: 1,
+                          } as never);
+                          setMessages((prev) =>
+                            prev.map((x) =>
+                              x.id === m.id
+                                ? {
+                                    ...x,
+                                    content: `Re-running ${taskType} from Sonic…`,
+                                    autoApproved: null,
+                                  }
+                                : x,
+                            ),
+                          );
+                          toast.success("Re-running from Sonic");
+                        } catch (e) {
+                          console.warn("[rerun] failed:", e);
+                          toast.error("Couldn't re-run");
+                        }
+                      }}
+                    >
+                      <RotateCcw className="mr-1 h-3 w-3" /> Re-run from Sonic
+                    </Button>
+                  </div>
                 )}
                 {m.role === "assistant" && m.resolved && (
                   <div className="text-xs text-muted-foreground">

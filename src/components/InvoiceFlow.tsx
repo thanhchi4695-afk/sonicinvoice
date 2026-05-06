@@ -70,6 +70,7 @@ import { LargePdfChunkDialog, getLargePdfDefault, setLargePdfDefault, type Large
 import { isLargePdf, splitPdf, extractPdfPage, getPdfPageCount } from "@/lib/pdf-splitter";
 import PostPublishHero from "@/components/PostPublishHero";
 import CollectionAutopilotOnboarding from "@/components/CollectionAutopilotOnboarding";
+import { triggerAfterInvoiceParse } from "@/lib/proactive-brain-trigger";
 
 export type InvoiceMatchMethod = "fingerprint_match" | "supplier_match" | "full_extraction";
 

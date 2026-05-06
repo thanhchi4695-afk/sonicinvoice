@@ -5147,23 +5147,38 @@ export type Database = {
       }
       user_preferences: {
         Row: {
+          auto_approve_seo: boolean
+          auto_approve_tags: boolean
+          briefing_hour_utc: number
           contribute_to_shared_learning: boolean
           created_at: string
           id: string
+          morning_briefing_enabled: boolean
+          proactive_mode_enabled: boolean
           updated_at: string
           user_id: string
         }
         Insert: {
+          auto_approve_seo?: boolean
+          auto_approve_tags?: boolean
+          briefing_hour_utc?: number
           contribute_to_shared_learning?: boolean
           created_at?: string
           id?: string
+          morning_briefing_enabled?: boolean
+          proactive_mode_enabled?: boolean
           updated_at?: string
           user_id: string
         }
         Update: {
+          auto_approve_seo?: boolean
+          auto_approve_tags?: boolean
+          briefing_hour_utc?: number
           contribute_to_shared_learning?: boolean
           created_at?: string
           id?: string
+          morning_briefing_enabled?: boolean
+          proactive_mode_enabled?: boolean
           updated_at?: string
           user_id?: string
         }

@@ -450,17 +450,69 @@ export default function SonicChat() {
             )}
             {messages.map((m) => (
               <div key={m.id} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
-                {!m.seo && !m.margin && !m.email && !m.description && (
-                  <div
-                    className={cn(
-                      "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                      m.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground",
+                {m.role === "proactive" && m.proactive ? (
+                  <div className="w-full max-w-[90%] space-y-2 rounded-r-xl border-l-2 border-teal-400 bg-muted/60 px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-teal-500">
+                      <span className="rounded bg-teal-500/15 px-1.5 py-0.5 font-semibold">Sonic</span>
+                      <span>noticed</span>
+                    </div>
+                    <div className="text-foreground">{m.proactive.observation}</div>
+                    {m.proactive.proposed_action && (
+                      <div className="text-xs text-muted-foreground">{m.proactive.proposed_action}</div>
                     )}
-                  >
-                    {m.content}
+                    {m.proactive.permission_question && !m.proactive.resolved && (
+                      <div className="text-sm text-foreground">{m.proactive.permission_question}</div>
+                    )}
+                    {m.proactive.requires_permission && !m.proactive.resolved && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            handleProactiveApprove(
+                              m.proactive!.task_id,
+                              (m.action_data as Record<string, unknown> | null)?.task_type as string | undefined,
+                            )
+                          }
+                        >
+                          Yes, go ahead
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleProactiveDismiss(m.proactive!.task_id)}
+                        >
+                          Not now
+                        </Button>
+                        {m.proactive.pipeline_to_run && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handlePipelineLaunch(m.proactive!.pipeline_to_run!)}
+                          >
+                            Run full pipeline instead
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    {m.proactive.resolved && (
+                      <div className="text-xs text-muted-foreground">
+                        {m.proactive.resolved === "approved" ? "Approved" : "Dismissed"}
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  !m.seo && !m.margin && !m.email && !m.description && (
+                    <div
+                      className={cn(
+                        "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
+                        m.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground",
+                      )}
+                    >
+                      {m.content}
+                    </div>
+                  )
                 )}
                 {m.role === "assistant" && m.description && (
                   <ProductDescriptionCard

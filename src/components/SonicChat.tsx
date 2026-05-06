@@ -306,6 +306,15 @@ export default function SonicChat() {
                     </Button>
                   </div>
                 )}
+                {m.role === "assistant" && m.download && (
+                  <a
+                    href={m.download.url}
+                    download={m.download.filename}
+                    className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                  >
+                    ⬇ {m.download.label}
+                  </a>
+                )}
                 {m.role === "assistant" && m.resolved && (
                   <div className="text-xs text-muted-foreground">
                     {m.resolved === "confirmed" ? "Confirmed" : "Cancelled"}

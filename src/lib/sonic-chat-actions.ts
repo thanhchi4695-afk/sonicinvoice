@@ -515,6 +515,113 @@ export async function runInlineAction(
   if (!decision || !decision.action) return null;
   const params = decision.params ?? {};
 
+  if (decision.action === "open_stock_check") {
+    // Explicit "show full stock check" → fall through to navigation.
+    if (/\b(see all stock|show full stock check|open stock check|full stock check)\b/i.test(userMessage)) {
+      return null;
+    }
+
+    const brand =
+      String(params.brand_name ?? params.brand ?? params.supplier ?? "").trim() ||
+      detectBrand(userMessage) ||
+      "";
+    const skuRaw =
+      String(params.sku ?? params.style_number ?? params.style ?? "").trim() ||
+      (userMessage.match(/\b([A-Z0-9]{4,}[-_]?\d{2,}|\d{5,})\b/)?.[1] ?? "");
+
+    if (!brand && !skuRaw) {
+      // Nothing usable inline — let the screen open instead.
+      return null;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return { text: "Sign in to check your stock history." };
+      }
+
+      // Brand existence in brand_patterns
+      let brandKnown = false;
+      if (brand) {
+        const { data: bp } = await supabase
+          .from("brand_patterns")
+          .select("brand_name")
+          .eq("user_id", user.id)
+          .ilike("brand_name", brand)
+          .limit(1);
+        brandKnown = !!(bp && bp.length > 0);
+      }
+
+      // Import history rows for this brand
+      let rows: Array<{ style_number: string | null; colour: string | null; started_at: string | null }> = [];
+      if (brand) {
+        const { data: hist } = await supabase
+          .from("inventory_import_runs")
+          .select("style_number, colour, started_at")
+          .eq("user_id", user.id)
+          .ilike("supplier_name", brand)
+          .order("started_at", { ascending: false })
+          .limit(200);
+        rows = (hist ?? []) as typeof rows;
+      }
+
+      const styleNorm = skuRaw.toLowerCase().replace(/[-_\s]/g, "");
+      const sameStyleRows = styleNorm
+        ? rows.filter(
+            (r) => (r.style_number ?? "").toLowerCase().replace(/[-_\s]/g, "") === styleNorm,
+          )
+        : [];
+
+      const refillMatch = sameStyleRows[0];
+      const tagLineNew = "add `new` + `new arrivals` + department new tag";
+      const tagLineRefill = "no `new` / `new arrivals` tags needed";
+
+      let classification: "REFILL" | "NEW COLOUR" | "NEW PRODUCT";
+      let detail: string;
+
+      if (skuRaw && refillMatch) {
+        classification = "REFILL";
+        const date = refillMatch.started_at
+          ? new Date(refillMatch.started_at).toLocaleDateString()
+          : "previously";
+        const colours = [
+          ...new Set(sameStyleRows.map((r) => r.colour).filter(Boolean) as string[]),
+        ];
+        // NEW COLOUR check: same style exists but the user's colour isn't among them
+        const userColour = detectColour(userMessage);
+        if (userColour && colours.length > 0 && !colours.some((c) => c.toLowerCase() === userColour.toLowerCase())) {
+          classification = "NEW COLOUR";
+          detail = `You stock this ${brand || "style"} in ${colours.join(", ")}. This looks like a NEW COLOUR.`;
+        } else {
+          detail = `That style (${brand ? brand + " " : ""}${skuRaw}) is already in your catalog — last imported ${date}. This is a REFILL.`;
+        }
+      } else if (brand && brandKnown) {
+        classification = "NEW PRODUCT";
+        detail = skuRaw
+          ? `${brand} is a known brand but style ${skuRaw} isn't in your history. Treat as a NEW PRODUCT.`
+          : `${brand} is a known brand but no matching style was provided. Treat as a NEW PRODUCT.`;
+      } else if (brand) {
+        classification = "NEW PRODUCT";
+        detail = `${brand} isn't in your history yet. This is a NEW PRODUCT — first invoice from this brand.`;
+      } else {
+        return null;
+      }
+
+      const tagAdvice = classification === "REFILL" ? tagLineRefill : tagLineNew;
+      const text = [
+        `**${classification}**`,
+        "",
+        detail,
+        "",
+        `**Tags:** ${tagAdvice}`,
+      ].join("\n");
+      return { text };
+    } catch (e) {
+      console.error("stock check inline failed:", e);
+      return null;
+    }
+  }
+
   if (decision.action === "calculate_margin") {
     const cost = Number.isFinite(Number(params.cost))
       ? Number(params.cost)

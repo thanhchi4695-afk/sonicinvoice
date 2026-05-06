@@ -16,6 +16,7 @@ import {
   PipelineContext,
   StepExecutionStatus,
 } from "@/lib/pipeline-context";
+import { onPipelineStepComplete, reportStepProgressInChat } from "@/lib/pipeline-trigger";
 
 interface PipelineRunnerProps {
   pipelineId: string;
@@ -85,8 +86,10 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
 
   const advanceStep = useCallback(() => {
     setRunningFlow(false);
+    let snap: { stepId: string; stepIndex: number } | null = null;
     setCtxState((prev) => {
       const stepId = steps[prev.currentStep]?.id;
+      snap = { stepId, stepIndex: prev.currentStep };
       const next: PipelineContext = {
         ...prev,
         currentStep: prev.currentStep + 1,
@@ -98,7 +101,35 @@ const PipelineRunner = ({ pipelineId, onRenderFlow, onExit }: PipelineRunnerProp
       setPipelineContext(next);
       return next;
     });
-  }, [steps]);
+
+    // Fire-and-forget: notify the proactive brain + post chat progress.
+    if (snap && pipeline) {
+      const { stepId, stepIndex } = snap;
+      const stepDef = steps[stepIndex];
+      const totalSteps = steps.length;
+      const isLastStep = stepIndex === totalSteps - 1;
+      (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        onPipelineStepComplete({
+          userId: user.id,
+          pipelineId: pipeline.id,
+          pipelineLabel: pipeline.name,
+          completedStep: stepDef?.flow ?? stepId,
+          stepIndex,
+          totalSteps,
+          isLastStep,
+        }).catch(() => {});
+        reportStepProgressInChat({
+          userId: user.id,
+          stepLabel: stepDef?.label ?? stepId,
+          stepIndex,
+          totalSteps,
+          pipelineLabel: pipeline.name,
+        }).catch(() => {});
+      })();
+    }
+  }, [steps, pipeline]);
 
   const skipStep = useCallback(() => {
     setRunningFlow(false);

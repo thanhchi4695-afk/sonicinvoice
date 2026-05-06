@@ -522,6 +522,68 @@ export default function SonicChat() {
       return;
     }
 
+    if (decision.action === "export_csv") {
+      try {
+        const invoiceId = String(decision.params?.invoice_id ?? "last");
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          await postAssistantNote("Sign in to export a CSV.");
+          return;
+        }
+
+        // Fetch the invoice job — "last" → most recent done invoice_read; otherwise by id.
+        let job: { id: string; result: Record<string, unknown> | null } | null = null;
+        if (invoiceId === "last" || invoiceId === "all") {
+          const { data } = await supabase
+            .from("invoice_processing_jobs")
+            .select("id, result")
+            .eq("user_id", user.id)
+            .eq("job_kind", "invoice_read")
+            .eq("status", "done")
+            .order("completed_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          job = data as typeof job;
+        } else {
+          const { data } = await supabase
+            .from("invoice_processing_jobs")
+            .select("id, result")
+            .eq("id", invoiceId)
+            .maybeSingle();
+          job = data as typeof job;
+        }
+
+        const products = (job?.result as { products?: ParsedRow[]; brand?: string } | null)?.products ?? [];
+        const brand = (job?.result as { brand?: string } | null)?.brand ?? "shopify";
+        if (!products.length) {
+          await postAssistantNote("No parsed invoice found to export. Parse one first, then ask me to export.");
+          return;
+        }
+
+        const enriched = applyTagsAndSeo(products, brand);
+        const csv = buildShopifyCsv(enriched);
+        const url = csvDownloadUrl(csv);
+        const filename = `${brand.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.csv`;
+
+        // Trigger the actual browser download immediately.
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        await postAssistantDownload(
+          `CSV downloaded — ${enriched.length} rows from ${brand}.`,
+          { url, filename, label: "Download again" },
+        );
+      } catch (e: any) {
+        console.error("export_csv failed:", e);
+        await postAssistantNote(`✕ Could not export CSV: ${e?.message ?? "unknown error"}`);
+      }
+      return;
+    }
+
     const ran = executeGatedAction(decision);
     await postAssistantNote(
       ran ? "Done — running that now." : "I couldn't run that action. Try again.",

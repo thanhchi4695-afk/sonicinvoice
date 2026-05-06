@@ -339,6 +339,66 @@ function extractCost(text: string): number {
 export interface InlineActionResult {
   text: string;
   copyable?: string;
+  seo?: {
+    title: string;
+    description: string;
+    titleLen: number;
+    descLen: number;
+    titleOver: boolean;
+    descOver: boolean;
+  };
+}
+
+const KNOWN_COLOURS = [
+  "black","white","ivory","cream","beige","tan","brown","chocolate","khaki","olive","mustard",
+  "yellow","gold","orange","coral","peach","red","crimson","burgundy","wine","pink","blush",
+  "rose","fuchsia","magenta","purple","lilac","lavender","plum","navy","blue","cobalt","denim",
+  "sky","teal","turquoise","aqua","mint","sage","green","emerald","forest","silver","grey","gray",
+  "charcoal","leopard","animal","floral","stripe","striped","print","multi",
+];
+
+function detectColour(text: string): string | null {
+  const lower = text.toLowerCase();
+  const sorted = [...KNOWN_COLOURS].sort((a, b) => b.length - a.length);
+  for (const c of sorted) {
+    const re = new RegExp(`\\b${c}\\b`, "i");
+    if (re.test(lower)) return c.replace(/\b\w/g, (x) => x.toUpperCase());
+  }
+  return null;
+}
+
+function detectProductName(
+  text: string,
+  brand: string | null,
+  colour: string | null,
+  productType: string | null,
+): string | null {
+  // Quoted phrase wins
+  const q = text.match(/["“']([^"”']{2,60})["”']/);
+  if (q) return q[1].trim();
+  // Strip known tokens, return remaining capitalised words sequence
+  let cleaned = text;
+  for (const tok of [brand, colour, productType]) {
+    if (tok) cleaned = cleaned.replace(new RegExp(tok, "ig"), " ");
+  }
+  cleaned = cleaned.replace(/[,.!?]/g, " ").replace(/\s+/g, " ").trim();
+  // Look for 1-4 capitalised tokens (style codes like "Mar26" allowed)
+  const m = cleaned.match(/\b([A-Z][\w-]+(?:\s+[A-Z][\w-]+){0,3})\b/);
+  return m ? m[1].trim() : null;
+}
+
+// Builds the SEO title using the required pattern:
+// "[Brand] [StyleName] - [Colour] | Australia"
+// Truncated to 62 chars + "..." when over 65 chars total.
+function buildSEO(brand: string, styleName: string, colour: string) {
+  const parts: string[] = [];
+  if (brand) parts.push(brand);
+  if (styleName) parts.push(styleName);
+  let left = parts.join(" ").trim();
+  if (colour) left = `${left} - ${colour}`.trim();
+  let title = `${left} | Australia`.replace(/\s+/g, " ").trim();
+  if (title.length > 65) title = title.slice(0, 62).trimEnd() + "...";
+  return title;
 }
 
 // Match a known product type in free-form text. Returns the canonical option.

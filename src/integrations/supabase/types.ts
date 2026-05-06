@@ -515,6 +515,89 @@ export type Database = {
           },
         ]
       }
+      agent_tasks: {
+        Row: {
+          approved_at: string | null
+          completed_at: string | null
+          created_at: string
+          dismissed_at: string | null
+          due_at: string | null
+          id: string
+          next_pipeline: string | null
+          next_task_type: string | null
+          observation: string | null
+          parent_task_id: string | null
+          permission_question: string | null
+          pipeline_id: string | null
+          pipeline_step: number | null
+          proposed_action: string | null
+          result_data: Json
+          result_summary: string | null
+          started_at: string | null
+          status: string
+          task_type: string
+          trigger_context: Json
+          trigger_source: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          due_at?: string | null
+          id?: string
+          next_pipeline?: string | null
+          next_task_type?: string | null
+          observation?: string | null
+          parent_task_id?: string | null
+          permission_question?: string | null
+          pipeline_id?: string | null
+          pipeline_step?: number | null
+          proposed_action?: string | null
+          result_data?: Json
+          result_summary?: string | null
+          started_at?: string | null
+          status?: string
+          task_type: string
+          trigger_context?: Json
+          trigger_source: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          due_at?: string | null
+          id?: string
+          next_pipeline?: string | null
+          next_task_type?: string | null
+          observation?: string | null
+          parent_task_id?: string | null
+          permission_question?: string | null
+          pipeline_id?: string | null
+          pipeline_step?: number | null
+          proposed_action?: string | null
+          result_data?: Json
+          result_summary?: string | null
+          started_at?: string | null
+          status?: string
+          task_type?: string
+          trigger_context?: Json
+          trigger_source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "agent_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_model_overrides: {
         Row: {
           created_at: string

@@ -101,15 +101,19 @@ export default function SonicChat() {
       console.error("sonic-chat invoke failed:", e);
     }
 
+    const asstInsert: {
+      user_id: string;
+      role: string;
+      content: string;
+      action_taken?: string;
+      action_data?: Record<string, unknown>;
+    } = { user_id: userId, role: "assistant", content: assistantText };
+    if (actionTaken) asstInsert.action_taken = actionTaken;
+    if (actionData) asstInsert.action_data = actionData;
+
     const { data: asstRow } = await supabase
       .from("chat_messages")
-      .insert({
-        user_id: userId,
-        role: "assistant",
-        content: assistantText,
-        action_taken: actionTaken,
-        action_data: actionData,
-      })
+      .insert(asstInsert)
       .select("id, role, content, created_at")
       .single();
 

@@ -26,6 +26,7 @@ interface Prefs {
   proactive_mode_enabled: boolean;
   auto_approve_tags: boolean;
   auto_approve_seo: boolean;
+  auto_approve_stock_check: boolean;
 }
 
 const DEFAULTS: Prefs = {
@@ -34,6 +35,7 @@ const DEFAULTS: Prefs = {
   proactive_mode_enabled: true,
   auto_approve_tags: false,
   auto_approve_seo: false,
+  auto_approve_stock_check: false,
 };
 
 const SonicAssistantSettings = () => {

@@ -26,6 +26,7 @@ interface Prefs {
   proactive_mode_enabled: boolean;
   auto_approve_tags: boolean;
   auto_approve_seo: boolean;
+  auto_approve_stock_check: boolean;
 }
 
 const DEFAULTS: Prefs = {
@@ -34,6 +35,7 @@ const DEFAULTS: Prefs = {
   proactive_mode_enabled: true,
   auto_approve_tags: false,
   auto_approve_seo: false,
+  auto_approve_stock_check: false,
 };
 
 const SonicAssistantSettings = () => {
@@ -51,7 +53,7 @@ const SonicAssistantSettings = () => {
     (async () => {
       const { data } = await supabase
         .from("user_preferences")
-        .select("morning_briefing_enabled, briefing_hour_utc, proactive_mode_enabled, auto_approve_tags, auto_approve_seo")
+        .select("morning_briefing_enabled, briefing_hour_utc, proactive_mode_enabled, auto_approve_tags, auto_approve_seo, auto_approve_stock_check")
         .eq("user_id", userId)
         .maybeSingle();
       if (data) {
@@ -61,6 +63,7 @@ const SonicAssistantSettings = () => {
           proactive_mode_enabled: data.proactive_mode_enabled ?? true,
           auto_approve_tags: data.auto_approve_tags ?? false,
           auto_approve_seo: data.auto_approve_seo ?? false,
+          auto_approve_stock_check: data.auto_approve_stock_check ?? false,
         });
       }
       setLoading(false);
@@ -178,6 +181,21 @@ const SonicAssistantSettings = () => {
                 <Switch
                   checked={prefs.auto_approve_seo}
                   onCheckedChange={(v) => save({ auto_approve_seo: v })}
+                  disabled={!prefs.proactive_mode_enabled}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="pr-4">
+                  <p className="text-sm font-medium">Auto-run stock checks</p>
+                  <p className="text-xs text-muted-foreground">
+                    Sonic will silently run low-stock scans when triggered, instead
+                    of asking each time. Reorder drafts still require your approval.
+                  </p>
+                </div>
+                <Switch
+                  checked={prefs.auto_approve_stock_check}
+                  onCheckedChange={(v) => save({ auto_approve_stock_check: v })}
                   disabled={!prefs.proactive_mode_enabled}
                 />
               </div>

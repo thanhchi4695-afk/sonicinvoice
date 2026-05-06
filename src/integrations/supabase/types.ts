@@ -5148,6 +5148,7 @@ export type Database = {
       user_preferences: {
         Row: {
           auto_approve_seo: boolean
+          auto_approve_stock_check: boolean
           auto_approve_tags: boolean
           briefing_hour_utc: number
           contribute_to_shared_learning: boolean
@@ -5160,6 +5161,7 @@ export type Database = {
         }
         Insert: {
           auto_approve_seo?: boolean
+          auto_approve_stock_check?: boolean
           auto_approve_tags?: boolean
           briefing_hour_utc?: number
           contribute_to_shared_learning?: boolean
@@ -5172,6 +5174,7 @@ export type Database = {
         }
         Update: {
           auto_approve_seo?: boolean
+          auto_approve_stock_check?: boolean
           auto_approve_tags?: boolean
           briefing_hour_utc?: number
           contribute_to_shared_learning?: boolean

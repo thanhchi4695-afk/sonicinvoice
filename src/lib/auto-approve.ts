@@ -38,7 +38,7 @@ export async function checkAndAutoApprove(
 
   const { data: prefs } = await supabase
     .from("user_preferences")
-    .select("auto_approve_tags, auto_approve_seo, proactive_mode_enabled")
+    .select("auto_approve_tags, auto_approve_seo, auto_approve_stock_check, proactive_mode_enabled")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -47,7 +47,7 @@ export async function checkAndAutoApprove(
   let triggerPref: "tags" | "seo" | "stock_check" | null = null;
   if (taskType === "generate_tags" && prefs.auto_approve_tags) triggerPref = "tags";
   else if (taskType === "generate_seo" && prefs.auto_approve_seo) triggerPref = "seo";
-  else if (taskType === "stock_check") triggerPref = "stock_check";
+  else if (taskType === "stock_check" && prefs.auto_approve_stock_check) triggerPref = "stock_check";
 
   if (!triggerPref) return false;
 

@@ -359,6 +359,16 @@ export interface InlineActionResult {
     marginPct: number;
     compareAt: number;
   };
+  email?: {
+    supplierName: string;
+    emailType: string;
+    subject: string;
+    body: string;
+    productDetails: string;
+    userName: string;
+    storeName: string;
+    toneVariant: number;
+  };
 }
 
 const KNOWN_COLOURS = [

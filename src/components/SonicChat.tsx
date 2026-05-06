@@ -191,6 +191,7 @@ export default function SonicChat() {
           inline.margin ?? null,
           inline.email ?? null,
           inline.description ?? null,
+          inline.quickReplies ?? null,
         );
       } else {
         const ran = executeChatAction(decision);

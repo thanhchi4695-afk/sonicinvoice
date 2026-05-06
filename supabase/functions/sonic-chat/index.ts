@@ -300,7 +300,9 @@ Deno.serve(async (req) => {
       const supaUrl = Deno.env.get("SUPABASE_URL");
       const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
       if (supaUrl && anonKey) {
-        const cached = getCachedContext(authHeader);
+        const cacheKey = await hashAuth(authHeader);
+        maybeInvalidate(req, cacheKey);
+        const cached = getCachedContext(cacheKey);
         if (cached) {
           personalContext = cached.personal;
           liveStoreContext = cached.live;

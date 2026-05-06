@@ -105,8 +105,51 @@ export default function SonicChat() {
   }, []);
 
   // Realtime: inject proactive-brain tasks into the chat the moment they appear
+  // Load morning briefing once per day on first open
   useEffect(() => {
     if (!userId) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const shownKey = `briefing_shown_${today.toISOString().split("T")[0]}`;
+    if (sessionStorage.getItem(shownKey)) return;
+
+    (async () => {
+      const { data: briefing } = await supabase
+        .from("agent_tasks")
+        .select("id, observation, created_at")
+        .eq("user_id", userId)
+        .eq("task_type", "morning_briefing")
+        .eq("status", "completed")
+        .gte("created_at", today.toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (briefing?.observation) {
+        const msg: ChatMessage = {
+          id: `briefing-${briefing.id}`,
+          role: "proactive",
+          content: briefing.observation,
+          created_at: briefing.created_at ?? new Date().toISOString(),
+          proactive: {
+            task_id: null,
+            observation: briefing.observation,
+            proposed_action: "",
+            permission_question: null,
+            requires_permission: false,
+            pipeline_to_run: null,
+            resolved: null,
+          },
+        };
+        setMessages((m) => (m.some((x) => x.id === msg.id) ? m : [...m, msg]));
+        sessionStorage.setItem(shownKey, "1");
+      }
+    })();
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let proactiveEnabled = true;
     const channel = supabase
       .channel(`proactive-tasks-${userId}`)
       .on(
@@ -119,6 +162,7 @@ export default function SonicChat() {
         },
         (payload) => {
           const t = payload.new as Record<string, any>;
+          if (!proactiveEnabled) return;
           if (t.status !== "permission_requested" && t.status !== "suggested") return;
           const msg: ChatMessage = {
             id: `proactive-${t.id}`,
@@ -141,6 +185,18 @@ export default function SonicChat() {
         },
       )
       .subscribe();
+
+    // Honor user preference: disable proactive injection when toggled off
+    supabase
+      .from("user_preferences")
+      .select("proactive_mode_enabled")
+      .eq("user_id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && data.proactive_mode_enabled === false) {
+          proactiveEnabled = false;
+        }
+      });
     return () => {
       supabase.removeChannel(channel);
     };

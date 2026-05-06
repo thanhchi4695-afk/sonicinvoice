@@ -38,6 +38,7 @@ const TeamManagement = lazy(() => import("@/components/TeamManagement"));
 const AutomationSettings = lazy(() => import("@/components/AutomationSettings"));
 const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"));
 const MultiBrandSuppliersSection = lazy(() => import("@/components/MultiBrandSuppliersSection"));
+import SonicAssistantSettings from "@/components/SonicAssistantSettings";
 
 const AccountScreen = () => {
   const { isAdmin } = useUserRole();
@@ -354,6 +355,9 @@ const AccountScreen = () => {
               This app will be available on the Shopify App Store. When installed from the App Store, your store connects automatically — no manual token entry needed.
             </p>
           </Section>
+
+          <SonicAssistantSettings />
+
 
           <Button
             variant="ghost"

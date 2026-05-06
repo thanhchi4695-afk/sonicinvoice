@@ -412,6 +412,7 @@ Deno.serve(async (req) => {
           setCachedContext(cacheKey, { personal: personalContext, live: liveStoreContext });
         }
       }
+    }
 
     const messages = [
       { role: "system", content: buildSystemPrompt(message) + "\n\n" + stateLine + personalContext + liveStoreContext },

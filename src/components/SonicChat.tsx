@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { executeChatAction, type SonicDecision } from "@/lib/sonic-chat-actions";
 
 type ChatRole = "user" | "assistant";
 interface ChatMessage {

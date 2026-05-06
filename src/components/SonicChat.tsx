@@ -234,16 +234,32 @@ export default function SonicChat() {
               </div>
             )}
             {messages.map((m) => (
-              <div
-                key={m.id}
-                className={cn(
-                  "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                  m.role === "user"
-                    ? "self-end bg-primary text-primary-foreground"
-                    : "self-start bg-muted text-foreground",
+              <div key={m.id} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
+                <div
+                  className={cn(
+                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
+                    m.role === "user"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground",
+                  )}
+                >
+                  {m.content}
+                </div>
+                {m.role === "assistant" && m.pending && (
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => handleConfirm(m)}>
+                      ✓ Yes, do it
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleCancel(m)}>
+                      Cancel
+                    </Button>
+                  </div>
                 )}
-              >
-                {m.content}
+                {m.role === "assistant" && m.resolved && (
+                  <div className="text-xs text-muted-foreground">
+                    {m.resolved === "confirmed" ? "Confirmed" : "Cancelled"}
+                  </div>
+                )}
               </div>
             ))}
             {sending && (

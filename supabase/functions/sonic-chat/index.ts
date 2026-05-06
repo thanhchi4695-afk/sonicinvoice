@@ -409,7 +409,7 @@ Deno.serve(async (req) => {
             console.warn("live store data parse failed:", e);
           }
 
-          setCachedContext(authHeader, { personal: personalContext, live: liveStoreContext });
+          setCachedContext(cacheKey, { personal: personalContext, live: liveStoreContext });
         }
       }
 

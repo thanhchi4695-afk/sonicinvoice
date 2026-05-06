@@ -138,11 +138,10 @@ export function CaseStudyPage() {
             ← Sonic Invoices
           </Link>
           <h1 className="mt-4 font-[Syne] text-4xl font-bold tracking-tight md:text-5xl">
-            From supplier email to Shopify in under 3 minutes
+            What 6 months of invoices looks like.
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
-            How a Sydney boutique replaced 4 hours of manual invoice keying per drop with an
-            agentic pipeline that gets smarter every week.
+            A Darwin swimwear retailer, 180+ brands, 3,800+ SKUs.
           </p>
         </div>
       </header>
@@ -150,9 +149,9 @@ export function CaseStudyPage() {
       <section className="container mx-auto max-w-4xl px-6 py-12">
         <div className="grid gap-6 md:grid-cols-3">
           {[
-            { k: "95%", v: "Less time per invoice" },
-            { k: "12+", v: "Variants/style auto-grouped" },
-            { k: "94%", v: "Brand parse accuracy" },
+            { k: "180+", v: "Distinct brands parsed" },
+            { k: "3,800+", v: "SKUs imported to Shopify" },
+            { k: "94%", v: "Avg parse accuracy after 6 months" },
           ].map((s) => (
             <Card key={s.k} className="p-6 text-center">
               <div className="font-[Syne] text-4xl font-bold text-primary">{s.k}</div>

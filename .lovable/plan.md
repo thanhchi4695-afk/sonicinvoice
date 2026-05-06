@@ -116,3 +116,55 @@ Template variables filled by the watcher before each call:
 4. **Trigger 1 (event):** invoice-arrives → suggested chain.
 5. **Trigger 2 (morning scan):** scheduled cron + briefing message.
 6. **Polish:** snooze, auto-run preferences, badge when closed.
+
+---
+
+## Layer 3 (expanded) — What It Actually Does
+
+### Immediate actions (no pipeline needed)
+After parsing a Baku invoice with 3 new styles, Sonic instantly generates tags and SEO titles for all 3 inline in chat — without asking, because these are fast, reversible, and low-risk. Then says: *"Tags and SEO titles done for 3 Baku styles. Want me to run the full new arrivals pipeline to update the feed and write social captions?"*
+
+### Pipeline chain trigger
+On Yes, Sonic kicks off `PipelineRunner` with the correct pipeline key. The pipeline now reports **each completed step back into the chat as it goes**, not just a progress bar.
+
+### Next recommendation
+After any pipeline completes, Sonic reads the task graph and fires the next logical suggestion:
+- New arrivals → feed health check
+- Restock → purchase order
+- Season close → next season's budget plan
+
+---
+
+## The Task Graph — Memory Layer (NEW table)
+
+`agent_tasks` Supabase table — the key new piece. Lets Sonic behave like an employee with memory ("I parsed Seafolly 2h ago. Tags done. SEO done. Feed not updated, no social captions. I should follow up.")
+
+```
+id | user_id | task_type | status | depends_on |
+trigger_source | context_json | created_at |
+completed_at | next_suggested | dismissed_at
+```
+
+RLS: user can only see/modify their own rows. Indexes on `(user_id, status)` and `(user_id, created_at desc)`.
+
+---
+
+## The 5 Real Conversations (concrete examples)
+
+1. **Morning briefing (8am cron):** *"Morning. 2 Seafolly emails overnight — parsed (48 products). Tags ready to review. Baku sizes 10/12 low — draft reorder email? Summer feed not updated in 6 days — Swimwear Galore updated theirs yesterday."*
+2. **After invoice parse:** *"Done — 24 Jantzen products. 18 refills, 6 new styles. Tags generated for the 6 new. Run full new arrivals pipeline (~8 min)?"*
+3. **Pipeline hand-off:** *"SEO titles done for 6 Jantzen styles. Next: update Google feed (~2 min). Go ahead?"*
+4. **Stock alert:** *"Funkita sizes 8/10 below reorder threshold (3 units). Last ordered 6 weeks ago. Draft reorder email?"*
+5. **Season close nudge:** *"Summer ends in 3 weeks. 47 full-price summer products in stock. ~12 likely won't move based on last year. Start season close pipeline?"*
+
+---
+
+## Build Order — 4 Sprints (final)
+
+| Sprint | Build | Notes |
+|--------|-------|-------|
+| 1 | `agent_tasks` table + task graph helpers | Memory layer first — everything depends on it |
+| 2 | Morning briefing (scheduled cron edge function) | Daily scan: inbox + stock + pending tasks → chat message |
+| 3 | Post-parse proactive suggestion (event trigger) | After every invoice parse, run the brain, post next suggestion |
+| 4 | Pipeline step hand-off (step completion trigger) | After each PipelineRunner step, auto-post next recommendation |
+

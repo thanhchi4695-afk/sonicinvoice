@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import TaskHistorySection from "@/components/TaskHistorySection";
 
 interface ExportEntry {
   supplier: string;
@@ -391,6 +392,8 @@ const HistoryScreen = () => {
             </div>
           ))}
         </div>
+
+        <TaskHistorySection />
       </div>
     </TooltipProvider>
   );

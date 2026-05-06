@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { checkAndAutoApprove } from "@/lib/auto-approve";
 import SupplierEmailCard from "@/components/SupplierEmailCard";
 import ProductDescriptionCard, { type ProductDescription } from "@/components/ProductDescriptionCard";
 import {
@@ -160,10 +161,30 @@ export default function SonicChat() {
           table: "agent_tasks",
           filter: `user_id=eq.${userId}`,
         },
-        (payload) => {
+        async (payload) => {
           const t = payload.new as Record<string, any>;
           if (!proactiveEnabled) return;
           if (t.status !== "permission_requested" && t.status !== "suggested") return;
+
+          // Sprint 4 — try auto-approve first for low-risk tasks
+          if (t.status === "permission_requested" && t.task_type) {
+            const wasAutoApproved = await checkAndAutoApprove(
+              t.id,
+              t.task_type,
+              userId,
+            );
+            if (wasAutoApproved) {
+              const note: ChatMessage = {
+                id: `auto-${t.id}`,
+                role: "assistant",
+                content: `Done: ${t.observation ?? t.task_type} (auto-completed based on your preferences)`,
+                created_at: new Date().toISOString(),
+              };
+              setMessages((m) => (m.some((x) => x.id === note.id) ? m : [...m, note]));
+              return;
+            }
+          }
+
           const msg: ChatMessage = {
             id: `proactive-${t.id}`,
             role: "proactive",

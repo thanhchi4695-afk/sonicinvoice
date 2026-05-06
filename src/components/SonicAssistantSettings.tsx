@@ -24,12 +24,16 @@ interface Prefs {
   morning_briefing_enabled: boolean;
   briefing_hour_utc: number;
   proactive_mode_enabled: boolean;
+  auto_approve_tags: boolean;
+  auto_approve_seo: boolean;
 }
 
 const DEFAULTS: Prefs = {
   morning_briefing_enabled: true,
   briefing_hour_utc: 22,
   proactive_mode_enabled: true,
+  auto_approve_tags: false,
+  auto_approve_seo: false,
 };
 
 const SonicAssistantSettings = () => {
@@ -47,7 +51,7 @@ const SonicAssistantSettings = () => {
     (async () => {
       const { data } = await supabase
         .from("user_preferences")
-        .select("morning_briefing_enabled, briefing_hour_utc, proactive_mode_enabled")
+        .select("morning_briefing_enabled, briefing_hour_utc, proactive_mode_enabled, auto_approve_tags, auto_approve_seo")
         .eq("user_id", userId)
         .maybeSingle();
       if (data) {
@@ -55,6 +59,8 @@ const SonicAssistantSettings = () => {
           morning_briefing_enabled: data.morning_briefing_enabled ?? true,
           briefing_hour_utc: data.briefing_hour_utc ?? 22,
           proactive_mode_enabled: data.proactive_mode_enabled ?? true,
+          auto_approve_tags: data.auto_approve_tags ?? false,
+          auto_approve_seo: data.auto_approve_seo ?? false,
         });
       }
       setLoading(false);
@@ -145,6 +151,41 @@ const SonicAssistantSettings = () => {
                   onCheckedChange={(v) => save({ proactive_mode_enabled: v })}
                 />
               </div>
+
+              <div className="flex items-center justify-between">
+                <div className="pr-4">
+                  <p className="text-sm font-medium">Auto-generate tags after parse</p>
+                  <p className="text-xs text-muted-foreground">
+                    Tags will be generated automatically after every invoice parse.
+                    You can edit them before importing to Shopify.
+                  </p>
+                </div>
+                <Switch
+                  checked={prefs.auto_approve_tags}
+                  onCheckedChange={(v) => save({ auto_approve_tags: v })}
+                  disabled={!prefs.proactive_mode_enabled}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="pr-4">
+                  <p className="text-sm font-medium">Auto-write SEO titles after parse</p>
+                  <p className="text-xs text-muted-foreground">
+                    SEO titles and meta descriptions will be written automatically
+                    after tags are done. Review them in the SEO Writer before pushing.
+                  </p>
+                </div>
+                <Switch
+                  checked={prefs.auto_approve_seo}
+                  onCheckedChange={(v) => save({ auto_approve_seo: v })}
+                  disabled={!prefs.proactive_mode_enabled}
+                />
+              </div>
+
+              <p className="text-[11px] text-muted-foreground bg-muted/40 rounded-md p-2 border border-border">
+                Auto-approved tasks still appear in your chat history and can be
+                reviewed or undone before Shopify import.
+              </p>
             </>
           )}
         </div>

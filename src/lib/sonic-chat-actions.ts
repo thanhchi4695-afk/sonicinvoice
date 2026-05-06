@@ -117,8 +117,7 @@ const ACTION_MAP: Record<string, { tab?: string; flow?: string }> = {
   open_social_media: { tab: "tools", flow: "social_media" },
 
   // Tools
-  open_tag_builder: { tab: "tools" },
-  open_seo_writer: { tab: "tools", flow: "csv_seo" },
+  // open_tag_builder + open_seo_writer are handled inline (see runInlineAction)
   open_export_collections: { tab: "tools" },
   open_import_collections: { tab: "tools" },
   open_auto_collections: { tab: "tools", flow: "collection_decomposer" },

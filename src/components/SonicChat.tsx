@@ -9,6 +9,7 @@ import {
   executeChatAction,
   executeGatedAction,
   runInlineAction,
+  runParseFromChat,
   type SonicDecision,
 } from "@/lib/sonic-chat-actions";
 
@@ -22,6 +23,7 @@ interface ChatMessage {
   action_data?: Record<string, unknown> | null;
   pending?: boolean;
   resolved?: "confirmed" | "cancelled" | null;
+  download?: { url: string; filename: string; label: string } | null;
 }
 
 const FALLBACK_REPLY =

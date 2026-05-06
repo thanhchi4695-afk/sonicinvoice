@@ -397,6 +397,8 @@ export default function SonicChat() {
     );
     setOpen(false);
   }
+
+  return (
     <>
       {/* Floating button */}
       {!open && (

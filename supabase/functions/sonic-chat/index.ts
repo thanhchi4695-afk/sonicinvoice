@@ -371,7 +371,7 @@ Deno.serve(async (req) => {
     }
 
     const messages = [
-      { role: "system", content: buildSystemPrompt(message) + "\n\n" + stateLine + personalContext },
+      { role: "system", content: buildSystemPrompt(message) + "\n\n" + stateLine + personalContext + liveStoreContext },
       ...history.map((h) => ({ role: h.role, content: h.content })),
       { role: "user", content: message },
     ];

@@ -170,14 +170,16 @@ export default function SonicChat() {
     }
   }
 
-  async function postAssistantNote(text: string) {
+  async function postAssistantNote(text: string, copyable: string | null = null) {
     if (!userId) return;
     const { data } = await supabase
       .from("chat_messages")
       .insert([{ user_id: userId, role: "assistant", content: text } as never])
       .select("id, role, content, created_at")
       .single();
-    if (data) setMessages((m) => [...m, data as ChatMessage]);
+    if (data) {
+      setMessages((m) => [...m, { ...(data as ChatMessage), copyable }]);
+    }
   }
 
   async function handleConfirm(msg: ChatMessage) {

@@ -220,8 +220,9 @@ interface ChatTurn {
 }
 
 // In-memory per-user cache for personal + live store context.
-// Keyed by a SHA-256 of the Authorization header so we never store the raw JWT.
+// Keyed by a SHA-256 of the Authorization header so the raw JWT never sits in memory.
 // TTL: 45s — long enough to absorb chat bursts, short enough to feel "live".
+// Cache is per edge isolate, so it warms naturally with the keepalive ping.
 const CONTEXT_TTL_MS = 45_000;
 const CONTEXT_CACHE_MAX = 200;
 interface CachedCtx { personal: string; live: string; expiresAt: number }
@@ -232,26 +233,22 @@ async function hashAuth(auth: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Sync cache helpers — keyed by a short hash held in a WeakMap-like Map.
-// We compute the hash once per request and stash it on a private symbol.
-const AUTH_KEY = Symbol("authKey");
-function getCachedContext(auth: string): CachedCtx | null {
-  // Compact eviction — drop expired entries opportunistically.
+function getCachedContext(key: string): CachedCtx | null {
   if (contextCache.size > CONTEXT_CACHE_MAX) {
     const now = Date.now();
     for (const [k, v] of contextCache) if (v.expiresAt < now) contextCache.delete(k);
   }
-  const key = (auth as unknown as Record<symbol, string>)[AUTH_KEY];
-  if (!key) return null;
   const hit = contextCache.get(key);
   if (hit && hit.expiresAt > Date.now()) return hit;
   if (hit) contextCache.delete(key);
   return null;
 }
-function setCachedContext(auth: string, ctx: { personal: string; live: string }): void {
-  const key = (auth as unknown as Record<symbol, string>)[AUTH_KEY];
-  if (!key) return;
+function setCachedContext(key: string, ctx: { personal: string; live: string }): void {
   contextCache.set(key, { ...ctx, expiresAt: Date.now() + CONTEXT_TTL_MS });
+}
+// Optional: invalidate via a header (e.g. when client knows data changed).
+function maybeInvalidate(req: Request, key: string) {
+  if (req.headers.get("x-sonic-cache") === "bypass") contextCache.delete(key);
 }
 
 Deno.serve(async (req) => {

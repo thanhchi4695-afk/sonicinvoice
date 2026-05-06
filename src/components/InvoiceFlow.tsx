@@ -2528,6 +2528,23 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         })();
       }
 
+      // Fire-and-forget: notify the proactive brain that a parse just completed.
+      try {
+        const products = Array.isArray(data.products) ? data.products : [];
+        const { data: sess } = await supabase.auth.getSession();
+        const uid = sess.session?.user?.id;
+        if (uid && products.length > 0) {
+          triggerAfterInvoiceParse(
+            uid,
+            String(data.job_id ?? data.invoice_id ?? `parse_${Date.now()}`),
+            String(data.supplier ?? supplierName ?? "Unknown"),
+            products.length,
+          );
+        }
+      } catch (e) {
+        console.warn("[proactive-brain] post-parse trigger skipped:", e);
+      }
+
       return data.products || [];
     } catch (err) {
       console.log('[SONIC-DEBUG] Invoice processing error', err);

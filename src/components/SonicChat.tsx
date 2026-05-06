@@ -14,8 +14,8 @@ interface ChatMessage {
   created_at: string;
 }
 
-const STUB_REPLY =
-  "Sonic chat is online. Intent classification ships in Sprint 2 — for now I'm just saving your messages.";
+const FALLBACK_REPLY =
+  "Sorry — I had trouble processing that. Try again in a moment.";
 
 export default function SonicChat() {
   const [open, setOpen] = useState(false);

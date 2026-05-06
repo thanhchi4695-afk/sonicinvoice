@@ -2,7 +2,8 @@
 // Maps the structured `action` returned by the intent classifier to real app side-effects.
 // Only safe (requires_permission: false) actions run automatically here.
 
-import { generateTags, type TagInput } from "@/lib/tag-engine";
+import { generateTags, type TagInput, TYPE_OPTIONS } from "@/lib/tag-engine";
+import { getBrandDirectory } from "@/lib/brand-directory";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -335,10 +336,122 @@ function extractCost(text: string): number {
   return Number(m[1].replace(",", "."));
 }
 
+export interface InlineActionResult {
+  text: string;
+  copyable?: string;
+}
+
+// Match a known product type in free-form text. Returns the canonical option.
+function detectProductType(text: string): string | null {
+  const lower = text.toLowerCase();
+  // Sort by length so "bikini tops" wins over "tops"
+  const sorted = [...TYPE_OPTIONS].sort((a, b) => b.length - a.length);
+  for (const t of sorted) {
+    if (lower.includes(t.toLowerCase())) return t;
+  }
+  // Common singular/loose aliases
+  const aliases: Record<string, string> = {
+    "bikini top": "Bikini Tops",
+    "bikini bottom": "Bikini Bottoms",
+    "one piece": "One Pieces",
+    "swim dress": "Swimdress",
+    "rashie": "Rashies & Sunsuits",
+    "tankini": "Tankini Tops",
+    "boardshort": "Boardshorts",
+    "sunglass": "Sunnies",
+  };
+  for (const [k, v] of Object.entries(aliases)) {
+    if (lower.includes(k)) return v;
+  }
+  return null;
+}
+
+function detectBrand(text: string): string | null {
+  try {
+    const dir = getBrandDirectory();
+    const lower = text.toLowerCase();
+    const sorted = [...dir].sort((a, b) => (b.name?.length ?? 0) - (a.name?.length ?? 0));
+    for (const b of sorted) {
+      if (b.name && lower.includes(b.name.toLowerCase())) return b.name;
+    }
+  } catch {}
+  // Common fallbacks
+  const known = ["Seafolly", "Funkita", "Funky Trunks", "Jantzen", "Sea Level", "Speedo", "Baku", "Pops + Co", "Le Specs"];
+  const lower = text.toLowerCase();
+  for (const k of known.sort((a, b) => b.length - a.length)) {
+    if (lower.includes(k.toLowerCase())) return k;
+  }
+  return null;
+}
+
+function detectArrivalMonth(text: string): string | null {
+  const m = text.match(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(\d{2})\b/i);
+  if (!m) return null;
+  return m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() + m[2];
+}
+
+function currentArrivalMonth(): string {
+  const d = new Date();
+  const mon = d.toLocaleString("en-US", { month: "short" });
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${mon}${yy}`;
+}
+
+function detectSpecials(text: string): string[] {
+  const lower = text.toLowerCase();
+  const specials: string[] = [];
+  if (/\b(dd|d\/e|e\/f|f\/g|g\/h|fuller cup|d-g|d-dd|a-dd)\b/.test(lower)) specials.push("d-g");
+  if (lower.includes("underwire")) specials.push("underwire");
+  if (lower.includes("chlorine")) specials.push("chlorine resist");
+  if (lower.includes("plus size") || /\b18\+\b/.test(lower) || lower.includes("extended")) specials.push("plus size");
+  if (lower.includes("tummy")) specials.push("tummy control");
+  if (lower.includes("mastectomy")) specials.push("mastectomy");
+  return [...new Set(specials)];
+}
+
+function buildTagsFromMessage(
+  params: Record<string, unknown>,
+  userMessage: string,
+): { vendor: string; productType: string; tags: string[] } {
+  const vendor =
+    String(params.brand ?? params.brand_name ?? params.vendor ?? "").trim() ||
+    detectBrand(userMessage) ||
+    "Unknown Brand";
+
+  let productType =
+    String(params.product_type ?? params.type ?? "").trim() ||
+    detectProductType(userMessage) ||
+    "Bikini Tops";
+  // Special swimdress override
+  if (/\bswim ?dress\b/i.test(userMessage)) productType = "Swimdress";
+
+  const lower = userMessage.toLowerCase();
+  const isNew = /\bnew\b/.test(lower) || params.isNew === true;
+  const hasCompareAt =
+    /\b(on sale|sale price|compare at|compare-at)\b/.test(lower) || params.hasCompareAt === true;
+  const arrivalMonth =
+    String(params.arrival_month ?? params.arrivalMonth ?? "").trim() ||
+    detectArrivalMonth(userMessage) ||
+    currentArrivalMonth();
+
+  const specials = detectSpecials(userMessage);
+
+  const input: TagInput = {
+    title: `${vendor} ${productType}`,
+    brand: vendor,
+    productType,
+    arrivalMonth,
+    priceStatus: hasCompareAt ? "sale" : "full_price",
+    isNew,
+    specials,
+  };
+  return { vendor, productType, tags: generateTags(input) };
+}
+
 export async function runInlineAction(
   decision: SonicDecision,
   userMessage: string,
-): Promise<string | null> {
+): Promise<InlineActionResult | null> {
   if (!decision || !decision.action) return null;
   const params = decision.params ?? {};
 
@@ -350,7 +463,7 @@ export async function runInlineAction(
     const category = String(params.category ?? "").trim().toLowerCase() || undefined;
 
     if (!Number.isFinite(cost) || cost <= 0) {
-      return "Give me a cost price and I'll work out the RRP — e.g. 'cost is $42.50 Baku'.";
+      return { text: "Give me a cost price and I'll work out the RRP — e.g. 'cost is $42.50 Baku'." };
     }
 
     try {
@@ -359,7 +472,7 @@ export async function runInlineAction(
       });
       if (error) throw error;
       if (!data || data.error) {
-        return `Couldn't calculate margin: ${data?.error ?? "unknown error"}`;
+        return { text: `Couldn't calculate margin: ${data?.error ?? "unknown error"}` };
       }
       const lines: string[] = [];
       const brandLabel = data.brand ? ` ${titleCase(data.brand)}` : "";
@@ -373,37 +486,32 @@ export async function runInlineAction(
       lines.push(`• Markup: ×${data.multiplier}`);
       lines.push(`• Raw: $${data.raw_rrp.toFixed(2)} → rounded to nearest $0.95`);
       lines.push(`• Margin: ${data.margin_pct.toFixed(1)}%`);
-      return lines.join("\n");
+      return { text: lines.join("\n") };
     } catch (e) {
       console.error("calculate-margin failed:", e);
-      return "Couldn't reach the margin calculator — try again in a moment.";
+      return { text: "Couldn't reach the margin calculator — try again in a moment." };
     }
   }
 
-  if (decision.action === "open_tag_builder") {
-    const brand = String(params.brand ?? "").trim() || "Unknown Brand";
-    const productType =
-      String(params.product_type ?? params.type ?? "").trim() || "Bikini Tops";
-    const input: TagInput = {
-      title: `${brand} ${productType}`,
-      brand,
-      productType: titleCase(productType),
-      priceStatus: "full_price",
-      isNew: true,
-      arrivalMonth: new Date().toLocaleString("en-AU", { month: "short", year: "2-digit" }).replace(" ", ""),
-    };
+  if (decision.action === "open_tag_builder" || decision.action === "generate_tags_inline") {
     try {
-      const tags = generateTags(input);
-      return [
-        `Tags for **${brand} — ${productType}**:`,
-        "",
-        tags.map((t) => `• ${t}`).join("\n"),
-        "",
-        `_Comma-separated:_ ${tags.join(", ")}`,
-      ].join("\n");
+      const { vendor, productType, tags } = buildTagsFromMessage(params, userMessage);
+      const csv = tags.join(", ");
+      return {
+        text: [
+          `**Tags for ${vendor} ${productType}**`,
+          "",
+          "```",
+          csv,
+          "```",
+        ].join("\n"),
+        copyable: csv,
+      };
     } catch (e) {
       console.error("tag generation failed:", e);
-      return "Couldn't generate tags — try again with a brand and product type (e.g. 'tags for Seafolly Bikini Tops').";
+      return {
+        text: "Couldn't generate tags — try again with a brand and product type (e.g. 'tags for Seafolly Bikini Tops').",
+      };
     }
   }
 
@@ -425,16 +533,18 @@ export async function runInlineAction(
     };
     try {
       const seo = generateSeo(product);
-      return [
-        `**SEO Title** (${seo.titleLength} chars${seo.titleOver ? " ⚠ over limit" : ""})`,
-        seo.seoTitle,
-        "",
-        `**Meta Description** (${seo.descLength} chars${seo.descOver ? " ⚠ over limit" : ""})`,
-        seo.seoDescription,
-      ].join("\n");
+      return {
+        text: [
+          `**SEO Title** (${seo.titleLength} chars${seo.titleOver ? " ⚠ over limit" : ""})`,
+          seo.seoTitle,
+          "",
+          `**Meta Description** (${seo.descLength} chars${seo.descOver ? " ⚠ over limit" : ""})`,
+          seo.seoDescription,
+        ].join("\n"),
+      };
     } catch (e) {
       console.error("SEO generation failed:", e);
-      return "Couldn't generate SEO — give me a brand, product type, and colour to work from.";
+      return { text: "Couldn't generate SEO — give me a brand, product type, and colour to work from." };
     }
   }
 

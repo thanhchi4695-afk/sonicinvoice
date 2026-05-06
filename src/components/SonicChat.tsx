@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, X, Send, Loader2 } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Copy } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ interface ChatMessage {
   pending?: boolean;
   resolved?: "confirmed" | "cancelled" | null;
   download?: { url: string; filename: string; label: string } | null;
+  copyable?: string | null;
 }
 
 const FALLBACK_REPLY =
@@ -147,7 +149,7 @@ export default function SonicChat() {
       // follow-up assistant message instead of navigating.
       const inline = await runInlineAction(decision, text);
       if (inline) {
-        await postAssistantNote(inline);
+        await postAssistantNote(inline.text, inline.copyable ?? null);
       } else {
         const ran = executeChatAction(decision);
         const closeOn = new Set([
@@ -169,14 +171,16 @@ export default function SonicChat() {
     }
   }
 
-  async function postAssistantNote(text: string) {
+  async function postAssistantNote(text: string, copyable: string | null = null) {
     if (!userId) return;
     const { data } = await supabase
       .from("chat_messages")
       .insert([{ user_id: userId, role: "assistant", content: text } as never])
       .select("id, role, content, created_at")
       .single();
-    if (data) setMessages((m) => [...m, data as ChatMessage]);
+    if (data) {
+      setMessages((m) => [...m, { ...(data as ChatMessage), copyable }]);
+    }
   }
 
   async function handleConfirm(msg: ChatMessage) {
@@ -305,6 +309,22 @@ export default function SonicChat() {
                       Cancel
                     </Button>
                   </div>
+                )}
+                {m.role === "assistant" && m.copyable && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(m.copyable!);
+                        toast.success("Copied!");
+                      } catch {
+                        toast.error("Copy failed");
+                      }
+                    }}
+                  >
+                    <Copy className="mr-1 h-3 w-3" /> Copy tags
+                  </Button>
                 )}
                 {m.role === "assistant" && m.download && (
                   <a

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, X, Send, Loader2, Copy } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Copy, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -824,6 +824,45 @@ export default function SonicChat() {
                   >
                     ⬇ {m.download.label}
                   </a>
+                )}
+                {m.role === "assistant" && m.autoApproved && !m.autoApproved.undone && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      const { taskId, taskType } = m.autoApproved!;
+                      const { error } = await supabase
+                        .from("agent_tasks")
+                        .update({
+                          status: "skipped",
+                          result_summary: `Undone by user before Shopify import (${taskType})`,
+                          completed_at: null,
+                          approved_at: null,
+                        })
+                        .eq("id", taskId);
+                      if (error) {
+                        toast.error("Couldn't undo");
+                        return;
+                      }
+                      setMessages((prev) =>
+                        prev.map((x) =>
+                          x.id === m.id
+                            ? {
+                                ...x,
+                                content: `Undone: ${taskType}. The auto-approval has been reverted — re-run from Sonic when you're ready.`,
+                                autoApproved: { ...x.autoApproved!, undone: true },
+                              }
+                            : x,
+                        ),
+                      );
+                      toast.success("Auto-approval undone");
+                    }}
+                  >
+                    <RotateCcw className="mr-1 h-3 w-3" /> Undo auto-approval
+                  </Button>
+                )}
+                {m.role === "assistant" && m.autoApproved?.undone && (
+                  <div className="text-[11px] text-muted-foreground">Undone — task marked skipped.</div>
                 )}
                 {m.role === "assistant" && m.resolved && (
                   <div className="text-xs text-muted-foreground">

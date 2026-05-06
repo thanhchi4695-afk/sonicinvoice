@@ -724,6 +724,9 @@ export default function SonicChat() {
                       )}
                     >
                       {m.content}
+                      {m.isStreaming && (
+                        <span className="sonic-blink ml-px inline-block h-[1em] w-[2px] align-text-bottom bg-current" />
+                      )}
                     </div>
                   )
                 )}

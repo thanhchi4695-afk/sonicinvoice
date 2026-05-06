@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import SupplierEmailCard from "@/components/SupplierEmailCard";
+import ProductDescriptionCard, { type ProductDescription } from "@/components/ProductDescriptionCard";
 import {
   executeChatAction,
   executeGatedAction,
@@ -57,6 +58,7 @@ interface ChatMessage {
     storeName: string;
     toneVariant: number;
   } | null;
+  description?: ProductDescription | null;
 }
 
 const FALLBACK_REPLY =
@@ -68,6 +70,7 @@ export default function SonicChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [hasActiveParse, setHasActiveParse] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Track auth
@@ -186,6 +189,7 @@ export default function SonicChat() {
           inline.seo ?? null,
           inline.margin ?? null,
           inline.email ?? null,
+          inline.description ?? null,
         );
       } else {
         const ran = executeChatAction(decision);
@@ -214,6 +218,7 @@ export default function SonicChat() {
     seo: ChatMessage["seo"] = null,
     margin: ChatMessage["margin"] = null,
     email: ChatMessage["email"] = null,
+    description: ChatMessage["description"] = null,
   ) {
     if (!userId) return;
     const { data } = await supabase
@@ -222,7 +227,7 @@ export default function SonicChat() {
       .select("id, role, content, created_at")
       .single();
     if (data) {
-      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo, margin, email }]);
+      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo, margin, email, description }]);
     }
   }
 
@@ -239,6 +244,7 @@ export default function SonicChat() {
         (decision.params?.invoice_text as string | undefined) ?? lastUser?.content ?? "";
       const supplier = (decision.params?.supplier as string | undefined) ?? undefined;
       try {
+        setHasActiveParse(true);
         const result = await runParseFromChat(text, supplier, async (line) => {
           await postAssistantNote(line);
         });
@@ -249,6 +255,7 @@ export default function SonicChat() {
         );
       } catch (e: any) {
         await postAssistantNote(`✕ ${e?.message ?? "Pipeline failed"}`);
+        setHasActiveParse(false);
       }
       return;
     }
@@ -333,7 +340,7 @@ export default function SonicChat() {
             )}
             {messages.map((m) => (
               <div key={m.id} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
-                {!m.seo && !m.margin && !m.email && (
+                {!m.seo && !m.margin && !m.email && !m.description && (
                   <div
                     className={cn(
                       "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
@@ -344,6 +351,17 @@ export default function SonicChat() {
                   >
                     {m.content}
                   </div>
+                )}
+                {m.role === "assistant" && m.description && (
+                  <ProductDescriptionCard
+                    description={m.description}
+                    hasActiveParse={hasActiveParse}
+                    onUpdate={(next) =>
+                      setMessages((arr) =>
+                        arr.map((x) => (x.id === m.id ? { ...x, description: next } : x)),
+                      )
+                    }
+                  />
                 )}
                 {m.role === "assistant" && m.email && (
                   <SupplierEmailCard

@@ -5,6 +5,7 @@
 import { generateTags, type TagInput, TYPE_OPTIONS } from "@/lib/tag-engine";
 import { getBrandDirectory } from "@/lib/brand-directory";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
+import { getStoreConfig } from "@/lib/prompt-builder";
 import { supabase } from "@/integrations/supabase/client";
 import {
   applyTagsAndSeo,

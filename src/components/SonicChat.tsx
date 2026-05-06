@@ -189,6 +189,7 @@ export default function SonicChat() {
           inline.seo ?? null,
           inline.margin ?? null,
           inline.email ?? null,
+          inline.description ?? null,
         );
       } else {
         const ran = executeChatAction(decision);

@@ -88,6 +88,15 @@ export const PIPELINE_LABELS: Record<string, string> = {
   season_close: 'Season close',
 };
 
+// Which pipeline naturally follows another pipeline (keyed by pipelineId)
+export const PIPELINE_NEXT_PIPELINE: Record<string, string | null> = {
+  new_arrivals: 'seo_boost',
+  seo_boost: 'marketing_launch',
+  marketing_launch: null,
+  restock: null,
+  season_close: null,
+};
+
 export function nextTaskFor(task: TaskType): TaskType | null {
   return TASK_NEXT_MAP[task] ?? null;
 }

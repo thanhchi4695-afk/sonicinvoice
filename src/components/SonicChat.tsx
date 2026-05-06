@@ -26,6 +26,14 @@ interface ChatMessage {
   resolved?: "confirmed" | "cancelled" | null;
   download?: { url: string; filename: string; label: string } | null;
   copyable?: string | null;
+  seo?: {
+    title: string;
+    description: string;
+    titleLen: number;
+    descLen: number;
+    titleOver: boolean;
+    descOver: boolean;
+  } | null;
 }
 
 const FALLBACK_REPLY =

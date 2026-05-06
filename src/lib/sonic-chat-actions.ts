@@ -379,6 +379,7 @@ export interface InlineActionResult {
     text: string;
     lengthVariant: "default" | "shorter" | "longer";
   };
+  quickReplies?: string[];
 }
 
 const KNOWN_COLOURS = [

@@ -111,3 +111,48 @@ export function executeChatAction(decision: SonicDecision): boolean {
       return false;
   }
 }
+
+/**
+ * Execute a permission-gated action AFTER the user has confirmed.
+ * These dispatch events that the rest of the app can listen for, so the
+ * heavy logic stays in its existing modules.
+ */
+export function executeGatedAction(decision: SonicDecision): boolean {
+  if (!decision || !decision.action) return false;
+  const params = decision.params ?? {};
+
+  switch (decision.action) {
+    case "export_csv": {
+      const invoiceId = String(params.invoice_id ?? "last");
+      window.dispatchEvent(
+        new CustomEvent("sonic:export-csv", { detail: { invoice_id: invoiceId } }),
+      );
+      return true;
+    }
+    case "delete_brand_patterns": {
+      const brand = String(params.brand_name ?? "").trim();
+      if (!brand) return false;
+      window.dispatchEvent(
+        new CustomEvent("sonic:delete-brand-patterns", { detail: { brand_name: brand } }),
+      );
+      return true;
+    }
+    case "parse_pending_emails": {
+      window.dispatchEvent(
+        new CustomEvent("sonic:parse-pending-emails", {
+          detail: { invoice_ids: params.invoice_ids ?? "all" },
+        }),
+      );
+      return true;
+    }
+    case "export_batch_csv": {
+      const period = String(params.period ?? "this_month");
+      window.dispatchEvent(
+        new CustomEvent("sonic:export-batch-csv", { detail: { period } }),
+      );
+      return true;
+    }
+    default:
+      return false;
+  }
+}

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { executeChatAction, type SonicDecision } from "@/lib/sonic-chat-actions";
+import { executeChatAction, executeGatedAction, type SonicDecision } from "@/lib/sonic-chat-actions";
 
 type ChatRole = "user" | "assistant";
 interface ChatMessage {
@@ -13,6 +13,10 @@ interface ChatMessage {
   role: ChatRole;
   content: string;
   created_at: string;
+  action_taken?: string | null;
+  action_data?: Record<string, unknown> | null;
+  pending?: boolean;
+  resolved?: "confirmed" | "cancelled" | null;
 }
 
 const FALLBACK_REPLY =
@@ -40,7 +44,7 @@ export default function SonicChat() {
     if (!open || !userId) return;
     supabase
       .from("chat_messages")
-      .select("id, role, content, created_at")
+      .select("id, role, content, created_at, action_taken, action_data")
       .eq("user_id", userId)
       .order("created_at", { ascending: true })
       .limit(100)
@@ -115,17 +119,24 @@ export default function SonicChat() {
     const { data: asstRow } = await supabase
       .from("chat_messages")
       .insert([asstInsert as never])
-      .select("id, role, content, created_at")
+      .select("id, role, content, created_at, action_taken, action_data")
       .single();
 
-    if (asstRow) setMessages((m) => [...m, asstRow as ChatMessage]);
+    const decision = (actionData ?? {}) as SonicDecision;
+    const isGated = !!decision.requires_permission && decision.action && decision.action !== "none";
+
+    if (asstRow) {
+      const enriched: ChatMessage = {
+        ...(asstRow as ChatMessage),
+        pending: isGated,
+      };
+      setMessages((m) => [...m, enriched]);
+    }
     setSending(false);
 
-    // Sprint 3: execute the action if it's safe (not permission-gated)
-    if (actionData) {
-      const decision = actionData as SonicDecision;
+    // Sprint 3: auto-execute safe actions
+    if (actionData && !isGated) {
       const ran = executeChatAction(decision);
-      // Auto-close the panel on navigation-style actions so the user sees the result
       const closeOn = new Set([
         "navigate_tab",
         "open_case_study",
@@ -142,6 +153,34 @@ export default function SonicChat() {
         setTimeout(() => setOpen(false), 400);
       }
     }
+  }
+
+  async function postAssistantNote(text: string) {
+    if (!userId) return;
+    const { data } = await supabase
+      .from("chat_messages")
+      .insert([{ user_id: userId, role: "assistant", content: text } as never])
+      .select("id, role, content, created_at")
+      .single();
+    if (data) setMessages((m) => [...m, data as ChatMessage]);
+  }
+
+  async function handleConfirm(msg: ChatMessage) {
+    const decision = (msg.action_data ?? {}) as SonicDecision;
+    setMessages((m) =>
+      m.map((x) => (x.id === msg.id ? { ...x, pending: false, resolved: "confirmed" } : x)),
+    );
+    const ran = executeGatedAction(decision);
+    await postAssistantNote(
+      ran ? "Done — running that now." : "I couldn't run that action. Try again.",
+    );
+  }
+
+  async function handleCancel(msg: ChatMessage) {
+    setMessages((m) =>
+      m.map((x) => (x.id === msg.id ? { ...x, pending: false, resolved: "cancelled" } : x)),
+    );
+    await postAssistantNote("Got it, cancelled.");
   }
 
   return (
@@ -195,16 +234,32 @@ export default function SonicChat() {
               </div>
             )}
             {messages.map((m) => (
-              <div
-                key={m.id}
-                className={cn(
-                  "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                  m.role === "user"
-                    ? "self-end bg-primary text-primary-foreground"
-                    : "self-start bg-muted text-foreground",
+              <div key={m.id} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
+                <div
+                  className={cn(
+                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
+                    m.role === "user"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground",
+                  )}
+                >
+                  {m.content}
+                </div>
+                {m.role === "assistant" && m.pending && (
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => handleConfirm(m)}>
+                      ✓ Yes, do it
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleCancel(m)}>
+                      Cancel
+                    </Button>
+                  </div>
                 )}
-              >
-                {m.content}
+                {m.role === "assistant" && m.resolved && (
+                  <div className="text-xs text-muted-foreground">
+                    {m.resolved === "confirmed" ? "Confirmed" : "Cancelled"}
+                  </div>
+                )}
               </div>
             ))}
             {sending && (

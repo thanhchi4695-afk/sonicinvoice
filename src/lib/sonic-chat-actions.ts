@@ -2,6 +2,9 @@
 // Maps the structured `action` returned by the intent classifier to real app side-effects.
 // Only safe (requires_permission: false) actions run automatically here.
 
+import { generateTags, type TagInput } from "@/lib/tag-engine";
+import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
+
 export type SonicAction =
   | "navigate_tab"
   | "open_case_study"
@@ -114,8 +117,7 @@ const ACTION_MAP: Record<string, { tab?: string; flow?: string }> = {
   open_social_media: { tab: "tools", flow: "social_media" },
 
   // Tools
-  open_tag_builder: { tab: "tools" },
-  open_seo_writer: { tab: "tools", flow: "csv_seo" },
+  // open_tag_builder + open_seo_writer are handled inline (see runInlineAction)
   open_export_collections: { tab: "tools" },
   open_import_collections: { tab: "tools" },
   open_auto_collections: { tab: "tools", flow: "collection_decomposer" },
@@ -266,4 +268,80 @@ export function executeGatedAction(decision: SonicDecision): boolean {
     default:
       return false;
   }
+}
+
+// ── Inline action handlers ─────────────────────────────────────────────────
+// These return a string to render as the next assistant chat message instead
+// of navigating anywhere. Returns null when the action is not inline.
+
+function titleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function runInlineAction(
+  decision: SonicDecision,
+  userMessage: string,
+): string | null {
+  if (!decision || !decision.action) return null;
+  const params = decision.params ?? {};
+
+  if (decision.action === "open_tag_builder") {
+    const brand = String(params.brand ?? "").trim() || "Unknown Brand";
+    const productType =
+      String(params.product_type ?? params.type ?? "").trim() || "Bikini Tops";
+    const input: TagInput = {
+      title: `${brand} ${productType}`,
+      brand,
+      productType: titleCase(productType),
+      priceStatus: "full_price",
+      isNew: true,
+      arrivalMonth: new Date().toLocaleString("en-AU", { month: "short", year: "2-digit" }).replace(" ", ""),
+    };
+    try {
+      const tags = generateTags(input);
+      return [
+        `Tags for **${brand} — ${productType}**:`,
+        "",
+        tags.map((t) => `• ${t}`).join("\n"),
+        "",
+        `_Comma-separated:_ ${tags.join(", ")}`,
+      ].join("\n");
+    } catch (e) {
+      console.error("tag generation failed:", e);
+      return "Couldn't generate tags — try again with a brand and product type (e.g. 'tags for Seafolly Bikini Tops').";
+    }
+  }
+
+  if (decision.action === "open_seo_writer") {
+    const brand = String(params.brand ?? "").trim();
+    const productType = String(params.product_type ?? params.type ?? "").trim();
+    const colour = String(params.colour ?? params.color ?? "").trim();
+    const titleFromParams = String(params.title ?? "").trim();
+    const fallbackTitle =
+      titleFromParams ||
+      [brand, colour, productType].filter(Boolean).join(" ") ||
+      userMessage.slice(0, 60);
+    const product: SeoProduct = {
+      title: fallbackTitle || "Product",
+      brand: brand || "Brand",
+      type: productType || "Product",
+      tags: colour ? [colour] : [],
+      description: userMessage,
+    };
+    try {
+      const seo = generateSeo(product);
+      return [
+        `**SEO Title** (${seo.titleLength} chars${seo.titleOver ? " ⚠ over limit" : ""})`,
+        seo.seoTitle,
+        "",
+        `**Meta Description** (${seo.descLength} chars${seo.descOver ? " ⚠ over limit" : ""})`,
+        seo.seoDescription,
+      ].join("\n");
+    } catch (e) {
+      console.error("SEO generation failed:", e);
+      return "Couldn't generate SEO — give me a brand, product type, and colour to work from.";
+    }
+  }
+
+  return null;
 }

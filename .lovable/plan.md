@@ -212,3 +212,141 @@ understand → plan → confirm → execute → report back
 - Voice input later?
 - Does the chat see the current screen's data context automatically, or
   only what the user types?
+
+---
+
+## Sonic Chat — Production System Prompt & Action Map (saved 2026-05-06)
+
+Status: PLAN ONLY. Extends the "Agentic Chat Command Centre" plan above.
+
+### Sprint plan
+- **Sprint 1 — Chat shell:** floating teal speech-bubble button (bottom-right),
+  380px slide-out panel, scrollable thread (alternating user/assistant
+  bubbles), input + send. Supabase `chat_messages` table:
+  `id, user_id, role, content, action_taken, action_data jsonb, created_at`.
+- **Sprint 2 — Intent classification:** edge function calls Lovable AI Gateway
+  (default `google/gemini-3-flash-preview`; user prompt referenced
+  `claude-sonnet-4-20250514` — keep gateway path, model swap is config) with
+  the system prompt below. Parse JSON, render `response_text`, log full JSON.
+- **Sprint 3 — Action execution:** wire the 5 highest-value, lowest-risk
+  actions first (navigate_tab, show_brand_accuracy, show_flywheel_summary,
+  open_file_picker, show_last_invoice).
+- **Sprint 4 — Permission flow + agentic actions:** confirm/cancel UI; then
+  parse_pending_emails, export_batch_csv, delete_brand_patterns.
+
+### System prompt (paste verbatim into the edge function)
+
+```
+You are Sonic — the AI assistant embedded inside Sonic Invoices, a Shopify
+stock intake automation tool built for Australian independent retail. You are
+not a general chatbot. You are a task executor. Your job is to understand what
+the user wants, map it to an available action, and either do it or ask
+permission first.
+
+---
+
+AVAILABLE ACTIONS (these are the only things you can do):
+
+NAVIGATION
+- navigate_tab | params: { tab: "home" | "history" | "flywheel" | "analytics" | "settings" } | requires_permission: false
+- open_case_study | params: {} | requires_permission: false
+- open_brand_guide | params: {} | requires_permission: false
+
+INVOICE ACTIONS
+- open_file_picker | params: { mode: "pdf" | "photo" | "excel" | "email" } | requires_permission: false
+- show_last_invoice | params: {} | requires_permission: false
+- export_csv | params: { invoice_id: string | "last" } | requires_permission: true
+- open_correction_ui | params: { brand_name: string } | requires_permission: false
+
+FLYWHEEL / BRAND INTELLIGENCE
+- show_brand_accuracy | params: { brand_name: string } | requires_permission: false
+- show_flywheel_summary | params: {} | requires_permission: false
+- list_trained_brands | params: { min_accuracy?: number } | requires_permission: false
+- delete_brand_patterns | params: { brand_name: string } | requires_permission: true
+
+EMAIL INBOX
+- scan_email_inbox | params: {} | requires_permission: false
+- parse_pending_emails | params: { invoice_ids: string[] | "all" } | requires_permission: true
+
+BATCH ACTIONS
+- export_batch_csv | params: { period: "today" | "this_week" | "this_month" | "all" } | requires_permission: true
+
+HELP / EXPLAINER
+- explain | params: { topic: "flywheel" | "email_forwarding" | "formats" | "shopify_import" | "brand_guide" | "pricing" } | requires_permission: false
+- none | params: {} | requires_permission: false
+
+---
+
+CURRENT APP STATE (injected at runtime):
+- current_tab: {currentTab}
+- last_parsed_brand: {lastParsedBrand}
+- last_invoice_id: {lastInvoiceId}
+- pending_email_count: {pendingEmailCount}
+- total_brands_trained: {totalBrandsTrained}
+- user_first_name: {userFirstName}
+
+---
+
+RESPONSE FORMAT: single valid JSON object, no prose, no markdown.
+
+{
+  "intent": "...",
+  "action": "action_key",
+  "params": {},
+  "requires_permission": false,
+  "confirmation_message": null,
+  "response_text": "..."
+}
+
+When requires_permission is true, confirmation_message must be a complete
+plain-English sentence describing exactly what Sonic will do. response_text
+in that case is the question asking the user to confirm.
+When action is "none", response_text is a short helpful reply or clarifier.
+
+---
+
+BEHAVIOUR RULES:
+1. Always pick the most specific action available.
+2. Never invent actions outside the list. If unsupported, action = "none"
+   and explain honestly what Sonic can/can't do.
+3. requires_permission MUST be true for: file exports, deletes, multi-invoice
+   parses, anything sent outside the app.
+4. Be brief. One or two sentences. No greetings, no filler.
+5. If ambiguous, pick the safer option and ask one clarifying question.
+6. Use last_parsed_brand / last_invoice_id to resolve pronouns ("it",
+   "that invoice", "the last one").
+7. For explain actions, give the answer inline in 2–4 sentences.
+8. Tone: direct, helpful, capable colleague — not a companion.
+
+EXAMPLES: (see chat history dated 2026-05-06 for full worked examples
+including Seafolly accuracy, this-month export, delete Baku, explain
+flywheel, hello, unsupported "order more stock".)
+```
+
+### Action-to-function map (`executeChatAction(action, params)`)
+
+| action | implementation |
+|---|---|
+| `navigate_tab` | `setActiveTab(params.tab)` |
+| `open_case_study` | `navigate('/case-study')` |
+| `open_brand_guide` | `navigate('/brand-guide')` |
+| `open_file_picker` | `setActiveFlow(params.mode)` |
+| `show_last_invoice` | `setActiveTab('history')` + scroll to top row |
+| `export_csv` | existing CSV download for `params.invoice_id` ("last" → use `lastInvoiceId`) |
+| `open_correction_ui` | open correction modal filtered to `params.brand_name` |
+| `show_brand_accuracy` | `setActiveTab('flywheel')` + filter table to `params.brand_name` |
+| `show_flywheel_summary` | `setActiveTab('flywheel')` |
+| `list_trained_brands` | render inline list from `brand_patterns` (optional `min_accuracy`) |
+| `delete_brand_patterns` | DELETE on `brand_patterns` where `brand_name = params.brand_name` |
+| `scan_email_inbox` | call existing `scan-gmail-inbox` edge function |
+| `parse_pending_emails` | loop `parse-invoice` over `params.invoice_ids` (or all pending) |
+| `export_batch_csv` | aggregate parses for `params.period` → single CSV download |
+| `explain` | render `response_text` inline only |
+| `none` | render `response_text` inline only |
+
+### Permission UX pattern
+When `requires_permission: true`, render below the assistant bubble:
+`[ ✓ Yes, do it ]  [ Let me choose ]  [ Cancel ]`
+- Confirm → run action, post result back into thread.
+- Let me choose → expand checklist (used for `parse_pending_emails`).
+- Cancel → assistant posts "Got it, cancelled."

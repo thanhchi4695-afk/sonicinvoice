@@ -4,6 +4,7 @@
 
 import { generateTags, type TagInput } from "@/lib/tag-engine";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
+import { supabase } from "@/integrations/supabase/client";
 
 export type SonicAction =
   | "navigate_tab"
@@ -278,12 +279,58 @@ function titleCase(s: string): string {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function runInlineAction(
+// Try to extract a cost price from a free-form user message ("cost is $42.50",
+// "for $30", "30 dollars"). Returns NaN when nothing usable is found.
+function extractCost(text: string): number {
+  const m = text.match(/\$?\s*(\d{1,6}(?:[.,]\d{1,2})?)/);
+  if (!m) return NaN;
+  return Number(m[1].replace(",", "."));
+}
+
+export async function runInlineAction(
   decision: SonicDecision,
   userMessage: string,
-): string | null {
+): Promise<string | null> {
   if (!decision || !decision.action) return null;
   const params = decision.params ?? {};
+
+  if (decision.action === "calculate_margin") {
+    const cost = Number.isFinite(Number(params.cost))
+      ? Number(params.cost)
+      : extractCost(userMessage);
+    const brand = String(params.brand ?? "").trim() || undefined;
+    const category = String(params.category ?? "").trim().toLowerCase() || undefined;
+
+    if (!Number.isFinite(cost) || cost <= 0) {
+      return "Give me a cost price and I'll work out the RRP — e.g. 'cost is $42.50 Baku'.";
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke("calculate-margin", {
+        body: { cost, brand, category },
+      });
+      if (error) throw error;
+      if (!data || data.error) {
+        return `Couldn't calculate margin: ${data?.error ?? "unknown error"}`;
+      }
+      const lines: string[] = [];
+      const brandLabel = data.brand ? ` ${titleCase(data.brand)}` : "";
+      lines.push(
+        `**$${data.cost.toFixed(2)} cost${brandLabel}** → **$${data.rrp.toFixed(2)} RRP**`,
+      );
+      lines.push("");
+      lines.push(
+        `• Category: ${titleCase(data.category)}${data.category_inferred ? " _(inferred)_" : ""}`,
+      );
+      lines.push(`• Markup: ×${data.multiplier}`);
+      lines.push(`• Raw: $${data.raw_rrp.toFixed(2)} → rounded to nearest $0.95`);
+      lines.push(`• Margin: ${data.margin_pct.toFixed(1)}%`);
+      return lines.join("\n");
+    } catch (e) {
+      console.error("calculate-margin failed:", e);
+      return "Couldn't reach the margin calculator — try again in a moment.";
+    }
+  }
 
   if (decision.action === "open_tag_builder") {
     const brand = String(params.brand ?? "").trim() || "Unknown Brand";

@@ -143,7 +143,7 @@ export default function SonicChat() {
     if (actionData && !isGated) {
       // Inline-result actions (tag builder, SEO writer) post their output as a
       // follow-up assistant message instead of navigating.
-      const inline = runInlineAction(decision, text);
+      const inline = await runInlineAction(decision, text);
       if (inline) {
         await postAssistantNote(inline);
       } else {

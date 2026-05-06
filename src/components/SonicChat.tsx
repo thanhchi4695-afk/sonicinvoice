@@ -46,6 +46,16 @@ interface ChatMessage {
     marginPct: number;
     compareAt: number;
   } | null;
+  email?: {
+    supplierName: string;
+    emailType: string;
+    subject: string;
+    body: string;
+    productDetails: string;
+    userName: string;
+    storeName: string;
+    toneVariant: number;
+  } | null;
 }
 
 const FALLBACK_REPLY =

@@ -44,7 +44,7 @@ export default function SonicChat() {
     if (!open || !userId) return;
     supabase
       .from("chat_messages")
-      .select("id, role, content, created_at")
+      .select("id, role, content, created_at, action_taken, action_data")
       .eq("user_id", userId)
       .order("created_at", { ascending: true })
       .limit(100)

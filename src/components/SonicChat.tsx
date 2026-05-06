@@ -24,6 +24,7 @@ interface ChatMessage {
   pending?: boolean;
   resolved?: "confirmed" | "cancelled" | null;
   download?: { url: string; filename: string; label: string } | null;
+  copyable?: string | null;
 }
 
 const FALLBACK_REPLY =

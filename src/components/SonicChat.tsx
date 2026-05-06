@@ -310,6 +310,22 @@ export default function SonicChat() {
                     </Button>
                   </div>
                 )}
+                {m.role === "assistant" && m.copyable && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(m.copyable!);
+                        toast.success("Copied!");
+                      } catch {
+                        toast.error("Copy failed");
+                      }
+                    }}
+                  >
+                    <Copy className="mr-1 h-3 w-3" /> Copy tags
+                  </Button>
+                )}
                 {m.role === "assistant" && m.download && (
                   <a
                     href={m.download.url}

@@ -26,6 +26,12 @@ import {
   runParseFromChat,
   type SonicDecision,
 } from "@/lib/sonic-chat-actions";
+import {
+  applyTagsAndSeo,
+  buildShopifyCsv,
+  csvDownloadUrl,
+  type ParsedRow,
+} from "@/lib/parse-from-chat";
 
 type ChatRole = "user" | "assistant" | "proactive";
 interface ChatMessage {

@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
 import TaskHistorySection from "@/components/TaskHistorySection";
+import PipelineTimelineSection from "@/components/PipelineTimelineSection";
 
 interface ExportEntry {
   supplier: string;
@@ -393,6 +394,7 @@ const HistoryScreen = () => {
           ))}
         </div>
 
+        <PipelineTimelineSection />
         <TaskHistorySection />
       </div>
     </TooltipProvider>

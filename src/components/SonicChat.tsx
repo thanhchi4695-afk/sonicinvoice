@@ -343,7 +343,60 @@ export default function SonicChat() {
     await postAssistantNote("Got it, cancelled.");
   }
 
-  return (
+  // ── Proactive task handlers ────────────────────────────────────────
+  async function handleProactiveApprove(taskId: string, taskType?: string) {
+    setMessages((arr) =>
+      arr.map((x) =>
+        x.proactive?.task_id === taskId
+          ? { ...x, proactive: { ...x.proactive, resolved: "approved" } }
+          : x,
+      ),
+    );
+    try {
+      await supabase
+        .from("agent_tasks")
+        .update({ status: "approved", approved_at: new Date().toISOString() })
+        .eq("id", taskId);
+      // Best-effort: kick off the matching action via the existing chat action runner.
+      const action = taskType ?? "none";
+      if (action && action !== "none") {
+        try {
+          await executeChatAction(action as never, {} as never);
+        } catch (e) {
+          console.warn("[proactive] executeChatAction failed:", e);
+        }
+      }
+    } catch (e) {
+      console.warn("[proactive] approve update failed:", e);
+    }
+    await postAssistantNote("On it.");
+  }
+
+  async function handleProactiveDismiss(taskId: string) {
+    setMessages((arr) =>
+      arr.map((x) =>
+        x.proactive?.task_id === taskId
+          ? { ...x, proactive: { ...x.proactive, resolved: "dismissed" } }
+          : x,
+      ),
+    );
+    try {
+      await supabase
+        .from("agent_tasks")
+        .update({ status: "skipped", dismissed_at: new Date().toISOString() })
+        .eq("id", taskId);
+    } catch (e) {
+      console.warn("[proactive] dismiss update failed:", e);
+    }
+    await postAssistantNote("Got it, skipping.");
+  }
+
+  function handlePipelineLaunch(pipelineKey: string) {
+    window.dispatchEvent(
+      new CustomEvent("sonic:launch-pipeline", { detail: { pipeline: pipelineKey } }),
+    );
+    setOpen(false);
+  }
     <>
       {/* Floating button */}
       {!open && (

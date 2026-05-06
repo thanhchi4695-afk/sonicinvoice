@@ -339,6 +339,66 @@ function extractCost(text: string): number {
 export interface InlineActionResult {
   text: string;
   copyable?: string;
+  seo?: {
+    title: string;
+    description: string;
+    titleLen: number;
+    descLen: number;
+    titleOver: boolean;
+    descOver: boolean;
+  };
+}
+
+const KNOWN_COLOURS = [
+  "black","white","ivory","cream","beige","tan","brown","chocolate","khaki","olive","mustard",
+  "yellow","gold","orange","coral","peach","red","crimson","burgundy","wine","pink","blush",
+  "rose","fuchsia","magenta","purple","lilac","lavender","plum","navy","blue","cobalt","denim",
+  "sky","teal","turquoise","aqua","mint","sage","green","emerald","forest","silver","grey","gray",
+  "charcoal","leopard","animal","floral","stripe","striped","print","multi",
+];
+
+function detectColour(text: string): string | null {
+  const lower = text.toLowerCase();
+  const sorted = [...KNOWN_COLOURS].sort((a, b) => b.length - a.length);
+  for (const c of sorted) {
+    const re = new RegExp(`\\b${c}\\b`, "i");
+    if (re.test(lower)) return c.replace(/\b\w/g, (x) => x.toUpperCase());
+  }
+  return null;
+}
+
+function detectProductName(
+  text: string,
+  brand: string | null,
+  colour: string | null,
+  productType: string | null,
+): string | null {
+  // Quoted phrase wins
+  const q = text.match(/["“']([^"”']{2,60})["”']/);
+  if (q) return q[1].trim();
+  // Strip known tokens, return remaining capitalised words sequence
+  let cleaned = text;
+  for (const tok of [brand, colour, productType]) {
+    if (tok) cleaned = cleaned.replace(new RegExp(tok, "ig"), " ");
+  }
+  cleaned = cleaned.replace(/[,.!?]/g, " ").replace(/\s+/g, " ").trim();
+  // Look for 1-4 capitalised tokens (style codes like "Mar26" allowed)
+  const m = cleaned.match(/\b([A-Z][\w-]+(?:\s+[A-Z][\w-]+){0,3})\b/);
+  return m ? m[1].trim() : null;
+}
+
+// Builds the SEO title using the required pattern:
+// "[Brand] [StyleName] - [Colour] | Australia"
+// Truncated to 62 chars + "..." when over 65 chars total.
+function buildSEO(brand: string, styleName: string, colour: string) {
+  const parts: string[] = [];
+  if (brand) parts.push(brand);
+  if (styleName) parts.push(styleName);
+  let left = parts.join(" ").trim();
+  if (colour) left = `${left} - ${colour}`.trim();
+  let title = `${left} | Australia`.replace(/\s+/g, " ").trim();
+  if (title.length > 65) title = title.slice(0, 62).trimEnd() + "...";
+  return title;
 }
 
 // Match a known product type in free-form text. Returns the canonical option.
@@ -516,36 +576,72 @@ export async function runInlineAction(
   }
 
   if (decision.action === "open_seo_writer") {
-    const brand = String(params.brand ?? "").trim();
-    const productType = String(params.product_type ?? params.type ?? "").trim();
-    const colour = String(params.colour ?? params.color ?? "").trim();
-    const titleFromParams = String(params.title ?? "").trim();
-    const fallbackTitle =
-      titleFromParams ||
-      [brand, colour, productType].filter(Boolean).join(" ") ||
-      userMessage.slice(0, 60);
-    const product: SeoProduct = {
-      title: fallbackTitle || "Product",
-      brand: brand || "Brand",
-      type: productType || "Product",
-      tags: colour ? [colour] : [],
-      description: userMessage,
-    };
-    try {
-      const seo = generateSeo(product);
-      return {
-        text: [
-          `**SEO Title** (${seo.titleLength} chars${seo.titleOver ? " ⚠ over limit" : ""})`,
-          seo.seoTitle,
-          "",
-          `**Meta Description** (${seo.descLength} chars${seo.descOver ? " ⚠ over limit" : ""})`,
-          seo.seoDescription,
-        ].join("\n"),
-      };
-    } catch (e) {
-      console.error("SEO generation failed:", e);
-      return { text: "Couldn't generate SEO — give me a brand, product type, and colour to work from." };
+    const brand =
+      String(params.brand ?? params.brand_name ?? "").trim() ||
+      detectBrand(userMessage) ||
+      "";
+    const productType =
+      String(params.product_type ?? params.type ?? "").trim() ||
+      detectProductType(userMessage) ||
+      "";
+    const colour =
+      String(params.colour ?? params.color ?? "").trim() ||
+      detectColour(userMessage) ||
+      "";
+    const productName =
+      String(params.product_name ?? params.style ?? params.title ?? "").trim() ||
+      detectProductName(userMessage, brand, colour, productType) ||
+      "";
+
+    // Need at least brand + product name. Brand-only → ask follow-up.
+    if (brand && !productName) {
+      return { text: "What's the style name and colour?" };
     }
+    if (!brand && !productName) {
+      return {
+        text: "Give me a brand and product name to write SEO for — e.g. 'SEO for Seafolly Mar26 in Black'.",
+      };
+    }
+
+    const title = buildSEO(brand, productName, colour);
+
+    let description = "";
+    try {
+      const { data, error } = await supabase.functions.invoke("sonic-seo-writer", {
+        body: {
+          brand,
+          product_name: productName,
+          colour,
+          product_type: productType,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      description = String(data?.description ?? "").trim();
+    } catch (e) {
+      console.error("sonic-seo-writer failed:", e);
+      return { text: "Couldn't reach the SEO writer — try again in a moment." };
+    }
+
+    const titleLen = title.length;
+    const descLen = description.length;
+    const titleOver = titleLen > 65;
+    const descOver = descLen > 155;
+    const titleBadge = `${titleLen}/65`;
+    const descBadge = `${descLen}/155`;
+
+    const text = [
+      `**SEO Title** — ${titleOver ? "🔴" : "🟢"} ${titleBadge}`,
+      title,
+      "",
+      `**Meta Description** — ${descOver ? "🔴" : "🟢"} ${descBadge}`,
+      description,
+    ].join("\n");
+
+    return {
+      text,
+      seo: { title, description, titleLen, descLen, titleOver, descOver },
+    };
   }
 
   return null;

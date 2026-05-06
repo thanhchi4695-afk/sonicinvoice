@@ -26,6 +26,14 @@ interface ChatMessage {
   resolved?: "confirmed" | "cancelled" | null;
   download?: { url: string; filename: string; label: string } | null;
   copyable?: string | null;
+  seo?: {
+    title: string;
+    description: string;
+    titleLen: number;
+    descLen: number;
+    titleOver: boolean;
+    descOver: boolean;
+  } | null;
 }
 
 const FALLBACK_REPLY =
@@ -149,7 +157,7 @@ export default function SonicChat() {
       // follow-up assistant message instead of navigating.
       const inline = await runInlineAction(decision, text);
       if (inline) {
-        await postAssistantNote(inline.text, inline.copyable ?? null);
+        await postAssistantNote(inline.text, inline.copyable ?? null, inline.seo ?? null);
       } else {
         const ran = executeChatAction(decision);
         const closeOn = new Set([
@@ -171,7 +179,11 @@ export default function SonicChat() {
     }
   }
 
-  async function postAssistantNote(text: string, copyable: string | null = null) {
+  async function postAssistantNote(
+    text: string,
+    copyable: string | null = null,
+    seo: ChatMessage["seo"] = null,
+  ) {
     if (!userId) return;
     const { data } = await supabase
       .from("chat_messages")
@@ -179,7 +191,7 @@ export default function SonicChat() {
       .select("id, role, content, created_at")
       .single();
     if (data) {
-      setMessages((m) => [...m, { ...(data as ChatMessage), copyable }]);
+      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo }]);
     }
   }
 
@@ -290,16 +302,84 @@ export default function SonicChat() {
             )}
             {messages.map((m) => (
               <div key={m.id} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
-                <div
-                  className={cn(
-                    "max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                    m.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground",
-                  )}
-                >
-                  {m.content}
-                </div>
+                {!m.seo && (
+                  <div
+                    className={cn(
+                      "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
+                      m.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground",
+                    )}
+                  >
+                    {m.content}
+                  </div>
+                )}
+                {m.role === "assistant" && m.seo && (
+                  <div className="w-full max-w-[85%] space-y-3 rounded-2xl border border-border bg-muted p-3 text-sm">
+                    <div>
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="font-semibold">SEO Title</span>
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 text-xs font-medium",
+                            m.seo.titleOver
+                              ? "bg-destructive/15 text-destructive"
+                              : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+                          )}
+                        >
+                          {m.seo.titleLen}/65
+                        </span>
+                      </div>
+                      <div className="rounded bg-background/60 p-2 text-foreground">{m.seo.title}</div>
+                    </div>
+                    <div>
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="font-semibold">Meta Description</span>
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 text-xs font-medium",
+                            m.seo.descOver
+                              ? "bg-destructive/15 text-destructive"
+                              : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+                          )}
+                        >
+                          {m.seo.descLen}/155
+                        </span>
+                      </div>
+                      <div className="rounded bg-background/60 p-2 text-foreground">{m.seo.description}</div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(m.seo!.title);
+                            toast.success("Copied!");
+                          } catch {
+                            toast.error("Copy failed");
+                          }
+                        }}
+                      >
+                        <Copy className="mr-1 h-3 w-3" /> Copy title
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(m.seo!.description);
+                            toast.success("Copied!");
+                          } catch {
+                            toast.error("Copy failed");
+                          }
+                        }}
+                      >
+                        <Copy className="mr-1 h-3 w-3" /> Copy description
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 {m.role === "assistant" && m.pending && (
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => handleConfirm(m)}>

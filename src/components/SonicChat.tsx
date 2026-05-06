@@ -39,6 +39,7 @@ interface ChatMessage {
   resolved?: "confirmed" | "cancelled" | null;
   download?: { url: string; filename: string; label: string } | null;
   copyable?: string | null;
+  autoApproved?: { taskId: string; taskType: string; undone?: boolean } | null;
   seo?: {
     title: string;
     description: string;
@@ -179,6 +180,7 @@ export default function SonicChat() {
                 role: "assistant",
                 content: `Done: ${t.observation ?? t.task_type} (auto-completed based on your preferences)`,
                 created_at: new Date().toISOString(),
+                autoApproved: { taskId: t.id, taskType: t.task_type, undone: false },
               };
               setMessages((m) => (m.some((x) => x.id === note.id) ? m : [...m, note]));
               return;

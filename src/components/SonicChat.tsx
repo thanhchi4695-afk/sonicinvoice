@@ -59,6 +59,7 @@ interface ChatMessage {
     toneVariant: number;
   } | null;
   description?: ProductDescription | null;
+  quickReplies?: string[] | null;
 }
 
 const FALLBACK_REPLY =

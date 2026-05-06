@@ -152,62 +152,78 @@ export default function SonicChat() {
   useEffect(() => {
     if (!userId) return;
     let proactiveEnabled = true;
-    const channel = supabase
-      .channel(`proactive-tasks-${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "agent_tasks",
-          filter: `user_id=eq.${userId}`,
-        },
-        async (payload) => {
-          const t = payload.new as Record<string, any>;
-          if (!proactiveEnabled) return;
-          if (t.status !== "permission_requested" && t.status !== "suggested") return;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-          // Sprint 4 — try auto-approve first for low-risk tasks
-          if (t.status === "permission_requested" && t.task_type) {
-            const wasAutoApproved = await checkAndAutoApprove(
-              t.id,
-              t.task_type,
-              userId,
-            );
-            if (wasAutoApproved) {
-              const note: ChatMessage = {
-                id: `auto-${t.id}`,
-                role: "assistant",
-                content: `Done: ${t.observation ?? t.task_type} (auto-completed based on your preferences)`,
-                created_at: new Date().toISOString(),
-                autoApproved: { taskId: t.id, taskType: t.task_type, undone: false },
-              };
-              setMessages((m) => (m.some((x) => x.id === note.id) ? m : [...m, note]));
-              return;
-            }
-          }
+    const onProactiveInsert = async (payload: { new: Record<string, any> }) => {
+      const t = payload.new as Record<string, any>;
+      if (!proactiveEnabled) return;
+      if (t.status !== "permission_requested" && t.status !== "suggested") return;
 
-          const msg: ChatMessage = {
-            id: `proactive-${t.id}`,
-            role: "proactive",
-            content: t.observation ?? "Sonic noticed something.",
-            created_at: t.created_at ?? new Date().toISOString(),
-            proactive: {
-              task_id: t.id,
-              observation: t.observation ?? "",
-              proposed_action: t.proposed_action ?? "",
-              permission_question: t.permission_question ?? null,
-              requires_permission: t.status === "permission_requested",
-              pipeline_to_run: t.pipeline_id ?? null,
-              resolved: null,
-            },
+      // Sprint 4 — try auto-approve first for low-risk tasks
+      if (t.status === "permission_requested" && t.task_type) {
+        const wasAutoApproved = await checkAndAutoApprove(t.id, t.task_type, userId);
+        if (wasAutoApproved) {
+          const note: ChatMessage = {
+            id: `auto-${t.id}`,
+            role: "assistant",
+            content: `Done: ${t.observation ?? t.task_type} (auto-completed based on your preferences)`,
+            created_at: new Date().toISOString(),
+            autoApproved: { taskId: t.id, taskType: t.task_type, undone: false },
           };
-          setMessages((m) => (m.some((x) => x.id === msg.id) ? m : [...m, msg]));
-          // Auto-open the panel so the user actually sees the suggestion
-          setOpen(true);
+          setMessages((m) => (m.some((x) => x.id === note.id) ? m : [...m, note]));
+          return;
+        }
+      }
+
+      const msg: ChatMessage = {
+        id: `proactive-${t.id}`,
+        role: "proactive",
+        content: t.observation ?? "Sonic noticed something.",
+        created_at: t.created_at ?? new Date().toISOString(),
+        proactive: {
+          task_id: t.id,
+          observation: t.observation ?? "",
+          proposed_action: t.proposed_action ?? "",
+          permission_question: t.permission_question ?? null,
+          requires_permission: t.status === "permission_requested",
+          pipeline_to_run: t.pipeline_id ?? null,
+          resolved: null,
         },
-      )
-      .subscribe();
+      };
+      setMessages((m) => (m.some((x) => x.id === msg.id) ? m : [...m, msg]));
+      // Auto-open the panel so the user actually sees the suggestion
+      setOpen(true);
+    };
+
+    const subscribe = () => {
+      channel = supabase
+        .channel(`proactive-tasks-${userId}-${Date.now()}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "agent_tasks",
+            filter: `user_id=eq.${userId}`,
+          },
+          onProactiveInsert,
+        )
+        .subscribe();
+    };
+
+    subscribe();
+
+    // Bug 1 fix: re-subscribe when the tab becomes visible again. Mobile OS
+    // (and some desktop browsers) kill the websocket when backgrounded, which
+    // causes proactive messages to silently stop arriving.
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      const state = (channel as { state?: string } | null)?.state;
+      if (state === "joined" || state === "joining") return;
+      if (channel) supabase.removeChannel(channel);
+      subscribe();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     // Honor user preference: disable proactive injection when toggled off
     supabase
@@ -220,8 +236,10 @@ export default function SonicChat() {
           proactiveEnabled = false;
         }
       });
+
     return () => {
-      supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [userId]);
 

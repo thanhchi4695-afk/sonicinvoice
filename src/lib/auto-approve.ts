@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { executeChatAction } from "./sonic-chat-actions";
+import { executeChatAction, type SonicDecision } from "./sonic-chat-actions";
 
 // Tasks that can be auto-approved (low risk, reversible)
 export const AUTO_APPROVABLE_TASKS = [
@@ -62,13 +62,13 @@ export async function checkAndAutoApprove(
   try {
     const action = TASK_TYPE_TO_ACTION[taskType];
     if (action) {
-      executeChatAction({
+      const decision: SonicDecision = {
+        intent: "action",
         action,
         params: {},
         requires_permission: false,
-        intent: "action",
-        confidence: 1,
-      } as never);
+      };
+      executeChatAction(decision);
     }
     await supabase
       .from("agent_tasks")

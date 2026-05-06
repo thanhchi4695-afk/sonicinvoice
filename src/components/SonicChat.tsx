@@ -70,6 +70,7 @@ export default function SonicChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [hasActiveParse, setHasActiveParse] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Track auth

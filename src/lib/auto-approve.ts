@@ -44,12 +44,12 @@ export async function checkAndAutoApprove(
 
   if (!prefs?.proactive_mode_enabled) return false;
 
-  const shouldAutoApprove =
-    (taskType === "generate_tags" && prefs.auto_approve_tags) ||
-    (taskType === "generate_seo" && prefs.auto_approve_seo) ||
-    taskType === "stock_check";
+  let triggerPref: "tags" | "seo" | "stock_check" | null = null;
+  if (taskType === "generate_tags" && prefs.auto_approve_tags) triggerPref = "tags";
+  else if (taskType === "generate_seo" && prefs.auto_approve_seo) triggerPref = "seo";
+  else if (taskType === "stock_check") triggerPref = "stock_check";
 
-  if (!shouldAutoApprove) return false;
+  if (!triggerPref) return false;
 
   await supabase
     .from("agent_tasks")
@@ -75,7 +75,7 @@ export async function checkAndAutoApprove(
       .update({
         status: "completed",
         completed_at: new Date().toISOString(),
-        result_summary: `Auto-completed: ${taskType}`,
+        result_summary: `Auto-completed via ${triggerPref} preference`,
       })
       .eq("id", taskId);
   } catch (e) {

@@ -308,6 +308,7 @@ Deno.serve(async (req) => {
         tools: [RECORD_TOOL],
         tool_choice: { type: "function", function: { name: "record_sonic_response" } },
         temperature: 0.2,
+        stream: false,
       }),
     });
 
@@ -335,14 +336,14 @@ Deno.serve(async (req) => {
     const data = await aiResp.json();
     const toolCall = data?.choices?.[0]?.message?.tool_calls?.[0];
     const argsRaw = toolCall?.function?.arguments;
-    let parsed;
+    let parsed: Record<string, unknown> | undefined;
     try {
       parsed = typeof argsRaw === "string" ? JSON.parse(argsRaw) : argsRaw;
     } catch (e) {
       console.error("Failed to parse tool args:", argsRaw, e);
     }
 
-    if (!parsed) {
+    if (!parsed || !parsed.action) {
       const fallbackText = data?.choices?.[0]?.message?.content ?? "Sorry, I didn't catch that.";
       parsed = {
         intent: "fallback",
@@ -354,8 +355,36 @@ Deno.serve(async (req) => {
       };
     }
 
-    return new Response(JSON.stringify(parsed), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // ── SSE stream: emit response_text word by word ──
+    const responseText: string =
+      typeof parsed.response_text === "string" ? parsed.response_text : "";
+    const words = responseText.split(/(\s+)/); // preserve whitespace
+    const finalPayload = { ...parsed, response_text: responseText };
+
+    const stream = new ReadableStream({
+      start(controller) {
+        const enc = new TextEncoder();
+        for (const word of words) {
+          if (word) {
+            controller.enqueue(
+              enc.encode(`data: ${JSON.stringify({ token: word })}\n\n`),
+            );
+          }
+        }
+        controller.enqueue(
+          enc.encode(`data: ${JSON.stringify({ done: true, ...finalPayload })}\n\n`),
+        );
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+      },
     });
   } catch (err) {
     console.error("sonic-chat fatal:", err);

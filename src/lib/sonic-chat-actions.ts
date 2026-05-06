@@ -379,6 +379,7 @@ export interface InlineActionResult {
     text: string;
     lengthVariant: "default" | "shorter" | "longer";
   };
+  quickReplies?: string[];
 }
 
 const KNOWN_COLOURS = [
@@ -897,8 +898,14 @@ export async function runInlineAction(
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const answer = String(data?.answer ?? "").trim();
-      if (!answer) return { text: "I couldn't get an answer for that — try rephrasing?" };
-      return { text: answer };
+      const quickReplies = [
+        "What's the total cost?",
+        "What's the total RRP?",
+        "Which brands?",
+        "What's the cheapest style?",
+      ];
+      if (!answer) return { text: "I couldn't get an answer for that — try rephrasing?", quickReplies };
+      return { text: answer, quickReplies };
     } catch (e) {
       console.error("sonic-invoice-question failed:", e);
       return { text: "Couldn't read the last invoice — try again in a moment." };

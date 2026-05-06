@@ -59,6 +59,7 @@ interface ChatMessage {
     toneVariant: number;
   } | null;
   description?: ProductDescription | null;
+  quickReplies?: string[] | null;
 }
 
 const FALLBACK_REPLY =
@@ -102,11 +103,11 @@ export default function SonicChat() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, open]);
 
-  async function handleSend() {
-    const text = input.trim();
+  async function handleSend(override?: string) {
+    const text = (override ?? input).trim();
     if (!text || sending || !userId) return;
     setSending(true);
-    setInput("");
+    if (!override) setInput("");
 
     const optimisticUser: ChatMessage = {
       id: `tmp-${Date.now()}`,
@@ -190,6 +191,7 @@ export default function SonicChat() {
           inline.margin ?? null,
           inline.email ?? null,
           inline.description ?? null,
+          inline.quickReplies ?? null,
         );
       } else {
         const ran = executeChatAction(decision);
@@ -219,6 +221,7 @@ export default function SonicChat() {
     margin: ChatMessage["margin"] = null,
     email: ChatMessage["email"] = null,
     description: ChatMessage["description"] = null,
+    quickReplies: string[] | null = null,
   ) {
     if (!userId) return;
     const { data } = await supabase
@@ -227,7 +230,7 @@ export default function SonicChat() {
       .select("id, role, content, created_at")
       .single();
     if (data) {
-      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo, margin, email, description }]);
+      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo, margin, email, description, quickReplies }]);
     }
   }
 
@@ -570,6 +573,21 @@ export default function SonicChat() {
                 {m.role === "assistant" && m.resolved && (
                   <div className="text-xs text-muted-foreground">
                     {m.resolved === "confirmed" ? "Confirmed" : "Cancelled"}
+                  </div>
+                )}
+                {m.role === "assistant" && m.quickReplies && m.quickReplies.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {m.quickReplies.map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        disabled={sending}
+                        onClick={() => handleSend(q)}
+                        className="rounded-full border border-border bg-background px-3 py-1 text-xs text-foreground hover:bg-muted disabled:opacity-50"
+                      >
+                        {q}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>

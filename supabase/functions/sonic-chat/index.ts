@@ -146,10 +146,9 @@ Communication & audit:
 7. For explain actions, give the answer inline in 2–4 sentences in response_text.
 8. Tone: direct, practical, capable colleague — not a companion.
 9. If the user mentions a brand, check brand params before defaulting to "none".
-10. For marketing/SEO topics, route to the specific tool — don't give a generic answer when a dedicated action exists.
+`;
 
-When requires_permission is true, confirmation_message is a complete plain-English description of what Sonic will do; response_text is the question asking the user to confirm.
-When action is "none", response_text is a short helpful reply or clarifier.
+const KB_SUFFIX = `
 
 ---
 
@@ -178,6 +177,12 @@ SEO Title ≤65 chars, pattern "Brand Style TypeLabel - Colour | Australia". SEO
 Sonic Invoices = AI invoice → Shopify CSV for Australian indie retail. Category: Stock Intake Automation. Primary client: Splash Swimwear (Lisa Richards, Darwin NT) — 3,858 products, 187 brands. Top brands: Sea Level (222), Seafolly (197), Baku (181), Jantzen (115), Kulani Kinis (112), Bond Eye (92), Funkita (89), Speedo (77), Le Specs (68), Tigerlily (54). Other clients: Pinkhill Boutique (Silvija Majetic), Stomp Shoes Darwin, Lulu & Daw. Owner Chi Nguyen, ABN 73 361 643 990, Darwin NT.
 Flywheel: every invoice trains brand_patterns per user_id; corrections logged to correction_log; accuracy compounds.
 Pricing guidance: $99–$299/month flat OR $2–5/invoice; first 3 clients on retainer. Strategic position: boring back-office infrastructure, sticky, fills gap between "stock arrives" and "stock live on site". Not competing with Shopify/Klaviyo/Meta Ads.`;
+
+const KB_KEYWORDS = /\b(tag|tagging|seo|meta description|csv|shopify csv|invoice|parsing|parse|brand|seafolly|baku|jantzen|sunseeker|sea level|ambra|funkita|speedo|tigerlily|kulani|bond eye|le specs|artesands|nip tuck|salty ink|jets|rhythm|reef|pops|monte|size|colour|color|markup|rrp|chlorine|d-g|swimdress|underwire|tummy|mastectomy|upf|handle|variant|flywheel|splash|pinkhill|stomp|lulu)\b/i;
+
+function buildSystemPrompt(message: string): string {
+  return KB_KEYWORDS.test(message) ? SYSTEM_PROMPT_BASE + KB_SUFFIX : SYSTEM_PROMPT_BASE;
+}
 
 const RECORD_TOOL = {
   type: "function",

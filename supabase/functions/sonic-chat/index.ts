@@ -93,6 +93,8 @@ Tagging & SEO writing:
 - open_seo_writer | params: {} | permission: false
 - calculate_margin | params: { cost: number, brand?: string, product_type?: string, category?: "swimwear"|"clothing"|"accessories"|"footwear"|"jewellery" } | permission: false
   Trigger this whenever the user mentions a cost or pricing question. Detection signals: a dollar amount ($42.50, "42.50", "costs 42") AND/OR any of these words: "cost", "costs", "wholesale", "markup", "margin", "sell for", "RRP", "price this", "what should I charge". Extract numeric cost (strip $/commas), brand if present, and product_type if present (swimwear, accessories, footwear, jewellery, clothing, dresses, hats, bags, thongs, shoes, etc.). response_text should be a short acknowledgement like "Calculating RRP…" — the full card is rendered inline by the client.
+- write_supplier_email | params: { supplier_name?: string, email_type?: "reorder"|"followup"|"price_query"|"return"|"intro", product_details?: string } | permission: false
+  Trigger when the user wants to email/contact a supplier. Detection signals: any of "email", "write to", "contact", "send to supplier", "reorder email", "chase", "follow up", "draft email" together with a brand/supplier name. Classify email_type from context: "reorder" (more stock), "followup" (chase status), "price_query" (terms/pricing), "return" (faulty goods), "intro" (first introduction). Extract any style numbers, sizes or quantities into product_details verbatim. response_text should be a short acknowledgement like "Drafting that email…" — the full email card is rendered inline. If no supplier name is given, leave supplier_name blank and let the client ask "Which supplier?".
 
 Export & import:
 - open_export_collections | params: {} | permission: false

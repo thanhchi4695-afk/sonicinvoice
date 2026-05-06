@@ -5,6 +5,7 @@
 import { generateTags, type TagInput, TYPE_OPTIONS } from "@/lib/tag-engine";
 import { getBrandDirectory } from "@/lib/brand-directory";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
+import { getStoreConfig } from "@/lib/prompt-builder";
 import { supabase } from "@/integrations/supabase/client";
 import {
   applyTagsAndSeo,
@@ -358,6 +359,16 @@ export interface InlineActionResult {
     grossProfit: number;
     marginPct: number;
     compareAt: number;
+  };
+  email?: {
+    supplierName: string;
+    emailType: string;
+    subject: string;
+    body: string;
+    productDetails: string;
+    userName: string;
+    storeName: string;
+    toneVariant: number;
   };
 }
 
@@ -773,6 +784,99 @@ export async function runInlineAction(
       text,
       seo: { title, description, titleLen, descLen, titleOver, descOver },
     };
+  }
+  if (decision.action === "write_supplier_email") {
+    const supplierName =
+      String(params.supplier_name ?? params.supplier ?? params.brand ?? "").trim() ||
+      detectBrand(userMessage) ||
+      "";
+
+    if (!supplierName) {
+      return { text: "Which supplier?" };
+    }
+
+    const lower = userMessage.toLowerCase();
+    let emailType = String(params.email_type ?? "").trim().toLowerCase();
+    if (!emailType) {
+      if (/\b(reorder|re-order|more stock|order more)\b/.test(lower)) emailType = "reorder";
+      else if (/\b(follow.?up|chase|status|where('?s| is)|update on|eta)\b/.test(lower)) emailType = "followup";
+      else if (/\b(price|pricing|terms|wholesale|cost|discount)\b/.test(lower)) emailType = "price_query";
+      else if (/\b(return|faulty|damaged|broken|defect)\b/.test(lower)) emailType = "return";
+      else if (/\b(intro|introduce|new stockist|first time|opening)\b/.test(lower)) emailType = "intro";
+      else emailType = "reorder";
+    }
+
+    const productDetails = String(params.product_details ?? "").trim() || userMessage;
+
+    let userName = String(params.user_name ?? "").trim();
+    let storeName = String(params.store_name ?? "").trim();
+    if (!userName || !storeName) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          if (!userName) {
+            const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+            userName = String(
+              meta.first_name ?? meta.name ?? meta.full_name ?? user.email?.split("@")[0] ?? "",
+            ).split(" ")[0];
+          }
+          if (!storeName) {
+            const { data: uk } = await supabase
+              .from("user_knowledge" as never)
+              .select("store_name" as never)
+              .eq("user_id" as never, user.id as never)
+              .maybeSingle();
+            storeName = (uk as { store_name?: string } | null)?.store_name ?? "";
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      if (!storeName) {
+        try {
+          storeName = getStoreConfig().name ?? "";
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    const toneVariant = Number(params.tone_variant ?? 0) || 0;
+
+    try {
+      const { data, error } = await supabase.functions.invoke("sonic-supplier-email", {
+        body: {
+          supplier_name: supplierName,
+          email_type: emailType,
+          product_details: productDetails,
+          user_name: userName,
+          store_name: storeName,
+          tone_variant: toneVariant,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const subject: string = String(data?.subject ?? "Quick note");
+      const body: string = String(data?.body ?? "");
+
+      return {
+        text: [`**Email to ${supplierName}**`, "", `**Subject:** ${subject}`, "", body].join("\n"),
+        email: {
+          supplierName,
+          emailType,
+          subject,
+          body,
+          productDetails,
+          userName,
+          storeName,
+          toneVariant,
+        },
+      };
+    } catch (e) {
+      console.error("sonic-supplier-email failed:", e);
+      return { text: "Couldn't reach the email writer — try again in a moment." };
+    }
   }
 
   return null;

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import SupplierEmailCard from "@/components/SupplierEmailCard";
 import {
   executeChatAction,
   executeGatedAction,
@@ -45,6 +46,16 @@ interface ChatMessage {
     grossProfit: number;
     marginPct: number;
     compareAt: number;
+  } | null;
+  email?: {
+    supplierName: string;
+    emailType: string;
+    subject: string;
+    body: string;
+    productDetails: string;
+    userName: string;
+    storeName: string;
+    toneVariant: number;
   } | null;
 }
 
@@ -169,7 +180,13 @@ export default function SonicChat() {
       // follow-up assistant message instead of navigating.
       const inline = await runInlineAction(decision, text);
       if (inline) {
-        await postAssistantNote(inline.text, inline.copyable ?? null, inline.seo ?? null, inline.margin ?? null);
+        await postAssistantNote(
+          inline.text,
+          inline.copyable ?? null,
+          inline.seo ?? null,
+          inline.margin ?? null,
+          inline.email ?? null,
+        );
       } else {
         const ran = executeChatAction(decision);
         const closeOn = new Set([
@@ -196,6 +213,7 @@ export default function SonicChat() {
     copyable: string | null = null,
     seo: ChatMessage["seo"] = null,
     margin: ChatMessage["margin"] = null,
+    email: ChatMessage["email"] = null,
   ) {
     if (!userId) return;
     const { data } = await supabase
@@ -204,7 +222,7 @@ export default function SonicChat() {
       .select("id, role, content, created_at")
       .single();
     if (data) {
-      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo, margin }]);
+      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo, margin, email }]);
     }
   }
 
@@ -315,7 +333,7 @@ export default function SonicChat() {
             )}
             {messages.map((m) => (
               <div key={m.id} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
-                {!m.seo && !m.margin && (
+                {!m.seo && !m.margin && !m.email && (
                   <div
                     className={cn(
                       "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
@@ -326,6 +344,61 @@ export default function SonicChat() {
                   >
                     {m.content}
                   </div>
+                )}
+                {m.role === "assistant" && m.email && (
+                  <SupplierEmailCard
+                    msgId={m.id}
+                    email={m.email}
+                    onUpdateBody={(newBody) =>
+                      setMessages((arr) =>
+                        arr.map((x) =>
+                          x.id === m.id && x.email
+                            ? { ...x, email: { ...x.email, body: newBody } }
+                            : x,
+                        ),
+                      )
+                    }
+                    onRegenerate={async () => {
+                      if (!m.email) return;
+                      const nextTone = ((m.email.toneVariant ?? 0) + 1) % 3;
+                      try {
+                        const { data, error } = await supabase.functions.invoke(
+                          "sonic-supplier-email",
+                          {
+                            body: {
+                              supplier_name: m.email.supplierName,
+                              email_type: m.email.emailType,
+                              product_details: m.email.productDetails,
+                              user_name: m.email.userName,
+                              store_name: m.email.storeName,
+                              tone_variant: nextTone,
+                            },
+                          },
+                        );
+                        if (error) throw error;
+                        if (data?.error) throw new Error(data.error);
+                        setMessages((arr) =>
+                          arr.map((x) =>
+                            x.id === m.id && x.email
+                              ? {
+                                  ...x,
+                                  email: {
+                                    ...x.email,
+                                    subject: String(data?.subject ?? x.email.subject),
+                                    body: String(data?.body ?? x.email.body),
+                                    toneVariant: nextTone,
+                                  },
+                                }
+                              : x,
+                          ),
+                        );
+                        toast.success("Regenerated with a different tone");
+                      } catch (err) {
+                        console.error(err);
+                        toast.error("Couldn't regenerate");
+                      }
+                    }}
+                  />
                 )}
                 {m.role === "assistant" && m.margin && (
                   <div className="w-full max-w-[85%] space-y-2 rounded-2xl border border-border bg-muted p-3 text-sm">

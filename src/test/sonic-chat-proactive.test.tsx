@@ -40,41 +40,57 @@ interface FakeChannel {
   handler: Handler | null;
   subscribed: boolean;
   removed: boolean;
+  on: (event: string, filter: unknown, handler: Handler) => FakeChannel;
+  subscribe: () => FakeChannel;
 }
 const channels: FakeChannel[] = [];
 
-function makeChannel(name: string): FakeChannel & {
-  on: (...args: unknown[]) => FakeChannel;
-  subscribe: () => FakeChannel;
-} {
-  const ch: FakeChannel = {
+function makeChannel(name: string): FakeChannel {
+  const ch = {
     name,
-    state: "joining",
-    handler: null,
+    state: "joining" as FakeChannel["state"],
+    handler: null as Handler | null,
     subscribed: false,
     removed: false,
+  } as FakeChannel;
+  ch.on = (_event, _filter, handler) => {
+    ch.handler = handler;
+    return ch;
+  };
+  ch.subscribe = () => {
+    ch.subscribed = true;
+    ch.state = "joined";
+    return ch;
   };
   channels.push(ch);
-  const api = {
-    ...ch,
-    on: (_event: string, _filter: unknown, handler: Handler) => {
-      ch.handler = handler;
-      return api;
-    },
-    subscribe: () => {
-      ch.subscribed = true;
-      ch.state = "joined";
-      return api;
-    },
-  };
-  // Keep `state` etc. live by reading from `ch` via getters
-  Object.defineProperty(api, "state", { get: () => ch.state });
-  Object.defineProperty(api, "subscribed", { get: () => ch.subscribed });
-  Object.defineProperty(api, "removed", { get: () => ch.removed });
-  return api as FakeChannel & {
-    on: (...args: unknown[]) => FakeChannel;
-    subscribe: () => FakeChannel;
-  };
+  return ch;
+}
+
+// A `from(table)` builder that supports both `await` (PostgrestBuilder is
+// thenable) and chained `.maybeSingle()` / `.single()` calls.
+function makeFromBuilder(table: string) {
+  const result =
+    table === "user_preferences"
+      ? { data: { proactive_mode_enabled: true }, error: null }
+      : { data: [], error: null };
+
+  const builder: Record<string, unknown> = {};
+  const chain = () => builder;
+  builder.select = chain;
+  builder.eq = chain;
+  builder.gte = chain;
+  builder.order = chain;
+  builder.limit = chain;
+  builder.maybeSingle = vi.fn().mockResolvedValue(result);
+  builder.single = vi.fn().mockResolvedValue(result);
+  builder.then = (
+    onFulfilled: (v: { data: unknown; error: null }) => unknown,
+  ) => Promise.resolve(result).then(onFulfilled);
+  builder.insert = vi.fn(() => ({
+    select: () => ({ single: vi.fn().mockResolvedValue({ data: null, error: null }) }),
+  }));
+  builder.update = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
+  return builder;
 }
 
 vi.mock("@/integrations/supabase/client", () => {
@@ -89,34 +105,8 @@ vi.mock("@/integrations/supabase/client", () => {
     removeChannel: vi.fn((ch: FakeChannel) => {
       ch.removed = true;
       ch.state = "closed";
-      // Find original entry (the proxy returned from makeChannel shares state via getters)
-      const found = channels.find((c) => c === ch || c.name === (ch as FakeChannel).name);
-      if (found) {
-        found.removed = true;
-        found.state = "closed";
-      }
     }),
-    from: vi.fn(() => {
-      const builder: Record<string, unknown> = {};
-      const chain = () => builder;
-      builder.select = chain;
-      builder.eq = chain;
-      builder.gte = chain;
-      builder.order = chain;
-      builder.limit = chain;
-      builder.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-      builder.single = vi.fn().mockResolvedValue({ data: null, error: null });
-      builder.insert = vi.fn(() => ({
-        select: () => ({ single: vi.fn().mockResolvedValue({ data: null, error: null }) }),
-      }));
-      builder.update = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
-      // user_preferences(...).select(...).eq(...).maybeSingle()
-      // Default returns proactive_mode_enabled = true so notifications flow.
-      builder.maybeSingle = vi
-        .fn()
-        .mockResolvedValue({ data: { proactive_mode_enabled: true }, error: null });
-      return builder;
-    }),
+    from: vi.fn((table: string) => makeFromBuilder(table)),
     functions: { invoke: vi.fn().mockResolvedValue({ data: null, error: null }) },
   };
   return { supabase };

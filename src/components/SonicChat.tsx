@@ -179,7 +179,11 @@ export default function SonicChat() {
     }
   }
 
-  async function postAssistantNote(text: string, copyable: string | null = null) {
+  async function postAssistantNote(
+    text: string,
+    copyable: string | null = null,
+    seo: ChatMessage["seo"] = null,
+  ) {
     if (!userId) return;
     const { data } = await supabase
       .from("chat_messages")
@@ -187,7 +191,7 @@ export default function SonicChat() {
       .select("id, role, content, created_at")
       .single();
     if (data) {
-      setMessages((m) => [...m, { ...(data as ChatMessage), copyable }]);
+      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo }]);
     }
   }
 

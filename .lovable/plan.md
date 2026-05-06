@@ -139,3 +139,76 @@ Selected card highlights teal.
 3. Brand guide — fully public or gated behind email capture?
 4. Forwarding address format: `chi@parse.sonicinvoices.com` requires MX on
    `parse.sonicinvoices.com` — is the user prepared to add the DNS record?
+
+---
+
+## Plan — Agentic Chat Command Centre (saved 2026-05-06)
+
+Status: PLAN ONLY — not yet implemented.
+
+Goal: a chat box inside Sonic Invoices that understands natural-language
+keywords, answers questions, and (with permission) executes app actions
+the way Claude's agentic tools do.
+
+### Pattern
+understand → plan → confirm → execute → report back
+
+### Capabilities (3 layers)
+1. **Intent recognition** — user types "parse new invoice" or "show Seafolly
+   accuracy" and the app maps it to a known action.
+2. **Action execution** — chat actually triggers the function (upload, parse,
+   export CSV, navigate tab) instead of just describing it.
+3. **Permission gating** — destructive / significant actions render a
+   confirm/cancel pair before running.
+
+### Intent map (initial)
+**Invoice actions**
+- "parse invoice / upload / new stock" → open file picker / email inbox
+- "show last invoice / recent parses" → history tab
+- "export CSV / download for Shopify" → CSV export of last parse
+- "fix [brand] / correct [field]" → correction UI for that brand
+
+**Flywheel / brand intelligence**
+- "how accurate is [brand]" → query `brand_patterns`, render card
+- "which brands have I trained / flywheel status" → flywheel dashboard
+- "overall accuracy" → weighted avg from `brand_stats`
+
+**Navigation**
+- "go to settings / open history / show dashboard" → tab switch
+- "show case study / brand guide" → open public pages
+
+**Help / explainer**
+- "how does email forwarding work" → inline FAQ
+- "what is the flywheel" → contextual explanation
+
+**Agentic (permission required)**
+- "parse all pending emails" → list found, confirm each
+- "export everything this month" → batch CSV, confirm before download
+- "delete [brand] patterns" → destructive, explicit confirm
+
+### Architecture
+- **Layer 1 — Chat UI:** slide-out panel or floating bottom-right button,
+  persistent across tabs. Supabase `chat_messages` table for history.
+- **Layer 2 — Intent classifier:** every message → Lovable AI Gateway
+  (default `google/gemini-3-flash-preview`) via edge function. System prompt
+  contains: full intent list + action codes, current app state (active tab,
+  last parsed brand, pending invoice count). Returns structured JSON via
+  tool-calling: `{ intent, action, params, requires_permission, confirmation_message }`.
+- **Layer 3 — Action executor:** client-side dispatcher mapping `action` →
+  existing Sonic Invoices function. No new business logic; just wiring.
+- **Layer 4 — Permission flow:** if `requires_permission` is true, render
+  Confirm / Cancel pair inline in the chat. On confirm, run the action and
+  post the result back into the thread.
+
+### Build order (when picked up)
+1. `chat_messages` table + RLS (user-scoped).
+2. Edge function `chat-intent` calling AI Gateway with tool-calling schema.
+3. Floating chat panel component, message list, input.
+4. Action dispatcher + initial 5-10 intents (start with read-only / nav).
+5. Permission UI for write actions; add agentic intents last.
+
+### Open questions
+- Persistent thread or per-session?
+- Voice input later?
+- Does the chat see the current screen's data context automatically, or
+  only what the user types?

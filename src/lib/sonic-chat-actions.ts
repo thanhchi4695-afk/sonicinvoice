@@ -549,11 +549,6 @@ export async function runInlineAction(
   const params = decision.params ?? {};
 
   if (decision.action === "open_stock_check") {
-    // Explicit "show full stock check" → fall through to navigation.
-    if (/\b(see all stock|show full stock check|open stock check|full stock check)\b/i.test(userMessage)) {
-      return null;
-    }
-
     const brand =
       String(params.brand_name ?? params.brand ?? params.supplier ?? "").trim() ||
       detectBrand(userMessage) ||
@@ -563,8 +558,9 @@ export async function runInlineAction(
       (userMessage.match(/\b([A-Z0-9]{4,}[-_]?\d{2,}|\d{5,})\b/)?.[1] ?? "");
 
     if (!brand && !skuRaw) {
-      // Nothing usable inline — let the screen open instead.
-      return null;
+      return {
+        text: "Tell me the brand or style number to check — e.g. 'stock check Seafolly 12345' or 'do we have Baku BK4521'.",
+      };
     }
 
     try {
@@ -637,7 +633,24 @@ export async function runInlineAction(
         classification = "NEW PRODUCT";
         detail = `${brand} isn't in your history yet. This is a NEW PRODUCT — first invoice from this brand.`;
       } else {
-        return null;
+        // Style number only, no brand — search history by style across all suppliers.
+        const { data: hist } = await supabase
+          .from("inventory_import_runs")
+          .select("style_number, colour, supplier_name, started_at")
+          .eq("user_id", user.id)
+          .order("started_at", { ascending: false })
+          .limit(500);
+        const matches = (hist ?? []).filter(
+          (r) => (r.style_number ?? "").toLowerCase().replace(/[-_\s]/g, "") === styleNorm,
+        );
+        if (matches.length) {
+          const m = matches[0] as { supplier_name: string | null; started_at: string | null };
+          classification = "REFILL";
+          detail = `Found style ${skuRaw} from ${m.supplier_name ?? "a previous supplier"} — last imported ${m.started_at ? new Date(m.started_at).toLocaleDateString() : "previously"}. This is a REFILL.`;
+        } else {
+          classification = "NEW PRODUCT";
+          detail = `Style ${skuRaw} isn't in your history yet. Treat as a NEW PRODUCT.`;
+        }
       }
 
       const tagAdvice = classification === "REFILL" ? tagLineRefill : tagLineNew;
@@ -651,7 +664,7 @@ export async function runInlineAction(
       return { text };
     } catch (e) {
       console.error("stock check inline failed:", e);
-      return null;
+      return { text: "Couldn't reach your stock history right now — try again in a moment." };
     }
   }
 

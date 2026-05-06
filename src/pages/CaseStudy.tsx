@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
 
 const setMeta = (name: string, content: string) => {
@@ -160,22 +161,101 @@ export function CaseStudyPage() {
           ))}
         </div>
 
-        <article className="prose prose-invert mt-12 max-w-none">
-          <h2 className="font-[Syne] text-2xl font-semibold">The pipeline</h2>
-          <p className="text-muted-foreground">
-            Gmail intake → cron scan → supplier auto-learn → confidence badge → Smart Bulk
-            auto-fire → attachment fetch → Gemini 2.5 Flash document parse → Claude Sonnet 4.5
-            brand intelligence → Perplexity AU RRP enrichment → buyer review → one-click Shopify
-            import with proper variant grouping.
-          </p>
+        {/* Before vs After */}
+        <div className="mt-14 grid gap-6 md:grid-cols-2">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
+            <h3 className="font-[Syne] text-xl font-semibold text-destructive">❌ Before</h3>
+            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+              <li>• Supplier emails invoices as PDF</li>
+              <li>• 2–4 hours manually re-keying products into Shopify</li>
+              <li>• Typos and wrong variants go live</li>
+              <li>• Every new brand starts from scratch</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-6">
+            <h3 className="font-[Syne] text-xl font-semibold text-primary">✅ After</h3>
+            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+              <li>• Invoice forwarded or uploaded in seconds</li>
+              <li>• Shopify-ready CSV generated in under 3 minutes</li>
+              <li>• Brand patterns learned and reused automatically</li>
+              <li>• 180+ brands recognised with no re-training</li>
+            </ul>
+          </div>
+        </div>
 
-          <h2 className="font-[Syne] text-2xl font-semibold">The flywheel</h2>
-          <p className="text-muted-foreground">
-            Every correction trains the brand pattern. SKU formats, size schemas and price bands
-            are stored per brand and re-injected on the next parse. Accuracy rises with every
-            invoice — see the <Link to="/brand-guide" className="text-primary underline">live brand directory</Link>.
-          </p>
-        </article>
+        {/* Timeline */}
+        <div className="mt-14">
+          <h2 className="font-[Syne] text-2xl font-semibold">How it works</h2>
+          <ol className="mt-6 grid gap-6 md:grid-cols-4 md:gap-0 relative">
+            {[
+              { t: "Invoice arrives", d: "Supplier emails a PDF." },
+              { t: "Upload or forward", d: "Dropped into Sonic or forwarded via email." },
+              { t: "AI parses + learns", d: "Products extracted, brand pattern saved." },
+              { t: "Import to Shopify", d: "Download CSV, import done." },
+            ].map((s, i, arr) => (
+              <li key={s.t} className="relative flex flex-col items-center text-center md:px-3">
+                {i < arr.length - 1 && (
+                  <span className="hidden md:block absolute top-5 left-1/2 w-full h-px bg-primary/30" aria-hidden />
+                )}
+                <span className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground font-[Syne] font-semibold">
+                  {i + 1}
+                </span>
+                <div className="mt-3 font-[Syne] font-semibold">{s.t}</div>
+                <div className="mt-1 text-xs text-muted-foreground max-w-[180px]">{s.d}</div>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        {/* Sample output */}
+        <div className="mt-14">
+          <h2 className="font-[Syne] text-2xl font-semibold">What the output looks like</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Sample Shopify CSV output</p>
+          <div className="mt-4 overflow-x-auto rounded-lg border border-border">
+            <table className="w-full font-[IBM_Plex_Mono] text-xs">
+              <thead className="bg-muted/40 text-left">
+                <tr>
+                  {["Handle","Title","Brand","Colour","Size","Price","Compare At","Tags"].map((h) => (
+                    <th key={h} className="px-3 py-2 font-medium whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="text-muted-foreground">
+                {[
+                  ["seafolly-long-sleeve-zip-rash","Seafolly Long Sleeve Zip Rash","Seafolly","Navy","10","109.95","139.95","womens, swimwear, rash-vests"],
+                  ["seafolly-long-sleeve-zip-rash","Seafolly Long Sleeve Zip Rash","Seafolly","Black","12","109.95","139.95","womens, swimwear, rash-vests"],
+                  ["jets-jetset-plunge-onepiece","Jets Jetset Plunge One Piece","Jets","Sand","8","159.00","189.00","womens, swimwear, one-piece"],
+                  ["bondi-born-margot-bikini-top","Bondi Born Margot Bikini Top","Bondi Born","Ivory","S","145.00","","womens, swimwear, bikini-top"],
+                  ["baku-cancun-boardshort","Baku Cancun Board Short","Baku","Coral","M","79.95","99.95","mens, swimwear, boardshorts"],
+                ].map((row, i) => (
+                  <tr key={i} className="border-t border-border">
+                    {row.map((c, j) => (
+                      <td key={j} className="px-3 py-2 whitespace-nowrap">{c}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* FAQ */}
+        <div className="mt-14">
+          <h2 className="font-[Syne] text-2xl font-semibold">FAQ</h2>
+          <Accordion type="single" collapsible className="mt-4">
+            {[
+              { q: "What invoice formats does Sonic accept?", a: "PDF, Excel, CSV, photo, and email forward." },
+              { q: "Does it work for any brand?", a: "Yes — and it gets more accurate the more invoices you process for that brand." },
+              { q: "Do I need to train it manually?", a: "No. Corrections you make are automatically saved and applied next time." },
+              { q: "Is my invoice data private?", a: "Yes. Your brand patterns are private to your account." },
+            ].map((f, i) => (
+              <AccordionItem key={i} value={`item-${i}`}>
+                <AccordionTrigger className="text-left font-[Syne]">{f.q}</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">{f.a}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
 
         <div className="mt-14 rounded-xl border border-border bg-muted/20 p-8">
           <h3 className="font-[Syne] text-2xl font-semibold">Join the retailer waitlist</h3>

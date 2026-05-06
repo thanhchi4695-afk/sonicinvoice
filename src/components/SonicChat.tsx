@@ -589,7 +589,6 @@ export default function SonicChat() {
                     ))}
                   </div>
                 )}
-                )}
               </div>
             ))}
             {sending && (

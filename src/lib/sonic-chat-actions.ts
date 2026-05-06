@@ -2,6 +2,9 @@
 // Maps the structured `action` returned by the intent classifier to real app side-effects.
 // Only safe (requires_permission: false) actions run automatically here.
 
+import { generateTags, type TagInput } from "@/lib/tag-engine";
+import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
+
 export type SonicAction =
   | "navigate_tab"
   | "open_case_study"

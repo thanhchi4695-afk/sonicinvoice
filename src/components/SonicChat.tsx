@@ -315,7 +315,7 @@ export default function SonicChat() {
             )}
             {messages.map((m) => (
               <div key={m.id} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
-                {!m.seo && (
+                {!m.seo && !m.margin && (
                   <div
                     className={cn(
                       "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
@@ -325,6 +325,54 @@ export default function SonicChat() {
                     )}
                   >
                     {m.content}
+                  </div>
+                )}
+                {m.role === "assistant" && m.margin && (
+                  <div className="w-full max-w-[85%] space-y-2 rounded-2xl border border-border bg-muted p-3 text-sm">
+                    <div className="grid grid-cols-2 gap-y-1 font-mono text-xs">
+                      <span className="text-muted-foreground">Cost (ex GST)</span>
+                      <span className="text-right">${m.margin.cost.toFixed(2)}</span>
+                      <span className="text-muted-foreground">Markup applied</span>
+                      <span className="text-right">
+                        ×{m.margin.multiplier} ({m.margin.category}
+                        {m.margin.categoryInferred ? ", inferred" : ""})
+                      </span>
+                    </div>
+                    <div className="border-t border-border" />
+                    <div className="grid grid-cols-2 gap-y-1 font-mono text-xs">
+                      <span className="font-semibold">Recommended RRP</span>
+                      <span className="text-right font-semibold">${m.margin.rrp.toFixed(2)}</span>
+                      <span className="text-muted-foreground">RRP ex GST</span>
+                      <span className="text-right">${m.margin.rrpExGst.toFixed(2)}</span>
+                      <span className="text-muted-foreground">Gross margin</span>
+                      <span className="text-right">{m.margin.marginPct.toFixed(1)}%</span>
+                      <span className="text-muted-foreground">Gross profit</span>
+                      <span className="text-right">${m.margin.grossProfit.toFixed(2)}</span>
+                    </div>
+                    <div className="rounded bg-background/60 p-2 text-xs">
+                      Compare at price for a 20% sale:{" "}
+                      <span className="font-semibold">${m.margin.compareAt.toFixed(2)}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        window.dispatchEvent(
+                          new CustomEvent("sonic:apply-margin-prices", {
+                            detail: {
+                              cost: m.margin!.cost,
+                              rrp: m.margin!.rrp,
+                              rrpExGst: m.margin!.rrpExGst,
+                              compareAt: m.margin!.compareAt,
+                              brand: m.margin!.brand,
+                              category: m.margin!.category,
+                            },
+                          }),
+                        );
+                        toast.success("Prices applied to active line");
+                      }}
+                    >
+                      Use these prices
+                    </Button>
                   </div>
                 )}
                 {m.role === "assistant" && m.seo && (

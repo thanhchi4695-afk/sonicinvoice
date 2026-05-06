@@ -221,6 +221,7 @@ export default function SonicChat() {
     margin: ChatMessage["margin"] = null,
     email: ChatMessage["email"] = null,
     description: ChatMessage["description"] = null,
+    quickReplies: string[] | null = null,
   ) {
     if (!userId) return;
     const { data } = await supabase
@@ -229,7 +230,7 @@ export default function SonicChat() {
       .select("id, role, content, created_at")
       .single();
     if (data) {
-      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo, margin, email, description }]);
+      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo, margin, email, description, quickReplies }]);
     }
   }
 

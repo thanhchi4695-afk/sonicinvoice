@@ -549,11 +549,6 @@ export async function runInlineAction(
   const params = decision.params ?? {};
 
   if (decision.action === "open_stock_check") {
-    // Explicit "show full stock check" → fall through to navigation.
-    if (/\b(see all stock|show full stock check|open stock check|full stock check)\b/i.test(userMessage)) {
-      return null;
-    }
-
     const brand =
       String(params.brand_name ?? params.brand ?? params.supplier ?? "").trim() ||
       detectBrand(userMessage) ||
@@ -563,8 +558,9 @@ export async function runInlineAction(
       (userMessage.match(/\b([A-Z0-9]{4,}[-_]?\d{2,}|\d{5,})\b/)?.[1] ?? "");
 
     if (!brand && !skuRaw) {
-      // Nothing usable inline — let the screen open instead.
-      return null;
+      return {
+        text: "Tell me the brand or style number to check — e.g. 'stock check Seafolly 12345' or 'do we have Baku BK4521'.",
+      };
     }
 
     try {

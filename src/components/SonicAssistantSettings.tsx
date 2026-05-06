@@ -24,12 +24,16 @@ interface Prefs {
   morning_briefing_enabled: boolean;
   briefing_hour_utc: number;
   proactive_mode_enabled: boolean;
+  auto_approve_tags: boolean;
+  auto_approve_seo: boolean;
 }
 
 const DEFAULTS: Prefs = {
   morning_briefing_enabled: true,
   briefing_hour_utc: 22,
   proactive_mode_enabled: true,
+  auto_approve_tags: false,
+  auto_approve_seo: false,
 };
 
 const SonicAssistantSettings = () => {

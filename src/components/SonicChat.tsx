@@ -93,6 +93,48 @@ export default function SonicChat() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Realtime: inject proactive-brain tasks into the chat the moment they appear
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`proactive-tasks-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "agent_tasks",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const t = payload.new as Record<string, any>;
+          if (t.status !== "permission_requested" && t.status !== "suggested") return;
+          const msg: ChatMessage = {
+            id: `proactive-${t.id}`,
+            role: "proactive",
+            content: t.observation ?? "Sonic noticed something.",
+            created_at: t.created_at ?? new Date().toISOString(),
+            proactive: {
+              task_id: t.id,
+              observation: t.observation ?? "",
+              proposed_action: t.proposed_action ?? "",
+              permission_question: t.permission_question ?? null,
+              requires_permission: t.status === "permission_requested",
+              pipeline_to_run: t.pipeline_id ?? null,
+              resolved: null,
+            },
+          };
+          setMessages((m) => (m.some((x) => x.id === msg.id) ? m : [...m, msg]));
+          // Auto-open the panel so the user actually sees the suggestion
+          setOpen(true);
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
   // Load history when opened
   useEffect(() => {
     if (!open || !userId) return;

@@ -229,6 +229,23 @@ export function executeGatedAction(decision: SonicDecision): boolean {
       );
       return true;
     }
+    case "open_accounting_push": {
+      const platform = String(params.platform ?? "any");
+      window.dispatchEvent(new CustomEvent("sonic:navigate-tab", { detail: "invoices" }));
+      window.dispatchEvent(
+        new CustomEvent("sonic:navigate-flow", {
+          detail: { id: "accounting_push", params: { platform } },
+        }),
+      );
+      return true;
+    }
+    case "open_bulk_sale": {
+      window.dispatchEvent(new CustomEvent("sonic:navigate-tab", { detail: "products" }));
+      window.dispatchEvent(
+        new CustomEvent("sonic:navigate-flow", { detail: { id: "bulk_sale", params } }),
+      );
+      return true;
+    }
     default:
       return false;
   }

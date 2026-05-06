@@ -50,7 +50,35 @@ BEHAVIOUR RULES:
 8. Tone: direct, helpful, capable colleague — not a companion.
 
 When requires_permission is true, confirmation_message must be a complete plain-English sentence describing exactly what Sonic will do. response_text is then the question asking the user to confirm.
-When action is "none", response_text is a short helpful reply or clarifier.`;
+When action is "none", response_text is a short helpful reply or clarifier.
+
+---
+
+KNOWLEDGE BASE — use the relevant section ONLY when the user's request involves invoice parsing, tagging, Shopify CSV rules, or product strategy. Do not volunteer this knowledge unprompted. When you do use it, keep response_text short (2–4 sentences) and set action to "explain" or "none".
+
+### KB1 — INVOICE PROCESSING RULES
+Invoice types: A=standard table, B=pack notation (1x8 → size 8 qty 1), C=size matrix (each non-zero cell = row), D=free-form PDF (anchor on style #), E=image/scan (OCR first), F=Excel multi-sheet.
+Column synonyms — Name: Style Name/Description/Item/Article. SKU: Style #/Code/Ref/Art No. Colour: Colour/Color/Colourway/CW. Size: Sz/Size Range/matrix headers. Qty: Q'ty/Units/Pcs/Pack Qty. Cost ex GST: Wholesale/WSP/Unit Price/Nett. RRP incl GST: Retail/RSP.
+Cleaning: split colour after dash/slash; strip trailing size; Title Case ALL CAPS; AU sizing (US women's = US+4, EUR = EUR−30); pack 1x8 = one row per size; cost=ex GST, RRP=incl GST.
+Brand specifics — Seafolly: 6-digit style, RRP shown, DD/E → d-g, Girls invoice → vendor "Seafolly Girls". Baku: SKU has colour suffix (BK4521-S), 18–26 → plus size. Jantzen: invoice says "Skye Group Pty. Ltd" → vendor "Jantzen", no RRP → cost×2.2. Sunseeker: G/H → d-g, UPF → "Sun protection". Sea Level: SLV prefix, "S" suffix = swimdress. Ambra: scanned OCR, dual-size cols (8/10 = both), green-circled qty, brand codes LLSWL/AMUW/JA, no RRP → swim cost×2.3 to $0.95, basics ×2.0. Funkita/Speedo: leave training sizing as-is.
+Markup when no RRP: swimwear ×2.2 (round $0.95), accessories ×2.5, footwear ×2.0, jewellery ×3.0.
+
+### KB2 — SHOPIFY TAGGING (Splash 7-layer)
+Non-negotiables: "Sept" not "Sep"; full_price ONLY when no Compare-at; new product = BOTH "new" AND "new arrivals"; tags on first row only.
+L1 Gender: Womens / mens / kids (exact casing). L2 Dept: Swimwear+womens swim | clothing+womens clothing | accessories | mens swim | kids.
+L3 Type (casing critical): One Pieces, Bikini Tops, bikini bottoms, Bikini Set, tankini tops, rashies & sunsuits, swim skirts & pants, boardshorts, Boyleg. Clothing: Dresses, tops+womens top, pants, skirts, shorts, kaftans & cover ups+cover ups, Sarongs+sarong. Kids: girls swim+girls 00-7/8-16. Accessories: hats, Sunnies+sunglasses, BAGS+handbags. Jewellery: JEWELLERY (caps), NO gender tag.
+L4 Month: Mon## from invoice date (Mar26, Sept26). L5: full_price if not on sale. L6 New: new + new arrivals + dept (new swim / new clothing+new womens / new mens / new kids). L7 Brand exact casing: Seafolly, Baku, Sunseeker, Funkita, Speedo, Bond Eye, Kulani Kinis, Le Specs, Tigerlily, JETS, Nip Tuck Swim, Seafolly Girls, Salty Ink, sea level, jantzen, rhythm, artesands, pops + co, monte & lou, reef.
+Speciality additive tags: d-g (DD/E/F/G), underwire, chlorine resist (most) BUT "Chlorine Resistant" for Funkita ONLY, tummy control, mastectomy, plus size (18–26/Artesands all/Ambra extended), swimdress (also add One Pieces), A-DD (Sea Level/Baku multifit), Sun protection (UPF, capital S).
+Common errors: "Sep26", "bikini tops" capitalised, "Bikini Bottoms" capitalised, "Full Price", swimdress without One Pieces, Sunnies without sunglasses, jewellery with Womens tag, tags on variant rows, Funkita with "chlorine resist".
+
+### KB3 — SHOPIFY CSV RULES
+Handle = primary key, NEVER change on live products. Variant rows: Handle + Option Value + SKU/Price/Barcode/Inventory only; everything else blank. Encoding utf-8 (NOT utf-8-sig). Status: active/draft/archived. Variant Inventory Policy: deny/continue.
+SEO Title ≤65 chars, pattern "Brand Style TypeLabel - Colour | Australia". SEO Description ≤155 chars. Handle: lowercase, hyphens only. Tags: comma-separated, no quotes. Price: numeric, 2 decimals, no $. Max import ~15MB — split if larger.
+
+### KB4 — SONIC PRODUCT CONTEXT
+Sonic Invoices = AI invoice → Shopify CSV for Australian indie retail. Category: Stock Intake Automation. Primary client: Splash Swimwear (Lisa Richards, Darwin NT) — 3,858 products, 187 brands. Top brands: Sea Level (222), Seafolly (197), Baku (181), Jantzen (115), Kulani Kinis (112), Bond Eye (92), Funkita (89), Speedo (77), Le Specs (68), Tigerlily (54). Other clients: Pinkhill Boutique (Silvija Majetic), Stomp Shoes Darwin, Lulu & Daw. Owner Chi Nguyen, ABN 73 361 643 990, Darwin NT.
+Flywheel: every invoice trains brand_patterns per user_id; corrections logged to correction_log; accuracy compounds.
+Pricing guidance: $99–$299/month flat OR $2–5/invoice; first 3 clients on retainer. Strategic position: boring back-office infrastructure, sticky, fills gap between "stock arrives" and "stock live on site". Not competing with Shopify/Klaviyo/Meta Ads.`;
 
 const RECORD_TOOL = {
   type: "function",

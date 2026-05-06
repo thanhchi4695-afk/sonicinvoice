@@ -28,6 +28,7 @@ import AdminSecrets from "./pages/AdminSecrets.tsx";
 import AdminAIModels from "./pages/AdminAIModels.tsx";
 import Rules from "./pages/Rules.tsx";
 import RulesSetup from "./pages/RulesSetup.tsx";
+import SonicKnowledge from "./pages/SonicKnowledge.tsx";
 import { lazy, Suspense } from "react";
 const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleShoppingHub.tsx"));
 const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx"));
@@ -76,6 +77,7 @@ const App = () => (
               <Route path="/admin/ai-models" element={<AdminAIModels />} />
               <Route path="/rules" element={<Rules />} />
               <Route path="/rules/setup" element={<RulesSetup />} />
+              <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
               <Route
                 path="/google-shopping"
                 element={

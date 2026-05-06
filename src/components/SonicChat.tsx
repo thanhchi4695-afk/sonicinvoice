@@ -80,14 +80,35 @@ export default function SonicChat() {
       );
     }
 
-    // Stub assistant reply (Sprint 2 will swap this for the AI gateway call)
+    // Call Sonic intent classifier
+    let assistantText = FALLBACK_REPLY;
+    let actionTaken: string | null = "none";
+    let actionData: Record<string, unknown> | null = null;
+    try {
+      const history = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }));
+      const { data, error } = await supabase.functions.invoke("sonic-chat", {
+        body: { message: text, history, state: {} },
+      });
+      if (error) throw error;
+      if (data?.response_text) {
+        assistantText = data.response_text;
+        actionTaken = data.action ?? "none";
+        actionData = data;
+      } else if (data?.error) {
+        assistantText = data.error;
+      }
+    } catch (e) {
+      console.error("sonic-chat invoke failed:", e);
+    }
+
     const { data: asstRow } = await supabase
       .from("chat_messages")
       .insert({
         user_id: userId,
         role: "assistant",
-        content: STUB_REPLY,
-        action_taken: "none",
+        content: assistantText,
+        action_taken: actionTaken,
+        action_data: actionData,
       })
       .select("id, role, content, created_at")
       .single();

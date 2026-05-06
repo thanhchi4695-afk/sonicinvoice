@@ -347,6 +347,18 @@ export interface InlineActionResult {
     titleOver: boolean;
     descOver: boolean;
   };
+  margin?: {
+    cost: number;
+    brand: string | null;
+    category: string;
+    categoryInferred: boolean;
+    multiplier: number;
+    rrp: number;
+    rrpExGst: number;
+    grossProfit: number;
+    marginPct: number;
+    compareAt: number;
+  };
 }
 
 const KNOWN_COLOURS = [

@@ -16,7 +16,7 @@ import {
   type SonicDecision,
 } from "@/lib/sonic-chat-actions";
 
-type ChatRole = "user" | "assistant";
+type ChatRole = "user" | "assistant" | "proactive";
 interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -60,6 +60,16 @@ interface ChatMessage {
   } | null;
   description?: ProductDescription | null;
   quickReplies?: string[] | null;
+  // Proactive (auto-injected by the brain via realtime)
+  proactive?: {
+    task_id: string;
+    observation: string;
+    proposed_action: string;
+    permission_question: string | null;
+    requires_permission: boolean;
+    pipeline_to_run: string | null;
+    resolved?: "approved" | "dismissed" | null;
+  } | null;
 }
 
 const FALLBACK_REPLY =

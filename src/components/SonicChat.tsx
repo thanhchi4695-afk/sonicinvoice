@@ -58,6 +58,7 @@ interface ChatMessage {
     storeName: string;
     toneVariant: number;
   } | null;
+  description?: ProductDescription | null;
 }
 
 const FALLBACK_REPLY =

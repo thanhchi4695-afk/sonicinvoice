@@ -14,8 +14,8 @@ interface ChatMessage {
   created_at: string;
 }
 
-const STUB_REPLY =
-  "Sonic chat is online. Intent classification ships in Sprint 2 — for now I'm just saving your messages.";
+const FALLBACK_REPLY =
+  "Sorry — I had trouble processing that. Try again in a moment.";
 
 export default function SonicChat() {
   const [open, setOpen] = useState(false);
@@ -80,15 +80,40 @@ export default function SonicChat() {
       );
     }
 
-    // Stub assistant reply (Sprint 2 will swap this for the AI gateway call)
+    // Call Sonic intent classifier
+    let assistantText = FALLBACK_REPLY;
+    let actionTaken: string | null = "none";
+    let actionData: Record<string, unknown> | null = null;
+    try {
+      const history = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }));
+      const { data, error } = await supabase.functions.invoke("sonic-chat", {
+        body: { message: text, history, state: {} },
+      });
+      if (error) throw error;
+      if (data?.response_text) {
+        assistantText = data.response_text;
+        actionTaken = data.action ?? "none";
+        actionData = data;
+      } else if (data?.error) {
+        assistantText = data.error;
+      }
+    } catch (e) {
+      console.error("sonic-chat invoke failed:", e);
+    }
+
+    const asstInsert: {
+      user_id: string;
+      role: string;
+      content: string;
+      action_taken?: string;
+      action_data?: Record<string, unknown>;
+    } = { user_id: userId, role: "assistant", content: assistantText };
+    if (actionTaken) asstInsert.action_taken = actionTaken;
+    if (actionData) asstInsert.action_data = actionData;
+
     const { data: asstRow } = await supabase
       .from("chat_messages")
-      .insert({
-        user_id: userId,
-        role: "assistant",
-        content: STUB_REPLY,
-        action_taken: "none",
-      })
+      .insert([asstInsert as never])
       .select("id, role, content, created_at")
       .single();
 

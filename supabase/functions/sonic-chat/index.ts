@@ -147,8 +147,40 @@ Deno.serve(async (req) => {
 - total_brands_trained: ${state.total_brands_trained ?? 0}
 - user_first_name: ${state.user_first_name ?? "there"}`;
 
+    // Fetch user's personal knowledge using their JWT (RLS-scoped)
+    let personalContext = "";
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader) {
+      try {
+        const supaUrl = Deno.env.get("SUPABASE_URL");
+        const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+        if (supaUrl && anonKey) {
+          const kbResp = await fetch(
+            `${supaUrl}/rest/v1/user_knowledge?select=category,key,value&order=category.asc&limit=200`,
+            { headers: { Authorization: authHeader, apikey: anonKey } },
+          );
+          if (kbResp.ok) {
+            const rows: Array<{ category: string; key: string; value: string }> = await kbResp.json();
+            if (rows.length) {
+              const grouped: Record<string, string[]> = {};
+              for (const r of rows) {
+                (grouped[r.category] ??= []).push(`- ${r.key}: ${r.value}`);
+              }
+              personalContext =
+                "\n\nPERSONAL CONTEXT (user-curated knowledge — apply when relevant):\n" +
+                Object.entries(grouped)
+                  .map(([cat, items]) => `### ${cat}\n${items.join("\n")}`)
+                  .join("\n\n");
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("user_knowledge fetch failed:", e);
+      }
+    }
+
     const messages = [
-      { role: "system", content: SYSTEM_PROMPT + "\n\n" + stateLine },
+      { role: "system", content: SYSTEM_PROMPT + "\n\n" + stateLine + personalContext },
       ...history.map((h) => ({ role: h.role, content: h.content })),
       { role: "user", content: message },
     ];

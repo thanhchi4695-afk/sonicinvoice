@@ -8,6 +8,7 @@ import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle, Package, Refresh
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { addAuditEntry } from "@/lib/audit-log";
+import { triggerStockAlertBrain } from "@/lib/stock-alert-trigger";
 
 /* ─── Types ───────────────────────────────────────── */
 
@@ -217,6 +218,27 @@ const StockMonitorPanel = ({ onBack }: Props) => {
       setMonitored(allProducts);
       if (newAlerts.length) {
         setAlerts(prev => [...newAlerts, ...prev]);
+
+        // Fire-and-forget: notify Sonic so the chat surfaces a reorder suggestion.
+        (async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          const grouped = new Map<string, typeof newAlerts>();
+          for (const a of newAlerts) {
+            const key = a.productTitle;
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key)!.push(a);
+          }
+          for (const [productTitle, group] of grouped) {
+            triggerStockAlertBrain({
+              userId: user.id,
+              brandName: productTitle,
+              lowSizes: group.map(g => g.variantTitle),
+              currentQty: group.reduce((sum, g) => sum + g.availableQty, 0),
+              threshold: group[0].threshold,
+            }).catch(() => {});
+          }
+        })();
       }
 
       addAuditEntry("Stock Monitor", `Scanned ${allProducts.length} ongoing variants, ${newAlerts.length} new alerts`);

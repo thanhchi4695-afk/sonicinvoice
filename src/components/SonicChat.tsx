@@ -185,6 +185,18 @@ export default function SonicChat() {
         },
       )
       .subscribe();
+
+    // Honor user preference: disable proactive injection when toggled off
+    supabase
+      .from("user_preferences")
+      .select("proactive_mode_enabled")
+      .eq("user_id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && data.proactive_mode_enabled === false) {
+          proactiveEnabled = false;
+        }
+      });
     return () => {
       supabase.removeChannel(channel);
     };

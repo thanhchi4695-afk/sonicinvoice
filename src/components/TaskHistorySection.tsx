@@ -121,6 +121,16 @@ const TaskHistorySection = () => {
             };
             const label = TASK_LABELS[r.task_type as keyof typeof TASK_LABELS] ?? r.task_type;
             const isOpen = expanded === r.id;
+            const autoMatch = r.result_summary?.match(/Auto-completed via (\w+) preference/);
+            const autoPref = autoMatch?.[1] ?? null;
+            const autoLabel =
+              autoPref === "tags"
+                ? "Auto: Tags pref"
+                : autoPref === "seo"
+                  ? "Auto: SEO pref"
+                  : autoPref === "stock_check"
+                    ? "Auto: Stock check"
+                    : null;
             return (
               <div key={r.id}>
                 <button
@@ -132,6 +142,15 @@ const TaskHistorySection = () => {
                   <Badge variant="outline" className={`text-[10px] ${badge.className}`}>
                     {badge.label}
                   </Badge>
+                  {autoLabel && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] bg-primary/10 text-primary border-primary/30 gap-1"
+                    >
+                      <Sparkles className="w-2.5 h-2.5" />
+                      {autoLabel}
+                    </Badge>
+                  )}
                   <span className="text-xs text-muted-foreground flex-1 truncate">
                     {(r.observation ?? "").slice(0, 60)}
                     {(r.observation?.length ?? 0) > 60 ? "…" : ""}

@@ -340,7 +340,7 @@ export default function SonicChat() {
             )}
             {messages.map((m) => (
               <div key={m.id} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
-                {!m.seo && !m.margin && !m.email && (
+                {!m.seo && !m.margin && !m.email && !m.description && (
                   <div
                     className={cn(
                       "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
@@ -351,6 +351,17 @@ export default function SonicChat() {
                   >
                     {m.content}
                   </div>
+                )}
+                {m.role === "assistant" && m.description && (
+                  <ProductDescriptionCard
+                    description={m.description}
+                    hasActiveParse={hasActiveParse}
+                    onUpdate={(next) =>
+                      setMessages((arr) =>
+                        arr.map((x) => (x.id === m.id ? { ...x, description: next } : x)),
+                      )
+                    }
+                  />
                 )}
                 {m.role === "assistant" && m.email && (
                   <SupplierEmailCard

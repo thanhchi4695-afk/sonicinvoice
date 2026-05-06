@@ -141,16 +141,22 @@ export function executeChatAction(decision: SonicDecision): boolean {
   // Generic mapped actions (open_* across all tabs)
   if (ACTION_MAP[action]) {
     const { tab, flow } = ACTION_MAP[action];
+    // Always set the tab first so the flow renders inside the right shell
+    // (and the previous flow is cleared by the navigate-tab handler).
     if (tab) navigateTab(tab);
-    if (flow) navigateFlow(flow, params);
+    if (flow) {
+      // Defer the flow dispatch so the tab change settles first.
+      setTimeout(() => navigateFlow(flow, params), 0);
+    }
     return true;
   }
 
   switch (action) {
     case "navigate_tab": {
       const tab = String(params.tab ?? "").toLowerCase();
-      if (VALID_TABS.has(tab)) {
-        navigateTab(tab);
+      const target = TAB_ALIASES[tab] ?? tab;
+      if (VALID_TABS.has(target)) {
+        navigateTab(target);
         return true;
       }
       return false;

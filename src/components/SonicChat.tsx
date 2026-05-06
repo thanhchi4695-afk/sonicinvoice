@@ -34,6 +34,18 @@ interface ChatMessage {
     titleOver: boolean;
     descOver: boolean;
   } | null;
+  margin?: {
+    cost: number;
+    brand: string | null;
+    category: string;
+    categoryInferred: boolean;
+    multiplier: number;
+    rrp: number;
+    rrpExGst: number;
+    grossProfit: number;
+    marginPct: number;
+    compareAt: number;
+  } | null;
 }
 
 const FALLBACK_REPLY =

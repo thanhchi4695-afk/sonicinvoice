@@ -370,6 +370,15 @@ export interface InlineActionResult {
     storeName: string;
     toneVariant: number;
   };
+  description?: {
+    brandName: string;
+    productName: string;
+    colour: string;
+    productType: string;
+    features: string[];
+    text: string;
+    lengthVariant: "default" | "shorter" | "longer";
+  };
 }
 
 const KNOWN_COLOURS = [

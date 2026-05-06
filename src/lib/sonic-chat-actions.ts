@@ -26,21 +26,31 @@ export interface SonicDecision {
   response_text?: string;
 }
 
+// Valid top-level tabs in Index.tsx
 const VALID_TABS = new Set([
   "home",
   "invoices",
-  "products",
-  "marketing",
   "tools",
   "history",
   "flywheel",
   "analytics",
-  "settings",
+  "billing",
+  "help",
+  "howto",
   "account",
+  "ai_agents",
+  "google_ads",
 ]);
 
+// Aliases the AI may emit → real tab keys
+const TAB_ALIASES: Record<string, string> = {
+  settings: "account",
+  products: "tools",
+  marketing: "tools",
+};
+
 function navigateTab(tab: string) {
-  const target = tab === "settings" ? "account" : tab;
+  const target = TAB_ALIASES[tab] ?? tab;
   window.dispatchEvent(new CustomEvent("sonic:navigate-tab", { detail: target }));
 }
 
@@ -50,7 +60,8 @@ function navigateFlow(flow: string, params?: Record<string, unknown>) {
   );
 }
 
-// Map of action_key → { tab?, flow? } so each action sets the right tab + flow.
+// Map of action_key → { tab?, flow? } using REAL Index.tsx FLOW_KEYS / tab names.
+// `flow` takes priority and renders the screen; `tab` is the fallback when no flow matches.
 const ACTION_MAP: Record<string, { tab?: string; flow?: string }> = {
   // Invoices tab
   open_invoice_upload: { tab: "invoices", flow: "invoice" },
@@ -61,59 +72,59 @@ const ACTION_MAP: Record<string, { tab?: string; flow?: string }> = {
   open_wholesale_import: { tab: "invoices", flow: "wholesale_import" },
   open_lookbook_import: { tab: "invoices", flow: "lookbook_import" },
   open_purchase_orders: { tab: "invoices", flow: "purchase_orders" },
-  open_order_forms: { tab: "invoices", flow: "order_forms" },
-  open_accounting_push: { tab: "invoices", flow: "accounting_push" },
+  open_order_forms: { tab: "invoices", flow: "order_form" },
+  open_accounting_push: { tab: "invoices", flow: "accounting" },
   open_stock_check: { tab: "invoices", flow: "stock_check" },
 
-  // Products tab
-  open_inventory_hub: { tab: "products", flow: "inventory_view" },
-  open_stock_monitor: { tab: "products", flow: "stock_monitor" },
-  open_restock_analytics: { tab: "products", flow: "restock_analytics" },
-  open_reorder: { tab: "products", flow: "reorder" },
-  open_inventory_planning: { tab: "products", flow: "inventory_planning" },
-  open_price_adjustment: { tab: "products", flow: "price_adjustment" },
-  open_price_lookup: { tab: "products", flow: "price_lookup" },
-  open_margin_protection: { tab: "products", flow: "margin_protection" },
-  open_markdown_ladders: { tab: "products", flow: "markdown_ladders" },
-  open_pl_analysis: { tab: "products", flow: "pl_analysis" },
-  open_bulk_sale: { tab: "products", flow: "bulk_sale" },
-  open_product_health: { tab: "products", flow: "product_health" },
-  open_style_grouping: { tab: "products", flow: "style_grouping" },
-  open_seasons: { tab: "products", flow: "seasons" },
-  open_image_optimisation: { tab: "products", flow: "image_optimisation" },
-  open_catalog_memory: { tab: "products", flow: "catalog_memory" },
-  open_supplier_performance: { tab: "products", flow: "supplier_performance" },
-  open_suppliers: { tab: "products", flow: "suppliers" },
-  open_lightspeed_converter: { tab: "products", flow: "lightspeed_converter" },
-  open_order_sync: { tab: "products", flow: "order_sync" },
+  // Products / inventory
+  open_inventory_hub: { tab: "tools", flow: "inventory_view" },
+  open_stock_monitor: { tab: "tools", flow: "stock_monitor" },
+  open_restock_analytics: { tab: "tools", flow: "restock" },
+  open_reorder: { tab: "tools", flow: "reorder" },
+  open_inventory_planning: { tab: "tools", flow: "inventory_planning" },
+  open_price_adjustment: { tab: "tools", flow: "price_adjust" },
+  open_price_lookup: { tab: "tools", flow: "price_lookup" },
+  open_margin_protection: { tab: "tools", flow: "margin_protection" },
+  open_markdown_ladders: { tab: "tools", flow: "markdown_ladder" },
+  open_pl_analysis: { tab: "tools", flow: "profit_loss" },
+  open_bulk_sale: { tab: "tools", flow: "sale" },
+  open_product_health: { tab: "tools", flow: "product_health" },
+  open_style_grouping: { tab: "tools", flow: "style_grouping" },
+  open_seasons: { tab: "tools", flow: "seasons" },
+  open_image_optimisation: { tab: "tools", flow: "image_optimise" },
+  open_catalog_memory: { tab: "tools", flow: "catalog_memory" },
+  open_supplier_performance: { tab: "tools", flow: "supplier_intelligence" },
+  open_suppliers: { tab: "tools", flow: "suppliers" },
+  open_lightspeed_converter: { tab: "tools", flow: "lightspeed_convert" },
+  open_order_sync: { tab: "tools", flow: "order_sync" },
 
-  // Marketing tab
-  open_feed_health: { tab: "marketing", flow: "feed_health" },
-  open_feed_optimisation: { tab: "marketing", flow: "feed_optimisation" },
-  open_google_colours: { tab: "marketing", flow: "google_colours" },
-  open_google_ads_attributes: { tab: "marketing", flow: "google_ads_attributes" },
-  open_google_ads_setup: { tab: "marketing", flow: "google_ads_setup" },
-  open_meta_ads_setup: { tab: "marketing", flow: "meta_ads_setup" },
-  open_performance_dashboard: { tab: "marketing", flow: "performance_dashboard" },
-  open_competitor_intel: { tab: "marketing", flow: "competitor_intel" },
-  open_organic_seo: { tab: "marketing", flow: "organic_seo" },
-  open_collection_seo: { tab: "marketing", flow: "collection_seo" },
-  open_geo_agentic: { tab: "marketing", flow: "geo_agentic" },
-  open_collab_seo: { tab: "marketing", flow: "collab_seo" },
-  open_social_media: { tab: "marketing", flow: "social_media" },
+  // Marketing
+  open_feed_health: { tab: "tools", flow: "feed_health" },
+  open_feed_optimisation: { tab: "tools", flow: "feed_optimise" },
+  open_google_colours: { tab: "tools", flow: "google_colour" },
+  open_google_ads_attributes: { tab: "google_ads" },
+  open_google_ads_setup: { tab: "tools", flow: "google_ads_setup" },
+  open_meta_ads_setup: { tab: "tools", flow: "meta_ads_setup" },
+  open_performance_dashboard: { tab: "tools", flow: "performance" },
+  open_competitor_intel: { tab: "tools", flow: "competitor_intel" },
+  open_organic_seo: { tab: "tools", flow: "organic_seo" },
+  open_collection_seo: { tab: "tools", flow: "collection_seo" },
+  open_geo_agentic: { tab: "tools", flow: "geo_agentic" },
+  open_collab_seo: { tab: "tools", flow: "collab_seo" },
+  open_social_media: { tab: "tools", flow: "social_media" },
 
-  // Tools tab
-  open_tag_builder: { tab: "tools", flow: "tag_builder" },
-  open_seo_writer: { tab: "tools", flow: "seo_writer" },
-  open_export_collections: { tab: "tools", flow: "export_collections" },
-  open_import_collections: { tab: "tools", flow: "import_collections" },
-  open_auto_collections: { tab: "tools", flow: "auto_collections" },
-  open_collection_seo_ai: { tab: "tools", flow: "collection_seo_ai" },
-  open_image_downloader: { tab: "tools", flow: "image_downloader" },
-  open_google_feed_preview: { tab: "tools", flow: "google_feed_preview" },
-  open_ai_instructions: { tab: "tools", flow: "ai_instructions" },
-  open_learning_memory: { tab: "tools", flow: "learning_memory" },
-  open_supplier_email_templates: { tab: "tools", flow: "supplier_email_templates" },
+  // Tools
+  open_tag_builder: { tab: "tools" },
+  open_seo_writer: { tab: "tools", flow: "csv_seo" },
+  open_export_collections: { tab: "tools" },
+  open_import_collections: { tab: "tools" },
+  open_auto_collections: { tab: "tools", flow: "collection_decomposer" },
+  open_collection_seo_ai: { tab: "tools", flow: "collection_seo" },
+  open_image_downloader: { tab: "tools" },
+  open_google_feed_preview: { tab: "tools", flow: "feed_health" },
+  open_ai_instructions: { tab: "account" },
+  open_learning_memory: { tab: "tools", flow: "supplier_intelligence" },
+  open_supplier_email_templates: { tab: "tools" },
   open_audit_log: { tab: "tools", flow: "audit_log" },
 };
 

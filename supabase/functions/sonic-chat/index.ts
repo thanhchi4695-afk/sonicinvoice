@@ -219,6 +219,38 @@ interface ChatTurn {
   content: string;
 }
 
+// In-memory per-user cache for personal + live store context.
+// Keyed by a SHA-256 of the Authorization header so the raw JWT never sits in memory.
+// TTL: 45s — long enough to absorb chat bursts, short enough to feel "live".
+// Cache is per edge isolate, so it warms naturally with the keepalive ping.
+const CONTEXT_TTL_MS = 45_000;
+const CONTEXT_CACHE_MAX = 200;
+interface CachedCtx { personal: string; live: string; expiresAt: number }
+const contextCache = new Map<string, CachedCtx>();
+
+async function hashAuth(auth: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(auth));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function getCachedContext(key: string): CachedCtx | null {
+  if (contextCache.size > CONTEXT_CACHE_MAX) {
+    const now = Date.now();
+    for (const [k, v] of contextCache) if (v.expiresAt < now) contextCache.delete(k);
+  }
+  const hit = contextCache.get(key);
+  if (hit && hit.expiresAt > Date.now()) return hit;
+  if (hit) contextCache.delete(key);
+  return null;
+}
+function setCachedContext(key: string, ctx: { personal: string; live: string }): void {
+  contextCache.set(key, { ...ctx, expiresAt: Date.now() + CONTEXT_TTL_MS });
+}
+// Optional: invalidate via a header (e.g. when client knows data changed).
+function maybeInvalidate(req: Request, key: string) {
+  if (req.headers.get("x-sonic-cache") === "bypass") contextCache.delete(key);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -258,7 +290,9 @@ Deno.serve(async (req) => {
 - total_brands_trained: ${state.total_brands_trained ?? 0}
 - user_first_name: ${state.user_first_name ?? "there"}`;
 
-    // Fetch user's personal knowledge + live store data using their JWT (RLS-scoped)
+    // Fetch user's personal knowledge + live store data using their JWT (RLS-scoped).
+    // Cached per-user in module memory for 45s to absorb chat bursts without
+    // hammering Postgres. Cache survives as long as the edge isolate stays warm.
     let personalContext = "";
     let liveStoreContext = "";
     const authHeader = req.headers.get("Authorization");
@@ -266,109 +300,118 @@ Deno.serve(async (req) => {
       const supaUrl = Deno.env.get("SUPABASE_URL");
       const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
       if (supaUrl && anonKey) {
-        const restHeaders = { Authorization: authHeader, apikey: anonKey };
+        const cacheKey = await hashAuth(authHeader);
+        maybeInvalidate(req, cacheKey);
+        const cached = getCachedContext(cacheKey);
+        if (cached) {
+          personalContext = cached.personal;
+          liveStoreContext = cached.live;
+        } else {
+          const restHeaders = { Authorization: authHeader, apikey: anonKey };
 
-        // Fire all four reads in parallel to keep latency flat.
-        const [kbRes, brandRes, importRes, taskRes] = await Promise.allSettled([
-          fetch(
-            `${supaUrl}/rest/v1/user_knowledge?select=category,key,value&order=category.asc&limit=200`,
-            { headers: restHeaders },
-          ),
-          fetch(
-            `${supaUrl}/rest/v1/brand_stats?select=brand_name,total_invoices_parsed,avg_accuracy&order=total_invoices_parsed.desc&limit=10`,
-            { headers: restHeaders },
-          ),
-          fetch(
-            `${supaUrl}/rest/v1/inventory_import_runs?select=supplier_name,units_applied,created_at&order=created_at.desc&limit=5`,
-            { headers: restHeaders },
-          ),
-          fetch(
-            `${supaUrl}/rest/v1/agent_tasks?select=task_type,observation&status=eq.pending&order=created_at.desc&limit=3`,
-            { headers: restHeaders },
-          ),
-        ]);
+          // Fire all four reads in parallel to keep latency flat.
+          const [kbRes, brandRes, importRes, taskRes] = await Promise.allSettled([
+            fetch(
+              `${supaUrl}/rest/v1/user_knowledge?select=category,key,value&order=category.asc&limit=200`,
+              { headers: restHeaders },
+            ),
+            fetch(
+              `${supaUrl}/rest/v1/brand_stats?select=brand_name,total_invoices_parsed,avg_accuracy&order=total_invoices_parsed.desc&limit=10`,
+              { headers: restHeaders },
+            ),
+            fetch(
+              `${supaUrl}/rest/v1/inventory_import_runs?select=supplier_name,units_applied,created_at&order=created_at.desc&limit=5`,
+              { headers: restHeaders },
+            ),
+            fetch(
+              `${supaUrl}/rest/v1/agent_tasks?select=task_type,observation&status=eq.pending&order=created_at.desc&limit=3`,
+              { headers: restHeaders },
+            ),
+          ]);
 
-        // user_knowledge → PERSONAL CONTEXT
-        try {
-          if (kbRes.status === "fulfilled" && kbRes.value.ok) {
-            const rows: Array<{ category: string; key: string; value: string }> =
-              await kbRes.value.json();
-            if (rows.length) {
-              const grouped: Record<string, string[]> = {};
-              for (const r of rows) {
-                (grouped[r.category] ??= []).push(`- ${r.key}: ${r.value}`);
+          // user_knowledge → PERSONAL CONTEXT
+          try {
+            if (kbRes.status === "fulfilled" && kbRes.value.ok) {
+              const rows: Array<{ category: string; key: string; value: string }> =
+                await kbRes.value.json();
+              if (rows.length) {
+                const grouped: Record<string, string[]> = {};
+                for (const r of rows) {
+                  (grouped[r.category] ??= []).push(`- ${r.key}: ${r.value}`);
+                }
+                personalContext =
+                  "\n\nPERSONAL CONTEXT (user-curated knowledge — apply when relevant):\n" +
+                  Object.entries(grouped)
+                    .map(([cat, items]) => `### ${cat}\n${items.join("\n")}`)
+                    .join("\n\n");
               }
-              personalContext =
-                "\n\nPERSONAL CONTEXT (user-curated knowledge — apply when relevant):\n" +
-                Object.entries(grouped)
-                  .map(([cat, items]) => `### ${cat}\n${items.join("\n")}`)
-                  .join("\n\n");
             }
+          } catch (e) {
+            console.warn("user_knowledge parse failed:", e);
           }
-        } catch (e) {
-          console.warn("user_knowledge parse failed:", e);
-        }
 
-        // brand_stats / inventory_import_runs / agent_tasks → LIVE STORE DATA
-        try {
-          const sections: string[] = [];
+          // brand_stats / inventory_import_runs / agent_tasks → LIVE STORE DATA
+          try {
+            const sections: string[] = [];
 
-          if (brandRes.status === "fulfilled" && brandRes.value.ok) {
-            const rows: Array<{
-              brand_name: string;
-              total_invoices_parsed: number;
-              avg_accuracy: number | null;
-            }> = await brandRes.value.json();
-            if (rows.length) {
-              const lines = rows.map((r) => {
-                const acc = r.avg_accuracy != null ? `${Number(r.avg_accuracy).toFixed(1)}%` : "n/a";
-                return `- ${r.brand_name}: ${r.total_invoices_parsed} invoices, ${acc} accuracy`;
-              });
-              sections.push(`### Top brands (by invoices parsed)\n${lines.join("\n")}`);
+            if (brandRes.status === "fulfilled" && brandRes.value.ok) {
+              const rows: Array<{
+                brand_name: string;
+                total_invoices_parsed: number;
+                avg_accuracy: number | null;
+              }> = await brandRes.value.json();
+              if (rows.length) {
+                const lines = rows.map((r) => {
+                  const acc = r.avg_accuracy != null ? `${Number(r.avg_accuracy).toFixed(1)}%` : "n/a";
+                  return `- ${r.brand_name}: ${r.total_invoices_parsed} invoices, ${acc} accuracy`;
+                });
+                sections.push(`### Top brands (by invoices parsed)\n${lines.join("\n")}`);
+              }
             }
-          }
 
-          if (importRes.status === "fulfilled" && importRes.value.ok) {
-            const rows: Array<{
-              supplier_name: string | null;
-              units_applied: number | null;
-              created_at: string;
-            }> = await importRes.value.json();
-            if (rows.length) {
-              const lines = rows.map((r) => {
-                const when = r.created_at?.slice(0, 10) ?? "";
-                const supplier = r.supplier_name ?? "unknown";
-                const units = r.units_applied ?? 0;
-                return `- ${when} · ${supplier} · ${units} units`;
-              });
-              sections.push(`### Recent imports (last 5)\n${lines.join("\n")}`);
+            if (importRes.status === "fulfilled" && importRes.value.ok) {
+              const rows: Array<{
+                supplier_name: string | null;
+                units_applied: number | null;
+                created_at: string;
+              }> = await importRes.value.json();
+              if (rows.length) {
+                const lines = rows.map((r) => {
+                  const when = r.created_at?.slice(0, 10) ?? "";
+                  const supplier = r.supplier_name ?? "unknown";
+                  const units = r.units_applied ?? 0;
+                  return `- ${when} · ${supplier} · ${units} units`;
+                });
+                sections.push(`### Recent imports (last 5)\n${lines.join("\n")}`);
+              }
             }
-          }
 
-          if (taskRes.status === "fulfilled" && taskRes.value.ok) {
-            const rows: Array<{ task_type: string; observation: string | null }> =
-              await taskRes.value.json();
-            if (rows.length) {
-              const lines = rows.map(
-                (r) => `- ${r.task_type}: ${(r.observation ?? "").slice(0, 160)}`,
-              );
-              sections.push(`### Pending agent tasks\n${lines.join("\n")}`);
+            if (taskRes.status === "fulfilled" && taskRes.value.ok) {
+              const rows: Array<{ task_type: string; observation: string | null }> =
+                await taskRes.value.json();
+              if (rows.length) {
+                const lines = rows.map(
+                  (r) => `- ${r.task_type}: ${(r.observation ?? "").slice(0, 160)}`,
+                );
+                sections.push(`### Pending agent tasks\n${lines.join("\n")}`);
+              }
             }
+
+            if (sections.length) {
+              let block =
+                "\n\nLIVE STORE DATA (current snapshot — reference when answering store/brand/import questions):\n" +
+                sections.join("\n\n");
+              // Hard cap at 2,000 chars to avoid bloating the prompt.
+              if (block.length > 2000) block = block.slice(0, 1997) + "...";
+              liveStoreContext = block;
+            }
+          } catch (e) {
+            console.warn("live store data parse failed:", e);
           }
 
-          if (sections.length) {
-            let block =
-              "\n\nLIVE STORE DATA (current snapshot — reference when answering store/brand/import questions):\n" +
-              sections.join("\n\n");
-            // Hard cap at 2,000 chars to avoid bloating the prompt.
-            if (block.length > 2000) block = block.slice(0, 1997) + "...";
-            liveStoreContext = block;
-          }
-        } catch (e) {
-          console.warn("live store data parse failed:", e);
+          setCachedContext(cacheKey, { personal: personalContext, live: liveStoreContext });
         }
       }
-    }
 
     const messages = [
       { role: "system", content: buildSystemPrompt(message) + "\n\n" + stateLine + personalContext + liveStoreContext },

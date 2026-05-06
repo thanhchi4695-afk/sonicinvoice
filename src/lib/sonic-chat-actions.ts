@@ -2,7 +2,8 @@
 // Maps the structured `action` returned by the intent classifier to real app side-effects.
 // Only safe (requires_permission: false) actions run automatically here.
 
-import { generateTags, type TagInput } from "@/lib/tag-engine";
+import { generateTags, type TagInput, TYPE_OPTIONS } from "@/lib/tag-engine";
+import { getBrandDirectory } from "@/lib/brand-directory";
 import { generateSeo, type SeoProduct } from "@/lib/seo-engine";
 import { supabase } from "@/integrations/supabase/client";
 import {

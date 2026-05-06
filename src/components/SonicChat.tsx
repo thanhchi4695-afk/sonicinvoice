@@ -113,7 +113,7 @@ export default function SonicChat() {
 
     const { data: asstRow } = await supabase
       .from("chat_messages")
-      .insert(asstInsert)
+      .insert([asstInsert])
       .select("id, role, content, created_at")
       .single();
 

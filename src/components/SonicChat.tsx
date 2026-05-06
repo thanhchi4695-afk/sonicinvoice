@@ -82,6 +82,7 @@ interface ChatMessage {
     pipeline_to_run: string | null;
     resolved?: "approved" | "dismissed" | null;
   } | null;
+  isStreaming?: boolean;
 }
 
 const FALLBACK_REPLY =

@@ -151,6 +151,41 @@ const SonicAssistantSettings = () => {
                   onCheckedChange={(v) => save({ proactive_mode_enabled: v })}
                 />
               </div>
+
+              <div className="flex items-center justify-between">
+                <div className="pr-4">
+                  <p className="text-sm font-medium">Auto-generate tags after parse</p>
+                  <p className="text-xs text-muted-foreground">
+                    Tags will be generated automatically after every invoice parse.
+                    You can edit them before importing to Shopify.
+                  </p>
+                </div>
+                <Switch
+                  checked={prefs.auto_approve_tags}
+                  onCheckedChange={(v) => save({ auto_approve_tags: v })}
+                  disabled={!prefs.proactive_mode_enabled}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="pr-4">
+                  <p className="text-sm font-medium">Auto-write SEO titles after parse</p>
+                  <p className="text-xs text-muted-foreground">
+                    SEO titles and meta descriptions will be written automatically
+                    after tags are done. Review them in the SEO Writer before pushing.
+                  </p>
+                </div>
+                <Switch
+                  checked={prefs.auto_approve_seo}
+                  onCheckedChange={(v) => save({ auto_approve_seo: v })}
+                  disabled={!prefs.proactive_mode_enabled}
+                />
+              </div>
+
+              <p className="text-[11px] text-muted-foreground bg-muted/40 rounded-md p-2 border border-border">
+                Auto-approved tasks still appear in your chat history and can be
+                reviewed or undone before Shopify import.
+              </p>
             </>
           )}
         </div>

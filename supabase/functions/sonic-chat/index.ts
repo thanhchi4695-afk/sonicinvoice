@@ -243,6 +243,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Fast keepalive path — used by cron to keep the function warm without spending AI credits.
+    if (message === "__ping__") {
+      return new Response(JSON.stringify({ ok: true, pong: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const stateLine = `CURRENT APP STATE:
 - current_tab: ${state.current_tab ?? "unknown"}
 - last_parsed_brand: ${state.last_parsed_brand ?? "none"}

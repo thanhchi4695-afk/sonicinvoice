@@ -25,14 +25,15 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Plan configuration — 3 tiers, AUD pricing
+// Plan keys must stay in sync with src/components/BillingScreen.tsx + AccountScreen.tsx
 const PLANS: Record<string, {
   name: string; handle: string; price: number;
   currency: string; trialDays: number; interval: string; test: boolean;
 }> = {
-  starter: {
-    name: "Starter",
-    handle: "starter",
-    price: 29.00,
+  essentials: {
+    name: "Essentials",
+    handle: "essentials",
+    price: 49.00,
     currency: "AUD",
     trialDays: 14,
     interval: "EVERY_30_DAYS",
@@ -41,16 +42,35 @@ const PLANS: Record<string, {
   pro: {
     name: "Pro",
     handle: "pro",
-    price: 59.00,
+    price: 99.00,
+    currency: "AUD",
+    trialDays: 14,
+    interval: "EVERY_30_DAYS",
+    test: false,
+  },
+  agent: {
+    name: "Agent",
+    handle: "agent",
+    price: 179.00,
+    currency: "AUD",
+    trialDays: 14,
+    interval: "EVERY_30_DAYS",
+    test: false,
+  },
+  // Legacy aliases — keep so existing subscribers on old keys still resolve.
+  starter: {
+    name: "Essentials",
+    handle: "essentials",
+    price: 49.00,
     currency: "AUD",
     trialDays: 14,
     interval: "EVERY_30_DAYS",
     test: false,
   },
   growth: {
-    name: "Growth",
-    handle: "growth",
-    price: 99.00,
+    name: "Agent",
+    handle: "agent",
+    price: 179.00,
     currency: "AUD",
     trialDays: 14,
     interval: "EVERY_30_DAYS",

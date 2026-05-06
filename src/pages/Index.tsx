@@ -231,7 +231,18 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     };
     const onNavFlow = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (typeof detail === "string") setActiveFlow(detail as ActiveFlow);
+      const flowId =
+        typeof detail === "string"
+          ? detail
+          : detail && typeof detail === "object" && typeof detail.id === "string"
+            ? detail.id
+            : null;
+      if (flowId && (FLOW_KEYS as Record<string, boolean>)[flowId]) {
+        if (detail && typeof detail === "object" && detail.params) {
+          (window as any).__sonicFlowParams = detail.params;
+        }
+        setActiveFlow(flowId as ActiveFlow);
+      }
     };
     const onNavTab = (e: Event) => {
       const detail = (e as CustomEvent).detail;

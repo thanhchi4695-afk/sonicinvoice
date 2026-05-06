@@ -664,7 +664,7 @@ export async function runInlineAction(
       return { text };
     } catch (e) {
       console.error("stock check inline failed:", e);
-      return null;
+      return { text: "Couldn't reach your stock history right now — try again in a moment." };
     }
   }
 

@@ -259,99 +259,135 @@ export default function SonicChat() {
     };
     setMessages((m) => [...m, optimisticUser]);
 
-    const { data: userRow } = await supabase
-      .from("chat_messages")
-      .insert({ user_id: userId, role: "user", content: text })
-      .select("id, role, content, created_at")
-      .single();
-
-    if (userRow) {
-      setMessages((m) =>
-        m.map((msg) => (msg.id === optimisticUser.id ? (userRow as ChatMessage) : msg)),
-      );
-    }
-
-    // Call Sonic intent classifier
-    let assistantText = FALLBACK_REPLY;
-    let actionTaken: string | null = "none";
+    let decision: SonicDecision = {} as SonicDecision;
+    let isGated = false;
     let actionData: Record<string, unknown> | null = null;
+
     try {
-      const history = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }));
-      const { data, error } = await supabase.functions.invoke("sonic-chat", {
-        body: { message: text, history, state: {} },
-      });
-      if (error) throw error;
-      if (data?.response_text) {
-        assistantText = data.response_text;
-        actionTaken = data.action ?? "none";
-        actionData = data;
-      } else if (data?.error) {
-        assistantText = data.error;
-      }
-    } catch (e) {
-      console.error("sonic-chat invoke failed:", e);
-    }
-
-    const asstInsert: {
-      user_id: string;
-      role: string;
-      content: string;
-      action_taken?: string;
-      action_data?: Record<string, unknown>;
-    } = { user_id: userId, role: "assistant", content: assistantText };
-    if (actionTaken) asstInsert.action_taken = actionTaken;
-    if (actionData) asstInsert.action_data = actionData;
-
-    const { data: asstRow } = await supabase
-      .from("chat_messages")
-      .insert([asstInsert as never])
-      .select("id, role, content, created_at, action_taken, action_data")
-      .single();
-
-    const decision = (actionData ?? {}) as SonicDecision;
-    const isGated = !!decision.requires_permission && decision.action && decision.action !== "none";
-
-    if (asstRow) {
-      const enriched: ChatMessage = {
-        ...(asstRow as ChatMessage),
-        pending: isGated,
-      };
-      setMessages((m) => [...m, enriched]);
-    }
-    setSending(false);
-
-    // Sprint 3: auto-execute safe actions
-    if (actionData && !isGated) {
-      // Inline-result actions (tag builder, SEO writer) post their output as a
-      // follow-up assistant message instead of navigating.
-      const inline = await runInlineAction(decision, text);
-      if (inline) {
-        await postAssistantNote(
-          inline.text,
-          inline.copyable ?? null,
-          inline.seo ?? null,
-          inline.margin ?? null,
-          inline.email ?? null,
-          inline.description ?? null,
-          inline.quickReplies ?? null,
-        );
-      } else {
-        const ran = executeChatAction(decision);
-        const closeOn = new Set([
-          "navigate_tab",
-          "open_case_study",
-          "open_brand_guide",
-          "open_file_picker",
-          "show_last_invoice",
-          "show_brand_accuracy",
-          "show_flywheel_summary",
-          "list_trained_brands",
-          "open_correction_ui",
-          "scan_email_inbox",
-        ]);
-        if (ran && decision.action && closeOn.has(decision.action)) {
-          setTimeout(() => setOpen(false), 400);
+      // Best-effort persist user message — don't block UI on DB errors.
+      try {
+        const { data: userRow } = await supabase
+          .from("chat_messages")
+          .insert({ user_id: userId, role: "user", content: text })
+          .select("id, role, content, created_at")
+          .single();
+        if (userRow) {
+          setMessages((m) =>
+            m.map((msg) => (msg.id === optimisticUser.id ? (userRow as ChatMessage) : msg)),
+          );
         }
+      } catch (e) {
+        console.warn("chat_messages user insert failed:", e);
+      }
+
+      // Call Sonic intent classifier — race against a 30s timeout so the
+      // spinner can never hang indefinitely on a stalled fetch.
+      let assistantText = FALLBACK_REPLY;
+      let actionTaken: string | null = "none";
+      try {
+        const history = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }));
+        const invokePromise = supabase.functions.invoke("sonic-chat", {
+          body: { message: text, history, state: {} },
+        });
+        const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+          setTimeout(
+            () => resolve({ data: null, error: new Error("Sonic took too long to respond. Try again.") }),
+            30000,
+          ),
+        );
+        const { data, error } = (await Promise.race([invokePromise, timeoutPromise])) as {
+          data: { response_text?: string; action?: string; error?: string } | null;
+          error: Error | null;
+        };
+        if (error) throw error;
+        if (data?.response_text) {
+          assistantText = data.response_text;
+          actionTaken = data.action ?? "none";
+          actionData = data as Record<string, unknown>;
+        } else if (data?.error) {
+          assistantText = data.error;
+        }
+      } catch (e) {
+        console.error("sonic-chat invoke failed:", e);
+        assistantText = e instanceof Error ? e.message : FALLBACK_REPLY;
+      }
+
+      decision = (actionData ?? {}) as SonicDecision;
+      isGated = !!decision.requires_permission && !!decision.action && decision.action !== "none";
+
+      const asstInsert: {
+        user_id: string;
+        role: string;
+        content: string;
+        action_taken?: string;
+        action_data?: Record<string, unknown>;
+      } = { user_id: userId, role: "assistant", content: assistantText };
+      if (actionTaken) asstInsert.action_taken = actionTaken;
+      if (actionData) asstInsert.action_data = actionData;
+
+      let asstRow: ChatMessage | null = null;
+      try {
+        const { data } = await supabase
+          .from("chat_messages")
+          .insert([asstInsert as never])
+          .select("id, role, content, created_at, action_taken, action_data")
+          .single();
+        asstRow = (data as ChatMessage) ?? null;
+      } catch (e) {
+        console.warn("chat_messages assistant insert failed:", e);
+      }
+
+      const enriched: ChatMessage = asstRow
+        ? { ...asstRow, pending: isGated }
+        : {
+            id: `local-${Date.now()}`,
+            role: "assistant",
+            content: assistantText,
+            created_at: new Date().toISOString(),
+            action_taken: actionTaken ?? undefined,
+            action_data: actionData ?? undefined,
+            pending: isGated,
+          };
+      setMessages((m) => [...m, enriched]);
+    } finally {
+      // ALWAYS clear the spinner so the chat can never get stuck "loading".
+      setSending(false);
+    }
+
+    // Sprint 3: auto-execute safe actions (after spinner is cleared).
+    if (actionData && !isGated) {
+      try {
+        const inline = await runInlineAction(decision, text);
+        if (inline) {
+          await postAssistantNote(
+            inline.text,
+            inline.copyable ?? null,
+            inline.seo ?? null,
+            inline.margin ?? null,
+            inline.email ?? null,
+            inline.description ?? null,
+            inline.quickReplies ?? null,
+          );
+        } else {
+          const ran = executeChatAction(decision);
+          const closeOn = new Set([
+            "navigate_tab",
+            "open_case_study",
+            "open_brand_guide",
+            "open_file_picker",
+            "show_last_invoice",
+            "show_brand_accuracy",
+            "show_flywheel_summary",
+            "list_trained_brands",
+            "open_correction_ui",
+            "scan_email_inbox",
+          ]);
+          if (ran && decision.action && closeOn.has(decision.action)) {
+            setTimeout(() => setOpen(false), 400);
+          }
+        }
+      } catch (e) {
+        console.error("post-response action failed:", e);
       }
     }
   }

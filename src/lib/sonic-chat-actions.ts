@@ -888,6 +888,23 @@ export async function runInlineAction(
     }
   }
 
+  if (decision.action === "invoice_question") {
+    const question = String(params.question ?? "").trim() || userMessage;
+    try {
+      const { data, error } = await supabase.functions.invoke("sonic-invoice-question", {
+        body: { question },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const answer = String(data?.answer ?? "").trim();
+      if (!answer) return { text: "I couldn't get an answer for that — try rephrasing?" };
+      return { text: answer };
+    } catch (e) {
+      console.error("sonic-invoice-question failed:", e);
+      return { text: "Couldn't read the last invoice — try again in a moment." };
+    }
+  }
+
   if (decision.action === "write_product_description") {
     const brandName =
       String(params.brand_name ?? params.brand ?? "").trim() ||

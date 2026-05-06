@@ -6,31 +6,49 @@ import { Progress } from "@/components/ui/progress";
 
 const PLANS = [
   {
-    key: "starter",
-    name: "Starter",
-    price: 29,
+    key: "essentials",
+    name: "Essentials",
+    price: 49,
     highlight: false,
     invoiceLimit: 50,
     teamLimit: 1,
-    features: ["Up to 50 invoices/mo", "Basic SEO tools", "1 team member", "Email support"],
+    features: [
+      "AI invoice parsing (50/mo)",
+      "7-layer tag generation",
+      "SEO title + meta writer",
+      "Stock check + margin calculator",
+      "Sonic chat",
+    ],
   },
   {
     key: "pro",
     name: "Pro",
-    price: 59,
+    price: 99,
     highlight: true,
     invoiceLimit: null as number | null,
     teamLimit: 5,
-    features: ["Unlimited invoices", "AI feed optimisation", "5 team members", "Priority support", "Margin protection"],
+    features: [
+      "Unlimited invoices",
+      "Google feed + Ads + Meta setup",
+      "Inventory + markdown ladder",
+      "5 automation pipelines",
+      "Morning briefing",
+    ],
   },
   {
-    key: "growth",
-    name: "Growth",
-    price: 99,
+    key: "agent",
+    name: "Agent",
+    price: 179,
     highlight: false,
     invoiceLimit: null as number | null,
     teamLimit: null as number | null,
-    features: ["Everything in Pro", "Unlimited team", "API access", "Dedicated support", "Custom integrations"],
+    features: [
+      "Proactive brain (autonomous)",
+      "Auto-approve tags + SEO",
+      "Pipeline auto-chaining",
+      "Stock alert → reorder draft",
+      "Dedicated onboarding",
+    ],
   },
 ];
 
@@ -175,7 +193,7 @@ const BillingScreen = () => {
           <div className="bg-primary/10 border border-primary/30 rounded-xl p-5 space-y-3">
             <div className="flex items-center gap-2">
               <CreditCard className="w-5 h-5 text-primary" />
-              <span className="text-lg font-semibold">{billingStatus.plan_name || "Starter"}</span>
+              <span className="text-lg font-semibold">{billingStatus.plan_name || "Essentials"}</span>
               <span className="ml-auto text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-medium capitalize">
                 {billingStatus.status}
               </span>

@@ -347,6 +347,18 @@ export interface InlineActionResult {
     titleOver: boolean;
     descOver: boolean;
   };
+  margin?: {
+    cost: number;
+    brand: string | null;
+    category: string;
+    categoryInferred: boolean;
+    multiplier: number;
+    rrp: number;
+    rrpExGst: number;
+    grossProfit: number;
+    marginPct: number;
+    compareAt: number;
+  };
 }
 
 const KNOWN_COLOURS = [
@@ -626,8 +638,13 @@ export async function runInlineAction(
     const cost = Number.isFinite(Number(params.cost))
       ? Number(params.cost)
       : extractCost(userMessage);
-    const brand = String(params.brand ?? "").trim() || undefined;
+    const brand =
+      String(params.brand ?? "").trim() || detectBrand(userMessage) || undefined;
     const category = String(params.category ?? "").trim().toLowerCase() || undefined;
+    const productType =
+      String(params.product_type ?? params.type ?? "").trim() ||
+      detectProductType(userMessage) ||
+      undefined;
 
     if (!Number.isFinite(cost) || cost <= 0) {
       return { text: "Give me a cost price and I'll work out the RRP — e.g. 'cost is $42.50 Baku'." };
@@ -635,25 +652,32 @@ export async function runInlineAction(
 
     try {
       const { data, error } = await supabase.functions.invoke("calculate-margin", {
-        body: { cost, brand, category },
+        body: { cost, brand, category, product_type: productType },
       });
       if (error) throw error;
       if (!data || data.error) {
         return { text: `Couldn't calculate margin: ${data?.error ?? "unknown error"}` };
       }
-      const lines: string[] = [];
-      const brandLabel = data.brand ? ` ${titleCase(data.brand)}` : "";
-      lines.push(
-        `**$${data.cost.toFixed(2)} cost${brandLabel}** → **$${data.rrp.toFixed(2)} RRP**`,
-      );
-      lines.push("");
-      lines.push(
-        `• Category: ${titleCase(data.category)}${data.category_inferred ? " _(inferred)_" : ""}`,
-      );
-      lines.push(`• Markup: ×${data.multiplier}`);
-      lines.push(`• Raw: $${data.raw_rrp.toFixed(2)} → rounded to nearest $0.95`);
-      lines.push(`• Margin: ${data.margin_pct.toFixed(1)}%`);
-      return { text: lines.join("\n") };
+
+      const text = [
+        `**$${data.cost.toFixed(2)} cost${data.brand ? " " + titleCase(data.brand) : ""}** → **$${data.rrp.toFixed(2)} RRP**`,
+      ].join("\n");
+
+      return {
+        text,
+        margin: {
+          cost: data.cost,
+          brand: data.brand ?? null,
+          category: data.category,
+          categoryInferred: !!data.category_inferred,
+          multiplier: data.multiplier,
+          rrp: data.rrp,
+          rrpExGst: data.rrp_ex_gst,
+          grossProfit: data.gross_profit,
+          marginPct: data.margin_pct,
+          compareAt: data.compare_at,
+        },
+      };
     } catch (e) {
       console.error("calculate-margin failed:", e);
       return { text: "Couldn't reach the margin calculator — try again in a moment." };

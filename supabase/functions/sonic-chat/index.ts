@@ -91,8 +91,8 @@ Social:
 Tagging & SEO writing:
 - open_tag_builder | params: { brand?: string, product_type?: string } | permission: false
 - open_seo_writer | params: {} | permission: false
-- calculate_margin | params: { cost: number, brand?: string, category?: "swimwear"|"accessories"|"footwear"|"jewellery" } | permission: false
-  Use whenever the user gives a cost price (e.g. "cost is $42.50 Baku", "what should I sell this $30 Havaianas for", "RRP for $18 cost Saben"). Extract the numeric cost (strip $ and commas) and the brand/category. response_text should be a brief acknowledgement like "Calculating RRP…" — the result is rendered inline by the client.
+- calculate_margin | params: { cost: number, brand?: string, product_type?: string, category?: "swimwear"|"clothing"|"accessories"|"footwear"|"jewellery" } | permission: false
+  Trigger this whenever the user mentions a cost or pricing question. Detection signals: a dollar amount ($42.50, "42.50", "costs 42") AND/OR any of these words: "cost", "costs", "wholesale", "markup", "margin", "sell for", "RRP", "price this", "what should I charge". Extract numeric cost (strip $/commas), brand if present, and product_type if present (swimwear, accessories, footwear, jewellery, clothing, dresses, hats, bags, thongs, shoes, etc.). response_text should be a short acknowledgement like "Calculating RRP…" — the full card is rendered inline by the client.
 
 Export & import:
 - open_export_collections | params: {} | permission: false

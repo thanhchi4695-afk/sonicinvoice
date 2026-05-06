@@ -34,6 +34,18 @@ interface ChatMessage {
     titleOver: boolean;
     descOver: boolean;
   } | null;
+  margin?: {
+    cost: number;
+    brand: string | null;
+    category: string;
+    categoryInferred: boolean;
+    multiplier: number;
+    rrp: number;
+    rrpExGst: number;
+    grossProfit: number;
+    marginPct: number;
+    compareAt: number;
+  } | null;
 }
 
 const FALLBACK_REPLY =
@@ -157,7 +169,7 @@ export default function SonicChat() {
       // follow-up assistant message instead of navigating.
       const inline = await runInlineAction(decision, text);
       if (inline) {
-        await postAssistantNote(inline.text, inline.copyable ?? null, inline.seo ?? null);
+        await postAssistantNote(inline.text, inline.copyable ?? null, inline.seo ?? null, inline.margin ?? null);
       } else {
         const ran = executeChatAction(decision);
         const closeOn = new Set([
@@ -183,6 +195,7 @@ export default function SonicChat() {
     text: string,
     copyable: string | null = null,
     seo: ChatMessage["seo"] = null,
+    margin: ChatMessage["margin"] = null,
   ) {
     if (!userId) return;
     const { data } = await supabase
@@ -191,7 +204,7 @@ export default function SonicChat() {
       .select("id, role, content, created_at")
       .single();
     if (data) {
-      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo }]);
+      setMessages((m) => [...m, { ...(data as ChatMessage), copyable, seo, margin }]);
     }
   }
 
@@ -302,7 +315,7 @@ export default function SonicChat() {
             )}
             {messages.map((m) => (
               <div key={m.id} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
-                {!m.seo && (
+                {!m.seo && !m.margin && (
                   <div
                     className={cn(
                       "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
@@ -312,6 +325,54 @@ export default function SonicChat() {
                     )}
                   >
                     {m.content}
+                  </div>
+                )}
+                {m.role === "assistant" && m.margin && (
+                  <div className="w-full max-w-[85%] space-y-2 rounded-2xl border border-border bg-muted p-3 text-sm">
+                    <div className="grid grid-cols-2 gap-y-1 font-mono text-xs">
+                      <span className="text-muted-foreground">Cost (ex GST)</span>
+                      <span className="text-right">${m.margin.cost.toFixed(2)}</span>
+                      <span className="text-muted-foreground">Markup applied</span>
+                      <span className="text-right">
+                        ×{m.margin.multiplier} ({m.margin.category}
+                        {m.margin.categoryInferred ? ", inferred" : ""})
+                      </span>
+                    </div>
+                    <div className="border-t border-border" />
+                    <div className="grid grid-cols-2 gap-y-1 font-mono text-xs">
+                      <span className="font-semibold">Recommended RRP</span>
+                      <span className="text-right font-semibold">${m.margin.rrp.toFixed(2)}</span>
+                      <span className="text-muted-foreground">RRP ex GST</span>
+                      <span className="text-right">${m.margin.rrpExGst.toFixed(2)}</span>
+                      <span className="text-muted-foreground">Gross margin</span>
+                      <span className="text-right">{m.margin.marginPct.toFixed(1)}%</span>
+                      <span className="text-muted-foreground">Gross profit</span>
+                      <span className="text-right">${m.margin.grossProfit.toFixed(2)}</span>
+                    </div>
+                    <div className="rounded bg-background/60 p-2 text-xs">
+                      Compare at price for a 20% sale:{" "}
+                      <span className="font-semibold">${m.margin.compareAt.toFixed(2)}</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        window.dispatchEvent(
+                          new CustomEvent("sonic:apply-margin-prices", {
+                            detail: {
+                              cost: m.margin!.cost,
+                              rrp: m.margin!.rrp,
+                              rrpExGst: m.margin!.rrpExGst,
+                              compareAt: m.margin!.compareAt,
+                              brand: m.margin!.brand,
+                              category: m.margin!.category,
+                            },
+                          }),
+                        );
+                        toast.success("Prices applied to active line");
+                      }}
+                    >
+                      Use these prices
+                    </Button>
                   </div>
                 )}
                 {m.role === "assistant" && m.seo && (

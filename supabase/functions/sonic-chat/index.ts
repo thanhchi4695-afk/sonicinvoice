@@ -219,6 +219,41 @@ interface ChatTurn {
   content: string;
 }
 
+// In-memory per-user cache for personal + live store context.
+// Keyed by a SHA-256 of the Authorization header so we never store the raw JWT.
+// TTL: 45s — long enough to absorb chat bursts, short enough to feel "live".
+const CONTEXT_TTL_MS = 45_000;
+const CONTEXT_CACHE_MAX = 200;
+interface CachedCtx { personal: string; live: string; expiresAt: number }
+const contextCache = new Map<string, CachedCtx>();
+
+async function hashAuth(auth: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(auth));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Sync cache helpers — keyed by a short hash held in a WeakMap-like Map.
+// We compute the hash once per request and stash it on a private symbol.
+const AUTH_KEY = Symbol("authKey");
+function getCachedContext(auth: string): CachedCtx | null {
+  // Compact eviction — drop expired entries opportunistically.
+  if (contextCache.size > CONTEXT_CACHE_MAX) {
+    const now = Date.now();
+    for (const [k, v] of contextCache) if (v.expiresAt < now) contextCache.delete(k);
+  }
+  const key = (auth as unknown as Record<symbol, string>)[AUTH_KEY];
+  if (!key) return null;
+  const hit = contextCache.get(key);
+  if (hit && hit.expiresAt > Date.now()) return hit;
+  if (hit) contextCache.delete(key);
+  return null;
+}
+function setCachedContext(auth: string, ctx: { personal: string; live: string }): void {
+  const key = (auth as unknown as Record<symbol, string>)[AUTH_KEY];
+  if (!key) return;
+  contextCache.set(key, { ...ctx, expiresAt: Date.now() + CONTEXT_TTL_MS });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 

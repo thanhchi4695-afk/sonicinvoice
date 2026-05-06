@@ -361,7 +361,7 @@ export default function SonicChat() {
       const action = taskType ?? "none";
       if (action && action !== "none") {
         try {
-          await executeChatAction(action as never, {} as never);
+          await executeChatAction(action as never);
         } catch (e) {
           console.warn("[proactive] executeChatAction failed:", e);
         }

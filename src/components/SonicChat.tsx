@@ -179,7 +179,13 @@ export default function SonicChat() {
       // follow-up assistant message instead of navigating.
       const inline = await runInlineAction(decision, text);
       if (inline) {
-        await postAssistantNote(inline.text, inline.copyable ?? null, inline.seo ?? null, inline.margin ?? null);
+        await postAssistantNote(
+          inline.text,
+          inline.copyable ?? null,
+          inline.seo ?? null,
+          inline.margin ?? null,
+          inline.email ?? null,
+        );
       } else {
         const ran = executeChatAction(decision);
         const closeOn = new Set([

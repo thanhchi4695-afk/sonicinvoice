@@ -15,7 +15,8 @@ export type TaskType =
   | 'pipeline_restock'
   | 'pipeline_seo_boost'
   | 'pipeline_marketing'
-  | 'pipeline_season_close';
+  | 'pipeline_season_close'
+  | 'product_enrichment_review';
 
 export type TriggerSource =
   | 'invoice_parse'

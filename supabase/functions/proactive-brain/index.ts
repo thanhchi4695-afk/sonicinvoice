@@ -112,10 +112,19 @@ TASK GRAPH (what logically follows what):
 parse_invoice → generate_tags → generate_seo → update_feed → write_social
 stock_check → reorder
 markdown_ladder → season_close pipeline
+product_enrichment_review → open_enrichment_queue
 
-VALID task_type values: parse_invoice, generate_tags, generate_seo, update_feed, write_social, stock_check, reorder, markdown_ladder, morning_briefing, pipeline_new_arrivals, pipeline_restock, pipeline_seo_boost, pipeline_marketing, pipeline_season_close, none
+PIPELINE LABELS:
+new_arrivals: New arrivals pipeline
+restock: Restock pipeline
+seo_boost: SEO boost pipeline
+marketing_launch: Marketing launch pipeline
+season_close: Season close pipeline
+enrichment_pipeline: Supplier content enrichment pipeline
 
-VALID pipeline_to_run values: new_arrivals, restock, seo_boost, marketing_launch, season_close, null
+VALID task_type values: parse_invoice, generate_tags, generate_seo, update_feed, write_social, stock_check, reorder, markdown_ladder, morning_briefing, pipeline_new_arrivals, pipeline_restock, pipeline_seo_boost, pipeline_marketing, pipeline_season_close, product_enrichment_review, none
+
+VALID pipeline_to_run values: new_arrivals, restock, seo_boost, marketing_launch, season_close, enrichment_pipeline, null
 
 CURRENT APP STATE:
 Trigger: ${trigger_source}

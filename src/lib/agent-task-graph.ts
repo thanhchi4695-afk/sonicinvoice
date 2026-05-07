@@ -15,7 +15,8 @@ export type TaskType =
   | 'pipeline_restock'
   | 'pipeline_seo_boost'
   | 'pipeline_marketing'
-  | 'pipeline_season_close';
+  | 'pipeline_season_close'
+  | 'product_enrichment_review';
 
 export type TriggerSource =
   | 'invoice_parse'
@@ -41,6 +42,7 @@ export const TASK_NEXT_MAP: Record<TaskType, TaskType | null> = {
   pipeline_seo_boost: 'pipeline_marketing',
   pipeline_marketing: null,
   pipeline_season_close: null,
+  product_enrichment_review: null,
 };
 
 // Which pipeline to suggest after each individual task chain
@@ -59,6 +61,7 @@ export const TASK_PIPELINE_SUGGESTION: Record<TaskType, string | null> = {
   pipeline_seo_boost: 'marketing_launch',
   pipeline_marketing: null,
   pipeline_season_close: null,
+  product_enrichment_review: null,
 };
 
 // Human-readable labels for chat messages
@@ -77,6 +80,7 @@ export const TASK_LABELS: Record<TaskType, string> = {
   pipeline_seo_boost: 'SEO boost pipeline',
   pipeline_marketing: 'Marketing launch pipeline',
   pipeline_season_close: 'Season close pipeline',
+  product_enrichment_review: 'Product content review',
 };
 
 // Pipeline display names

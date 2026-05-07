@@ -1021,7 +1021,7 @@ Deno.serve(async (req) => {
           product {
             id title vendor productType tags
             options { name values }
-            variants(first: 100) {
+            variants(first: 30) {
               nodes {
                 id sku barcode title
                 inventoryQuantity
@@ -1035,47 +1035,47 @@ Deno.serve(async (req) => {
 
         const allVariants: Record<string, unknown> = {};
         const BATCH_SIZE = 5;
+        // Escape Shopify search-syntax-significant chars in user-supplied tokens.
+        const esc = (s: string) => s.replace(/[\\"()]/g, "\\$&");
 
         for (let i = 0; i < body.lookup_items.length; i += BATCH_SIZE) {
           const batch = body.lookup_items.slice(i, i + BATCH_SIZE);
           const promises = batch.flatMap((item: { sku?: string; barcode?: string; stylePrefix?: string; titleQuery?: string }) => {
             const queries: Promise<unknown>[] = [];
-            if (item.barcode) {
+
+            // ── Combined targeted variant lookup ──
+            // Fold SKU + barcode + stylePrefix into ONE productVariants query
+            // using Shopify's `OR` search syntax. This collapses 3 round-trips
+            // per item into 1 and avoids any full-catalog scan.
+            const variantClauses: string[] = [];
+            if (item.sku) variantClauses.push(`sku:${esc(item.sku)}`);
+            if (item.barcode) variantClauses.push(`barcode:${esc(item.barcode)}`);
+            if (item.stylePrefix) variantClauses.push(`sku:${esc(item.stylePrefix)}*`);
+
+            if (variantClauses.length > 0) {
+              const combined = variantClauses.join(" OR ");
               queries.push(
                 fetch(graphqlUrl, {
                   method: "POST", headers: gqlHeaders,
                   body: JSON.stringify({
-                    query: `{ productVariants(first: 10, query: "barcode:${item.barcode}") { nodes { ${VARIANT_FIELDS} } } }`,
+                    query: `{ productVariants(first: 30, query: ${JSON.stringify(combined)}) { nodes { ${VARIANT_FIELDS} } } }`,
                   }),
                 }).then(r => r.json()).catch(() => null)
               );
             }
-            if (item.sku) {
+
+            // ── Title fallback ──
+            // Only run the (much more expensive) products full-text query when
+            // we have NO SKU/barcode/stylePrefix to anchor the lookup. With a
+            // SKU present the variant query above is authoritative; the title
+            // search just adds latency and false positives.
+            const hasAnchor = !!(item.sku || item.barcode || item.stylePrefix);
+            if (item.titleQuery && !hasAnchor) {
               queries.push(
                 fetch(graphqlUrl, {
                   method: "POST", headers: gqlHeaders,
                   body: JSON.stringify({
-                    query: `{ productVariants(first: 10, query: "sku:${item.sku}") { nodes { ${VARIANT_FIELDS} } } }`,
-                  }),
-                }).then(r => r.json()).catch(() => null)
-              );
-            }
-            if (item.stylePrefix) {
-              queries.push(
-                fetch(graphqlUrl, {
-                  method: "POST", headers: gqlHeaders,
-                  body: JSON.stringify({
-                    query: `{ productVariants(first: 20, query: "sku:${item.stylePrefix}*") { nodes { ${VARIANT_FIELDS} } } }`,
-                  }),
-                }).then(r => r.json()).catch(() => null)
-              );
-            }
-            if (item.titleQuery) {
-              queries.push(
-                fetch(graphqlUrl, {
-                  method: "POST", headers: gqlHeaders,
-                  body: JSON.stringify({
-                    query: `{ products(first: 10, query: "${item.titleQuery}") { nodes { id title vendor productType tags options { name values } variants(first: 100) { nodes { id sku barcode title inventoryQuantity selectedOptions { name value } image { url } inventoryItem { id } } } } } }`,
+                    query: `{ products(first: 5, query: ${JSON.stringify(item.titleQuery)}) { nodes { id title vendor productType tags options { name values } variants(first: 30) { nodes { id sku barcode title inventoryQuantity selectedOptions { name value } image { url } inventoryItem { id } } } } } }`,
                   }),
                 }).then(r => r.json()).catch(() => null)
               );

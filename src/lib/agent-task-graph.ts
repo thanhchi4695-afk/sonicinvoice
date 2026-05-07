@@ -61,6 +61,7 @@ export const TASK_PIPELINE_SUGGESTION: Record<TaskType, string | null> = {
   pipeline_seo_boost: 'marketing_launch',
   pipeline_marketing: null,
   pipeline_season_close: null,
+  product_enrichment_review: null,
 };
 
 // Human-readable labels for chat messages

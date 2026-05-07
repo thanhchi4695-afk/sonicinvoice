@@ -342,97 +342,134 @@ Deno.serve(async (req) => {
     }
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    // STEP 1 — fetch batch
-    const nowIso = new Date().toISOString();
-    let query = admin
-      .from("product_enrichment_queue")
-      .select("*")
-      .eq("user_id", userId);
-
-    if (retryNotFound) {
-      query = query.in("status", ["pending", "not_found"])
-        .or(`status.eq.pending,and(status.eq.not_found,next_retry_at.lte.${nowIso})`);
-    } else {
-      query = query.eq("status", "pending");
-    }
-
-    const { data: rows, error: qErr } = await query
-      .order("status", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(batchSize);
-
-    if (qErr) return json({ error: qErr.message }, 500);
-
-    // Filter out exhausted retries client-side (postgrest .or with retry_count compare is fiddly)
-    const candidates = (rows ?? []).filter((r) =>
-      r.status === "pending" ||
-      (r.status === "not_found" && r.retry_count < r.max_retries),
-    ) as QueueRow[];
-
-    const startedAt = Date.now();
     const deps = { admin, baseUrl: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_ROLE_KEY };
+    const startedAt = Date.now();
 
-    let enriched = 0, notFound = 0, failed = 0, processed = 0;
-    const enrichedVendors: string[] = [];
+    const runBatchForUser = async (uid: string) => {
+      const nowIso = new Date().toISOString();
+      let query = admin
+        .from("product_enrichment_queue")
+        .select("*")
+        .eq("user_id", uid);
 
-    for (const row of candidates) {
-      if (Date.now() - startedAt > MAX_RUNTIME_MS) {
-        console.warn("[orchestrator] approaching runtime limit, stopping batch");
-        break;
+      if (retryNotFound) {
+        query = query.in("status", ["pending", "not_found"])
+          .or(`status.eq.pending,and(status.eq.not_found,next_retry_at.lte.${nowIso})`);
+      } else {
+        query = query.eq("status", "pending");
       }
-      processed++;
-      try {
-        const outcome = await processProduct(row, deps);
-        if (outcome === "enriched") {
-          enriched++;
-          enrichedVendors.push(row.vendor ?? "Unknown");
-        } else if (outcome === "not_found") notFound++;
-        else failed++;
-      } catch (e) {
-        console.error(`[orchestrator] product ${row.id} threw:`, e);
-        failed++;
-        await admin.from("product_enrichment_queue").update({
-          status: "failed",
-          last_attempted: new Date().toISOString(),
-        }).eq("id", row.id).then(() => {}, () => {});
+
+      const { data: rows, error: qErr } = await query
+        .order("status", { ascending: true })
+        .order("created_at", { ascending: true })
+        .limit(batchSize);
+      if (qErr) {
+        console.error(`[orchestrator] query failed for ${uid}:`, qErr);
+        return { user_id: uid, processed: 0, enriched: 0, not_found: 0, failed: 0, vendor_summary: "" };
       }
-      await new Promise((r) => setTimeout(r, PER_PRODUCT_DELAY_MS));
+
+      const candidates = (rows ?? []).filter((r) =>
+        r.status === "pending" ||
+        (r.status === "not_found" && r.retry_count < r.max_retries),
+      ) as QueueRow[];
+
+      let enriched = 0, notFound = 0, failed = 0, processed = 0;
+      const enrichedVendors: string[] = [];
+
+      for (const row of candidates) {
+        if (Date.now() - startedAt > MAX_RUNTIME_MS) {
+          console.warn("[orchestrator] runtime limit reached, stopping");
+          break;
+        }
+        processed++;
+        try {
+          const outcome = await processProduct(row, deps);
+          if (outcome === "enriched") {
+            enriched++;
+            enrichedVendors.push(row.vendor ?? "Unknown");
+          } else if (outcome === "not_found") notFound++;
+          else failed++;
+        } catch (e) {
+          console.error(`[orchestrator] product ${row.id} threw:`, e);
+          failed++;
+          await admin.from("product_enrichment_queue").update({
+            status: "failed",
+            last_attempted: new Date().toISOString(),
+          }).eq("id", row.id).then(() => {}, () => {});
+        }
+        await new Promise((r) => setTimeout(r, PER_PRODUCT_DELAY_MS));
+      }
+
+      const counts = new Map<string, number>();
+      for (const v of enrichedVendors) counts.set(v, (counts.get(v) ?? 0) + 1);
+      const vendorSummary = Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([v, c]) => `${c} ${v}`)
+        .join(", ");
+
+      if (enriched > 0) {
+        try {
+          await admin.from("agent_tasks").insert({
+            user_id: uid,
+            task_type: "product_enrichment_review",
+            trigger_source: "pipeline_handoff",
+            status: "permission_requested",
+            observation: `${enriched} products enriched and ready to review${vendorSummary ? ` — ${vendorSummary}` : ""}.`,
+            permission_question: `I've enriched ${enriched} products with images and descriptions. Want to review them now?`,
+            pipeline_id: null,
+          });
+        } catch (e) {
+          console.warn("[orchestrator] agent_tasks insert failed:", e);
+        }
+      }
+
+      return { user_id: uid, processed, enriched, not_found: notFound, failed, vendor_summary: vendorSummary };
+    };
+
+    if (isScheduled) {
+      // Find users with active Shopify connection AND eligible queue rows
+      const { data: conns } = await admin
+        .from("shopify_connections")
+        .select("user_id")
+        .not("access_token", "is", null);
+      const connUserIds = new Set((conns ?? []).map((c) => c.user_id as string));
+
+      const nowIso = new Date().toISOString();
+      const { data: pendingRows } = await admin
+        .from("product_enrichment_queue")
+        .select("user_id, status, next_retry_at")
+        .in("status", ["pending", "not_found"]);
+
+      const eligibleUsers = new Set<string>();
+      for (const r of pendingRows ?? []) {
+        if (!connUserIds.has(r.user_id as string)) continue;
+        if (r.status === "pending") eligibleUsers.add(r.user_id as string);
+        else if (r.status === "not_found" && (!r.next_retry_at || r.next_retry_at <= nowIso)) {
+          eligibleUsers.add(r.user_id as string);
+        }
+      }
+
+      const results: unknown[] = [];
+      let totals = { processed: 0, enriched: 0, not_found: 0, failed: 0 };
+      for (const uid of eligibleUsers) {
+        if (Date.now() - startedAt > MAX_RUNTIME_MS) {
+          console.warn("[orchestrator] runtime limit, stopping multi-user loop");
+          break;
+        }
+        const r = await runBatchForUser(uid);
+        results.push(r);
+        totals.processed += r.processed;
+        totals.enriched += r.enriched;
+        totals.not_found += r.not_found;
+        totals.failed += r.failed;
+      }
+      return json({ scheduled: true, users: results.length, ...totals, results });
     }
 
-    // Vendor summary: top 3 by count
-    const counts = new Map<string, number>();
-    for (const v of enrichedVendors) counts.set(v, (counts.get(v) ?? 0) + 1);
-    const vendorSummary = Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([v, c]) => `${c} ${v}`)
-      .join(", ");
-
-    // Handoff agent task
-    if (enriched > 0) {
-      try {
-        await admin.from("agent_tasks").insert({
-          user_id: userId,
-          task_type: "product_enrichment_review",
-          trigger_source: "pipeline_handoff",
-          status: "permission_requested",
-          observation: `${enriched} products enriched and ready to review${vendorSummary ? ` — ${vendorSummary}` : ""}.`,
-          permission_question: `I've enriched ${enriched} products with images and descriptions. Want to review them now?`,
-          pipeline_id: null,
-        });
-      } catch (e) {
-        console.warn("[orchestrator] agent_tasks insert failed:", e);
-      }
-    }
-
-    return json({
-      processed,
-      enriched,
-      not_found: notFound,
-      failed,
-      vendor_summary: vendorSummary,
-    });
+    // Manual single-user path
+    const result = await runBatchForUser(userId!);
+    return json(result);
   } catch (e) {
     console.error("[orchestrator] fatal:", e);
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);

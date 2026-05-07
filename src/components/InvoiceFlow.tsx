@@ -819,7 +819,20 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       console.log("[Phase2] done:", result.written, "written,", result.failed, "failed");
 
       // ── Phase 3 — auto price research ──────────────────────
-      if (accepted.length > 0) {
+      // Skip entirely when ≥70% of items already carry both cost and RRP
+      // from the invoice (e.g. Bond-Eye, JOOR exports). Web research can
+      // burn 8–30s per item and is unnecessary when prices are present.
+      const needsResearch = accepted.filter(
+        (it) => !(Number(it.cost) > 0 && Number(it.rrp) > 0),
+      ).length;
+      const skipPhase3 = accepted.length > 0 && needsResearch / accepted.length < 0.3;
+      if (skipPhase3) {
+        console.log(`[Phase3] skipped — ${accepted.length - needsResearch}/${accepted.length} items already priced`);
+        toast.success("💰 Prices taken from invoice — research skipped", {
+          description: "All items have both cost and RRP. No web lookup needed.",
+        });
+      }
+      if (!skipPhase3 && accepted.length > 0) {
         const phase3Items: Phase3Item[] = accepted.map((item) => {
           const skuBrand = detectBrandFromSku(item.sku);
           return {

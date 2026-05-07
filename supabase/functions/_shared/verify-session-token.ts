@@ -7,8 +7,7 @@
  * the Authorization header. Invalid tokens are rejected with 401.
  */
 
-const SHOPIFY_API_KEY = Deno.env.get("SHOPIFY_API_KEY") || "";
-const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET") || "";
+import { getShopifyAppByKey, peekJwtPayload } from "./shopify-apps.ts";
 
 export interface SessionTokenPayload {
   iss: string;   // https://{shop}.myshopify.com/admin
@@ -32,12 +31,19 @@ export async function verifyShopifySessionToken(
     const parts = token.split(".");
     if (parts.length !== 3) return null;
 
-    const encoder = new TextEncoder();
+    // ═══ Multi-app routing: pick the secret matching the token's `aud` ═══
+    const unverified = peekJwtPayload(token) as Partial<SessionTokenPayload> | null;
+    const aud = unverified?.aud;
+    const app = getShopifyAppByKey(aud);
+    if (!app) {
+      console.warn("[session-token] No matching Shopify app for aud=", aud);
+      return null;
+    }
 
-    // ═══ HMAC-SHA256 signature verification using SHOPIFY_API_SECRET ═══
+    const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",
-      encoder.encode(SHOPIFY_API_SECRET),
+      encoder.encode(app.apiSecret),
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["verify"]
@@ -51,20 +57,11 @@ export async function verifyShopifySessionToken(
 
     const valid = await crypto.subtle.verify("HMAC", key, signature, signatureInput);
     if (!valid) {
-      console.warn("[session-token] Invalid HMAC signature");
+      console.warn("[session-token] Invalid HMAC signature for app=", app.label);
       return null;
     }
 
-    // Decode payload
-    const payload: SessionTokenPayload = JSON.parse(
-      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))
-    );
-
-    // Verify audience matches our API key
-    if (payload.aud !== SHOPIFY_API_KEY) {
-      console.warn("[session-token] Audience mismatch:", payload.aud, "!=", SHOPIFY_API_KEY);
-      return null;
-    }
+    const payload = unverified as SessionTokenPayload;
 
     // Verify not expired (10s leeway)
     const now = Math.floor(Date.now() / 1000);

@@ -1465,6 +1465,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     const started = Date.now();
     const MAX_MS = 6 * 60_000; // 6 min — beyond this the edge function has almost certainly hit IDLE_TIMEOUT
     const POLL_MS = 3_000;
+    const STALL_MS = 90_000; // No heartbeat in 90s while "running" → worker is dead
     let lastStatus = "running";
 
     setEnrichLines([{ name: label, status: "searching", action: "Reading safely in the background…", confidence: 0 }]);
@@ -1472,7 +1473,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     while (Date.now() - started < MAX_MS) {
       const { data: job, error } = await supabase
         .from("invoice_processing_jobs")
-        .select("status, result, error_message")
+        .select("status, result, error_message, started_at")
         .eq("id", jobId)
         .maybeSingle();
 
@@ -1491,16 +1492,39 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
       if (job?.status === "failed") {
         const msg = job.error_message || "The background reader could not finish this invoice.";
-        const isTimeout = /idle_?timeout|150s|timeout/i.test(msg);
+        const isTimeout = /idle_?timeout|150s|240s|too large|exceeded|timeout/i.test(msg);
         toast.error(isTimeout ? "Invoice too large or complex to read in one pass" : "Reading failed", {
           description: isTimeout
-            ? "This file took longer than the 150 s server limit. Try splitting the PDF, uploading just the invoice page, or re-saving as a smaller file."
+            ? "Try splitting the PDF, uploading just the invoice page, or re-saving as a smaller file."
             : msg,
           duration: 12000,
         });
         setEnrichLines([]);
         setProcessStartTime(null);
         return null;
+      }
+
+      // Stalled-worker detection: heartbeat updates `started_at` every 20s.
+      // If we see "running" but the last heartbeat was >90s ago, the platform
+      // killed the isolate — bail out instead of waiting the full 6 min.
+      if (job?.status === "running" && job.started_at) {
+        const lastBeat = new Date(job.started_at as string).getTime();
+        if (Number.isFinite(lastBeat) && Date.now() - lastBeat > STALL_MS && Date.now() - started > STALL_MS) {
+          toast.error("Reader stopped responding", {
+            description: "The background reader was killed mid-run (likely too large for one pass). Try splitting the PDF or uploading just the invoice page.",
+            duration: 12000,
+          });
+          setEnrichLines([]);
+          setProcessStartTime(null);
+          // Mark the row failed so it doesn't dangle as "running" forever.
+          try {
+            await supabase
+              .from("invoice_processing_jobs")
+              .update({ status: "failed", error_message: "Worker stalled — no heartbeat for >90s", completed_at: new Date().toISOString() })
+              .eq("id", jobId);
+          } catch {}
+          return null;
+        }
       }
 
       await new Promise((r) => setTimeout(r, POLL_MS));

@@ -322,21 +322,34 @@ Deno.serve(async (req) => {
     const batchSize = Math.max(1, Math.min(25, body?.batch_size ?? 10));
     const retryNotFound = !!body?.retry_not_found;
 
-    // Identity: cron header → use body.user_id; else require JWT.
+    // Identity:
+    //   - x-cron-secret OR (body.scheduled && Bearer service_role) → scheduled multi-user mode
+    //   - body.user_id with cron secret → single user
+    //   - else require user JWT
     let userId: string | null = null;
+    let isScheduled = false;
     const cronHeader = req.headers.get("x-cron-secret");
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const isServiceRoleCall = bearerToken && bearerToken === SUPABASE_SERVICE_ROLE_KEY;
+
     if (CRON_SECRET && cronHeader === CRON_SECRET) {
-      userId = body?.user_id ?? null;
-      if (!userId) return json({ error: "user_id required for scheduled calls" }, 400);
+      if (body?.scheduled) {
+        isScheduled = true;
+      } else {
+        userId = body?.user_id ?? null;
+        if (!userId) return json({ error: "user_id required" }, 400);
+      }
+    } else if (isServiceRoleCall && body?.scheduled) {
+      isScheduled = true;
+    } else if (isServiceRoleCall && body?.user_id) {
+      userId = body.user_id;
     } else {
-      const authHeader = req.headers.get("Authorization") ?? "";
       if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
       const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         global: { headers: { Authorization: authHeader } },
       });
-      const { data: claims, error: claimsErr } = await userClient.auth.getClaims(
-        authHeader.replace("Bearer ", ""),
-      );
+      const { data: claims, error: claimsErr } = await userClient.auth.getClaims(bearerToken);
       if (claimsErr || !claims?.claims?.sub) return json({ error: "Unauthorized" }, 401);
       userId = claims.claims.sub as string;
     }

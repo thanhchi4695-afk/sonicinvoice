@@ -88,13 +88,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    const payload = await verifySessionToken(sessionToken);
-    if (!payload) {
+    const result = await verifySessionToken(sessionToken);
+    if (!result.ok) {
+      const expectedAud = SHOPIFY_API_KEY;
+      const errorMessages: Record<string, string> = {
+        malformed: "Session token is malformed (not a valid JWT).",
+        bad_signature: "Session token signature is invalid — SHOPIFY_API_SECRET in the backend does not match the app that issued the token.",
+        aud_mismatch: `Session token was issued for a different Shopify app (aud=${result.tokenAud}, expected ${expectedAud}). Open the production app, not a separate testing app.`,
+        expired: "Session token has expired — reload the app from Shopify Admin.",
+        error: `Session token verification error: ${result.detail || "unknown"}`,
+      };
       return new Response(
-        JSON.stringify({ error: "Invalid session token" }),
+        JSON.stringify({
+          error: errorMessages[result.reason],
+          reason: result.reason,
+          token_aud: result.tokenAud,
+          expected_aud: expectedAud,
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    const payload = result.payload;
 
     const shop = extractShopDomain((payload.dest || payload.iss) as string);
     console.log("Session verified for shop:", shop);

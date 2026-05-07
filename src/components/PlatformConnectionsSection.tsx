@@ -224,6 +224,41 @@ export default function PlatformConnectionsSection() {
     return { shopify: s.count ?? 0, lightspeed: l.count ?? 0 };
   };
 
+  const pollShopifySyncJob = async (jobId: string) => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 15 * 60 * 1000) {
+      const { data: job, error } = await supabase
+        .from("sync_jobs")
+        .select("id,status,products_synced,total_products,error_message,completed_at")
+        .eq("id", jobId)
+        .maybeSingle<SyncJob>();
+      if (error) throw error;
+
+      if (job) {
+        const synced = job.products_synced ?? 0;
+        const total = job.total_products ?? 0;
+        setShopifySyncProgress(total > 0 ? `${synced.toLocaleString()} / ${total.toLocaleString()} products` : `${synced.toLocaleString()} products`);
+
+        if (job.status === "done") {
+          const counts = await loadCatalogCounts();
+          setShopifyCount(counts.shopify);
+          setShopifyLastSynced(job.completed_at ?? new Date().toISOString());
+          toast.success(`Catalog synced — ${(job.total_products ?? job.products_synced ?? counts.shopify).toLocaleString()} products ready`, {
+            description: "Stock check is ready for fast invoice matching.",
+          });
+          return;
+        }
+
+        if (job.status === "failed") {
+          throw new Error(job.error_message || "Catalog sync failed");
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+    throw new Error("Catalog sync is still running. Check again in a few minutes.");
+  };
+
   // ── Shopify actions ───────────────────────────────────────
   const handleShopifyConnect = async () => {
     if (!shopifyInput.trim()) {

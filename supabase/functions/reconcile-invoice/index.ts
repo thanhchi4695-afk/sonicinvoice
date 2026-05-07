@@ -349,7 +349,8 @@ Deno.serve(async (req) => {
       .in("platform", platforms);
 
     let catalog: CatalogItem[] = (cacheRows ?? []) as CatalogItem[];
-    let freshness: "live" | "cached" | "refreshed" = catalog.length === 0 ? "live" : "cached";
+    let freshness: "live" | "cached" | "refreshed" | "refreshing_in_background" =
+      catalog.length === 0 ? "live" : "cached";
 
     const newestCachedAt = (cacheRows ?? []).reduce<number>((max, r: any) => {
       const t = r.cached_at ? new Date(r.cached_at).getTime() : 0;

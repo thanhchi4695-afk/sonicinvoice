@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { tokenResponseToConnectionColumns } from "../_shared/shopify-token.ts";
+import { getShopifyAppByShop, getPrimaryShopifyApp, type ShopifyAppCreds } from "../_shared/shopify-apps.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,8 +9,13 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SHOPIFY_API_KEY = Deno.env.get("SHOPIFY_API_KEY")!;
-const SHOPIFY_API_SECRET = Deno.env.get("SHOPIFY_API_SECRET")!;
+async function resolveApp(shop: string): Promise<ShopifyAppCreds> {
+  const pinned = await getShopifyAppByShop(shop);
+  const app = pinned ?? getPrimaryShopifyApp();
+  if (!app) throw new Error("No Shopify app credentials configured");
+  console.log(`[shopify-oauth] shop=${shop} -> app=${app.label} key=${app.apiKey.slice(0, 6)}…`);
+  return app;
+}
 const APP_URL = Deno.env.get("APP_URL") || "https://sonicinvoice.lovable.app";
 
 const SCOPES = "read_products,write_products,read_orders,read_inventory,write_inventory";
@@ -26,7 +32,7 @@ function generateNonce(): string {
   return Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function verifyHmac(query: URLSearchParams): Promise<boolean> {
+async function verifyHmac(query: URLSearchParams, secret: string): Promise<boolean> {
   const hmac = query.get("hmac");
   if (!hmac) return false;
 
@@ -38,7 +44,7 @@ async function verifyHmac(query: URLSearchParams): Promise<boolean> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(SHOPIFY_API_SECRET),
+    encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
@@ -103,7 +109,8 @@ Deno.serve(async (req) => {
       }, { onConflict: "user_id" });
 
       const redirectUri = getRedirectUri(req);
-      const installUrl = `https://${shop}/admin/oauth/authorize?client_id=${SHOPIFY_API_KEY}&scope=${SCOPES}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
+      const app = await resolveApp(shop);
+      const installUrl = `https://${shop}/admin/oauth/authorize?client_id=${app.apiKey}&scope=${SCOPES}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
 
       return new Response(JSON.stringify({ install_url: installUrl }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -120,8 +127,9 @@ Deno.serve(async (req) => {
         return new Response("Missing required parameters", { status: 400 });
       }
 
-      // Verify HMAC
-      const valid = await verifyHmac(url.searchParams);
+      // Resolve credentials by shop, then verify HMAC with that secret.
+      const app = await resolveApp(shop);
+      const valid = await verifyHmac(url.searchParams, app.apiSecret);
       if (!valid) {
         return new Response("Invalid HMAC signature", { status: 403 });
       }
@@ -149,8 +157,8 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          client_id: SHOPIFY_API_KEY,
-          client_secret: SHOPIFY_API_SECRET,
+          client_id: app.apiKey,
+          client_secret: app.apiSecret,
           code,
           expiring: true,
         }),

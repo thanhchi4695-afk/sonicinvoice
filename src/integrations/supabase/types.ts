@@ -3252,6 +3252,105 @@ export type Database = {
         }
         Relationships: []
       }
+      product_enrichment_queue: {
+        Row: {
+          ai_description: string | null
+          ai_seo_description: string | null
+          ai_seo_title: string | null
+          approved_at: string | null
+          approved_by: string | null
+          colour: string | null
+          created_at: string | null
+          id: string
+          image_alt_text: string | null
+          last_attempted: string | null
+          max_retries: number
+          next_retry_at: string | null
+          product_page_url: string | null
+          product_title: string | null
+          push_error: string | null
+          pushed_at: string | null
+          retry_count: number
+          scrape_source: string | null
+          scraped_description: string | null
+          scraped_images: Json | null
+          shopify_handle: string
+          shopify_product_id: string
+          shopify_variant_id: string | null
+          status: string
+          style_number: string | null
+          supplier_url: string | null
+          updated_at: string | null
+          url_confidence: string | null
+          user_id: string
+          vendor: string | null
+        }
+        Insert: {
+          ai_description?: string | null
+          ai_seo_description?: string | null
+          ai_seo_title?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          colour?: string | null
+          created_at?: string | null
+          id?: string
+          image_alt_text?: string | null
+          last_attempted?: string | null
+          max_retries?: number
+          next_retry_at?: string | null
+          product_page_url?: string | null
+          product_title?: string | null
+          push_error?: string | null
+          pushed_at?: string | null
+          retry_count?: number
+          scrape_source?: string | null
+          scraped_description?: string | null
+          scraped_images?: Json | null
+          shopify_handle: string
+          shopify_product_id: string
+          shopify_variant_id?: string | null
+          status?: string
+          style_number?: string | null
+          supplier_url?: string | null
+          updated_at?: string | null
+          url_confidence?: string | null
+          user_id: string
+          vendor?: string | null
+        }
+        Update: {
+          ai_description?: string | null
+          ai_seo_description?: string | null
+          ai_seo_title?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          colour?: string | null
+          created_at?: string | null
+          id?: string
+          image_alt_text?: string | null
+          last_attempted?: string | null
+          max_retries?: number
+          next_retry_at?: string | null
+          product_page_url?: string | null
+          product_title?: string | null
+          push_error?: string | null
+          pushed_at?: string | null
+          retry_count?: number
+          scrape_source?: string | null
+          scraped_description?: string | null
+          scraped_images?: Json | null
+          shopify_handle?: string
+          shopify_product_id?: string
+          shopify_variant_id?: string | null
+          status?: string
+          style_number?: string | null
+          supplier_url?: string | null
+          updated_at?: string | null
+          url_confidence?: string | null
+          user_id?: string
+          vendor?: string | null
+        }
+        Relationships: []
+      }
       product_reorder_settings: {
         Row: {
           created_at: string

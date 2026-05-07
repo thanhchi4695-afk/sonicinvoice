@@ -492,6 +492,7 @@ Deno.serve(async (req) => {
       mode,
       updatedAtMin,
       startPageInfo: resumableJob?.last_page_cursor ?? null,
+      initialProductsSynced: resumableJob?.products_synced ?? 0,
     });
 
     const edgeRuntime = (globalThis as any).EdgeRuntime;

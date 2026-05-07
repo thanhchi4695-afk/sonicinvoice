@@ -21,10 +21,14 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SHOPIFY_API_KEY           = Deno.env.get("SHOPIFY_API_KEY")!;
 const SHOPIFY_API_SECRET        = Deno.env.get("SHOPIFY_API_SECRET")!;
 
-async function verifySessionToken(token: string): Promise<Record<string, unknown> | null> {
+type VerifyResult =
+  | { ok: true; payload: Record<string, unknown> }
+  | { ok: false; reason: "malformed" | "bad_signature" | "aud_mismatch" | "expired" | "error"; detail?: string; tokenAud?: string };
+
+async function verifySessionToken(token: string): Promise<VerifyResult> {
   try {
     const parts = token.split(".");
-    if (parts.length !== 3) return null;
+    if (parts.length !== 3) return { ok: false, reason: "malformed" };
 
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
@@ -39,25 +43,28 @@ async function verifySessionToken(token: string): Promise<Record<string, unknown
     );
 
     const valid = await crypto.subtle.verify("HMAC", key, signature, signatureInput);
-    if (!valid) return null;
-
     const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+
+    if (!valid) {
+      console.warn("Session token bad signature. token aud=", payload?.aud, "expected aud=", SHOPIFY_API_KEY);
+      return { ok: false, reason: "bad_signature", tokenAud: payload?.aud };
+    }
 
     if (payload.aud !== SHOPIFY_API_KEY) {
       console.warn("Session token aud mismatch:", payload.aud, "!=", SHOPIFY_API_KEY);
-      return null;
+      return { ok: false, reason: "aud_mismatch", tokenAud: payload?.aud };
     }
 
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp && payload.exp + 10 < now) {
       console.warn("Session token expired");
-      return null;
+      return { ok: false, reason: "expired" };
     }
 
-    return payload;
+    return { ok: true, payload };
   } catch (err) {
     console.error("Session token verification error:", err);
-    return null;
+    return { ok: false, reason: "error", detail: err instanceof Error ? err.message : String(err) };
   }
 }
 

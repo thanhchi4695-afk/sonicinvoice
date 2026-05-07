@@ -143,7 +143,6 @@ const ACTION_MAP: Record<string, { tab?: string; flow?: string }> = {
   open_pl_analysis: { tab: "tools", flow: "profit_loss" },
   open_bulk_sale: { tab: "tools", flow: "sale" },
   open_product_health: { tab: "tools", flow: "product_health" },
-  open_enrichment_queue: { tab: "tools", flow: "enrichment_queue" },
   open_style_grouping: { tab: "tools", flow: "style_grouping" },
   open_seasons: { tab: "tools", flow: "seasons" },
   open_image_optimisation: { tab: "tools", flow: "image_optimise" },

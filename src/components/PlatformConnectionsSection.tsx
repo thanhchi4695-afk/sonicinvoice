@@ -276,6 +276,28 @@ export default function PlatformConnectionsSection() {
       setCustomAppToken("");
       setShowCustomApp(false);
       void loadAll();
+
+      // Auto-populate catalog cache on first connect so the invoice fast path
+      // works immediately on the user's very first invoice.
+      void (async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          await supabase.functions.invoke("sync-shopify-catalog", {
+            body: {
+              user_id: user.id,
+              shop_domain: domain,
+              access_token: token,
+              mode: "full",
+            },
+          });
+          toast.success("Catalog synced — stock check is ready", {
+            description: "Your products are now cached for fast invoice matching.",
+          });
+        } catch (e) {
+          console.warn("Background catalog sync failed:", e);
+        }
+      })();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to verify token");
     } finally {

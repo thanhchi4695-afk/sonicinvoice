@@ -408,6 +408,10 @@ Deno.serve(async (req) => {
       access_token,
       mode = "full",
       location_id,
+      job_id,
+      continue_from_cursor,
+      products_synced,
+      total_products,
     } = body || {};
 
     if (!user_id) {
@@ -421,6 +425,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     let resolvedShopDomain = shop_domain as string | undefined;
     let resolvedAccessToken = access_token as string | undefined;
@@ -482,7 +487,7 @@ Deno.serve(async (req) => {
       updatedAtMin = lastSyncedAt;
     }
 
-    const { data: resumableJob } = await supabase
+    const { data: resumableJob } = job_id ? { data: null } : await supabase
       .from("sync_jobs")
       .select("id, last_page_cursor, products_synced, total_products")
       .eq("user_id", user_id)
@@ -494,22 +499,26 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    const { data: job, error: jobError } = await supabase
-      .from("sync_jobs")
-      .insert({
-        user_id,
-        platform: "shopify",
-        job_type: "catalog_sync",
-        status: "running",
-        products_synced: resumableJob?.products_synced ?? 0,
-        total_products: resumableJob?.total_products ?? null,
-        last_page_cursor: resumableJob?.last_page_cursor ?? null,
-      })
-      .select("id")
-      .single();
+    let syncJobId = job_id as string | undefined;
+    if (!syncJobId) {
+      const { data: job, error: jobError } = await supabase
+        .from("sync_jobs")
+        .insert({
+          user_id,
+          platform: "shopify",
+          job_type: "catalog_sync",
+          status: "running",
+          products_synced: resumableJob?.products_synced ?? 0,
+          total_products: resumableJob?.total_products ?? null,
+          last_page_cursor: resumableJob?.last_page_cursor ?? null,
+        })
+        .select("id")
+        .single();
 
-    if (jobError || !job?.id) {
-      throw new Error(`Failed to create sync job: ${jobError?.message ?? "unknown error"}`);
+      if (jobError || !job?.id) {
+        throw new Error(`Failed to create sync job: ${jobError?.message ?? "unknown error"}`);
+      }
+      syncJobId = job.id;
     }
 
     const runPromise = runShopifyCatalogSync({

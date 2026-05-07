@@ -42,6 +42,7 @@ export const TASK_NEXT_MAP: Record<TaskType, TaskType | null> = {
   pipeline_seo_boost: 'pipeline_marketing',
   pipeline_marketing: null,
   pipeline_season_close: null,
+  product_enrichment_review: null,
 };
 
 // Which pipeline to suggest after each individual task chain

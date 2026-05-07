@@ -190,7 +190,7 @@ async function callWebsearchTier(item: Phase3Item): Promise<Phase3ProductResult 
 
   const invokeOnce = async () => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
+    const timeout = setTimeout(() => controller.abort(), 8_000);
     try {
       const result = await supabase.functions.invoke("enrich-via-websearch", {
         body: {
@@ -208,13 +208,13 @@ async function callWebsearchTier(item: Phase3Item): Promise<Phase3ProductResult 
 
   try {
     let resp: Awaited<ReturnType<typeof invokeOnce>> | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 1; attempt++) {
       try {
         resp = await invokeOnce();
         const status = (resp?.error as { status?: number } | null)?.status;
         if (status !== 503) break;
       } catch (e) {
-        if (attempt === 2) throw e;
+        if (attempt === 0) throw e;
       }
       await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
     }
@@ -347,7 +347,24 @@ export async function runPhase3PriceResearch(
       const item = items[idx];
       let result: Phase3ProductResult | null = null;
 
-      if (!opts.markupOnly) {
+      // Early-exit: skip web research if invoice already has both cost + RRP.
+      // Bond-Eye-style invoices ship complete pricing — no need to query
+      // supplier sites or AI websearch (which can hang for many seconds each).
+      const invoiceCost = Number(item.unit_cost) || 0;
+      const invoiceRrp = Number(item.rrp) || 0;
+      const hasInvoicePricing = invoiceCost > 0 && invoiceRrp > 0 && invoiceRrp > invoiceCost;
+
+      if (hasInvoicePricing) {
+        result = {
+          product_title: item.product_title,
+          vendor: item.vendor,
+          recommended_rrp: invoiceRrp,
+          price_source: "none",
+          confidence: 100,
+        };
+        // Mark as invoice-sourced via bySource bucket label
+        result.price_source = "markup_fallback"; // bucket label kept stable for UI; could add "invoice"
+      } else if (!opts.markupOnly) {
         // 1. Supplier's own website (cached) — highest authority for RRP
         result = await callWebsiteRRP(item);
         // 1.5 NEW — AI WebSearch (Anthropic web_search / Brave). Fills the

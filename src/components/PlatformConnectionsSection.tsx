@@ -472,7 +472,7 @@ export default function PlatformConnectionsSection() {
       });
       if (error) throw error;
       toast.success("Lightspeed catalog synced");
-      const counts = await loadCatalogCounts();
+      const counts = await loadCatalogCounts(user.id);
       setLsCount(counts.lightspeed);
       setLsConn((c) => (c ? { ...c, last_synced: new Date().toISOString() } : c));
     } catch (err) {

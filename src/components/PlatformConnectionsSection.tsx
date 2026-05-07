@@ -40,6 +40,15 @@ interface LightspeedConn {
   last_synced: string | null;
 }
 
+interface SyncJob {
+  id: string;
+  status: "running" | "done" | "failed";
+  products_synced: number;
+  total_products: number | null;
+  error_message: string | null;
+  completed_at: string | null;
+}
+
 function formatRelative(iso: string | null): string {
   if (!iso) return "never";
   const diff = Date.now() - new Date(iso).getTime();
@@ -62,6 +71,7 @@ export default function PlatformConnectionsSection() {
   const [shopifyInput, setShopifyInput] = useState("");
   const [shopifyOAuthLoading, setShopifyOAuthLoading] = useState(false);
   const [shopifySyncing, setShopifySyncing] = useState(false);
+  const [shopifySyncProgress, setShopifySyncProgress] = useState<string | null>(null);
   const [connectedPlatformCount, setConnectedPlatformCount] = useState(0);
   const [showCustomApp, setShowCustomApp] = useState(false);
   const [customAppDomain, setCustomAppDomain] = useState("");
@@ -214,6 +224,47 @@ export default function PlatformConnectionsSection() {
     return { shopify: s.count ?? 0, lightspeed: l.count ?? 0 };
   };
 
+  const pollShopifySyncJob = async (jobId: string) => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < 15 * 60 * 1000) {
+      const { data: job, error } = await (supabase as any)
+        .from("sync_jobs")
+        .select("id,status,products_synced,total_products,error_message,completed_at")
+        .eq("id", jobId)
+        .maybeSingle();
+      if (error) throw error;
+
+      const currentJob = job as SyncJob | null;
+      if (currentJob) {
+        const synced = currentJob.products_synced ?? 0;
+        const total = currentJob.total_products ?? 0;
+        setShopifySyncProgress(
+          total > 0
+            ? `${synced.toLocaleString()} / ${total.toLocaleString()} products`
+            : `${synced.toLocaleString()} products`,
+        );
+
+        if (currentJob.status === "done") {
+          const counts = await loadCatalogCounts();
+          setShopifyCount(counts.shopify);
+          setShopifyLastSynced(currentJob.completed_at ?? new Date().toISOString());
+          toast.success(
+            `Catalog synced — ${(currentJob.total_products ?? currentJob.products_synced ?? counts.shopify).toLocaleString()} products ready`,
+            { description: "Stock check is ready for fast invoice matching." },
+          );
+          return;
+        }
+
+        if (currentJob.status === "failed") {
+          throw new Error(currentJob.error_message || "Catalog sync failed");
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+    throw new Error("Catalog sync is still running. Check again in a few minutes.");
+  };
+
   // ── Shopify actions ───────────────────────────────────────
   const handleShopifyConnect = async () => {
     if (!shopifyInput.trim()) {
@@ -283,7 +334,7 @@ export default function PlatformConnectionsSection() {
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
-          await supabase.functions.invoke("sync-shopify-catalog", {
+          const { data: syncData, error: syncError } = await supabase.functions.invoke("sync-shopify-catalog", {
             body: {
               user_id: user.id,
               shop_domain: domain,
@@ -291,11 +342,12 @@ export default function PlatformConnectionsSection() {
               mode: "full",
             },
           });
-          toast.success("Catalog synced — stock check is ready", {
-            description: "Your products are now cached for fast invoice matching.",
-          });
+          if (syncError) throw syncError;
+          if (syncData?.job_id) await pollShopifySyncJob(syncData.job_id);
         } catch (e) {
           console.warn("Background catalog sync failed:", e);
+        } finally {
+          setShopifySyncProgress(null);
         }
       })();
     } catch (err) {
@@ -307,28 +359,24 @@ export default function PlatformConnectionsSection() {
 
   const handleShopifySync = async () => {
     setShopifySyncing(true);
+    setShopifySyncProgress(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
-      const { error } = await supabase.functions.invoke("sync-shopify-catalog", {
+      const { data, error } = await supabase.functions.invoke("sync-shopify-catalog", {
         body: { user_id: user.id },
       });
       if (error) throw error;
-      toast.success("Shopify catalog synced");
-      const counts = await loadCatalogCounts();
-      setShopifyCount(counts.shopify);
-      const syncedAt = new Date().toISOString();
-      await supabase
-        .from("platform_connections")
-        .update({ last_synced_at: syncedAt })
-        .eq("user_id", user.id)
-        .eq("platform", "shopify")
-        .eq("is_active", true);
-      setShopifyLastSynced(syncedAt);
+      if (!data?.job_id) throw new Error("Sync did not return a job id");
+      toast.success("Catalog sync started", {
+        description: "Products are being cached in the background.",
+      });
+      await pollShopifySyncJob(data.job_id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sync failed");
     } finally {
       setShopifySyncing(false);
+      setShopifySyncProgress(null);
     }
   };
 
@@ -491,7 +539,7 @@ export default function PlatformConnectionsSection() {
                   {shopifyCount.toLocaleString()} products cached
                 </div>
                 <div className="text-muted-foreground">
-                  Synced {formatRelative(shopifyLastSynced)}
+                  {shopifySyncProgress ? `Syncing ${shopifySyncProgress}` : `Synced ${formatRelative(shopifyLastSynced)}`}
                 </div>
               </div>
               <div className="flex gap-2">

@@ -5140,6 +5140,51 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_jobs: {
+        Row: {
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          job_type: string
+          last_page_cursor: string | null
+          platform: string
+          products_synced: number
+          started_at: string
+          status: string
+          total_products: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          job_type?: string
+          last_page_cursor?: string | null
+          platform?: string
+          products_synced?: number
+          started_at?: string
+          status?: string
+          total_products?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          job_type?: string
+          last_page_cursor?: string | null
+          platform?: string
+          products_synced?: number
+          started_at?: string
+          status?: string
+          total_products?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       transfer_order_lines: {
         Row: {
           barcode: string | null

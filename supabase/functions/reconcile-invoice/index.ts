@@ -360,6 +360,7 @@ Deno.serve(async (req) => {
     const tooSmall = catalog.length < MIN_CACHE_ITEMS;
 
     if (platform_connected && (stale || tooSmall)) {
+      // Fire syncs in the background — don't block the reconcile response.
       for (const conn of activeConns) {
         const fnName = conn.platform === "shopify"
           ? "sync-shopify-catalog"
@@ -370,16 +371,27 @@ Deno.serve(async (req) => {
           access_token: conn.access_token,
           location_id: conn.location_id,
         };
-        await triggerSync(supabaseUrl, serviceKey, fnName, syncBody);
+        triggerSync(supabaseUrl, serviceKey, fnName, syncBody)
+          .catch((e) => console.warn("[reconcile] background sync failed:", e));
       }
-      // Re-fetch catalog
-      const { data: refreshed } = await supabase
-        .from("product_catalog_cache")
-        .select("*")
-        .eq("user_id", user_id)
-        .in("platform", platforms);
-      catalog = (refreshed ?? []) as CatalogItem[];
-      freshness = "refreshed";
+
+      // If cache is empty/tiny, give the sync up to MAX_CATALOG_WAIT_MS to
+      // populate something usable; otherwise proceed with what we have.
+      if (tooSmall) {
+        const refetch = (async () => {
+          const { data: refreshed } = await supabase
+            .from("product_catalog_cache")
+            .select("*")
+            .eq("user_id", user_id)
+            .in("platform", platforms);
+          return (refreshed ?? []) as CatalogItem[];
+        })();
+        const timeout = new Promise<CatalogItem[]>((resolve) =>
+          setTimeout(() => resolve(catalog), MAX_CATALOG_WAIT_MS),
+        );
+        catalog = await Promise.race([refetch, timeout]);
+      }
+      freshness = "refreshing_in_background" as any;
     }
 
     // 3. Match

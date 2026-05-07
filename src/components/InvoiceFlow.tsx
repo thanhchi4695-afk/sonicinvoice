@@ -3587,13 +3587,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         const uid = userRes?.user?.id;
 
         // ── Fast path: known supplier + fully priced + cached catalog ──
-        const supplierKnown = !!(supplierName && supplierName.length > 0);
-        const allPriced = invoice_lines.every(
-          (l: any) => Number(l.cost) > 0 && Number(l.rrp) > 0,
-        );
         const hasShopify = platformConnections.some((c) => c.platform === "shopify");
+        const { canUseFastPath, runFastPath } = await import("@/lib/reconcile-fast-path");
 
-        if (uid && supplierKnown && allPriced && hasShopify) {
+        if (uid && hasShopify && canUseFastPath({
+          supplierName,
+          hasShopify,
+          invoiceLines: invoice_lines as any,
+          cacheSize: 51, // probe; real check is on returned cache below
+        })) {
           const { data: cachedCatalog } = await supabase
             .from("product_catalog_cache")
             .select("sku, barcode, product_title, vendor, platform_product_id, platform_variant_id, current_qty, current_cost")
@@ -3601,55 +3603,20 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             .limit(5000);
 
           if (cachedCatalog && cachedCatalog.length > 50) {
-            const byKey = new Map<string, any>();
-            for (const c of cachedCatalog) {
-              if (c.sku) byKey.set("s:" + String(c.sku).toLowerCase(), c);
-              if (c.barcode) byKey.set("b:" + String(c.barcode).toLowerCase(), c);
-            }
-            const lines = invoice_lines.map((l: any) => {
-              const m =
-                (l.sku && byKey.get("s:" + String(l.sku).toLowerCase())) ||
-                (l.barcode && byKey.get("b:" + String(l.barcode).toLowerCase())) ||
-                null;
-              return {
-                invoice_sku: l.sku ?? null,
-                invoice_product_name: l.product_name ?? null,
-                invoice_colour: l.colour ?? null,
-                invoice_size: l.size ?? null,
-                invoice_qty: l.qty,
-                invoice_cost: l.cost ?? null,
-                invoice_rrp: l.rrp ?? null,
-                match_type: m ? "exact_refill" : "new",
-                matched_product_id: m?.platform_product_id ?? null,
-                matched_variant_id: m?.platform_variant_id ?? null,
-                matched_current_qty: m?.current_qty ?? null,
-                matched_current_cost: m?.current_cost ?? null,
-                cost_delta_pct: null,
-                conflict_reason: null,
-                user_decision: "pending",
-              };
-            });
-            const summary = {
-              total: lines.length,
-              new_products: lines.filter((l) => l.match_type === "new").length,
-              exact_refills: lines.filter((l) => l.match_type === "exact_refill").length,
-              new_variants: 0,
-              new_colours: 0,
-              conflicts: 0,
-            };
+            const fp = runFastPath(invoice_lines as any, cachedCatalog as any);
             setReconcileProgress(100);
             const enriched = {
               session_id: null,
-              summary,
-              lines,
-              catalog_freshness: "cached_fast_path",
+              summary: fp.summary,
+              lines: fp.lines,
+              catalog_freshness: fp.catalog_freshness,
               platform_connected: true,
               platform,
             };
             setReconcileResult(enriched as any);
             window.dispatchEvent(new CustomEvent("sonic:reconciliation-ready", { detail: enriched }));
             toast.success("Stock check complete (fast path)", {
-              description: `${summary.exact_refills} refills · ${summary.new_products} new products`,
+              description: `${fp.summary.exact_refills} refills · ${fp.summary.new_products} new products`,
             });
             return;
           }

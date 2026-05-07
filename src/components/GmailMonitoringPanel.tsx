@@ -94,6 +94,8 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
   }, [load]);
 
   // Detect ?gmail=connected once on mount and toast.
+  // Also clear stale found-invoices from any previous Gmail account so the
+  // list reflects the freshly connected inbox.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const status = params.get("gmail");
@@ -101,6 +103,14 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
     const email = params.get("email") ?? "";
     if (status === "connected") {
       toast.success(`Gmail connected${email ? ` — ${email} is now monitored` : ""}`);
+      // Fire-and-forget: wipe stale rows then trigger a fresh scan
+      void (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        await supabase.from("gmail_found_invoices").delete().eq("user_id", user.id);
+        await load();
+        void scanNow();
+      })();
     } else if (status === "error") {
       toast.error(
         `Gmail connection failed${
@@ -116,6 +126,7 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
       params.toString() ? `?${params.toString()}` : ""
     }${window.location.hash}`;
     window.history.replaceState({}, "", next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Realtime: refresh the list when the cron scan inserts new rows.

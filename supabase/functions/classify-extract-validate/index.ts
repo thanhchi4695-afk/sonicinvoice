@@ -96,9 +96,34 @@ Deno.serve(async (req) => {
         const jobId = jobRow.id as string;
         console.log(`[classify-extract-validate] async invoice_read job ${jobId} started`);
 
+        // Heartbeat so the client poller can detect a silently-dead worker
+        // (e.g. platform killed the isolate past its wall-clock budget).
+        // We bump `started_at` every 20s while running. The client treats
+        // a "running" row whose started_at is older than ~90s as stalled.
+        const heartbeat = setInterval(() => {
+          admin.from("invoice_processing_jobs")
+            .update({ started_at: new Date().toISOString() })
+            .eq("id", jobId)
+            .then(() => {}, () => {});
+        }, 20_000);
+
+        // Self-imposed deadline. The platform will kill the isolate well
+        // before infinity — racing against an explicit timeout lets us
+        // mark the job failed instead of leaving the row "running".
+        const HARD_DEADLINE_MS = 240_000; // 4 min — keeps us under the platform cap
+        const deadline = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(
+            `Reader exceeded ${HARD_DEADLINE_MS / 1000}s — invoice is too large or complex for one pass. Try splitting the PDF or uploading just the invoice page.`,
+          )), HARD_DEADLINE_MS),
+        );
+
         const work = (async () => {
           try {
-            const result = await runPipeline({ body, authHeader, supabaseUrl, serviceKey, anonKey, userId, admin });
+            const result = await Promise.race([
+              runPipeline({ body, authHeader, supabaseUrl, serviceKey, anonKey, userId, admin }),
+              deadline,
+            ]);
+            clearInterval(heartbeat);
             await admin.from("invoice_processing_jobs").update({
               status: "done",
               result,
@@ -106,6 +131,7 @@ Deno.serve(async (req) => {
             }).eq("id", jobId);
             console.log(`[classify-extract-validate] async invoice_read job ${jobId} complete`);
           } catch (err) {
+            clearInterval(heartbeat);
             console.error(`[classify-extract-validate] async invoice_read job ${jobId} failed:`, err);
             await admin.from("invoice_processing_jobs").update({
               status: "failed",

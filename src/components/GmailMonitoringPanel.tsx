@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Zap,
   Inbox,
+  RotateCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -93,6 +94,8 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
   }, [load]);
 
   // Detect ?gmail=connected once on mount and toast.
+  // Also clear stale found-invoices from any previous Gmail account so the
+  // list reflects the freshly connected inbox.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const status = params.get("gmail");
@@ -100,6 +103,14 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
     const email = params.get("email") ?? "";
     if (status === "connected") {
       toast.success(`Gmail connected${email ? ` — ${email} is now monitored` : ""}`);
+      // Fire-and-forget: wipe stale rows then trigger a fresh scan
+      void (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        await supabase.from("gmail_found_invoices").delete().eq("user_id", user.id);
+        await load();
+        void scanNow();
+      })();
     } else if (status === "error") {
       toast.error(
         `Gmail connection failed${
@@ -115,6 +126,7 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
       params.toString() ? `?${params.toString()}` : ""
     }${window.location.hash}`;
     window.history.replaceState({}, "", next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Realtime: refresh the list when the cron scan inserts new rows.
@@ -188,6 +200,35 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
       toast.success(
         `Scan complete — ${found.length} invoice email${found.length === 1 ? "" : "s"} found`,
       );
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function resetAndRescan() {
+    const ok = await confirmDialog({
+      title: "Reset and rescan inbox?",
+      description: "This clears the current list of discovered invoices and re-scans the connected Gmail inbox from scratch. Useful after switching Gmail accounts.",
+      confirmLabel: "Reset & rescan",
+    });
+    if (!ok) return;
+    setScanning(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sign in first");
+      const { error: delErr } = await supabase
+        .from("gmail_found_invoices")
+        .delete()
+        .eq("user_id", user.id);
+      if (delErr) throw new Error(delErr.message);
+      setInvoices([]);
+      const { data, error } = await supabase.functions.invoke("scan-gmail-inbox", { body: {} });
+      if (error) throw new Error(error.message);
+      const found = (data as { invoices_found?: unknown[] })?.invoices_found ?? [];
+      toast.success(`Rescan complete — ${found.length} invoice email${found.length === 1 ? "" : "s"} found`);
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -303,6 +344,16 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
                 <RefreshCw className="w-3 h-3 mr-1" />
               )}
               Check for invoices now
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void resetAndRescan()}
+              disabled={scanning}
+              title="Clear the list and re-scan from scratch (use after switching Gmail accounts)"
+            >
+              <RotateCw className="w-3 h-3 mr-1" />
+              Reset & rescan
             </Button>
             <Button
               size="sm"

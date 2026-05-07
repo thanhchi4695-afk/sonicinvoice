@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronLeft, Package, AlertTriangle, TrendingUp, TrendingDown,
   Loader2, RefreshCw, Filter, Sparkles, Clock, BarChart3,

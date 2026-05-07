@@ -176,6 +176,35 @@ export default function ProductHealthPanel({ onBack }: Props) {
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState("");
   const [tab, setTab] = useState("all");
+  const [scanning, setScanning] = useState(false);
+  const [lastScanQueued, setLastScanQueued] = useState(0);
+  const navigate = useNavigate();
+
+  const handleGapScan = async () => {
+    setScanning(true);
+    const toastId = toast.loading(
+      "Scanning your Shopify store for products missing images or descriptions...",
+    );
+    try {
+      const { data, error } = await supabase.functions.invoke("gap-scanner", {
+        body: { manual: true },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const newly = data?.newly_queued ?? 0;
+      const total = data?.incomplete_found ?? 0;
+      setLastScanQueued(newly);
+      toast.success(
+        `Scan complete — ${newly} products added to enrichment queue. ${total} total need attention.`,
+        { id: toastId },
+      );
+    } catch (e) {
+      console.error("[gap-scanner]", e);
+      toast.error("Scan failed — check your Shopify connection in Settings.", { id: toastId });
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const fetchAndScore = async () => {
     setLoading(true);

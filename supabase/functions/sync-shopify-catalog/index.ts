@@ -523,15 +523,18 @@ Deno.serve(async (req) => {
 
     const runPromise = runShopifyCatalogSync({
       supabase,
-      jobId: job.id,
+      jobId: syncJobId,
       userId: user_id,
       shopDomain: resolvedShopDomain,
       accessToken: resolvedAccessToken,
       locationId: resolvedLocationId,
       mode,
       updatedAtMin,
-      startPageInfo: resumableJob?.last_page_cursor ?? null,
-      initialProductsSynced: resumableJob?.products_synced ?? 0,
+      startPageInfo: continue_from_cursor ?? resumableJob?.last_page_cursor ?? null,
+      initialProductsSynced: products_synced ?? resumableJob?.products_synced ?? 0,
+      totalProducts: total_products ?? resumableJob?.total_products ?? null,
+      continuationUrl: `${Deno.env.get("SUPABASE_URL")!}/functions/v1/sync-shopify-catalog`,
+      serviceKey,
     });
 
     const edgeRuntime = (globalThis as any).EdgeRuntime;
@@ -544,9 +547,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        job_id: job.id,
+        job_id: syncJobId,
         status: "running",
-        resumed_from_cursor: Boolean(resumableJob?.last_page_cursor),
+        resumed_from_cursor: Boolean(continue_from_cursor ?? resumableJob?.last_page_cursor),
       }),
       { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

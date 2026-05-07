@@ -66,8 +66,9 @@ interface ReconciliationLine {
   user_decision: "pending";
 }
 
-const STALE_HOURS = 4;
-const MIN_CACHE_ITEMS = 10;
+const STALE_HOURS = 24;
+const MIN_CACHE_ITEMS = 100;
+const MAX_CATALOG_WAIT_MS = 3_000;
 const PRICE_DELTA_THRESHOLD = 0.1;
 const FUZZY_THRESHOLD = 0.8;
 
@@ -348,7 +349,8 @@ Deno.serve(async (req) => {
       .in("platform", platforms);
 
     let catalog: CatalogItem[] = (cacheRows ?? []) as CatalogItem[];
-    let freshness: "live" | "cached" | "refreshed" = catalog.length === 0 ? "live" : "cached";
+    let freshness: "live" | "cached" | "refreshed" | "refreshing_in_background" =
+      catalog.length === 0 ? "live" : "cached";
 
     const newestCachedAt = (cacheRows ?? []).reduce<number>((max, r: any) => {
       const t = r.cached_at ? new Date(r.cached_at).getTime() : 0;
@@ -359,6 +361,7 @@ Deno.serve(async (req) => {
     const tooSmall = catalog.length < MIN_CACHE_ITEMS;
 
     if (platform_connected && (stale || tooSmall)) {
+      // Fire syncs in the background — don't block the reconcile response.
       for (const conn of activeConns) {
         const fnName = conn.platform === "shopify"
           ? "sync-shopify-catalog"
@@ -369,16 +372,27 @@ Deno.serve(async (req) => {
           access_token: conn.access_token,
           location_id: conn.location_id,
         };
-        await triggerSync(supabaseUrl, serviceKey, fnName, syncBody);
+        triggerSync(supabaseUrl, serviceKey, fnName, syncBody)
+          .catch((e) => console.warn("[reconcile] background sync failed:", e));
       }
-      // Re-fetch catalog
-      const { data: refreshed } = await supabase
-        .from("product_catalog_cache")
-        .select("*")
-        .eq("user_id", user_id)
-        .in("platform", platforms);
-      catalog = (refreshed ?? []) as CatalogItem[];
-      freshness = "refreshed";
+
+      // If cache is empty/tiny, give the sync up to MAX_CATALOG_WAIT_MS to
+      // populate something usable; otherwise proceed with what we have.
+      if (tooSmall) {
+        const refetch = (async () => {
+          const { data: refreshed } = await supabase
+            .from("product_catalog_cache")
+            .select("*")
+            .eq("user_id", user_id)
+            .in("platform", platforms);
+          return (refreshed ?? []) as CatalogItem[];
+        })();
+        const timeout = new Promise<CatalogItem[]>((resolve) =>
+          setTimeout(() => resolve(catalog), MAX_CATALOG_WAIT_MS),
+        );
+        catalog = await Promise.race([refetch, timeout]);
+      }
+      freshness = "refreshing_in_background" as any;
     }
 
     // 3. Match

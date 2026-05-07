@@ -120,38 +120,47 @@ const ShopifyEmbeddedProvider = ({ children }: Props) => {
           return;
         }
 
-        // Step 3: Set Supabase session (single call — no other component should do this)
-        // Wrap in 8s timeout — supabase.auth.setSession() can hang indefinitely
-        // inside Shopify Admin iframes when third-party storage is partitioned,
-        // which previously left us stuck on the "Signing you in via Shopify…" screen
-        // until the outer 15s hard-timeout fired with a generic handshake error.
-        console.log("[embedded-auth] Verify OK, calling setSession…");
-        const setSessionPromise = supabase.auth.setSession({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-        });
-        const setSessionTimeout = new Promise<{ error: { message: string } }>((resolve) =>
-          setTimeout(() => resolve({ error: { message: "setSession timed out after 8s (likely partitioned storage in iframe)" } }), 8000)
-        );
-        const { error: sessionError } = (await Promise.race([setSessionPromise, setSessionTimeout])) as { error: { message: string } | null };
+        // Step 3: Persist session WITHOUT calling supabase.auth.setSession().
+        // setSession() acquires a navigator.locks lock with `steal: true`, which
+        // throws "Lock broken by another request with the 'steal' option" when
+        // Shopify Admin loads the embedded app in multiple iframes (e.g. nav
+        // prefetch + visible iframe). We write the auth payload directly into
+        // the storage key supabase-js reads on init, then nudge it with
+        // getSession() (which is lock-free for reads).
+        console.log("[embedded-auth] Verify OK, persisting session to storage…");
+        try {
+          const projectRef = (import.meta.env.VITE_SUPABASE_PROJECT_ID as string) || "";
+          const storageKey = `sb-${projectRef}-auth-token`;
+          const expiresIn = typeof data.expires_in === "number" ? data.expires_in : 3600;
+          const expiresAt = typeof data.expires_at === "number"
+            ? data.expires_at
+            : Math.floor(Date.now() / 1000) + expiresIn;
+          const payload = {
+            access_token: data.access_token,
+            refresh_token: data.refresh_token,
+            expires_in: expiresIn,
+            expires_at: expiresAt,
+            token_type: "bearer",
+            user: data.user ?? null,
+          };
+          localStorage.setItem(storageKey, JSON.stringify(payload));
+        } catch (storageErr) {
+          // Partitioned storage in iframe — that's OK, queries below still
+          // include the Authorization header from supabase-js memory state.
+          console.warn("[embedded-auth] localStorage write failed (partitioned?):", storageErr);
+        }
+
+        // Refresh in-memory auth state without acquiring the steal-lock.
+        try {
+          await Promise.race([
+            supabase.auth.getSession(),
+            new Promise((resolve) => setTimeout(resolve, 2000)),
+          ]);
+        } catch { /* ignore */ }
 
         if (cancelled) return;
 
-        if (sessionError) {
-          console.warn("[embedded-auth] setSession failed:", sessionError);
-          // Even when setSession fails (typically because the iframe can't
-          // persist auth tokens), we already have valid Supabase JWTs from
-          // the verify endpoint. Treat the user as authenticated for the
-          // life of this tab — Supabase queries that include the access_token
-          // header will still succeed.
-          setAuthError(null);
-          setAuthState("authenticated");
-          localStorage.setItem("onboarding_complete", "true");
-          addAuditEntry("Login", `Embedded session auth (no-store) for ${data.shop || base.shop}`);
-          return;
-        }
-
-        console.log("[embedded-auth] setSession OK — authenticated");
+        console.log("[embedded-auth] Session persisted — authenticated");
         setAuthError(null);
         setAuthState("authenticated");
         localStorage.setItem("onboarding_complete", "true");

@@ -66,12 +66,12 @@ function buildEnvRegistry(): ShopifyAppCreds[] {
     }
   }
 
-  // Numbered fallbacks _2 ... _9
+  // Numbered fallbacks _2 ... _9 (optionally pinned via SHOPIFY_API_KEY_n_SHOP)
   for (let i = 2; i <= 9; i++) {
     const k = Deno.env.get(`SHOPIFY_API_KEY_${i}`) ?? "";
     const s = Deno.env.get(`SHOPIFY_API_SECRET_${i}`) ?? "";
-    console.log(`[shopify-apps] env app_${i} key_present=${!!k} key_len=${k.length} secret_len=${s.length} dup_of_primary=${k === (Deno.env.get("SHOPIFY_API_KEY") ?? "")}`);
-    push(`app_${i}`, k, s);
+    const shop = Deno.env.get(`SHOPIFY_API_KEY_${i}_SHOP`) ?? null;
+    push(`app_${i}`, k, s, shop);
   }
 
   // Primary

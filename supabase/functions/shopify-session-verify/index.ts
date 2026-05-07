@@ -10,7 +10,8 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { getShopifyAppByKey, getAllShopifyApps, peekJwtPayload } from "../_shared/shopify-apps.ts";
+import { tokenResponseToConnectionColumns } from "../_shared/shopify-token.ts";
+import { getShopifyAppByKey, getAllShopifyApps, peekJwtPayload, type ShopifyAppCreds } from "../_shared/shopify-apps.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +22,7 @@ const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 type VerifyResult =
-  | { ok: true; payload: Record<string, unknown> }
+  | { ok: true; payload: Record<string, unknown>; app: ShopifyAppCreds }
   | { ok: false; reason: "malformed" | "bad_signature" | "aud_mismatch" | "expired" | "error"; detail?: string; tokenAud?: string };
 
 async function verifySessionToken(token: string): Promise<VerifyResult> {
@@ -64,7 +65,7 @@ async function verifySessionToken(token: string): Promise<VerifyResult> {
       return { ok: false, reason: "expired" };
     }
 
-    return { ok: true, payload };
+    return { ok: true, payload, app };
   } catch (err) {
     console.error("Session token verification error:", err);
     return { ok: false, reason: "error", detail: err instanceof Error ? err.message : String(err) };

@@ -10,6 +10,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { getShopifyAppByKey, getShopifyApps, peekJwtPayload } from "../_shared/shopify-apps.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,8 +19,6 @@ const corsHeaders = {
 
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SHOPIFY_API_KEY           = Deno.env.get("SHOPIFY_API_KEY")!;
-const SHOPIFY_API_SECRET        = Deno.env.get("SHOPIFY_API_SECRET")!;
 
 type VerifyResult =
   | { ok: true; payload: Record<string, unknown> }
@@ -30,9 +29,18 @@ async function verifySessionToken(token: string): Promise<VerifyResult> {
     const parts = token.split(".");
     if (parts.length !== 3) return { ok: false, reason: "malformed" };
 
+    // Multi-app routing: select credentials by token's aud claim.
+    const peeked = peekJwtPayload(token) as Record<string, unknown> | null;
+    const tokenAud = typeof peeked?.aud === "string" ? (peeked!.aud as string) : undefined;
+    const app = getShopifyAppByKey(tokenAud);
+    if (!app) {
+      console.warn("Session token aud has no matching app:", tokenAud);
+      return { ok: false, reason: "aud_mismatch", tokenAud };
+    }
+
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
-      "raw", encoder.encode(SHOPIFY_API_SECRET),
+      "raw", encoder.encode(app.apiSecret),
       { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
     );
 
@@ -43,16 +51,11 @@ async function verifySessionToken(token: string): Promise<VerifyResult> {
     );
 
     const valid = await crypto.subtle.verify("HMAC", key, signature, signatureInput);
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const payload = peeked ?? JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
 
     if (!valid) {
-      console.warn("Session token bad signature. token aud=", payload?.aud, "expected aud=", SHOPIFY_API_KEY);
-      return { ok: false, reason: "bad_signature", tokenAud: payload?.aud };
-    }
-
-    if (payload.aud !== SHOPIFY_API_KEY) {
-      console.warn("Session token aud mismatch:", payload.aud, "!=", SHOPIFY_API_KEY);
-      return { ok: false, reason: "aud_mismatch", tokenAud: payload?.aud };
+      console.warn("Session token bad signature for app=", app.label, "aud=", tokenAud);
+      return { ok: false, reason: "bad_signature", tokenAud };
     }
 
     const now = Math.floor(Date.now() / 1000);
@@ -90,11 +93,11 @@ Deno.serve(async (req) => {
 
     const result = await verifySessionToken(sessionToken);
     if (!result.ok) {
-      const expectedAud = SHOPIFY_API_KEY;
+      const knownAuds = getShopifyApps().map((a) => `${a.label}:${a.apiKey}`);
       const errorMessages: Record<string, string> = {
         malformed: "Session token is malformed (not a valid JWT).",
-        bad_signature: "Session token signature is invalid — SHOPIFY_API_SECRET in the backend does not match the app that issued the token.",
-        aud_mismatch: `Session token was issued for a different Shopify app (aud=${result.tokenAud}, expected ${expectedAud}). Open the production app, not a separate testing app.`,
+        bad_signature: "Session token signature is invalid — none of the configured Shopify app secrets matched.",
+        aud_mismatch: `Session token was issued for an unknown Shopify app (aud=${result.tokenAud}). Configured apps: ${knownAuds.join(", ") || "none"}.`,
         expired: "Session token has expired — reload the app from Shopify Admin.",
         error: `Session token verification error: ${result.detail || "unknown"}`,
       };
@@ -103,7 +106,7 @@ Deno.serve(async (req) => {
           error: errorMessages[result.reason],
           reason: result.reason,
           token_aud: result.tokenAud,
-          expected_aud: expectedAud,
+          configured_apps: knownAuds,
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

@@ -148,34 +148,39 @@ export default function PlatformConnectionsSection() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [{ data: { user } }, ls, counts] = await Promise.all([
-        supabase.auth.getUser(),
-        loadLightspeedConn(),
-        loadCatalogCounts(),
-      ]);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setShopifyConnected(false);
+        setShopifyDomain("");
+        setShopifyLastSynced(null);
+        setLsConn(null);
+        setShopifyCount(0);
+        setLsCount(0);
+        setConnectedPlatformCount(0);
+        return;
+      }
 
-      let shopifySyncMeta: { shop_domain: string | null; last_synced_at: string | null } | null = null;
-      let platformCount = 0;
-      if (user) {
-        const [{ data }, activePlatforms] = await Promise.all([
-          supabase
+      const [ls, counts, shopifyMetaRes, platformsRes] = await Promise.all([
+        loadLightspeedConn(user.id),
+        loadCatalogCounts(user.id),
+        supabase
           .from("platform_connections")
           .select("shop_domain, last_synced_at")
           .eq("user_id", user.id)
           .eq("platform", "shopify")
           .eq("is_active", true)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from("platform_connections")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", user.id)
-            .eq("is_active", true),
-        ]);
-        shopifySyncMeta = data;
-        platformCount = activePlatforms.count ?? 0;
-      }
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("platform_connections")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("is_active", true),
+      ]);
+
+      const shopifySyncMeta = shopifyMetaRes.data;
+      const platformCount = platformsRes.count ?? 0;
 
       if (shopifySyncMeta?.shop_domain) {
         setShopifyConnected(true);
@@ -195,13 +200,11 @@ export default function PlatformConnectionsSection() {
     }
   };
 
-  const loadLightspeedConn = async (): Promise<LightspeedConn | null> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+  const loadLightspeedConn = async (userId: string): Promise<LightspeedConn | null> => {
     const { data } = await supabase
       .from("pos_connections")
       .select("ls_x_domain_prefix, ls_r_account_id, last_synced")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .in("platform", ["lightspeed_x", "lightspeed_r"])
       .maybeSingle();
     if (!data) return null;
@@ -209,19 +212,17 @@ export default function PlatformConnectionsSection() {
     return data as LightspeedConn;
   };
 
-  const loadCatalogCounts = async (): Promise<{ shopify: number; lightspeed: number }> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { shopify: 0, lightspeed: 0 };
+  const loadCatalogCounts = async (userId: string): Promise<{ shopify: number; lightspeed: number }> => {
     const [s, l] = await Promise.all([
       supabase
         .from("product_catalog_cache")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("platform", "shopify"),
       supabase
         .from("product_catalog_cache")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .eq("platform", "lightspeed"),
     ]);
     return { shopify: s.count ?? 0, lightspeed: l.count ?? 0 };

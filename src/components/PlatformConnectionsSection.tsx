@@ -532,7 +532,7 @@ export default function PlatformConnectionsSection() {
                   {shopifyCount.toLocaleString()} products cached
                 </div>
                 <div className="text-muted-foreground">
-                  Synced {formatRelative(shopifyLastSynced)}
+                  {shopifySyncProgress ? `Syncing ${shopifySyncProgress}` : `Synced ${formatRelative(shopifyLastSynced)}`}
                 </div>
               </div>
               <div className="flex gap-2">

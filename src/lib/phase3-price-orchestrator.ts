@@ -190,7 +190,7 @@ async function callWebsearchTier(item: Phase3Item): Promise<Phase3ProductResult 
 
   const invokeOnce = async () => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
+    const timeout = setTimeout(() => controller.abort(), 8_000);
     try {
       const result = await supabase.functions.invoke("enrich-via-websearch", {
         body: {

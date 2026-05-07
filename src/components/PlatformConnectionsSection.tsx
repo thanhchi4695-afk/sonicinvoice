@@ -115,8 +115,11 @@ export default function PlatformConnectionsSection() {
   }, [stats.lastSyncedAt, stats.total]);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      void loadAll();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      // Only reload on actual sign-in/out — token refreshes don't change the data we read
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        void loadAll();
+      }
     });
 
     void loadAll();

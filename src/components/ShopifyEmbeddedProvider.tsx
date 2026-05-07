@@ -108,6 +108,14 @@ const ShopifyEmbeddedProvider = ({ children }: Props) => {
 
         if (response.status === 404 && data?.needs_install) {
           console.warn("[embedded-auth] Shop not installed:", data?.error);
+          if (data?.install_url) {
+            try {
+              window.top?.location.assign(data.install_url);
+            } catch {
+              window.location.assign(data.install_url);
+            }
+            return;
+          }
           setAuthError(data?.error || "App not installed for this shop");
           setAuthState("needs_install");
           return;

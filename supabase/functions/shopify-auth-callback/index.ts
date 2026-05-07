@@ -13,16 +13,20 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { tokenResponseToConnectionColumns } from "../_shared/shopify-token.ts";
-import { getShopifyAppByShop, getPrimaryShopifyApp, type ShopifyAppCreds } from "../_shared/shopify-apps.ts";
+import { getShopifyAppByKey, getShopifyAppByShop, getPrimaryShopifyApp, type ShopifyAppCreds } from "../_shared/shopify-apps.ts";
 
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const APP_URL                   = Deno.env.get("APP_URL") || "https://sonicinvoice.lovable.app";
 const API_VERSION               = "2025-01";
 
-async function resolveApp(shop: string): Promise<ShopifyAppCreds> {
-  const pinned = await getShopifyAppByShop(shop);
-  const app = pinned ?? getPrimaryShopifyApp();
+async function resolveApp(shop: string, query: URLSearchParams): Promise<ShopifyAppCreds> {
+  // Shopify includes client_id on app-initiated install/callback requests. Prefer
+  // that over shop pinning so a merchant can reinstall from the Partner/Admin
+  // install URL even if the app-specific shop pin is temporarily missing.
+  const byClientId = await getShopifyAppByKey(query.get("client_id"));
+  const pinned = byClientId ? null : await getShopifyAppByShop(shop);
+  const app = byClientId ?? pinned ?? getPrimaryShopifyApp();
   if (!app) throw new Error("No Shopify app credentials configured");
   console.log(`[shopify-auth-callback] shop=${shop} -> app=${app.label} key=${app.apiKey.slice(0, 6)}…`);
   return app;
@@ -65,7 +69,7 @@ Deno.serve(async (req) => {
       return new Response("Missing required parameters (code, shop)", { status: 400 });
     }
 
-    const app = await resolveApp(shop);
+    const app = await resolveApp(shop, url.searchParams);
     const valid = await verifyHmac(url.searchParams, app.apiSecret);
     if (!valid) {
       return new Response("Invalid HMAC signature", { status: 403 });

@@ -10,7 +10,8 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { getShopifyAppByKey, getAllShopifyApps, peekJwtPayload } from "../_shared/shopify-apps.ts";
+import { tokenResponseToConnectionColumns } from "../_shared/shopify-token.ts";
+import { getShopifyAppByKey, getAllShopifyApps, peekJwtPayload, type ShopifyAppCreds } from "../_shared/shopify-apps.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,9 +20,13 @@ const corsHeaders = {
 
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const API_VERSION               = "2025-01";
+const SCOPES                    = "read_products,write_products,read_orders,read_inventory,write_inventory";
+const OFFLINE_TOKEN_TYPE        = "urn:shopify:params:oauth:token-type:offline-access-token";
+const TOKEN_EXCHANGE_GRANT      = "urn:ietf:params:oauth:grant-type:token-exchange";
 
 type VerifyResult =
-  | { ok: true; payload: Record<string, unknown> }
+  | { ok: true; payload: Record<string, unknown>; app: ShopifyAppCreds }
   | { ok: false; reason: "malformed" | "bad_signature" | "aud_mismatch" | "expired" | "error"; detail?: string; tokenAud?: string };
 
 async function verifySessionToken(token: string): Promise<VerifyResult> {
@@ -64,7 +69,7 @@ async function verifySessionToken(token: string): Promise<VerifyResult> {
       return { ok: false, reason: "expired" };
     }
 
-    return { ok: true, payload };
+    return { ok: true, payload, app };
   } catch (err) {
     console.error("Session token verification error:", err);
     return { ok: false, reason: "error", detail: err instanceof Error ? err.message : String(err) };
@@ -73,6 +78,90 @@ async function verifySessionToken(token: string): Promise<VerifyResult> {
 
 function extractShopDomain(issOrDest: string): string {
   try { return new URL(issOrDest).hostname; } catch { return issOrDest; }
+}
+
+function buildInstallUrl(shop: string, app: ShopifyAppCreds): string {
+  const redirectUri = `${SUPABASE_URL}/functions/v1/shopify-auth-callback`;
+  return `https://${shop}/admin/oauth/authorize?client_id=${app.apiKey}&scope=${SCOPES}&redirect_uri=${encodeURIComponent(redirectUri)}&state=embedded`;
+}
+
+function generateToken(): string {
+  const a = new Uint8Array(32);
+  crypto.getRandomValues(a);
+  return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function completeEmbeddedInstall(supabaseAdmin: ReturnType<typeof createClient>, shop: string, app: ShopifyAppCreds, sessionToken: string) {
+  const resp = await fetch(`https://${shop}/admin/oauth/access_token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: app.apiKey,
+      client_secret: app.apiSecret,
+      grant_type: TOKEN_EXCHANGE_GRANT,
+      subject_token: sessionToken,
+      subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
+      requested_token_type: OFFLINE_TOKEN_TYPE,
+      expiring: "1",
+    }),
+  });
+  if (!resp.ok) {
+    console.warn(`[session-verify] embedded token exchange failed for ${shop}: ${resp.status} ${await resp.text()}`);
+    return null;
+  }
+  const tokenJson = await resp.json();
+  const accessToken = tokenJson.access_token;
+  if (!accessToken) return null;
+
+  const shopResp = await fetch(`https://${shop}/admin/api/${API_VERSION}/shop.json`, {
+    headers: { "X-Shopify-Access-Token": accessToken },
+  });
+  const shopData = shopResp.ok ? await shopResp.json() : { shop: {} };
+  const shopEmail = shopData.shop?.email || `${shop.replace(".myshopify.com", "")}@shopify-login.local`;
+  const shopName = shopData.shop?.name || shop;
+
+  const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+  let userId = existingUsers?.users?.find((u: { email?: string }) => u.email === shopEmail)?.id ?? null;
+  if (!userId) {
+    const { data: newUser, error } = await supabaseAdmin.auth.admin.createUser({
+      email: shopEmail,
+      password: generateToken(),
+      email_confirm: true,
+      user_metadata: { shop, shop_name: shopName, auth_provider: "shopify" },
+    });
+    if (error || !newUser?.user) throw new Error(`Failed to create Shopify user: ${error?.message ?? "unknown"}`);
+    userId = newUser.user.id;
+  }
+
+  const tokenCols = tokenResponseToConnectionColumns(tokenJson);
+  await supabaseAdmin.from("shopify_connections").upsert({
+    user_id: userId,
+    store_url: shop,
+    access_token: accessToken,
+    api_version: API_VERSION,
+    shop_name: shopName,
+    updated_at: new Date().toISOString(),
+    refresh_token: tokenCols.refresh_token,
+    token_expires_at: tokenCols.token_expires_at,
+    refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+    needs_reauth: false,
+  }, { onConflict: "user_id" });
+
+  await supabaseAdmin.from("platform_connections").delete().eq("user_id", userId).eq("platform", "shopify");
+  await supabaseAdmin.from("platform_connections").insert({
+    user_id: userId,
+    platform: "shopify",
+    shop_domain: shop,
+    access_token: accessToken,
+    refresh_token: tokenCols.refresh_token,
+    token_expires_at: tokenCols.token_expires_at,
+    refresh_token_expires_at: tokenCols.refresh_token_expires_at,
+    needs_reauth: false,
+    is_active: true,
+  });
+
+  console.log(`[session-verify] completed embedded install for ${shop} via ${app.label}`);
+  return { user_id: userId, shop_name: shopName };
 }
 
 Deno.serve(async (req) => {
@@ -118,17 +207,24 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: conn } = await supabaseAdmin
+    let { data: conn } = await supabaseAdmin
       .from("shopify_connections")
       .select("user_id, shop_name")
       .eq("store_url", shop)
       .single();
 
     if (!conn) {
-      return new Response(
-        JSON.stringify({ error: "App not installed for this shop", needs_install: true }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      conn = await completeEmbeddedInstall(supabaseAdmin, shop, result.app, sessionToken);
+      if (!conn) {
+        return new Response(
+          JSON.stringify({
+            error: "App not installed for this shop",
+            needs_install: true,
+            install_url: buildInstallUrl(shop, result.app),
+          }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // supabase-js v2 doesn't expose createSession on auth.admin in this runtime.

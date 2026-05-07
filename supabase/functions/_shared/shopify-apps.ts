@@ -173,7 +173,13 @@ export async function getShopifyAppByShop(
 }
 
 export function getPrimaryShopifyApp(): ShopifyAppCreds | null {
-  return getEnvRegistry()[0] ?? null;
+  const env = getEnvRegistry();
+  return env.find((a) => a.label === "primary") ?? env[0] ?? null;
+}
+
+export async function getShopifyAppByLabel(label: string): Promise<ShopifyAppCreds | null> {
+  const all = await getAllShopifyApps();
+  return all.find((a) => a.label === label) ?? null;
 }
 
 /**

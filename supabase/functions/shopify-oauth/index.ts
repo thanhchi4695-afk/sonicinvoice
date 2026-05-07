@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { tokenResponseToConnectionColumns } from "../_shared/shopify-token.ts";
-import { getShopifyAppByShop, getPrimaryShopifyApp, type ShopifyAppCreds } from "../_shared/shopify-apps.ts";
+import { getShopifyAppByKey, getShopifyAppByShop, getPrimaryShopifyApp, type ShopifyAppCreds } from "../_shared/shopify-apps.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,9 +9,10 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-async function resolveApp(shop: string): Promise<ShopifyAppCreds> {
-  const pinned = await getShopifyAppByShop(shop);
-  const app = pinned ?? getPrimaryShopifyApp();
+async function resolveApp(shop: string, query?: URLSearchParams): Promise<ShopifyAppCreds> {
+  const byClientId = query ? await getShopifyAppByKey(query.get("client_id")) : null;
+  const pinned = byClientId ? null : await getShopifyAppByShop(shop);
+  const app = byClientId ?? pinned ?? getPrimaryShopifyApp();
   if (!app) throw new Error("No Shopify app credentials configured");
   console.log(`[shopify-oauth] shop=${shop} -> app=${app.label} key=${app.apiKey.slice(0, 6)}…`);
   return app;
@@ -128,7 +129,7 @@ Deno.serve(async (req) => {
       }
 
       // Resolve credentials by shop, then verify HMAC with that secret.
-      const app = await resolveApp(shop);
+      const app = await resolveApp(shop, url.searchParams);
       const valid = await verifyHmac(url.searchParams, app.apiSecret);
       if (!valid) {
         return new Response("Invalid HMAC signature", { status: 403 });

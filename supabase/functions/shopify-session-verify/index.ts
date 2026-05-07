@@ -21,6 +21,7 @@ const corsHeaders = {
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const API_VERSION               = "2025-01";
+const SCOPES                    = "read_products,write_products,read_orders,read_inventory,write_inventory";
 const OFFLINE_TOKEN_TYPE        = "urn:shopify:params:oauth:token-type:offline-access-token";
 const TOKEN_EXCHANGE_GRANT      = "urn:ietf:params:oauth:grant-type:token-exchange";
 
@@ -77,6 +78,11 @@ async function verifySessionToken(token: string): Promise<VerifyResult> {
 
 function extractShopDomain(issOrDest: string): string {
   try { return new URL(issOrDest).hostname; } catch { return issOrDest; }
+}
+
+function buildInstallUrl(shop: string, app: ShopifyAppCreds): string {
+  const redirectUri = `${SUPABASE_URL}/functions/v1/shopify-auth-callback`;
+  return `https://${shop}/admin/oauth/authorize?client_id=${app.apiKey}&scope=${SCOPES}&redirect_uri=${encodeURIComponent(redirectUri)}&state=embedded`;
 }
 
 function generateToken(): string {
@@ -211,7 +217,11 @@ Deno.serve(async (req) => {
       conn = await completeEmbeddedInstall(supabaseAdmin, shop, result.app, sessionToken);
       if (!conn) {
         return new Response(
-          JSON.stringify({ error: "App not installed for this shop", needs_install: true }),
+          JSON.stringify({
+            error: "App not installed for this shop",
+            needs_install: true,
+            install_url: buildInstallUrl(shop, result.app),
+          }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

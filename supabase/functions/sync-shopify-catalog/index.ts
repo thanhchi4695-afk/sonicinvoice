@@ -12,6 +12,8 @@ const corsHeaders = {
 };
 
 const API_VERSION = "2024-01";
+const PAGE_PRODUCT_LIMIT = 250;
+const UPSERT_CHUNK_SIZE = 500;
 
 interface ShopifyVariant {
   id: number;
@@ -125,9 +127,9 @@ async function fetchProductsPage(
   const baseFields = "id,title,vendor,variants,options,updated_at";
   let path: string;
   if (pageInfo) {
-    path = `/products.json?limit=250&fields=${baseFields}&page_info=${encodeURIComponent(pageInfo)}`;
+    path = `/products.json?limit=${PAGE_PRODUCT_LIMIT}&fields=${baseFields}&page_info=${encodeURIComponent(pageInfo)}`;
   } else {
-    const params = new URLSearchParams({ limit: "250", fields: baseFields });
+    const params = new URLSearchParams({ limit: String(PAGE_PRODUCT_LIMIT), fields: baseFields });
     if (updatedAtMin) params.set("updated_at_min", updatedAtMin);
     path = `/products.json?${params.toString()}`;
   }
@@ -178,6 +180,183 @@ async function fetchInventoryLevels(
   return map;
 }
 
+async function fetchProductCount(
+  shop: string,
+  token: string,
+  updatedAtMin: string | undefined,
+): Promise<number | null> {
+  const params = new URLSearchParams();
+  if (updatedAtMin) params.set("updated_at_min", updatedAtMin);
+  const query = params.toString();
+  const res = await shopifyFetch(
+    shop,
+    token,
+    `/products/count.json${query ? `?${query}` : ""}`,
+  );
+  if (!res.ok) return null;
+  const json = await res.json().catch(() => ({}));
+  return typeof json.count === "number" ? json.count : null;
+}
+
+async function updateJob(
+  supabase: ReturnType<typeof createClient>,
+  jobId: string,
+  patch: Record<string, unknown>,
+) {
+  await supabase
+    .from("sync_jobs")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", jobId);
+}
+
+async function runShopifyCatalogSync(params: {
+  supabase: ReturnType<typeof createClient>;
+  jobId: string;
+  userId: string;
+  shopDomain: string;
+  accessToken: string;
+  locationId?: string;
+  mode: string;
+  updatedAtMin?: string;
+  startPageInfo: string | null;
+}) {
+  const {
+    supabase,
+    jobId,
+    userId,
+    shopDomain,
+    accessToken,
+    locationId,
+    mode,
+    updatedAtMin,
+    startPageInfo,
+  } = params;
+  const startedAt = Date.now();
+  let pageInfo: string | null = startPageInfo;
+  let pageNum = 0;
+  let productsSynced = 0;
+  let variantsSynced = 0;
+
+  try {
+    const totalProducts = await fetchProductCount(shopDomain, accessToken, updatedAtMin);
+    await updateJob(supabase, jobId, {
+      total_products: totalProducts,
+      status: "running",
+      error_message: null,
+    });
+
+    while (true) {
+      pageNum++;
+      const { products, nextPageInfo } = await fetchProductsPage(
+        shopDomain,
+        accessToken,
+        pageInfo,
+        pageNum === 1 && !pageInfo ? updatedAtMin : undefined,
+      );
+
+      if (products.length === 0 && pageNum === 1) break;
+
+      const pageInventoryItemIds: number[] = [];
+      for (const p of products) {
+        for (const v of p.variants || []) {
+          if (v.inventory_item_id) pageInventoryItemIds.push(v.inventory_item_id);
+        }
+      }
+      const inventoryMap = await fetchInventoryLevels(
+        shopDomain,
+        accessToken,
+        pageInventoryItemIds,
+        locationId,
+      );
+
+      const rows: any[] = [];
+      const nowIso = new Date().toISOString();
+      for (const product of products) {
+        const optionNames = (product.options || []).map((o) => o.name);
+        for (const variant of product.variants || []) {
+          const { colour, size } = parseVariantTitle(
+            variant.title,
+            optionNames,
+            variant,
+          );
+          const liveQty = inventoryMap.get(variant.inventory_item_id);
+          const qty =
+            liveQty !== undefined ? liveQty : variant.inventory_quantity ?? null;
+
+          rows.push({
+            user_id: userId,
+            platform: "shopify",
+            platform_product_id: String(product.id),
+            platform_variant_id: String(variant.id),
+            sku: variant.sku || null,
+            product_title: product.title,
+            variant_title: variant.title,
+            vendor: (product as any).vendor || null,
+            colour,
+            size,
+            current_qty: qty,
+            current_cost: null,
+            current_price: variant.price ? Number(variant.price) : null,
+            barcode: variant.barcode || null,
+            cached_at: nowIso,
+          });
+          variantsSynced++;
+        }
+      }
+
+      for (let i = 0; i < rows.length; i += UPSERT_CHUNK_SIZE) {
+        const { error } = await supabase
+          .from("product_catalog_cache")
+          .upsert(rows.slice(i, i + UPSERT_CHUNK_SIZE), {
+            onConflict: "user_id,platform,platform_variant_id",
+          });
+        if (error) throw new Error(`Cache upsert failed: ${error.message}`);
+      }
+
+      productsSynced += products.length;
+      await updateJob(supabase, jobId, {
+        products_synced: productsSynced,
+        total_products: totalProducts,
+        last_page_cursor: nextPageInfo,
+      });
+
+      console.log(
+        `[sync-shopify-catalog] job=${jobId} page=${pageNum} products=${products.length} variants_total=${variantsSynced} elapsed_ms=${Date.now() - startedAt}`,
+      );
+
+      pageInfo = nextPageInfo;
+      if (!pageInfo) break;
+    }
+
+    const finishedAt = new Date().toISOString();
+    await supabase
+      .from("platform_connections")
+      .update({ last_synced_at: finishedAt })
+      .eq("user_id", userId)
+      .eq("platform", "shopify")
+      .eq("shop_domain", shopDomain);
+
+    await updateJob(supabase, jobId, {
+      status: "done",
+      products_synced: productsSynced,
+      total_products: totalProducts ?? productsSynced,
+      last_page_cursor: null,
+      completed_at: finishedAt,
+    });
+
+    console.log(
+      `[sync-shopify-catalog] completed job=${jobId} products=${productsSynced} variants=${variantsSynced} mode=${mode} duration_ms=${Date.now() - startedAt}`,
+    );
+  } catch (err) {
+    console.error("sync-shopify-catalog background error:", err);
+    await updateJob(supabase, jobId, {
+      status: "failed",
+      error_message: err instanceof Error ? err.message : String(err),
+      completed_at: new Date().toISOString(),
+    });
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -188,8 +367,6 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-
-  const startedAt = Date.now();
 
   try {
     const body = await req.json();
@@ -203,13 +380,8 @@ Deno.serve(async (req) => {
 
     if (!user_id) {
       return new Response(
-        JSON.stringify({
-          error: "Missing required field: user_id",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        JSON.stringify({ error: "Missing required field: user_id" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -268,13 +440,8 @@ Deno.serve(async (req) => {
 
     if (!resolvedShopDomain || !resolvedAccessToken) {
       return new Response(
-        JSON.stringify({
-          error: "Missing required Shopify connection for this user",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        JSON.stringify({ error: "Missing required Shopify connection for this user" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -283,126 +450,69 @@ Deno.serve(async (req) => {
       updatedAtMin = lastSyncedAt;
     }
 
-    let pageInfo: string | null = null;
-    let pageNum = 0;
-    let productsSynced = 0;
-    let variantsSynced = 0;
-
-    while (true) {
-      pageNum++;
-      const { products, nextPageInfo } = await fetchProductsPage(
-        resolvedShopDomain,
-        resolvedAccessToken,
-        pageInfo,
-        pageNum === 1 ? updatedAtMin : undefined,
-      );
-
-      if (products.length === 0 && pageNum === 1) break;
-
-      // Inventory levels for this page only
-      const pageInventoryItemIds: number[] = [];
-      for (const p of products) {
-        for (const v of p.variants || []) {
-          if (v.inventory_item_id) pageInventoryItemIds.push(v.inventory_item_id);
-        }
-      }
-      const inventoryMap = await fetchInventoryLevels(
-        resolvedShopDomain,
-        resolvedAccessToken,
-        pageInventoryItemIds,
-        resolvedLocationId,
-      );
-
-      const rows: any[] = [];
-      const nowIso = new Date().toISOString();
-      for (const product of products) {
-        const optionNames = (product.options || []).map((o) => o.name);
-        for (const variant of product.variants || []) {
-          const { colour, size } = parseVariantTitle(
-            variant.title,
-            optionNames,
-            variant,
-          );
-          const liveQty = inventoryMap.get(variant.inventory_item_id);
-          const qty =
-            liveQty !== undefined ? liveQty : variant.inventory_quantity ?? null;
-
-          rows.push({
-            user_id,
-            platform: "shopify",
-            platform_product_id: String(product.id),
-            platform_variant_id: String(variant.id),
-            sku: variant.sku || null,
-            product_title: product.title,
-            variant_title: variant.title,
-            vendor: (product as any).vendor || null,
-            colour,
-            size,
-            current_qty: qty,
-            current_cost: null,
-            current_price: variant.price ? Number(variant.price) : null,
-            barcode: variant.barcode || null,
-            cached_at: nowIso,
-          });
-          variantsSynced++;
-        }
-      }
-
-      if (rows.length > 0) {
-        const CHUNK = 500;
-        for (let i = 0; i < rows.length; i += CHUNK) {
-          const { error } = await supabase
-            .from("product_catalog_cache")
-            .upsert(rows.slice(i, i + CHUNK), {
-              onConflict: "user_id,platform,platform_variant_id",
-            });
-          if (error) throw new Error(`Cache upsert failed: ${error.message}`);
-        }
-      }
-
-      productsSynced += products.length;
-      console.log(
-        `[sync-shopify-catalog] page=${pageNum} products=${products.length} variants_total=${variantsSynced} elapsed_ms=${Date.now() - startedAt}`,
-      );
-
-      pageInfo = nextPageInfo;
-      if (!pageInfo) break;
-    }
-
-    const finishedAt = new Date().toISOString();
-    await supabase
-      .from("platform_connections")
-      .update({ last_synced_at: finishedAt })
+    const { data: resumableJob } = await supabase
+      .from("sync_jobs")
+      .select("id, last_page_cursor, products_synced, total_products")
       .eq("user_id", user_id)
       .eq("platform", "shopify")
-      .eq("shop_domain", resolvedShopDomain);
+      .eq("job_type", "catalog_sync")
+      .in("status", ["running", "failed"])
+      .not("last_page_cursor", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data: job, error: jobError } = await supabase
+      .from("sync_jobs")
+      .insert({
+        user_id,
+        platform: "shopify",
+        job_type: "catalog_sync",
+        status: "running",
+        products_synced: resumableJob?.products_synced ?? 0,
+        total_products: resumableJob?.total_products ?? null,
+        last_page_cursor: resumableJob?.last_page_cursor ?? null,
+      })
+      .select("id")
+      .single();
+
+    if (jobError || !job?.id) {
+      throw new Error(`Failed to create sync job: ${jobError?.message ?? "unknown error"}`);
+    }
+
+    const runPromise = runShopifyCatalogSync({
+      supabase,
+      jobId: job.id,
+      userId: user_id,
+      shopDomain: resolvedShopDomain,
+      accessToken: resolvedAccessToken,
+      locationId: resolvedLocationId,
+      mode,
+      updatedAtMin,
+      startPageInfo: resumableJob?.last_page_cursor ?? null,
+    });
+
+    const edgeRuntime = (globalThis as any).EdgeRuntime;
+    if (edgeRuntime?.waitUntil) {
+      edgeRuntime.waitUntil(runPromise);
+    } else {
+      runPromise.catch((err) => console.error("Background sync failed:", err));
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        products_synced: productsSynced,
-        variants_synced: variantsSynced,
-        pages: pageNum,
-        duration_ms: Date.now() - startedAt,
-        mode,
-        incremental_since: updatedAtMin || null,
+        job_id: job.id,
+        status: "running",
+        resumed_from_cursor: Boolean(resumableJob?.last_page_cursor),
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
     console.error("sync-shopify-catalog error:", err);
     return new Response(
-      JSON.stringify({
-        error: err instanceof Error ? err.message : String(err),
-        duration_ms: Date.now() - startedAt,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

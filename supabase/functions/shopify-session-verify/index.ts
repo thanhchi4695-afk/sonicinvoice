@@ -208,3 +208,4 @@ Deno.serve(async (req) => {
     );
   }
 });
+// redeploy: pick up SHOPIFY_API_KEY_2/_SECRET_2

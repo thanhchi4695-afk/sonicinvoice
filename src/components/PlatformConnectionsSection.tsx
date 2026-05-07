@@ -329,7 +329,7 @@ export default function PlatformConnectionsSection() {
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
-          await supabase.functions.invoke("sync-shopify-catalog", {
+          const { data: syncData, error: syncError } = await supabase.functions.invoke("sync-shopify-catalog", {
             body: {
               user_id: user.id,
               shop_domain: domain,
@@ -337,9 +337,8 @@ export default function PlatformConnectionsSection() {
               mode: "full",
             },
           });
-          toast.success("Catalog synced — stock check is ready", {
-            description: "Your products are now cached for fast invoice matching.",
-          });
+          if (syncError) throw syncError;
+          if (syncData?.job_id) await pollShopifySyncJob(syncData.job_id);
         } catch (e) {
           console.warn("Background catalog sync failed:", e);
         }
@@ -353,28 +352,24 @@ export default function PlatformConnectionsSection() {
 
   const handleShopifySync = async () => {
     setShopifySyncing(true);
+    setShopifySyncProgress(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
-      const { error } = await supabase.functions.invoke("sync-shopify-catalog", {
+      const { data, error } = await supabase.functions.invoke("sync-shopify-catalog", {
         body: { user_id: user.id },
       });
       if (error) throw error;
-      toast.success("Shopify catalog synced");
-      const counts = await loadCatalogCounts();
-      setShopifyCount(counts.shopify);
-      const syncedAt = new Date().toISOString();
-      await supabase
-        .from("platform_connections")
-        .update({ last_synced_at: syncedAt })
-        .eq("user_id", user.id)
-        .eq("platform", "shopify")
-        .eq("is_active", true);
-      setShopifyLastSynced(syncedAt);
+      if (!data?.job_id) throw new Error("Sync did not return a job id");
+      toast.success("Catalog sync started", {
+        description: "Products are being cached in the background.",
+      });
+      await pollShopifySyncJob(data.job_id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sync failed");
     } finally {
       setShopifySyncing(false);
+      setShopifySyncProgress(null);
     }
   };
 

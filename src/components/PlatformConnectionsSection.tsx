@@ -234,19 +234,24 @@ export default function PlatformConnectionsSection() {
         .maybeSingle();
       if (error) throw error;
 
-      if (job as SyncJob | null) {
-        const currentJob = job as SyncJob;
+      const currentJob = job as SyncJob | null;
+      if (currentJob) {
         const synced = currentJob.products_synced ?? 0;
         const total = currentJob.total_products ?? 0;
-        setShopifySyncProgress(total > 0 ? `${synced.toLocaleString()} / ${total.toLocaleString()} products` : `${synced.toLocaleString()} products`);
+        setShopifySyncProgress(
+          total > 0
+            ? `${synced.toLocaleString()} / ${total.toLocaleString()} products`
+            : `${synced.toLocaleString()} products`,
+        );
 
         if (currentJob.status === "done") {
           const counts = await loadCatalogCounts();
           setShopifyCount(counts.shopify);
           setShopifyLastSynced(currentJob.completed_at ?? new Date().toISOString());
-          toast.success(`Catalog synced — ${(currentJob.total_products ?? currentJob.products_synced ?? counts.shopify).toLocaleString()} products ready`, {
-            description: "Stock check is ready for fast invoice matching.",
-          });
+          toast.success(
+            `Catalog synced — ${(currentJob.total_products ?? currentJob.products_synced ?? counts.shopify).toLocaleString()} products ready`,
+            { description: "Stock check is ready for fast invoice matching." },
+          );
           return;
         }
 

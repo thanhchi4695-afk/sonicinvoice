@@ -217,6 +217,9 @@ export function executeChatAction(decision: SonicDecision): boolean {
     case "open_case_study":
       window.location.assign("/case-study");
       return true;
+    case "open_enrichment_queue":
+      window.location.assign("/products/enrichment-queue");
+      return true;
     case "open_brand_guide":
       window.location.assign("/brand-guide");
       return true;

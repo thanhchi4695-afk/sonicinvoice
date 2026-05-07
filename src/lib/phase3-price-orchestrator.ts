@@ -208,13 +208,13 @@ async function callWebsearchTier(item: Phase3Item): Promise<Phase3ProductResult 
 
   try {
     let resp: Awaited<ReturnType<typeof invokeOnce>> | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 1; attempt++) {
       try {
         resp = await invokeOnce();
         const status = (resp?.error as { status?: number } | null)?.status;
         if (status !== 503) break;
       } catch (e) {
-        if (attempt === 2) throw e;
+        if (attempt === 0) throw e;
       }
       await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
     }

@@ -100,6 +100,7 @@ export async function runEnrichmentRetry(): Promise<{ processed: number; enriche
   const enriched = Number(data?.enriched ?? 0);
   const text = `Retrying ${processed} products that weren't found last week. I'll let you know if any are live now.`;
   return { processed, enriched, text };
+}
 
 export type SonicAction =
   | "navigate_tab"

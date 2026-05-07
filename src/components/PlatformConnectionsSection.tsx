@@ -40,6 +40,15 @@ interface LightspeedConn {
   last_synced: string | null;
 }
 
+interface SyncJob {
+  id: string;
+  status: "running" | "done" | "failed";
+  products_synced: number;
+  total_products: number | null;
+  error_message: string | null;
+  completed_at: string | null;
+}
+
 function formatRelative(iso: string | null): string {
   if (!iso) return "never";
   const diff = Date.now() - new Date(iso).getTime();
@@ -62,6 +71,7 @@ export default function PlatformConnectionsSection() {
   const [shopifyInput, setShopifyInput] = useState("");
   const [shopifyOAuthLoading, setShopifyOAuthLoading] = useState(false);
   const [shopifySyncing, setShopifySyncing] = useState(false);
+  const [shopifySyncProgress, setShopifySyncProgress] = useState<string | null>(null);
   const [connectedPlatformCount, setConnectedPlatformCount] = useState(0);
   const [showCustomApp, setShowCustomApp] = useState(false);
   const [customAppDomain, setCustomAppDomain] = useState("");

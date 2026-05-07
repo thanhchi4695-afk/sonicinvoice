@@ -116,7 +116,7 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
 
       <h1 className="text-2xl sm:text-3xl font-bold font-display mb-1">Start a new run</h1>
       <p className="text-sm text-muted-foreground mb-8">
-        Two quick questions and we’ll guide you through the full 6-phase flow.
+        Three quick questions and we’ll guide you through the full 6-phase flow.
       </p>
 
       {/* ── Q1 ── */}

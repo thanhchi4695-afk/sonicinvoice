@@ -219,6 +219,7 @@ async function runShopifyCatalogSync(params: {
   mode: string;
   updatedAtMin?: string;
   startPageInfo: string | null;
+  initialProductsSynced?: number;
 }) {
   const {
     supabase,
@@ -230,11 +231,12 @@ async function runShopifyCatalogSync(params: {
     mode,
     updatedAtMin,
     startPageInfo,
+    initialProductsSynced = 0,
   } = params;
   const startedAt = Date.now();
   let pageInfo: string | null = startPageInfo;
   let pageNum = 0;
-  let productsSynced = 0;
+  let productsSynced = initialProductsSynced;
   let variantsSynced = 0;
 
   try {

@@ -198,7 +198,7 @@ Deno.serve(async (req) => {
 
       // For embedded apps, redirect back into the Shopify Admin iframe
       const redirectUrl = isShopifyInitiated
-        ? `https://${shop}/admin/apps/${SHOPIFY_API_KEY}`
+        ? `https://${shop}/admin/apps/${app.apiKey}`
         : `${APP_URL}/?shopify_login=${loginToken}`;
 
       return new Response(null, {

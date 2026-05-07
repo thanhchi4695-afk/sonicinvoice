@@ -66,8 +66,9 @@ interface ReconciliationLine {
   user_decision: "pending";
 }
 
-const STALE_HOURS = 4;
-const MIN_CACHE_ITEMS = 10;
+const STALE_HOURS = 24;
+const MIN_CACHE_ITEMS = 100;
+const MAX_CATALOG_WAIT_MS = 3_000;
 const PRICE_DELTA_THRESHOLD = 0.1;
 const FUZZY_THRESHOLD = 0.8;
 

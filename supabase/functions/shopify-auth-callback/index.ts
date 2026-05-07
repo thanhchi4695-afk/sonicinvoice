@@ -13,13 +13,20 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { tokenResponseToConnectionColumns } from "../_shared/shopify-token.ts";
+import { getShopifyAppByShop, getPrimaryShopifyApp, type ShopifyAppCreds } from "../_shared/shopify-apps.ts";
 
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SHOPIFY_API_KEY           = Deno.env.get("SHOPIFY_API_KEY")!;
-const SHOPIFY_API_SECRET        = Deno.env.get("SHOPIFY_API_SECRET")!;
 const APP_URL                   = Deno.env.get("APP_URL") || "https://sonicinvoice.lovable.app";
 const API_VERSION               = "2025-01";
+
+async function resolveApp(shop: string): Promise<ShopifyAppCreds> {
+  const pinned = await getShopifyAppByShop(shop);
+  const app = pinned ?? getPrimaryShopifyApp();
+  if (!app) throw new Error("No Shopify app credentials configured");
+  console.log(`[shopify-auth-callback] shop=${shop} -> app=${app.label} key=${app.apiKey.slice(0, 6)}…`);
+  return app;
+}
 
 function generateToken(): string {
   const a = new Uint8Array(32);
@@ -27,7 +34,7 @@ function generateToken(): string {
   return Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function verifyHmac(query: URLSearchParams): Promise<boolean> {
+async function verifyHmac(query: URLSearchParams, secret: string): Promise<boolean> {
   const hmac = query.get("hmac");
   if (!hmac) return false;
   const params = new URLSearchParams(query);
@@ -35,7 +42,7 @@ async function verifyHmac(query: URLSearchParams): Promise<boolean> {
   params.sort();
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
-    "raw", encoder.encode(SHOPIFY_API_SECRET),
+    "raw", encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(params.toString()));
@@ -58,7 +65,8 @@ Deno.serve(async (req) => {
       return new Response("Missing required parameters (code, shop)", { status: 400 });
     }
 
-    const valid = await verifyHmac(url.searchParams);
+    const app = await resolveApp(shop);
+    const valid = await verifyHmac(url.searchParams, app.apiSecret);
     if (!valid) {
       return new Response("Invalid HMAC signature", { status: 403 });
     }
@@ -97,7 +105,7 @@ Deno.serve(async (req) => {
     const tokenResp = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_id: SHOPIFY_API_KEY, client_secret: SHOPIFY_API_SECRET, code, expiring: true }),
+      body: JSON.stringify({ client_id: app.apiKey, client_secret: app.apiSecret, code, expiring: true }),
     });
     if (!tokenResp.ok) {
       console.error("Token exchange failed:", await tokenResp.text());

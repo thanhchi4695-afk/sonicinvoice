@@ -34,7 +34,7 @@ export async function verifyShopifySessionToken(
     // ═══ Multi-app routing: pick the secret matching the token's `aud` ═══
     const unverified = peekJwtPayload(token) as Partial<SessionTokenPayload> | null;
     const aud = unverified?.aud;
-    const app = getShopifyAppByKey(aud);
+    const app = await getShopifyAppByKey(aud);
     if (!app) {
       console.warn("[session-token] No matching Shopify app for aud=", aud);
       return null;

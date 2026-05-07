@@ -4066,6 +4066,45 @@ export type Database = {
         }
         Relationships: []
       }
+      shopify_apps: {
+        Row: {
+          api_key: string
+          api_secret: string
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          notes: string | null
+          scopes: string | null
+          shop_domain: string | null
+          updated_at: string
+        }
+        Insert: {
+          api_key: string
+          api_secret: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          notes?: string | null
+          scopes?: string | null
+          shop_domain?: string | null
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string
+          api_secret?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          notes?: string | null
+          scopes?: string | null
+          shop_domain?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shopify_connections: {
         Row: {
           access_token: string

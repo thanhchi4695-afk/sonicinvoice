@@ -10,7 +10,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { getShopifyAppByKey, getShopifyApps, peekJwtPayload } from "../_shared/shopify-apps.ts";
+import { getShopifyAppByKey, getAllShopifyApps, peekJwtPayload } from "../_shared/shopify-apps.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,7 +32,7 @@ async function verifySessionToken(token: string): Promise<VerifyResult> {
     // Multi-app routing: select credentials by token's aud claim.
     const peeked = peekJwtPayload(token) as Record<string, unknown> | null;
     const tokenAud = typeof peeked?.aud === "string" ? (peeked!.aud as string) : undefined;
-    const app = getShopifyAppByKey(tokenAud);
+    const app = await getShopifyAppByKey(tokenAud);
     if (!app) {
       console.warn("Session token aud has no matching app:", tokenAud);
       return { ok: false, reason: "aud_mismatch", tokenAud };
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
     const result = await verifySessionToken(sessionToken);
     if (!result.ok) {
-      const knownAuds = getShopifyApps().map((a) => `${a.label}:${a.apiKey}`);
+      const knownAuds = (await getAllShopifyApps()).map((a) => `${a.label}:${a.apiKey}`);
       const errorMessages: Record<string, string> = {
         malformed: "Session token is malformed (not a valid JWT).",
         bad_signature: "Session token signature is invalid — none of the configured Shopify app secrets matched.",

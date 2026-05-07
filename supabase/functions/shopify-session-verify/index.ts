@@ -201,17 +201,20 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: conn } = await supabaseAdmin
+    let { data: conn } = await supabaseAdmin
       .from("shopify_connections")
       .select("user_id, shop_name")
       .eq("store_url", shop)
       .single();
 
     if (!conn) {
-      return new Response(
-        JSON.stringify({ error: "App not installed for this shop", needs_install: true }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      conn = await completeEmbeddedInstall(supabaseAdmin, shop, result.app, sessionToken);
+      if (!conn) {
+        return new Response(
+          JSON.stringify({ error: "App not installed for this shop", needs_install: true }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // supabase-js v2 doesn't expose createSession on auth.admin in this runtime.

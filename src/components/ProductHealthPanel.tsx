@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   ChevronLeft, Package, AlertTriangle, TrendingUp, TrendingDown,
   Loader2, RefreshCw, Filter, Sparkles, Clock, BarChart3,
@@ -174,6 +176,35 @@ export default function ProductHealthPanel({ onBack }: Props) {
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState("");
   const [tab, setTab] = useState("all");
+  const [scanning, setScanning] = useState(false);
+  const [lastScanQueued, setLastScanQueued] = useState(0);
+  const navigate = useNavigate();
+
+  const handleGapScan = async () => {
+    setScanning(true);
+    const toastId = toast.loading(
+      "Scanning your Shopify store for products missing images or descriptions...",
+    );
+    try {
+      const { data, error } = await supabase.functions.invoke("gap-scanner", {
+        body: { manual: true },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const newly = data?.newly_queued ?? 0;
+      const total = data?.incomplete_found ?? 0;
+      setLastScanQueued(newly);
+      toast.success(
+        `Scan complete — ${newly} products added to enrichment queue. ${total} total need attention.`,
+        { id: toastId },
+      );
+    } catch (e) {
+      console.error("[gap-scanner]", e);
+      toast.error("Scan failed — check your Shopify connection in Settings.", { id: toastId });
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const fetchAndScore = async () => {
     setLoading(true);
@@ -308,10 +339,39 @@ export default function ProductHealthPanel({ onBack }: Props) {
           </h2>
           <p className="text-xs text-muted-foreground">AI-powered inventory health analysis</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleGapScan}
+          disabled={scanning}
+          className="gap-1.5"
+        >
+          {scanning ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Sparkles className="w-4 h-4" />
+          )}
+          Scan for missing content
+        </Button>
         <Button variant="ghost" size="sm" onClick={fetchAndScore}>
           <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
+
+      {lastScanQueued > 0 && (
+        <Card className="p-3 mb-3 flex items-center justify-between bg-primary/5 border-primary/20">
+          <p className="text-xs">
+            <span className="font-semibold">{lastScanQueued}</span> products ready for enrichment.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate("/products/enrichment-queue")}
+          >
+            Review products ready to enrich →
+          </Button>
+        </Card>
+      )}
 
       {products.length === 0 ? (
         <Card className="p-8 text-center">

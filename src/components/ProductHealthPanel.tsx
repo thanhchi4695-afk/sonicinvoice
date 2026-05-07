@@ -339,10 +339,39 @@ export default function ProductHealthPanel({ onBack }: Props) {
           </h2>
           <p className="text-xs text-muted-foreground">AI-powered inventory health analysis</p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleGapScan}
+          disabled={scanning}
+          className="gap-1.5"
+        >
+          {scanning ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Sparkles className="w-4 h-4" />
+          )}
+          Scan for missing content
+        </Button>
         <Button variant="ghost" size="sm" onClick={fetchAndScore}>
           <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
+
+      {lastScanQueued > 0 && (
+        <Card className="p-3 mb-3 flex items-center justify-between bg-primary/5 border-primary/20">
+          <p className="text-xs">
+            <span className="font-semibold">{lastScanQueued}</span> products ready for enrichment.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => navigate("/products/enrichment-queue")}
+          >
+            Review products ready to enrich →
+          </Button>
+        </Card>
+      )}
 
       {products.length === 0 ? (
         <Card className="p-8 text-center">

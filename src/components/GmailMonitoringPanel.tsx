@@ -348,6 +348,16 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
             <Button
               size="sm"
               variant="outline"
+              onClick={() => void resetAndRescan()}
+              disabled={scanning}
+              title="Clear the list and re-scan from scratch (use after switching Gmail accounts)"
+            >
+              <RotateCw className="w-3 h-3 mr-1" />
+              Reset & rescan
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               className="text-destructive hover:text-destructive"
               onClick={() => void disconnect()}
             >

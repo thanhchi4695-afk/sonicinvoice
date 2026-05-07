@@ -227,30 +227,31 @@ export default function PlatformConnectionsSection() {
   const pollShopifySyncJob = async (jobId: string) => {
     const startedAt = Date.now();
     while (Date.now() - startedAt < 15 * 60 * 1000) {
-      const { data: job, error } = await supabase
+      const { data: job, error } = await (supabase as any)
         .from("sync_jobs")
         .select("id,status,products_synced,total_products,error_message,completed_at")
         .eq("id", jobId)
-        .maybeSingle<SyncJob>();
+        .maybeSingle();
       if (error) throw error;
 
-      if (job) {
-        const synced = job.products_synced ?? 0;
-        const total = job.total_products ?? 0;
+      if (job as SyncJob | null) {
+        const currentJob = job as SyncJob;
+        const synced = currentJob.products_synced ?? 0;
+        const total = currentJob.total_products ?? 0;
         setShopifySyncProgress(total > 0 ? `${synced.toLocaleString()} / ${total.toLocaleString()} products` : `${synced.toLocaleString()} products`);
 
-        if (job.status === "done") {
+        if (currentJob.status === "done") {
           const counts = await loadCatalogCounts();
           setShopifyCount(counts.shopify);
-          setShopifyLastSynced(job.completed_at ?? new Date().toISOString());
-          toast.success(`Catalog synced — ${(job.total_products ?? job.products_synced ?? counts.shopify).toLocaleString()} products ready`, {
+          setShopifyLastSynced(currentJob.completed_at ?? new Date().toISOString());
+          toast.success(`Catalog synced — ${(currentJob.total_products ?? currentJob.products_synced ?? counts.shopify).toLocaleString()} products ready`, {
             description: "Stock check is ready for fast invoice matching.",
           });
           return;
         }
 
-        if (job.status === "failed") {
-          throw new Error(job.error_message || "Catalog sync failed");
+        if (currentJob.status === "failed") {
+          throw new Error(currentJob.error_message || "Catalog sync failed");
         }
       }
 

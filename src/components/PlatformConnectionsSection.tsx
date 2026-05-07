@@ -249,7 +249,8 @@ export default function PlatformConnectionsSection() {
         );
 
         if (currentJob.status === "done") {
-          const counts = await loadCatalogCounts();
+          const { data: { user: u } } = await supabase.auth.getUser();
+          const counts = u ? await loadCatalogCounts(u.id) : { shopify: 0, lightspeed: 0 };
           setShopifyCount(counts.shopify);
           setShopifyLastSynced(currentJob.completed_at ?? new Date().toISOString());
           toast.success(

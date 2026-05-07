@@ -341,6 +341,8 @@ export default function PlatformConnectionsSection() {
           if (syncData?.job_id) await pollShopifySyncJob(syncData.job_id);
         } catch (e) {
           console.warn("Background catalog sync failed:", e);
+        } finally {
+          setShopifySyncProgress(null);
         }
       })();
     } catch (err) {

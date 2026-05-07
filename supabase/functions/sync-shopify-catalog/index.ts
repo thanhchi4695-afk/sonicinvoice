@@ -324,6 +324,7 @@ async function runShopifyCatalogSync(params: {
       }
 
       productsSynced += products.length;
+      productsThisRun += products.length;
       await updateJob(supabase, jobId, {
         products_synced: productsSynced,
         total_products: totalProducts,
@@ -335,6 +336,27 @@ async function runShopifyCatalogSync(params: {
       );
 
       pageInfo = nextPageInfo;
+      if (pageInfo && productsThisRun >= PRODUCTS_PER_BACKGROUND_RUN) {
+        await fetch(continuationUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            shop_domain: shopDomain,
+            access_token: accessToken,
+            location_id: locationId,
+            mode,
+            job_id: jobId,
+            continue_from_cursor: pageInfo,
+            products_synced: productsSynced,
+            total_products: totalProducts,
+          }),
+        }).catch((err) => console.error("Failed to continue catalog sync:", err));
+        return;
+      }
       if (!pageInfo) break;
     }
 

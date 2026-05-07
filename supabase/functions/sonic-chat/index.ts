@@ -52,6 +52,12 @@ Pricing & margin:
 Bulk operations:
 - open_bulk_sale | params: {} | permission: true | confirmation: "Sonic will open Bulk Sale to apply sale pricing across selected products. Compare-At prices update in Shopify after you confirm."
 - open_product_health | params: {} | permission: false
+- open_enrichment_queue | params: {} | permission: false
+  Trigger when the user wants to review enriched products awaiting approval. Detection signals: "review enriched products", "approve descriptions", "check enrichment", "what products are ready to review", "enrichment queue". response_text should be a short acknowledgement like "Opening the enrichment review queue…".
+- run_enrichment_scan | params: {} | permission: true | confirmation: "I'll scan your Shopify store for products missing images or descriptions, then enrich them from supplier websites. This takes about 2-3 minutes. Go ahead?"
+  Trigger when the user wants to find and fix products missing images/descriptions. Detection signals: "scan for missing content", "find products without images", "enrich products", "fill in descriptions", "update missing product info". response_text should be a short acknowledgement like "Scanning your Shopify store…" — full progress is rendered inline by the client.
+- run_enrichment_retry | params: {} | permission: false
+  Trigger when the user wants to retry products that weren't found in the last enrichment run. Detection signals: "retry missing products", "check if suppliers updated", "retry not found". response_text should be a short acknowledgement like "Retrying products that weren't found last week…".
 - open_style_grouping | params: {} | permission: false
 - open_seasons | params: {} | permission: false
 - open_image_optimisation | params: {} | permission: false

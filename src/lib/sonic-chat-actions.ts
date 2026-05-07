@@ -56,6 +56,52 @@ export async function runParseFromChat(
   return { csvUrl, rowCount: enriched.length, brand };
 }
 
+/**
+ * Pipeline executed when the user confirms `run_enrichment_scan`.
+ * Runs gap-scanner → enrichment-orchestrator and emits a status line per step.
+ */
+export async function runEnrichmentScan(
+  onStatus: StatusEmitter,
+): Promise<{ incompleteFound: number; newlyQueued: number; enriched: number; notFound: number; failed: number }> {
+  await onStatus("Scanning your Shopify store for products missing content...");
+  const scan = await supabase.functions.invoke("gap-scanner", { body: { manual: true } });
+  if (scan.error) throw new Error(scan.error.message ?? "Gap scan failed");
+  if (scan.data?.error) throw new Error(scan.data.error);
+  const incompleteFound = Number(scan.data?.incomplete_found ?? 0);
+  const newlyQueued = Number(scan.data?.newly_queued ?? 0);
+
+  await onStatus(`Found ${incompleteFound} products. Starting enrichment pipeline...`);
+
+  const enrich = await supabase.functions.invoke("enrichment-orchestrator", {
+    body: { batch_size: 25 },
+  });
+  if (enrich.error) throw new Error(enrich.error.message ?? "Enrichment failed");
+  if (enrich.data?.error) throw new Error(enrich.data.error);
+
+  const enriched = Number(enrich.data?.enriched ?? 0);
+  const notFound = Number(enrich.data?.not_found ?? 0);
+  const failed = Number(enrich.data?.failed ?? 0);
+
+  await onStatus(`Done — ${enriched} products enriched and ready to review.`);
+  return { incompleteFound, newlyQueued, enriched, notFound, failed };
+}
+
+/**
+ * Pipeline executed for `run_enrichment_retry` — low-risk, no permission needed.
+ * Re-runs enrichment-orchestrator with retry_not_found: true.
+ */
+export async function runEnrichmentRetry(): Promise<{ processed: number; enriched: number; text: string }> {
+  const { data, error } = await supabase.functions.invoke("enrichment-orchestrator", {
+    body: { retry_not_found: true, batch_size: 25 },
+  });
+  if (error) throw new Error(error.message ?? "Retry failed");
+  if (data?.error) throw new Error(data.error);
+  const processed = Number(data?.processed ?? 0);
+  const enriched = Number(data?.enriched ?? 0);
+  const text = `Retrying ${processed} products that weren't found last week. I'll let you know if any are live now.`;
+  return { processed, enriched, text };
+}
+
 export type SonicAction =
   | "navigate_tab"
   | "open_case_study"
@@ -216,6 +262,9 @@ export function executeChatAction(decision: SonicDecision): boolean {
     }
     case "open_case_study":
       window.location.assign("/case-study");
+      return true;
+    case "open_enrichment_queue":
+      window.location.assign("/products/enrichment-queue");
       return true;
     case "open_brand_guide":
       window.location.assign("/brand-guide");

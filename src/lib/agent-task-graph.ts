@@ -80,6 +80,7 @@ export const TASK_LABELS: Record<TaskType, string> = {
   pipeline_seo_boost: 'SEO boost pipeline',
   pipeline_marketing: 'Marketing launch pipeline',
   pipeline_season_close: 'Season close pipeline',
+  product_enrichment_review: 'Product content review',
 };
 
 // Pipeline display names

@@ -21,10 +21,14 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SHOPIFY_API_KEY           = Deno.env.get("SHOPIFY_API_KEY")!;
 const SHOPIFY_API_SECRET        = Deno.env.get("SHOPIFY_API_SECRET")!;
 
-async function verifySessionToken(token: string): Promise<Record<string, unknown> | null> {
+type VerifyResult =
+  | { ok: true; payload: Record<string, unknown> }
+  | { ok: false; reason: "malformed" | "bad_signature" | "aud_mismatch" | "expired" | "error"; detail?: string; tokenAud?: string };
+
+async function verifySessionToken(token: string): Promise<VerifyResult> {
   try {
     const parts = token.split(".");
-    if (parts.length !== 3) return null;
+    if (parts.length !== 3) return { ok: false, reason: "malformed" };
 
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
@@ -39,25 +43,28 @@ async function verifySessionToken(token: string): Promise<Record<string, unknown
     );
 
     const valid = await crypto.subtle.verify("HMAC", key, signature, signatureInput);
-    if (!valid) return null;
-
     const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+
+    if (!valid) {
+      console.warn("Session token bad signature. token aud=", payload?.aud, "expected aud=", SHOPIFY_API_KEY);
+      return { ok: false, reason: "bad_signature", tokenAud: payload?.aud };
+    }
 
     if (payload.aud !== SHOPIFY_API_KEY) {
       console.warn("Session token aud mismatch:", payload.aud, "!=", SHOPIFY_API_KEY);
-      return null;
+      return { ok: false, reason: "aud_mismatch", tokenAud: payload?.aud };
     }
 
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp && payload.exp + 10 < now) {
       console.warn("Session token expired");
-      return null;
+      return { ok: false, reason: "expired" };
     }
 
-    return payload;
+    return { ok: true, payload };
   } catch (err) {
     console.error("Session token verification error:", err);
-    return null;
+    return { ok: false, reason: "error", detail: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -81,13 +88,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    const payload = await verifySessionToken(sessionToken);
-    if (!payload) {
+    const result = await verifySessionToken(sessionToken);
+    if (!result.ok) {
+      const expectedAud = SHOPIFY_API_KEY;
+      const errorMessages: Record<string, string> = {
+        malformed: "Session token is malformed (not a valid JWT).",
+        bad_signature: "Session token signature is invalid — SHOPIFY_API_SECRET in the backend does not match the app that issued the token.",
+        aud_mismatch: `Session token was issued for a different Shopify app (aud=${result.tokenAud}, expected ${expectedAud}). Open the production app, not a separate testing app.`,
+        expired: "Session token has expired — reload the app from Shopify Admin.",
+        error: `Session token verification error: ${result.detail || "unknown"}`,
+      };
       return new Response(
-        JSON.stringify({ error: "Invalid session token" }),
+        JSON.stringify({
+          error: errorMessages[result.reason],
+          reason: result.reason,
+          token_aud: result.tokenAud,
+          expected_aud: expectedAud,
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    const payload = result.payload;
 
     const shop = extractShopDomain((payload.dest || payload.iss) as string);
     console.log("Session verified for shop:", shop);

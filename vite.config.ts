@@ -28,6 +28,7 @@ export default defineConfig(({ mode }) => ({
     "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(supabaseUrl),
     "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabasePublishableKey),
     "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(supabasePublishableKey),
+    "import.meta.env.VITE_SHOPIFY_API_KEY": JSON.stringify(shopifyApiKey),
   },
   resolve: {
     alias: {

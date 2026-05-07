@@ -14,6 +14,7 @@ const corsHeaders = {
 const API_VERSION = "2024-01";
 const PAGE_PRODUCT_LIMIT = 250;
 const UPSERT_CHUNK_SIZE = 500;
+const PRODUCTS_PER_BACKGROUND_RUN = 500;
 
 interface ShopifyVariant {
   id: number;
@@ -220,6 +221,9 @@ async function runShopifyCatalogSync(params: {
   updatedAtMin?: string;
   startPageInfo: string | null;
   initialProductsSynced?: number;
+  totalProducts?: number | null;
+  continuationUrl: string;
+  serviceKey: string;
 }) {
   const {
     supabase,
@@ -232,15 +236,19 @@ async function runShopifyCatalogSync(params: {
     updatedAtMin,
     startPageInfo,
     initialProductsSynced = 0,
+    totalProducts: knownTotalProducts,
+    continuationUrl,
+    serviceKey,
   } = params;
   const startedAt = Date.now();
   let pageInfo: string | null = startPageInfo;
   let pageNum = 0;
   let productsSynced = initialProductsSynced;
+  let productsThisRun = 0;
   let variantsSynced = 0;
 
   try {
-    const totalProducts = await fetchProductCount(shopDomain, accessToken, updatedAtMin);
+    const totalProducts = knownTotalProducts ?? await fetchProductCount(shopDomain, accessToken, updatedAtMin);
     await updateJob(supabase, jobId, {
       total_products: totalProducts,
       status: "running",

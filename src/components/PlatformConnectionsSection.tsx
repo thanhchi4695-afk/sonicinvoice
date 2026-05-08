@@ -705,6 +705,12 @@ export default function PlatformConnectionsSection() {
                 )}
                 Connect Shopify
               </Button>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Use this if Sonic Invoice is installed from the Shopify App Store.
+                If your store uses a <strong>Custom App</strong> (created in Settings →
+                Apps → Develop apps), use the token option below instead — OAuth
+                will return a 404 from Shopify for custom apps.
+              </p>
 
               <div className="pt-2 border-t border-border">
                 <button

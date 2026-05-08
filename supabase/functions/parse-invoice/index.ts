@@ -28,6 +28,22 @@ interface ParsedRow {
   quantity?: number | null;
   costPrice?: number | null;
   rrp?: number | null;
+  vendor?: string | null;
+  productType?: string | null;
+  material?: string | null;
+  arrivalTag?: string | null;
+  specialTags?: string[] | null;
+}
+
+interface InvoiceMeta {
+  documentType?: "tax_invoice" | "packing_list" | "credit_note" | "quote" | "unknown";
+  supplier?: string | null;
+  invoiceNumber?: string | null;
+  invoiceDate?: string | null;
+  subtotalExGst?: number | null;
+  totalInclGst?: number | null;
+  layoutType?: string | null;
+  notes?: string | null;
 }
 
 const STAGE1_FIELDS: (keyof ParsedRow)[] = [

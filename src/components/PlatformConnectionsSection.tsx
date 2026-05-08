@@ -719,6 +719,17 @@ export default function PlatformConnectionsSection() {
                 )}
                 Connect Shopify
               </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={openCustomAppConnect}
+                disabled={shopifyOAuthLoading || !shopifyInput.trim()}
+              >
+                <KeyRound className="w-3 h-3 mr-1" />
+                Connect Custom App Token
+              </Button>
               <p className="text-[10px] text-muted-foreground leading-snug">
                 Use this if Sonic Invoice is installed from the Shopify App Store.
                 If your store uses a <strong>Custom App</strong> (created in Settings →
@@ -733,7 +744,7 @@ export default function PlatformConnectionsSection() {
                   className="text-[11px] text-muted-foreground hover:text-foreground hover:underline w-full text-left flex items-center gap-1"
                 >
                   <KeyRound className="w-3 h-3" />
-                  {showCustomApp ? "Hide" : "Connect via Custom App Token (for testing)"}
+                  {showCustomApp ? "Hide token form" : "Show token form"}
                 </button>
                 {showCustomApp && (
                   <div className="space-y-2 mt-2">

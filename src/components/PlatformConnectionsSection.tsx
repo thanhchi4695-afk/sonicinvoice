@@ -137,6 +137,15 @@ async function verifyCustomAppCredentials(payload: CustomAppVerifyPayload): Prom
     headers.Authorization = `Bearer ${publishableKey}`;
   }
 
+  // Include Shopify session token when in embedded context — lets the edge
+  // function recover the user_id even when the iframe partitioned localStorage
+  // and we have no Supabase JWT to send.
+  const shopifyToken = (window as unknown as { __shopify_session_token?: string })
+    .__shopify_session_token;
+  if (shopifyToken) {
+    headers["X-Shopify-Session-Token"] = shopifyToken;
+  }
+
   try {
     const response = await fetch(`${supabaseUrl}/functions/v1/shopify-custom-app-verify`, {
       method: "POST",
@@ -145,28 +154,25 @@ async function verifyCustomAppCredentials(payload: CustomAppVerifyPayload): Prom
       signal: controller.signal,
     });
 
-    const text = await response.text();
-    let body: CustomAppVerifyResponse = {};
-    try {
-      body = text ? JSON.parse(text) : {};
-    } catch {
-      if (!response.ok) throw new Error(text || "Verification failed");
-    }
-
-    if (response.status === 401) {
-      throw new Error(
-        "Your session expired in the Shopify iframe. Reload the app from Shopify Admin (or open it in a new tab) and try again.",
-      );
-    }
-
     if (!response.ok) {
-      throw new Error(body.error || `Verification failed (${response.status})`);
+      let errMsg = `Server error (${response.status})`;
+      try {
+        const errJson = await response.json();
+        errMsg = errJson?.error || errMsg;
+      } catch {
+        // ignore JSON parse errors — keep the status-based fallback message
+      }
+      if (response.status === 401) {
+        errMsg =
+          "Your session expired in the Shopify iframe. Reload the app from Shopify Admin (or open it in a new tab) and try again.";
+      }
+      throw new Error(errMsg);
     }
 
-    return body;
+    return (await response.json()) as CustomAppVerifyResponse;
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error("Shopify did not respond within 60 seconds. Try the Admin API access token option if Client ID + Secret keeps timing out.");
+      throw new Error("Verification timed out — check your domain and token and try again");
     }
     throw err;
   } finally {

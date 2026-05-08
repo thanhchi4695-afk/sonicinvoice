@@ -391,10 +391,17 @@ export default function PlatformConnectionsSection() {
       toast.error("Enter your Shopify store domain first");
       return;
     }
+    const url = normalizeShopifyDomain(shopifyInput);
+    if (url === "splashswimweardarwin.myshopify.com") {
+      openCustomAppConnect();
+      toast.message("Use the Custom App token for this store", {
+        description: "The OAuth install window is only for Shopify App Store installs.",
+      });
+      return;
+    }
     const popup = window.open("", "shopify_oauth", "width=960,height=820");
     setShopifyOAuthLoading(true);
     try {
-      const url = normalizeShopifyDomain(shopifyInput);
       const installUrl = await Promise.race([
         initiateOAuth(url),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), SHOPIFY_OAUTH_TIMEOUT_MS)),

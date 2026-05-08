@@ -30,29 +30,64 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const jwt = authHeader.replace(/^Bearer\s+/i, "");
-    if (!jwt) {
-      return new Response(
-        JSON.stringify({ error: "Not authenticated" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Identify the calling user from their JWT
-    const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${jwt}` } },
-    });
-    const { data: userData, error: userErr } = await userClient.auth.getUser();
-    if (userErr || !userData?.user) {
+    // Try to identify the calling user from their JWT first.
+    let userId: string | null = null;
+    if (jwt && jwt !== anonKey) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: `Bearer ${jwt}` } },
+      });
+      const { data: userData } = await userClient.auth.getUser();
+      userId = userData?.user?.id ?? null;
+    }
+
+    // Fallback: in the Shopify embedded iframe, localStorage may be partitioned
+    // and the client has no Supabase JWT. Accept the Shopify session token
+    // header instead and resolve the user via shopify-session-verify.
+    if (!userId) {
+      const shopifySessionToken = req.headers.get("X-Shopify-Session-Token");
+      if (shopifySessionToken) {
+        try {
+          const shopifyVerifyRes = await fetch(
+            `${supabaseUrl}/functions/v1/shopify-session-verify`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${serviceKey}`,
+              },
+              body: JSON.stringify({ session_token: shopifySessionToken }),
+            },
+          );
+          if (shopifyVerifyRes.ok) {
+            const shopifyJson = await shopifyVerifyRes.json();
+            const sessAccessToken: string | undefined = shopifyJson?.access_token;
+            if (sessAccessToken) {
+              const sessClient = createClient(supabaseUrl, anonKey, {
+                global: { headers: { Authorization: `Bearer ${sessAccessToken}` } },
+              });
+              const { data: sessUser } = await sessClient.auth.getUser();
+              userId = sessUser?.user?.id ?? null;
+            }
+          } else {
+            console.warn("[custom-app-verify] shopify-session-verify failed:", shopifyVerifyRes.status);
+          }
+        } catch (e) {
+          console.warn("[custom-app-verify] shopify session fallback errored:", (e as Error).message);
+        }
+      }
+    }
+
+    if (!userId) {
       return new Response(
-        JSON.stringify({ error: "Not authenticated" }),
+        JSON.stringify({ error: "Authentication required. Please refresh the page and try again." }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    const userId = userData.user.id;
 
     const body = await req.json().catch(() => ({}));
     const rawDomain: string = body?.shop_domain ?? body?.domain ?? "";

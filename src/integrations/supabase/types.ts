@@ -813,6 +813,75 @@ export type Database = {
           },
         ]
       }
+      brand_profiles: {
+        Row: {
+          confidence: number | null
+          cost_column_name: string | null
+          created_at: string | null
+          gst_inclusive_pricing: boolean | null
+          id: string
+          invoices_processed: number | null
+          known_colours: string[] | null
+          known_sizes: string[] | null
+          layout_type: string | null
+          notes: string | null
+          product_types: string[] | null
+          raw_md: string | null
+          rrp_on_invoice: boolean | null
+          shopify_vendor: string | null
+          special_tag_rules: string[] | null
+          supplier_key: string
+          supplier_legal: string | null
+          supplier_name: string
+          updated_at: string | null
+          vendor_mapping: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          cost_column_name?: string | null
+          created_at?: string | null
+          gst_inclusive_pricing?: boolean | null
+          id?: string
+          invoices_processed?: number | null
+          known_colours?: string[] | null
+          known_sizes?: string[] | null
+          layout_type?: string | null
+          notes?: string | null
+          product_types?: string[] | null
+          raw_md?: string | null
+          rrp_on_invoice?: boolean | null
+          shopify_vendor?: string | null
+          special_tag_rules?: string[] | null
+          supplier_key: string
+          supplier_legal?: string | null
+          supplier_name: string
+          updated_at?: string | null
+          vendor_mapping?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          cost_column_name?: string | null
+          created_at?: string | null
+          gst_inclusive_pricing?: boolean | null
+          id?: string
+          invoices_processed?: number | null
+          known_colours?: string[] | null
+          known_sizes?: string[] | null
+          layout_type?: string | null
+          notes?: string | null
+          product_types?: string[] | null
+          raw_md?: string | null
+          rrp_on_invoice?: boolean | null
+          shopify_vendor?: string | null
+          special_tag_rules?: string[] | null
+          supplier_key?: string
+          supplier_legal?: string | null
+          supplier_name?: string
+          updated_at?: string | null
+          vendor_mapping?: string | null
+        }
+        Relationships: []
+      }
       brand_rules: {
         Row: {
           brand: string

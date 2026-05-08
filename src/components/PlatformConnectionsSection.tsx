@@ -28,7 +28,7 @@ const AUTO_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
 const STALE_WARN_MS = 24 * 60 * 60 * 1000; // 24h
 const LOAD_TIMEOUT_MS = 8000;
 const SHOPIFY_OAUTH_TIMEOUT_MS = 12000;
-const CUSTOM_APP_VERIFY_TIMEOUT_MS = 20000;
+const CUSTOM_APP_VERIFY_TIMEOUT_MS = 60000;
 
 function withTimeout<T>(promise: PromiseLike<T>, fallback: T, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -473,6 +473,7 @@ export default function PlatformConnectionsSection() {
     }
 
     setCustomAppSaving(true);
+    toast.loading("Verifying Shopify credentials…", { id: "shopify-custom-verify" });
     try {
       const payload: Record<string, string> = { shop_domain: domain };
       if (customAppMode === "token") {
@@ -484,7 +485,7 @@ export default function PlatformConnectionsSection() {
       const { data, error } = await withRejectingTimeout(
         supabase.functions.invoke("shopify-custom-app-verify", { body: payload }),
         CUSTOM_APP_VERIFY_TIMEOUT_MS,
-        "Shopify verification took too long. Please refresh and try again.",
+        "Shopify verification is taking longer than expected. The credentials are valid from the backend test, so please refresh and try once more.",
       );
       if (error) {
         const msg =
@@ -501,6 +502,7 @@ export default function PlatformConnectionsSection() {
       if (!data?.success) {
         throw new Error(data?.error || "Verification failed");
       }
+      toast.dismiss("shopify-custom-verify");
       toast.success(`Connected to ${data.shop_name}`);
       setCustomAppSaving(false);
       setCustomAppDomain("");
@@ -531,6 +533,7 @@ export default function PlatformConnectionsSection() {
         }
       })();
     } catch (err) {
+      toast.dismiss("shopify-custom-verify");
       toast.error(err instanceof Error ? err.message : "Failed to verify");
     } finally {
       setCustomAppSaving(false);

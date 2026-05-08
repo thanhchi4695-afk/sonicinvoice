@@ -186,6 +186,21 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Use local record if it was updated within the last 24 hours
+      // to avoid an extra live Shopify API call on every page load.
+      const isRecent = sub?.updated_at &&
+        Date.now() - new Date(sub.updated_at).getTime() < 24 * 60 * 60 * 1000;
+      if (sub && isRecent) {
+        return new Response(JSON.stringify({
+          has_subscription: sub.status === "active",
+          plan_name: sub.plan_name,
+          status: sub.status,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       // Also check with Shopify directly
       const result = await shopifyGraphQL(`
         query {

@@ -1,4 +1,30 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
+
+class SectionErrorBoundary extends React.Component<
+  { children: React.ReactNode; name: string },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; name: string }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.warn(`[AccountScreen] ${this.props.name} crashed:`, error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="text-xs text-muted-foreground p-2">
+          {this.props.name} failed to load. Try refreshing.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES } from "@/i18n/config";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -269,18 +295,30 @@ const AccountScreen = () => {
         {/* ─── CONNECTIONS ───────────────────────────────────── */}
         <TabsContent value="connections" className="mt-0 space-y-0">
           <Section title="Platform connections">
-            <PlatformConnectionsSection />
+            <SectionErrorBoundary name="Platform connections">
+              <PlatformConnectionsSection />
+            </SectionErrorBoundary>
           </Section>
           <Section title="🔌 POS integration">
-            <POSConnectionPanel />
+            <SectionErrorBoundary name="POS integration">
+              <POSConnectionPanel />
+            </SectionErrorBoundary>
           </Section>
-          <WholesaleConnectionsSection />
-          <AccountingConnectionsSection />
-          <ApiKeysSection />
+          <SectionErrorBoundary name="Wholesale connections">
+            <WholesaleConnectionsSection />
+          </SectionErrorBoundary>
+          <SectionErrorBoundary name="Accounting connections">
+            <AccountingConnectionsSection />
+          </SectionErrorBoundary>
+          <SectionErrorBoundary name="Price intelligence API keys">
+            <ApiKeysSection />
+          </SectionErrorBoundary>
           <Section title="🔌 Connectors Marketplace">
-            <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
-              <ConnectorsMarketplace />
-            </Suspense>
+            <SectionErrorBoundary name="Connectors Marketplace">
+              <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
+                <ConnectorsMarketplace />
+              </Suspense>
+            </SectionErrorBoundary>
           </Section>
         </TabsContent>
 
@@ -301,14 +339,18 @@ const AccountScreen = () => {
             <BudgetPill variant="full" />
           </Section>
           <Section title="🧠 Skills Library (Claude)">
-            <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
-              <ClaudeSkillsLibrary />
-            </Suspense>
+            <SectionErrorBoundary name="Skills Library">
+              <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+                <ClaudeSkillsLibrary />
+              </Suspense>
+            </SectionErrorBoundary>
           </Section>
           <Section title="🏷️ Multi-brand suppliers">
-            <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
-              <MultiBrandSuppliersSection />
-            </Suspense>
+            <SectionErrorBoundary name="Multi-brand suppliers">
+              <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+                <MultiBrandSuppliersSection />
+              </Suspense>
+            </SectionErrorBoundary>
           </Section>
           <DefaultInstructionsSection />
           <SharedLearningSection />
@@ -325,9 +367,11 @@ const AccountScreen = () => {
         {/* ─── TEAM & BILLING ────────────────────────────────── */}
         <TabsContent value="team" className="mt-0 space-y-0">
           <Section title="👥 Team & Roles">
-            <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
-              <TeamManagement />
-            </Suspense>
+            <SectionErrorBoundary name="Team & Roles">
+              <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
+                <TeamManagement />
+              </Suspense>
+            </SectionErrorBoundary>
           </Section>
           <BillingSection />
         </TabsContent>
@@ -421,14 +465,17 @@ function BillingSection() {
 
   const checkBillingStatus = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke("shopify-billing", {
-        body: { action: "status" },
-      });
-      if (!error && data) {
-        setBillingStatus(data);
-      }
-    } catch (err) {
-      // Silently ignore — no Shopify connection yet
+      const timeout = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 5000)
+      );
+      const invoke = supabase.functions
+        .invoke("shopify-billing", { body: { action: "status" } })
+        .then((r) => (r.error ? null : r.data))
+        .catch(() => null);
+      const data = await Promise.race([invoke, timeout]);
+      if (data) setBillingStatus(data as typeof billingStatus);
+    } catch {
+      // ignore — billing check is optional
     } finally {
       setLoading(false);
     }

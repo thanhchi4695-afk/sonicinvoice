@@ -3,10 +3,24 @@ import App from "./App.tsx";
 import "./index.css";
 import "./i18n/config";
 
-// ═══ Set Shopify API key meta tag at runtime for App Bridge ═══
+const PRIMARY_SHOPIFY_API_KEY = "aebbc68f4f67197beb20489d6d2987e4";
+const KNOWN_SHOPIFY_API_KEYS = [PRIMARY_SHOPIFY_API_KEY, "8277057587c9b97483827190f085fe6d"];
+
+function resolveShopifyApiKey() {
+  const params = new URLSearchParams(window.location.search);
+  const shop = params.get("shop")?.toLowerCase();
+  if (shop === "splashswimweardarwin.myshopify.com") return "8277057587c9b97483827190f085fe6d";
+
+  const explicitKey = params.get("client_id") || params.get("api_key") || params.get("app_key");
+  if (explicitKey && KNOWN_SHOPIFY_API_KEYS.includes(explicitKey)) return explicitKey;
+  const sources = [window.location.href, document.referrer].filter(Boolean);
+  return KNOWN_SHOPIFY_API_KEYS.find((key) => sources.some((source) => source.includes(key))) || import.meta.env.VITE_SHOPIFY_API_KEY || PRIMARY_SHOPIFY_API_KEY;
+}
+
+// ═══ Set Shopify API key meta tag before App Bridge reads it ═══
 const apiKeyMeta = document.getElementById("shopify-api-key-meta");
-if (apiKeyMeta && import.meta.env.VITE_SHOPIFY_API_KEY) {
-  apiKeyMeta.setAttribute("content", import.meta.env.VITE_SHOPIFY_API_KEY);
+if (apiKeyMeta) {
+  apiKeyMeta.setAttribute("content", resolveShopifyApiKey());
 }
 
 // ═══ Load Shopify App Bridge ONLY when running embedded inside Shopify Admin ═══

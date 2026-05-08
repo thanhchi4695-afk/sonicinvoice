@@ -6,6 +6,10 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { SONIC_MASTER_PROMPT_V2 } from "../_shared/sonic-master-prompt-v2.ts";
+import {
+  findBrandProfile,
+  autoLearnBrandProfile,
+} from "../_shared/auto-learn-brand-profile.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -205,8 +209,9 @@ async function stage1ClaudePdf(
   supplierName: string,
   brandHints = "",
   model: string = DEFAULT_CLAUDE_MODEL,
+  brandProfileMd = "",
 ): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
-  const systemPrompt = SONIC_MASTER_PROMPT_V2 +
+  const systemPrompt = SONIC_MASTER_PROMPT_V2 + brandProfileMd +
     `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore the "Part A/B/C" prose format from Step 8. Instead, call the \`return_invoice\` tool exactly once with the structured meta (including subtotalExGst from the invoice) and one row per size variant. Numbers must be plain numbers. Use null when unsure.`;
 
   const userText =
@@ -683,9 +688,27 @@ Deno.serve(async (req) => {
     let extractor: "claude-pdf" | "gemini" = "gemini";
 
     const isPdf = mimeType === "application/pdf";
+
+    // Auto-learn: load any saved brand profile for this supplier and inject
+    // it into Claude's system prompt before extraction.
+    let brandProfileMd = "";
+    try {
+      const profileLookup = await findBrandProfile(
+        supplierName,
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY,
+      );
+      brandProfileMd = profileLookup.profileMd;
+      console.log(
+        `[parse-invoice] Brand profile ${profileLookup.found ? `loaded (${profileLookup.confidence}%)` : "not found"} for "${supplierName}"`,
+      );
+    } catch (e) {
+      console.warn("[parse-invoice] Brand profile lookup failed:", (e as Error).message);
+    }
+
     if (isPdf && ANTHROPIC_API_KEY) {
       try {
-        const claudeOut = await stage1ClaudePdf(fileBase64, mimeType, supplierName, brandHints, claudeModel);
+        const claudeOut = await stage1ClaudePdf(fileBase64, mimeType, supplierName, brandHints, claudeModel, brandProfileMd);
         invoiceMeta = claudeOut.meta;
         // Short-circuit packing lists: surface to the user instead of pretending it's an invoice.
         if (invoiceMeta.documentType === "packing_list") {
@@ -707,12 +730,50 @@ Deno.serve(async (req) => {
         }
         const validated = await validateAndMaybeReExtract(
           fileBase64, mimeType, invoiceMeta, claudeOut.rows,
-          SONIC_MASTER_PROMPT_V2 + `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore "Part A/B/C" prose. Call the return_invoice tool exactly once.`,
+          SONIC_MASTER_PROMPT_V2 + brandProfileMd + `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore "Part A/B/C" prose. Call the return_invoice tool exactly once.`,
           claudeModel,
         );
         stage1Rows = validated.rows;
         validation = validated.validation;
         extractor = "claude-pdf";
+
+        // Fire-and-forget auto-learn: writes/updates the brand profile in the
+        // background so the next invoice from this supplier gets the benefit.
+        if (validation.passed && ANTHROPIC_API_KEY) {
+          autoLearnBrandProfile(
+            {
+              documentType: invoiceMeta.documentType ?? "tax_invoice",
+              supplierName: invoiceMeta.supplier ?? supplierName,
+              invoiceNumber: invoiceMeta.invoiceNumber ?? undefined,
+              invoiceDate: invoiceMeta.invoiceDate ?? undefined,
+              subtotalExGst: invoiceMeta.subtotalExGst ?? undefined,
+              layoutType: invoiceMeta.layoutType ?? undefined,
+            },
+            stage1Rows.map((r) => ({
+              styleName: r.productName ?? "",
+              styleNumber: r.styleNumber ?? "",
+              colour: r.colour ?? "",
+              size: r.size ?? "",
+              quantity: Number(r.quantity ?? 0),
+              costPrice: r.costPrice ?? null,
+              rrpPrice: r.rrp ?? null,
+              vendor: r.vendor ?? "",
+              material: r.material ?? undefined,
+              arrivalTag: r.arrivalTag ?? undefined,
+              productType: r.productType ?? undefined,
+              specialTags: r.specialTags ?? undefined,
+            })),
+            fileBase64,
+            mimeType,
+            ANTHROPIC_API_KEY,
+            SUPABASE_URL,
+            SUPABASE_SERVICE_ROLE_KEY,
+          ).then((result) => {
+            console.log(`[auto-learn] ${result.action} profile for "${result.supplierKey}"`);
+          }).catch((err) => {
+            console.warn("[auto-learn] Background task failed:", err?.message ?? err);
+          });
+        }
       } catch (e) {
         console.warn("[parse-invoice] Claude PDF stage failed, falling back to Gemini:", (e as Error).message);
       }

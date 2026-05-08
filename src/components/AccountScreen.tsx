@@ -1559,10 +1559,15 @@ function WholesaleConnectionsSection() {
   }, []);
 
   const loadConnections = async () => {
+    setLoading(true);
     try {
-      const { data } = await supabase
-        .from("wholesale_connections")
-        .select("id, platform, label, connected_at, last_synced");
+      const { data } = await withConnectionTimeout(
+        supabase
+          .from("wholesale_connections")
+          .select("id, platform, label, connected_at, last_synced"),
+        { data: [], error: null } as any,
+        "wholesale connections",
+      );
       if (data) {
         const map: typeof connections = {};
         for (const c of data) {
@@ -1570,8 +1575,12 @@ function WholesaleConnectionsSection() {
         }
         setConnections(map);
       }
-    } catch {}
-    setLoading(false);
+    } catch (err) {
+      console.error("Failed to load wholesale connections:", err);
+      setConnections({});
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleConnect = async (platformId: string, credKey: string) => {

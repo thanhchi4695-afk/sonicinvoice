@@ -105,7 +105,172 @@ function brandHintsBlock(p: BrandPattern | null): string {
   return lines.join("\n");
 }
 
-// Stage 1 — Gemini 2.5 Flash via Lovable AI Gateway
+// ─────────────────────────────────────────────────────────────
+// Stage 1A — Claude native PDF extraction (master prompt v2)
+// Sends the raw PDF as a `document` content block so Claude
+// reads layout natively (preserves columns, section headers,
+// matrix tables) instead of receiving pre-extracted text.
+// Returns rows + invoice meta (subtotal etc.) for validation.
+// ─────────────────────────────────────────────────────────────
+const RETURN_INVOICE_TOOL = {
+  name: "return_invoice",
+  description: "Return the parsed invoice meta and every product variant row.",
+  input_schema: {
+    type: "object",
+    properties: {
+      meta: {
+        type: "object",
+        properties: {
+          documentType: { type: "string", enum: ["tax_invoice", "packing_list", "credit_note", "quote", "unknown"] },
+          supplier: { type: ["string", "null"] },
+          invoiceNumber: { type: ["string", "null"] },
+          invoiceDate: { type: ["string", "null"] },
+          subtotalExGst: { type: ["number", "null"] },
+          totalInclGst: { type: ["number", "null"] },
+          layoutType: { type: ["string", "null"] },
+          notes: { type: ["string", "null"] },
+        },
+        required: ["documentType"],
+      },
+      rows: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            productName: { type: ["string", "null"] },
+            styleNumber: { type: ["string", "null"] },
+            colour: { type: ["string", "null"] },
+            size: { type: ["string", "null"] },
+            quantity: { type: ["number", "null"] },
+            costPrice: { type: ["number", "null"] },
+            rrp: { type: ["number", "null"] },
+            vendor: { type: ["string", "null"] },
+            productType: { type: ["string", "null"] },
+            material: { type: ["string", "null"] },
+            arrivalTag: { type: ["string", "null"] },
+            specialTags: { type: "array", items: { type: "string" } },
+          },
+          required: ["productName", "styleNumber", "colour", "size", "quantity", "costPrice"],
+        },
+      },
+    },
+    required: ["meta", "rows"],
+  },
+};
+
+async function callClaudeInvoice(
+  contentBlocks: any[],
+  systemPrompt: string,
+  maxTokens = 8000,
+): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY!,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      tools: [RETURN_INVOICE_TOOL],
+      tool_choice: { type: "tool", name: "return_invoice" },
+      messages: [{ role: "user", content: contentBlocks }],
+    }),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    if (resp.status === 429) throw new Error("Claude rate limit exceeded. Retry shortly.");
+    throw new Error(`Claude PDF extract failed: ${resp.status} ${t.slice(0, 300)}`);
+  }
+  const json = await resp.json();
+  const block = (json.content || []).find((b: any) => b.type === "tool_use");
+  if (!block) throw new Error("Claude returned no tool_use block");
+  const meta: InvoiceMeta = block.input?.meta ?? { documentType: "unknown" };
+  const rows: ParsedRow[] = Array.isArray(block.input?.rows) ? block.input.rows : [];
+  return { meta, rows };
+}
+
+async function stage1ClaudePdf(
+  fileBase64: string,
+  mimeType: string,
+  supplierName: string,
+  brandHints = "",
+): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
+  const systemPrompt = SONIC_MASTER_PROMPT_V2 +
+    `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore the "Part A/B/C" prose format from Step 8. Instead, call the \`return_invoice\` tool exactly once with the structured meta (including subtotalExGst from the invoice) and one row per size variant. Numbers must be plain numbers. Use null when unsure.`;
+
+  const userText =
+    `Supplier hint from upload: ${supplierName}${brandHints}\n\n` +
+    `Extract every product line item from this invoice. Follow the master prompt steps in order. ` +
+    `Return via the return_invoice tool only.`;
+
+  const isPdf = mimeType === "application/pdf";
+  const docBlock = isPdf
+    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
+    : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
+
+  return await callClaudeInvoice([docBlock, { type: "text", text: userText }], systemPrompt);
+}
+
+// Validation pass — sums extracted cost*qty against invoice subtotal.
+// If mismatch > $1.00 (and subtotal is known), ask Claude to re-examine
+// and return a corrected row set. Free accuracy insurance.
+async function validateAndMaybeReExtract(
+  fileBase64: string,
+  mimeType: string,
+  meta: InvoiceMeta,
+  rows: ParsedRow[],
+  systemPromptBase: string,
+): Promise<{ rows: ParsedRow[]; validation: { passed: boolean; expected: number | null; actual: number; delta: number; reExtracted: boolean } }> {
+  const expected = typeof meta.subtotalExGst === "number" ? meta.subtotalExGst : null;
+  const actual = rows.reduce(
+    (s, r) => s + (Number(r.costPrice ?? 0) * Number(r.quantity ?? 0)),
+    0,
+  );
+  const delta = expected === null ? 0 : Math.abs(expected - actual);
+  const passed = expected === null ? true : delta <= 1.0;
+
+  if (passed || expected === null) {
+    return { rows, validation: { passed, expected, actual, delta, reExtracted: false } };
+  }
+
+  // Re-extract: send the document back with a focused correction prompt.
+  console.log(`[validate] subtotal mismatch — expected ${expected} got ${actual.toFixed(2)} (Δ ${delta.toFixed(2)}). Asking Claude to re-examine.`);
+  const correctionPrompt = systemPromptBase +
+    `\n\n## RE-EXTRACTION REQUIRED\nA prior extraction summed cost_ex_gst × qty to ${actual.toFixed(2)} but the invoice subtotal ex-GST is ${expected.toFixed(2)} (Δ ${delta.toFixed(2)}). Re-examine the document and return a corrected row set via return_invoice. Common causes: missed lines, wrong column treated as cost, GST-inclusive cost not divided by 1.1, dual-size rows not split, matrix cells skipped.`;
+
+  const isPdf = mimeType === "application/pdf";
+  const docBlock = isPdf
+    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
+    : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
+
+  try {
+    const { rows: fixedRows, meta: fixedMeta } = await callClaudeInvoice(
+      [docBlock, { type: "text", text: "Re-examine and return the corrected row set." }],
+      correctionPrompt,
+    );
+    const fixedActual = fixedRows.reduce(
+      (s, r) => s + (Number(r.costPrice ?? 0) * Number(r.quantity ?? 0)),
+      0,
+    );
+    const fixedDelta = Math.abs(expected - fixedActual);
+    const fixedPassed = fixedDelta <= 1.0;
+    if (fixedRows.length > 0) {
+      return {
+        rows: fixedRows,
+        validation: { passed: fixedPassed, expected, actual: fixedActual, delta: fixedDelta, reExtracted: true },
+      };
+    }
+    void fixedMeta;
+  } catch (e) {
+    console.warn("[validate] re-extract failed:", (e as Error).message);
+  }
+  return { rows, validation: { passed: false, expected, actual, delta, reExtracted: true } };
+}
+
+
 async function stage1Gemini(fileBase64: string, mimeType: string, supplierName: string, brandHints = "") {
   const systemPrompt = `You are a precise invoice parser. Extract every line item from the supplied invoice. Return ONLY a JSON object matching the provided schema. Numbers must be plain numbers (no currency symbols). Use null for any field you cannot confidently extract.`;
 

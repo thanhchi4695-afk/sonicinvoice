@@ -304,9 +304,11 @@ const AccountScreen = () => {
           <AccountingConnectionsSection />
           <ApiKeysSection />
           <Section title="🔌 Connectors Marketplace">
-            <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
-              <ConnectorsMarketplace />
-            </Suspense>
+            <SectionErrorBoundary name="Connectors Marketplace">
+              <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
+                <ConnectorsMarketplace />
+              </Suspense>
+            </SectionErrorBoundary>
           </Section>
         </TabsContent>
 

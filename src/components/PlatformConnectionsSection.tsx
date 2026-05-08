@@ -246,19 +246,23 @@ export default function PlatformConnectionsSection() {
   };
 
   const loadCatalogCounts = async (userId: string): Promise<{ shopify: number; lightspeed: number }> => {
-    const [s, l] = await Promise.all([
-      supabase
-        .from("product_catalog_cache")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("platform", "shopify"),
-      supabase
-        .from("product_catalog_cache")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("platform", "lightspeed"),
-    ]);
-    return { shopify: s.count ?? 0, lightspeed: l.count ?? 0 };
+    try {
+      const [s, l] = await Promise.all([
+        supabase
+          .from("product_catalog_cache")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("platform", "shopify"),
+        supabase
+          .from("product_catalog_cache")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("platform", "lightspeed"),
+      ]);
+      return { shopify: s.count ?? 0, lightspeed: l.count ?? 0 };
+    } catch {
+      return { shopify: 0, lightspeed: 0 };
+    }
   };
 
   const pollShopifySyncJob = async (jobId: string) => {

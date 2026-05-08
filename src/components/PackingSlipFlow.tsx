@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { getInvoiceParserModel } from "@/lib/invoice-parser-model";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 

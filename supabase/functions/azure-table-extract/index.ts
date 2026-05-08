@@ -163,13 +163,16 @@ async function interpretTablesWithLLM(tables: AzureTable[], fileName: string, su
   const raw = getContent(data);
   const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
   const jsonStr = (m?.[1] || raw).trim();
-  let parsed: { products?: unknown[] };
+  let parsed: { products?: unknown[]; format?: string };
   try {
     parsed = JSON.parse(jsonStr);
   } catch {
     throw new Error(`LLM returned invalid JSON: ${jsonStr.slice(0, 200)}`);
   }
-  return Array.isArray(parsed.products) ? parsed.products : [];
+  return {
+    products: Array.isArray(parsed.products) ? parsed.products : [],
+    format: parsed.format ?? null,
+  };
 }
 
 Deno.serve(async (req) => {

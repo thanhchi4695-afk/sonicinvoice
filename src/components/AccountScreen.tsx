@@ -108,6 +108,7 @@ const AccountScreen = () => {
     setStoreType(cfg.storeType || 'shopify');
     setLsVersion(cfg.lightspeedVersion || 'x_series');
     setStoreCity(cfg.city || '');
+    setStoreUrl(cfg.url || '');
     setFreeShippingThreshold(cfg.freeShippingThreshold || '');
   }, []);
 

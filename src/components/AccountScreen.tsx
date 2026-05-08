@@ -62,6 +62,7 @@ import { getDevEmbeddedMode, setDevEmbeddedMode } from "@/lib/shopify-embedded";
 import { toast } from "sonner";
 const TeamManagement = lazy(() => import("@/components/TeamManagement"));
 const AutomationSettings = lazy(() => import("@/components/AutomationSettings"));
+const InvoiceParserModelSetting = lazy(() => import("@/components/InvoiceParserModelSetting").then(m => ({ default: m.InvoiceParserModelSetting })));
 const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"));
 const MultiBrandSuppliersSection = lazy(() => import("@/components/MultiBrandSuppliersSection"));
 import SonicAssistantSettings from "@/components/SonicAssistantSettings";

@@ -367,9 +367,11 @@ const AccountScreen = () => {
         {/* ─── TEAM & BILLING ────────────────────────────────── */}
         <TabsContent value="team" className="mt-0 space-y-0">
           <Section title="👥 Team & Roles">
-            <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
-              <TeamManagement />
-            </Suspense>
+            <SectionErrorBoundary name="Team & Roles">
+              <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>
+                <TeamManagement />
+              </Suspense>
+            </SectionErrorBoundary>
           </Section>
           <BillingSection />
         </TabsContent>

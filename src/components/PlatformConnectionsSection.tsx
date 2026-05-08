@@ -787,25 +787,65 @@ export default function PlatformConnectionsSection() {
                 </button>
                 {showCustomApp && (
                   <div className="space-y-2 mt-2">
+                    <div className="flex gap-1 p-0.5 bg-muted rounded-md">
+                      <button
+                        type="button"
+                        onClick={() => setCustomAppMode("token")}
+                        className={`flex-1 text-[11px] py-1 rounded ${customAppMode === "token" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+                      >
+                        Access Token
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomAppMode("client")}
+                        className={`flex-1 text-[11px] py-1 rounded ${customAppMode === "client" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+                      >
+                        Client ID + Secret
+                      </button>
+                    </div>
                     <Input
                       placeholder="yourstore.myshopify.com"
                       value={customAppDomain}
                       onChange={(e) => setCustomAppDomain(e.target.value)}
                       className="h-8 text-xs"
                     />
-                    <Input
-                      placeholder="shpat_..."
-                      type="password"
-                      value={customAppToken}
-                      onChange={(e) => setCustomAppToken(e.target.value)}
-                      className="h-8 text-xs font-mono"
-                    />
+                    {customAppMode === "token" ? (
+                      <Input
+                        placeholder="shpat_..."
+                        type="password"
+                        value={customAppToken}
+                        onChange={(e) => setCustomAppToken(e.target.value)}
+                        className="h-8 text-xs font-mono"
+                      />
+                    ) : (
+                      <>
+                        <Input
+                          placeholder="Client ID"
+                          value={customAppClientId}
+                          onChange={(e) => setCustomAppClientId(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                        <Input
+                          placeholder="Client Secret"
+                          type="password"
+                          value={customAppClientSecret}
+                          onChange={(e) => setCustomAppClientSecret(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
                       className="w-full"
                       onClick={handleCustomAppSave}
-                      disabled={customAppSaving || !customAppDomain.trim() || !customAppToken.trim()}
+                      disabled={
+                        customAppSaving ||
+                        !customAppDomain.trim() ||
+                        (customAppMode === "token"
+                          ? !customAppToken.trim()
+                          : !customAppClientId.trim() || !customAppClientSecret.trim())
+                      }
                     >
                       {customAppSaving ? (
                         <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -815,7 +855,9 @@ export default function PlatformConnectionsSection() {
                       Verify & Save
                     </Button>
                     <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      Required scopes: <span className="font-mono">read_products, write_products, read_inventory, write_inventory, read_locations</span>
+                      {customAppMode === "client"
+                        ? "Uses Shopify Dev Dashboard client_credentials grant. App must be installed on the store."
+                        : <>Required scopes: <span className="font-mono">read_products, write_products, read_inventory, write_inventory, read_locations</span></>}
                     </p>
                   </div>
                 )}

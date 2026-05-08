@@ -169,24 +169,32 @@ export default function PlatformConnectionsSection() {
         Promise.all([
           loadLightspeedConn(user.id).catch(() => null),
           loadCatalogCounts(user.id).catch(() => ({ shopify: 0, lightspeed: 0 })),
-          supabase
-            .from("platform_connections")
-            .select("shop_domain, last_synced_at")
-            .eq("user_id", user.id)
-            .eq("platform", "shopify")
-            .eq("is_active", true)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle()
-            .then((r) => r)
-            .catch(() => ({ data: null, error: null })),
-          supabase
-            .from("platform_connections")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", user.id)
-            .eq("is_active", true)
-            .then((r) => r)
-            .catch(() => ({ count: 0, error: null })),
+          (async () => {
+            try {
+              return await supabase
+                .from("platform_connections")
+                .select("shop_domain, last_synced_at")
+                .eq("user_id", user.id)
+                .eq("platform", "shopify")
+                .eq("is_active", true)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            } catch {
+              return { data: null, error: null } as any;
+            }
+          })(),
+          (async () => {
+            try {
+              return await supabase
+                .from("platform_connections")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", user.id)
+                .eq("is_active", true);
+            } catch {
+              return { count: 0, error: null } as any;
+            }
+          })(),
         ]),
         timeoutPromise,
       ]).catch((err) => {

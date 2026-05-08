@@ -504,15 +504,31 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
       });
       if (az.ok) {
         const azJson = await az.json();
-        const azProducts = Array.isArray(azJson?.products) ? azJson.products : [];
+        const azProductsRaw = Array.isArray(azJson?.products) ? azJson.products : [];
+        // Normalise Azure output → internal product shape.
+        // Bond Eye–style flat lists give us RRP directly, so we surface it as both
+        // `rrp` and `compare_at_price` so the Shopify CSV gets a Compare At Price
+        // without needing Phase 3 price research.
+        const azProducts = azProductsRaw.map((p: Record<string, unknown>) => {
+          const cost = Number(p.unit_cost ?? p.cost ?? 0) || 0;
+          const rrp = p.rrp != null && p.rrp !== "" ? Number(p.rrp) : null;
+          return {
+            ...p,
+            cost,
+            unit_cost: cost,
+            rrp: rrp ?? null,
+            compare_at_price: rrp ?? null,
+          };
+        });
         if (azProducts.length > 0) {
-          console.log(`[classify-extract-validate] Azure layout returned ${azProducts.length} line items in ${azJson.azure_ms}ms`);
+          console.log(`[classify-extract-validate] Azure layout returned ${azProducts.length} line items in ${azJson.azure_ms}ms (format=${azJson.format ?? "unknown"})`);
           extraction = {
             products: azProducts,
             supplier: supplierName || classification?.supplier_name || null,
             extractor: "azure_layout+llm",
             tables_found: azJson.tables_found,
             azure_raw_tables: azJson.raw_tables ?? [],
+            invoice_format: azJson.format ?? null,
           };
           azureUsed = true;
         } else {

@@ -208,9 +208,10 @@ Deno.serve(async (req) => {
       return json({ products: [], raw_tables: [], tables_found: 0, azure_ms: tAzure, note: "no tables detected" }, 200);
     }
 
-    const products = await interpretTablesWithLLM(tables, fileName, supplierName);
+    const { products, format } = await interpretTablesWithLLM(tables, fileName, supplierName);
     return json({
       products,
+      format,
       raw_tables: rawTables,
       tables_found: tables.length,
       azure_ms: tAzure,

@@ -238,9 +238,42 @@ export default function PlatformConnectionsSection() {
         setShopifyDomain(shopifySyncMeta.shop_domain);
         setShopifyLastSynced(shopifySyncMeta?.last_synced_at ?? null);
       } else {
-        setShopifyConnected(false);
-        setShopifyDomain("");
-        setShopifyLastSynced(null);
+        // Fallback to shopify_connections (source of truth)
+        try {
+          const { data: legacyConn } = await supabase
+            .from("shopify_connections")
+            .select("store_url, updated_at, shop_name")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          if (legacyConn?.store_url) {
+            setShopifyConnected(true);
+            setShopifyDomain(legacyConn.store_url);
+            setShopifyLastSynced(legacyConn.updated_at ?? null);
+
+            // Repair platform_connections row so this fallback isn't needed next time
+            supabase
+              .from("platform_connections")
+              .upsert({
+                user_id: user.id,
+                platform: "shopify",
+                shop_domain: legacyConn.store_url,
+                is_active: true,
+                needs_reauth: false,
+              }, { onConflict: "user_id,platform" })
+              .then(({ error }) => {
+                if (!error) console.log("[PlatformConnections] repaired missing platform_connections row");
+              });
+          } else {
+            setShopifyConnected(false);
+            setShopifyDomain("");
+            setShopifyLastSynced(null);
+          }
+        } catch {
+          setShopifyConnected(false);
+          setShopifyDomain("");
+          setShopifyLastSynced(null);
+        }
       }
       setConnectedPlatformCount(platformCount);
       setLsConn(ls);

@@ -443,18 +443,36 @@ export default function PlatformConnectionsSection() {
   const handleCustomAppSave = async () => {
     const domain = customAppDomain.trim();
     const token = customAppToken.trim();
-    if (!domain || !token) {
-      toast.error("Enter both store domain and access token");
+    const clientId = customAppClientId.trim();
+    const clientSecret = customAppClientSecret.trim();
+
+    if (!domain) {
+      toast.error("Enter your store domain");
       return;
     }
+    if (customAppMode === "token" && !token) {
+      toast.error("Enter the Admin API access token");
+      return;
+    }
+    if (customAppMode === "client" && (!clientId || !clientSecret)) {
+      toast.error("Enter both Client ID and Client Secret");
+      return;
+    }
+
     setCustomAppSaving(true);
     try {
+      const payload: Record<string, string> = { shop_domain: domain };
+      if (customAppMode === "token") {
+        payload.access_token = token;
+      } else {
+        payload.client_id = clientId;
+        payload.client_secret = clientSecret;
+      }
       const { data, error } = await supabase.functions.invoke(
         "shopify-custom-app-verify",
-        { body: { shop_domain: domain, access_token: token } },
+        { body: payload },
       );
       if (error) {
-        // Try to surface the function's JSON error body
         const msg =
           (error as { context?: { body?: string } })?.context?.body ||
           error.message ||
@@ -472,11 +490,12 @@ export default function PlatformConnectionsSection() {
       toast.success(`Connected to ${data.shop_name}`);
       setCustomAppDomain("");
       setCustomAppToken("");
+      setCustomAppClientId("");
+      setCustomAppClientSecret("");
       setShowCustomApp(false);
       void loadAll();
 
-      // Auto-populate catalog cache on first connect so the invoice fast path
-      // works immediately on the user's very first invoice.
+      // Auto-populate catalog cache on first connect
       void (async () => {
         try {
           const { data: { user } } = await supabase.auth.getUser();
@@ -485,7 +504,6 @@ export default function PlatformConnectionsSection() {
             body: {
               user_id: user.id,
               shop_domain: domain,
-              access_token: token,
               mode: "full",
             },
           });
@@ -498,7 +516,7 @@ export default function PlatformConnectionsSection() {
         }
       })();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to verify token");
+      toast.error(err instanceof Error ? err.message : "Failed to verify");
     } finally {
       setCustomAppSaving(false);
     }

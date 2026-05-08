@@ -32,6 +32,11 @@ async function resolveApp(shop: string, query: URLSearchParams): Promise<Shopify
   return app;
 }
 
+function buildAdminAppUrl(shop: string, app: ShopifyAppCreds): string {
+  const appHandle = Deno.env.get("SHOPIFY_APP_HANDLE") || "sonic-invoices";
+  return `https://${shop}/admin/apps/${appHandle}`;
+}
+
 function generateToken(): string {
   const a = new Uint8Array(32);
   crypto.getRandomValues(a);
@@ -202,7 +207,7 @@ Deno.serve(async (req) => {
 
       // For embedded apps, redirect back into the Shopify Admin iframe
       const redirectUrl = isShopifyInitiated
-        ? `https://${shop}/admin/apps/${app.apiKey}`
+        ? buildAdminAppUrl(shop, app)
         : `${APP_URL}/?shopify_login=${loginToken}`;
 
       return new Response(null, {

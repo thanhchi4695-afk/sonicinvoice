@@ -143,7 +143,28 @@ Deno.serve(async (req) => {
       });
     if (platErr) {
       console.error("platform_connections insert failed", platErr);
-      // non-fatal — shopify_connections is the source of truth
+      // Try upsert as fallback in case row already exists
+      const { error: upsertErr } = await admin
+        .from("platform_connections")
+        .upsert({
+          user_id: userId,
+          platform: "shopify",
+          shop_domain,
+          access_token: accessToken,
+          is_active: true,
+          needs_reauth: false,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "user_id,platform" });
+
+      if (upsertErr) {
+        console.error("platform_connections upsert also failed:", upsertErr);
+        return new Response(
+          JSON.stringify({
+            error: `Connection saved to Shopify but UI sync failed: ${upsertErr.message}. Try refreshing.`,
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     return new Response(

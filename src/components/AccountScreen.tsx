@@ -95,6 +95,7 @@ const AccountScreen = () => {
   const [markup, setMarkup] = useState("2.35");
   const [rounding, setRounding] = useState("nearest_05");
   const [storeCity, setStoreCity] = useState("");
+  const [storeUrl, setStoreUrl] = useState("");
   const [freeShippingThreshold, setFreeShippingThreshold] = useState("");
   const [industry, setIndustry] = useState(() => getStoreConfig().industry || "clothing");
   const [taxRegion, setTaxRegion] = useState(() => getTaxConfig().regionCode || "AU");

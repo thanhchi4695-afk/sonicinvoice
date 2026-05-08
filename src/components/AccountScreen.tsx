@@ -40,6 +40,26 @@ const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"
 const MultiBrandSuppliersSection = lazy(() => import("@/components/MultiBrandSuppliersSection"));
 import SonicAssistantSettings from "@/components/SonicAssistantSettings";
 
+const CONNECTION_LOAD_TIMEOUT_MS = 8000;
+
+function withConnectionTimeout<T>(promise: PromiseLike<T>, fallback: T, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    Promise.resolve(promise).catch((error) => {
+      console.warn(`[Account connections] ${label} failed:`, error);
+      return fallback;
+    }),
+    new Promise<T>((resolve) => {
+      timer = setTimeout(() => {
+        console.warn(`[Account connections] ${label} timed out`);
+        resolve(fallback);
+      }, CONNECTION_LOAD_TIMEOUT_MS);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 const AccountScreen = () => {
   const { isAdmin } = useUserRole();
   const [storeName, setStoreName] = useState("");
@@ -1539,10 +1559,15 @@ function WholesaleConnectionsSection() {
   }, []);
 
   const loadConnections = async () => {
+    setLoading(true);
     try {
-      const { data } = await supabase
-        .from("wholesale_connections")
-        .select("id, platform, label, connected_at, last_synced");
+      const { data } = await withConnectionTimeout(
+        supabase
+          .from("wholesale_connections")
+          .select("id, platform, label, connected_at, last_synced"),
+        { data: [], error: null } as any,
+        "wholesale connections",
+      );
       if (data) {
         const map: typeof connections = {};
         for (const c of data) {
@@ -1550,8 +1575,12 @@ function WholesaleConnectionsSection() {
         }
         setConnections(map);
       }
-    } catch {}
-    setLoading(false);
+    } catch (err) {
+      console.error("Failed to load wholesale connections:", err);
+      setConnections({});
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleConnect = async (platformId: string, credKey: string) => {

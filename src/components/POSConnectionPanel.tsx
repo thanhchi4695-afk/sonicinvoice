@@ -17,6 +17,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const LS_DOMAIN_PREFIX_KEY = "ls_domain_prefix";
+const LOAD_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: PromiseLike<T>, fallback: T, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    Promise.resolve(promise).catch((error) => {
+      console.warn(`[POSConnectionPanel] ${label} failed:`, error);
+      return fallback;
+    }),
+    new Promise<T>((resolve) => {
+      timer = setTimeout(() => {
+        console.warn(`[POSConnectionPanel] ${label} timed out`);
+        resolve(fallback);
+      }, LOAD_TIMEOUT_MS);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 /** Extract just the prefix from any of these inputs:
  *   "stompshoes"
@@ -208,16 +227,35 @@ export default function POSConnectionPanel() {
   const loadConnections = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: shopifyConn } = user ? await supabase
-        .from("platform_connections")
-        .select("shop_domain")
-        .eq("user_id", user.id)
-        .eq("platform", "shopify")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle() : { data: null };
+      const authRes = await withTimeout(
+        supabase.auth.getUser(),
+        { data: { user: null }, error: null } as Awaited<ReturnType<typeof supabase.auth.getUser>>,
+        "auth lookup",
+      );
+      const user = authRes.data.user;
+
+      const [shopifyRes, posRes] = await Promise.all([
+        user ? withTimeout(
+          supabase
+            .from("platform_connections")
+            .select("shop_domain")
+            .eq("user_id", user.id)
+            .eq("platform", "shopify")
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          { data: null, error: null } as any,
+          "Shopify status",
+        ) : Promise.resolve({ data: null, error: null }),
+        withTimeout(
+          supabase.from("pos_connections").select("*"),
+          { data: [], error: null } as any,
+          "POS connections",
+        ),
+      ]);
+
+      const shopifyConn = shopifyRes.data;
       if (shopifyConn) {
         setShopifyConnected(true);
         setShopifyDomain(shopifyConn.shop_domain || "");
@@ -227,15 +265,17 @@ export default function POSConnectionPanel() {
           setStockCheckPrefs(updated);
           saveStockCheckPrefs(updated);
         }
+      } else {
+        setShopifyConnected(false);
+        setShopifyDomain("");
       }
 
-      // Check Lightspeed connections
-      const { data } = await supabase
-        .from("pos_connections")
-        .select("*");
-      setConnections((data as unknown as POSConnection[]) || []);
+      setConnections((posRes.data as unknown as POSConnection[]) || []);
     } catch (err) {
       console.error("Failed to load POS connections:", err);
+      setShopifyConnected(false);
+      setShopifyDomain("");
+      setConnections([]);
     } finally {
       setLoading(false);
     }

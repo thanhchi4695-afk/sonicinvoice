@@ -28,7 +28,7 @@ const AUTO_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
 const STALE_WARN_MS = 24 * 60 * 60 * 1000; // 24h
 const LOAD_TIMEOUT_MS = 8000;
 const SHOPIFY_OAUTH_TIMEOUT_MS = 12000;
-const CUSTOM_APP_VERIFY_TIMEOUT_MS = 60000;
+const CUSTOM_APP_VERIFY_TIMEOUT_MS = 15000;
 const CUSTOM_APP_AUTH_LOOKUP_TIMEOUT_MS = 2500;
 
 function withTimeout<T>(promise: PromiseLike<T>, fallback: T, label: string): Promise<T> {

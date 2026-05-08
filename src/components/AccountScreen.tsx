@@ -339,14 +339,18 @@ const AccountScreen = () => {
             <BudgetPill variant="full" />
           </Section>
           <Section title="🧠 Skills Library (Claude)">
-            <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
-              <ClaudeSkillsLibrary />
-            </Suspense>
+            <SectionErrorBoundary name="Skills Library">
+              <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+                <ClaudeSkillsLibrary />
+              </Suspense>
+            </SectionErrorBoundary>
           </Section>
           <Section title="🏷️ Multi-brand suppliers">
-            <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
-              <MultiBrandSuppliersSection />
-            </Suspense>
+            <SectionErrorBoundary name="Multi-brand suppliers">
+              <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+                <MultiBrandSuppliersSection />
+              </Suspense>
+            </SectionErrorBoundary>
           </Section>
           <DefaultInstructionsSection />
           <SharedLearningSection />

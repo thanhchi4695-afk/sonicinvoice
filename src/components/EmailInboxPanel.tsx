@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, Copy, Check, Upload, Mail, Paperclip, ChevronDown, Loader2, FileText, Image, RefreshCw, LogOut, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { addAuditEntry } from "@/lib/audit-log";
+import { getInvoiceParserModel } from "@/lib/invoice-parser-model";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -368,6 +369,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
               mimeType: item.attachmentMime || "application/pdf",
               inputFilename: item.attachmentName,
               source: "gmail",
+              claudeModel: getInvoiceParserModel(),
             },
           },
         );

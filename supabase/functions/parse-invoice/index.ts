@@ -158,9 +158,16 @@ const RETURN_INVOICE_TOOL = {
   },
 };
 
+const ALLOWED_CLAUDE_MODELS = new Set([
+  "claude-sonnet-4-5-20250929",
+  "claude-sonnet-4-20250514",
+]);
+const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+
 async function callClaudeInvoice(
   contentBlocks: any[],
   systemPrompt: string,
+  model: string = DEFAULT_CLAUDE_MODEL,
   maxTokens = 8000,
 ): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -171,7 +178,7 @@ async function callClaudeInvoice(
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-5-20250929",
+      model,
       max_tokens: maxTokens,
       system: systemPrompt,
       tools: [RETURN_INVOICE_TOOL],
@@ -197,6 +204,7 @@ async function stage1ClaudePdf(
   mimeType: string,
   supplierName: string,
   brandHints = "",
+  model: string = DEFAULT_CLAUDE_MODEL,
 ): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
   const systemPrompt = SONIC_MASTER_PROMPT_V2 +
     `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore the "Part A/B/C" prose format from Step 8. Instead, call the \`return_invoice\` tool exactly once with the structured meta (including subtotalExGst from the invoice) and one row per size variant. Numbers must be plain numbers. Use null when unsure.`;
@@ -211,7 +219,7 @@ async function stage1ClaudePdf(
     ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
     : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
 
-  return await callClaudeInvoice([docBlock, { type: "text", text: userText }], systemPrompt);
+  return await callClaudeInvoice([docBlock, { type: "text", text: userText }], systemPrompt, model);
 }
 
 // Validation pass — sums extracted cost*qty against invoice subtotal.
@@ -223,6 +231,7 @@ async function validateAndMaybeReExtract(
   meta: InvoiceMeta,
   rows: ParsedRow[],
   systemPromptBase: string,
+  model: string = DEFAULT_CLAUDE_MODEL,
 ): Promise<{ rows: ParsedRow[]; validation: { passed: boolean; expected: number | null; actual: number; delta: number; reExtracted: boolean } }> {
   const expected = typeof meta.subtotalExGst === "number" ? meta.subtotalExGst : null;
   const actual = rows.reduce(
@@ -250,6 +259,7 @@ async function validateAndMaybeReExtract(
     const { rows: fixedRows, meta: fixedMeta } = await callClaudeInvoice(
       [docBlock, { type: "text", text: "Re-examine and return the corrected row set." }],
       correctionPrompt,
+      model,
     );
     const fixedActual = fixedRows.reduce(
       (s, r) => s + (Number(r.costPrice ?? 0) * Number(r.quantity ?? 0)),
@@ -626,6 +636,8 @@ Deno.serve(async (req) => {
   const inputFilename: string | null = body?.inputFilename || null;
   const inputFileRef: string | null = body?.inputFileRef || null;
   const source: string | null = body?.source || null;
+  const requestedModel: string = typeof body?.claudeModel === "string" ? body.claudeModel : DEFAULT_CLAUDE_MODEL;
+  const claudeModel: string = ALLOWED_CLAUDE_MODELS.has(requestedModel) ? requestedModel : DEFAULT_CLAUDE_MODEL;
 
   if (!fileBase64 || typeof fileBase64 !== "string") {
     return new Response(JSON.stringify({ error: "fileBase64 (string) is required" }), {
@@ -673,7 +685,7 @@ Deno.serve(async (req) => {
     const isPdf = mimeType === "application/pdf";
     if (isPdf && ANTHROPIC_API_KEY) {
       try {
-        const claudeOut = await stage1ClaudePdf(fileBase64, mimeType, supplierName, brandHints);
+        const claudeOut = await stage1ClaudePdf(fileBase64, mimeType, supplierName, brandHints, claudeModel);
         invoiceMeta = claudeOut.meta;
         // Short-circuit packing lists: surface to the user instead of pretending it's an invoice.
         if (invoiceMeta.documentType === "packing_list") {
@@ -696,6 +708,7 @@ Deno.serve(async (req) => {
         const validated = await validateAndMaybeReExtract(
           fileBase64, mimeType, invoiceMeta, claudeOut.rows,
           SONIC_MASTER_PROMPT_V2 + `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore "Part A/B/C" prose. Call the return_invoice tool exactly once.`,
+          claudeModel,
         );
         stage1Rows = validated.rows;
         validation = validated.validation;
@@ -748,6 +761,7 @@ Deno.serve(async (req) => {
         fieldCompleteness: completeness,
         rows: stage3Rows,
         extractor,
+        claudeModel: extractor === "claude-pdf" ? claudeModel : null,
         meta: invoiceMeta,
         validation,
       }),

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { getInvoiceParserModel } from "@/lib/invoice-parser-model";
 import { useStoreMode } from "@/hooks/use-store-mode";
 import Papa from "papaparse";
 
@@ -226,6 +227,7 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
           fileType: ext,
           supplierName: supplierInput || undefined,
           forceMode: "packing_slip",
+          claudeModel: getInvoiceParserModel(),
         },
       });
 
@@ -332,6 +334,7 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
           fileType: ext,
           supplierName: supplier || supplierInput || undefined,
           forceMode: "invoice",
+          claudeModel: getInvoiceParserModel(),
         },
       });
       if (error) throw error;

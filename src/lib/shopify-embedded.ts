@@ -49,8 +49,35 @@ export function getHostFromUrl(): string | null {
   return params.get("host");
 }
 
+const PRIMARY_SHOPIFY_API_KEY = "aebbc68f4f67197beb20489d6d2987e4";
+const KNOWN_SHOPIFY_API_KEYS = [
+  PRIMARY_SHOPIFY_API_KEY,
+  // Splash Swimwear custom app client ID (public App Bridge identifier, not a secret).
+  "8277057587c9b97483827190f085fe6d",
+];
+
+function getApiKeyFromUrlOrReferrer(): string | null {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  const explicitKey = params.get("client_id") || params.get("api_key") || params.get("app_key");
+  if (explicitKey && KNOWN_SHOPIFY_API_KEYS.includes(explicitKey)) return explicitKey;
+
+  const sources = [window.location.href, document.referrer].filter(Boolean);
+  for (const source of sources) {
+    for (const key of KNOWN_SHOPIFY_API_KEYS) {
+      if (source.includes(key)) return key;
+    }
+  }
+
+  return null;
+}
+
 /** Get the Shopify API key from env or the hardcoded meta tag */
 export function getApiKey(): string {
+  const requestKey = getApiKeyFromUrlOrReferrer();
+  if (requestKey) return requestKey;
+
   const envKey = import.meta.env.VITE_SHOPIFY_API_KEY;
   if (envKey) return envKey;
 

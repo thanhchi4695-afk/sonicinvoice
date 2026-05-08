@@ -26,6 +26,25 @@ import { cn } from "@/lib/utils";
 const AUTO_SYNC_KEY = "platform_auto_sync_enabled";
 const AUTO_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
 const STALE_WARN_MS = 24 * 60 * 60 * 1000; // 24h
+const LOAD_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: PromiseLike<T>, fallback: T, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    Promise.resolve(promise).catch((error) => {
+      console.warn(`[PlatformConnections] ${label} failed:`, error);
+      return fallback;
+    }),
+    new Promise<T>((resolve) => {
+      timer = setTimeout(() => {
+        console.warn(`[PlatformConnections] ${label} timed out`);
+        resolve(fallback);
+      }, LOAD_TIMEOUT_MS);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 interface CatalogStats {
   shopifyCount: number;
@@ -148,7 +167,12 @@ export default function PlatformConnectionsSection() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const authRes = await withTimeout(
+        supabase.auth.getUser(),
+        { data: { user: null }, error: null } as Awaited<ReturnType<typeof supabase.auth.getUser>>,
+        "auth lookup",
+      );
+      const user = authRes.data.user;
       if (!user) {
         setShopifyConnected(false);
         setShopifyDomain("");
@@ -160,12 +184,7 @@ export default function PlatformConnectionsSection() {
         return;
       }
 
-      const LOAD_TIMEOUT_MS = 8000;
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("load_timeout")), LOAD_TIMEOUT_MS)
-      );
-
-      const [ls, counts, shopifyMetaRes, platformsRes] = await Promise.race([
+      const [ls, counts, shopifyMetaRes, platformsRes] = await withTimeout(
         Promise.all([
           loadLightspeedConn(user.id).catch(() => null),
           loadCatalogCounts(user.id).catch(() => ({ shopify: 0, lightspeed: 0 })),
@@ -196,16 +215,14 @@ export default function PlatformConnectionsSection() {
             }
           })(),
         ]),
-        timeoutPromise,
-      ]).catch((err) => {
-        console.warn("[PlatformConnections] loadAll timed out or failed:", err);
-        return [
+        [
           null,
           { shopify: 0, lightspeed: 0 },
           { data: null, error: null },
           { count: 0, error: null },
-        ] as const;
-      }) as [
+        ] as const,
+        "connection queries",
+      ) as [
         LightspeedConn | null,
         { shopify: number; lightspeed: number },
         { data: { shop_domain: string | null; last_synced_at: string | null } | null },

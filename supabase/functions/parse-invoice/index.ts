@@ -209,8 +209,9 @@ async function stage1ClaudePdf(
   supplierName: string,
   brandHints = "",
   model: string = DEFAULT_CLAUDE_MODEL,
+  brandProfileMd = "",
 ): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
-  const systemPrompt = SONIC_MASTER_PROMPT_V2 +
+  const systemPrompt = SONIC_MASTER_PROMPT_V2 + brandProfileMd +
     `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore the "Part A/B/C" prose format from Step 8. Instead, call the \`return_invoice\` tool exactly once with the structured meta (including subtotalExGst from the invoice) and one row per size variant. Numbers must be plain numbers. Use null when unsure.`;
 
   const userText =

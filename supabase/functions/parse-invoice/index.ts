@@ -747,6 +747,9 @@ Deno.serve(async (req) => {
         confidence,
         fieldCompleteness: completeness,
         rows: stage3Rows,
+        extractor,
+        meta: invoiceMeta,
+        validation,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );

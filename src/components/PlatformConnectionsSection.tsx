@@ -27,6 +27,7 @@ const AUTO_SYNC_KEY = "platform_auto_sync_enabled";
 const AUTO_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
 const STALE_WARN_MS = 24 * 60 * 60 * 1000; // 24h
 const LOAD_TIMEOUT_MS = 8000;
+const SHOPIFY_OAUTH_TIMEOUT_MS = 12000;
 
 function withTimeout<T>(promise: PromiseLike<T>, fallback: T, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -330,14 +331,33 @@ export default function PlatformConnectionsSection() {
       toast.error("Enter your Shopify store domain first");
       return;
     }
+    const popup = window.open("", "shopify_oauth", "width=960,height=820");
     setShopifyOAuthLoading(true);
     try {
       const url = shopifyInput.includes(".myshopify.com")
         ? shopifyInput.trim()
         : `${shopifyInput.trim()}.myshopify.com`;
-      const installUrl = await initiateOAuth(url);
-      window.location.href = installUrl;
+      const installUrl = await Promise.race([
+        initiateOAuth(url),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), SHOPIFY_OAUTH_TIMEOUT_MS)),
+      ]);
+
+      if (!installUrl) {
+        popup?.close();
+        throw new Error("Shopify took too long to respond. Please try again.");
+      }
+
+      if (popup && !popup.closed) {
+        popup.location.href = installUrl;
+        toast.success("Shopify authorization opened in a new window");
+        setShopifyOAuthLoading(false);
+        return;
+      }
+
+      window.location.assign(installUrl);
+      window.setTimeout(() => setShopifyOAuthLoading(false), 2500);
     } catch (err) {
+      popup?.close();
       toast.error(err instanceof Error ? err.message : "OAuth failed");
       setShopifyOAuthLoading(false);
     }

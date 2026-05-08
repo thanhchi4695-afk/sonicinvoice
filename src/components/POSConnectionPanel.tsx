@@ -245,12 +245,12 @@ export default function POSConnectionPanel() {
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle(),
-          { data: null, error: null },
+          { data: null, error: null } as any,
           "Shopify status",
         ) : Promise.resolve({ data: null, error: null }),
         withTimeout(
           supabase.from("pos_connections").select("*"),
-          { data: [], error: null },
+          { data: [], error: null } as any,
           "POS connections",
         ),
       ]);

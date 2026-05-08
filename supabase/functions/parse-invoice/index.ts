@@ -761,6 +761,7 @@ Deno.serve(async (req) => {
         fieldCompleteness: completeness,
         rows: stage3Rows,
         extractor,
+        claudeModel: extractor === "claude-pdf" ? claudeModel : null,
         meta: invoiceMeta,
         validation,
       }),

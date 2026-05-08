@@ -154,7 +154,7 @@ const AccountScreen = () => {
         <TabsContent value="store" className="mt-0 space-y-0">
           <Section title="Store details">
             <Field label="Store name" value={storeName} onChange={setStoreName} placeholder="My Boutique" />
-            <Field label="Store website" placeholder="mystore.com" />
+            <Field label="Store website" value={storeUrl} onChange={setStoreUrl} placeholder="mystore.com" />
             <Field label="City / Location" value={storeCity} onChange={setStoreCity} placeholder="e.g. Darwin NT" />
             <p className="text-[11px] text-muted-foreground -mt-2">Used in product descriptions and SEO meta text.</p>
             <Field label="Free shipping threshold (AUD)" value={freeShippingThreshold} onChange={setFreeShippingThreshold} placeholder="e.g. 150" type="number" />

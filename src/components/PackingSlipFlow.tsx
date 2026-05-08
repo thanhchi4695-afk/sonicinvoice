@@ -334,6 +334,7 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
           fileType: ext,
           supplierName: supplier || supplierInput || undefined,
           forceMode: "invoice",
+          claudeModel: getInvoiceParserModel(),
         },
       });
       if (error) throw error;

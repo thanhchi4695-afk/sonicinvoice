@@ -350,7 +350,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       setActiveTab("account");
       toast.success("Shopify connected");
       if (window.opener && !window.opener.closed) {
-        window.opener.postMessage({ type: "sonic:shopify-connected" }, window.location.origin);
+        window.opener.postMessage({ type: "sonic:shopify-connected" }, "*");
         window.close();
       }
     }

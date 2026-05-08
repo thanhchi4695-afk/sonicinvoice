@@ -227,6 +227,7 @@ export default function PackingSlipFlow({ onBack }: PackingSlipFlowProps) {
           fileType: ext,
           supplierName: supplierInput || undefined,
           forceMode: "packing_slip",
+          claudeModel: getInvoiceParserModel(),
         },
       });
 

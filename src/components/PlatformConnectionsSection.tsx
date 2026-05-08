@@ -473,6 +473,7 @@ export default function PlatformConnectionsSection() {
     }
 
     setCustomAppSaving(true);
+    toast.loading("Verifying Shopify credentials…", { id: "shopify-custom-verify" });
     try {
       const payload: Record<string, string> = { shop_domain: domain };
       if (customAppMode === "token") {
@@ -501,6 +502,7 @@ export default function PlatformConnectionsSection() {
       if (!data?.success) {
         throw new Error(data?.error || "Verification failed");
       }
+      toast.dismiss("shopify-custom-verify");
       toast.success(`Connected to ${data.shop_name}`);
       setCustomAppSaving(false);
       setCustomAppDomain("");
@@ -531,6 +533,7 @@ export default function PlatformConnectionsSection() {
         }
       })();
     } catch (err) {
+      toast.dismiss("shopify-custom-verify");
       toast.error(err instanceof Error ? err.message : "Failed to verify");
     } finally {
       setCustomAppSaving(false);

@@ -368,6 +368,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
               mimeType: item.attachmentMime || "application/pdf",
               inputFilename: item.attachmentName,
               source: "gmail",
+              claudeModel: getInvoiceParserModel(),
             },
           },
         );

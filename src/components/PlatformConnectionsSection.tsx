@@ -117,22 +117,30 @@ async function verifyCustomAppCredentials(payload: CustomAppVerifyPayload): Prom
     throw new Error("Backend configuration missing. Refresh the app and try again.");
   }
 
+  // Pull whatever access token we can find. Inside the Shopify iframe,
+  // localStorage may be partitioned and empty — fall back to the in-memory
+  // Supabase session, then a refresh.
   const accessToken = await getCurrentAccessToken();
-  if (!accessToken) {
-    throw new Error("Please sign in again before verifying Shopify credentials.");
-  }
 
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), CUSTOM_APP_VERIFY_TIMEOUT_MS);
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    apikey: publishableKey,
+  };
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  } else {
+    // No user token — still send the publishable key as Bearer so the
+    // function can at least respond with a clear 401 instead of a CORS error.
+    headers.Authorization = `Bearer ${publishableKey}`;
+  }
+
   try {
     const response = await fetch(`${supabaseUrl}/functions/v1/shopify-custom-app-verify`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: publishableKey,
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -143,6 +151,12 @@ async function verifyCustomAppCredentials(payload: CustomAppVerifyPayload): Prom
       body = text ? JSON.parse(text) : {};
     } catch {
       if (!response.ok) throw new Error(text || "Verification failed");
+    }
+
+    if (response.status === 401) {
+      throw new Error(
+        "Your session expired in the Shopify iframe. Reload the app from Shopify Admin (or open it in a new tab) and try again.",
+      );
     }
 
     if (!response.ok) {

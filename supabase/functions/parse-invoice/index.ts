@@ -158,9 +158,16 @@ const RETURN_INVOICE_TOOL = {
   },
 };
 
+const ALLOWED_CLAUDE_MODELS = new Set([
+  "claude-sonnet-4-5-20250929",
+  "claude-sonnet-4-20250514",
+]);
+const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+
 async function callClaudeInvoice(
   contentBlocks: any[],
   systemPrompt: string,
+  model: string = DEFAULT_CLAUDE_MODEL,
   maxTokens = 8000,
 ): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -171,7 +178,7 @@ async function callClaudeInvoice(
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-5-20250929",
+      model,
       max_tokens: maxTokens,
       system: systemPrompt,
       tools: [RETURN_INVOICE_TOOL],
@@ -197,6 +204,7 @@ async function stage1ClaudePdf(
   mimeType: string,
   supplierName: string,
   brandHints = "",
+  model: string = DEFAULT_CLAUDE_MODEL,
 ): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
   const systemPrompt = SONIC_MASTER_PROMPT_V2 +
     `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore the "Part A/B/C" prose format from Step 8. Instead, call the \`return_invoice\` tool exactly once with the structured meta (including subtotalExGst from the invoice) and one row per size variant. Numbers must be plain numbers. Use null when unsure.`;
@@ -211,7 +219,7 @@ async function stage1ClaudePdf(
     ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
     : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
 
-  return await callClaudeInvoice([docBlock, { type: "text", text: userText }], systemPrompt);
+  return await callClaudeInvoice([docBlock, { type: "text", text: userText }], systemPrompt, model);
 }
 
 // Validation pass — sums extracted cost*qty against invoice subtotal.

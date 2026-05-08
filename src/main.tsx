@@ -8,6 +8,9 @@ const KNOWN_SHOPIFY_API_KEYS = [PRIMARY_SHOPIFY_API_KEY, "8277057587c9b974838271
 
 function resolveShopifyApiKey() {
   const params = new URLSearchParams(window.location.search);
+  const shop = params.get("shop")?.toLowerCase();
+  if (shop === "splashswimweardarwin.myshopify.com") return "8277057587c9b97483827190f085fe6d";
+
   const explicitKey = params.get("client_id") || params.get("api_key") || params.get("app_key");
   if (explicitKey && KNOWN_SHOPIFY_API_KEYS.includes(explicitKey)) return explicitKey;
   const sources = [window.location.href, document.referrer].filter(Boolean);

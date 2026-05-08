@@ -160,24 +160,57 @@ export default function PlatformConnectionsSection() {
         return;
       }
 
-      const [ls, counts, shopifyMetaRes, platformsRes] = await Promise.all([
-        loadLightspeedConn(user.id),
-        loadCatalogCounts(user.id),
-        supabase
-          .from("platform_connections")
-          .select("shop_domain, last_synced_at")
-          .eq("user_id", user.id)
-          .eq("platform", "shopify")
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("platform_connections")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .eq("is_active", true),
-      ]);
+      const LOAD_TIMEOUT_MS = 8000;
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("load_timeout")), LOAD_TIMEOUT_MS)
+      );
+
+      const [ls, counts, shopifyMetaRes, platformsRes] = await Promise.race([
+        Promise.all([
+          loadLightspeedConn(user.id).catch(() => null),
+          loadCatalogCounts(user.id).catch(() => ({ shopify: 0, lightspeed: 0 })),
+          (async () => {
+            try {
+              return await supabase
+                .from("platform_connections")
+                .select("shop_domain, last_synced_at")
+                .eq("user_id", user.id)
+                .eq("platform", "shopify")
+                .eq("is_active", true)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            } catch {
+              return { data: null, error: null } as any;
+            }
+          })(),
+          (async () => {
+            try {
+              return await supabase
+                .from("platform_connections")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", user.id)
+                .eq("is_active", true);
+            } catch {
+              return { count: 0, error: null } as any;
+            }
+          })(),
+        ]),
+        timeoutPromise,
+      ]).catch((err) => {
+        console.warn("[PlatformConnections] loadAll timed out or failed:", err);
+        return [
+          null,
+          { shopify: 0, lightspeed: 0 },
+          { data: null, error: null },
+          { count: 0, error: null },
+        ] as const;
+      }) as [
+        LightspeedConn | null,
+        { shopify: number; lightspeed: number },
+        { data: { shop_domain: string | null; last_synced_at: string | null } | null },
+        { count: number | null }
+      ];
 
       const shopifySyncMeta = shopifyMetaRes.data;
       const platformCount = platformsRes.count ?? 0;
@@ -213,19 +246,23 @@ export default function PlatformConnectionsSection() {
   };
 
   const loadCatalogCounts = async (userId: string): Promise<{ shopify: number; lightspeed: number }> => {
-    const [s, l] = await Promise.all([
-      supabase
-        .from("product_catalog_cache")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("platform", "shopify"),
-      supabase
-        .from("product_catalog_cache")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("platform", "lightspeed"),
-    ]);
-    return { shopify: s.count ?? 0, lightspeed: l.count ?? 0 };
+    try {
+      const [s, l] = await Promise.all([
+        supabase
+          .from("product_catalog_cache")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("platform", "shopify"),
+        supabase
+          .from("product_catalog_cache")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("platform", "lightspeed"),
+      ]);
+      return { shopify: s.count ?? 0, lightspeed: l.count ?? 0 };
+    } catch {
+      return { shopify: 0, lightspeed: 0 };
+    }
   };
 
   const pollShopifySyncJob = async (jobId: string) => {

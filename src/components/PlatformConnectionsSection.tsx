@@ -80,6 +80,12 @@ function formatRelative(iso: string | null): string {
   return `${Math.round(hrs / 24)} d ago`;
 }
 
+function normalizeShopifyDomain(input: string): string {
+  const domain = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!domain) return "";
+  return domain.includes(".myshopify.com") ? domain : `${domain}.myshopify.com`;
+}
+
 export default function PlatformConnectionsSection() {
   const [loading, setLoading] = useState(true);
 
@@ -359,6 +365,16 @@ export default function PlatformConnectionsSection() {
   };
 
   // ── Shopify actions ───────────────────────────────────────
+  const openCustomAppConnect = () => {
+    const domain = normalizeShopifyDomain(shopifyInput);
+    if (!domain) {
+      toast.error("Enter your Shopify store domain first");
+      return;
+    }
+    setCustomAppDomain(domain);
+    setShowCustomApp(true);
+  };
+
   const handleShopifyConnect = async () => {
     if (!shopifyInput.trim()) {
       toast.error("Enter your Shopify store domain first");
@@ -367,9 +383,7 @@ export default function PlatformConnectionsSection() {
     const popup = window.open("", "shopify_oauth", "width=960,height=820");
     setShopifyOAuthLoading(true);
     try {
-      const url = shopifyInput.includes(".myshopify.com")
-        ? shopifyInput.trim()
-        : `${shopifyInput.trim()}.myshopify.com`;
+      const url = normalizeShopifyDomain(shopifyInput);
       const installUrl = await Promise.race([
         initiateOAuth(url),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), SHOPIFY_OAUTH_TIMEOUT_MS)),

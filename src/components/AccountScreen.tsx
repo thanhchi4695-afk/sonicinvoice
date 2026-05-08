@@ -385,6 +385,11 @@ const AccountScreen = () => {
               <AutomationSettings />
             </Suspense>
           </Section>
+          <Section title="Invoice parser">
+            <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
+              <InvoiceParserModelSetting />
+            </Suspense>
+          </Section>
           <NotificationPrefsSection />
           <Section title="🛠️ Developer mode">
             <div className="flex items-center justify-between">

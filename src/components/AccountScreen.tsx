@@ -1,4 +1,30 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
+
+class SectionErrorBoundary extends React.Component<
+  { children: React.ReactNode; name: string },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; name: string }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.warn(`[AccountScreen] ${this.props.name} crashed:`, error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="text-xs text-muted-foreground p-2">
+          {this.props.name} failed to load. Try refreshing.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES } from "@/i18n/config";
 import { PageHeader } from "@/components/layout/PageHeader";

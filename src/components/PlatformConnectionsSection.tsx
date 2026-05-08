@@ -29,6 +29,7 @@ const STALE_WARN_MS = 24 * 60 * 60 * 1000; // 24h
 const LOAD_TIMEOUT_MS = 8000;
 const SHOPIFY_OAUTH_TIMEOUT_MS = 12000;
 const CUSTOM_APP_VERIFY_TIMEOUT_MS = 60000;
+const CUSTOM_APP_AUTH_LOOKUP_TIMEOUT_MS = 2500;
 
 function withTimeout<T>(promise: PromiseLike<T>, fallback: T, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -58,6 +59,93 @@ function withRejectingTimeout<T>(promise: PromiseLike<T>, ms: number, message: s
   ]).finally(() => {
     if (timer) clearTimeout(timer);
   });
+}
+
+interface CustomAppVerifyPayload {
+  shop_domain: string;
+  access_token?: string;
+  client_id?: string;
+  client_secret?: string;
+}
+
+interface CustomAppVerifyResponse {
+  success?: boolean;
+  error?: string;
+  shop_name?: string;
+  shop_domain?: string;
+}
+
+function getStoredAccessToken(): string | null {
+  try {
+    const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined;
+    if (!projectRef) return null;
+    const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { access_token?: string } | null;
+    return parsed?.access_token || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getCurrentAccessToken(): Promise<string | null> {
+  const sessionToken = await withRejectingTimeout(
+    supabase.auth.getSession().then(({ data }) => data.session?.access_token || null),
+    CUSTOM_APP_AUTH_LOOKUP_TIMEOUT_MS,
+    "Auth lookup timed out",
+  ).catch(() => null);
+
+  return sessionToken || getStoredAccessToken();
+}
+
+async function verifyCustomAppCredentials(payload: CustomAppVerifyPayload): Promise<CustomAppVerifyResponse> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+  if (!supabaseUrl || !publishableKey) {
+    throw new Error("Backend configuration missing. Refresh the app and try again.");
+  }
+
+  const accessToken = await getCurrentAccessToken();
+  if (!accessToken) {
+    throw new Error("Please sign in again before verifying Shopify credentials.");
+  }
+
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), CUSTOM_APP_VERIFY_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/shopify-custom-app-verify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: publishableKey,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    const text = await response.text();
+    let body: CustomAppVerifyResponse = {};
+    try {
+      body = text ? JSON.parse(text) : {};
+    } catch {
+      if (!response.ok) throw new Error(text || "Verification failed");
+    }
+
+    if (!response.ok) {
+      throw new Error(body.error || `Verification failed (${response.status})`);
+    }
+
+    return body;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Shopify did not respond within 60 seconds. Try the Admin API access token option if Client ID + Secret keeps timing out.");
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 interface CatalogStats {
@@ -475,30 +563,14 @@ export default function PlatformConnectionsSection() {
     setCustomAppSaving(true);
     toast.loading("Verifying Shopify credentials…", { id: "shopify-custom-verify" });
     try {
-      const payload: Record<string, string> = { shop_domain: domain };
+      const payload: CustomAppVerifyPayload = { shop_domain: domain };
       if (customAppMode === "token") {
         payload.access_token = token;
       } else {
         payload.client_id = clientId;
         payload.client_secret = clientSecret;
       }
-      const { data, error } = await withRejectingTimeout(
-        supabase.functions.invoke("shopify-custom-app-verify", { body: payload }),
-        CUSTOM_APP_VERIFY_TIMEOUT_MS,
-        "Shopify verification is taking longer than expected. The credentials are valid from the backend test, so please refresh and try once more.",
-      );
-      if (error) {
-        const msg =
-          (error as { context?: { body?: string } })?.context?.body ||
-          error.message ||
-          "Verification failed";
-        let parsed = msg;
-        try {
-          const j = JSON.parse(msg);
-          if (j?.error) parsed = j.error;
-        } catch { /* ignore */ }
-        throw new Error(parsed);
-      }
+      const data = await verifyCustomAppCredentials(payload);
       if (!data?.success) {
         throw new Error(data?.error || "Verification failed");
       }

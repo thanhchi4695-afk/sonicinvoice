@@ -231,6 +231,7 @@ async function validateAndMaybeReExtract(
   meta: InvoiceMeta,
   rows: ParsedRow[],
   systemPromptBase: string,
+  model: string = DEFAULT_CLAUDE_MODEL,
 ): Promise<{ rows: ParsedRow[]; validation: { passed: boolean; expected: number | null; actual: number; delta: number; reExtracted: boolean } }> {
   const expected = typeof meta.subtotalExGst === "number" ? meta.subtotalExGst : null;
   const actual = rows.reduce(
@@ -258,6 +259,7 @@ async function validateAndMaybeReExtract(
     const { rows: fixedRows, meta: fixedMeta } = await callClaudeInvoice(
       [docBlock, { type: "text", text: "Re-examine and return the corrected row set." }],
       correctionPrompt,
+      model,
     );
     const fixedActual = fixedRows.reduce(
       (s, r) => s + (Number(r.costPrice ?? 0) * Number(r.quantity ?? 0)),

@@ -160,24 +160,49 @@ export default function PlatformConnectionsSection() {
         return;
       }
 
-      const [ls, counts, shopifyMetaRes, platformsRes] = await Promise.all([
-        loadLightspeedConn(user.id),
-        loadCatalogCounts(user.id),
-        supabase
-          .from("platform_connections")
-          .select("shop_domain, last_synced_at")
-          .eq("user_id", user.id)
-          .eq("platform", "shopify")
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("platform_connections")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .eq("is_active", true),
-      ]);
+      const LOAD_TIMEOUT_MS = 8000;
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("load_timeout")), LOAD_TIMEOUT_MS)
+      );
+
+      const [ls, counts, shopifyMetaRes, platformsRes] = await Promise.race([
+        Promise.all([
+          loadLightspeedConn(user.id).catch(() => null),
+          loadCatalogCounts(user.id).catch(() => ({ shopify: 0, lightspeed: 0 })),
+          supabase
+            .from("platform_connections")
+            .select("shop_domain, last_synced_at")
+            .eq("user_id", user.id)
+            .eq("platform", "shopify")
+            .eq("is_active", true)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+            .then((r) => r)
+            .catch(() => ({ data: null, error: null })),
+          supabase
+            .from("platform_connections")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("is_active", true)
+            .then((r) => r)
+            .catch(() => ({ count: 0, error: null })),
+        ]),
+        timeoutPromise,
+      ]).catch((err) => {
+        console.warn("[PlatformConnections] loadAll timed out or failed:", err);
+        return [
+          null,
+          { shopify: 0, lightspeed: 0 },
+          { data: null, error: null },
+          { count: 0, error: null },
+        ] as const;
+      }) as [
+        LightspeedConn | null,
+        { shopify: number; lightspeed: number },
+        { data: { shop_domain: string | null; last_synced_at: string | null } | null },
+        { count: number | null }
+      ];
 
       const shopifySyncMeta = shopifyMetaRes.data;
       const platformCount = platformsRes.count ?? 0;

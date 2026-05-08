@@ -5,6 +5,7 @@
 // Persists job + result to public.parse_jobs.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { SONIC_MASTER_PROMPT_V2 } from "../_shared/sonic-master-prompt-v2.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

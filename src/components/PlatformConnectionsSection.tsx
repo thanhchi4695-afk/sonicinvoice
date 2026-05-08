@@ -28,6 +28,7 @@ const AUTO_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
 const STALE_WARN_MS = 24 * 60 * 60 * 1000; // 24h
 const LOAD_TIMEOUT_MS = 8000;
 const SHOPIFY_OAUTH_TIMEOUT_MS = 12000;
+const CUSTOM_APP_VERIFY_TIMEOUT_MS = 20000;
 
 function withTimeout<T>(promise: PromiseLike<T>, fallback: T, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -41,6 +42,18 @@ function withTimeout<T>(promise: PromiseLike<T>, fallback: T, label: string): Pr
         console.warn(`[PlatformConnections] ${label} timed out`);
         resolve(fallback);
       }, LOAD_TIMEOUT_MS);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+function withRejectingTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), ms);
     }),
   ]).finally(() => {
     if (timer) clearTimeout(timer);

@@ -574,6 +574,14 @@ export default function PlatformConnectionsSection() {
   };
 
   const handleCustomAppSave = async () => {
+    const isEmbedded = window.self !== window.top;
+    if (isEmbedded) {
+      const standaloneUrl = "https://sonicinvoice.lovable.app/account?action=connect-shopify";
+      window.open(standaloneUrl, "_blank");
+      toast.info("Opening Sonic Invoices in a new tab — connect your store there for best results.");
+      return;
+    }
+
     const domain = customAppDomain.trim();
     const token = customAppToken.trim();
     const clientId = customAppClientId.trim();

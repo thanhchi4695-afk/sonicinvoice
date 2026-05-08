@@ -295,14 +295,24 @@ const AccountScreen = () => {
         {/* ─── CONNECTIONS ───────────────────────────────────── */}
         <TabsContent value="connections" className="mt-0 space-y-0">
           <Section title="Platform connections">
-            <PlatformConnectionsSection />
+            <SectionErrorBoundary name="Platform connections">
+              <PlatformConnectionsSection />
+            </SectionErrorBoundary>
           </Section>
           <Section title="🔌 POS integration">
-            <POSConnectionPanel />
+            <SectionErrorBoundary name="POS integration">
+              <POSConnectionPanel />
+            </SectionErrorBoundary>
           </Section>
-          <WholesaleConnectionsSection />
-          <AccountingConnectionsSection />
-          <ApiKeysSection />
+          <SectionErrorBoundary name="Wholesale connections">
+            <WholesaleConnectionsSection />
+          </SectionErrorBoundary>
+          <SectionErrorBoundary name="Accounting connections">
+            <AccountingConnectionsSection />
+          </SectionErrorBoundary>
+          <SectionErrorBoundary name="Price intelligence API keys">
+            <ApiKeysSection />
+          </SectionErrorBoundary>
           <Section title="🔌 Connectors Marketplace">
             <SectionErrorBoundary name="Connectors Marketplace">
               <Suspense fallback={<div className="text-xs text-muted-foreground">Loading…</div>}>

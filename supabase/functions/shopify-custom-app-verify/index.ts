@@ -56,7 +56,9 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const rawDomain: string = body?.shop_domain ?? body?.domain ?? "";
-    const accessToken: string = (body?.access_token ?? "").trim();
+    let accessToken: string = (body?.access_token ?? "").trim();
+    const clientId: string = (body?.client_id ?? "").trim();
+    const clientSecret: string = (body?.client_secret ?? "").trim();
 
     const shop_domain = cleanDomain(rawDomain);
     if (!shop_domain || !shop_domain.endsWith(".myshopify.com")) {
@@ -65,9 +67,44 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    // If no access token, try client_credentials grant (Shopify Dev Dashboard apps)
+    if (!accessToken && clientId && clientSecret) {
+      const tokenRes = await fetch(
+        `https://${shop_domain}/admin/oauth/access_token`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            grant_type: "client_credentials",
+            client_id: clientId,
+            client_secret: clientSecret,
+          }),
+        },
+      );
+      if (!tokenRes.ok) {
+        const errText = await tokenRes.text().catch(() => "");
+        console.error("client_credentials exchange failed", tokenRes.status, errText);
+        return new Response(
+          JSON.stringify({
+            error: `Client credentials rejected (${tokenRes.status}). Check the Client ID, Client Secret, and that the app is installed on this store.`,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const tokenJson = await tokenRes.json().catch(() => ({} as Record<string, unknown>));
+      accessToken = String(tokenJson?.access_token ?? "").trim();
+      if (!accessToken) {
+        return new Response(
+          JSON.stringify({ error: "Shopify did not return an access_token from client_credentials grant." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     if (!accessToken || accessToken.length < 10) {
       return new Response(
-        JSON.stringify({ error: "Missing or invalid Admin API access token" }),
+        JSON.stringify({ error: "Provide either an Admin API access token or client_id + client_secret" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

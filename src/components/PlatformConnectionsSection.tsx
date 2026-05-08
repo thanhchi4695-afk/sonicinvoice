@@ -102,6 +102,9 @@ export default function PlatformConnectionsSection() {
   const [showCustomApp, setShowCustomApp] = useState(false);
   const [customAppDomain, setCustomAppDomain] = useState("");
   const [customAppToken, setCustomAppToken] = useState("");
+  const [customAppMode, setCustomAppMode] = useState<"token" | "client">("token");
+  const [customAppClientId, setCustomAppClientId] = useState("");
+  const [customAppClientSecret, setCustomAppClientSecret] = useState("");
   const [customAppSaving, setCustomAppSaving] = useState(false);
 
   // Lightspeed
@@ -440,18 +443,36 @@ export default function PlatformConnectionsSection() {
   const handleCustomAppSave = async () => {
     const domain = customAppDomain.trim();
     const token = customAppToken.trim();
-    if (!domain || !token) {
-      toast.error("Enter both store domain and access token");
+    const clientId = customAppClientId.trim();
+    const clientSecret = customAppClientSecret.trim();
+
+    if (!domain) {
+      toast.error("Enter your store domain");
       return;
     }
+    if (customAppMode === "token" && !token) {
+      toast.error("Enter the Admin API access token");
+      return;
+    }
+    if (customAppMode === "client" && (!clientId || !clientSecret)) {
+      toast.error("Enter both Client ID and Client Secret");
+      return;
+    }
+
     setCustomAppSaving(true);
     try {
+      const payload: Record<string, string> = { shop_domain: domain };
+      if (customAppMode === "token") {
+        payload.access_token = token;
+      } else {
+        payload.client_id = clientId;
+        payload.client_secret = clientSecret;
+      }
       const { data, error } = await supabase.functions.invoke(
         "shopify-custom-app-verify",
-        { body: { shop_domain: domain, access_token: token } },
+        { body: payload },
       );
       if (error) {
-        // Try to surface the function's JSON error body
         const msg =
           (error as { context?: { body?: string } })?.context?.body ||
           error.message ||
@@ -469,11 +490,12 @@ export default function PlatformConnectionsSection() {
       toast.success(`Connected to ${data.shop_name}`);
       setCustomAppDomain("");
       setCustomAppToken("");
+      setCustomAppClientId("");
+      setCustomAppClientSecret("");
       setShowCustomApp(false);
       void loadAll();
 
-      // Auto-populate catalog cache on first connect so the invoice fast path
-      // works immediately on the user's very first invoice.
+      // Auto-populate catalog cache on first connect
       void (async () => {
         try {
           const { data: { user } } = await supabase.auth.getUser();
@@ -482,7 +504,6 @@ export default function PlatformConnectionsSection() {
             body: {
               user_id: user.id,
               shop_domain: domain,
-              access_token: token,
               mode: "full",
             },
           });
@@ -495,7 +516,7 @@ export default function PlatformConnectionsSection() {
         }
       })();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to verify token");
+      toast.error(err instanceof Error ? err.message : "Failed to verify");
     } finally {
       setCustomAppSaving(false);
     }
@@ -766,25 +787,65 @@ export default function PlatformConnectionsSection() {
                 </button>
                 {showCustomApp && (
                   <div className="space-y-2 mt-2">
+                    <div className="flex gap-1 p-0.5 bg-muted rounded-md">
+                      <button
+                        type="button"
+                        onClick={() => setCustomAppMode("token")}
+                        className={`flex-1 text-[11px] py-1 rounded ${customAppMode === "token" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+                      >
+                        Access Token
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomAppMode("client")}
+                        className={`flex-1 text-[11px] py-1 rounded ${customAppMode === "client" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+                      >
+                        Client ID + Secret
+                      </button>
+                    </div>
                     <Input
                       placeholder="yourstore.myshopify.com"
                       value={customAppDomain}
                       onChange={(e) => setCustomAppDomain(e.target.value)}
                       className="h-8 text-xs"
                     />
-                    <Input
-                      placeholder="shpat_..."
-                      type="password"
-                      value={customAppToken}
-                      onChange={(e) => setCustomAppToken(e.target.value)}
-                      className="h-8 text-xs font-mono"
-                    />
+                    {customAppMode === "token" ? (
+                      <Input
+                        placeholder="shpat_..."
+                        type="password"
+                        value={customAppToken}
+                        onChange={(e) => setCustomAppToken(e.target.value)}
+                        className="h-8 text-xs font-mono"
+                      />
+                    ) : (
+                      <>
+                        <Input
+                          placeholder="Client ID"
+                          value={customAppClientId}
+                          onChange={(e) => setCustomAppClientId(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                        <Input
+                          placeholder="Client Secret"
+                          type="password"
+                          value={customAppClientSecret}
+                          onChange={(e) => setCustomAppClientSecret(e.target.value)}
+                          className="h-8 text-xs font-mono"
+                        />
+                      </>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
                       className="w-full"
                       onClick={handleCustomAppSave}
-                      disabled={customAppSaving || !customAppDomain.trim() || !customAppToken.trim()}
+                      disabled={
+                        customAppSaving ||
+                        !customAppDomain.trim() ||
+                        (customAppMode === "token"
+                          ? !customAppToken.trim()
+                          : !customAppClientId.trim() || !customAppClientSecret.trim())
+                      }
                     >
                       {customAppSaving ? (
                         <Loader2 className="w-3 h-3 mr-1 animate-spin" />
@@ -794,7 +855,9 @@ export default function PlatformConnectionsSection() {
                       Verify & Save
                     </Button>
                     <p className="text-[10px] text-muted-foreground leading-relaxed">
-                      Required scopes: <span className="font-mono">read_products, write_products, read_inventory, write_inventory, read_locations</span>
+                      {customAppMode === "client"
+                        ? "Uses Shopify Dev Dashboard client_credentials grant. App must be installed on the store."
+                        : <>Required scopes: <span className="font-mono">read_products, write_products, read_inventory, write_inventory, read_locations</span></>}
                     </p>
                   </div>
                 )}

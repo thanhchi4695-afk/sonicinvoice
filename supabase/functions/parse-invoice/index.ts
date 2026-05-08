@@ -636,6 +636,8 @@ Deno.serve(async (req) => {
   const inputFilename: string | null = body?.inputFilename || null;
   const inputFileRef: string | null = body?.inputFileRef || null;
   const source: string | null = body?.source || null;
+  const requestedModel: string = typeof body?.claudeModel === "string" ? body.claudeModel : DEFAULT_CLAUDE_MODEL;
+  const claudeModel: string = ALLOWED_CLAUDE_MODELS.has(requestedModel) ? requestedModel : DEFAULT_CLAUDE_MODEL;
 
   if (!fileBase64 || typeof fileBase64 !== "string") {
     return new Response(JSON.stringify({ error: "fileBase64 (string) is required" }), {

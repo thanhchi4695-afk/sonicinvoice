@@ -80,6 +80,12 @@ function formatRelative(iso: string | null): string {
   return `${Math.round(hrs / 24)} d ago`;
 }
 
+function normalizeShopifyDomain(input: string): string {
+  const domain = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!domain) return "";
+  return domain.includes(".myshopify.com") ? domain : `${domain}.myshopify.com`;
+}
+
 export default function PlatformConnectionsSection() {
   const [loading, setLoading] = useState(true);
 
@@ -147,6 +153,17 @@ export default function PlatformConnectionsSection() {
     return () => {
       subscription.unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== "sonic:shopify-connected") return;
+      setShopifyOAuthLoading(false);
+      toast.success("Shopify connected");
+      void loadAll();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   }, []);
 
   // Auto-sync interval
@@ -359,17 +376,32 @@ export default function PlatformConnectionsSection() {
   };
 
   // ── Shopify actions ───────────────────────────────────────
+  const openCustomAppConnect = () => {
+    const domain = normalizeShopifyDomain(shopifyInput);
+    if (!domain) {
+      toast.error("Enter your Shopify store domain first");
+      return;
+    }
+    setCustomAppDomain(domain);
+    setShowCustomApp(true);
+  };
+
   const handleShopifyConnect = async () => {
     if (!shopifyInput.trim()) {
       toast.error("Enter your Shopify store domain first");
       return;
     }
+    const url = normalizeShopifyDomain(shopifyInput);
+    if (url === "splashswimweardarwin.myshopify.com") {
+      openCustomAppConnect();
+      toast.message("Use the Custom App token for this store", {
+        description: "The OAuth install window is only for Shopify App Store installs.",
+      });
+      return;
+    }
     const popup = window.open("", "shopify_oauth", "width=960,height=820");
     setShopifyOAuthLoading(true);
     try {
-      const url = shopifyInput.includes(".myshopify.com")
-        ? shopifyInput.trim()
-        : `${shopifyInput.trim()}.myshopify.com`;
       const installUrl = await Promise.race([
         initiateOAuth(url),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), SHOPIFY_OAUTH_TIMEOUT_MS)),
@@ -705,6 +737,17 @@ export default function PlatformConnectionsSection() {
                 )}
                 Connect Shopify
               </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={openCustomAppConnect}
+                disabled={shopifyOAuthLoading || !shopifyInput.trim()}
+              >
+                <KeyRound className="w-3 h-3 mr-1" />
+                Connect Custom App Token
+              </Button>
               <p className="text-[10px] text-muted-foreground leading-snug">
                 Use this if Sonic Invoice is installed from the Shopify App Store.
                 If your store uses a <strong>Custom App</strong> (created in Settings →
@@ -719,7 +762,7 @@ export default function PlatformConnectionsSection() {
                   className="text-[11px] text-muted-foreground hover:text-foreground hover:underline w-full text-left flex items-center gap-1"
                 >
                   <KeyRound className="w-3 h-3" />
-                  {showCustomApp ? "Hide" : "Connect via Custom App Token (for testing)"}
+                  {showCustomApp ? "Hide token form" : "Show token form"}
                 </button>
                 {showCustomApp && (
                   <div className="space-y-2 mt-2">

@@ -481,9 +481,10 @@ export default function PlatformConnectionsSection() {
         payload.client_id = clientId;
         payload.client_secret = clientSecret;
       }
-      const { data, error } = await supabase.functions.invoke(
-        "shopify-custom-app-verify",
-        { body: payload },
+      const { data, error } = await withRejectingTimeout(
+        supabase.functions.invoke("shopify-custom-app-verify", { body: payload }),
+        CUSTOM_APP_VERIFY_TIMEOUT_MS,
+        "Shopify verification took too long. Please refresh and try again.",
       );
       if (error) {
         const msg =
@@ -501,6 +502,7 @@ export default function PlatformConnectionsSection() {
         throw new Error(data?.error || "Verification failed");
       }
       toast.success(`Connected to ${data.shop_name}`);
+      setCustomAppSaving(false);
       setCustomAppDomain("");
       setCustomAppToken("");
       setCustomAppClientId("");

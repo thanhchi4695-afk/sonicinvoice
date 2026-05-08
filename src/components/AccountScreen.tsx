@@ -465,14 +465,17 @@ function BillingSection() {
 
   const checkBillingStatus = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke("shopify-billing", {
-        body: { action: "status" },
-      });
-      if (!error && data) {
-        setBillingStatus(data);
-      }
-    } catch (err) {
-      // Silently ignore — no Shopify connection yet
+      const timeout = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 5000)
+      );
+      const invoke = supabase.functions
+        .invoke("shopify-billing", { body: { action: "status" } })
+        .then((r) => (r.error ? null : r.data))
+        .catch(() => null);
+      const data = await Promise.race([invoke, timeout]);
+      if (data) setBillingStatus(data as typeof billingStatus);
+    } catch {
+      // ignore — billing check is optional
     } finally {
       setLoading(false);
     }

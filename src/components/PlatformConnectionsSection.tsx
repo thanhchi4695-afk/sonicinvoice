@@ -602,7 +602,11 @@ export default function PlatformConnectionsSection() {
         payload.client_id = clientId;
         payload.client_secret = clientSecret;
       }
-      const data = await verifyCustomAppCredentials(payload);
+      const data = await withRejectingTimeout(
+        verifyCustomAppCredentials(payload),
+        CUSTOM_APP_VERIFY_TIMEOUT_MS,
+        "Verification timed out — check your domain and token and try again",
+      );
       if (!data?.success) {
         throw new Error(data?.error || "Verification failed");
       }

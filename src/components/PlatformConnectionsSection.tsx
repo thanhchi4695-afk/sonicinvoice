@@ -102,6 +102,9 @@ export default function PlatformConnectionsSection() {
   const [showCustomApp, setShowCustomApp] = useState(false);
   const [customAppDomain, setCustomAppDomain] = useState("");
   const [customAppToken, setCustomAppToken] = useState("");
+  const [customAppMode, setCustomAppMode] = useState<"token" | "client">("token");
+  const [customAppClientId, setCustomAppClientId] = useState("");
+  const [customAppClientSecret, setCustomAppClientSecret] = useState("");
   const [customAppSaving, setCustomAppSaving] = useState(false);
 
   // Lightspeed

@@ -348,6 +348,11 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     if (params.get("shopify_connected") === "1") {
       window.history.replaceState({}, "", window.location.pathname);
       setActiveTab("account");
+      toast.success("Shopify connected");
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: "sonic:shopify-connected" }, window.location.origin);
+        window.close();
+      }
     }
   }, []);
 

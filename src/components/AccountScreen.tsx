@@ -95,6 +95,7 @@ const AccountScreen = () => {
   const [markup, setMarkup] = useState("2.35");
   const [rounding, setRounding] = useState("nearest_05");
   const [storeCity, setStoreCity] = useState("");
+  const [storeUrl, setStoreUrl] = useState("");
   const [freeShippingThreshold, setFreeShippingThreshold] = useState("");
   const [industry, setIndustry] = useState(() => getStoreConfig().industry || "clothing");
   const [taxRegion, setTaxRegion] = useState(() => getTaxConfig().regionCode || "AU");
@@ -107,6 +108,7 @@ const AccountScreen = () => {
     setStoreType(cfg.storeType || 'shopify');
     setLsVersion(cfg.lightspeedVersion || 'x_series');
     setStoreCity(cfg.city || '');
+    setStoreUrl(cfg.url || '');
     setFreeShippingThreshold(cfg.freeShippingThreshold || '');
   }, []);
 
@@ -152,7 +154,7 @@ const AccountScreen = () => {
         <TabsContent value="store" className="mt-0 space-y-0">
           <Section title="Store details">
             <Field label="Store name" value={storeName} onChange={setStoreName} placeholder="My Boutique" />
-            <Field label="Store website" placeholder="mystore.com" />
+            <Field label="Store website" value={storeUrl} onChange={setStoreUrl} placeholder="mystore.com" />
             <Field label="City / Location" value={storeCity} onChange={setStoreCity} placeholder="e.g. Darwin NT" />
             <p className="text-[11px] text-muted-foreground -mt-2">Used in product descriptions and SEO meta text.</p>
             <Field label="Free shipping threshold (AUD)" value={freeShippingThreshold} onChange={setFreeShippingThreshold} placeholder="e.g. 150" type="number" />
@@ -289,7 +291,7 @@ const AccountScreen = () => {
 
           <LocationsSection />
 
-          <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); toast.success("Settings saved"); }}>Save settings</Button>
+          <Button variant="teal" className="w-full mt-4 h-12 text-base" onClick={() => { saveStoreConfig({ name: storeName, url: storeUrl, currency, storeType, lightspeedVersion: lsVersion, city: storeCity, freeShippingThreshold }); toast.success("Settings saved"); }}>Save settings</Button>
         </TabsContent>
 
         {/* ─── CONNECTIONS ───────────────────────────────────── */}

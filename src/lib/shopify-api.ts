@@ -1,5 +1,19 @@
 import { supabase } from "@/integrations/supabase/client";
 
+const FUNCTION_TIMEOUT_MS = 12000;
+
+function withFunctionTimeout<T>(promise: PromiseLike<T>, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timed out. Please try again.`)), FUNCTION_TIMEOUT_MS);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 export interface ShopifyConnection {
   id: string;
   store_url: string;
@@ -50,11 +64,15 @@ async function callProxy(body: Record<string, unknown>) {
 }
 
 export async function initiateOAuth(shop: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke("shopify-oauth", {
-    body: { shop },
-  });
+  const { data, error } = await withFunctionTimeout(
+    supabase.functions.invoke("shopify-oauth", {
+      body: { shop },
+    }),
+    "Shopify connection",
+  );
   if (error) throw new Error(error.message || "Failed to start OAuth");
   if (data?.error) throw new Error(data.error);
+  if (!data?.install_url) throw new Error("Shopify did not return an authorization URL");
   return data.install_url;
 }
 

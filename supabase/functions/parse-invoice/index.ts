@@ -6,6 +6,10 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { SONIC_MASTER_PROMPT_V2 } from "../_shared/sonic-master-prompt-v2.ts";
+import {
+  findBrandProfile,
+  autoLearnBrandProfile,
+} from "../_shared/auto-learn-brand-profile.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

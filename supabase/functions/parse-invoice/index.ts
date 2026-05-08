@@ -662,8 +662,53 @@ Deno.serve(async (req) => {
     const brandPattern = await loadBrandPattern(admin, userId, supplierName);
     const brandHints = brandHintsBlock(brandPattern);
 
-    // Stage 1
-    const stage1Rows = await stage1Gemini(fileBase64, mimeType, supplierName, brandHints);
+    // Stage 1 — prefer Claude native PDF extraction (master prompt v2 +
+    // schema-first + validation). Falls back to Gemini for non-PDF inputs
+    // or if Anthropic is unavailable.
+    let stage1Rows: ParsedRow[] = [];
+    let invoiceMeta: InvoiceMeta = { documentType: "unknown" };
+    let validation: { passed: boolean; expected: number | null; actual: number; delta: number; reExtracted: boolean } | null = null;
+    let extractor: "claude-pdf" | "gemini" = "gemini";
+
+    const isPdf = mimeType === "application/pdf";
+    if (isPdf && ANTHROPIC_API_KEY) {
+      try {
+        const claudeOut = await stage1ClaudePdf(fileBase64, mimeType, supplierName, brandHints);
+        invoiceMeta = claudeOut.meta;
+        // Short-circuit packing lists: surface to the user instead of pretending it's an invoice.
+        if (invoiceMeta.documentType === "packing_list") {
+          await admin.from("parse_jobs").update({
+            status: "done",
+            stage1_output: claudeOut.rows,
+            stage2_output: [],
+            stage3_output: [],
+            output_rows: [],
+            error_message: "Document detected as packing list — no cost data. Find the matching tax invoice.",
+          }).eq("id", jobId);
+          return new Response(JSON.stringify({
+            jobId,
+            documentType: "packing_list",
+            warning: "No cost data — find the matching tax invoice.",
+            rows: [],
+            meta: invoiceMeta,
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+        }
+        const validated = await validateAndMaybeReExtract(
+          fileBase64, mimeType, invoiceMeta, claudeOut.rows,
+          SONIC_MASTER_PROMPT_V2 + `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore "Part A/B/C" prose. Call the return_invoice tool exactly once.`,
+        );
+        stage1Rows = validated.rows;
+        validation = validated.validation;
+        extractor = "claude-pdf";
+      } catch (e) {
+        console.warn("[parse-invoice] Claude PDF stage failed, falling back to Gemini:", (e as Error).message);
+      }
+    }
+    if (stage1Rows.length === 0) {
+      stage1Rows = await stage1Gemini(fileBase64, mimeType, supplierName, brandHints);
+      extractor = "gemini";
+    }
+
     const { level: confidence, completeness } = computeConfidence(stage1Rows);
     await admin
       .from("parse_jobs")

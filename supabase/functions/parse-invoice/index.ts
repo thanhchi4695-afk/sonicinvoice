@@ -685,7 +685,7 @@ Deno.serve(async (req) => {
     const isPdf = mimeType === "application/pdf";
     if (isPdf && ANTHROPIC_API_KEY) {
       try {
-        const claudeOut = await stage1ClaudePdf(fileBase64, mimeType, supplierName, brandHints);
+        const claudeOut = await stage1ClaudePdf(fileBase64, mimeType, supplierName, brandHints, claudeModel);
         invoiceMeta = claudeOut.meta;
         // Short-circuit packing lists: surface to the user instead of pretending it's an invoice.
         if (invoiceMeta.documentType === "packing_list") {
@@ -708,6 +708,7 @@ Deno.serve(async (req) => {
         const validated = await validateAndMaybeReExtract(
           fileBase64, mimeType, invoiceMeta, claudeOut.rows,
           SONIC_MASTER_PROMPT_V2 + `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore "Part A/B/C" prose. Call the return_invoice tool exactly once.`,
+          claudeModel,
         );
         stage1Rows = validated.rows;
         validation = validated.validation;

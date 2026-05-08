@@ -155,6 +155,17 @@ export default function PlatformConnectionsSection() {
     };
   }, []);
 
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== "sonic:shopify-connected") return;
+      setShopifyOAuthLoading(false);
+      toast.success("Shopify connected");
+      void loadAll();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   // Auto-sync interval
   useEffect(() => {
     if (intervalRef.current) {

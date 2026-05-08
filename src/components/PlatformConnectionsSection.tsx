@@ -89,13 +89,25 @@ function getStoredAccessToken(): string | null {
 }
 
 async function getCurrentAccessToken(): Promise<string | null> {
+  // Try localStorage first — it's synchronous and instant.
+  const stored = getStoredAccessToken();
+  if (stored) return stored;
+
+  // Fall back to supabase.auth.getSession() with a generous timeout.
   const sessionToken = await withRejectingTimeout(
     supabase.auth.getSession().then(({ data }) => data.session?.access_token || null),
-    CUSTOM_APP_AUTH_LOOKUP_TIMEOUT_MS,
+    8000,
     "Auth lookup timed out",
   ).catch(() => null);
+  if (sessionToken) return sessionToken;
 
-  return sessionToken || getStoredAccessToken();
+  // Last resort — try refreshing the session.
+  try {
+    const { data } = await supabase.auth.refreshSession();
+    return data.session?.access_token || null;
+  } catch {
+    return null;
+  }
 }
 
 async function verifyCustomAppCredentials(payload: CustomAppVerifyPayload): Promise<CustomAppVerifyResponse> {

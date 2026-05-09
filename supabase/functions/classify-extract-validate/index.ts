@@ -1165,3 +1165,52 @@ async function runSonicGrader(opts: {
     };
   }
 }
+
+// ─────── Static SKU-prefix → vendor routing (mirrors src/lib/sku-brand-prefix.ts) ───────
+// Applied server-side immediately after extraction so the grader and the
+// persisted job both see the canonical brand instead of the raw invoice header.
+interface StaticPrefixRule { prefix: string; contains?: string; brand: string; }
+const STATIC_VENDOR_RULES: StaticPrefixRule[] = [
+  { prefix: "JA", brand: "Jantzen" },
+  { prefix: "SS", brand: "Sunseeker" },
+  { prefix: "OB", brand: "Olga Berg" },
+  { prefix: "SL", brand: "Sea Level" },
+  { prefix: "AT", contains: "ND", brand: "Artesands" },
+  { prefix: "AT", contains: "GA", brand: "Bond Eye Aria" },
+  { prefix: "BOUND", brand: "Bond Eye" },
+  { prefix: "LSP", brand: "Le Specs" },
+  { prefix: "CSSB", brand: "Chern'ee Sutton" },
+  { prefix: "SBS", brand: "Smelly Balls" },
+  { prefix: "SBO", brand: "Smelly Balls" },
+  { prefix: "MOSP", brand: "Smelly Balls" },
+  { prefix: "LLSW", brand: "Love Luna" },
+  { prefix: "AMUW", brand: "Ambra" },
+];
+
+function detectBrandFromSkuStatic(sku: string | null | undefined): string | null {
+  if (!sku) return null;
+  const cleaned = String(sku).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (cleaned.length < 3) return null;
+  for (const rule of STATIC_VENDOR_RULES) {
+    if (!cleaned.startsWith(rule.prefix)) continue;
+    if (rule.contains && !cleaned.slice(rule.prefix.length).includes(rule.contains)) continue;
+    return rule.brand;
+  }
+  return null;
+}
+
+function applyStaticVendorRouting<T extends Record<string, unknown>>(products: T[]): T[] {
+  if (!Array.isArray(products)) return products;
+  let routed = 0;
+  for (const p of products) {
+    const sku = (p.sku ?? p.style_code ?? "") as string;
+    const brand = detectBrandFromSkuStatic(sku);
+    if (brand) {
+      (p as Record<string, unknown>).vendor = brand;
+      (p as Record<string, unknown>).brand = brand;
+      routed++;
+    }
+  }
+  if (routed > 0) console.log(`[vendor-routing] applied SKU-prefix vendor to ${routed}/${products.length} products`);
+  return products;
+}

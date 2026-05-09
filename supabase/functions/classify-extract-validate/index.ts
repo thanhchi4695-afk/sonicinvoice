@@ -472,8 +472,11 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
   const parseBody = {
     ...rest,
     fileContent,
+    fileBase64: fileContent,
     fileName,
+    filename: fileName,
     fileType,
+    mimeType: fileType,
     supplierName: supplierName || classification?.supplier_name || undefined,
     invoice_classification: classification ?? undefined,
     supplierSkillsMarkdown: mergedSkills.length > 0 ? mergedSkills : undefined,

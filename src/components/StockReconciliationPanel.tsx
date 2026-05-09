@@ -159,6 +159,47 @@ export function StockReconciliationPanel({
   );
   const [drawerIdx, setDrawerIdx] = useState<number | null>(null);
   const [reclassified, setReclassified] = useState<Record<number, string>>({});
+  const [pricePlan, setPricePlan] = useState<PricePlan | null>(null);
+  const [planRunning, setPlanRunning] = useState(false);
+
+  const runPricePlan = async (
+    refillLines: ReconciliationLine[],
+  ): Promise<PricePlan | null> => {
+    if (refillLines.length === 0) return null;
+    setPlanRunning(true);
+    try {
+      const plan = await planRefillPriceRestore(refillLines);
+      setPricePlan(plan);
+      const s = plan.summary;
+      toast({
+        title: "Sale prices checked",
+        description: `${s.restored} restored · ${s.no_change} no change · ${s.skipped_lower} skipped (lower RRP)`,
+      });
+      return plan;
+    } catch (e) {
+      toast({
+        title: "Price check failed",
+        description: e instanceof Error ? e.message : "Could not fetch Shopify prices",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setPlanRunning(false);
+    }
+  };
+
+  const overridesFromPlan = (
+    plan: PricePlan | null,
+  ): Record<string, { price: number; compareAt: number | null }> => {
+    if (!plan) return {};
+    const out: Record<string, { price: number; compareAt: number | null }> = {};
+    for (const [key, e] of Object.entries(plan.byKey)) {
+      if (e.state === "restored" && e.new_price != null) {
+        out[key] = { price: e.new_price, compareAt: e.new_compare_at };
+      }
+    }
+    return out;
+  };
 
   const drawerLine = drawerIdx != null ? lines[drawerIdx] ?? null : null;
 

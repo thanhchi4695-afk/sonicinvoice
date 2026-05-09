@@ -168,6 +168,29 @@ const ALLOWED_CLAUDE_MODELS = new Set([
   "claude-sonnet-4-20250514",
 ]);
 const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
+const FALLBACK_CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+
+/** Anthropic direct call with automatic 4.6 → 4.5 fallback on unknown-model errors. */
+async function anthropicMessages(body: Record<string, unknown>, model: string): Promise<Response> {
+  const send = (m: string) => fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY!,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ ...body, model: m }),
+  });
+  let resp = await send(model);
+  if (!resp.ok && (resp.status === 404 || resp.status === 400) && model !== FALLBACK_CLAUDE_MODEL) {
+    const t = await resp.clone().text();
+    if (/model/i.test(t)) {
+      console.warn(`[claude] ${model} rejected (${resp.status}) — falling back to ${FALLBACK_CLAUDE_MODEL}`);
+      resp = await send(FALLBACK_CLAUDE_MODEL);
+    }
+  }
+  return resp;
+}
 
 async function callClaudeInvoice(
   contentBlocks: any[],
@@ -175,22 +198,13 @@ async function callClaudeInvoice(
   model: string = DEFAULT_CLAUDE_MODEL,
   maxTokens = 8000,
 ): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      tools: [RETURN_INVOICE_TOOL],
-      tool_choice: { type: "tool", name: "return_invoice" },
-      messages: [{ role: "user", content: contentBlocks }],
-    }),
-  });
+  const resp = await anthropicMessages({
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    tools: [RETURN_INVOICE_TOOL],
+    tool_choice: { type: "tool", name: "return_invoice" },
+    messages: [{ role: "user", content: contentBlocks }],
+  }, model);
   if (!resp.ok) {
     const t = await resp.text();
     if (resp.status === 429) throw new Error("Claude rate limit exceeded. Retry shortly.");
@@ -435,22 +449,13 @@ For each variant, output a Shopify-ready row with these columns:
     },
   ];
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8000,
-      system: systemPrompt,
-      tools,
-      tool_choice: { type: "tool", name: "return_shopify_rows" },
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-  });
+  const resp = await anthropicMessages({
+    max_tokens: 8000,
+    system: systemPrompt,
+    tools,
+    tool_choice: { type: "tool", name: "return_shopify_rows" },
+    messages: [{ role: "user", content: userPrompt }],
+  }, "claude-sonnet-4-6");
 
   if (!resp.ok) {
     const t = await resp.text();

@@ -2810,6 +2810,7 @@ export type Database = {
           input_file_ref: string | null
           input_filename: string | null
           input_mime_type: string | null
+          invoice_number: string | null
           output_rows: Json | null
           shopify_import_result: Json | null
           source: string | null
@@ -2830,6 +2831,7 @@ export type Database = {
           input_file_ref?: string | null
           input_filename?: string | null
           input_mime_type?: string | null
+          invoice_number?: string | null
           output_rows?: Json | null
           shopify_import_result?: Json | null
           source?: string | null
@@ -2850,6 +2852,7 @@ export type Database = {
           input_file_ref?: string | null
           input_filename?: string | null
           input_mime_type?: string | null
+          invoice_number?: string | null
           output_rows?: Json | null
           shopify_import_result?: Json | null
           source?: string | null

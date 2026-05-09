@@ -418,6 +418,22 @@ Detection: supplier contains "We Are Feel Good" or "WAFG", or ABN is 88 627 285 
 
 ---
 
+## GST-FREE BRANDS (AU TAX-LAW EXEMPTIONS)
+
+Some brands ship products that are **GST-free by Australian tax law**, not by accident. The invoice will show `Tax Rate = 0%` or `GST = $0.00` on these lines. Treat them as the legal default — never "correct" them to 10%.
+
+| Brand | What's GST-free | Why |
+|---|---|---|
+| **Love Luna** (via Ambra Corporation) | All period swimwear / period underwear lines | Menstrual product GST exemption (A New Tax System (Goods and Services Tax) Act 1999, Sch 4). |
+| **We Are Feel Good** | Most sunscreens (SPF 30+ therapeutic) | Sunscreen lotion exemption. Lip balms / body milks remain 10%. |
+
+**Parser behaviour:**
+- When the supplier matches a GST-free brand, pass `cost_ex_gst` straight from the printed unit price (it already excludes GST because none is charged).
+- Do NOT add 10% in any "ex-GST → inc-GST" calculation downstream.
+- Mixed-rate invoices (e.g. We Are Feel Good with both sunscreen and lip balm): respect the per-line `Tax Rate` column.
+
+---
+
 ## SEA LEVEL — SECTION HEADERS & DUAL SIZING
 
 When the SKU-prefix override routes a Bond-Eye-letterheaded invoice to Sea Level (SKUs starting `SL` followed by digits):

@@ -7,6 +7,51 @@ import Papa from "papaparse";
 import { matchCollectionsWithBrand } from "./collection-engine";
 import { getPublishStatus, shopifyStatusValue } from "./publish-status";
 import { expandLineBySize } from "./size-run-expander";
+import { detectBrandFromSku } from "./sku-brand-prefix";
+
+// ── Vendor & Type inference at export time ────────────────
+//
+// Two regression fixes that surface in the Shopify export CSV:
+//
+// 1. Vendor field must be the canonical brand (driven by SKU prefix when
+//    available), NOT the raw invoice header (e.g. "Bond-Eye Australia"
+//    becomes "Bond Eye" / "Sea Level" / "Artesands" depending on the SKU).
+// 2. Type column was always falling back to "General" because the master
+//    prompt's category wasn't being pushed into ExportLine.type. We add a
+//    title-driven mapping as a final safety net so swimwear/bikini/dress
+//    products land in the right Shopify Type column even when type is empty.
+
+/** Apply SKU-prefix → canonical brand routing. Falls back to the input
+ *  brand when no rule matches (so the cleaned supplier_profile vendor —
+ *  not the invoice header — wins for non-multi-brand suppliers). */
+function applyVendorRouting(line: ExportLine): ExportLine {
+  const fromSku = detectBrandFromSku(line.sku);
+  if (!fromSku) return line;
+  if ((line.brand || "").trim().toLowerCase() === fromSku.toLowerCase()) return line;
+  return { ...line, brand: fromSku };
+}
+
+/** Title-driven Shopify Type mapping. Applies to ALL brands. Returns the
+ *  existing type unchanged when it's already meaningful (anything other
+ *  than empty / "General" / "Uncategorised"). */
+const TYPE_RULES: Array<{ pattern: RegExp; type: string }> = [
+  // Order matters: more specific patterns first.
+  { pattern: /\b(rashie|rashvest|rash\s*vest|sunsuit)\b/i, type: "Rashies & Sunsuits" },
+  { pattern: /\b(one\s*piece|one[-\s]?pce|1\s*pce|onepiece)\b/i, type: "One Pieces" },
+  { pattern: /\b(brief|bikini\s*pant|bikini\s*bottom|bottom)\b/i, type: "Bikini Bottoms" },
+  { pattern: /\b(balconette|bra\s*top|crop|bandeau|bikini\s*top)\b/i, type: "Bikini Tops" },
+  { pattern: /\b(dress|kaftan|sarong|cover[-\s]?up|coverup)\b/i, type: "Cover Ups" },
+];
+
+function inferProductType(title: string, currentType: string): string {
+  const t = (currentType || "").trim();
+  if (t && !/^(general|uncategori[sz]ed)$/i.test(t)) return t;
+  const name = title || "";
+  for (const rule of TYPE_RULES) {
+    if (rule.pattern.test(name)) return rule.type;
+  }
+  return t || "General";
+}
 
 // ── Types ──────────────────────────────────────────────────
 

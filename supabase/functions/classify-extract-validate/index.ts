@@ -915,9 +915,6 @@ const RETURN_INVOICE_TOOL = {
     },
     required: ["products"],
   },
-  // Cache breakpoint on the last tool — caches tools+system together as one
-  // prefix, comfortably exceeding Anthropic's 1,024-token minimum.
-  cache_control: { type: "ephemeral" },
 } as const;
 
 async function runClaudePdfDirect(opts: {

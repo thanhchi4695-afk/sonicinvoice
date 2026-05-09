@@ -209,7 +209,9 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const handleConnectGmail = async () => {
     setConnecting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("gmail-oauth-start");
+      const { data, error } = await supabase.functions.invoke("gmail-oauth-start", {
+        body: { origin: window.location.origin },
+      });
       if (error) throw error;
       const url = (data as any)?.url;
       if (!url) throw new Error("No OAuth URL returned");

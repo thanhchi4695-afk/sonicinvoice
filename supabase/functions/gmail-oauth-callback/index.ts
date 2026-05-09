@@ -30,10 +30,10 @@ Deno.serve(async (req) => {
   const errorParam = url.searchParams.get("error");
 
   if (errorParam) {
-    return redirect(`${baseFor(state)}/dashboard?gmail=error&reason=${errorParam}`);
+    return redirect(`${returnOrigin}/dashboard?gmail=error&reason=${errorParam}`);
   }
   if (!code || !state) {
-    return redirect(`${APP_BASE_URL}/dashboard?gmail=error&reason=missing_code`);
+    return redirect(`${returnOrigin}/dashboard?gmail=error&reason=missing_code`);
   }
 
   // state may be "<userId>" OR "<userId>|<base64Origin>"
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
   if (!clientId || !clientSecret) {
-    return redirect(`${APP_BASE_URL}/dashboard?gmail=error&reason=missing_secrets`);
+    return redirect(`${returnOrigin}/dashboard?gmail=error&reason=missing_secrets`);
   }
 
   const redirectUri = `${supabaseUrl}/functions/v1/gmail-oauth-callback`;
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     if (!tokenResp.ok) {
       const t = await tokenResp.text();
       console.error("[gmail-oauth-callback] token exchange failed", t);
-      return redirect(`${APP_BASE_URL}/dashboard?gmail=error&reason=token_exchange`);
+      return redirect(`${returnOrigin}/dashboard?gmail=error&reason=token_exchange`);
     }
     const tokens = await tokenResp.json() as {
       access_token: string;
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
       // Likely already authorised previously — Google only returns
       // a refresh_token on the first consent. We force prompt=consent on
       // the auth URL to avoid this, but bail loudly if it ever happens.
-      return redirect(`${APP_BASE_URL}/dashboard?gmail=error&reason=no_refresh_token`);
+      return redirect(`${returnOrigin}/dashboard?gmail=error&reason=no_refresh_token`);
     }
 
     // 2. Get the user's Gmail address
@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
       { headers: { Authorization: `Bearer ${tokens.access_token}` } },
     );
     if (!profileResp.ok) {
-      return redirect(`${APP_BASE_URL}/dashboard?gmail=error&reason=profile_fetch`);
+      return redirect(`${returnOrigin}/dashboard?gmail=error&reason=profile_fetch`);
     }
     const profile = await profileResp.json() as { emailAddress: string };
 
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       .from("gmail_connections")
       .upsert(
         {
-          user_id: state,
+          user_id: userId,
           email_address: profile.emailAddress,
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token,
@@ -121,15 +121,15 @@ Deno.serve(async (req) => {
 
     if (upsertErr) {
       console.error("[gmail-oauth-callback] upsert failed", upsertErr);
-      return redirect(`${APP_BASE_URL}/dashboard?gmail=error&reason=db_write`);
+      return redirect(`${returnOrigin}/dashboard?gmail=error&reason=db_write`);
     }
 
     return redirect(
-      `${APP_BASE_URL}/dashboard?gmail=connected&email=${encodeURIComponent(profile.emailAddress)}`,
+      `${returnOrigin}/dashboard?gmail=connected&email=${encodeURIComponent(profile.emailAddress)}`,
     );
   } catch (err) {
     console.error("[gmail-oauth-callback] error", err);
-    return redirect(`${APP_BASE_URL}/dashboard?gmail=error&reason=exception`);
+    return redirect(`${returnOrigin}/dashboard?gmail=error&reason=exception`);
   }
 });
 

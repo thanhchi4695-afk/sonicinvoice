@@ -460,9 +460,24 @@ export function StockReconciliationPanel({
                 <ExportButton
                   label={`Export ${exportSets.refills.length} stock updates`}
                   colorClass="bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={exportSets.refills.length === 0}
-                  onClick={() => {
-                    const res = exportStockUpdateCsv(exportSets.refills);
+                  disabled={exportSets.refills.length === 0 || planRunning}
+                  onClick={async () => {
+                    // STEP 1-4 of refill price restore: detect sale → plan → log
+                    let plan = pricePlan;
+                    if (!plan) plan = await runPricePlan(exportSets.refills);
+                    if (plan) {
+                      const log = await logPricePlan(plan, { triggered_by: "refill" });
+                      if (log.inserted > 0) {
+                        toast({
+                          title: "Price restorations logged",
+                          description: `${log.inserted} change(s) recorded`,
+                        });
+                      }
+                    }
+                    // STEP 6: export with restored prices baked into the CSV
+                    const res = exportStockUpdateCsv(exportSets.refills, {
+                      priceOverrides: overridesFromPlan(plan),
+                    });
                     toast({ title: "Stock update exported", description: `${res.rowCount} rows · ${res.filename}` });
                     onExport({ ...exportSets, newProducts: [], newVariants: [], all: exportSets.refills });
                   }}
@@ -470,9 +485,22 @@ export function StockReconciliationPanel({
                     <>
                       <p className="font-medium mb-1">Stock update CSV (additive)</p>
                       <p>Adds the received quantities to your current Shopify stock — it does <strong>not</strong> replace existing levels.</p>
+                      <p className="mt-2">If a matched product is currently on sale, its price will be <strong>restored to the invoice RRP</strong> and the sale flag cleared.</p>
                       <p className="mt-2 text-muted-foreground">
                         Import using the <em>Matrixify / Excelify</em> app in <em>additive inventory</em> mode.
                       </p>
+                    </>
+                  }
+                />
+                <ExportButton
+                  label={planRunning ? "Checking…" : "Check sale prices"}
+                  colorClass="bg-slate-200 hover:bg-slate-300 text-slate-800"
+                  disabled={exportSets.refills.length === 0 || planRunning}
+                  onClick={() => runPricePlan(exportSets.refills)}
+                  tooltip={
+                    <>
+                      <p className="font-medium mb-1">Preview price restorations</p>
+                      <p>Fetches the current Shopify price for every refill line and shows which lines will have their sale price restored.</p>
                     </>
                   }
                 />

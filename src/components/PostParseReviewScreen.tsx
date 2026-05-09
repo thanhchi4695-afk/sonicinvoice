@@ -1095,7 +1095,26 @@ export default function PostParseReviewScreen({
         <p className="text-xs text-muted-foreground">Review, fix, and teach the AI before exporting</p>
       </div>
 
-      {/* Summary Panel */}
+      {/* Brand profile status banner — drives Save/Export gating below. */}
+      {brandProfileStatus && isDoNotBook && (
+        <div
+          role="alert"
+          className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive flex items-start gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{buildDoNotBookMessage(brandProfileStatus)}</span>
+        </div>
+      )}
+      {brandProfileStatus && isNeedsEnrichment && (
+        <div
+          role="status"
+          className="mb-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning flex items-start gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{buildNeedsEnrichmentMessage(brandProfileStatus)}</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
         <StatCard label="Total Rows" value={products.length} icon={<FileText className="w-3.5 h-3.5" />} colorClass="text-foreground bg-muted/30 border-border" />
         <StatCard label="Accepted" value={accepted.length} icon={<Check className="w-3.5 h-3.5" />} colorClass="text-success bg-success/10 border-success/20" />

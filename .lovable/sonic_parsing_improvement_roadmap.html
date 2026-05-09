@@ -1,0 +1,147 @@
+
+<style>
+.tab-row{display:flex;gap:4px;margin-bottom:1rem;flex-wrap:wrap;}
+.tab{font-size:13px;padding:6px 14px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;}
+.tab.active{background:var(--color-background-secondary);color:var(--color-text-primary);border-color:var(--color-border-primary);font-weight:500;}
+.panel{display:none;}.panel.active{display:block;}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:10px;}
+.card.done{border-left:3px solid var(--color-border-success);}
+.card.next{border-left:3px solid var(--color-border-info);}
+.card.future{border-left:3px solid var(--color-border-warning);}
+.card.moonshot{border-left:3px solid var(--color-border-secondary);}
+.badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:var(--border-radius-md);font-weight:500;margin-right:6px;}
+.bdone{background:var(--color-background-success);color:var(--color-text-success);}
+.bnext{background:var(--color-background-info);color:var(--color-text-info);}
+.bfut{background:var(--color-background-warning);color:var(--color-text-warning);}
+.bmoon{background:var(--color-background-secondary);color:var(--color-text-secondary);}
+.bdanger{background:var(--color-background-danger);color:var(--color-text-danger);}
+.mono{font-family:var(--font-mono);font-size:12px;background:var(--color-background-secondary);padding:2px 7px;border-radius:4px;}
+.label{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin:1.2rem 0 0.5rem;}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:1rem;}
+.stat{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 12px;text-align:center;}
+.stat-val{font-size:20px;font-weight:500;color:var(--color-text-primary);}
+.stat-label{font-size:11px;color:var(--color-text-secondary);margin-top:2px;}
+.impact-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.pill{font-size:11px;padding:2px 9px;border-radius:20px;border:0.5px solid var(--color-border-secondary);color:var(--color-text-secondary);}
+</style>
+
+<div class="tab-row">
+  <button class="tab active" onclick="show('built')">✅ Already built</button>
+  <button class="tab" onclick="show('next')">🔥 Do next</button>
+  <button class="tab" onclick="show('newai')">🧠 New AI (May 2026)</button>
+  <button class="tab" onclick="show('sequence')">📋 Full sequence</button>
+</div>
+
+<div id="built" class="panel active">
+  <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:1rem">Everything confirmed built in this conversation session today:</p>
+
+  <div class="card done"><span class="badge bdone">Done</span><strong>Native Claude PDF document block extraction</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">Stage 1 uses <span class="mono">stage1ClaudePdf()</span> — sends raw PDF as a native document block to Claude Sonnet, preserving table structure, section headers, and page context. Azure/Gemini stays as fallback for non-PDFs.</p></div>
+
+  <div class="card done"><span class="badge bdone">Done</span><strong>Schema-first extraction via <span class="mono">return_invoice</span> tool</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">Claude must return via a typed tool — one row per size variant, with vendor/productType/specialTags. Forces structured output, not freeform text.</p></div>
+
+  <div class="card done"><span class="badge bdone">Done</span><strong>Validation + auto re-extract loop</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0"><span class="mono">validateAndMaybeReExtract()</span> sums <span class="mono">costPrice × qty</span> vs invoice subtotal. If delta &gt;$1, Claude re-examines the PDF and returns corrected rows.</p></div>
+
+  <div class="card done"><span class="badge bdone">Done</span><strong>Sonic Master Prompt v2 — 42-brand vendor lookup + universal rules</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">Step 0–8 pipeline: document type check → layout detection → vendor routing by SKU prefix → schema extraction → section header logic → multi-brand splitting → validation. Covers all 7 layout types.</p></div>
+
+  <div class="card done"><span class="badge bdone">Done</span><strong>Auto-learn brand profile system</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0"><span class="mono">autoLearnBrandProfile()</span> — fires after every successful parse, generates .md profile via Haiku, upserts to <span class="mono">brand_profiles</span> Supabase table. Confidence grows 5% per invoice.</p></div>
+
+  <div class="card done"><span class="badge bdone">Done</span><strong>Dynamic brand profile injection</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0"><span class="mono">findBrandProfile()</span> — fuzzy supplier lookup at parse time. Loads saved .md profile and appends to system prompt before extraction. 42 brands now in library.</p></div>
+
+  <div class="card done"><span class="badge bdone">Done</span><strong>profile_status column — active / needs_enrichment / do_not_book</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">Blocks cost booking from packing lists and order confirmations. Shows actionable warning in UI. Approved by Lovable today.</p></div>
+
+  <div class="card done"><span class="badge bdone">Done</span><strong>Refill price restoration logic</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">On exact refill, detects if product is on sale, restores full RRP, clears compare_at_price, logs to price_changes table. Non-destructive — never reduces a non-sale price.</p></div>
+
+  <div class="card done"><span class="badge bdone">Done</span><strong>32 brand profiles in Supplier Brain (from Cowork session today)</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">ZIP uploaded, reviewed, quality-passed. Ready to seed into brand_profiles table. Covers Rhythm, Bond Eye, Sea Level, Jantzen, Zoggs, Love Luna, We Are Feel Good + 25 more.</p></div>
+</div>
+
+<div id="next" class="panel">
+  <p class="label">Priority 1 — Close the open loops from today (this week)</p>
+
+  <div class="card next"><span class="badge bnext">Do now</span><strong>Add ANTHROPIC_API_KEY to Supabase secrets + fix PDF MIME routing</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">The Bond Eye invoice showed <span class="mono">azure_layout+llm</span> in the debug — Claude-pdf path is never firing because the API key isn't set. Fix this first or nothing else matters. The Lovable prompt for this was written earlier today.</p>
+  <div class="impact-row"><span class="pill">Unblocks entire Claude pipeline</span><span class="pill">30 min fix</span></div></div>
+
+  <div class="card next"><span class="badge bnext">Do now</span><strong>Seed all 32 Cowork profiles into brand_profiles table</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">Tell Lovable: "Add a batch import function that reads the 32 .md files from the ZIP and upserts them into brand_profiles using the template field mappings." Library goes from 10 to 42 active profiles.</p>
+  <div class="impact-row"><span class="pill">42 brands with specific rules</span><span class="pill">1-2 hour task</span></div></div>
+
+  <div class="card next"><span class="badge bnext">This week</span><strong>Cin7 size-unpacking + Sea Level SKU routing + non-invoice detection</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">The Lovable prompt covering these 5 fixes was written and is ready to send. Fixes Rhythm, We Are Feel Good, TOGS, and the Audi/Wacoal non-invoice problem.</p>
+  <div class="impact-row"><span class="pill">Fixes 6 new brands</span><span class="pill">Prevents garbage from non-invoices</span></div></div>
+
+  <p class="label">Priority 2 — Model upgrade (high value, low effort)</p>
+
+  <div class="card next"><span class="badge bnext">Quick win</span><strong>Upgrade to Claude Sonnet 4.6 model string</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">Lovable wired in <span class="mono">claude-sonnet-4-5-20250929</span>. The current model is <span class="mono">claude-sonnet-4-6</span> — 30-50% faster, 1M token context window now GA at no extra cost. One line change in the edge function.</p>
+  <div class="impact-row"><span class="pill">30-50% faster parsing</span><span class="pill">1M token context included</span><span class="pill">One line change</span></div></div>
+
+  <p class="label">Priority 3 — Prompt caching (immediate cost savings)</p>
+
+  <div class="card next"><span class="badge bnext">This week</span><strong>Add prompt caching to the master prompt + brand profiles</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:6px 0 0">The master prompt (4,000+ tokens) is sent on every invoice. Adding a <span class="mono">cache_control: ephemeral</span> block around it means the first invoice of the day pays full price but every subsequent one costs 90% less for the prompt portion. Same for injected brand profiles — the Bond Eye profile loads once, cached for 5 minutes.</p>
+  <div class="impact-row"><span class="pill">~70% cost reduction per invoice</span><span class="pill">No accuracy change</span><span class="pill">One Lovable prompt</span></div></div>
+</div>
+
+<div id="newai" class="panel">
+  <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:1rem">Three major AI capabilities launched this week (May 6, 2026) that directly apply to Sonic:</p>
+
+  <div class="card future"><span class="badge bfut">Apply now</span><strong>Claude Managed Agents — Dreaming (research preview)</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:8px 0 4px">This is the most important new capability for Sonic's long-term accuracy. <strong>Dreaming is exactly what the auto-learn system is trying to do manually — but automated and better.</strong></p>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:4px 0 4px">What it does: a scheduled background process reviews past invoice parsing sessions, finds patterns across them (recurring mistakes, column names it gets wrong, brands it misidentifies), and updates the agent's memory. Duplicates merged, stale entries replaced, new insights surfaced.</p>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:4px 0 0">For Sonic: instead of manually writing brand profiles after each invoice, dreaming reads all past parse sessions, finds that "SP column = cost for Bond Eye invoices" appears in 4 sessions, and permanently upgrades the Supplier Brain with that knowledge — without you doing anything. <strong>Request access at claude.com/form/claude-managed-agents.</strong></p>
+  <div class="impact-row"><span class="pill">Self-improving parser</span><span class="pill">Finds patterns across 95 invoices</span><span class="pill">Research preview — request access</span></div></div>
+
+  <div class="card future"><span class="badge bfut">Apply this month</span><strong>Claude Managed Agents — Outcomes (public beta)</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:8px 0 4px">You write a rubric describing what a perfect invoice extraction looks like. A separate grader agent evaluates each extraction against that rubric in its own context window — not influenced by the parser's reasoning — and tells it exactly what to fix.</p>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:4px 0 0">For Sonic: the rubric is "every product has a colour, size, cost, vendor; cost × qty matches subtotal; no TESTER rows included; vendor comes from SKU prefix not invoice header." The grader runs after every parse and catches errors the subtotal check misses — like a product with blank colour or wrong vendor. Early adopters report 10-point accuracy improvement. Wisedocs cut document review time 50%.</p>
+  <div class="impact-row"><span class="pill">Catches errors beyond subtotal check</span><span class="pill">Available now — beta header</span><span class="pill">10pt accuracy improvement reported</span></div></div>
+
+  <div class="card future"><span class="badge bfut">Apply this month</span><strong>Claude Managed Agents — Multiagent Orchestration (public beta)</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:8px 0 4px">A lead agent delegates to up to 20 specialist subagents running in parallel. Each subagent focuses on one thing.</p>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:4px 0 0">For Sonic: Lead agent detects supplier + loads profile. Subagent 1 (Haiku) extracts the product rows. Subagent 2 (Haiku) runs the subtotal validation. Subagent 3 (Haiku) generates/updates the brand profile. Subagent 4 (Haiku) checks for non-invoice signals. All in parallel. Multi-page invoices like Rigon (85 lines, 4 pages) split across subagents by page. Total parse time drops dramatically.</p>
+  <div class="impact-row"><span class="pill">Parallel processing</span><span class="pill">Each subagent specialised</span><span class="pill">Available now — beta header</span></div></div>
+
+  <div class="card future"><span class="badge bfut">Background</span><strong>1M token context window — now GA, no surcharge</strong>
+  <p style="font-size:13px;color:var(--color-text-secondary);margin:8px 0 0">As of March 13 2026, 1M token context on Sonnet 4.6 and Opus 4.7 costs the same per-token as 9K. No premium, no beta header. For Sonic: load the entire brand profile library (all 42 profiles) in context for every parse. Claude picks the right one without a separate lookup query.</p>
+  <div class="impact-row"><span class="pill">Entire library in one context</span><span class="pill">No extra cost</span><span class="pill">Already available</span></div></div>
+</div>
+
+<div id="sequence" class="panel">
+  <p class="label">Week 1 — Fix what's broken, unlock what's built</p>
+  <div class="card next"><span class="badge bnext">1</span> Add ANTHROPIC_API_KEY to Supabase → confirms <span class="mono">extractor: claude-pdf</span> in debug</div>
+  <div class="card next"><span class="badge bnext">2</span> Update model string to <span class="mono">claude-sonnet-4-6</span> → 30-50% faster, 1M context</div>
+  <div class="card next"><span class="badge bnext">3</span> Seed 32 Cowork profiles into brand_profiles → 42 active brands</div>
+  <div class="card next"><span class="badge bnext">4</span> Send Cin7 + Sea Level + non-invoice Lovable prompt → fixes Rhythm, TOGS, We Are Feel Good</div>
+  <div class="card next"><span class="badge bnext">5</span> Add prompt caching to master prompt + brand profiles → ~70% cost reduction</div>
+
+  <p class="label">Week 2 — Outcomes rubric (biggest accuracy leap)</p>
+  <div class="card future"><span class="badge bfut">6</span> Implement Claude Managed Agents Outcomes — write the Sonic rubric (colour not blank, vendor from SKU, subtotal match, no TESTER rows, size not blank). Grader runs after every parse. Catches what subtotal check misses.</div>
+  <div class="card future"><span class="badge bfut">7</span> Load all 42 brand profiles into a single 1M-token context block → remove the separate database lookup query, faster cold starts</div>
+
+  <p class="label">Week 3-4 — Multiagent + Dreaming</p>
+  <div class="card future"><span class="badge bfut">8</span> Request dreaming access at claude.com/form/claude-managed-agents. While waiting, migrate the auto-learn system to Claude Managed Agents memory (instead of the custom Supabase brand_profiles table) so it's ready when dreaming goes GA.</div>
+  <div class="card future"><span class="badge bfut">9</span> Implement multiagent orchestration for large invoices (Rigon 85-line 4-pager, Salty Ink 3-pager). Lead agent splits by page, subagents extract in parallel, validator merges results.</div>
+
+  <p class="label">The compounding flywheel after all 9 steps</p>
+  <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:14px 16px;font-size:13px;color:var(--color-text-secondary);line-height:1.8">
+    Every new invoice → parsed by Claude with brand-specific profile → validated by outcomes rubric → grader catches any errors → corrected rows saved → auto-learn updates profile → dreaming reviews all sessions overnight → parser wakes up smarter tomorrow. No human in the loop unless the grader flags a problem.
+  </div>
+</div>
+
+<script>
+function show(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>

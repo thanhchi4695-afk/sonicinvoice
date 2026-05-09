@@ -584,23 +584,61 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
 
   // ─────── STAGE 2B — Claude-PDF direct (Anthropic native) or parse-invoice fallback ───────
   let claudePdfUsed = false;
+  let claudeInvoiceSubtotal: number | null = null;
+  let graderResult: GraderResult | null = null;
+  let graderAttempts = 0;
 
   if (!extraction && preferClaudePdf) {
     try {
-      const claudeProducts = await runClaudePdfDirect({
+      const first = await runClaudePdfDirect({
         fileBase64: String(fileContent),
         supplierName: supplierName || classification?.supplier_name || null,
         skillsMarkdown: mergedSkills,
       });
+      let claudeProducts = first.products;
+      claudeInvoiceSubtotal = first.invoice_subtotal;
+      claudePdfUsed = true;
+      console.log(`[claude-pdf] success: ${claudeProducts.length} products, subtotal=${claudeInvoiceSubtotal}`);
+
+      // Grader loop — max 2 re-extraction attempts.
+      const MAX_REEXTRACT = 2;
+      for (let attempt = 1; attempt <= MAX_REEXTRACT + 1; attempt++) {
+        graderAttempts = attempt;
+        graderResult = await runSonicGrader({
+          products: claudeProducts,
+          invoice_subtotal: claudeInvoiceSubtotal,
+          supplier_hint: supplierName || classification?.supplier_name || null,
+        });
+        console.log(
+          `[grader] attempt=${attempt} score=${graderResult.score} passed=${graderResult.passed} reextract=${graderResult.reextract_needed}`,
+        );
+        if (!graderResult.reextract_needed || attempt > MAX_REEXTRACT) break;
+        try {
+          const retry = await runClaudePdfDirect({
+            fileBase64: String(fileContent),
+            supplierName: supplierName || classification?.supplier_name || null,
+            skillsMarkdown: mergedSkills,
+            reextractReason: graderResult.reextract_reason,
+          });
+          claudeProducts = retry.products;
+          if (retry.invoice_subtotal != null) claudeInvoiceSubtotal = retry.invoice_subtotal;
+          console.log(`[claude-pdf] re-extract attempt ${attempt} → ${claudeProducts.length} products`);
+        } catch (retryErr) {
+          console.warn(`[claude-pdf] re-extract attempt ${attempt} failed:`, retryErr);
+          break;
+        }
+      }
+      if (graderResult) graderResult.attempts = graderAttempts;
+
       extraction = {
         products: claudeProducts,
         supplier: supplierName || classification?.supplier_name || null,
         extractor: "claude-pdf",
+        invoice_subtotal: claudeInvoiceSubtotal,
       };
-      claudePdfUsed = true;
-      console.log(`[claude-pdf] success: ${claudeProducts.length} products`);
     } catch (e) {
       console.error("[claude-pdf] failed:", e instanceof Error ? e.message : String(e));
+      claudePdfUsed = false;
       // Fall through to Azure (if available) or parse-invoice
       if (isPdf && hasAzure) {
         try {

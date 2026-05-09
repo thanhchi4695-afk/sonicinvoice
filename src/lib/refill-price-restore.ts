@@ -68,21 +68,15 @@ interface ShopifyVariantSnapshot {
   compareAt: number | null;
 }
 
-const VARIANT_QUERY = /* GraphQL */ `
-  query VariantBatch($ids: [ID!]!) {
+const PRODUCT_QUERY = /* GraphQL */ `
+  query ProductBatch($ids: [ID!]!) {
     nodes(ids: $ids) {
-      ... on ProductVariant {
+      ... on Product {
         id
-        price
-        compareAtPrice
-        sku
-        product {
-          id
-          title
-          variants(first: 100) {
-            edges {
-              node { id price compareAtPrice }
-            }
+        title
+        variants(first: 100) {
+          edges {
+            node { id sku price compareAtPrice }
           }
         }
       }
@@ -94,48 +88,51 @@ function asGid(prefix: string, id: string): string {
   return id.startsWith("gid://") ? id : `gid://shopify/${prefix}/${id}`;
 }
 
-async function fetchVariantSnapshots(
-  variantIds: string[],
+/**
+ * Fetch full variant snapshots for every supplied product. Indexed by both
+ * variant GID (for direct lookups) and product GID (for sibling resolution
+ * and new_variant lines that don't yet have a variant id).
+ *
+ * Exposed as the optional `_fetcher` argument on `planRefillPriceRestore`
+ * so unit tests can swap in a deterministic in-memory implementation
+ * without mocking the Supabase client.
+ */
+export async function fetchProductSnapshots(
+  productIds: string[],
 ): Promise<{ byVariantId: Record<string, ShopifyVariantSnapshot>; productSiblings: Record<string, ShopifyVariantSnapshot[]> }> {
   const byVariantId: Record<string, ShopifyVariantSnapshot> = {};
   const productSiblings: Record<string, ShopifyVariantSnapshot[]> = {};
-  if (variantIds.length === 0) return { byVariantId, productSiblings };
+  const ids = Array.from(new Set(productIds.map((p) => asGid("Product", p))));
+  if (ids.length === 0) return { byVariantId, productSiblings };
 
-  const ids = variantIds.map((v) => asGid("ProductVariant", v));
-  // Chunk to stay under cost limits — 25 nodes per request.
   for (let i = 0; i < ids.length; i += 25) {
     const chunk = ids.slice(i, i + 25);
     const { data, error } = await supabase.functions.invoke("shopify-proxy", {
-      body: { action: "graphql", query: VARIANT_QUERY, variables: { ids: chunk } },
+      body: { action: "graphql", query: PRODUCT_QUERY, variables: { ids: chunk } },
     });
     if (error) {
-      console.warn("[refill-price-restore] variant fetch failed", error.message);
+      console.warn("[refill-price-restore] product fetch failed", error.message);
       continue;
     }
     const nodes: any[] = data?.nodes ?? data?.data?.nodes ?? [];
     for (const n of nodes) {
       if (!n?.id) continue;
-      const snap: ShopifyVariantSnapshot = {
-        variantId: n.id,
-        productId: n.product?.id ?? "",
-        price: parseFloat(n.price ?? "0"),
-        compareAt: n.compareAtPrice != null ? parseFloat(n.compareAtPrice) : null,
-      };
-      byVariantId[n.id] = snap;
-      const pid = n.product?.id;
-      if (pid && !productSiblings[pid]) {
-        productSiblings[pid] = (n.product.variants?.edges ?? []).map((e: any) => ({
-          variantId: e.node.id,
-          productId: pid,
-          price: parseFloat(e.node.price ?? "0"),
-          compareAt: e.node.compareAtPrice != null ? parseFloat(e.node.compareAtPrice) : null,
-        }));
-      }
+      const pid = n.id as string;
+      const sibs: ShopifyVariantSnapshot[] = (n.variants?.edges ?? []).map((e: any) => ({
+        variantId: e.node.id,
+        productId: pid,
+        price: parseFloat(e.node.price ?? "0"),
+        compareAt: e.node.compareAtPrice != null ? parseFloat(e.node.compareAtPrice) : null,
+      }));
+      productSiblings[pid] = sibs;
+      for (const v of sibs) byVariantId[v.variantId] = v;
     }
-    await new Promise((r) => setTimeout(r, 500)); // rate-limit per project memory
+    if (i + 25 < ids.length) await new Promise((r) => setTimeout(r, 500));
   }
   return { byVariantId, productSiblings };
 }
+
+export type SnapshotFetcher = typeof fetchProductSnapshots;
 
 function isOnSale(snap: ShopifyVariantSnapshot, invoiceRrp: number | null): boolean {
   // compare_at quirk: equal to price → not on sale

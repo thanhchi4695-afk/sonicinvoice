@@ -989,6 +989,10 @@ async function runClaudePdfDirect(opts: {
           {
             type: "document",
             source: { type: "base64", media_type: "application/pdf", data: fileBase64 },
+            // Cache breakpoint on the PDF — it's the largest static block
+            // (~3,500+ tokens), well above Anthropic's 1,024-token minimum.
+            // Tools + system get cached as part of the same prefix.
+            cache_control: { type: "ephemeral" },
           },
           { type: "text", text: userPrompt },
         ],

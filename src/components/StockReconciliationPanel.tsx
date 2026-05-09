@@ -772,6 +772,37 @@ function LineRow({
             </div>
           )}
 
+          {priceEntry && (isRefill || isNewVariant) && (
+            <div className="mt-2 text-xs">
+              {priceEntry.state === "restored" && priceEntry.new_price != null && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/15 text-amber-700 border border-amber-500/30">
+                  🟡 Price: ${priceEntry.current_price?.toFixed(2)} → ${priceEntry.new_price.toFixed(2)} (restored from sale)
+                  {priceEntry.sibling_variants && priceEntry.sibling_variants.length > 0 && (
+                    <span className="text-muted-foreground"> · +{priceEntry.sibling_variants.length} sibling{priceEntry.sibling_variants.length === 1 ? "" : "s"}</span>
+                  )}
+                </span>
+              )}
+              {priceEntry.state === "no_change" && priceEntry.current_price != null && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 border border-emerald-500/30">
+                  ✅ Price: ${priceEntry.current_price.toFixed(2)} (no change)
+                </span>
+              )}
+              {priceEntry.state === "skipped_no_rrp" && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-500/10 text-sky-700 border border-sky-500/30">
+                  🔵 RRP not on invoice — apply pricing rules
+                </span>
+              )}
+              {priceEntry.state === "skipped_lower" && priceEntry.warning && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/30">
+                  ⚠ {priceEntry.warning}
+                </span>
+              )}
+              {priceEntry.state === "skipped_no_match" && (
+                <span className="text-muted-foreground">Price check skipped — no Shopify match</span>
+              )}
+            </div>
+          )}
+
           {isNewVariant && matchedProductLabel && (
             <div className="mt-2 text-xs flex items-center gap-1 text-muted-foreground">
               <span>Adding to:</span>

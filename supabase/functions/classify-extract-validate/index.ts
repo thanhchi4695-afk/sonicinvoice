@@ -736,7 +736,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     products: validatedProducts,
     classification,
     classification_source: classification?._source ?? "missing",
-    extractor_used: azureUsed ? "azure_layout+llm" : "parse-invoice",
+    extractor_used: azureUsed ? "azure_layout+llm" : (claudePdfUsed ? "claude-pdf" : "parse-invoice"),
     validation_summary: validationSummary,
     multi_brand_split: multiBrandSplit,
     filename_mismatch: filenameMismatch,

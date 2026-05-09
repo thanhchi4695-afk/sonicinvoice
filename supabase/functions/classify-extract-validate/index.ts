@@ -868,6 +868,8 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     distributor_match: distributorMatch,
     grader_result: graderResult,
     invoice_subtotal: claudeInvoiceSubtotal,
+    cache_creation_tokens: cacheCreationTokens,
+    cache_read_tokens: cacheReadTokens,
   };
 }
 

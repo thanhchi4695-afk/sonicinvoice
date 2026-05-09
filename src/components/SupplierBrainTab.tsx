@@ -219,7 +219,7 @@ export default function SupplierBrainTab() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: si }, { data: sh }, { data: sp }, contribFlag] = await Promise.all([
+    const [{ data: si }, { data: sh }, { data: sp }, { data: bp }, contribFlag] = await Promise.all([
       supabase.from("supplier_intelligence")
         .select("id, supplier_name, detected_pattern, confidence_score, invoice_count, last_correction_rate, is_shared_origin, column_map, last_invoice_date")
         .order("invoice_count", { ascending: false }),
@@ -227,6 +227,8 @@ export default function SupplierBrainTab() {
         .select("supplier_name, contributing_users, total_invoices_processed, is_verified"),
       supabase.from("supplier_profiles")
         .select("supplier_name, lead_time_days, restock_period_days, default_restock_status, supplier_email, payment_terms, contact_name, portal_url"),
+      supabase.from("brand_profiles")
+        .select("supplier_key, supplier_name, shopify_vendor, profile_status"),
       getContributeShared(),
     ]);
     setRows((si || []) as SupplierRow[]);
@@ -244,9 +246,28 @@ export default function SupplierBrainTab() {
       };
     }
     setOpsData(opsMap);
+
+    // Build status lookup keyed by every reasonable name variant.
+    const statusMap = new Map<string, ProfileStatus>();
+    type BP = { supplier_key: string; supplier_name: string; shopify_vendor: string | null; profile_status: ProfileStatus };
+    for (const b of (bp || []) as BP[]) {
+      const status = (b.profile_status || "active") as ProfileStatus;
+      const keys = [b.supplier_key, b.supplier_name, b.shopify_vendor || ""]
+        .filter(Boolean)
+        .map((k) => k!.trim().toLowerCase());
+      for (const k of keys) statusMap.set(k, status);
+    }
+    setProfileStatusMap(statusMap);
+
     setContribute(contribFlag);
     setLoading(false);
   };
+
+  const lookupStatus = (name: string | null | undefined): ProfileStatus | null => {
+    if (!name) return null;
+    return profileStatusMap.get(name.trim().toLowerCase()) ?? null;
+  };
+
 
   const getOps = (name: string): OpsFields => opsData[name] || EMPTY_OPS;
   const updateOps = (name: string, patch: Partial<OpsFields>) => {

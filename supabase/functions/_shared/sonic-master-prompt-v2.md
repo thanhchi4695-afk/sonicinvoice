@@ -12,7 +12,7 @@ const response = await fetch("https://api.anthropic.com/v1/messages", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: 4000,
     system: SONIC_MASTER_PROMPT_V2,
     messages: [{

@@ -3,21 +3,26 @@
 
 export const INVOICE_PARSER_MODELS = [
   {
+    id: "claude-sonnet-4-6",
+    label: "Sonnet 4.6 (project default)",
+    description: "Latest Sonnet — ~30-50% faster, 1M context, near-Opus reasoning at Sonnet pricing.",
+  },
+  {
     id: "claude-sonnet-4-5-20250929",
-    label: "Sonnet 4.5 (project default)",
-    description: "Newer, generally better at PDF reading. Recommended.",
+    label: "Sonnet 4.5 (fallback)",
+    description: "Previous default. Used automatically if 4.6 is unreachable.",
   },
   {
     id: "claude-sonnet-4-20250514",
-    label: "Sonnet 4 (master prompt example)",
-    description: "Matches the model in the Sonic Master Prompt v2 example.",
+    label: "Sonnet 4 (legacy)",
+    description: "Older snapshot. Kept for reproducing prior runs.",
   },
 ] as const;
 
 export type InvoiceParserModelId = (typeof INVOICE_PARSER_MODELS)[number]["id"];
 
 const STORAGE_KEY = "sonic.invoiceParserClaudeModel";
-export const DEFAULT_INVOICE_PARSER_MODEL: InvoiceParserModelId = "claude-sonnet-4-5-20250929";
+export const DEFAULT_INVOICE_PARSER_MODEL: InvoiceParserModelId = "claude-sonnet-4-6";
 
 export function getInvoiceParserModel(): InvoiceParserModelId {
   if (typeof window === "undefined") return DEFAULT_INVOICE_PARSER_MODEL;

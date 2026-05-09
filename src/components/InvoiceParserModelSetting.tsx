@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 
 export function InvoiceParserModelSetting() {
-  const [model, setModel] = useState<InvoiceParserModelId>("claude-sonnet-4-5-20250929");
+  const [model, setModel] = useState<InvoiceParserModelId>("claude-sonnet-4-6");
   useEffect(() => {
     setModel(getInvoiceParserModel());
   }, []);

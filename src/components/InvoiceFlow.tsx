@@ -3680,6 +3680,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           vendor: group.brand,
           type: group.type,
           brandWebsite,
+          styleNumber: (group as any).vendorCode || (group as any).styleGroup || '',
           storeName,
           storeCity,
           customInstructions: customInstr,
@@ -3701,7 +3702,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         origin: result.origin || undefined,
         productPageUrl: result.productPageUrl || '',
         enrichConfidence: result.confidence || 'low',
-        enrichNote: result.note || '',
+        enrichNote: result.imageSource === 'cascade'
+          ? `${result.note || 'Real images via ' + (result.imageStrategy || 'cascade')}`
+          : (result.note || ''),
       };
     } catch (e) {
       return { enrichConfidence: 'low', enrichNote: e instanceof Error ? e.message : 'Network error' };

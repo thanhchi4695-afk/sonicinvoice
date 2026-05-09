@@ -482,15 +482,40 @@ export default function SupplierBrainTab() {
         </div>
       ) : (
         <div className="space-y-2">
-          {rows.map(r => {
+          {/* Profile-status filter */}
+          <div className="flex items-center justify-end gap-2 text-xs">
+            <Label className="text-muted-foreground">Profile status:</Label>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+              <SelectTrigger className="w-44 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="needs_enrichment">Needs enrichment</SelectItem>
+                <SelectItem value="do_not_book">Do not book</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {rows
+            .filter((r) => {
+              if (statusFilter === "all") return true;
+              const s = lookupStatus(r.supplier_name) ?? "active";
+              return s === statusFilter;
+            })
+            .map(r => {
             const tone = confidenceTone(r.confidence_score);
             const pattern = r.detected_pattern as InvoicePattern | null;
+            const profileStatus = lookupStatus(r.supplier_name);
             return (
               <Card key={r.id} className="p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold truncate">{r.supplier_name}</p>
+                      {profileStatus && (
+                        <Badge variant="outline" className={`text-[10px] ${statusBadgeClasses(profileStatus)}`}>
+                          {statusLabel(profileStatus)}
+                        </Badge>
+                      )}
                       {pattern && (
                         <Badge variant="outline" className="text-[10px]">
                           Pattern {pattern} · {PATTERN_LABEL[pattern] || "Unknown"}

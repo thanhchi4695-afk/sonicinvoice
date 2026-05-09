@@ -27,6 +27,12 @@ import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTrace
 import SizeGridEditor from "@/components/SizeGridEditor";
 import InvoiceDebugOverlay from "@/components/InvoiceDebugOverlay";
 import FieldConfidenceHeader, { lowConfidenceFieldNames } from "@/components/FieldConfidenceHeader";
+import {
+  fetchBrandProfileStatus,
+  buildDoNotBookMessage,
+  buildNeedsEnrichmentMessage,
+  type BrandProfileStatusInfo,
+} from "@/lib/brand-profile-status";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;
@@ -298,6 +304,19 @@ export default function PostParseReviewScreen({
     try { return localStorage.getItem("sonic_auto_refine_profile") !== "false"; } catch { return true; }
   });
   const [autoPublishing, setAutoPublishing] = useState(false);
+
+  // Brand profile status — drives the banners + Save/Export gating below.
+  const [brandProfileStatus, setBrandProfileStatus] = useState<BrandProfileStatusInfo | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!supplierName) { setBrandProfileStatus(null); return; }
+    fetchBrandProfileStatus(supplierName)
+      .then((info) => { if (!cancelled) setBrandProfileStatus(info); })
+      .catch(() => { if (!cancelled) setBrandProfileStatus(null); });
+    return () => { cancelled = true; };
+  }, [supplierName]);
+  const isDoNotBook = brandProfileStatus?.profile_status === "do_not_book";
+  const isNeedsEnrichment = brandProfileStatus?.profile_status === "needs_enrichment";
 
   async function handleAutoPublish() {
     if (!watchdogRun?.runId) return;
@@ -1076,7 +1095,26 @@ export default function PostParseReviewScreen({
         <p className="text-xs text-muted-foreground">Review, fix, and teach the AI before exporting</p>
       </div>
 
-      {/* Summary Panel */}
+      {/* Brand profile status banner — drives Save/Export gating below. */}
+      {brandProfileStatus && isDoNotBook && (
+        <div
+          role="alert"
+          className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive flex items-start gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{buildDoNotBookMessage(brandProfileStatus)}</span>
+        </div>
+      )}
+      {brandProfileStatus && isNeedsEnrichment && (
+        <div
+          role="status"
+          className="mb-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning flex items-start gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{buildNeedsEnrichmentMessage(brandProfileStatus)}</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
         <StatCard label="Total Rows" value={products.length} icon={<FileText className="w-3.5 h-3.5" />} colorClass="text-foreground bg-muted/30 border-border" />
         <StatCard label="Accepted" value={accepted.length} icon={<Check className="w-3.5 h-3.5" />} colorClass="text-success bg-success/10 border-success/20" />
@@ -1816,7 +1854,14 @@ export default function PostParseReviewScreen({
           <Button variant="outline" size="sm" onClick={onBack} className="gap-1">
             <ChevronDown className="w-3.5 h-3.5 rotate-90" /> Back
           </Button>
-          <Button variant="outline" size="sm" onClick={handleSaveToCatalog} className="gap-1" disabled={savingToCatalog}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSaveToCatalog}
+            className="gap-1"
+            disabled={savingToCatalog || isDoNotBook}
+            title={isDoNotBook ? "Blocked — supplier profile is set to do_not_book" : undefined}
+          >
             <Package className="w-3.5 h-3.5" />
             {savingToCatalog ? "Saving…" : savedToCatalog ? "✅ Saved to catalog" : "Save to Catalog"}
           </Button>
@@ -1831,10 +1876,24 @@ export default function PostParseReviewScreen({
               <FileText className="w-3.5 h-3.5" /> Get Descriptions
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handleExportClick} className="gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportClick}
+            className="gap-1"
+            disabled={isDoNotBook}
+            title={isDoNotBook ? "Blocked — supplier profile is set to do_not_book" : undefined}
+          >
             <Download className="w-3.5 h-3.5" /> Export Accepted ({accepted.length})
           </Button>
-          <Button variant="teal" size="sm" onClick={() => { triggerProfileUpdate(); if (needsReview.length > 0) setShowExportWarning(true); else onPushToShopify(); }} className="gap-1">
+          <Button
+            variant="teal"
+            size="sm"
+            onClick={() => { triggerProfileUpdate(); if (needsReview.length > 0) setShowExportWarning(true); else onPushToShopify(); }}
+            className="gap-1"
+            disabled={isDoNotBook}
+            title={isDoNotBook ? "Blocked — supplier profile is set to do_not_book" : undefined}
+          >
             <ArrowUpRight className="w-3.5 h-3.5" /> Push to Shopify ({accepted.length})
           </Button>
           {watchdogRun && watchdogRun.autoPublishEligible && (

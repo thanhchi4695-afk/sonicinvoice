@@ -29,6 +29,7 @@ import { getStoreLocations } from "@/components/AccountScreen";
 import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCount, type InventoryItem } from "@/lib/inventory-sim";
 import { addAuditEntry } from "@/lib/audit-log";
 import { normaliseVendor } from "@/lib/normalise-vendor";
+import { getBrandDirectory, matchVendor, addBrand, updateBrand, type BrandDirectoryEntry } from "@/lib/brand-directory";
 import { calculateConfidence, type ConfidenceBreakdown, type ConfidenceLevel, getConfidenceLabel } from "@/lib/confidence";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource } from "@/lib/barcode-catalog";
@@ -550,6 +551,82 @@ const MatchSourceBadge = ({ source, barcode }: { source: MatchSource; barcode?: 
     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium border ${c.cls}`} title={barcode ? `Barcode: ${barcode}` : undefined}>
       {c.icon} {c.label}
     </span>
+  );
+};
+
+// ── Inline editor for adding/updating a brand website from the
+//    "missing website" warning banner shown above Enrich-all.
+const MissingBrandRow = ({
+  brandName,
+  onSaved,
+  onSkip,
+}: {
+  brandName: string;
+  onSaved: () => void;
+  onSkip: () => void;
+}) => {
+  const [website, setWebsite] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    const cleaned = website.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "").toLowerCase();
+    if (!cleaned || !/[a-z0-9]\.[a-z]{2,}/i.test(cleaned)) return;
+    setSaving(true);
+    try {
+      const existing = matchVendor(brandName);
+      if (existing) {
+        updateBrand(existing.brand.id, {
+          website: cleaned,
+          status: existing.brand.status === 'system' ? existing.brand.status : 'custom',
+        });
+      } else {
+        addBrand({
+          name: brandName,
+          aliases: [],
+          website: cleaned,
+          category: 'general',
+          industry: 'general',
+          country: 'AU',
+          tag: brandName.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim(),
+          status: 'custom',
+          notes: '',
+          addedBy: 'user',
+        });
+      }
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 bg-card/50 rounded px-2 py-1.5 border border-border/50">
+      <span className="text-xs font-medium min-w-[110px] truncate" title={brandName}>{brandName}</span>
+      <input
+        type="text"
+        value={website}
+        onChange={(e) => setWebsite(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
+        placeholder="brand-website.com"
+        className="flex-1 text-xs bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+      <button
+        type="button"
+        onClick={save}
+        disabled={saving || !website.trim()}
+        className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+      <button
+        type="button"
+        onClick={onSkip}
+        className="text-xs px-2 py-1 rounded text-muted-foreground hover:text-foreground"
+        title="Skip — accept LLM-image fallback for this brand"
+      >
+        Skip
+      </button>
+    </div>
   );
 };
 
@@ -1804,7 +1881,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     } finally {
       setPushingShopify(false);
     }
-  };
+};
 
 
   const handleDriveListFiles = async () => {
@@ -3230,6 +3307,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [enrichAllRunning, setEnrichAllRunning] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
+  const [brandDirVersion, setBrandDirVersion] = useState(0);
+  const [dismissedMissingBrands, setDismissedMissingBrands] = useState<Set<string>>(new Set());
   const [validationDebug, setValidationDebug] = useState<ValidationDebugInfo | null>(null);
   const [validatedProducts, setValidatedProducts] = useState<ValidatedProduct[]>([]);
   // ── Brain Mode (5-stage pipeline) state — only populated when toggle is ON ──
@@ -3664,10 +3743,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const storeCity = storeConfig.city || '';
       const customInstr = storeConfig.defaultInstructions || '';
       
-      // Look up brand website from brand directory
-      const brandDir = JSON.parse(localStorage.getItem('brand_directory_sonic_invoice') || '[]');
-      const brandEntry = brandDir.find((b: any) => b.name.toLowerCase() === group.brand.toLowerCase());
-      const brandWebsite = brandEntry?.website || '';
+      // Look up brand website from brand directory (alias-aware)
+      const brandMatch = matchVendor(group.brand);
+      const brandWebsite = brandMatch?.brand.website || '';
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-product`, {
         method: 'POST',
@@ -5340,6 +5418,59 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
               </button>
             )}
           </div>
+
+          {/* Brand-website validation banner — warns when image fetch will fall back to LLM */}
+          {(() => {
+            // Re-evaluate when directory version changes
+            void brandDirVersion;
+            const seen = new Set<string>();
+            const missing: string[] = [];
+            for (const g of productGroups) {
+              const name = (g.brand || '').trim();
+              if (!name) continue;
+              const key = name.toLowerCase();
+              if (seen.has(key)) continue;
+              seen.add(key);
+              if (dismissedMissingBrands.has(key)) continue;
+              const m = matchVendor(name);
+              if (!m || !m.brand.website || !m.brand.website.trim()) {
+                missing.push(name);
+              }
+            }
+            if (missing.length === 0) return null;
+            return (
+              <div className="bg-warning/10 border border-warning/40 rounded-lg p-3 mb-3">
+                <div className="flex items-start gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-warning">
+                      {missing.length} supplier brand{missing.length > 1 ? 's' : ''} missing a website
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">
+                      Image fetching will fall back to LLM-suggested URLs (less reliable). Add the brand's official site below to enable the JSON-LD → DOM → LLM cascade used by URL Importer.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-1.5 mt-2">
+                  {missing.map((brandName) => (
+                    <MissingBrandRow
+                      key={brandName}
+                      brandName={brandName}
+                      onSaved={() => setBrandDirVersion(v => v + 1)}
+                      onSkip={() => {
+                        const k = brandName.toLowerCase();
+                        setDismissedMissingBrands(prev => {
+                          const next = new Set(prev);
+                          next.add(k);
+                          return next;
+                        });
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Enrichment status bar */}
           {(() => {

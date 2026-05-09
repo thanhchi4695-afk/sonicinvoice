@@ -15,14 +15,22 @@ First, determine what kind of document this is. Look at the header and footer ca
 |---|---|---|
 | "Tax Invoice" in header + Price/Rate column + GST/Total in footer | ✅ Tax invoice | Proceed with extraction |
 | "Packing List" / "PL No." / "Delivery Note" / "Picking Slip" in header | ❌ Packing list | STOP — report document type, extract product names and qtys only (no cost data available) |
+| "PACKING LIST" header AND "PPS Number" / "Box Number" (Wacoal / Freya format) | ❌ Packing list | STOP — same as above |
 | Total column contains kg weights (e.g. "0.450") not dollar amounts | ❌ Packing list | STOP — same as above |
 | No Price, Rate, Cost, or Wholesale column visible | ❌ Packing list or order confirmation | STOP — same as above |
 | "Credit Note" / "Credit Memo" in header | ⚠️ Credit note | Extract as negative quantities |
 | "Quote" / "Proforma Invoice" | ⚠️ Not a final invoice | Flag — costs may not be final |
+| "Certificate of Registration" + "Motor Vehicle Registry" / "Number Plate" | ❌ Vehicle registration | STOP — return document_type: vehicle_registration, action: discard |
+| Sky Gazer document with no price column | ❌ Order confirmation | STOP — return document_type: order_confirmation |
 
 If this is a packing list, stop extraction and return:
 \`\`\`json
 { "document_type": "packing_list", "supplier": "...", "products": [{"style_name": "...", "style_number": "...", "qty": 0}], "warning": "No cost data available — find matching tax invoice" }
+\`\`\`
+
+For non-invoice documents (vehicle registration, order confirmations without prices, etc.), STOP and return:
+\`\`\`json
+{ "document_type": "vehicle_registration", "supplier": "...", "warning": "Not a supplier invoice — no products to extract.", "action": "discard" }
 \`\`\`
 
 ---
@@ -54,7 +62,10 @@ Suppliers often invoice under a legal/parent company name that differs from the 
 
 | Invoice header says | Shopify Vendor | Notes |
 |---|---|---|
-| Bond-Eye Australia / Bond-Eye Australia Pty Ltd | Bond Eye | SL#### style codes — NOT Sea Level |
+| Bond-Eye Australia / Bond-Eye Australia Pty Ltd | Bond Eye OR Sea Level | **SKU-prefix override**: SKUs starting \`SL\` followed by digits (e.g. SL1205ECO, SL4015ECO) → vendor = Sea Level. SKUs starting \`BOUND\` (e.g. BOUND633R) → vendor = Bond Eye. The SKU prefix wins over the invoice header. |
+| We Are Feel Good / WAFG / ABN 88 627 285 296 | We Are Feel Good | Sunscreen / skincare. See brand-specific rules below. |
+| Rhythm Group / Cin7 invoice (URL contains go.cin7.com) for Rhythm | Rhythm Womens or Rhythm Mens | See Cin7 format handling below. |
+| The Commonfolk (Cin7 invoice) | The Commonfolk | See Cin7 format handling below. |
 | Skye Group Pty Ltd | Jantzen | Always — Jantzen is distributed by Skye Group |
 | Ambra Corporation Pty Ltd | Ambra or Love Luna | LLSW prefix = Love Luna; AMUW prefix = Ambra |
 | HEAD OCEANIA PTY LIMITED | Zoggs | A Division of HEAD |
@@ -323,9 +334,61 @@ Return in this exact structure:
 | Jets invoiced by Seafolly Pty Ltd | Vendor = Jets (not Seafolly) |
 | Style "KOSCUSZKIO" (Nude Footwear) | Title Case = "Kosciuszko" — brand uses Australian geography names |
 | "STOCK TESTER" or "-ST" SKU suffix | Skip row entirely |
+| WAFG row where SKU starts \`TEST\` OR description contains "Tester" / "TESTER" OR RRP = 0.00 | Skip — display tester, not sellable inventory |
+
+---
+
+## CIN7 FORMAT HANDLING (Rhythm, The Commonfolk, We Are Feel Good when Cin7-generated)
+
+**Detection signals:** the document footer / a URL contains \`go.cin7.com\`, OR each product is rendered as a self-contained block (no traditional table headers) of the form:
+
+\`\`\`
+[Total Qty]  [SKU]  [Item Name]  [Colour]  [Unit Price]  [Subtotal]
+             [Colour code]
+             Size: 1S 2M 3L 4XL 5XXL
+             Qty:  300
+\`\`\`
+
+**How to parse a Cin7 block:**
+1. Read the \`Size:\` line — those are the size labels in order (the leading digit is a position index, ignore it; treat \`1S\` as \`S\`, \`2M\` as \`M\`, etc.).
+2. Read the \`Qty:\` line. If it is a single multi-digit run with no spaces (e.g. \`300\`, \`60\`, \`0\`), each digit is the quantity for the corresponding size position (S=3, M=0, L=0, XL=0, XXL=0). If it shows space-separated numbers, pair each number with its size in order.
+3. Skip any (size, qty) pair where qty = 0 or blank.
+4. Emit one output row per remaining (size, qty) pair. Unit Price is per item ex-GST, applied to every row.
+5. **Reconciliation rule**: sum \`qty × unit_price\` for the rows you emitted. If this does NOT equal the line subtotal within $0.10, collapse to a single row with \`size = "Assorted"\`, \`qty = total_qty\`, and add flag \`"Cin7 size split unclear — manual review needed"\`.
+6. If \`Qty:\` is just \`0\` with no further breakdown, emit a single row with \`size = "Assorted"\`, \`qty = total_qty\` and the same flag.
+
+**Cin7 SKU decoding for Rhythm** (pattern \`[SEASON]-[CATEGORY]-[COLOUR]\`):
+- \`0725M\` = Jul 2025 Mens season prefix.
+- Categories: \`HW\`=Headwear, \`JA\`=Jams/Boardshorts, \`PT\`=Printed Tee, \`WT\`=Woven Top.
+- Last segment = colour code (BLK=Black, SAN=Sand, NAT=Natural, TOB=Tobacco, SFM=Seafoam, DRE=Dusty Rose, etc.).
+- Numeric waist sizes (28/30/32/33/34/36) = men's boardshort sizing; letter sizes = clothing sizing.
+
+---
+
+## WE ARE FEEL GOOD — BRAND-SPECIFIC RULES
+
+Detection: supplier contains "We Are Feel Good" or "WAFG", or ABN is 88 627 285 296.
+
+- **Sub Total is GST-inclusive.** When validating, compare \`sum(unit_price × qty)\` against \`Sub Total ÷ 1.1\`, NOT the raw Sub Total.
+- **Unit Price is always ex-GST per individual unit** — use it directly as \`cost_ex_gst\`. Ignore the per-row Tax Rate column for cost extraction (the figure shown is already ex-GST regardless of whether the row prints 10% or 0%).
+- **Pack pricing**: lines like "Coconut Sunscreen Lotion SPF50+ 75ml 12 Pack" with \`Qty=12, Unit Price=$10.00\` mean buy 12 units at $10.00 each. The "12 Pack" describes the retail shelf format. **Do NOT divide unit price by 12.** Import as \`qty=12, cost_ex_gst=10.00\`.
+- **Skip TESTER rows entirely**: any row where SKU starts \`TEST\`, OR description contains "Tester"/"TESTER", OR RRP = 0.00. Do not emit Shopify products for them.
+- All products are \`size = "One Size"\` (no size variants).
+- Vendor = \`We Are Feel Good\`. Product type = Sunscreen / Skincare / Lip Balm based on description.
+
+---
+
+## SEA LEVEL — SECTION HEADERS & DUAL SIZING
+
+When the SKU-prefix override routes a Bond-Eye-letterheaded invoice to Sea Level (SKUs starting \`SL\` followed by digits):
+
+- **Collection tags from section headers**: lines like "Essentials Edit", "Essentials", "Spinnaker", "Messina", "Castaway", "Beach Accessories", "Salt", "Sunset" are section headers. Apply each as a collection tag (lowercase, hyphenated — e.g. \`essentials-edit\`, \`spinnaker\`) to every product below it until the next header.
+- **Dual sizing**: sizes appear as \`AU10/US6\`, \`AU12/US8\`, \`AU14/US10\` — extract the AU size only (\`10\`, \`12\`, \`14\`).
+- **Multifit / Mastsuit styles**: \`O/S\` → \`One Size\`.
 
 ---
 
 *Sonic Invoices Master Intelligence Prompt v2.0*
 *Covers 63 brands: Seafolly · Baku · Bond Eye · Jantzen · Sea Level · Sunseeker · Funkita · Funky Trunks · Pops + Co · Capriosca · Artesands · Nip Tuck Swim · Kulani Kinis · Speedo · Reef · Rhythm · Tigerlily · Jets · Budgy Smuggler · Skwosh · Runaway The Label · Salty Ink · Hammamas · OM Designs · Monte & Lou · Lulu & Bird · Zoggs · Ambra · Love Luna · Frank Green · Glasshouse · Circa · Smelly Balls · Nude Footwear · Bling2o · Holster · Italian Cartel · Olga Berg · Moe Moe · Rigon · Rubyyaya · Auguste · Bali In A Bottle · Bebe Luxe · Blue Scarab · Budgy Smuggler · By Frankie · Cinnamon · Florabelle · Function Design · G2M/Miss Goodlife · Itami · Light + Glo · Lulalife · Rusty · Seven Wonders · Significant Other · Sky Gazer · Suit Saver · Summi Summi · Sun Soul · The Commonfolk · Trelise Cooper · Vacay · Wacoal · Walnut Melbourne + all unknown brands via universal logic*
+
 `;

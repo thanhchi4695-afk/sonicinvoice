@@ -1,0 +1,2 @@
+ALTER TABLE public.parse_jobs ADD COLUMN IF NOT EXISTS invoice_number text;
+CREATE INDEX IF NOT EXISTS idx_parse_jobs_user_invoice_number ON public.parse_jobs (user_id, invoice_number) WHERE invoice_number IS NOT NULL;

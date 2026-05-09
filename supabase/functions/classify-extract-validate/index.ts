@@ -39,6 +39,13 @@ interface PipelineContext {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  console.log(
+    "[startup] ANTHROPIC_API_KEY present:",
+    !!Deno.env.get("ANTHROPIC_API_KEY"),
+    "AZURE present:",
+    !!Deno.env.get("AZURE_DOCUMENT_INTELLIGENCE_KEY"),
+  );
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -488,12 +495,23 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
   let extraction: Record<string, unknown> | null = null;
   let azureUsed = false;
 
-  const isPdf = String(fileType || "").toLowerCase() === "pdf" ||
+  const mt = String(fileType || "").toLowerCase();
+  const isPdf =
+    mt === "pdf" ||
+    mt === "application/pdf" ||
+    mt === "application/octet-stream" ||
     String(fileName || "").toLowerCase().endsWith(".pdf");
   const hasAzure = !!Deno.env.get("AZURE_DOCUMENT_INTELLIGENCE_KEY") &&
     !!Deno.env.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT");
+  const hasAnthropic = !!Deno.env.get("ANTHROPIC_API_KEY");
+  // Prefer Claude-native PDF parsing when the key is present — Azure is only
+  // used as a fallback for PDFs when ANTHROPIC_API_KEY is missing.
+  const preferClaudePdf = isPdf && hasAnthropic;
+  console.log(
+    `[route] isPdf=${isPdf} hasAnthropic=${hasAnthropic} hasAzure=${hasAzure} preferClaudePdf=${preferClaudePdf} fileName=${fileName} fileType=${fileType}`,
+  );
 
-  if (isPdf && hasAzure) {
+  if (isPdf && hasAzure && !preferClaudePdf) {
     try {
       const az = await fetch(`${supabaseUrl}/functions/v1/azure-table-extract`, {
         method: "POST",
@@ -564,21 +582,31 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     }
   }
 
-  // ─────── STAGE 2B — Fallback / non-PDF — original parse-invoice agent ───────
+  // ─────── STAGE 2B — Fallback / non-PDF / Claude-PDF — parse-invoice agent ───────
+  let claudePdfUsed = false;
   if (!extraction) {
-    const ext = await fetch(`${supabaseUrl}/functions/v1/parse-invoice`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: authHeader, apikey: anonKey },
-      body: JSON.stringify(parseBody),
-    });
+    try {
+      const ext = await fetch(`${supabaseUrl}/functions/v1/parse-invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: authHeader, apikey: anonKey },
+        body: JSON.stringify(parseBody),
+      });
 
-    if (!ext.ok) {
-      const errText = await ext.text();
-      const err = new Error(`Extraction failed (${ext.status}): ${errText.slice(0, 500)}`);
-      (err as Error & { status?: number }).status = ext.status;
-      throw err;
+      if (!ext.ok) {
+        const errText = await ext.text();
+        const err = new Error(`Extraction failed (${ext.status}): ${errText.slice(0, 500)}`);
+        (err as Error & { status?: number }).status = ext.status;
+        if (preferClaudePdf) console.error("[claude-pdf] failed:", err.message);
+        throw err;
+      }
+      extraction = await ext.json();
+      if (preferClaudePdf) claudePdfUsed = true;
+    } catch (e) {
+      if (preferClaudePdf) {
+        console.error("[claude-pdf] threw:", e instanceof Error ? e.message : String(e));
+      }
+      throw e;
     }
-    extraction = await ext.json();
   }
 
   // ─────── STAGE 3 — validation ───────
@@ -708,7 +736,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     products: validatedProducts,
     classification,
     classification_source: classification?._source ?? "missing",
-    extractor_used: azureUsed ? "azure_layout+llm" : "parse-invoice",
+    extractor_used: azureUsed ? "azure_layout+llm" : (claudePdfUsed ? "claude-pdf" : "parse-invoice"),
     validation_summary: validationSummary,
     multi_brand_split: multiBrandSplit,
     filename_mismatch: filenameMismatch,

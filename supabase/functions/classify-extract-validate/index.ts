@@ -792,6 +792,24 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     console.warn("[classify-extract-validate] multi-brand split failed:", e);
   }
 
+  // ─────── STAGE 3C — Sonic Outcomes Grader (single-pass for non-claude paths) ───────
+  // Claude-PDF runs the grader inline with its re-extract loop. For Azure /
+  // parse-invoice we still grade once (post multi-brand split so vendor checks work).
+  if (!graderResult && validatedProducts.length > 0 && Deno.env.get("ANTHROPIC_API_KEY")) {
+    try {
+      graderResult = await runSonicGrader({
+        products: validatedProducts as Array<Record<string, unknown>>,
+        invoice_subtotal: claudeInvoiceSubtotal,
+        supplier_hint: classification?.supplier_name || supplierName || null,
+      });
+      graderAttempts = 1;
+      graderResult.attempts = 1;
+      console.log(`[grader] (post-extract) score=${graderResult.score} passed=${graderResult.passed}`);
+    } catch (e) {
+      console.warn("[grader] post-extract grade failed:", e);
+    }
+  }
+
   // ─────── Persist classification to supplier_profiles ───────
   const supplierFinal = classification?.supplier_name || extraction?.supplier || supplierName || null;
   if (userId && classification && !usedSavedProfile && supplierFinal) {
@@ -841,6 +859,8 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     multi_brand_split: multiBrandSplit,
     filename_mismatch: filenameMismatch,
     distributor_match: distributorMatch,
+    grader_result: graderResult,
+    invoice_subtotal: claudeInvoiceSubtotal,
   };
 }
 

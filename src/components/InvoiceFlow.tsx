@@ -3680,6 +3680,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           vendor: group.brand,
           type: group.type,
           brandWebsite,
+          styleNumber: (group as any).vendorCode || (group as any).styleGroup || '',
           storeName,
           storeCity,
           customInstructions: customInstr,

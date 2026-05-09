@@ -684,7 +684,9 @@ export function generateLightspeedCSV(
   const restockLevelCol = `restock_level_${outletKey}`;
 
   // Expand size runs the same way the Shopify path does.
-  const lines: ExportLine[] = rawLines.flatMap((ln) => expandLineBySize(ln));
+  const lines: ExportLine[] = rawLines
+    .map(applyVendorRouting)
+    .flatMap((ln) => expandLineBySize(ln));
 
   // Column order MIRRORS the official Lightspeed X-Series product-export template exactly.
   const headers = [

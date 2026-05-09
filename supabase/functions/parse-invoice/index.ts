@@ -685,9 +685,13 @@ Deno.serve(async (req) => {
     let stage1Rows: ParsedRow[] = [];
     let invoiceMeta: InvoiceMeta = { documentType: "unknown" };
     let validation: { passed: boolean; expected: number | null; actual: number; delta: number; reExtracted: boolean } | null = null;
-    let extractor: "claude-pdf" | "gemini" = "gemini";
+    let extractor: "claude-pdf" | "gemini" | "azure-fallback" = "gemini";
 
-    const isPdf = mimeType === "application/pdf";
+    const isPdfByMime = mimeType === "application/pdf";
+    const isPdfByName = !!inputFilename && inputFilename.toLowerCase().endsWith(".pdf");
+    const isPdf = isPdfByMime || isPdfByName;
+    const useClaudePdf = isPdf && !!ANTHROPIC_API_KEY;
+    console.log(`[route] mimeType=${mimeType} fileName=${inputFilename} hasApiKey=${!!ANTHROPIC_API_KEY} → using ${useClaudePdf ? "claude-pdf" : "azure-fallback"}`);
 
     // Auto-learn: load any saved brand profile for this supplier and inject
     // it into Claude's system prompt before extraction.
@@ -706,7 +710,7 @@ Deno.serve(async (req) => {
       console.warn("[parse-invoice] Brand profile lookup failed:", (e as Error).message);
     }
 
-    if (isPdf && ANTHROPIC_API_KEY) {
+    if (useClaudePdf) {
       try {
         const claudeOut = await stage1ClaudePdf(fileBase64, mimeType, supplierName, brandHints, claudeModel, brandProfileMd);
         invoiceMeta = claudeOut.meta;

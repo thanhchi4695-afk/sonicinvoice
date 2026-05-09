@@ -896,6 +896,7 @@ Deno.serve(async (req) => {
       .update({
         stage3_output: stage3Rows,
         output_rows: stage3Rows,
+        invoice_number: invoiceMeta.invoiceNumber ?? null,
         status: "done",
       })
       .eq("id", jobId);

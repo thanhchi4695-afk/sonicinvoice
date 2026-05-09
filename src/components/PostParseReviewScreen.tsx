@@ -27,6 +27,12 @@ import SourceTraceViewer, { InlineSourcePreview } from "@/components/SourceTrace
 import SizeGridEditor from "@/components/SizeGridEditor";
 import InvoiceDebugOverlay from "@/components/InvoiceDebugOverlay";
 import FieldConfidenceHeader, { lowConfidenceFieldNames } from "@/components/FieldConfidenceHeader";
+import {
+  fetchBrandProfileStatus,
+  buildDoNotBookMessage,
+  buildNeedsEnrichmentMessage,
+  type BrandProfileStatusInfo,
+} from "@/lib/brand-profile-status";
 
 interface PostParseReviewScreenProps {
   debug: ValidationDebugInfo;

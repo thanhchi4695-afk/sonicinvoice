@@ -29,6 +29,11 @@ import {
 import SupplierWebsiteRRPPanel from "@/components/SupplierWebsiteRRPPanel";
 import SupplierExtractionSkills from "@/components/SupplierExtractionSkills";
 import { useConfirmDialog } from "@/hooks/use-confirm-dialog";
+import {
+  statusBadgeClasses,
+  statusLabel,
+  type ProfileStatus,
+} from "@/lib/brand-profile-status";
 
 interface SupplierRow {
   id: string;

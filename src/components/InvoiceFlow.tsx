@@ -5496,6 +5496,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                     <MissingBrandRow
                       key={brandName}
                       brandName={brandName}
+                      hint={supplierName}
                       onSaved={() => setBrandDirVersion(v => v + 1)}
                       onSkip={() => {
                         const k = brandName.toLowerCase();

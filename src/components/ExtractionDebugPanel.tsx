@@ -12,6 +12,8 @@ export interface ExtractionDebugInfo {
     column_count: number;
     grid?: string[][];
   }>;
+  cache_creation_tokens?: number | null;
+  cache_read_tokens?: number | null;
 }
 
 interface Props {
@@ -60,6 +62,15 @@ export default function ExtractionDebugPanel({ info }: Props) {
               cls: {info.classification_source}
             </span>
           )}
+          {(info.cache_read_tokens ?? 0) > 0 ? (
+            <span className="rounded px-1.5 py-0.5 text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+              cache: HIT ({info.cache_read_tokens!.toLocaleString()} tokens saved)
+            </span>
+          ) : (info.cache_creation_tokens ?? 0) > 0 ? (
+            <span className="rounded px-1.5 py-0.5 text-xs bg-sky-500/20 text-sky-600 dark:text-sky-400">
+              cache: MISS ({info.cache_creation_tokens!.toLocaleString()} tokens cached)
+            </span>
+          ) : null}
         </span>
         {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
       </button>

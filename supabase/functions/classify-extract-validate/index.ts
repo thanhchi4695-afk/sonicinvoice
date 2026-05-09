@@ -39,12 +39,12 @@ interface PipelineContext {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  console.log(
-    "[startup] ANTHROPIC_API_KEY present:",
-    !!Deno.env.get("ANTHROPIC_API_KEY"),
-    "AZURE present:",
-    !!Deno.env.get("AZURE_DOCUMENT_INTELLIGENCE_KEY"),
-  );
+  console.log("[startup] ANTHROPIC_API_KEY present:", !!Deno.env.get("ANTHROPIC_API_KEY"));
+  try {
+    console.log("[startup] Deno.env keys available:", Object.keys(Deno.env.toObject()).join(", "));
+  } catch (e) {
+    console.log("[startup] Deno.env.toObject() failed:", e instanceof Error ? e.message : String(e));
+  }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

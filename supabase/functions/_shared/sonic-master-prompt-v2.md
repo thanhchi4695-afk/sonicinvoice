@@ -98,7 +98,10 @@ Suppliers often invoice under a legal/parent company name that differs from the 
 
 | Invoice header says | Shopify Vendor | Notes |
 |---|---|---|
-| Bond-Eye Australia / Bond-Eye Australia Pty Ltd | Bond Eye | SL#### style codes — NOT Sea Level |
+| Bond-Eye Australia / Bond-Eye Australia Pty Ltd | Bond Eye OR Sea Level | **SKU-prefix override**: SKUs starting `SL` followed by digits (e.g. SL1205ECO, SL4015ECO) → vendor = Sea Level. SKUs starting `BOUND` (e.g. BOUND633R) → vendor = Bond Eye. The SKU prefix wins over the invoice header. |
+| We Are Feel Good / WAFG / ABN 88 627 285 296 | We Are Feel Good | Sunscreen / skincare. See brand-specific rules below. |
+| Rhythm Group / Cin7 invoice (URL contains go.cin7.com) for Rhythm | Rhythm Womens or Rhythm Mens | See Cin7 format handling below. |
+| The Commonfolk (Cin7 invoice) | The Commonfolk | See Cin7 format handling below. |
 | Skye Group Pty Ltd | Jantzen | Always — Jantzen is distributed by Skye Group |
 | Ambra Corporation Pty Ltd | Ambra or Love Luna | LLSW prefix = Love Luna; AMUW prefix = Ambra |
 | HEAD OCEANIA PTY LIMITED | Zoggs | A Division of HEAD |

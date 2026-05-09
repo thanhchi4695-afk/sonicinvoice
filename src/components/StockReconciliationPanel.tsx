@@ -30,6 +30,12 @@ import {
   exportLightspeedStockUpdateCsv,
   exportLightspeedNewVariantsCsv,
 } from "@/lib/reconciliation-csv";
+import {
+  planRefillPriceRestore,
+  logPricePlan,
+  type PricePlan,
+  type PricePlanEntry,
+} from "@/lib/refill-price-restore";
 
 export interface ExportSets {
   newProducts: ReconciliationLine[];
@@ -153,6 +159,47 @@ export function StockReconciliationPanel({
   );
   const [drawerIdx, setDrawerIdx] = useState<number | null>(null);
   const [reclassified, setReclassified] = useState<Record<number, string>>({});
+  const [pricePlan, setPricePlan] = useState<PricePlan | null>(null);
+  const [planRunning, setPlanRunning] = useState(false);
+
+  const runPricePlan = async (
+    refillLines: ReconciliationLine[],
+  ): Promise<PricePlan | null> => {
+    if (refillLines.length === 0) return null;
+    setPlanRunning(true);
+    try {
+      const plan = await planRefillPriceRestore(refillLines);
+      setPricePlan(plan);
+      const s = plan.summary;
+      toast({
+        title: "Sale prices checked",
+        description: `${s.restored} restored · ${s.no_change} no change · ${s.skipped_lower} skipped (lower RRP)`,
+      });
+      return plan;
+    } catch (e) {
+      toast({
+        title: "Price check failed",
+        description: e instanceof Error ? e.message : "Could not fetch Shopify prices",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setPlanRunning(false);
+    }
+  };
+
+  const overridesFromPlan = (
+    plan: PricePlan | null,
+  ): Record<string, { price: number; compareAt: number | null }> => {
+    if (!plan) return {};
+    const out: Record<string, { price: number; compareAt: number | null }> = {};
+    for (const [key, e] of Object.entries(plan.byKey)) {
+      if (e.state === "restored" && e.new_price != null) {
+        out[key] = { price: e.new_price, compareAt: e.new_compare_at };
+      }
+    }
+    return out;
+  };
 
   const drawerLine = drawerIdx != null ? lines[drawerIdx] ?? null : null;
 
@@ -338,6 +385,11 @@ export function StockReconciliationPanel({
                       }
                       groupBadge={meta.badge}
                       onOpen={() => setDrawerIdx(idx)}
+                      priceEntry={
+                        pricePlan?.byKey[
+                          (line.invoice_sku || line.invoice_product_name || "").trim()
+                        ]
+                      }
                     />
                   ))}
                 </div>
@@ -413,9 +465,24 @@ export function StockReconciliationPanel({
                 <ExportButton
                   label={`Export ${exportSets.refills.length} stock updates`}
                   colorClass="bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={exportSets.refills.length === 0}
-                  onClick={() => {
-                    const res = exportStockUpdateCsv(exportSets.refills);
+                  disabled={exportSets.refills.length === 0 || planRunning}
+                  onClick={async () => {
+                    // STEP 1-4 of refill price restore: detect sale → plan → log
+                    let plan = pricePlan;
+                    if (!plan) plan = await runPricePlan(exportSets.refills);
+                    if (plan) {
+                      const log = await logPricePlan(plan, { triggered_by: "refill" });
+                      if (log.inserted > 0) {
+                        toast({
+                          title: "Price restorations logged",
+                          description: `${log.inserted} change(s) recorded`,
+                        });
+                      }
+                    }
+                    // STEP 6: export with restored prices baked into the CSV
+                    const res = exportStockUpdateCsv(exportSets.refills, {
+                      priceOverrides: overridesFromPlan(plan),
+                    });
                     toast({ title: "Stock update exported", description: `${res.rowCount} rows · ${res.filename}` });
                     onExport({ ...exportSets, newProducts: [], newVariants: [], all: exportSets.refills });
                   }}
@@ -423,9 +490,22 @@ export function StockReconciliationPanel({
                     <>
                       <p className="font-medium mb-1">Stock update CSV (additive)</p>
                       <p>Adds the received quantities to your current Shopify stock — it does <strong>not</strong> replace existing levels.</p>
+                      <p className="mt-2">If a matched product is currently on sale, its price will be <strong>restored to the invoice RRP</strong> and the sale flag cleared.</p>
                       <p className="mt-2 text-muted-foreground">
                         Import using the <em>Matrixify / Excelify</em> app in <em>additive inventory</em> mode.
                       </p>
+                    </>
+                  }
+                />
+                <ExportButton
+                  label={planRunning ? "Checking…" : "Check sale prices"}
+                  colorClass="bg-slate-200 hover:bg-slate-300 text-slate-800"
+                  disabled={exportSets.refills.length === 0 || planRunning}
+                  onClick={() => runPricePlan(exportSets.refills)}
+                  tooltip={
+                    <>
+                      <p className="font-medium mb-1">Preview price restorations</p>
+                      <p>Fetches the current Shopify price for every refill line and shows which lines will have their sale price restored.</p>
                     </>
                   }
                 />
@@ -619,6 +699,7 @@ function LineRow({
   onDecision,
   groupBadge,
   onOpen,
+  priceEntry,
 }: {
   line: ReconciliationLine;
   checked: boolean;
@@ -627,6 +708,7 @@ function LineRow({
   onDecision: (d: "new" | "old") => void;
   groupBadge: string;
   onOpen?: () => void;
+  priceEntry?: PricePlanEntry;
 }) {
   const isConflict = line.match_type.endsWith("_conflict");
   const isRefill = line.match_type.startsWith("exact_refill");
@@ -687,6 +769,37 @@ function LineRow({
               <span className="font-medium">{line.matched_current_qty}</span>
               <span className="text-muted-foreground"> → After import: </span>
               <span className="font-medium text-blue-600">{afterQty}</span>
+            </div>
+          )}
+
+          {priceEntry && (isRefill || isNewVariant) && (
+            <div className="mt-2 text-xs">
+              {priceEntry.state === "restored" && priceEntry.new_price != null && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/15 text-amber-700 border border-amber-500/30">
+                  🟡 Price: ${priceEntry.current_price?.toFixed(2)} → ${priceEntry.new_price.toFixed(2)} (restored from sale)
+                  {priceEntry.sibling_variants && priceEntry.sibling_variants.length > 0 && (
+                    <span className="text-muted-foreground"> · +{priceEntry.sibling_variants.length} sibling{priceEntry.sibling_variants.length === 1 ? "" : "s"}</span>
+                  )}
+                </span>
+              )}
+              {priceEntry.state === "no_change" && priceEntry.current_price != null && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 border border-emerald-500/30">
+                  ✅ Price: ${priceEntry.current_price.toFixed(2)} (no change)
+                </span>
+              )}
+              {priceEntry.state === "skipped_no_rrp" && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-500/10 text-sky-700 border border-sky-500/30">
+                  🔵 RRP not on invoice — apply pricing rules
+                </span>
+              )}
+              {priceEntry.state === "skipped_lower" && priceEntry.warning && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/30">
+                  ⚠ {priceEntry.warning}
+                </span>
+              )}
+              {priceEntry.state === "skipped_no_match" && (
+                <span className="text-muted-foreground">Price check skipped — no Shopify match</span>
+              )}
             </div>
           )}
 

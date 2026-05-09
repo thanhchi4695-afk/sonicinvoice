@@ -3057,6 +3057,60 @@ export type Database = {
         }
         Relationships: []
       }
+      price_changes: {
+        Row: {
+          compare_at_after: number | null
+          compare_at_before: number | null
+          created_at: string
+          id: string
+          invoice_number: string | null
+          price_after: number | null
+          price_before: number | null
+          reason: string
+          shopify_product_id: string
+          shopify_variant_id: string
+          sku: string | null
+          style_name: string | null
+          triggered_by: string
+          user_id: string
+          vendor: string | null
+        }
+        Insert: {
+          compare_at_after?: number | null
+          compare_at_before?: number | null
+          created_at?: string
+          id?: string
+          invoice_number?: string | null
+          price_after?: number | null
+          price_before?: number | null
+          reason?: string
+          shopify_product_id: string
+          shopify_variant_id: string
+          sku?: string | null
+          style_name?: string | null
+          triggered_by?: string
+          user_id: string
+          vendor?: string | null
+        }
+        Update: {
+          compare_at_after?: number | null
+          compare_at_before?: number | null
+          created_at?: string
+          id?: string
+          invoice_number?: string | null
+          price_after?: number | null
+          price_before?: number | null
+          reason?: string
+          shopify_product_id?: string
+          shopify_variant_id?: string
+          sku?: string | null
+          style_name?: string | null
+          triggered_by?: string
+          user_id?: string
+          vendor?: string | null
+        }
+        Relationships: []
+      }
       price_lookups: {
         Row: {
           colour: string | null

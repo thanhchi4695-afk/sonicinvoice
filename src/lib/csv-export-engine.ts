@@ -362,7 +362,11 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
   }
 
   return Array.from(groups.values()).map(({ base, lines: groupLines }) => {
-    const title = deduplicateTitle(base.name.replace(/\b(XXS|XS|S|M|L|XL|XXL|\d{1,3})\b/gi, "").trim() || base.name, base.brand);
+    // Title cleanup: only strip the brand prefix — DO NOT strip digits or
+    // sizes from the title itself (that broke "Ava 1 Pce" → "Ava Pce" and
+    // killed the "1" in any 1-Piece swimwear style). Size/colour tokens are
+    // already stripped via `normalizeBaseTitle` purely for grouping keys.
+    const title = deduplicateTitle(base.name, base.brand);
     const hasSize = groupLines.some(l => !!l.size);
     const hasColour = groupLines.some(l => !!l.colour);
 

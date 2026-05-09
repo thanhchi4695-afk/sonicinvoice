@@ -823,6 +823,10 @@ const RETURN_INVOICE_TOOL = {
   input_schema: {
     type: "object",
     properties: {
+      invoice_subtotal: {
+        type: ["number", "null"],
+        description: "Invoice subtotal ex-GST printed on the document. null if not visible.",
+      },
       products: {
         type: "array",
         items: {

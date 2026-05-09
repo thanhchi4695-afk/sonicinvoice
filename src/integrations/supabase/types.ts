@@ -826,6 +826,7 @@ export type Database = {
           layout_type: string | null
           notes: string | null
           product_types: string[] | null
+          profile_status: string
           raw_md: string | null
           rrp_on_invoice: boolean | null
           shopify_vendor: string | null
@@ -848,6 +849,7 @@ export type Database = {
           layout_type?: string | null
           notes?: string | null
           product_types?: string[] | null
+          profile_status?: string
           raw_md?: string | null
           rrp_on_invoice?: boolean | null
           shopify_vendor?: string | null
@@ -870,6 +872,7 @@ export type Database = {
           layout_type?: string | null
           notes?: string | null
           product_types?: string[] | null
+          profile_status?: string
           raw_md?: string | null
           rrp_on_invoice?: boolean | null
           shopify_vendor?: string | null

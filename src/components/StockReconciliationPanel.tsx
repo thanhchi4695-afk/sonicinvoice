@@ -468,8 +468,11 @@ export function StockReconciliationPanel({
                   disabled={exportSets.refills.length === 0 || planRunning}
                   onClick={async () => {
                     // STEP 1-4 of refill price restore: detect sale → plan → log
+                    // Include new_variant lines so siblings on the same product
+                    // get their sale prices restored too.
+                    const planLines = [...exportSets.refills, ...exportSets.newVariants];
                     let plan = pricePlan;
-                    if (!plan) plan = await runPricePlan(exportSets.refills);
+                    if (!plan) plan = await runPricePlan(planLines);
                     if (plan) {
                       const log = await logPricePlan(plan, { triggered_by: "refill" });
                       if (log.inserted > 0) {

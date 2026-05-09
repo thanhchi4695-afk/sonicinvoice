@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
     const data = await callAI({
       // Claude Sonnet 4.5 is the most accurate on structured tabular invoice
       // data. Falls back to Claude Haiku → Gemini 2.5 Flash via ai-gateway.
-      model: "anthropic/claude-sonnet-4-5",
+      model: "anthropic/claude-sonnet-4-6",
       temperature: 0.05,
       messages: [
         { role: "system", content: EXTRACT_PROMPT },

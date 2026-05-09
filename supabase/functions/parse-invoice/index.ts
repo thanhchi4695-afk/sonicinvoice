@@ -163,10 +163,11 @@ const RETURN_INVOICE_TOOL = {
 };
 
 const ALLOWED_CLAUDE_MODELS = new Set([
+  "claude-sonnet-4-6",
   "claude-sonnet-4-5-20250929",
   "claude-sonnet-4-20250514",
 ]);
-const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
 
 async function callClaudeInvoice(
   contentBlocks: any[],
@@ -442,7 +443,7 @@ For each variant, output a Shopify-ready row with these columns:
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-sonnet-4-6",
       max_tokens: 8000,
       system: systemPrompt,
       tools,

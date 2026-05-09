@@ -27,6 +27,14 @@ const MODEL_FALLBACKS: Record<string, string[]> = {
   ],
   // Anthropic Claude — primary for invoice extraction (highest accuracy on
   // structured tabular data). Falls back to Gemini if Anthropic is unreachable.
+  // Sonnet 4.6 is the current default; 4.5 stays in the chain so a 404 on the
+  // newer id degrades gracefully without breaking parsing.
+  "anthropic/claude-sonnet-4-6": [
+    "anthropic/claude-sonnet-4-6",
+    "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-haiku-4-5",
+    "google/gemini-2.5-flash",
+  ],
   "anthropic/claude-sonnet-4-5": [
     "anthropic/claude-sonnet-4-5",
     "anthropic/claude-haiku-4-5",

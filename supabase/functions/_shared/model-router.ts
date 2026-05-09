@@ -51,11 +51,11 @@ const JOB_MODEL: Record<AIJob, string> = {
   // Brand intelligence — Claude Sonnet 4.5 (large system prompts, rule
   // adherence, structured CSV output). Falls back to Gemini 2.5 Flash via
   // the ai-gateway fallback chain if Anthropic is unreachable.
-  "brand.tag":            "anthropic/claude-sonnet-4-5",
-  "product.naming":       "anthropic/claude-sonnet-4-5",
-  "product.enrich":       "anthropic/claude-sonnet-4-5",
-  "seo.description":      "anthropic/claude-sonnet-4-5",
-  "collection.architect": "anthropic/claude-sonnet-4-5",
+  "brand.tag":            "anthropic/claude-sonnet-4-6",
+  "product.naming":       "anthropic/claude-sonnet-4-6",
+  "product.enrich":       "anthropic/claude-sonnet-4-6",
+  "seo.description":      "anthropic/claude-sonnet-4-6",
+  "collection.architect": "anthropic/claude-sonnet-4-6",
 
   // Web-grounded enrichment — keep on gateway Gemini for now. The cheaper
   // /products.json scrape path runs before this; only call when scrape miss.

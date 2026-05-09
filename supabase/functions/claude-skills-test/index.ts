@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
       : "") + "You are a helpful retail assistant. Be concise.";
 
     const res = await callAI({
-      model: "anthropic/claude-sonnet-4-5",
+      model: "anthropic/claude-sonnet-4-6",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userTask },
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       output: getContent(res),
       sample_task: userTask,
-      model: "anthropic/claude-sonnet-4-5",
+      model: "anthropic/claude-sonnet-4-6",
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("claude-skills-test error:", e);

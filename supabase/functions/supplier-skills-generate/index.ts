@@ -117,7 +117,7 @@ Write the markdown file now. Output ONLY the markdown — no preamble, no closin
     let markdown = "";
     try {
       const resp = await callAI({
-        model: "anthropic/claude-sonnet-4-5",
+        model: "anthropic/claude-sonnet-4-6",
         max_tokens: 2500,
         messages: [
           { role: "system", content: "You write precise, structured extraction rule books for invoice processing models." },

@@ -322,7 +322,7 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
         handle: generateHandle(title, ln.brand),
         title,
         vendor: ln.brand,
-        type: ln.type,
+        type: inferProductType(ln.name, ln.type),
         tags: buildRichTags(ln) || ln.tags || `${ln.brand}, ${ln.type}`,
         bodyHtml: ln.bodyHtml || `<p>${ln.name} by ${ln.brand}. Premium ${ln.type.toLowerCase()}.</p>`,
         seoTitle: ln.seoTitle || `${ln.name} | ${ln.brand}`.slice(0, 70),

@@ -32,8 +32,9 @@ export function parseProfile(filename, content) {
     pick(/^#\s*SUPPLIER SKILL:\s*(.+?)\s*$/m) || supplier_key;
   const confRaw = pick(/^\s*Confidence:\s*(\d{1,3})\s*%/mi);
   const confidence = confRaw ? Math.max(0, Math.min(100, parseInt(confRaw, 10))) : 65;
-  const supplier_legal = pick(/Legal entity[^\n:]*:\s*(.+?)\s*$/mi);
-  const shopify_vendor = pick(/(?:^|\n)\s*[-*]?\s*Vendor\s*:\s*(.+?)\s*$/mi);
+  const strip = (s) => s == null ? null : s.replace(/^[`*\s]+|[`*\s]+$/g, "") || null;
+  const supplier_legal = strip(pick(/Legal entity[^\n:]*:\s*(.+?)\s*$/mi));
+  const shopify_vendor = strip(pick(/(?:^|\n)\s*[-*]?\s*Vendor\s*:\s*(.+?)\s*$/mi));
 
   return {
     supplier_key,

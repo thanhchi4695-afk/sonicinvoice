@@ -91,6 +91,9 @@ export default function SupplierBrainTab() {
   const [opsData, setOpsData] = useState<Record<string, OpsFields>>({});
   const [savingOps, setSavingOps] = useState<string | null>(null);
   const [driveUrl, setDriveUrl] = useState("");
+  // Brand-profile status (from brand_profiles MD imports), keyed by lower(supplier_name).
+  const [profileStatusMap, setProfileStatusMap] = useState<Map<string, ProfileStatus>>(new Map());
+  const [statusFilter, setStatusFilter] = useState<"all" | ProfileStatus>("all");
 
   // Drive picker state machine: idle → picking → seeding → done
   type FileStatus = "queued" | "running" | "done" | "skipped" | "error";

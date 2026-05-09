@@ -722,6 +722,7 @@ Deno.serve(async (req) => {
             stage2_output: [],
             stage3_output: [],
             output_rows: [],
+            invoice_number: invoiceMeta.invoiceNumber ?? null,
             error_message: "Document detected as packing list — no cost data. Find the matching tax invoice.",
           }).eq("id", jobId);
           return new Response(JSON.stringify({
@@ -732,6 +733,93 @@ Deno.serve(async (req) => {
             meta: invoiceMeta,
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
         }
+
+        // Short-circuit non-invoice documents (vehicle registration, order confirmations w/o prices, etc.)
+        const nonInvoiceTypes = new Set(["vehicle_registration", "order_confirmation", "quote", "credit_note"]);
+        const dt = String(invoiceMeta.documentType ?? "");
+        if (nonInvoiceTypes.has(dt) || (claudeOut.rows.length === 0 && dt !== "tax_invoice")) {
+          const warning =
+            dt === "vehicle_registration"
+              ? "Vehicle registration certificate — not a supplier invoice. No products to extract."
+              : dt === "order_confirmation"
+              ? "Order confirmation — no prices shown. Find the matching tax invoice."
+              : dt === "quote"
+              ? "Quote / Proforma — costs may not be final."
+              : dt === "credit_note"
+              ? "Credit note — extracted as negative quantities."
+              : `Document detected as ${dt || "non-invoice"} — nothing to import.`;
+          await admin.from("parse_jobs").update({
+            status: "done",
+            stage1_output: claudeOut.rows,
+            stage2_output: [],
+            stage3_output: [],
+            output_rows: [],
+            invoice_number: invoiceMeta.invoiceNumber ?? null,
+            error_message: warning,
+          }).eq("id", jobId);
+          return new Response(JSON.stringify({
+            jobId,
+            documentType: dt || "unknown",
+            warning,
+            action: dt === "vehicle_registration" ? "discard" : "review",
+            rows: [],
+            meta: invoiceMeta,
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+        }
+
+        // Duplicate-invoice detection — if this user already has a completed job with the same
+        // invoice number, short-circuit before paying for Stage 2/3.
+        const invNum = (invoiceMeta.invoiceNumber || "").trim();
+        if (invNum) {
+          const { data: existing } = await admin
+            .from("parse_jobs")
+            .select("id, status, created_at")
+            .eq("user_id", userId)
+            .eq("invoice_number", invNum)
+            .neq("id", jobId)
+            .in("status", ["done", "imported"])
+            .limit(1)
+            .maybeSingle();
+          if (existing?.id) {
+            await admin.from("parse_jobs").update({
+              status: "done",
+              stage1_output: claudeOut.rows,
+              stage2_output: [],
+              stage3_output: [],
+              output_rows: [],
+              invoice_number: invNum,
+              error_message: `Duplicate invoice — number ${invNum} was already processed (job ${existing.id}).`,
+            }).eq("id", jobId);
+            return new Response(JSON.stringify({
+              jobId,
+              status: "duplicate",
+              invoice_number: invNum,
+              existing_job_id: existing.id,
+              action: "skipped",
+              warning: `Invoice ${invNum} has already been processed.`,
+              meta: invoiceMeta,
+              rows: [],
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+          }
+        } else if (inputFilename && /^\d{4}-\d{2}-\d{2}\s\d{2}-\d{2}\.pdf$/i.test(inputFilename)) {
+          // Filename-based fallback: timestamp-named scan with no extractable invoice number.
+          await admin.from("parse_jobs").update({
+            status: "done",
+            stage1_output: claudeOut.rows,
+            stage2_output: [],
+            stage3_output: [],
+            output_rows: [],
+            error_message: "Scan of unknown invoice — manual review needed (timestamp filename, no invoice number extracted).",
+          }).eq("id", jobId);
+          return new Response(JSON.stringify({
+            jobId,
+            status: "needs_review",
+            warning: "Scan of unknown invoice — manual review needed.",
+            meta: invoiceMeta,
+            rows: [],
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+        }
+
         const validated = await validateAndMaybeReExtract(
           fileBase64, mimeType, invoiceMeta, claudeOut.rows,
           SONIC_MASTER_PROMPT_V2 + brandProfileMd + `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore "Part A/B/C" prose. Call the return_invoice tool exactly once.`,

@@ -1029,7 +1029,12 @@ async function runClaudePdfDirect(opts: {
     };
   });
 
-  return { products, invoice_subtotal: Number.isFinite(invoice_subtotal as number) ? (invoice_subtotal as number) : null };
+  return {
+    products,
+    invoice_subtotal: Number.isFinite(invoice_subtotal as number) ? (invoice_subtotal as number) : null,
+    cache_creation_tokens,
+    cache_read_tokens,
+  };
 }
 
 // ─────── Sonic Outcomes Grader (Claude Haiku 4.5) ───────

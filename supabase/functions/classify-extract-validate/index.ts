@@ -914,22 +914,51 @@ async function runClaudePdfDirect(opts: {
   supplierName: string | null;
   skillsMarkdown: string;
   reextractReason?: string | null;
-}): Promise<{ products: Array<Record<string, unknown>>; invoice_subtotal: number | null }> {
+}): Promise<{
+  products: Array<Record<string, unknown>>;
+  invoice_subtotal: number | null;
+  cache_creation_tokens: number;
+  cache_read_tokens: number;
+}> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
-  const systemPrompt = [
+  // ── Static master prompt (cacheable) ──
+  const masterPrompt = [
     "You are an expert invoice/packing-slip extractor for fashion wholesale documents.",
     "Extract EVERY line item. Preserve every variant (colour + size combo) as its own row.",
     "Numbers must be plain numbers (no currency symbols). Use null when truly unknown.",
     "Carry section headers (e.g. 'Eco', 'Recycled') across page breaks as `category`.",
     "Also return the invoice subtotal ex-GST as `invoice_subtotal` (null if not printed).",
+  ].join("\n");
+
+  // ── Per-supplier brand profile block (cacheable when present) ──
+  const brandProfileBlock = [
     opts.supplierName ? `Supplier: ${opts.supplierName}` : "",
-    opts.skillsMarkdown ? `\n\nSupplier-specific extraction rules:\n${opts.skillsMarkdown}` : "",
-    opts.reextractReason
-      ? `\n\nIMPORTANT — RE-EXTRACTION FEEDBACK FROM GRADER:\n${opts.reextractReason}\nFix these specific issues this time.`
-      : "",
-  ].filter(Boolean).join("\n");
+    opts.skillsMarkdown ? `Supplier-specific extraction rules:\n${opts.skillsMarkdown}` : "",
+  ].filter(Boolean).join("\n\n");
+
+  // ── Per-attempt grader feedback (NEVER cached) ──
+  const reextractBlock = opts.reextractReason
+    ? `IMPORTANT — RE-EXTRACTION FEEDBACK FROM GRADER:\n${opts.reextractReason}\nFix these specific issues this time.`
+    : "";
+
+  // Build system as content blocks with explicit cache_control breakpoints.
+  // Master prompt is always cached. Brand profile, when present, is cached as
+  // a second block so master+profile are served from cache together.
+  const systemBlocks: Array<Record<string, unknown>> = [
+    { type: "text", text: masterPrompt, cache_control: { type: "ephemeral" } },
+  ];
+  if (brandProfileBlock) {
+    systemBlocks.push({
+      type: "text",
+      text: brandProfileBlock,
+      cache_control: { type: "ephemeral" },
+    });
+  }
+  if (reextractBlock) {
+    systemBlocks.push({ type: "text", text: reextractBlock });
+  }
 
   const userPrompt = "Extract all product line items from this invoice PDF using the return_invoice tool.";
 
@@ -940,12 +969,13 @@ async function runClaudePdfDirect(opts: {
     headers: {
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      "anthropic-beta": "prompt-caching-2024-07-31",
       "content-type": "application/json",
     },
     body: JSON.stringify({
       model: ANTHROPIC_MODEL,
       max_tokens: 8000,
-      system: systemPrompt,
+      system: systemBlocks,
       tools: [RETURN_INVOICE_TOOL],
       tool_choice: { type: "tool", name: "return_invoice" },
       messages: [{
@@ -974,6 +1004,12 @@ async function runClaudePdfDirect(opts: {
   const rawProducts = Array.isArray(toolUse.input.products) ? toolUse.input.products : [];
   const subtotalRaw = toolUse.input.invoice_subtotal;
   const invoice_subtotal = subtotalRaw == null || subtotalRaw === "" ? null : Number(subtotalRaw);
+  const usage = (data?.usage ?? {}) as Record<string, unknown>;
+  const cache_creation_tokens = Number(usage.cache_creation_input_tokens ?? 0) || 0;
+  const cache_read_tokens = Number(usage.cache_read_input_tokens ?? 0) || 0;
+  console.log(
+    `[claude-pdf] cache: creation=${cache_creation_tokens} read=${cache_read_tokens}`,
+  );
 
   const products = rawProducts.map((p: Record<string, unknown>) => {
     const cost = Number(p.cost ?? 0) || 0;

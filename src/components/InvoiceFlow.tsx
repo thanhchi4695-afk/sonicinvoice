@@ -2495,6 +2495,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         raw_tables: Array.isArray(data.azure_raw_tables) ? data.azure_raw_tables : [],
         cache_creation_tokens: data.cache_creation_tokens ?? null,
         cache_read_tokens: data.cache_read_tokens ?? null,
+        supplier: data.supplier ?? null,
+        attempts: data.grader_result?.attempts ?? 1,
+        grader_score: data.grader_result?.score ?? null,
+        grader_passed: data.grader_result?.passed ?? null,
+        grader_summary: data.grader_result?.passed
+          ? "all criteria passed"
+          : data.grader_result?.reextract_needed
+            ? "re-extraction triggered"
+            : "review needed",
       });
       setGraderResult(data.grader_result ?? null);
       // Capture multi-brand split metadata (Skye → Jantzen+Sunseeker etc).

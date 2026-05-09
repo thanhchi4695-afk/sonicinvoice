@@ -596,7 +596,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
         supplierName: supplierName || classification?.supplier_name || null,
         skillsMarkdown: mergedSkills,
       });
-      let claudeProducts = first.products;
+      let claudeProducts = applyStaticVendorRouting(first.products);
       claudeInvoiceSubtotal = first.invoice_subtotal;
       claudePdfUsed = true;
       console.log(`[claude-pdf] success: ${claudeProducts.length} products, subtotal=${claudeInvoiceSubtotal}`);

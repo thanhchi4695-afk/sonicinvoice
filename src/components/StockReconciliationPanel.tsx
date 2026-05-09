@@ -503,8 +503,8 @@ export function StockReconciliationPanel({
                 <ExportButton
                   label={planRunning ? "Checking…" : "Check sale prices"}
                   colorClass="bg-slate-200 hover:bg-slate-300 text-slate-800"
-                  disabled={exportSets.refills.length === 0 || planRunning}
-                  onClick={() => runPricePlan(exportSets.refills)}
+                  disabled={(exportSets.refills.length === 0 && exportSets.newVariants.length === 0) || planRunning}
+                  onClick={() => runPricePlan([...exportSets.refills, ...exportSets.newVariants])}
                   tooltip={
                     <>
                       <p className="font-medium mb-1">Preview price restorations</p>

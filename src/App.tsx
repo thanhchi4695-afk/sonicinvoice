@@ -43,83 +43,79 @@ const App = () => (
         <BarcodeProvider>
           <ConfirmDialogProvider>
             <PromptDialogProvider>
-            <Toaster />
-            <Sonner />
-          <BrowserRouter>
-            <StockyAnnouncementBar />
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/dashboard" element={<Index />} />
-              <Route path="/dashboard/*" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/login/signup" element={<Login />} />
-              <Route path="/sign-in" element={<Navigate to="/login" replace />} />
-              <Route path="/signin" element={<Navigate to="/login" replace />} />
-              <Route path="/signup" element={<Navigate to="/login?signup=1" replace />} />
-              <Route path="/sign-up" element={<Navigate to="/login?signup=1" replace />} />
-              <Route path="/register" element={<Navigate to="/login?signup=1" replace />} />
-              <Route path="/auth" element={<Navigate to="/login" replace />} />
-              <Route path="/settings" element={<Index initialTab="account" />} />
-              <Route path="/account" element={<Index initialTab="account" />} />
-              <Route path="/billing" element={<Index initialTab="billing" />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/auth/xero/callback" element={<AuthCallbackPage />} />
-              <Route path="/auth/myob/callback" element={<AuthCallbackPage />} />
-              <Route path="/auth/lightspeed-x/callback" element={<AuthCallbackPage />} />
-              <Route path="/auth/lightspeed-r/callback" element={<AuthCallbackPage />} />
-              <Route path="/support" element={<Support />} />
-              <Route path="/unsubscribe" element={<Unsubscribe />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/brand-guide" element={<BrandGuide />} />
-              <Route path="/case-study" element={<CaseStudyPage />} />
-              <Route path="/health" element={<Health />} />
-              <Route path="/admin/secrets" element={<AdminSecrets />} />
-              <Route path="/admin/ai-models" element={<AdminAIModels />} />
-              <Route path="/rules" element={<Rules />} />
-              <Route path="/rules/setup" element={<RulesSetup />} />
-              <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
-              <Route
-                path="/google-shopping"
-                element={
-                  <Suspense fallback={null}>
-                    <GoogleShoppingHub />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="/pricing-intelligence"
-                element={
-                  <Suspense fallback={null}>
-                    <PricingIntelligence />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="/tools/feed-health"
-                element={
-                  <RequireAuth>
-                    <Suspense fallback={null}>
-                      <FeedHealthPanel onBack={() => window.history.back()} />
-                    </Suspense>
-                  </RequireAuth>
-                }
-              />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              {/* Phase slugs aren't standalone routes — Review/Enrich/Publish live
-                  inside the invoice flow on the dashboard. Redirect deep links so
-                  they don't 404. */}
-              <Route path="/review" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/enrich" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/publish" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/capture" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/price" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/analyse" element={<Index initialTab="analytics" />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-          <InstallAppBanner />
-          <EmbeddedAuthHealthCheck />
-          <SonicChat />
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <StockyAnnouncementBar />
+                <Routes>
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/dashboard" element={<Index />} />
+                  <Route path="/dashboard/*" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/login/signup" element={<Login />} />
+                  <Route path="/sign-in" element={<Navigate to="/login" replace />} />
+                  <Route path="/signin" element={<Navigate to="/login" replace />} />
+                  <Route path="/signup" element={<Navigate to="/login?signup=1" replace />} />
+                  <Route path="/sign-up" element={<Navigate to="/login?signup=1" replace />} />
+                  <Route path="/register" element={<Navigate to="/login?signup=1" replace />} />
+                  <Route path="/auth" element={<Navigate to="/login" replace />} />
+                  <Route path="/settings" element={<Index initialTab="account" />} />
+                  <Route path="/account" element={<Index initialTab="account" />} />
+                  <Route path="/billing" element={<Index initialTab="billing" />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/auth/xero/callback" element={<AuthCallbackPage />} />
+                  <Route path="/auth/myob/callback" element={<AuthCallbackPage />} />
+                  <Route path="/auth/lightspeed-x/callback" element={<AuthCallbackPage />} />
+                  <Route path="/auth/lightspeed-r/callback" element={<AuthCallbackPage />} />
+                  <Route path="/support" element={<Support />} />
+                  <Route path="/unsubscribe" element={<Unsubscribe />} />
+                  <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/brand-guide" element={<BrandGuide />} />
+                  <Route path="/case-study" element={<CaseStudyPage />} />
+                  <Route path="/health" element={<Health />} />
+                  <Route path="/admin/secrets" element={<AdminSecrets />} />
+                  <Route path="/admin/ai-models" element={<AdminAIModels />} />
+                  <Route path="/rules" element={<Rules />} />
+                  <Route path="/rules/setup" element={<RulesSetup />} />
+                  <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
+                  <Route
+                    path="/google-shopping"
+                    element={
+                      <Suspense fallback={null}>
+                        <GoogleShoppingHub />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/pricing-intelligence"
+                    element={
+                      <Suspense fallback={null}>
+                        <PricingIntelligence />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/tools/feed-health"
+                    element={
+                      <RequireAuth>
+                        <Suspense fallback={null}>
+                          <FeedHealthPanel onBack={() => window.history.back()} />
+                        </Suspense>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route path="/review" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/enrich" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/publish" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/capture" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/price" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/analyse" element={<Index initialTab="analytics" />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+                <InstallAppBanner />
+                <EmbeddedAuthHealthCheck />
+                <SonicChat />
+              </BrowserRouter>
             </PromptDialogProvider>
           </ConfirmDialogProvider>
         </BarcodeProvider>

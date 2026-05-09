@@ -12,6 +12,8 @@ export interface ExtractionDebugInfo {
     column_count: number;
     grid?: string[][];
   }>;
+  cache_creation_tokens?: number | null;
+  cache_read_tokens?: number | null;
 }
 
 interface Props {

@@ -385,6 +385,11 @@ export function StockReconciliationPanel({
                       }
                       groupBadge={meta.badge}
                       onOpen={() => setDrawerIdx(idx)}
+                      priceEntry={
+                        pricePlan?.byKey[
+                          (line.invoice_sku || line.invoice_product_name || "").trim()
+                        ]
+                      }
                     />
                   ))}
                 </div>

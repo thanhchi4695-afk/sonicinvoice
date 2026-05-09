@@ -1015,6 +1015,7 @@ async function runClaudePdfDirect(opts: {
   const usage = (data?.usage ?? {}) as Record<string, unknown>;
   const cache_creation_tokens = Number(usage.cache_creation_input_tokens ?? 0) || 0;
   const cache_read_tokens = Number(usage.cache_read_input_tokens ?? 0) || 0;
+  console.log("[cache] usage:", JSON.stringify(usage));
   console.log(
     `[claude-pdf] cache: creation=${cache_creation_tokens} read=${cache_read_tokens}`,
   );

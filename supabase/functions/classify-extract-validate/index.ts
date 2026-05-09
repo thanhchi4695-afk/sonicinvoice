@@ -588,6 +588,8 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
   let claudeInvoiceSubtotal: number | null = null;
   let graderResult: GraderResult | null = null;
   let graderAttempts = 0;
+  let cacheCreationTokens = 0;
+  let cacheReadTokens = 0;
 
   if (!extraction && preferClaudePdf) {
     try {
@@ -598,6 +600,8 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
       });
       let claudeProducts = applyStaticVendorRouting(first.products);
       claudeInvoiceSubtotal = first.invoice_subtotal;
+      cacheCreationTokens += first.cache_creation_tokens;
+      cacheReadTokens += first.cache_read_tokens;
       claudePdfUsed = true;
       console.log(`[claude-pdf] success: ${claudeProducts.length} products, subtotal=${claudeInvoiceSubtotal}`);
 
@@ -623,6 +627,8 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
           });
           claudeProducts = applyStaticVendorRouting(retry.products);
           if (retry.invoice_subtotal != null) claudeInvoiceSubtotal = retry.invoice_subtotal;
+          cacheCreationTokens += retry.cache_creation_tokens;
+          cacheReadTokens += retry.cache_read_tokens;
           console.log(`[claude-pdf] re-extract attempt ${attempt} → ${claudeProducts.length} products`);
         } catch (retryErr) {
           console.warn(`[claude-pdf] re-extract attempt ${attempt} failed:`, retryErr);

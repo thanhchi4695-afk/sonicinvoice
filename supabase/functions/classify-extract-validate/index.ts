@@ -582,21 +582,31 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     }
   }
 
-  // ─────── STAGE 2B — Fallback / non-PDF — original parse-invoice agent ───────
+  // ─────── STAGE 2B — Fallback / non-PDF / Claude-PDF — parse-invoice agent ───────
+  let claudePdfUsed = false;
   if (!extraction) {
-    const ext = await fetch(`${supabaseUrl}/functions/v1/parse-invoice`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: authHeader, apikey: anonKey },
-      body: JSON.stringify(parseBody),
-    });
+    try {
+      const ext = await fetch(`${supabaseUrl}/functions/v1/parse-invoice`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: authHeader, apikey: anonKey },
+        body: JSON.stringify(parseBody),
+      });
 
-    if (!ext.ok) {
-      const errText = await ext.text();
-      const err = new Error(`Extraction failed (${ext.status}): ${errText.slice(0, 500)}`);
-      (err as Error & { status?: number }).status = ext.status;
-      throw err;
+      if (!ext.ok) {
+        const errText = await ext.text();
+        const err = new Error(`Extraction failed (${ext.status}): ${errText.slice(0, 500)}`);
+        (err as Error & { status?: number }).status = ext.status;
+        if (preferClaudePdf) console.error("[claude-pdf] failed:", err.message);
+        throw err;
+      }
+      extraction = await ext.json();
+      if (preferClaudePdf) claudePdfUsed = true;
+    } catch (e) {
+      if (preferClaudePdf) {
+        console.error("[claude-pdf] threw:", e instanceof Error ? e.message : String(e));
+      }
+      throw e;
     }
-    extraction = await ext.json();
   }
 
   // ─────── STAGE 3 — validation ───────

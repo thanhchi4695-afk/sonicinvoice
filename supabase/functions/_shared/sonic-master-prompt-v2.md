@@ -98,13 +98,17 @@ Suppliers often invoice under a legal/parent company name that differs from the 
 
 | Invoice header says | Shopify Vendor | Notes |
 |---|---|---|
-| Bond-Eye Australia / Bond-Eye Australia Pty Ltd | Bond Eye OR Sea Level | **SKU-prefix override**: SKUs starting `SL` followed by digits (e.g. SL1205ECO, SL4015ECO) → vendor = Sea Level. SKUs starting `BOUND` (e.g. BOUND633R) → vendor = Bond Eye. The SKU prefix wins over the invoice header. |
+| Bond-Eye Australia / Bond-Eye Australia Pty Ltd | Bond Eye OR Sea Level OR Artesands OR Bond Eye Aria | **SKU-prefix override** (single legal entity → 4 Shopify brands): SKU starting `SL` + digits → **Sea Level**. SKU starting `BOUND` → **Bond Eye**. SKU starting `AT` and containing `ND` (e.g. `AT0123ND`) → **Artesands** (Neo Du Palmis). SKU starting `AT` and containing `GA` (e.g. `AT0456GA`) → **Bond Eye Aria**. The SKU prefix wins over the invoice header. |
+| Sunshades Eyewear Pty Ltd | Le Specs OR Status Anxiety OR Pared | **SKU-prefix override**: `LSP` → Le Specs. Use `Shipped` qty (not `Ordered`). RRP is GST-incl. |
+| Concept Brands Pty Ltd | Miracle Suit (or other Concept brands) | Cin7 format. **Use the per-row Brand column to route Shopify vendor — do not trust the invoice header.** |
+| Roadtrip Essential Pty Ltd | Smelly Balls OR Chern'ee Sutton | **SKU-prefix override**: `SBS`/`SBO`/`MOSP`/`SB` → Smelly Balls. `CSSB` → Chern'ee Sutton (artist collab). Pack of 6 inner cartons. |
+| Rock Denim Pty Ltd / Rock Fashions | Iris Maxi (or other Rock Denim labels) | Boho dresses/pants. `REV1` suffix on invoice number = revised invoice (check for prior version). |
 | We Are Feel Good / WAFG / ABN 88 627 285 296 | We Are Feel Good | Sunscreen / skincare. See brand-specific rules below. |
 | Rhythm Group / Cin7 invoice (URL contains go.cin7.com) for Rhythm | Rhythm Womens or Rhythm Mens | See Cin7 format handling below. |
 | The Commonfolk (Cin7 invoice) | The Commonfolk | See Cin7 format handling below. |
-| Skye Group Pty Ltd | Jantzen | Always — Jantzen is distributed by Skye Group |
-| Ambra Corporation Pty Ltd | Ambra or Love Luna | LLSW prefix = Love Luna; AMUW prefix = Ambra |
-| HEAD OCEANIA PTY LIMITED | Zoggs | A Division of HEAD |
+| Skye Group Pty Ltd | Jantzen OR Sunseeker | **SKU-prefix override**: `JA` → Jantzen, `SS` → Sunseeker. Settlement-discount terms (e.g. 5%-30) are payment-side — **do NOT deduct from cost**. |
+| Ambra Corporation Pty Ltd | Ambra or Love Luna | LLSW prefix = Love Luna; AMUW prefix = Ambra. **Love Luna period swimwear is GST-FREE (0%)** — see GST-free brands rule below. |
+| HEAD OCEANIA PTY LIMITED | Zoggs | A Division of HEAD. **5% discount is baked into per-row price** — do NOT apply again. |
 | MAPM International Pty Ltd | Nude Footwear | Also distributes Clarks, SASO — use Brand field on invoice |
 | Sapphire Group Pty Ltd | Glasshouse Fragrances or Circa Home | FG prefix = Glasshouse; FC prefix = Circa |
 | Australian Lifestyle Brands Pty Ltd | Smelly Balls | Or Tigerlily — confirm from invoice content |
@@ -411,6 +415,22 @@ Detection: supplier contains "We Are Feel Good" or "WAFG", or ABN is 88 627 285 
 - **Skip TESTER rows entirely**: any row where SKU starts `TEST`, OR description contains "Tester"/"TESTER", OR RRP = 0.00. Do not emit Shopify products for them.
 - All products are `size = "One Size"` (no size variants).
 - Vendor = `We Are Feel Good`. Product type = Sunscreen / Skincare / Lip Balm based on description.
+
+---
+
+## GST-FREE BRANDS (AU TAX-LAW EXEMPTIONS)
+
+Some brands ship products that are **GST-free by Australian tax law**, not by accident. The invoice will show `Tax Rate = 0%` or `GST = $0.00` on these lines. Treat them as the legal default — never "correct" them to 10%.
+
+| Brand | What's GST-free | Why |
+|---|---|---|
+| **Love Luna** (via Ambra Corporation) | All period swimwear / period underwear lines | Menstrual product GST exemption (A New Tax System (Goods and Services Tax) Act 1999, Sch 4). |
+| **We Are Feel Good** | Most sunscreens (SPF 30+ therapeutic) | Sunscreen lotion exemption. Lip balms / body milks remain 10%. |
+
+**Parser behaviour:**
+- When the supplier matches a GST-free brand, pass `cost_ex_gst` straight from the printed unit price (it already excludes GST because none is charged).
+- Do NOT add 10% in any "ex-GST → inc-GST" calculation downstream.
+- Mixed-rate invoices (e.g. We Are Feel Good with both sunscreen and lip balm): respect the per-line `Tax Rate` column.
 
 ---
 

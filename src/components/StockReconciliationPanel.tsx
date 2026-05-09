@@ -699,6 +699,7 @@ function LineRow({
   onDecision,
   groupBadge,
   onOpen,
+  priceEntry,
 }: {
   line: ReconciliationLine;
   checked: boolean;
@@ -707,6 +708,7 @@ function LineRow({
   onDecision: (d: "new" | "old") => void;
   groupBadge: string;
   onOpen?: () => void;
+  priceEntry?: PricePlanEntry;
 }) {
   const isConflict = line.match_type.endsWith("_conflict");
   const isRefill = line.match_type.startsWith("exact_refill");

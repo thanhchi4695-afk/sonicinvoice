@@ -152,9 +152,12 @@ function lineKey(line: ReconciliationLine): string {
 /**
  * Build a price-restore plan for the supplied refill / new_variant lines.
  * Does NOT write to Shopify. Caller decides when to push.
+ *
+ * Pass an explicit `_fetcher` from tests to avoid hitting Supabase.
  */
 export async function planRefillPriceRestore(
   lines: ReconciliationLine[],
+  _fetcher: SnapshotFetcher = fetchProductSnapshots,
 ): Promise<PricePlan> {
   const eligible = lines.filter(
     (l) =>
@@ -164,11 +167,13 @@ export async function planRefillPriceRestore(
       l.match_type === "new_variant_conflict",
   );
 
-  const variantIds = eligible
-    .map((l) => l.matched_variant_id)
+  // Always fetch by product so that new_variant lines (no variant id yet)
+  // and exact_refill lines on the same product reuse one snapshot.
+  const productIds = eligible
+    .map((l) => l.matched_product_id)
     .filter((id): id is string => !!id);
 
-  const { byVariantId, productSiblings } = await fetchVariantSnapshots(variantIds);
+  const { byVariantId, productSiblings } = await _fetcher(productIds);
 
   const plan: PricePlan = {
     byKey: {},
@@ -182,27 +187,32 @@ export async function planRefillPriceRestore(
     },
   };
 
+  // Track product-level decisions so multiple refill lines hitting the same
+  // product don't double-count siblings.
+  const productHandled = new Set<string>();
+
   for (const line of eligible) {
     const key = lineKey(line);
     if (!key) continue;
 
     const variantGid = line.matched_variant_id ? asGid("ProductVariant", line.matched_variant_id) : null;
     const productGid = line.matched_product_id ? asGid("Product", line.matched_product_id) : null;
-    const snap = variantGid ? byVariantId[variantGid] : undefined;
+    const directSnap = variantGid ? byVariantId[variantGid] : undefined;
 
     const entry: PricePlanEntry = {
       invoice_sku: line.invoice_sku,
       shopify_product_id: productGid,
       shopify_variant_id: variantGid,
-      current_price: snap?.price ?? null,
-      current_compare_at: snap?.compareAt ?? null,
+      current_price: directSnap?.price ?? null,
+      current_compare_at: directSnap?.compareAt ?? null,
       invoice_rrp: line.invoice_rrp,
       new_price: null,
       new_compare_at: null,
       state: "no_change",
     };
 
-    if (!snap) {
+    // No matched product at all — nothing we can do.
+    if (!productGid) {
       entry.state = "skipped_no_match";
       plan.summary.skipped_no_match++;
       plan.byKey[key] = entry;
@@ -217,40 +227,57 @@ export async function planRefillPriceRestore(
       continue;
     }
 
-    const onSale = isOnSale(snap, line.invoice_rrp);
-
-    if (!onSale) {
-      // Not on sale — never reduce
-      if (line.invoice_rrp < snap.price - 0.001) {
-        entry.state = "skipped_lower";
-        entry.warning = `Invoice RRP $${line.invoice_rrp.toFixed(2)} lower than current $${snap.price.toFixed(2)} — skipped`;
-        plan.summary.skipped_lower++;
-      } else {
-        entry.state = "no_change";
-        plan.summary.no_change++;
-      }
+    const allSiblings = productSiblings[productGid] ?? [];
+    if (allSiblings.length === 0) {
+      entry.state = "skipped_no_match";
+      entry.warning = "Shopify product not found — could not load variants";
+      plan.summary.skipped_no_match++;
       plan.byKey[key] = entry;
       continue;
     }
 
-    // Restore — price := invoice RRP, compare_at := null
-    entry.new_price = line.invoice_rrp;
-    entry.new_compare_at = null;
-    entry.state = "restored";
-    plan.summary.restored++;
+    // Decide for the matched variant (if any).
+    if (directSnap) {
+      const onSale = isOnSale(directSnap, line.invoice_rrp);
+      if (!onSale) {
+        if (line.invoice_rrp < directSnap.price - 0.001) {
+          entry.state = "skipped_lower";
+          entry.warning = `Invoice RRP $${line.invoice_rrp.toFixed(2)} lower than current $${directSnap.price.toFixed(2)} — skipped`;
+          plan.summary.skipped_lower++;
+        } else {
+          entry.state = "no_change";
+          plan.summary.no_change++;
+        }
+      } else {
+        entry.new_price = line.invoice_rrp;
+        entry.new_compare_at = null;
+        entry.state = "restored";
+        plan.summary.restored++;
+      }
+    } else {
+      // new_variant on existing product — direct variant doesn't exist yet,
+      // so the line itself is "no_change" but we still cascade to siblings.
+      entry.state = "no_change";
+      plan.summary.no_change++;
+    }
 
-    // Restore on ALL siblings of the parent product (rule: only-some-on-sale case)
-    const siblings = snap.productId ? productSiblings[snap.productId] ?? [] : [];
-    entry.sibling_variants = siblings
-      .filter((sib) => sib.variantId !== snap.variantId)
-      .filter((sib) => isOnSale(sib, line.invoice_rrp))
-      .map((sib) => ({
-        variant_id: sib.variantId,
-        current_price: sib.price,
-        current_compare_at: sib.compareAt,
-        new_price: line.invoice_rrp!,
-        new_compare_at: null,
-      }));
+    // Sibling cascade — restore every other on-sale variant of the parent
+    // product to the invoice RRP. Only process siblings once per product.
+    if (!productHandled.has(productGid)) {
+      productHandled.add(productGid);
+      entry.sibling_variants = allSiblings
+        .filter((sib) => sib.variantId !== directSnap?.variantId)
+        .filter((sib) => isOnSale(sib, line.invoice_rrp))
+        .map((sib) => ({
+          variant_id: sib.variantId,
+          current_price: sib.price,
+          current_compare_at: sib.compareAt,
+          new_price: line.invoice_rrp!,
+          new_compare_at: null,
+        }));
+    } else {
+      entry.sibling_variants = [];
+    }
 
     plan.byKey[key] = entry;
   }

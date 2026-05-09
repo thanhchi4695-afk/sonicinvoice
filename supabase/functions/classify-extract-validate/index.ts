@@ -582,8 +582,77 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     }
   }
 
-  // ─────── STAGE 2B — Fallback / non-PDF / Claude-PDF — parse-invoice agent ───────
+  // ─────── STAGE 2B — Claude-PDF direct (Anthropic native) or parse-invoice fallback ───────
   let claudePdfUsed = false;
+
+  if (!extraction && preferClaudePdf) {
+    try {
+      const claudeProducts = await runClaudePdfDirect({
+        fileBase64: String(fileContent),
+        supplierName: supplierName || classification?.supplier_name || null,
+        skillsMarkdown: mergedSkills,
+      });
+      extraction = {
+        products: claudeProducts,
+        supplier: supplierName || classification?.supplier_name || null,
+        extractor: "claude-pdf",
+      };
+      claudePdfUsed = true;
+      console.log(`[claude-pdf] success: ${claudeProducts.length} products`);
+    } catch (e) {
+      console.error("[claude-pdf] failed:", e instanceof Error ? e.message : String(e));
+      // Fall through to Azure (if available) or parse-invoice
+      if (isPdf && hasAzure) {
+        try {
+          console.log("[claude-pdf] falling back to Azure layout");
+          const az = await fetch(`${supabaseUrl}/functions/v1/azure-table-extract`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({
+              fileContent,
+              fileName,
+              fileType,
+              supplierName: supplierName || classification?.supplier_name || undefined,
+            }),
+          });
+          if (az.ok) {
+            const azJson = await az.json();
+            const azProductsRaw = Array.isArray(azJson?.products) ? azJson.products : [];
+            const azProducts = azProductsRaw.map((p: Record<string, unknown>) => {
+              const cost = Number(p.unit_cost ?? p.cost ?? 0) || 0;
+              const rrp = p.rrp != null && p.rrp !== "" ? Number(p.rrp) : null;
+              const qty = Number(p.qty ?? p.quantity ?? 0) || 0;
+              const name = String(p.product_title ?? p.name ?? "").trim();
+              const sku = String(p.style_code ?? p.sku ?? "").trim();
+              const colour = String(p.colour ?? p.color ?? "").trim();
+              const size = String(p.size ?? "").trim();
+              const category = String(p.category ?? "").trim();
+              return {
+                ...p, name, product_name: name, product_title: name,
+                sku, style_code: sku, colour, size, qty, quantity: qty,
+                cost, unit_cost: cost, rrp: rrp ?? null, compare_at_price: rrp ?? null,
+                tags: category ? [category] : (Array.isArray(p.tags) ? p.tags : []),
+              };
+            });
+            if (azProducts.length > 0) {
+              extraction = {
+                products: azProducts,
+                supplier: supplierName || classification?.supplier_name || null,
+                extractor: "azure_layout+llm",
+                tables_found: azJson.tables_found,
+                azure_raw_tables: azJson.raw_tables ?? [],
+                invoice_format: azJson.format ?? null,
+              };
+              azureUsed = true;
+            }
+          }
+        } catch (azErr) {
+          console.warn("[claude-pdf] Azure fallback also failed:", azErr);
+        }
+      }
+    }
+  }
+
   if (!extraction) {
     try {
       const ext = await fetch(`${supabaseUrl}/functions/v1/parse-invoice`, {
@@ -594,17 +663,10 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
 
       if (!ext.ok) {
         const errText = await ext.text();
-        const err = new Error(`Extraction failed (${ext.status}): ${errText.slice(0, 500)}`);
-        (err as Error & { status?: number }).status = ext.status;
-        if (preferClaudePdf) console.error("[claude-pdf] failed:", err.message);
-        throw err;
+        throw new Error(`Extraction failed (${ext.status}): ${errText.slice(0, 500)}`);
       }
       extraction = await ext.json();
-      if (preferClaudePdf) claudePdfUsed = true;
     } catch (e) {
-      if (preferClaudePdf) {
-        console.error("[claude-pdf] threw:", e instanceof Error ? e.message : String(e));
-      }
       throw e;
     }
   }

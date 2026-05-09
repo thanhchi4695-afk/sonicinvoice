@@ -39,12 +39,12 @@ interface PipelineContext {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  console.log(
-    "[startup] ANTHROPIC_API_KEY present:",
-    !!Deno.env.get("ANTHROPIC_API_KEY"),
-    "AZURE present:",
-    !!Deno.env.get("AZURE_DOCUMENT_INTELLIGENCE_KEY"),
-  );
+  console.log("[startup] ANTHROPIC_API_KEY present:", !!Deno.env.get("ANTHROPIC_API_KEY"));
+  try {
+    console.log("[startup] Deno.env keys available:", Object.keys(Deno.env.toObject()).join(", "));
+  } catch (e) {
+    console.log("[startup] Deno.env.toObject() failed:", e instanceof Error ? e.message : String(e));
+  }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -582,8 +582,77 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     }
   }
 
-  // ─────── STAGE 2B — Fallback / non-PDF / Claude-PDF — parse-invoice agent ───────
+  // ─────── STAGE 2B — Claude-PDF direct (Anthropic native) or parse-invoice fallback ───────
   let claudePdfUsed = false;
+
+  if (!extraction && preferClaudePdf) {
+    try {
+      const claudeProducts = await runClaudePdfDirect({
+        fileBase64: String(fileContent),
+        supplierName: supplierName || classification?.supplier_name || null,
+        skillsMarkdown: mergedSkills,
+      });
+      extraction = {
+        products: claudeProducts,
+        supplier: supplierName || classification?.supplier_name || null,
+        extractor: "claude-pdf",
+      };
+      claudePdfUsed = true;
+      console.log(`[claude-pdf] success: ${claudeProducts.length} products`);
+    } catch (e) {
+      console.error("[claude-pdf] failed:", e instanceof Error ? e.message : String(e));
+      // Fall through to Azure (if available) or parse-invoice
+      if (isPdf && hasAzure) {
+        try {
+          console.log("[claude-pdf] falling back to Azure layout");
+          const az = await fetch(`${supabaseUrl}/functions/v1/azure-table-extract`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({
+              fileContent,
+              fileName,
+              fileType,
+              supplierName: supplierName || classification?.supplier_name || undefined,
+            }),
+          });
+          if (az.ok) {
+            const azJson = await az.json();
+            const azProductsRaw = Array.isArray(azJson?.products) ? azJson.products : [];
+            const azProducts = azProductsRaw.map((p: Record<string, unknown>) => {
+              const cost = Number(p.unit_cost ?? p.cost ?? 0) || 0;
+              const rrp = p.rrp != null && p.rrp !== "" ? Number(p.rrp) : null;
+              const qty = Number(p.qty ?? p.quantity ?? 0) || 0;
+              const name = String(p.product_title ?? p.name ?? "").trim();
+              const sku = String(p.style_code ?? p.sku ?? "").trim();
+              const colour = String(p.colour ?? p.color ?? "").trim();
+              const size = String(p.size ?? "").trim();
+              const category = String(p.category ?? "").trim();
+              return {
+                ...p, name, product_name: name, product_title: name,
+                sku, style_code: sku, colour, size, qty, quantity: qty,
+                cost, unit_cost: cost, rrp: rrp ?? null, compare_at_price: rrp ?? null,
+                tags: category ? [category] : (Array.isArray(p.tags) ? p.tags : []),
+              };
+            });
+            if (azProducts.length > 0) {
+              extraction = {
+                products: azProducts,
+                supplier: supplierName || classification?.supplier_name || null,
+                extractor: "azure_layout+llm",
+                tables_found: azJson.tables_found,
+                azure_raw_tables: azJson.raw_tables ?? [],
+                invoice_format: azJson.format ?? null,
+              };
+              azureUsed = true;
+            }
+          }
+        } catch (azErr) {
+          console.warn("[claude-pdf] Azure fallback also failed:", azErr);
+        }
+      }
+    }
+  }
+
   if (!extraction) {
     try {
       const ext = await fetch(`${supabaseUrl}/functions/v1/parse-invoice`, {
@@ -594,17 +663,10 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
 
       if (!ext.ok) {
         const errText = await ext.text();
-        const err = new Error(`Extraction failed (${ext.status}): ${errText.slice(0, 500)}`);
-        (err as Error & { status?: number }).status = ext.status;
-        if (preferClaudePdf) console.error("[claude-pdf] failed:", err.message);
-        throw err;
+        throw new Error(`Extraction failed (${ext.status}): ${errText.slice(0, 500)}`);
       }
       extraction = await ext.json();
-      if (preferClaudePdf) claudePdfUsed = true;
     } catch (e) {
-      if (preferClaudePdf) {
-        console.error("[claude-pdf] threw:", e instanceof Error ? e.message : String(e));
-      }
       throw e;
     }
   }
@@ -748,5 +810,116 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// ─────── Claude-native PDF extraction (Anthropic API direct) ───────
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
+
+const RETURN_INVOICE_TOOL = {
+  name: "return_invoice",
+  description: "Return all line items extracted from the invoice PDF.",
+  input_schema: {
+    type: "object",
+    properties: {
+      products: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Product/style name" },
+            sku: { type: "string", description: "Style code / SKU" },
+            colour: { type: "string" },
+            size: { type: "string" },
+            qty: { type: "number" },
+            cost: { type: "number", description: "Unit cost ex-tax" },
+            rrp: { type: ["number", "null"] },
+            barcode: { type: ["string", "null"] },
+            category: { type: ["string", "null"], description: "Section header e.g. Eco, Recycled" },
+          },
+          required: ["name", "sku", "qty", "cost"],
+        },
+      },
+    },
+    required: ["products"],
+  },
+} as const;
+
+async function runClaudePdfDirect(opts: {
+  fileBase64: string;
+  supplierName: string | null;
+  skillsMarkdown: string;
+}): Promise<Array<Record<string, unknown>>> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+
+  const systemPrompt = [
+    "You are an expert invoice/packing-slip extractor for fashion wholesale documents.",
+    "Extract EVERY line item. Preserve every variant (colour + size combo) as its own row.",
+    "Numbers must be plain numbers (no currency symbols). Use null when truly unknown.",
+    "Carry section headers (e.g. 'Eco', 'Recycled') across page breaks as `category`.",
+    opts.supplierName ? `Supplier: ${opts.supplierName}` : "",
+    opts.skillsMarkdown ? `\n\nSupplier-specific extraction rules:\n${opts.skillsMarkdown}` : "",
+  ].filter(Boolean).join("\n");
+
+  const userPrompt = "Extract all product line items from this invoice PDF using the return_invoice tool.";
+
+  const fileBase64 = String(opts.fileBase64 || "").replace(/^data:[^;]+;base64,/, "");
+
+  const response = await fetch(ANTHROPIC_API_URL, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 8000,
+      system: systemPrompt,
+      tools: [RETURN_INVOICE_TOOL],
+      tool_choice: { type: "tool", name: "return_invoice" },
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: fileBase64 },
+          },
+          { type: "text", text: userPrompt },
+        ],
+      }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Anthropic API ${response.status}: ${errText.slice(0, 500)}`);
+  }
+
+  const data = await response.json();
+  const toolUse = (data?.content || []).find((b: Record<string, unknown>) => b.type === "tool_use");
+  if (!toolUse || !toolUse.input) {
+    throw new Error("Anthropic returned no tool_use block");
+  }
+  const products = Array.isArray(toolUse.input.products) ? toolUse.input.products : [];
+  // Normalise to internal shape (mirror Azure mapping)
+  return products.map((p: Record<string, unknown>) => {
+    const cost = Number(p.cost ?? 0) || 0;
+    const rrp = p.rrp != null && p.rrp !== "" ? Number(p.rrp) : null;
+    const qty = Number(p.qty ?? 0) || 0;
+    const name = String(p.name ?? "").trim();
+    const sku = String(p.sku ?? "").trim();
+    const colour = String(p.colour ?? "").trim();
+    const size = String(p.size ?? "").trim();
+    const category = String(p.category ?? "").trim();
+    return {
+      name, product_name: name, product_title: name,
+      sku, style_code: sku, colour, size, qty, quantity: qty,
+      cost, unit_cost: cost, rrp, compare_at_price: rrp,
+      barcode: p.barcode ?? null,
+      tags: category ? [category] : [],
+    };
   });
 }

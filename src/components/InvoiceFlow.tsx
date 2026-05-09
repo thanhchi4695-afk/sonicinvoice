@@ -3231,6 +3231,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
   const [enrichAllRunning, setEnrichAllRunning] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
+  const [brandDirVersion, setBrandDirVersion] = useState(0);
+  const [dismissedMissingBrands, setDismissedMissingBrands] = useState<Set<string>>(new Set());
   const [validationDebug, setValidationDebug] = useState<ValidationDebugInfo | null>(null);
   const [validatedProducts, setValidatedProducts] = useState<ValidatedProduct[]>([]);
   // ── Brain Mode (5-stage pipeline) state — only populated when toggle is ON ──

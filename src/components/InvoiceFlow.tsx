@@ -3665,10 +3665,9 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const storeCity = storeConfig.city || '';
       const customInstr = storeConfig.defaultInstructions || '';
       
-      // Look up brand website from brand directory
-      const brandDir = JSON.parse(localStorage.getItem('brand_directory_sonic_invoice') || '[]');
-      const brandEntry = brandDir.find((b: any) => b.name.toLowerCase() === group.brand.toLowerCase());
-      const brandWebsite = brandEntry?.website || '';
+      // Look up brand website from brand directory (alias-aware)
+      const brandMatch = matchVendor(group.brand);
+      const brandWebsite = brandMatch?.brand.website || '';
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-product`, {
         method: 'POST',

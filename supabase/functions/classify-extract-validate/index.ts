@@ -495,12 +495,23 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
   let extraction: Record<string, unknown> | null = null;
   let azureUsed = false;
 
-  const isPdf = String(fileType || "").toLowerCase() === "pdf" ||
+  const mt = String(fileType || "").toLowerCase();
+  const isPdf =
+    mt === "pdf" ||
+    mt === "application/pdf" ||
+    mt === "application/octet-stream" ||
     String(fileName || "").toLowerCase().endsWith(".pdf");
   const hasAzure = !!Deno.env.get("AZURE_DOCUMENT_INTELLIGENCE_KEY") &&
     !!Deno.env.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT");
+  const hasAnthropic = !!Deno.env.get("ANTHROPIC_API_KEY");
+  // Prefer Claude-native PDF parsing when the key is present — Azure is only
+  // used as a fallback for PDFs when ANTHROPIC_API_KEY is missing.
+  const preferClaudePdf = isPdf && hasAnthropic;
+  console.log(
+    `[route] isPdf=${isPdf} hasAnthropic=${hasAnthropic} hasAzure=${hasAzure} preferClaudePdf=${preferClaudePdf} fileName=${fileName} fileType=${fileType}`,
+  );
 
-  if (isPdf && hasAzure) {
+  if (isPdf && hasAzure && !preferClaudePdf) {
     try {
       const az = await fetch(`${supabaseUrl}/functions/v1/azure-table-extract`, {
         method: "POST",

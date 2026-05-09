@@ -596,7 +596,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
         supplierName: supplierName || classification?.supplier_name || null,
         skillsMarkdown: mergedSkills,
       });
-      let claudeProducts = first.products;
+      let claudeProducts = applyStaticVendorRouting(first.products);
       claudeInvoiceSubtotal = first.invoice_subtotal;
       claudePdfUsed = true;
       console.log(`[claude-pdf] success: ${claudeProducts.length} products, subtotal=${claudeInvoiceSubtotal}`);
@@ -621,7 +621,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
             skillsMarkdown: mergedSkills,
             reextractReason: graderResult.reextract_reason,
           });
-          claudeProducts = retry.products;
+          claudeProducts = applyStaticVendorRouting(retry.products);
           if (retry.invoice_subtotal != null) claudeInvoiceSubtotal = retry.invoice_subtotal;
           console.log(`[claude-pdf] re-extract attempt ${attempt} → ${claudeProducts.length} products`);
         } catch (retryErr) {
@@ -1023,8 +1023,13 @@ RUBRIC — check every criterion:
 6. COST_VALIDATES: sum(cost_ex_gst × qty) must equal invoice subtotal ±$1.00.
    If subtotal unknown, mark as "unverified" not fail.
 
-7. RRP_ABOVE_COST: Every rrp_incl_gst must be > cost_ex_gst × 1.1.
-   Flag any product where margin < 10% after GST.
+7. RRP_ABOVE_COST: For every product, check: rrp_incl_gst > (cost_ex_gst × 1.1).
+   This verifies RRP covers cost plus GST with any margin above zero.
+   Example: cost=$76.90, cost×1.1=$84.59, rrp=$180.00 → $180 > $84.59 → PASS.
+   Only fail if rrp_incl_gst is actually lower than cost_ex_gst × 1.1
+   (i.e. selling below cost after GST). Do not compute gross margin percentage.
+   Do not apply any percentage threshold. The check is purely: rrp > cost × 1.1.
+   If rrp_incl_gst is missing/null for a product, mark this criterion "unverified" not "fail".
 
 Return this exact JSON:
 {
@@ -1137,10 +1142,17 @@ async function runSonicGrader(opts: {
   }
   try {
     const parsed = JSON.parse(match[0]);
+    const criteria = (parsed.criteria ?? {}) as Record<string, string>;
+    // Recompute score deterministically: pass + unverified count toward score.
+    const entries = Object.entries(criteria);
+    const total = entries.length || 7;
+    const passing = entries.filter(([, v]) => v === "pass" || v === "unverified").length;
+    const score = Math.round((passing / total) * 100);
+    const failed = entries.filter(([, v]) => v === "fail").length;
     return {
-      passed: !!parsed.passed,
-      score: Number(parsed.score) || 0,
-      criteria: parsed.criteria ?? {},
+      passed: failed === 0,
+      score,
+      criteria,
       failures: Array.isArray(parsed.failures) ? parsed.failures : [],
       reextract_needed: !!parsed.reextract_needed,
       reextract_reason: String(parsed.reextract_reason ?? ""),
@@ -1152,4 +1164,53 @@ async function runSonicGrader(opts: {
       error: e instanceof Error ? e.message : String(e),
     };
   }
+}
+
+// ─────── Static SKU-prefix → vendor routing (mirrors src/lib/sku-brand-prefix.ts) ───────
+// Applied server-side immediately after extraction so the grader and the
+// persisted job both see the canonical brand instead of the raw invoice header.
+interface StaticPrefixRule { prefix: string; contains?: string; brand: string; }
+const STATIC_VENDOR_RULES: StaticPrefixRule[] = [
+  { prefix: "JA", brand: "Jantzen" },
+  { prefix: "SS", brand: "Sunseeker" },
+  { prefix: "OB", brand: "Olga Berg" },
+  { prefix: "SL", brand: "Sea Level" },
+  { prefix: "AT", contains: "ND", brand: "Artesands" },
+  { prefix: "AT", contains: "GA", brand: "Bond Eye Aria" },
+  { prefix: "BOUND", brand: "Bond Eye" },
+  { prefix: "LSP", brand: "Le Specs" },
+  { prefix: "CSSB", brand: "Chern'ee Sutton" },
+  { prefix: "SBS", brand: "Smelly Balls" },
+  { prefix: "SBO", brand: "Smelly Balls" },
+  { prefix: "MOSP", brand: "Smelly Balls" },
+  { prefix: "LLSW", brand: "Love Luna" },
+  { prefix: "AMUW", brand: "Ambra" },
+];
+
+function detectBrandFromSkuStatic(sku: string | null | undefined): string | null {
+  if (!sku) return null;
+  const cleaned = String(sku).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (cleaned.length < 3) return null;
+  for (const rule of STATIC_VENDOR_RULES) {
+    if (!cleaned.startsWith(rule.prefix)) continue;
+    if (rule.contains && !cleaned.slice(rule.prefix.length).includes(rule.contains)) continue;
+    return rule.brand;
+  }
+  return null;
+}
+
+function applyStaticVendorRouting<T extends Record<string, unknown>>(products: T[]): T[] {
+  if (!Array.isArray(products)) return products;
+  let routed = 0;
+  for (const p of products) {
+    const sku = (p.sku ?? p.style_code ?? "") as string;
+    const brand = detectBrandFromSkuStatic(sku);
+    if (brand) {
+      (p as Record<string, unknown>).vendor = brand;
+      (p as Record<string, unknown>).brand = brand;
+      routed++;
+    }
+  }
+  if (routed > 0) console.log(`[vendor-routing] applied SKU-prefix vendor to ${routed}/${products.length} products`);
+  return products;
 }

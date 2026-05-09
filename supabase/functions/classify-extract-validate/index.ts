@@ -915,6 +915,9 @@ const RETURN_INVOICE_TOOL = {
     },
     required: ["products"],
   },
+  // Cache breakpoint on the last tool — caches tools+system together as one
+  // prefix, comfortably exceeding Anthropic's 1,024-token minimum.
+  cache_control: { type: "ephemeral" },
 } as const;
 
 async function runClaudePdfDirect(opts: {
@@ -951,18 +954,15 @@ async function runClaudePdfDirect(opts: {
     ? `IMPORTANT — RE-EXTRACTION FEEDBACK FROM GRADER:\n${opts.reextractReason}\nFix these specific issues this time.`
     : "";
 
-  // Build system as content blocks with explicit cache_control breakpoints.
-  // Master prompt is always cached. Brand profile, when present, is cached as
-  // a second block so master+profile are served from cache together.
+  // Build system as content blocks. The cache breakpoint lives on the last
+  // tool (see RETURN_INVOICE_TOOL above), which caches tools + system together
+  // as one prefix. Individual system blocks are too small (<1,024 tokens) to
+  // be cache breakpoints on their own, so we don't put cache_control here.
   const systemBlocks: Array<Record<string, unknown>> = [
-    { type: "text", text: masterPrompt, cache_control: { type: "ephemeral" } },
+    { type: "text", text: masterPrompt },
   ];
   if (brandProfileBlock) {
-    systemBlocks.push({
-      type: "text",
-      text: brandProfileBlock,
-      cache_control: { type: "ephemeral" },
-    });
+    systemBlocks.push({ type: "text", text: brandProfileBlock });
   }
   if (reextractBlock) {
     systemBlocks.push({ type: "text", text: reextractBlock });

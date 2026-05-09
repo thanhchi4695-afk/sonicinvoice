@@ -5159,6 +5159,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 qtyHeaderWarnings={qtyHeaderWarnings}
                 watchdogRun={watchdogRun}
               />
+              <GraderBadge result={graderResult} />
               <ExtractionDebugPanel info={extractionDebug} />
             </div>
           )}

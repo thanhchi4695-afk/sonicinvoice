@@ -28,17 +28,27 @@ const Landing = () => {
       return;
     }
     let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (cancelled) return;
+      // If getSession() stalls (e.g. navigator.locks contention), fall back to public landing
+      localStorage.removeItem("onboarding_complete");
+      setChecking(false);
+    }, 1500);
     supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
+      clearTimeout(timeout);
       if (data.session) {
         navigate("/dashboard", { replace: true });
       } else {
-        // Make absolutely sure stale localStorage doesn't fake an authed state later
         localStorage.removeItem("onboarding_complete");
         setChecking(false);
       }
+    }).catch(() => {
+      if (cancelled) return;
+      clearTimeout(timeout);
+      setChecking(false);
     });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(timeout); };
   }, [location.search, navigate]);
 
   if (checking) {

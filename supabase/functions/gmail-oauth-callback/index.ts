@@ -30,10 +30,20 @@ Deno.serve(async (req) => {
   const errorParam = url.searchParams.get("error");
 
   if (errorParam) {
-    return redirect(`${APP_BASE_URL}/dashboard?gmail=error&reason=${errorParam}`);
+    return redirect(`${baseFor(state)}/dashboard?gmail=error&reason=${errorParam}`);
   }
   if (!code || !state) {
     return redirect(`${APP_BASE_URL}/dashboard?gmail=error&reason=missing_code`);
+  }
+
+  // state may be "<userId>" OR "<userId>|<base64Origin>"
+  const [userId, originB64] = state.split("|");
+  let returnOrigin = APP_BASE_URL;
+  if (originB64) {
+    try {
+      const decoded = atob(originB64);
+      if (/^https?:\/\//.test(decoded)) returnOrigin = decoded.replace(/\/$/, "");
+    } catch { /* ignore */ }
   }
 
   const clientId = Deno.env.get("GOOGLE_CLIENT_ID");

@@ -51,14 +51,22 @@ First, determine what kind of document this is. Look at the header and footer ca
 |---|---|---|
 | "Tax Invoice" in header + Price/Rate column + GST/Total in footer | ✅ Tax invoice | Proceed with extraction |
 | "Packing List" / "PL No." / "Delivery Note" / "Picking Slip" in header | ❌ Packing list | STOP — report document type, extract product names and qtys only (no cost data available) |
+| "PACKING LIST" header AND "PPS Number" / "Box Number" (Wacoal / Freya format) | ❌ Packing list | STOP — same as above |
 | Total column contains kg weights (e.g. "0.450") not dollar amounts | ❌ Packing list | STOP — same as above |
 | No Price, Rate, Cost, or Wholesale column visible | ❌ Packing list or order confirmation | STOP — same as above |
 | "Credit Note" / "Credit Memo" in header | ⚠️ Credit note | Extract as negative quantities |
 | "Quote" / "Proforma Invoice" | ⚠️ Not a final invoice | Flag — costs may not be final |
+| "Certificate of Registration" + "Motor Vehicle Registry" / "Number Plate" | ❌ Vehicle registration | STOP — return document_type: vehicle_registration, action: discard |
+| Sky Gazer document with no price column | ❌ Order confirmation | STOP — return document_type: order_confirmation |
 
 If this is a packing list, stop extraction and return:
 ```json
 { "document_type": "packing_list", "supplier": "...", "products": [{"style_name": "...", "style_number": "...", "qty": 0}], "warning": "No cost data available — find matching tax invoice" }
+```
+
+For non-invoice documents (vehicle registration, order confirmations without prices, etc.), STOP and return:
+```json
+{ "document_type": "vehicle_registration", "supplier": "...", "warning": "Not a supplier invoice — no products to extract.", "action": "discard" }
 ```
 
 ---

@@ -297,7 +297,9 @@ function normalizeBaseTitle(name: string): string {
 function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduct[] {
   // Expand any size-run rows ("8-16", "S-L") into one row per individual size.
   // Quantity is split evenly across the run; SKU is suffixed with the size.
-  const lines: ExportLine[] = rawLines.flatMap((ln) => expandLineBySize(ln));
+  const lines: ExportLine[] = rawLines
+    .map(applyVendorRouting)
+    .flatMap((ln) => expandLineBySize(ln));
 
   if (mode === "simple") {
     // Even in simple mode, Shopify rejects multiple rows that share the same

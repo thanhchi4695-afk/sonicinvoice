@@ -305,6 +305,19 @@ export default function PostParseReviewScreen({
   });
   const [autoPublishing, setAutoPublishing] = useState(false);
 
+  // Brand profile status — drives the banners + Save/Export gating below.
+  const [brandProfileStatus, setBrandProfileStatus] = useState<BrandProfileStatusInfo | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!supplierName) { setBrandProfileStatus(null); return; }
+    fetchBrandProfileStatus(supplierName)
+      .then((info) => { if (!cancelled) setBrandProfileStatus(info); })
+      .catch(() => { if (!cancelled) setBrandProfileStatus(null); });
+    return () => { cancelled = true; };
+  }, [supplierName]);
+  const isDoNotBook = brandProfileStatus?.profile_status === "do_not_book";
+  const isNeedsEnrichment = brandProfileStatus?.profile_status === "needs_enrichment";
+
   async function handleAutoPublish() {
     if (!watchdogRun?.runId) return;
     setAutoPublishing(true);

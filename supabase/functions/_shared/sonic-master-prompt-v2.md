@@ -444,5 +444,55 @@ When the SKU-prefix override routes a Bond-Eye-letterheaded invoice to Sea Level
 
 ---
 
+## BRAND-SPECIFIC OCR & QUIRK RULES
+
+These are extraction-time corrections for known recurring failure modes. Apply them BEFORE confidence scoring.
+
+### Holster (Holster Fashion Pty Ltd)
+- **OCR digit confusion `B` ↔ `8`**: Holster SKUs are alphanumeric and frequently OCR as `B` where the actual character is `8` (and vice versa, rarely). When a SKU starts with `HST` or `HOL` and contains a `B` in a position normally occupied by digits (positions 4+), substitute `8`. Example: `HSTB123` → `HST8123`. If both forms appear in the same invoice, prefer the digit form.
+- Sizes are footwear EU (36–42) — emit as numeric strings, not "Small/Medium/Large".
+
+### Togs / Togs Australia
+- **Dual-size lines**: rows like `10/12`, `12/14` describe a multi-fit garment, NOT two separate variants. Emit as a single variant with size = `10/12` (preserve the slash). Do not split into two rows.
+- If the invoice prints AU and US in the same cell (`AU10 / US6`), keep AU only — same rule as Sea Level.
+
+### Zoggs (HEAD Oceania)
+- **5% trade discount is already baked into the per-row Unit Price.** The discount line at the bottom is informational only — do NOT subtract it again from line costs.
+- Validation: `sum(qty × unit_price)` should equal printed `Sub Total` (ex-GST) within $0.05. If it matches, the discount is already applied.
+- Sizes for swim goggles: emit `One Size` unless explicitly Junior/Adult.
+
+### Le Specs (Sunshades Eyewear)
+- **Always use the `Shipped` quantity column, never `Ordered`.** Backorders show `Ordered=2, Shipped=0` and must be skipped (qty=0 → exclude line).
+- RRP column is GST-inclusive; cost column is ex-GST. Don't mix them.
+- SKU format: `LSP` + 7 digits + colour code (e.g. `LSP2452310 BLK`). Strip trailing colour code from SKU; capture as the Colour option.
+
+---
+
+## WACOAL — PACKING LIST ↔ TAX INVOICE PAIRING
+
+Wacoal Australia sends a **packing list first** (no prices) and the **tax invoice 3–10 days later**. Cost data MUST come from the tax invoice; the packing list only confirms what physically arrived.
+
+**Detection — packing list:**
+- Header contains "Packing List" / "Delivery Docket" / "Despatch Advice"
+- No `Unit Price`, `Cost`, `GST`, or `Total` columns (only SKU + Description + Qty)
+- Document number prefix usually `DN` or `PL`
+
+**Detection — tax invoice:**
+- Header contains "Tax Invoice"
+- Has `Unit Price` and `GST` columns
+- Document number prefix `INV` / `TI`
+
+**Parser behaviour:**
+1. If packing list detected → set `profile_status` enforcement to **`do_not_book`** (Wacoal is already flagged). Extract SKUs + qtys for receipt-matching only. Do NOT emit Shopify cost data.
+2. Store the packing-list reference number in `parse_jobs.related_doc_ref`.
+3. When a Wacoal **tax invoice** is later parsed, attempt pairing:
+   - Match on (supplier = Wacoal) AND (overlap of ≥80% of SKUs+qtys with a packing list from the prior 14 days)
+   - On match: surface a "Pair with packing list `DN12345`?" prompt in the Post-Parse Review screen. User confirms → packing list is marked `paired` and the tax invoice unlocks cost booking.
+4. Unpaired tax invoices still parse normally — pairing is a confirmation aid, not a hard gate.
+
+Same pattern applies to any future supplier where document type is `do_not_book` due to "packing list only".
+
+---
+
 *Sonic Invoices Master Intelligence Prompt v2.0*
 *Covers 63 brands: Seafolly · Baku · Bond Eye · Jantzen · Sea Level · Sunseeker · Funkita · Funky Trunks · Pops + Co · Capriosca · Artesands · Nip Tuck Swim · Kulani Kinis · Speedo · Reef · Rhythm · Tigerlily · Jets · Budgy Smuggler · Skwosh · Runaway The Label · Salty Ink · Hammamas · OM Designs · Monte & Lou · Lulu & Bird · Zoggs · Ambra · Love Luna · Frank Green · Glasshouse · Circa · Smelly Balls · Nude Footwear · Bling2o · Holster · Italian Cartel · Olga Berg · Moe Moe · Rigon · Rubyyaya · Auguste · Bali In A Bottle · Bebe Luxe · Blue Scarab · Budgy Smuggler · By Frankie · Cinnamon · Florabelle · Function Design · G2M/Miss Goodlife · Itami · Light + Glo · Lulalife · Rusty · Seven Wonders · Significant Other · Sky Gazer · Suit Saver · Summi Summi · Sun Soul · The Commonfolk · Trelise Cooper · Vacay · Wacoal · Walnut Melbourne + all unknown brands via universal logic*

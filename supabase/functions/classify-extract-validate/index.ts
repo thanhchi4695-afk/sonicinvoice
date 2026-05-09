@@ -1142,10 +1142,17 @@ async function runSonicGrader(opts: {
   }
   try {
     const parsed = JSON.parse(match[0]);
+    const criteria = (parsed.criteria ?? {}) as Record<string, string>;
+    // Recompute score deterministically: pass + unverified count toward score.
+    const entries = Object.entries(criteria);
+    const total = entries.length || 7;
+    const passing = entries.filter(([, v]) => v === "pass" || v === "unverified").length;
+    const score = Math.round((passing / total) * 100);
+    const failed = entries.filter(([, v]) => v === "fail").length;
     return {
-      passed: !!parsed.passed,
-      score: Number(parsed.score) || 0,
-      criteria: parsed.criteria ?? {},
+      passed: failed === 0,
+      score,
+      criteria,
       failures: Array.isArray(parsed.failures) ? parsed.failures : [],
       reextract_needed: !!parsed.reextract_needed,
       reextract_reason: String(parsed.reextract_reason ?? ""),

@@ -192,9 +192,11 @@ async function anthropicMessages(body: Record<string, unknown>, model: string): 
   return resp;
 }
 
+type SystemBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } };
+
 async function callClaudeInvoice(
   contentBlocks: any[],
-  systemPrompt: string,
+  systemPrompt: string | SystemBlock[],
   model: string = DEFAULT_CLAUDE_MODEL,
   maxTokens = 8000,
 ): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
@@ -211,11 +213,50 @@ async function callClaudeInvoice(
     throw new Error(`Claude PDF extract failed: ${resp.status} ${t.slice(0, 300)}`);
   }
   const json = await resp.json();
+  const u = json.usage || {};
+  if (u.cache_read_input_tokens || u.cache_creation_input_tokens) {
+    console.log(`[claude-cache] read=${u.cache_read_input_tokens ?? 0} created=${u.cache_creation_input_tokens ?? 0} input=${u.input_tokens ?? 0} output=${u.output_tokens ?? 0}`);
+  }
   const block = (json.content || []).find((b: any) => b.type === "tool_use");
   if (!block) throw new Error("Claude returned no tool_use block");
   const meta: InvoiceMeta = block.input?.meta ?? { documentType: "unknown" };
   const rows: ParsedRow[] = Array.isArray(block.input?.rows) ? block.input.rows : [];
   return { meta, rows };
+}
+
+/**
+ * Build the cached system prompt for invoice extraction.
+ *
+ * Layout (Anthropic prompt caching, max 4 breakpoints):
+ *   1. Master prompt v2          — stable across all invoices    → cached
+ *   2. Active brand profile (md) — stable per supplier           → cached when ≥ ~800 chars
+ *   3. Runtime output contract   — small, always last (uncached)
+ *
+ * Cache TTL is 5 minutes (default ephemeral). Cache key = exact bytes of all
+ * blocks up to and including the cache_control marker, so the master prompt
+ * survives across every invoice and the brand profile survives across runs
+ * for the same supplier within the window.
+ */
+function buildCachedSystemPrompt(brandProfileMd: string): SystemBlock[] {
+  const blocks: SystemBlock[] = [
+    { type: "text", text: SONIC_MASTER_PROMPT_V2, cache_control: { type: "ephemeral" } },
+  ];
+  const profile = brandProfileMd?.trim() ?? "";
+  if (profile.length > 0) {
+    // Only mark as cache breakpoint if substantial (≥ ~800 chars ≈ 200 tokens
+    // is below Sonnet's 1024-token min, so small profiles ride on the master
+    // prompt block instead of creating a useless extra breakpoint).
+    if (profile.length >= 4000) {
+      blocks.push({ type: "text", text: profile, cache_control: { type: "ephemeral" } });
+    } else {
+      blocks.push({ type: "text", text: profile });
+    }
+  }
+  blocks.push({
+    type: "text",
+    text: `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore the "Part A/B/C" prose format from Step 8. Instead, call the \`return_invoice\` tool exactly once with the structured meta (including subtotalExGst from the invoice) and one row per size variant. Numbers must be plain numbers. Use null when unsure.`,
+  });
+  return blocks;
 }
 
 async function stage1ClaudePdf(
@@ -226,8 +267,7 @@ async function stage1ClaudePdf(
   model: string = DEFAULT_CLAUDE_MODEL,
   brandProfileMd = "",
 ): Promise<{ meta: InvoiceMeta; rows: ParsedRow[] }> {
-  const systemPrompt = SONIC_MASTER_PROMPT_V2 + brandProfileMd +
-    `\n\n## RUNTIME OUTPUT CONTRACT\nIgnore the "Part A/B/C" prose format from Step 8. Instead, call the \`return_invoice\` tool exactly once with the structured meta (including subtotalExGst from the invoice) and one row per size variant. Numbers must be plain numbers. Use null when unsure.`;
+  const systemBlocks = buildCachedSystemPrompt(brandProfileMd);
 
   const userText =
     `Supplier hint from upload: ${supplierName}${brandHints}\n\n` +
@@ -239,7 +279,7 @@ async function stage1ClaudePdf(
     ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
     : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
 
-  return await callClaudeInvoice([docBlock, { type: "text", text: userText }], systemPrompt, model);
+  return await callClaudeInvoice([docBlock, { type: "text", text: userText }], systemBlocks, model);
 }
 
 // Validation pass — sums extracted cost*qty against invoice subtotal.

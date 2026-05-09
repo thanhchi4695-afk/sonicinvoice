@@ -156,7 +156,7 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
     }
     try {
       const { data, error } = await supabase.functions.invoke("gmail-oauth-start", {
-        body: {},
+        body: { origin: window.location.origin },
       });
       if (error) throw new Error(error.message);
       const url = (data as { url?: string })?.url;
@@ -184,6 +184,11 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
       toast.error(error.message);
       return;
     }
+    // Clear queued invoices so a different account doesn't inherit them
+    await supabase
+      .from("gmail_found_invoices")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
     setConn(null);
     setInvoices([]);
     toast.success("Gmail disconnected");

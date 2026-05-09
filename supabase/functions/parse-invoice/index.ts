@@ -710,7 +710,7 @@ Deno.serve(async (req) => {
       console.warn("[parse-invoice] Brand profile lookup failed:", (e as Error).message);
     }
 
-    if (isPdf && ANTHROPIC_API_KEY) {
+    if (useClaudePdf) {
       try {
         const claudeOut = await stage1ClaudePdf(fileBase64, mimeType, supplierName, brandHints, claudeModel, brandProfileMd);
         invoiceMeta = claudeOut.meta;

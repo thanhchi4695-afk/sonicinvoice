@@ -7,6 +7,51 @@ import Papa from "papaparse";
 import { matchCollectionsWithBrand } from "./collection-engine";
 import { getPublishStatus, shopifyStatusValue } from "./publish-status";
 import { expandLineBySize } from "./size-run-expander";
+import { detectBrandFromSku } from "./sku-brand-prefix";
+
+// ── Vendor & Type inference at export time ────────────────
+//
+// Two regression fixes that surface in the Shopify export CSV:
+//
+// 1. Vendor field must be the canonical brand (driven by SKU prefix when
+//    available), NOT the raw invoice header (e.g. "Bond-Eye Australia"
+//    becomes "Bond Eye" / "Sea Level" / "Artesands" depending on the SKU).
+// 2. Type column was always falling back to "General" because the master
+//    prompt's category wasn't being pushed into ExportLine.type. We add a
+//    title-driven mapping as a final safety net so swimwear/bikini/dress
+//    products land in the right Shopify Type column even when type is empty.
+
+/** Apply SKU-prefix → canonical brand routing. Falls back to the input
+ *  brand when no rule matches (so the cleaned supplier_profile vendor —
+ *  not the invoice header — wins for non-multi-brand suppliers). */
+function applyVendorRouting(line: ExportLine): ExportLine {
+  const fromSku = detectBrandFromSku(line.sku);
+  if (!fromSku) return line;
+  if ((line.brand || "").trim().toLowerCase() === fromSku.toLowerCase()) return line;
+  return { ...line, brand: fromSku };
+}
+
+/** Title-driven Shopify Type mapping. Applies to ALL brands. Returns the
+ *  existing type unchanged when it's already meaningful (anything other
+ *  than empty / "General" / "Uncategorised"). */
+const TYPE_RULES: Array<{ pattern: RegExp; type: string }> = [
+  // Order matters: more specific patterns first.
+  { pattern: /\b(rashie|rashvest|rash\s*vest|sunsuit)\b/i, type: "Rashies & Sunsuits" },
+  { pattern: /\b(one\s*piece|one[-\s]?pce|1\s*pce|onepiece)\b/i, type: "One Pieces" },
+  { pattern: /\b(brief|bikini\s*pant|bikini\s*bottom|bottom)\b/i, type: "Bikini Bottoms" },
+  { pattern: /\b(balconette|bra\s*top|crop|bandeau|bikini\s*top)\b/i, type: "Bikini Tops" },
+  { pattern: /\b(dress|kaftan|sarong|cover[-\s]?up|coverup)\b/i, type: "Cover Ups" },
+];
+
+function inferProductType(title: string, currentType: string): string {
+  const t = (currentType || "").trim();
+  if (t && !/^(general|uncategori[sz]ed)$/i.test(t)) return t;
+  const name = title || "";
+  for (const rule of TYPE_RULES) {
+    if (rule.pattern.test(name)) return rule.type;
+  }
+  return t || "General";
+}
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -142,26 +187,41 @@ export function deduplicateTitle(name: string, vendor: string): string {
   if (name && PLACEHOLDER_RE.test(name)) {
     name = name.replace(PLACEHOLDER_RE, vendor || "").replace(/\s{2,}/g, " ").trim();
   }
-  if (!vendor || !name) return name;
-  const vendorLower = vendor.toLowerCase().trim();
-  const nameLower = name.toLowerCase().trim();
+  if (!name) return name;
 
-  // Check if title starts with vendor name duplicated: "Brand Brand Product"
-  const doubleVendor = `${vendorLower} ${vendorLower}`;
-  if (nameLower.startsWith(doubleVendor)) {
-    return vendor + name.slice(vendor.length + 1 + vendor.length);
+  // Shopify Title is the product name ONLY — the brand belongs in the
+  // Vendor column. Strip leading occurrence(s) of the vendor (and a few
+  // common umbrella variants) so titles like
+  //   "Bond-Eye Australia Ava 1 Pce - Black Recycled"
+  // collapse to "Ava 1 Pce - Black Recycled".
+  if (!vendor) return name.replace(/\s{2,}/g, " ").trim();
+
+  const variants = new Set<string>();
+  const push = (s: string) => {
+    const v = s.trim();
+    if (v) variants.add(v.toLowerCase());
+  };
+  push(vendor);
+  // Common umbrella → canonical aliases (best-effort; harmless if unmatched).
+  push(vendor.replace(/[-\s]+australia\b/i, ""));
+  push(vendor.replace(/-/g, " "));
+  push(vendor.replace(/\s+/g, "-"));
+
+  let working = name.trim();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const lower = working.toLowerCase();
+    for (const v of variants) {
+      if (lower === v) { working = ""; changed = true; break; }
+      if (lower.startsWith(v + " ") || lower.startsWith(v + "-") || lower.startsWith(v + ":")) {
+        working = working.slice(v.length).replace(/^[\s\-:]+/, "");
+        changed = true;
+        break;
+      }
+    }
   }
-
-  // Build full title: "Brand Name" — check if Name already starts with Brand
-  const fullTitle = `${vendor} ${name}`;
-  const fullLower = fullTitle.toLowerCase();
-  const doublePrefixCheck = `${vendorLower} ${vendorLower}`;
-  if (fullLower.startsWith(doublePrefixCheck)) {
-    // "Brand" + " " + "Brand Something" => just use name as-is (it already has brand)
-    return name;
-  }
-
-  return fullTitle;
+  return working.replace(/\s{2,}/g, " ").trim() || name.trim();
 }
 
 // ── Variant Grouping ───────────────────────────────────────
@@ -237,7 +297,9 @@ function normalizeBaseTitle(name: string): string {
 function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduct[] {
   // Expand any size-run rows ("8-16", "S-L") into one row per individual size.
   // Quantity is split evenly across the run; SKU is suffixed with the size.
-  const lines: ExportLine[] = rawLines.flatMap((ln) => expandLineBySize(ln));
+  const lines: ExportLine[] = rawLines
+    .map(applyVendorRouting)
+    .flatMap((ln) => expandLineBySize(ln));
 
   if (mode === "simple") {
     // Even in simple mode, Shopify rejects multiple rows that share the same
@@ -260,7 +322,7 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
         handle: generateHandle(title, ln.brand),
         title,
         vendor: ln.brand,
-        type: ln.type,
+        type: inferProductType(ln.name, ln.type),
         tags: buildRichTags(ln) || ln.tags || `${ln.brand}, ${ln.type}`,
         bodyHtml: ln.bodyHtml || `<p>${ln.name} by ${ln.brand}. Premium ${ln.type.toLowerCase()}.</p>`,
         seoTitle: ln.seoTitle || `${ln.name} | ${ln.brand}`.slice(0, 70),
@@ -300,7 +362,11 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
   }
 
   return Array.from(groups.values()).map(({ base, lines: groupLines }) => {
-    const title = deduplicateTitle(base.name.replace(/\b(XXS|XS|S|M|L|XL|XXL|\d{1,3})\b/gi, "").trim() || base.name, base.brand);
+    // Title cleanup: only strip the brand prefix — DO NOT strip digits or
+    // sizes from the title itself (that broke "Ava 1 Pce" → "Ava Pce" and
+    // killed the "1" in any 1-Piece swimwear style). Size/colour tokens are
+    // already stripped via `normalizeBaseTitle` purely for grouping keys.
+    const title = deduplicateTitle(base.name, base.brand);
     const hasSize = groupLines.some(l => !!l.size);
     const hasColour = groupLines.some(l => !!l.colour);
 
@@ -328,7 +394,7 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
         handle: generateHandle(title, base.brand),
         title,
         vendor: base.brand,
-        type: base.type,
+        type: inferProductType(title, base.type),
         tags: buildRichTags(base) || base.tags || `${base.brand}, ${base.type}`,
         bodyHtml: base.bodyHtml || `<p>${base.name} by ${base.brand}. Premium ${base.type.toLowerCase()}.</p>`,
         seoTitle: base.seoTitle || `${base.name} | ${base.brand}`.slice(0, 70),
@@ -387,7 +453,7 @@ function groupProducts(rawLines: ExportLine[], mode: VariantMode): GroupedProduc
       handle,
       title,
       vendor: base.brand,
-      type: base.type,
+      type: inferProductType(title, base.type),
       tags: buildRichTags(base) || base.tags || `${base.brand}, ${base.type}`,
       bodyHtml: base.bodyHtml || `<p>${base.name} by ${base.brand}. Premium ${base.type.toLowerCase()}.</p>`,
       seoTitle: base.seoTitle || `${base.name} | ${base.brand}`.slice(0, 70),
@@ -618,7 +684,9 @@ export function generateLightspeedCSV(
   const restockLevelCol = `restock_level_${outletKey}`;
 
   // Expand size runs the same way the Shopify path does.
-  const lines: ExportLine[] = rawLines.flatMap((ln) => expandLineBySize(ln));
+  const lines: ExportLine[] = rawLines
+    .map(applyVendorRouting)
+    .flatMap((ln) => expandLineBySize(ln));
 
   // Column order MIRRORS the official Lightspeed X-Series product-export template exactly.
   const headers = [

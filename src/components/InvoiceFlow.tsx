@@ -641,6 +641,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
   const [aiExtractionNotes, setAiExtractionNotes] = useState<string | null>(null);
   const [extractionDebug, setExtractionDebug] = useState<import("@/components/ExtractionDebugPanel").ExtractionDebugInfo | null>(null);
+  const [graderResult, setGraderResult] = useState<import("@/components/GraderBadge").GraderResult | null>(null);
   // Multi-brand split metadata returned by classify-extract-validate.
   // When `applied` is true, the review screen shows a banner, per-brand chips,
   // and lets the user publish a single brand at a time.

@@ -621,7 +621,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
             skillsMarkdown: mergedSkills,
             reextractReason: graderResult.reextract_reason,
           });
-          claudeProducts = retry.products;
+          claudeProducts = applyStaticVendorRouting(retry.products);
           if (retry.invoice_subtotal != null) claudeInvoiceSubtotal = retry.invoice_subtotal;
           console.log(`[claude-pdf] re-extract attempt ${attempt} → ${claudeProducts.length} products`);
         } catch (retryErr) {

@@ -5343,6 +5343,59 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             )}
           </div>
 
+          {/* Brand-website validation banner — warns when image fetch will fall back to LLM */}
+          {(() => {
+            // Re-evaluate when directory version changes
+            void brandDirVersion;
+            const seen = new Set<string>();
+            const missing: string[] = [];
+            for (const g of productGroups) {
+              const name = (g.brand || '').trim();
+              if (!name) continue;
+              const key = name.toLowerCase();
+              if (seen.has(key)) continue;
+              seen.add(key);
+              if (dismissedMissingBrands.has(key)) continue;
+              const m = matchVendor(name);
+              if (!m || !m.brand.website || !m.brand.website.trim()) {
+                missing.push(name);
+              }
+            }
+            if (missing.length === 0) return null;
+            return (
+              <div className="bg-warning/10 border border-warning/40 rounded-lg p-3 mb-3">
+                <div className="flex items-start gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-warning">
+                      {missing.length} supplier brand{missing.length > 1 ? 's' : ''} missing a website
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">
+                      Image fetching will fall back to LLM-suggested URLs (less reliable). Add the brand's official site below to enable the JSON-LD → DOM → LLM cascade used by URL Importer.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-1.5 mt-2">
+                  {missing.map((brandName) => (
+                    <MissingBrandRow
+                      key={brandName}
+                      brandName={brandName}
+                      onSaved={() => setBrandDirVersion(v => v + 1)}
+                      onSkip={() => {
+                        const k = brandName.toLowerCase();
+                        setDismissedMissingBrands(prev => {
+                          const next = new Set(prev);
+                          next.add(k);
+                          return next;
+                        });
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Enrichment status bar */}
           {(() => {
             const enrichedCount = productGroups.filter(g => g.enriched).length;

@@ -241,16 +241,34 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   };
 
   const handleDisconnect = async () => {
-    if (!confirm("Disconnect Gmail? You can reconnect any time.")) return;
-    const { error } = await supabase
+    if (!confirm("Disconnect Gmail? Inbox history for this account will be cleared. You can reconnect any time.")) return;
+    // Delete the connection row entirely so reconnecting with a different
+    // Google account cleanly replaces it (the upsert in the OAuth callback
+    // keys on user_id, which works either way — but a stale row with
+    // is_active=false leaves the new row's email_address ambiguous in some
+    // edge cases).
+    const { error: delConnErr } = await supabase
       .from("gmail_connections")
-      .update({ is_active: false })
+      .delete()
       .eq("is_active", true);
-    if (error) { toast({ title: "Failed", description: error.message, variant: "destructive" }); return; }
-    addAuditEntry("Email", "Disconnected Gmail");
+    if (delConnErr) {
+      toast({ title: "Failed", description: delConnErr.message, variant: "destructive" });
+      return;
+    }
+    // Wipe the found-invoices queue so the next account starts fresh and
+    // the sender column doesn't keep showing items from the old inbox.
+    const { error: delInvErr } = await supabase
+      .from("gmail_found_invoices")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000"); // RLS scopes to user
+    if (delInvErr) {
+      console.warn("[gmail] failed to clear found invoices", delInvErr);
+    }
+    addAuditEntry("Email", "Disconnected Gmail and cleared inbox queue");
     setConnection(null);
     setGmailItems([]);
-    toast({ title: "Gmail disconnected" });
+    setAutoProcessedIds(new Set());
+    toast({ title: "Gmail disconnected", description: "Inbox queue cleared." });
   };
 
   const handleScanNow = async () => {

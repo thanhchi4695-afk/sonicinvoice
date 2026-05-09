@@ -134,15 +134,29 @@ export function exportNewProductsCsv(
 
 // ── Format B: Inventory adjustment (additive) ──────────────
 
+export interface RefillPriceOverride {
+  /** New full price (RRP) — emitted as Variant Price */
+  price: number;
+  /** New compare-at — emit empty string to clear sale flag */
+  compareAt: number | null;
+}
+
 export function exportStockUpdateCsv(
   lines: ReconciliationLine[],
-  opts: { locationName?: string } = {},
+  opts: {
+    locationName?: string;
+    /** Map of `invoice_sku || invoice_product_name` → price override */
+    priceOverrides?: Record<string, RefillPriceOverride>;
+  } = {},
 ): { filename: string; rowCount: number } {
   const location = opts.locationName || "Main Store";
+  const overrides = opts.priceOverrides ?? {};
   const rows = lines.map((l) => {
     const o = inferOptions(l);
     const handle = shopifyHandle(l.invoice_product_name || l.invoice_sku || "product");
-    return {
+    const key = (l.invoice_sku || l.invoice_product_name || "").trim();
+    const ov = overrides[key];
+    const row: Record<string, string> = {
       Handle: handle,
       Title: l.invoice_product_name || "",
       "Option1 Name": o.o1Name,
@@ -155,6 +169,11 @@ export function exportStockUpdateCsv(
       "Inventory Policy": "deny",
       Location: location,
     };
+    if (ov) {
+      row["Variant Price"] = ov.price.toFixed(2);
+      row["Variant Compare At Price"] = ov.compareAt != null ? ov.compareAt.toFixed(2) : "";
+    }
+    return row;
   });
   const csv = Papa.unparse(rows);
   const filename = `shopify-stock-update-${todayStamp()}.csv`;

@@ -1,0 +1,1 @@
+ALTER TABLE public.invoice_processing_jobs ADD COLUMN IF NOT EXISTS grader_result jsonb;

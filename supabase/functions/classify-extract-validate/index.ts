@@ -134,6 +134,7 @@ Deno.serve(async (req) => {
             await admin.from("invoice_processing_jobs").update({
               status: "done",
               result,
+              grader_result: (result as Record<string, unknown>)?.grader_result ?? null,
               completed_at: new Date().toISOString(),
             }).eq("id", jobId);
             console.log(`[classify-extract-validate] async invoice_read job ${jobId} complete`);
@@ -584,23 +585,61 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
 
   // ─────── STAGE 2B — Claude-PDF direct (Anthropic native) or parse-invoice fallback ───────
   let claudePdfUsed = false;
+  let claudeInvoiceSubtotal: number | null = null;
+  let graderResult: GraderResult | null = null;
+  let graderAttempts = 0;
 
   if (!extraction && preferClaudePdf) {
     try {
-      const claudeProducts = await runClaudePdfDirect({
+      const first = await runClaudePdfDirect({
         fileBase64: String(fileContent),
         supplierName: supplierName || classification?.supplier_name || null,
         skillsMarkdown: mergedSkills,
       });
+      let claudeProducts = first.products;
+      claudeInvoiceSubtotal = first.invoice_subtotal;
+      claudePdfUsed = true;
+      console.log(`[claude-pdf] success: ${claudeProducts.length} products, subtotal=${claudeInvoiceSubtotal}`);
+
+      // Grader loop — max 2 re-extraction attempts.
+      const MAX_REEXTRACT = 2;
+      for (let attempt = 1; attempt <= MAX_REEXTRACT + 1; attempt++) {
+        graderAttempts = attempt;
+        graderResult = await runSonicGrader({
+          products: claudeProducts,
+          invoice_subtotal: claudeInvoiceSubtotal,
+          supplier_hint: supplierName || classification?.supplier_name || null,
+        });
+        console.log(
+          `[grader] attempt=${attempt} score=${graderResult.score} passed=${graderResult.passed} reextract=${graderResult.reextract_needed}`,
+        );
+        if (!graderResult.reextract_needed || attempt > MAX_REEXTRACT) break;
+        try {
+          const retry = await runClaudePdfDirect({
+            fileBase64: String(fileContent),
+            supplierName: supplierName || classification?.supplier_name || null,
+            skillsMarkdown: mergedSkills,
+            reextractReason: graderResult.reextract_reason,
+          });
+          claudeProducts = retry.products;
+          if (retry.invoice_subtotal != null) claudeInvoiceSubtotal = retry.invoice_subtotal;
+          console.log(`[claude-pdf] re-extract attempt ${attempt} → ${claudeProducts.length} products`);
+        } catch (retryErr) {
+          console.warn(`[claude-pdf] re-extract attempt ${attempt} failed:`, retryErr);
+          break;
+        }
+      }
+      if (graderResult) graderResult.attempts = graderAttempts;
+
       extraction = {
         products: claudeProducts,
         supplier: supplierName || classification?.supplier_name || null,
         extractor: "claude-pdf",
+        invoice_subtotal: claudeInvoiceSubtotal,
       };
-      claudePdfUsed = true;
-      console.log(`[claude-pdf] success: ${claudeProducts.length} products`);
     } catch (e) {
       console.error("[claude-pdf] failed:", e instanceof Error ? e.message : String(e));
+      claudePdfUsed = false;
       // Fall through to Azure (if available) or parse-invoice
       if (isPdf && hasAzure) {
         try {
@@ -754,6 +793,24 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     console.warn("[classify-extract-validate] multi-brand split failed:", e);
   }
 
+  // ─────── STAGE 3C — Sonic Outcomes Grader (single-pass for non-claude paths) ───────
+  // Claude-PDF runs the grader inline with its re-extract loop. For Azure /
+  // parse-invoice we still grade once (post multi-brand split so vendor checks work).
+  if (!graderResult && validatedProducts.length > 0 && Deno.env.get("ANTHROPIC_API_KEY")) {
+    try {
+      graderResult = await runSonicGrader({
+        products: validatedProducts as Array<Record<string, unknown>>,
+        invoice_subtotal: claudeInvoiceSubtotal,
+        supplier_hint: classification?.supplier_name || supplierName || null,
+      });
+      graderAttempts = 1;
+      graderResult.attempts = 1;
+      console.log(`[grader] (post-extract) score=${graderResult.score} passed=${graderResult.passed}`);
+    } catch (e) {
+      console.warn("[grader] post-extract grade failed:", e);
+    }
+  }
+
   // ─────── Persist classification to supplier_profiles ───────
   const supplierFinal = classification?.supplier_name || extraction?.supplier || supplierName || null;
   if (userId && classification && !usedSavedProfile && supplierFinal) {
@@ -803,6 +860,8 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     multi_brand_split: multiBrandSplit,
     filename_mismatch: filenameMismatch,
     distributor_match: distributorMatch,
+    grader_result: graderResult,
+    invoice_subtotal: claudeInvoiceSubtotal,
   };
 }
 
@@ -823,6 +882,10 @@ const RETURN_INVOICE_TOOL = {
   input_schema: {
     type: "object",
     properties: {
+      invoice_subtotal: {
+        type: ["number", "null"],
+        description: "Invoice subtotal ex-GST printed on the document. null if not visible.",
+      },
       products: {
         type: "array",
         items: {
@@ -850,7 +913,8 @@ async function runClaudePdfDirect(opts: {
   fileBase64: string;
   supplierName: string | null;
   skillsMarkdown: string;
-}): Promise<Array<Record<string, unknown>>> {
+  reextractReason?: string | null;
+}): Promise<{ products: Array<Record<string, unknown>>; invoice_subtotal: number | null }> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
@@ -859,8 +923,12 @@ async function runClaudePdfDirect(opts: {
     "Extract EVERY line item. Preserve every variant (colour + size combo) as its own row.",
     "Numbers must be plain numbers (no currency symbols). Use null when truly unknown.",
     "Carry section headers (e.g. 'Eco', 'Recycled') across page breaks as `category`.",
+    "Also return the invoice subtotal ex-GST as `invoice_subtotal` (null if not printed).",
     opts.supplierName ? `Supplier: ${opts.supplierName}` : "",
     opts.skillsMarkdown ? `\n\nSupplier-specific extraction rules:\n${opts.skillsMarkdown}` : "",
+    opts.reextractReason
+      ? `\n\nIMPORTANT — RE-EXTRACTION FEEDBACK FROM GRADER:\n${opts.reextractReason}\nFix these specific issues this time.`
+      : "",
   ].filter(Boolean).join("\n");
 
   const userPrompt = "Extract all product line items from this invoice PDF using the return_invoice tool.";
@@ -903,9 +971,11 @@ async function runClaudePdfDirect(opts: {
   if (!toolUse || !toolUse.input) {
     throw new Error("Anthropic returned no tool_use block");
   }
-  const products = Array.isArray(toolUse.input.products) ? toolUse.input.products : [];
-  // Normalise to internal shape (mirror Azure mapping)
-  return products.map((p: Record<string, unknown>) => {
+  const rawProducts = Array.isArray(toolUse.input.products) ? toolUse.input.products : [];
+  const subtotalRaw = toolUse.input.invoice_subtotal;
+  const invoice_subtotal = subtotalRaw == null || subtotalRaw === "" ? null : Number(subtotalRaw);
+
+  const products = rawProducts.map((p: Record<string, unknown>) => {
     const cost = Number(p.cost ?? 0) || 0;
     const rrp = p.rrp != null && p.rrp !== "" ? Number(p.rrp) : null;
     const qty = Number(p.qty ?? 0) || 0;
@@ -922,4 +992,164 @@ async function runClaudePdfDirect(opts: {
       tags: category ? [category] : [],
     };
   });
+
+  return { products, invoice_subtotal: Number.isFinite(invoice_subtotal as number) ? (invoice_subtotal as number) : null };
+}
+
+// ─────── Sonic Outcomes Grader (Claude Haiku 4.5) ───────
+const SONIC_GRADER_MODEL = "claude-haiku-4-5-20251001";
+
+const SONIC_OUTCOMES_RUBRIC = `
+You are a grader evaluating an invoice extraction for Splash Swimwear.
+Score the extraction and return JSON only.
+
+RUBRIC — check every criterion:
+
+1. COMPLETENESS: Does product count match the expected line items?
+   (hint: check against the invoice subtotal — if sum(cost×qty) ≈ subtotal, count is likely correct)
+
+2. NO_BLANK_COLOURS: Every product must have a colour value.
+   Blank, null, "Unknown", or "Not Specified" = fail this criterion.
+
+3. NO_BLANK_SIZES: Every product must have a size value.
+   Blank or null = fail. "One Size" is valid.
+
+4. VENDOR_FROM_SKU: Vendor must come from SKU prefix routing, not the invoice header.
+   BOUND* = Bond Eye, SL* = Sea Level, AT*ND = Artesands, AT*GA = Bond Eye Aria.
+   If vendor matches the raw invoice header string (e.g. "Bond-Eye Australia") = fail.
+
+5. NO_TESTER_ROWS: No rows where SKU starts with TEST or RRP = 0.
+
+6. COST_VALIDATES: sum(cost_ex_gst × qty) must equal invoice subtotal ±$1.00.
+   If subtotal unknown, mark as "unverified" not fail.
+
+7. RRP_ABOVE_COST: Every rrp_incl_gst must be > cost_ex_gst × 1.1.
+   Flag any product where margin < 10% after GST.
+
+Return this exact JSON:
+{
+  "passed": true | false,
+  "score": 0-100,
+  "criteria": {
+    "completeness": "pass" | "fail" | "unverified",
+    "no_blank_colours": "pass" | "fail",
+    "no_blank_sizes": "pass" | "fail",
+    "vendor_from_sku": "pass" | "fail" | "unverified",
+    "no_tester_rows": "pass" | "fail",
+    "cost_validates": "pass" | "fail" | "unverified",
+    "rrp_above_cost": "pass" | "fail"
+  },
+  "failures": ["list of specific failures with product names"],
+  "reextract_needed": true | false,
+  "reextract_reason": "specific instruction for what to fix on re-extraction"
+}
+
+If reextract_needed is true, the agent will re-run extraction with your reextract_reason
+appended to the system prompt. Be specific — name the exact products and fields that failed.
+`.trim();
+
+export interface GraderResult {
+  passed: boolean;
+  score: number;
+  criteria: Record<string, "pass" | "fail" | "unverified">;
+  failures: string[];
+  reextract_needed: boolean;
+  reextract_reason: string;
+  attempts?: number;
+  error?: string;
+}
+
+async function runSonicGrader(opts: {
+  products: Array<Record<string, unknown>>;
+  invoice_subtotal: number | null;
+  supplier_hint: string | null;
+}): Promise<GraderResult> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) {
+    return {
+      passed: false, score: 0, criteria: {}, failures: ["ANTHROPIC_API_KEY not set"],
+      reextract_needed: false, reextract_reason: "", error: "missing_key",
+    };
+  }
+
+  // Trim products to fields the grader needs (keeps token cost down).
+  const slim = opts.products.map((p) => ({
+    name: p.name ?? p.product_name ?? null,
+    sku: p.sku ?? p.style_code ?? null,
+    vendor: p.vendor ?? p.brand ?? null,
+    colour: p.colour ?? p.color ?? null,
+    size: p.size ?? null,
+    qty: p.qty ?? p.quantity ?? null,
+    cost_ex_gst: p.cost ?? p.unit_cost ?? null,
+    rrp_incl_gst: p.rrp ?? p.compare_at_price ?? null,
+  }));
+
+  const payload = {
+    invoice_subtotal: opts.invoice_subtotal,
+    supplier_hint: opts.supplier_hint,
+    product_count: slim.length,
+    products: slim,
+  };
+
+  const userPrompt =
+    `Grade this extraction. Return JSON only — no prose, no markdown fences.\n\n` +
+    `Extraction payload:\n\`\`\`json\n${JSON.stringify(payload).slice(0, 60000)}\n\`\`\``;
+
+  const response = await fetch(ANTHROPIC_API_URL, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: SONIC_GRADER_MODEL,
+      max_tokens: 1500,
+      system: SONIC_OUTCOMES_RUBRIC,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    return {
+      passed: false, score: 0, criteria: {}, failures: [`grader API ${response.status}`],
+      reextract_needed: false, reextract_reason: "", error: errText.slice(0, 300),
+    };
+  }
+
+  const data = await response.json();
+  const text = (data?.content || [])
+    .filter((b: Record<string, unknown>) => b.type === "text")
+    .map((b: Record<string, unknown>) => String(b.text || ""))
+    .join("\n")
+    .trim();
+
+  // Strip ``` fences if Claude added them despite instruction
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  // Find first {...} block
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) {
+    return {
+      passed: false, score: 0, criteria: {}, failures: ["grader returned no JSON"],
+      reextract_needed: false, reextract_reason: "", error: text.slice(0, 300),
+    };
+  }
+  try {
+    const parsed = JSON.parse(match[0]);
+    return {
+      passed: !!parsed.passed,
+      score: Number(parsed.score) || 0,
+      criteria: parsed.criteria ?? {},
+      failures: Array.isArray(parsed.failures) ? parsed.failures : [],
+      reextract_needed: !!parsed.reextract_needed,
+      reextract_reason: String(parsed.reextract_reason ?? ""),
+    };
+  } catch (e) {
+    return {
+      passed: false, score: 0, criteria: {}, failures: ["grader JSON parse failed"],
+      reextract_needed: false, reextract_reason: "",
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
 }

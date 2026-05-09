@@ -2419,6 +2419,7 @@ export type Database = {
           created_at: string
           error_message: string | null
           file_name: string | null
+          grader_result: Json | null
           id: string
           job_kind: string
           request_payload: Json | null
@@ -2433,6 +2434,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           file_name?: string | null
+          grader_result?: Json | null
           id?: string
           job_kind?: string
           request_payload?: Json | null
@@ -2447,6 +2449,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           file_name?: string | null
+          grader_result?: Json | null
           id?: string
           job_kind?: string
           request_payload?: Json | null

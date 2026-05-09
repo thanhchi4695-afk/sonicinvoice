@@ -66,6 +66,7 @@ import DriveQueuePanel from "@/components/DriveQueuePanel";
 import LinePipelineProgress from "@/components/LinePipelineProgress";
 import AutoAgentsRunSummary, { buildAgentPlan, type AgentRunPlan } from "@/components/AutoAgentsRunSummary";
 import ExtractionDebugPanel from "@/components/ExtractionDebugPanel";
+import GraderBadge from "@/components/GraderBadge";
 import { LargePdfChunkDialog, getLargePdfDefault, setLargePdfDefault, type LargePdfChoice } from "@/components/LargePdfChunkDialog";
 import { isLargePdf, splitPdf, extractPdfPage, getPdfPageCount } from "@/lib/pdf-splitter";
 import PostPublishHero from "@/components/PostPublishHero";
@@ -641,6 +642,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [aiFieldConfidence, setAiFieldConfidence] = useState<Record<string, number> | null>(null);
   const [aiExtractionNotes, setAiExtractionNotes] = useState<string | null>(null);
   const [extractionDebug, setExtractionDebug] = useState<import("@/components/ExtractionDebugPanel").ExtractionDebugInfo | null>(null);
+  const [graderResult, setGraderResult] = useState<import("@/components/GraderBadge").GraderResult | null>(null);
   // Multi-brand split metadata returned by classify-extract-validate.
   // When `applied` is true, the review screen shows a banner, per-brand chips,
   // and lets the user publish a single brand at a time.
@@ -2375,6 +2377,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         classification_source: data.classification_source ?? null,
         raw_tables: Array.isArray(data.azure_raw_tables) ? data.azure_raw_tables : [],
       });
+      setGraderResult(data.grader_result ?? null);
       // Capture multi-brand split metadata (Skye → Jantzen+Sunseeker etc).
       // When the edge function found a matching invoice_company_name and
       // tagged at least one line item, applied=true.
@@ -5156,6 +5159,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 qtyHeaderWarnings={qtyHeaderWarnings}
                 watchdogRun={watchdogRun}
               />
+              <GraderBadge result={graderResult} />
               <ExtractionDebugPanel info={extractionDebug} />
             </div>
           )}

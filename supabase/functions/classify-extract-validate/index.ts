@@ -1023,8 +1023,13 @@ RUBRIC — check every criterion:
 6. COST_VALIDATES: sum(cost_ex_gst × qty) must equal invoice subtotal ±$1.00.
    If subtotal unknown, mark as "unverified" not fail.
 
-7. RRP_ABOVE_COST: Every rrp_incl_gst must be > cost_ex_gst × 1.1.
-   Flag any product where margin < 10% after GST.
+7. RRP_ABOVE_COST: For every product, check: rrp_incl_gst > (cost_ex_gst × 1.1).
+   This verifies RRP covers cost plus GST with any margin above zero.
+   Example: cost=$76.90, cost×1.1=$84.59, rrp=$180.00 → $180 > $84.59 → PASS.
+   Only fail if rrp_incl_gst is actually lower than cost_ex_gst × 1.1
+   (i.e. selling below cost after GST). Do not compute gross margin percentage.
+   Do not apply any percentage threshold. The check is purely: rrp > cost × 1.1.
+   If rrp_incl_gst is missing/null for a product, mark this criterion "unverified" not "fail".
 
 Return this exact JSON:
 {

@@ -156,7 +156,7 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
     }
     try {
       const { data, error } = await supabase.functions.invoke("gmail-oauth-start", {
-        body: {},
+        body: { origin: window.location.origin },
       });
       if (error) throw new Error(error.message);
       const url = (data as { url?: string })?.url;

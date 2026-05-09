@@ -915,9 +915,6 @@ const RETURN_INVOICE_TOOL = {
     },
     required: ["products"],
   },
-  // Cache breakpoint on the last tool — caches tools+system together as one
-  // prefix, comfortably exceeding Anthropic's 1,024-token minimum.
-  cache_control: { type: "ephemeral" },
 } as const;
 
 async function runClaudePdfDirect(opts: {
@@ -992,6 +989,10 @@ async function runClaudePdfDirect(opts: {
           {
             type: "document",
             source: { type: "base64", media_type: "application/pdf", data: fileBase64 },
+            // Cache breakpoint on the PDF — it's the largest static block
+            // (~3,500+ tokens), well above Anthropic's 1,024-token minimum.
+            // Tools + system get cached as part of the same prefix.
+            cache_control: { type: "ephemeral" },
           },
           { type: "text", text: userPrompt },
         ],

@@ -468,8 +468,11 @@ export function StockReconciliationPanel({
                   disabled={exportSets.refills.length === 0 || planRunning}
                   onClick={async () => {
                     // STEP 1-4 of refill price restore: detect sale → plan → log
+                    // Include new_variant lines so siblings on the same product
+                    // get their sale prices restored too.
+                    const planLines = [...exportSets.refills, ...exportSets.newVariants];
                     let plan = pricePlan;
-                    if (!plan) plan = await runPricePlan(exportSets.refills);
+                    if (!plan) plan = await runPricePlan(planLines);
                     if (plan) {
                       const log = await logPricePlan(plan, { triggered_by: "refill" });
                       if (log.inserted > 0) {
@@ -500,8 +503,8 @@ export function StockReconciliationPanel({
                 <ExportButton
                   label={planRunning ? "Checking…" : "Check sale prices"}
                   colorClass="bg-slate-200 hover:bg-slate-300 text-slate-800"
-                  disabled={exportSets.refills.length === 0 || planRunning}
-                  onClick={() => runPricePlan(exportSets.refills)}
+                  disabled={(exportSets.refills.length === 0 && exportSets.newVariants.length === 0) || planRunning}
+                  onClick={() => runPricePlan([...exportSets.refills, ...exportSets.newVariants])}
                   tooltip={
                     <>
                       <p className="font-medium mb-1">Preview price restorations</p>

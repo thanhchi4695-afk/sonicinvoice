@@ -134,6 +134,7 @@ Deno.serve(async (req) => {
             await admin.from("invoice_processing_jobs").update({
               status: "done",
               result,
+              grader_result: (result as Record<string, unknown>)?.grader_result ?? null,
               completed_at: new Date().toISOString(),
             }).eq("id", jobId);
             console.log(`[classify-extract-validate] async invoice_read job ${jobId} complete`);

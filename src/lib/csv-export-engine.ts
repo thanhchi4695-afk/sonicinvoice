@@ -187,26 +187,41 @@ export function deduplicateTitle(name: string, vendor: string): string {
   if (name && PLACEHOLDER_RE.test(name)) {
     name = name.replace(PLACEHOLDER_RE, vendor || "").replace(/\s{2,}/g, " ").trim();
   }
-  if (!vendor || !name) return name;
-  const vendorLower = vendor.toLowerCase().trim();
-  const nameLower = name.toLowerCase().trim();
+  if (!name) return name;
 
-  // Check if title starts with vendor name duplicated: "Brand Brand Product"
-  const doubleVendor = `${vendorLower} ${vendorLower}`;
-  if (nameLower.startsWith(doubleVendor)) {
-    return vendor + name.slice(vendor.length + 1 + vendor.length);
+  // Shopify Title is the product name ONLY — the brand belongs in the
+  // Vendor column. Strip leading occurrence(s) of the vendor (and a few
+  // common umbrella variants) so titles like
+  //   "Bond-Eye Australia Ava 1 Pce - Black Recycled"
+  // collapse to "Ava 1 Pce - Black Recycled".
+  if (!vendor) return name.replace(/\s{2,}/g, " ").trim();
+
+  const variants = new Set<string>();
+  const push = (s: string) => {
+    const v = s.trim();
+    if (v) variants.add(v.toLowerCase());
+  };
+  push(vendor);
+  // Common umbrella → canonical aliases (best-effort; harmless if unmatched).
+  push(vendor.replace(/[-\s]+australia\b/i, ""));
+  push(vendor.replace(/-/g, " "));
+  push(vendor.replace(/\s+/g, "-"));
+
+  let working = name.trim();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const lower = working.toLowerCase();
+    for (const v of variants) {
+      if (lower === v) { working = ""; changed = true; break; }
+      if (lower.startsWith(v + " ") || lower.startsWith(v + "-") || lower.startsWith(v + ":")) {
+        working = working.slice(v.length).replace(/^[\s\-:]+/, "");
+        changed = true;
+        break;
+      }
+    }
   }
-
-  // Build full title: "Brand Name" — check if Name already starts with Brand
-  const fullTitle = `${vendor} ${name}`;
-  const fullLower = fullTitle.toLowerCase();
-  const doublePrefixCheck = `${vendorLower} ${vendorLower}`;
-  if (fullLower.startsWith(doublePrefixCheck)) {
-    // "Brand" + " " + "Brand Something" => just use name as-is (it already has brand)
-    return name;
-  }
-
-  return fullTitle;
+  return working.replace(/\s{2,}/g, " ").trim() || name.trim();
 }
 
 // ── Variant Grouping ───────────────────────────────────────

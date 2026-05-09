@@ -34,6 +34,24 @@ Deno.serve(async (req) => {
   const { data: userData, error } = await userClient.auth.getUser();
   if (error || !userData?.user) return json({ error: "Not authenticated" }, 401);
 
+  // Pick up the caller's origin so the callback can redirect them back to
+  // the same host they started from (preview, custom domain, prod, etc.)
+  // instead of always redirecting to APP_URL.
+  let originHint = "";
+  try {
+    const body = await req.json().catch(() => ({}));
+    originHint = (body?.origin as string) || "";
+  } catch { /* no body */ }
+  if (!originHint) {
+    originHint = req.headers.get("origin") ?? req.headers.get("referer") ?? "";
+  }
+  // Strip path from referer if needed
+  try { originHint = new URL(originHint).origin; } catch { originHint = ""; }
+
+  const statePayload = originHint
+    ? `${userData.user.id}|${btoa(originHint)}`
+    : userData.user.id;
+
   const callbackUrl = `${supabaseUrl}/functions/v1/gmail-oauth-callback`;
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authUrl.searchParams.set("client_id", clientId);
@@ -42,7 +60,7 @@ Deno.serve(async (req) => {
   authUrl.searchParams.set("scope", "https://www.googleapis.com/auth/gmail.readonly");
   authUrl.searchParams.set("access_type", "offline");
   authUrl.searchParams.set("prompt", "consent");
-  authUrl.searchParams.set("state", userData.user.id);
+  authUrl.searchParams.set("state", statePayload);
 
   // Return URL as JSON so the front-end can do window.location.href = url.
   // (Returning a 302 from a fetch() doesn't navigate the browser.)

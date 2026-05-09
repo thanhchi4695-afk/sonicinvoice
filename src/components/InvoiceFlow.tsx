@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { setSessionProducts as setInvoiceSessionProducts } from "@/stores/invoice-session-store";
 import { startShadowSession, logShadowStep, logShadowFeedback, completeShadowSession } from "@/lib/agent-shadow";
@@ -30,6 +30,7 @@ import { lookupInventory, updateStock, incrementStockUpdates, getStockUpdatesCou
 import { addAuditEntry } from "@/lib/audit-log";
 import { normaliseVendor } from "@/lib/normalise-vendor";
 import { getBrandDirectory, matchVendor, addBrand, updateBrand, type BrandDirectoryEntry } from "@/lib/brand-directory";
+import { suggestBrandWebsites } from "@/lib/brand-website-suggester";
 import { calculateConfidence, type ConfidenceBreakdown, type ConfidenceLevel, getConfidenceLabel } from "@/lib/confidence";
 import ConfidenceBadge from "@/components/ConfidenceBadge";
 import { matchProduct, saveBarcodeToCatalog, getBarcodeCatalog, type MatchSource } from "@/lib/barcode-catalog";
@@ -558,15 +559,23 @@ const MatchSourceBadge = ({ source, barcode }: { source: MatchSource; barcode?: 
 //    "missing website" warning banner shown above Enrich-all.
 const MissingBrandRow = ({
   brandName,
+  hint,
   onSaved,
   onSkip,
 }: {
   brandName: string;
+  hint?: string | null;
   onSaved: () => void;
   onSkip: () => void;
 }) => {
-  const [website, setWebsite] = useState("");
+  const suggestions = useMemo(
+    () => suggestBrandWebsites(brandName, hint),
+    [brandName, hint],
+  );
+  const [website, setWebsite] = useState(suggestions[0]?.host ?? "");
   const [saving, setSaving] = useState(false);
+
+  const isAutoSuggested = website.trim().toLowerCase() === (suggestions[0]?.host ?? "");
 
   const save = async () => {
     const cleaned = website.trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "").toLowerCase();
@@ -600,32 +609,63 @@ const MissingBrandRow = ({
   };
 
   return (
-    <div className="flex items-center gap-2 bg-card/50 rounded px-2 py-1.5 border border-border/50">
-      <span className="text-xs font-medium min-w-[110px] truncate" title={brandName}>{brandName}</span>
-      <input
-        type="text"
-        value={website}
-        onChange={(e) => setWebsite(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
-        placeholder="brand-website.com"
-        className="flex-1 text-xs bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-      />
-      <button
-        type="button"
-        onClick={save}
-        disabled={saving || !website.trim()}
-        className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-      >
-        {saving ? 'Saving…' : 'Save'}
-      </button>
-      <button
-        type="button"
-        onClick={onSkip}
-        className="text-xs px-2 py-1 rounded text-muted-foreground hover:text-foreground"
-        title="Skip — accept LLM-image fallback for this brand"
-      >
-        Skip
-      </button>
+    <div className="bg-card/50 rounded px-2 py-1.5 border border-border/50">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium min-w-[110px] truncate" title={brandName}>{brandName}</span>
+        <input
+          type="text"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') save(); }}
+          placeholder="brand-website.com"
+          className="flex-1 text-xs bg-background border border-border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        {isAutoSuggested && suggestions[0] && (
+          <span
+            className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary"
+            title={suggestions[0].reason}
+          >
+            auto
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving || !website.trim()}
+          className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : isAutoSuggested ? 'Accept' : 'Save'}
+        </button>
+        <button
+          type="button"
+          onClick={onSkip}
+          className="text-xs px-2 py-1 rounded text-muted-foreground hover:text-foreground"
+          title="Skip — accept LLM-image fallback for this brand"
+        >
+          Skip
+        </button>
+      </div>
+      {suggestions.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1 mt-1.5 pl-[118px]">
+          <span className="text-[10px] text-muted-foreground">Suggestions:</span>
+          {suggestions.slice(0, 4).map((s) => (
+            <button
+              key={s.host}
+              type="button"
+              onClick={() => setWebsite(s.host)}
+              title={s.reason}
+              className={`text-[10px] px-1.5 py-0.5 rounded border transition ${
+                website.trim().toLowerCase() === s.host
+                  ? 'bg-primary/15 border-primary/40 text-primary'
+                  : 'bg-muted/40 border-border/50 text-muted-foreground hover:text-foreground hover:border-border'
+              }`}
+            >
+              {s.host}
+              <span className="ml-1 opacity-60">· {s.source}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -5456,6 +5496,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                     <MissingBrandRow
                       key={brandName}
                       brandName={brandName}
+                      hint={supplierName}
                       onSaved={() => setBrandDirVersion(v => v + 1)}
                       onSkip={() => {
                         const k = brandName.toLowerCase();

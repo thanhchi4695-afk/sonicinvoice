@@ -1854,7 +1854,14 @@ export default function PostParseReviewScreen({
           <Button variant="outline" size="sm" onClick={onBack} className="gap-1">
             <ChevronDown className="w-3.5 h-3.5 rotate-90" /> Back
           </Button>
-          <Button variant="outline" size="sm" onClick={handleSaveToCatalog} className="gap-1" disabled={savingToCatalog}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSaveToCatalog}
+            className="gap-1"
+            disabled={savingToCatalog || isDoNotBook}
+            title={isDoNotBook ? "Blocked — supplier profile is set to do_not_book" : undefined}
+          >
             <Package className="w-3.5 h-3.5" />
             {savingToCatalog ? "Saving…" : savedToCatalog ? "✅ Saved to catalog" : "Save to Catalog"}
           </Button>
@@ -1869,10 +1876,24 @@ export default function PostParseReviewScreen({
               <FileText className="w-3.5 h-3.5" /> Get Descriptions
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handleExportClick} className="gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportClick}
+            className="gap-1"
+            disabled={isDoNotBook}
+            title={isDoNotBook ? "Blocked — supplier profile is set to do_not_book" : undefined}
+          >
             <Download className="w-3.5 h-3.5" /> Export Accepted ({accepted.length})
           </Button>
-          <Button variant="teal" size="sm" onClick={() => { triggerProfileUpdate(); if (needsReview.length > 0) setShowExportWarning(true); else onPushToShopify(); }} className="gap-1">
+          <Button
+            variant="teal"
+            size="sm"
+            onClick={() => { triggerProfileUpdate(); if (needsReview.length > 0) setShowExportWarning(true); else onPushToShopify(); }}
+            className="gap-1"
+            disabled={isDoNotBook}
+            title={isDoNotBook ? "Blocked — supplier profile is set to do_not_book" : undefined}
+          >
             <ArrowUpRight className="w-3.5 h-3.5" /> Push to Shopify ({accepted.length})
           </Button>
           {watchdogRun && watchdogRun.autoPublishEligible && (

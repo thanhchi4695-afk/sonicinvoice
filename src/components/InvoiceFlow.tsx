@@ -2377,6 +2377,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         classification_source: data.classification_source ?? null,
         raw_tables: Array.isArray(data.azure_raw_tables) ? data.azure_raw_tables : [],
       });
+      setGraderResult(data.grader_result ?? null);
       // Capture multi-brand split metadata (Skye → Jantzen+Sunseeker etc).
       // When the edge function found a matching invoice_company_name and
       // tagged at least one line item, applied=true.

@@ -245,8 +245,27 @@ const BatchReviewScreen = ({
   };
 
   const updateField = useCallback((idx: number, field: string, value: string | number) => {
-    onSetProducts(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
-  }, [onSetProducts]);
+    onSetProducts(prev => {
+      const before = prev[idx];
+      if (before && supplierKey) {
+        const beforeVal = (before as unknown as Record<string, unknown>)[field];
+        if (String(beforeVal ?? "") !== String(value ?? "")) {
+          void logCorrection({
+            jobId, supplierKey,
+            shopifyVendor: before.vendor,
+            sku: before.sku,
+            styleName: before.title,
+            fieldCorrected: field,
+            valueBefore: beforeVal,
+            valueAfter: value,
+            correctionType: correctionTypeFor(field),
+            graderScoreBefore, extractorUsed, invoiceDate,
+          });
+        }
+      }
+      return prev.map((p, i) => i === idx ? { ...p, [field]: value } : p);
+    });
+  }, [onSetProducts, jobId, supplierKey, graderScoreBefore, extractorUsed, invoiceDate]);
 
   const promptBulk = async (label: string, field: string) => {
     const val = await promptDialog({

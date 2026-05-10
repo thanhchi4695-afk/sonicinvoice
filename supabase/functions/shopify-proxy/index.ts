@@ -75,6 +75,42 @@ interface ShopifyRequestBody {
   };
 }
 
+const extractShopifyErrorMessage = (payload: unknown): string => {
+  if (!payload) return "";
+  if (typeof payload === "string") return payload;
+  if (Array.isArray(payload)) {
+    return payload.map(extractShopifyErrorMessage).filter(Boolean).join("; ");
+  }
+  if (typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    const direct = record.error || record.errors || record.message;
+    if (direct) return extractShopifyErrorMessage(direct);
+    return Object.values(record).map(extractShopifyErrorMessage).filter(Boolean).join("; ");
+  }
+  return String(payload);
+};
+
+const isShopifyAuthError = (status: number, payload: unknown) =>
+  status === 401 || /invalid api key|access token|unrecognized login|wrong password/i.test(extractShopifyErrorMessage(payload));
+
+const shopifyErrorResponse = (status: number, payload: unknown, fallbackMessage: string) => {
+  const detail = extractShopifyErrorMessage(payload);
+  const authError = isShopifyAuthError(status, payload);
+  return new Response(JSON.stringify({
+    error: authError
+      ? "Shopify rejected the access token (401). Please reconnect your Shopify store in Settings → Connections."
+      : detail || fallbackMessage,
+    details: payload,
+    needs_reauth: authError,
+    shopify_status: status,
+  }), {
+    // Return 200 so supabase-js does not replace Shopify's message with
+    // the generic "Edge Function returned a non-2xx status code" error.
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });

@@ -86,6 +86,7 @@ const qualityBadge = (score: number | null, editCount: number) => {
 };
 
 const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }: Props) => {
+  const [tab, setTab] = useState<"history" | "corrections">("history");
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PatternRow[]>([]);
   const [supplierMap, setSupplierMap] = useState<Record<string, string>>({});

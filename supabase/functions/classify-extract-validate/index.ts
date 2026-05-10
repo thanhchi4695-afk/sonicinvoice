@@ -613,6 +613,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
           products: claudeProducts,
           invoice_subtotal: claudeInvoiceSubtotal,
           supplier_hint: supplierName || classification?.supplier_name || null,
+          admin,
         });
         console.log(
           `[grader] attempt=${attempt} score=${graderResult.score} passed=${graderResult.passed} reextract=${graderResult.reextract_needed}`,

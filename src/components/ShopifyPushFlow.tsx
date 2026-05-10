@@ -25,6 +25,9 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
   const [results, setResults] = useState<PushResult[]>([]);
   const [done, setDone] = useState(false);
   const [useGraphQL, setUseGraphQL] = useState(true);
+  const [publications, setPublications] = useState<ShopifyPublication[]>([]);
+  const [selectedPubIds, setSelectedPubIds] = useState<string[]>([]);
+  const [posOnlyForNoImages, setPosOnlyForNoImages] = useState(true);
 
   useEffect(() => {
     getConnection().then((conn) => {
@@ -37,7 +40,21 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
         setConnected(false);
       }
     });
+    // Load sales channels (publications) — non-blocking
+    getPublications()
+      .then((pubs) => {
+        setPublications(pubs);
+        // Default: select all (Online Store + POS + others)
+        setSelectedPubIds(pubs.map((p) => p.id));
+      })
+      .catch((e) => console.warn("[ShopifyPushFlow] could not load publications", e));
   }, []);
+
+  const posPublicationId = useMemo(
+    () => publications.find((p) => /point of sale|pos/i.test(p.name))?.id || null,
+    [publications],
+  );
+  const productHasImages = (p: PushProduct) => Array.isArray(p.images) && p.images.length > 0;
 
   const stats = useMemo(() => {
     const created = results.filter((r) => r.status === "success").length;

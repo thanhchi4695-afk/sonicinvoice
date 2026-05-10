@@ -486,7 +486,68 @@ Deno.serve(async (req) => {
           });
         }
 
-        result = { product: productResult?.product };
+        const createdProduct = productResult?.product as { id?: string } | undefined;
+
+        // Optionally publish to selected sales channels (publications)
+        const publicationIds = (body.publication_ids || []) as string[];
+        if (createdProduct?.id && publicationIds.length > 0) {
+          const publishMutation = `
+            mutation publishablePublish($id: ID!, $input: [PublicationInput!]!) {
+              publishablePublish(id: $id, input: $input) {
+                userErrors { field message }
+              }
+            }
+          `;
+          const publishResp = await fetch(`${baseUrl}/graphql.json`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Shopify-Access-Token": access_token,
+            },
+            body: JSON.stringify({
+              query: publishMutation,
+              variables: {
+                id: createdProduct.id,
+                input: publicationIds.map((pid) => ({ publicationId: pid })),
+              },
+            }),
+          });
+          const publishJson = await publishResp.json().catch(() => ({}));
+          const pubErrors = publishJson?.data?.publishablePublish?.userErrors || [];
+          if (pubErrors.length > 0) {
+            console.error("[shopify-proxy] publishablePublish userErrors", pubErrors);
+          }
+        }
+
+        result = { product: createdProduct };
+        break;
+      }
+
+      case "get_publications": {
+        const pubQuery = `
+          query {
+            publications(first: 25) {
+              edges { node { id name } }
+            }
+          }
+        `;
+        const pubResp = await fetch(`${baseUrl}/graphql.json`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": access_token,
+          },
+          body: JSON.stringify({ query: pubQuery }),
+        });
+        const pubJson = await pubResp.json().catch(() => ({}));
+        if (!pubResp.ok || pubJson?.errors) {
+          return new Response(JSON.stringify({
+            error: "Failed to fetch publications",
+            details: pubJson?.errors || pubJson,
+          }), { status: pubResp.status || 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        const edges = pubJson?.data?.publications?.edges || [];
+        result = { publications: edges.map((e: { node: { id: string; name: string } }) => e.node) };
         break;
       }
 

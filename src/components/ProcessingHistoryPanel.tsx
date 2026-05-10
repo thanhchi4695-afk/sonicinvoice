@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { formatDuration } from "@/lib/processing-timing";
+import CorrectionsLogPanel from "@/components/CorrectionsLogPanel";
 
 interface Props {
   onBack: () => void;

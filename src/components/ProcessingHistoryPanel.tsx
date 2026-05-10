@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { formatDuration } from "@/lib/processing-timing";
+import CorrectionsLogPanel from "@/components/CorrectionsLogPanel";
 
 interface Props {
   onBack: () => void;
@@ -85,6 +86,7 @@ const qualityBadge = (score: number | null, editCount: number) => {
 };
 
 const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }: Props) => {
+  const [tab, setTab] = useState<"history" | "corrections">("history");
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PatternRow[]>([]);
   const [supplierMap, setSupplierMap] = useState<Record<string, string>>({});
@@ -191,6 +193,30 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }:
         )}
       </div>
 
+      <div className="flex items-center gap-1 mb-3 border-b border-border">
+        <button
+          onClick={() => setTab("history")}
+          className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+            tab === "history"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          History
+        </button>
+        <button
+          onClick={() => setTab("corrections")}
+          className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+            tab === "corrections"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <ScrollText className="w-3.5 h-3.5" /> Corrections
+        </button>
+      </div>
+
+      {tab === "corrections" ? <CorrectionsLogPanel /> : (<>
       <div className="relative mb-3">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
@@ -341,6 +367,7 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }:
       <p className="text-[10px] text-muted-foreground mt-3">
         Sourced from learned invoice patterns. Quality is derived from the number of edits made during review.
       </p>
+      </>)}
     </div>
   );
 };

@@ -18,6 +18,7 @@ import {
   validateForExport, generateShopifyCSV, inferCategory, generateHandles,
   type ScannedProductForExport,
 } from "@/lib/shopify-csv-schema";
+import { logCorrection, correctionTypeFor } from "@/lib/corrections-log";
 
 /* ─── types ─── */
 export interface BatchProduct {
@@ -42,6 +43,12 @@ interface Props {
   products: BatchProduct[];
   onBack: () => void;
   onSetProducts: (fn: (prev: BatchProduct[]) => BatchProduct[]) => void;
+  /** Optional context — when provided, every edit/reject is logged to corrections. */
+  jobId?: string | null;
+  supplierKey?: string | null;
+  graderScoreBefore?: number | null;
+  extractorUsed?: string | null;
+  invoiceDate?: string | null;
 }
 
 type SortKey = "title" | "price" | "quantity" | "confidence" | "status";
@@ -162,7 +169,11 @@ const BulkBar = ({
 };
 
 /* ─── main component ─── */
-const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
+const BatchReviewScreen = ({
+  products, onBack, onSetProducts,
+  jobId = null, supplierKey = null,
+  graderScoreBefore = null, extractorUsed = null, invoiceDate = null,
+}: Props) => {
   const config = getStoreConfig();
   const sym = config.currencySymbol || "$";
   const confirmDialog = useConfirmDialog();
@@ -234,8 +245,27 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
   };
 
   const updateField = useCallback((idx: number, field: string, value: string | number) => {
-    onSetProducts(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
-  }, [onSetProducts]);
+    onSetProducts(prev => {
+      const before = prev[idx];
+      if (before && supplierKey) {
+        const beforeVal = (before as unknown as Record<string, unknown>)[field];
+        if (String(beforeVal ?? "") !== String(value ?? "")) {
+          void logCorrection({
+            jobId, supplierKey,
+            shopifyVendor: before.vendor,
+            sku: before.sku,
+            styleName: before.title,
+            fieldCorrected: field,
+            valueBefore: beforeVal,
+            valueAfter: value,
+            correctionType: correctionTypeFor(field),
+            graderScoreBefore, extractorUsed, invoiceDate,
+          });
+        }
+      }
+      return prev.map((p, i) => i === idx ? { ...p, [field]: value } : p);
+    });
+  }, [onSetProducts, jobId, supplierKey, graderScoreBefore, extractorUsed, invoiceDate]);
 
   const promptBulk = async (label: string, field: string) => {
     const val = await promptDialog({
@@ -274,7 +304,23 @@ const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
       destructive: true,
     });
     if (!ok) return;
-    onSetProducts(prev => prev.filter(p => !selected.has(p.id)));
+    onSetProducts(prev => {
+      if (supplierKey) {
+        for (const p of prev) {
+          if (selected.has(p.id)) {
+            void logCorrection({
+              jobId, supplierKey,
+              shopifyVendor: p.vendor, sku: p.sku, styleName: p.title,
+              fieldCorrected: "row",
+              valueBefore: null, valueAfter: "rejected",
+              correctionType: "row_reject",
+              graderScoreBefore, extractorUsed, invoiceDate,
+            });
+          }
+        }
+      }
+      return prev.filter(p => !selected.has(p.id));
+    });
     toast.success(`Deleted ${selected.size} items`);
     setSelected(new Set());
   };

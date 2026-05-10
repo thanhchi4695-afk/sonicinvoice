@@ -1591,6 +1591,68 @@ export type Database = {
           },
         ]
       }
+      corrections: {
+        Row: {
+          correction_type: string
+          created_at: string
+          extractor_used: string | null
+          field_corrected: string
+          grader_score_before: number | null
+          id: string
+          invoice_date: string | null
+          invoice_job_id: string | null
+          shopify_vendor: string | null
+          sku: string | null
+          style_name: string | null
+          supplier_key: string
+          user_id: string
+          value_after: string | null
+          value_before: string | null
+        }
+        Insert: {
+          correction_type: string
+          created_at?: string
+          extractor_used?: string | null
+          field_corrected: string
+          grader_score_before?: number | null
+          id?: string
+          invoice_date?: string | null
+          invoice_job_id?: string | null
+          shopify_vendor?: string | null
+          sku?: string | null
+          style_name?: string | null
+          supplier_key: string
+          user_id: string
+          value_after?: string | null
+          value_before?: string | null
+        }
+        Update: {
+          correction_type?: string
+          created_at?: string
+          extractor_used?: string | null
+          field_corrected?: string
+          grader_score_before?: number | null
+          id?: string
+          invoice_date?: string | null
+          invoice_job_id?: string | null
+          shopify_vendor?: string | null
+          sku?: string | null
+          style_name?: string | null
+          supplier_key?: string
+          user_id?: string
+          value_after?: string | null
+          value_before?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corrections_invoice_job_id_fkey"
+            columns: ["invoice_job_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_processing_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_lines: {
         Row: {
           accounting_category: string | null

@@ -613,6 +613,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
           products: claudeProducts,
           invoice_subtotal: claudeInvoiceSubtotal,
           supplier_hint: supplierName || classification?.supplier_name || null,
+          admin,
         });
         console.log(
           `[grader] attempt=${attempt} score=${graderResult.score} passed=${graderResult.passed} reextract=${graderResult.reextract_needed}`,
@@ -808,6 +809,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
         products: validatedProducts as Array<Record<string, unknown>>,
         invoice_subtotal: claudeInvoiceSubtotal,
         supplier_hint: classification?.supplier_name || supplierName || null,
+        admin,
       });
       graderAttempts = 1;
       graderResult.attempts = 1;
@@ -1115,10 +1117,40 @@ export interface GraderResult {
   error?: string;
 }
 
+/** Pull recent corrections for a supplier and format them as learned-rule bullets
+ *  to append to the grader system prompt. Returns "" on any failure. */
+async function fetchSupplierCorrectionContext(
+  admin: ReturnType<typeof createClient> | null,
+  supplierKey: string | null,
+): Promise<string> {
+  if (!admin || !supplierKey) return "";
+  try {
+    const { data } = await admin
+      .from("corrections")
+      .select("field_corrected, value_before, value_after, correction_type")
+      .eq("supplier_key", supplierKey)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (!data?.length) return "";
+    const bullets = data
+      .map((c) => {
+        const before = c.value_before || "(blank)";
+        const after = c.value_after || "(blank)";
+        return `- ${c.field_corrected} [${c.correction_type}]: "${before}" was corrected to "${after}"`;
+      })
+      .join("\n");
+    return `\n\nLEARNED CORRECTIONS FOR THIS SUPPLIER (${supplierKey}):\n${bullets}\n\nFlag the same kinds of mistakes in this extraction.`;
+  } catch (err) {
+    console.warn("[grader] fetchSupplierCorrectionContext failed:", err);
+    return "";
+  }
+}
+
 async function runSonicGrader(opts: {
   products: Array<Record<string, unknown>>;
   invoice_subtotal: number | null;
   supplier_hint: string | null;
+  admin?: ReturnType<typeof createClient> | null;
 }): Promise<GraderResult> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) {
@@ -1151,6 +1183,15 @@ async function runSonicGrader(opts: {
     `Grade this extraction. Return JSON only — no prose, no markdown fences.\n\n` +
     `Extraction payload:\n\`\`\`json\n${JSON.stringify(payload).slice(0, 60000)}\n\`\`\``;
 
+  const correctionContext = await fetchSupplierCorrectionContext(
+    opts.admin ?? null,
+    opts.supplier_hint,
+  );
+  const systemPrompt = SONIC_OUTCOMES_RUBRIC + correctionContext;
+  if (correctionContext) {
+    console.log(`[grader] appended ${correctionContext.length} chars of supplier corrections to rubric`);
+  }
+
   const response = await fetch(ANTHROPIC_API_URL, {
     method: "POST",
     headers: {
@@ -1161,7 +1202,7 @@ async function runSonicGrader(opts: {
     body: JSON.stringify({
       model: SONIC_GRADER_MODEL,
       max_tokens: 1500,
-      system: SONIC_OUTCOMES_RUBRIC,
+      system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     }),
   });

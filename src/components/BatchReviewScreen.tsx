@@ -304,7 +304,23 @@ const BatchReviewScreen = ({
       destructive: true,
     });
     if (!ok) return;
-    onSetProducts(prev => prev.filter(p => !selected.has(p.id)));
+    onSetProducts(prev => {
+      if (supplierKey) {
+        for (const p of prev) {
+          if (selected.has(p.id)) {
+            void logCorrection({
+              jobId, supplierKey,
+              shopifyVendor: p.vendor, sku: p.sku, styleName: p.title,
+              fieldCorrected: "row",
+              valueBefore: null, valueAfter: "rejected",
+              correctionType: "row_reject",
+              graderScoreBefore, extractorUsed, invoiceDate,
+            });
+          }
+        }
+      }
+      return prev.filter(p => !selected.has(p.id));
+    });
     toast.success(`Deleted ${selected.size} items`);
     setSelected(new Set());
   };

@@ -18,6 +18,7 @@ import {
   validateForExport, generateShopifyCSV, inferCategory, generateHandles,
   type ScannedProductForExport,
 } from "@/lib/shopify-csv-schema";
+import { logCorrection, correctionTypeFor } from "@/lib/corrections-log";
 
 /* ─── types ─── */
 export interface BatchProduct {

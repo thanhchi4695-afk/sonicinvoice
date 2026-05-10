@@ -367,6 +367,7 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }:
       <p className="text-[10px] text-muted-foreground mt-3">
         Sourced from learned invoice patterns. Quality is derived from the number of edits made during review.
       </p>
+      </>)}
     </div>
   );
 };

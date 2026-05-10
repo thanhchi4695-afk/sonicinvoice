@@ -75,6 +75,42 @@ interface ShopifyRequestBody {
   };
 }
 
+const extractShopifyErrorMessage = (payload: unknown): string => {
+  if (!payload) return "";
+  if (typeof payload === "string") return payload;
+  if (Array.isArray(payload)) {
+    return payload.map(extractShopifyErrorMessage).filter(Boolean).join("; ");
+  }
+  if (typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    const direct = record.error || record.errors || record.message;
+    if (direct) return extractShopifyErrorMessage(direct);
+    return Object.values(record).map(extractShopifyErrorMessage).filter(Boolean).join("; ");
+  }
+  return String(payload);
+};
+
+const isShopifyAuthError = (status: number, payload: unknown) =>
+  status === 401 || /invalid api key|access token|unrecognized login|wrong password/i.test(extractShopifyErrorMessage(payload));
+
+const shopifyErrorResponse = (status: number, payload: unknown, fallbackMessage: string) => {
+  const detail = extractShopifyErrorMessage(payload);
+  const authError = isShopifyAuthError(status, payload);
+  return new Response(JSON.stringify({
+    error: authError
+      ? "Shopify rejected the access token (401). Please reconnect your Shopify store in Settings → Connections."
+      : detail || fallbackMessage,
+    details: payload,
+    needs_reauth: authError,
+    shopify_status: status,
+  }), {
+    // Return 200 so supabase-js does not replace Shopify's message with
+    // the generic "Edge Function returned a non-2xx status code" error.
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -458,12 +494,11 @@ Deno.serve(async (req) => {
 
         if (!graphqlResp.ok) {
           console.error("[shopify-proxy] graphql_create_product HTTP error", graphqlResp.status, graphqlData);
-          return new Response(JSON.stringify({
-            error: `Shopify HTTP ${graphqlResp.status}`,
-            details: graphqlData,
-          }), {
-            status: graphqlResp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return shopifyErrorResponse(
+            graphqlResp.status,
+            graphqlData,
+            `Shopify HTTP ${graphqlResp.status}`,
+          );
         }
 
         const gqlAny = graphqlData as { errors?: unknown; data?: { productSet?: { product?: unknown; userErrors?: { field?: string[]; message: string }[] } } };
@@ -541,10 +576,11 @@ Deno.serve(async (req) => {
         });
         const pubJson = await pubResp.json().catch(() => ({}));
         if (!pubResp.ok || pubJson?.errors) {
-          return new Response(JSON.stringify({
-            error: "Failed to fetch publications",
-            details: pubJson?.errors || pubJson,
-          }), { status: pubResp.status || 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return shopifyErrorResponse(
+            pubResp.status || 502,
+            pubJson?.errors || pubJson,
+            "Failed to fetch publications",
+          );
         }
         const edges = pubJson?.data?.publications?.edges || [];
         result = { publications: edges.map((e: { node: { id: string; name: string } }) => e.node) };

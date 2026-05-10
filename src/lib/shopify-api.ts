@@ -78,7 +78,12 @@ async function callProxy(body: Record<string, unknown>) {
     }
     throw new Error(detail || error.message || "Shopify API call failed");
   }
-  if (data?.error) throw new Error(data.error);
+  if (data?.error) {
+    if (data.needs_reauth || /401|invalid api key|unrecognized login|access token/i.test(String(data.error))) {
+      throw new Error("Shopify rejected the access token (401). Please reconnect your Shopify store in Settings → Connections.");
+    }
+    throw new Error(String(data.error));
+  }
   return data;
 }
 

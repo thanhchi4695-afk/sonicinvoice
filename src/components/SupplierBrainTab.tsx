@@ -81,6 +81,14 @@ function confidenceTone(score: number) {
   return                { label: "Needs review",    cls: "bg-destructive/15 text-destructive border-destructive/30" };
 }
 
+// Per-brand correction-rate badge thresholds (Week 4 corrections log spec).
+function correctionTone(count: number) {
+  if (count === 0)  return { icon: "✅", label: "Clean",            cls: "bg-success/15 text-success border-success/30" };
+  if (count < 5)   return { icon: "🔵", label: "Minor",            cls: "bg-primary/15 text-primary border-primary/30" };
+  if (count < 10)  return { icon: "🟡", label: "Review",           cls: "bg-warning/15 text-warning border-warning/30" };
+  return            { icon: "⚠️", label: "Needs attention",  cls: "bg-destructive/15 text-destructive border-destructive/30" };
+}
+
 export default function SupplierBrainTab() {
   const confirmDialog = useConfirmDialog();
   const [rows, setRows] = useState<SupplierRow[]>([]);

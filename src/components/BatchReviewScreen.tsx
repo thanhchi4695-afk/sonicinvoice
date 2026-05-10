@@ -42,6 +42,12 @@ interface Props {
   products: BatchProduct[];
   onBack: () => void;
   onSetProducts: (fn: (prev: BatchProduct[]) => BatchProduct[]) => void;
+  /** Optional context — when provided, every edit/reject is logged to corrections. */
+  jobId?: string | null;
+  supplierKey?: string | null;
+  graderScoreBefore?: number | null;
+  extractorUsed?: string | null;
+  invoiceDate?: string | null;
 }
 
 type SortKey = "title" | "price" | "quantity" | "confidence" | "status";

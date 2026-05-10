@@ -5841,6 +5841,15 @@ export type Database = {
           supplier_sku_format: string
         }[]
       }
+      get_supplier_correction_rollup: {
+        Args: { _days?: number }
+        Returns: {
+          flag_enrichment: boolean
+          last3_avg: number
+          supplier_key: string
+          total_count: number
+        }[]
+      }
       get_supplier_hints: {
         Args: { _limit?: number; _supplier: string; _user_id: string }
         Returns: string

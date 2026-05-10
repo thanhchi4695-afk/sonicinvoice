@@ -271,35 +271,13 @@ export default function SupplierBrainTab() {
     setProfileStatusMap(statusMap);
 
     // ── Corrections rollup (Week 4) ───────────────────────────
-    // Count corrections per supplier_key, plus avg corrections per invoice
-    // across the last 3 invoices. Auto-flag profile_status = needs_enrichment
-    // when avg > 5 so Cowork / Claude Extension picks the brand up for
-    // enrichment.
-    type Corr = { supplier_key: string; invoice_job_id: string | null; created_at: string };
-    const { data: corr } = await supabase
-      .from("corrections")
-      .select("supplier_key, invoice_job_id, created_at")
-      .order("created_at", { ascending: false })
-      .limit(2000);
+    // Server-side aggregation via RPC — avoids pulling thousands of raw
+    // correction rows on every Supplier Brain visit. Returns one row per
+    // supplier_key with total_count + last3_avg over a 90-day window.
+    type Rollup = { supplier_key: string; total_count: number; last3_avg: number; flag_enrichment: boolean };
+    const { data: rollup } = await supabase
+      .rpc("get_supplier_correction_rollup" as never, { _days: 90 } as never);
 
-    // supplier_key (slug) -> { total, perJob: Map<jobId, { count, ts }> }
-    const perKey = new Map<string, { total: number; perJob: Map<string, { count: number; ts: number }> }>();
-    for (const c of (corr || []) as Corr[]) {
-      const k = (c.supplier_key || "").trim().toLowerCase();
-      if (!k) continue;
-      let entry = perKey.get(k);
-      if (!entry) { entry = { total: 0, perJob: new Map() }; perKey.set(k, entry); }
-      entry.total += 1;
-      if (c.invoice_job_id) {
-        const ts = new Date(c.created_at).getTime();
-        const existing = entry.perJob.get(c.invoice_job_id);
-        if (existing) { existing.count += 1; existing.ts = Math.max(existing.ts, ts); }
-        else entry.perJob.set(c.invoice_job_id, { count: 1, ts });
-      }
-    }
-
-    // supplier_key -> supplier_name lookup, so we can re-key the count map
-    // by lower(supplier_name) for fast UI rendering.
     const keyToName = new Map<string, string>();
     for (const b of (bp || []) as Array<{ supplier_key: string; supplier_name: string }>) {
       if (b.supplier_key && b.supplier_name) {
@@ -309,19 +287,14 @@ export default function SupplierBrainTab() {
 
     const countMap = new Map<string, number>();
     const flagKeys: string[] = [];
-    for (const [key, entry] of perKey) {
-      countMap.set(key, entry.total);
+    for (const r of ((rollup as unknown as Rollup[]) || [])) {
+      const key = (r.supplier_key || "").trim().toLowerCase();
+      if (!key) continue;
+      const total = Number(r.total_count) || 0;
+      countMap.set(key, total);
       const nameLower = keyToName.get(key);
-      if (nameLower) countMap.set(nameLower, entry.total);
-
-      // avg corrections per invoice over last 3 invoices
-      const last3 = Array.from(entry.perJob.values())
-        .sort((a, b) => b.ts - a.ts)
-        .slice(0, 3);
-      if (last3.length >= 1) {
-        const avg = last3.reduce((s, j) => s + j.count, 0) / last3.length;
-        if (avg > 5) flagKeys.push(key);
-      }
+      if (nameLower) countMap.set(nameLower, total);
+      if (r.flag_enrichment) flagKeys.push(key);
     }
     setCorrectionCountMap(countMap);
 

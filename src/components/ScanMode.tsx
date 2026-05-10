@@ -543,6 +543,14 @@ const ScanMode = ({ onBack }: { onBack: () => void }) => {
         products={products}
         onBack={() => setShowBatchReview(false)}
         onSetProducts={setProducts}
+        // Scan Mode is a barcode-driven flow with no invoice job behind it,
+        // so jobId / supplierKey / grader context are intentionally null.
+        // The corrections log will record edits as standalone entries.
+        jobId={null}
+        supplierKey={null}
+        graderScoreBefore={null}
+        extractorUsed={null}
+        invoiceDate={null}
       />
     );
   }

@@ -494,12 +494,11 @@ Deno.serve(async (req) => {
 
         if (!graphqlResp.ok) {
           console.error("[shopify-proxy] graphql_create_product HTTP error", graphqlResp.status, graphqlData);
-          return new Response(JSON.stringify({
-            error: `Shopify HTTP ${graphqlResp.status}`,
-            details: graphqlData,
-          }), {
-            status: graphqlResp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+          return shopifyErrorResponse(
+            graphqlResp.status,
+            graphqlData,
+            `Shopify HTTP ${graphqlResp.status}`,
+          );
         }
 
         const gqlAny = graphqlData as { errors?: unknown; data?: { productSet?: { product?: unknown; userErrors?: { field?: string[]; message: string }[] } } };
@@ -577,10 +576,11 @@ Deno.serve(async (req) => {
         });
         const pubJson = await pubResp.json().catch(() => ({}));
         if (!pubResp.ok || pubJson?.errors) {
-          return new Response(JSON.stringify({
-            error: "Failed to fetch publications",
-            details: pubJson?.errors || pubJson,
-          }), { status: pubResp.status || 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return shopifyErrorResponse(
+            pubResp.status || 502,
+            pubJson?.errors || pubJson,
+            "Failed to fetch publications",
+          );
         }
         const edges = pubJson?.data?.publications?.edges || [];
         result = { publications: edges.map((e: { node: { id: string; name: string } }) => e.node) };

@@ -431,13 +431,42 @@ Deno.serve(async (req) => {
           };
         });
 
+        // Resolve a location ID for inventory: prefer client-supplied, fall back to first active location.
+        let resolvedLocationId: string | null = body.location_id ? String(body.location_id) : null;
+        const anyVariantHasQty = variants.some((v) => Number(v.inventory_quantity ?? 0) > 0 || v.inventory_management === "shopify");
+        if (!resolvedLocationId && anyVariantHasQty) {
+          try {
+            const locResp = await shopifyFetch("/locations.json");
+            const locData = await locResp.json();
+            const active = (locData.locations || []).find((l: { active?: boolean; id: number | string }) => l.active);
+            if (active?.id) resolvedLocationId = String(active.id);
+          } catch (e) {
+            console.warn("[shopify-proxy] failed to fetch fallback location", e);
+          }
+        }
+        // Convert numeric location id to GID format if needed
+        const locationGid = resolvedLocationId
+          ? (String(resolvedLocationId).startsWith("gid://") ? String(resolvedLocationId) : `gid://shopify/Location/${resolvedLocationId}`)
+          : null;
+
         const variantsInput = variants.map((v) => {
           const variant: Record<string, unknown> = {
             price: String(v.price || "0.00"),
           };
           if (v.compare_at_price) variant.compareAtPrice = String(v.compare_at_price);
           if (v.sku) variant.sku = String(v.sku);
-          if (v.cost) variant.inventoryItem = { cost: String(v.cost) };
+          // inventoryItem: cost + tracked. Tracking is required for inventoryQuantities to stick.
+          const invItem: Record<string, unknown> = {};
+          if (v.cost) invItem.cost = String(v.cost);
+          if (v.inventory_management === "shopify" || Number(v.inventory_quantity ?? 0) > 0) {
+            invItem.tracked = true;
+          }
+          if (Object.keys(invItem).length > 0) variant.inventoryItem = invItem;
+          // inventoryQuantities — required to seed stock at a location on create
+          const qty = Number(v.inventory_quantity ?? 0);
+          if (locationGid && (qty > 0 || v.inventory_management === "shopify")) {
+            variant.inventoryQuantities = [{ locationId: locationGid, name: "available", quantity: qty }];
+          }
           const optVals: { name: string; optionName: string }[] = [];
           if (v.option1 && effectiveOptions[0]) optVals.push({ name: String(v.option1), optionName: effectiveOptions[0].name });
           if (v.option2 && effectiveOptions[1]) optVals.push({ name: String(v.option2), optionName: effectiveOptions[1].name });

@@ -81,6 +81,14 @@ function confidenceTone(score: number) {
   return                { label: "Needs review",    cls: "bg-destructive/15 text-destructive border-destructive/30" };
 }
 
+// Per-brand correction-rate badge thresholds (Week 4 corrections log spec).
+function correctionTone(count: number) {
+  if (count === 0)  return { icon: "✅", label: "Clean",            cls: "bg-success/15 text-success border-success/30" };
+  if (count < 5)   return { icon: "🔵", label: "Minor",            cls: "bg-primary/15 text-primary border-primary/30" };
+  if (count < 10)  return { icon: "🟡", label: "Review",           cls: "bg-warning/15 text-warning border-warning/30" };
+  return            { icon: "⚠️", label: "Needs attention",  cls: "bg-destructive/15 text-destructive border-destructive/30" };
+}
+
 export default function SupplierBrainTab() {
   const confirmDialog = useConfirmDialog();
   const [rows, setRows] = useState<SupplierRow[]>([]);
@@ -93,6 +101,9 @@ export default function SupplierBrainTab() {
   const [driveUrl, setDriveUrl] = useState("");
   // Brand-profile status (from brand_profiles MD imports), keyed by lower(supplier_name).
   const [profileStatusMap, setProfileStatusMap] = useState<Map<string, ProfileStatus>>(new Map());
+  // Per-brand correction counts, keyed by lower(supplier_name). Powers the
+  // correction-rate badge and the auto-flagging of needs_enrichment status.
+  const [correctionCountMap, setCorrectionCountMap] = useState<Map<string, number>>(new Map());
   const [statusFilter, setStatusFilter] = useState<"all" | ProfileStatus>("all");
 
   // Drive picker state machine: idle → picking → seeding → done
@@ -258,6 +269,78 @@ export default function SupplierBrainTab() {
       for (const k of keys) statusMap.set(k, status);
     }
     setProfileStatusMap(statusMap);
+
+    // ── Corrections rollup (Week 4) ───────────────────────────
+    // Count corrections per supplier_key, plus avg corrections per invoice
+    // across the last 3 invoices. Auto-flag profile_status = needs_enrichment
+    // when avg > 5 so Cowork / Claude Extension picks the brand up for
+    // enrichment.
+    type Corr = { supplier_key: string; invoice_job_id: string | null; created_at: string };
+    const { data: corr } = await supabase
+      .from("corrections")
+      .select("supplier_key, invoice_job_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(2000);
+
+    // supplier_key (slug) -> { total, perJob: Map<jobId, { count, ts }> }
+    const perKey = new Map<string, { total: number; perJob: Map<string, { count: number; ts: number }> }>();
+    for (const c of (corr || []) as Corr[]) {
+      const k = (c.supplier_key || "").trim().toLowerCase();
+      if (!k) continue;
+      let entry = perKey.get(k);
+      if (!entry) { entry = { total: 0, perJob: new Map() }; perKey.set(k, entry); }
+      entry.total += 1;
+      if (c.invoice_job_id) {
+        const ts = new Date(c.created_at).getTime();
+        const existing = entry.perJob.get(c.invoice_job_id);
+        if (existing) { existing.count += 1; existing.ts = Math.max(existing.ts, ts); }
+        else entry.perJob.set(c.invoice_job_id, { count: 1, ts });
+      }
+    }
+
+    // supplier_key -> supplier_name lookup, so we can re-key the count map
+    // by lower(supplier_name) for fast UI rendering.
+    const keyToName = new Map<string, string>();
+    for (const b of (bp || []) as Array<{ supplier_key: string; supplier_name: string }>) {
+      if (b.supplier_key && b.supplier_name) {
+        keyToName.set(b.supplier_key.trim().toLowerCase(), b.supplier_name.trim().toLowerCase());
+      }
+    }
+
+    const countMap = new Map<string, number>();
+    const flagKeys: string[] = [];
+    for (const [key, entry] of perKey) {
+      countMap.set(key, entry.total);
+      const nameLower = keyToName.get(key);
+      if (nameLower) countMap.set(nameLower, entry.total);
+
+      // avg corrections per invoice over last 3 invoices
+      const last3 = Array.from(entry.perJob.values())
+        .sort((a, b) => b.ts - a.ts)
+        .slice(0, 3);
+      if (last3.length >= 1) {
+        const avg = last3.reduce((s, j) => s + j.count, 0) / last3.length;
+        if (avg > 5) flagKeys.push(key);
+      }
+    }
+    setCorrectionCountMap(countMap);
+
+    // Auto-flag high-correction brands → needs_enrichment.
+    if (flagKeys.length > 0) {
+      const { data: existing } = await supabase
+        .from("brand_profiles")
+        .select("supplier_key, profile_status")
+        .in("supplier_key", flagKeys);
+      const toUpdate = (existing || [])
+        .filter((b: { profile_status: string | null }) => b.profile_status !== "needs_enrichment")
+        .map((b: { supplier_key: string }) => b.supplier_key);
+      if (toUpdate.length > 0) {
+        await supabase
+          .from("brand_profiles")
+          .update({ profile_status: "needs_enrichment" })
+          .in("supplier_key", toUpdate);
+      }
+    }
 
     setContribute(contribFlag);
     setLoading(false);
@@ -535,6 +618,18 @@ export default function SupplierBrainTab() {
                     <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
                       <span className={`px-1.5 py-0.5 rounded border ${tone.cls}`}>{r.confidence_score}% · {tone.label}</span>
                       <span>{r.invoice_count} invoice{r.invoice_count === 1 ? "" : "s"}</span>
+                      {(() => {
+                        const cCount = correctionCountMap.get((r.supplier_name || "").trim().toLowerCase()) ?? 0;
+                        const ct = correctionTone(cCount);
+                        return (
+                          <span
+                            className={`px-1.5 py-0.5 rounded border ${ct.cls}`}
+                            title={`${cCount} manual correction${cCount === 1 ? "" : "s"} logged for this brand`}
+                          >
+                            {ct.icon} {cCount} correction{cCount === 1 ? "" : "s"} · {ct.label}
+                          </span>
+                        );
+                      })()}
                       {r.last_correction_rate != null && (
                         <span>{Math.round(r.last_correction_rate * 100)}% correction rate</span>
                       )}

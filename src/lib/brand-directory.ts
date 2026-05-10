@@ -25,14 +25,26 @@ function today(): string { return new Date().toISOString().slice(0, 10); }
 
 // ── CRUD ───────────────────────────────────────────────────
 export function getBrandDirectory(): BrandDirectoryEntry[] {
+  const defaults = getDefaultBrands();
   try {
     const saved = localStorage.getItem(BRAND_DIR_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Merge in any system brands the saved directory is missing
+        // (e.g. brands added in newer app versions). Custom user entries
+        // always win on name conflicts.
+        const existingNames = new Set(parsed.map((b: BrandDirectoryEntry) => b.name.toLowerCase()));
+        const missing = defaults.filter((d) => !existingNames.has(d.name.toLowerCase()));
+        if (missing.length > 0) {
+          const merged = [...parsed, ...missing];
+          saveBrandDirectory(merged);
+          return merged;
+        }
+        return parsed;
+      }
     }
   } catch {}
-  const defaults = getDefaultBrands();
   saveBrandDirectory(defaults);
   return defaults;
 }
@@ -216,6 +228,8 @@ function getDefaultBrands(): BrandDirectoryEntry[] {
     b('Seed Heritage', 'seedheritage.com', 'fashion'),
     b('Aje', 'ajeworld.com.au', 'fashion'),
     b('Zimmermann', 'zimmermann.com', 'fashion'),
+    b('Go Girl', 'gogirlwholesale.com', 'fashion', ['GO GIRL', 'Go Girl Wholesale', 'Vaniggy', 'Vaniggy Retail', 'Vaniggy Retail Pty Ltd']),
+    b('La Sofia', 'gogirlwholesale.com', 'fashion', ['LA SOFIA', 'LaSofia']),
     // Jewellery
     b('Pandora', 'pandora.net', 'jewellery', [], 'EU'),
     b('Swarovski', 'swarovski.com', 'jewellery', [], 'EU'),

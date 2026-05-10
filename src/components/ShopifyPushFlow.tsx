@@ -273,6 +273,57 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
         <p className="text-xs text-muted-foreground">
           {products.length} products ready · Creates as {productStatus}s via {useGraphQL ? "GraphQL Admin API" : "REST API"}
         </p>
+
+        {/* Sales channels */}
+        {useGraphQL && publications.length > 0 && (
+          <div className="rounded-md border border-border p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold">Sales channels</p>
+              <span className="text-[10px] text-muted-foreground">
+                {selectedPubIds.length} of {publications.length} selected
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {publications.map((p) => {
+                const checked = selectedPubIds.includes(p.id);
+                return (
+                  <label key={p.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        setSelectedPubIds((prev) =>
+                          e.target.checked
+                            ? [...prev, p.id]
+                            : prev.filter((id) => id !== p.id),
+                        );
+                      }}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span className="truncate">{p.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {posPublicationId && (
+              <label className="flex items-start gap-2 text-xs cursor-pointer pt-2 border-t border-border">
+                <input
+                  type="checkbox"
+                  checked={posOnlyForNoImages}
+                  onChange={(e) => setPosOnlyForNoImages(e.target.checked)}
+                  className="h-3.5 w-3.5 mt-0.5"
+                />
+                <span className="text-muted-foreground">
+                  Send products <span className="text-foreground font-medium">without photos</span> to Point of Sale only
+                  {(() => {
+                    const noImg = products.filter((p) => !productHasImages(p)).length;
+                    return noImg > 0 ? ` · ${noImg} match${noImg === 1 ? "" : "es"}` : "";
+                  })()}
+                </span>
+              </label>
+            )}
+          </div>
+        )}
         <Button
           variant="teal"
           className="w-full h-12 text-base"

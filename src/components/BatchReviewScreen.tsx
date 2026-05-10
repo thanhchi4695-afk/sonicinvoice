@@ -169,7 +169,11 @@ const BulkBar = ({
 };
 
 /* ─── main component ─── */
-const BatchReviewScreen = ({ products, onBack, onSetProducts }: Props) => {
+const BatchReviewScreen = ({
+  products, onBack, onSetProducts,
+  jobId = null, supplierKey = null,
+  graderScoreBefore = null, extractorUsed = null, invoiceDate = null,
+}: Props) => {
   const config = getStoreConfig();
   const sym = config.currencySymbol || "$";
   const confirmDialog = useConfirmDialog();

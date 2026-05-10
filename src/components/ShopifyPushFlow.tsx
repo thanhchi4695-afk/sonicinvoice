@@ -83,7 +83,14 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
 
         try {
           const product = { ...products[i], status: productStatus };
-          const { id, handle } = await pushProductGraphQL(product);
+          // Sales channel routing: if product has no images and POS-only fallback is enabled,
+          // restrict publishing to the Point of Sale channel only. Otherwise use the
+          // user-selected publication set.
+          const noImages = !productHasImages(products[i]);
+          const pubIds = noImages && posOnlyForNoImages && posPublicationId
+            ? [posPublicationId]
+            : selectedPubIds;
+          const { id, handle } = await pushProductGraphQL(product, pubIds);
           finalResults[i] = { title: products[i].title, status: "success", shopifyId: id, handle };
         } catch (err) {
           finalResults[i] = {

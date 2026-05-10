@@ -125,11 +125,21 @@ export async function pushProduct(product: PushProduct): Promise<{ id: string }>
 export async function pushProductGraphQL(
   product: PushProduct,
   publicationIds?: string[],
+  locationId?: string,
 ): Promise<{ id: string; handle?: string }> {
+  // Auto-resolve default location if not provided so inventory quantities stick on create.
+  let locId = locationId;
+  if (!locId) {
+    try {
+      const conn = await getConnection();
+      if (conn?.default_location_id) locId = conn.default_location_id;
+    } catch { /* ignore */ }
+  }
   const data = await callProxy({
     action: "graphql_create_product",
     product,
     publication_ids: publicationIds || [],
+    location_id: locId,
   });
   const gqlId = data.product?.id || "";
   // Extract numeric ID from GID format: gid://shopify/Product/12345

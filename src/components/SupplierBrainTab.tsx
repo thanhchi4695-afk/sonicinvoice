@@ -101,6 +101,9 @@ export default function SupplierBrainTab() {
   const [driveUrl, setDriveUrl] = useState("");
   // Brand-profile status (from brand_profiles MD imports), keyed by lower(supplier_name).
   const [profileStatusMap, setProfileStatusMap] = useState<Map<string, ProfileStatus>>(new Map());
+  // Per-brand correction counts, keyed by lower(supplier_name). Powers the
+  // correction-rate badge and the auto-flagging of needs_enrichment status.
+  const [correctionCountMap, setCorrectionCountMap] = useState<Map<string, number>>(new Map());
   const [statusFilter, setStatusFilter] = useState<"all" | ProfileStatus>("all");
 
   // Drive picker state machine: idle → picking → seeding → done

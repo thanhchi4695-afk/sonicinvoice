@@ -62,6 +62,8 @@ interface ShopifyRequestBody {
   new_variants?: Array<{ price: string; sku?: string; barcode?: string; options: string[]; qty?: number; locationId?: string; cost?: string; imageSrc?: string }>;
   // For graphql_search_catalog
   query_string?: string;
+  // For graphql_create_product — sales channel publishing
+  publication_ids?: string[];
   // For graphql_create_collection
   gql_collection?: {
     title: string;

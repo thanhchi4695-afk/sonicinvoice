@@ -12,7 +12,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface ShopifyRequestBody {
-  action: "test" | "get_locations" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "update_variant_price" | "adjust_inventory" | "set_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "delete_collection" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog" | "graphql_create_collection" | "graphql";
+  action: "test" | "get_locations" | "get_publications" | "push_product" | "find_variant" | "find_by_barcode" | "get_inventory_levels" | "update_variant_cost" | "update_variant_price" | "adjust_inventory" | "set_inventory" | "update_seo" | "graphql_create_product" | "get_custom_collections" | "get_smart_collections" | "create_custom_collection" | "update_custom_collection" | "create_smart_collection" | "update_smart_collection" | "update_collection_seo" | "delete_collection" | "get_products_page" | "set_metafields" | "update_image_alt" | "replace_product_image" | "batch_lookup" | "graphql_adjust_inventory" | "graphql_create_variant" | "graphql_search_catalog" | "graphql_create_collection" | "graphql";
   // For generic graphql passthrough
   query?: string;
   variables?: Record<string, unknown>;
@@ -62,6 +62,8 @@ interface ShopifyRequestBody {
   new_variants?: Array<{ price: string; sku?: string; barcode?: string; options: string[]; qty?: number; locationId?: string; cost?: string; imageSrc?: string }>;
   // For graphql_search_catalog
   query_string?: string;
+  // For graphql_create_product — sales channel publishing
+  publication_ids?: string[];
   // For graphql_create_collection
   gql_collection?: {
     title: string;
@@ -484,7 +486,68 @@ Deno.serve(async (req) => {
           });
         }
 
-        result = { product: productResult?.product };
+        const createdProduct = productResult?.product as { id?: string } | undefined;
+
+        // Optionally publish to selected sales channels (publications)
+        const publicationIds = (body.publication_ids || []) as string[];
+        if (createdProduct?.id && publicationIds.length > 0) {
+          const publishMutation = `
+            mutation publishablePublish($id: ID!, $input: [PublicationInput!]!) {
+              publishablePublish(id: $id, input: $input) {
+                userErrors { field message }
+              }
+            }
+          `;
+          const publishResp = await fetch(`${baseUrl}/graphql.json`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Shopify-Access-Token": access_token,
+            },
+            body: JSON.stringify({
+              query: publishMutation,
+              variables: {
+                id: createdProduct.id,
+                input: publicationIds.map((pid) => ({ publicationId: pid })),
+              },
+            }),
+          });
+          const publishJson = await publishResp.json().catch(() => ({}));
+          const pubErrors = publishJson?.data?.publishablePublish?.userErrors || [];
+          if (pubErrors.length > 0) {
+            console.error("[shopify-proxy] publishablePublish userErrors", pubErrors);
+          }
+        }
+
+        result = { product: createdProduct };
+        break;
+      }
+
+      case "get_publications": {
+        const pubQuery = `
+          query {
+            publications(first: 25) {
+              edges { node { id name } }
+            }
+          }
+        `;
+        const pubResp = await fetch(`${baseUrl}/graphql.json`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Shopify-Access-Token": access_token,
+          },
+          body: JSON.stringify({ query: pubQuery }),
+        });
+        const pubJson = await pubResp.json().catch(() => ({}));
+        if (!pubResp.ok || pubJson?.errors) {
+          return new Response(JSON.stringify({
+            error: "Failed to fetch publications",
+            details: pubJson?.errors || pubJson,
+          }), { status: pubResp.status || 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        const edges = pubJson?.data?.publications?.edges || [];
+        result = { publications: edges.map((e: { node: { id: string; name: string } }) => e.node) };
         break;
       }
 

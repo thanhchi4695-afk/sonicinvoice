@@ -117,12 +117,29 @@ export async function pushProduct(product: PushProduct): Promise<{ id: string }>
   return { id: String(data.product?.id || "") };
 }
 
-export async function pushProductGraphQL(product: PushProduct): Promise<{ id: string; handle?: string }> {
-  const data = await callProxy({ action: "graphql_create_product", product });
+export async function pushProductGraphQL(
+  product: PushProduct,
+  publicationIds?: string[],
+): Promise<{ id: string; handle?: string }> {
+  const data = await callProxy({
+    action: "graphql_create_product",
+    product,
+    publication_ids: publicationIds || [],
+  });
   const gqlId = data.product?.id || "";
   // Extract numeric ID from GID format: gid://shopify/Product/12345
   const numericId = String(gqlId).split("/").pop() || String(gqlId);
   return { id: numericId, handle: data.product?.handle };
+}
+
+export interface ShopifyPublication {
+  id: string;
+  name: string;
+}
+
+export async function getPublications(): Promise<ShopifyPublication[]> {
+  const data = await callProxy({ action: "get_publications" as any });
+  return (data?.publications || []) as ShopifyPublication[];
 }
 
 export async function getConnection(): Promise<ShopifyConnection | null> {

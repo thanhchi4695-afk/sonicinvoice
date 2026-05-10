@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Check, X, Loader2, ExternalLink, Download, ShoppingBag, AlertTriangle, RotateCcw, Copy } from "lucide-react";
 import { toast } from "sonner";
-import { PushProduct, PushResult, pushProducts, getConnection, recordPush, pushProductGraphQL } from "@/lib/shopify-api";
+import { PushProduct, PushResult, pushProducts, getConnection, recordPush, pushProductGraphQL, getPublications, ShopifyPublication } from "@/lib/shopify-api";
 import { openShopifyAdmin } from "@/lib/open-shopify-admin";
 
 interface ShopifyPushFlowProps {
@@ -25,6 +25,9 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
   const [results, setResults] = useState<PushResult[]>([]);
   const [done, setDone] = useState(false);
   const [useGraphQL, setUseGraphQL] = useState(true);
+  const [publications, setPublications] = useState<ShopifyPublication[]>([]);
+  const [selectedPubIds, setSelectedPubIds] = useState<string[]>([]);
+  const [posOnlyForNoImages, setPosOnlyForNoImages] = useState(true);
 
   useEffect(() => {
     getConnection().then((conn) => {
@@ -37,7 +40,21 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
         setConnected(false);
       }
     });
+    // Load sales channels (publications) — non-blocking
+    getPublications()
+      .then((pubs) => {
+        setPublications(pubs);
+        // Default: select all (Online Store + POS + others)
+        setSelectedPubIds(pubs.map((p) => p.id));
+      })
+      .catch((e) => console.warn("[ShopifyPushFlow] could not load publications", e));
   }, []);
+
+  const posPublicationId = useMemo(
+    () => publications.find((p) => /point of sale|pos/i.test(p.name))?.id || null,
+    [publications],
+  );
+  const productHasImages = (p: PushProduct) => Array.isArray(p.images) && p.images.length > 0;
 
   const stats = useMemo(() => {
     const created = results.filter((r) => r.status === "success").length;
@@ -66,7 +83,14 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
 
         try {
           const product = { ...products[i], status: productStatus };
-          const { id, handle } = await pushProductGraphQL(product);
+          // Sales channel routing: if product has no images and POS-only fallback is enabled,
+          // restrict publishing to the Point of Sale channel only. Otherwise use the
+          // user-selected publication set.
+          const noImages = !productHasImages(products[i]);
+          const pubIds = noImages && posOnlyForNoImages && posPublicationId
+            ? [posPublicationId]
+            : selectedPubIds;
+          const { id, handle } = await pushProductGraphQL(product, pubIds);
           finalResults[i] = { title: products[i].title, status: "success", shopifyId: id, handle };
         } catch (err) {
           finalResults[i] = {
@@ -249,6 +273,57 @@ const ShopifyPushFlow = ({ products, source, onFallbackCSV }: ShopifyPushFlowPro
         <p className="text-xs text-muted-foreground">
           {products.length} products ready · Creates as {productStatus}s via {useGraphQL ? "GraphQL Admin API" : "REST API"}
         </p>
+
+        {/* Sales channels */}
+        {useGraphQL && publications.length > 0 && (
+          <div className="rounded-md border border-border p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold">Sales channels</p>
+              <span className="text-[10px] text-muted-foreground">
+                {selectedPubIds.length} of {publications.length} selected
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {publications.map((p) => {
+                const checked = selectedPubIds.includes(p.id);
+                return (
+                  <label key={p.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        setSelectedPubIds((prev) =>
+                          e.target.checked
+                            ? [...prev, p.id]
+                            : prev.filter((id) => id !== p.id),
+                        );
+                      }}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span className="truncate">{p.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {posPublicationId && (
+              <label className="flex items-start gap-2 text-xs cursor-pointer pt-2 border-t border-border">
+                <input
+                  type="checkbox"
+                  checked={posOnlyForNoImages}
+                  onChange={(e) => setPosOnlyForNoImages(e.target.checked)}
+                  className="h-3.5 w-3.5 mt-0.5"
+                />
+                <span className="text-muted-foreground">
+                  Send products <span className="text-foreground font-medium">without photos</span> to Point of Sale only
+                  {(() => {
+                    const noImg = products.filter((p) => !productHasImages(p)).length;
+                    return noImg > 0 ? ` · ${noImg} match${noImg === 1 ? "" : "es"}` : "";
+                  })()}
+                </span>
+              </label>
+            )}
+          </div>
+        )}
         <Button
           variant="teal"
           className="w-full h-12 text-base"

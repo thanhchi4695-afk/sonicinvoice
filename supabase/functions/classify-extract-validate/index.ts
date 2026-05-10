@@ -809,6 +809,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
         products: validatedProducts as Array<Record<string, unknown>>,
         invoice_subtotal: claudeInvoiceSubtotal,
         supplier_hint: classification?.supplier_name || supplierName || null,
+        admin,
       });
       graderAttempts = 1;
       graderResult.attempts = 1;

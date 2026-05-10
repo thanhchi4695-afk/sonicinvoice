@@ -58,7 +58,26 @@ async function callProxy(body: Record<string, unknown>) {
   const { data, error } = await supabase.functions.invoke("shopify-proxy", {
     body,
   });
-  if (error) throw new Error(error.message || "Shopify API call failed");
+  if (error) {
+    // FunctionsHttpError hides the body — try to read it for the real message
+    let detail = "";
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx && typeof ctx.text === "function") {
+        const txt = await ctx.text();
+        try {
+          const j = JSON.parse(txt);
+          detail = j.error || j.errors || txt;
+        } catch {
+          detail = txt;
+        }
+      }
+    } catch { /* ignore */ }
+    if (typeof detail === "string" && /401|invalid api key|unrecognized login|access token/i.test(detail)) {
+      throw new Error("Shopify rejected the access token (401). Please reconnect your Shopify store in Settings → Connections.");
+    }
+    throw new Error(detail || error.message || "Shopify API call failed");
+  }
   if (data?.error) throw new Error(data.error);
   return data;
 }

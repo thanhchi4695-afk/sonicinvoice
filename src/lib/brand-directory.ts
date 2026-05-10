@@ -228,6 +228,8 @@ function getDefaultBrands(): BrandDirectoryEntry[] {
     b('Seed Heritage', 'seedheritage.com', 'fashion'),
     b('Aje', 'ajeworld.com.au', 'fashion'),
     b('Zimmermann', 'zimmermann.com', 'fashion'),
+    b('Go Girl', 'gogirlwholesale.com', 'fashion', ['GO GIRL', 'Go Girl Wholesale', 'Vaniggy', 'Vaniggy Retail', 'Vaniggy Retail Pty Ltd']),
+    b('La Sofia', 'gogirlwholesale.com', 'fashion', ['LA SOFIA', 'LaSofia']),
     // Jewellery
     b('Pandora', 'pandora.net', 'jewellery', [], 'EU'),
     b('Swarovski', 'swarovski.com', 'jewellery', [], 'EU'),

@@ -618,6 +618,18 @@ export default function SupplierBrainTab() {
                     <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
                       <span className={`px-1.5 py-0.5 rounded border ${tone.cls}`}>{r.confidence_score}% · {tone.label}</span>
                       <span>{r.invoice_count} invoice{r.invoice_count === 1 ? "" : "s"}</span>
+                      {(() => {
+                        const cCount = correctionCountMap.get((r.supplier_name || "").trim().toLowerCase()) ?? 0;
+                        const ct = correctionTone(cCount);
+                        return (
+                          <span
+                            className={`px-1.5 py-0.5 rounded border ${ct.cls}`}
+                            title={`${cCount} manual correction${cCount === 1 ? "" : "s"} logged for this brand`}
+                          >
+                            {ct.icon} {cCount} correction{cCount === 1 ? "" : "s"} · {ct.label}
+                          </span>
+                        );
+                      })()}
                       {r.last_correction_rate != null && (
                         <span>{Math.round(r.last_correction_rate * 100)}% correction rate</span>
                       )}

@@ -299,16 +299,16 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
       "Published",
       "Option1 Name",
       "Option1 Value",
-      "Variant SKU",
-      "Variant Price",
-      "Variant Cost",
+      "Image Src",
+      "Image Position",
+      "Image Alt Text",
       "Variant Inventory Tracker",
       "Variant Inventory Qty",
       "Variant Requires Shipping",
       "Variant Taxable",
-      "Image Src",
-      "Image Position",
-      "Image Alt Text",
+      "Variant SKU",
+      "Variant Price",
+      "Variant Cost",
     ];
     const rows: string[][] = [headers];
     let exported = 0;
@@ -318,6 +318,8 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
       if (!desc) continue;
       const fullName = r?.full_product_name?.trim() || item.style_name;
       const imgSrc = r?.image_url || "";
+      const colour = (item as { colour?: string }).colour?.trim() || "";
+      const altText = imgSrc ? (colour ? `${fullName} — ${colour}` : fullName) : "";
       rows.push([
         slugify(item.style_number || fullName),
         fullName,
@@ -328,16 +330,16 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
         "TRUE",
         "Title",
         "Default Title",
-        item.style_number,
-        Number(item.rrp_incl_gst || 0).toFixed(2),
-        Number(item.cost_ex_gst || 0).toFixed(2),
+        imgSrc,
+        imgSrc ? "1" : "",
+        altText,
         "shopify",
         "0",
         "TRUE",
         "TRUE",
-        imgSrc,
-        imgSrc ? "1" : "",
-        imgSrc ? fullName : "",
+        item.style_number,
+        Number(item.rrp_incl_gst || 0).toFixed(2),
+        Number(item.cost_ex_gst || 0).toFixed(2),
       ]);
       exported++;
     }

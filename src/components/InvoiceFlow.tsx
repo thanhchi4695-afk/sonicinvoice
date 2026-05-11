@@ -5861,6 +5861,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                             debugHttpStatus: group.debugHttpStatus,
                             debugAiRaw: group.debugAiRaw,
                             debugStateWrite: group.debugStateWrite,
+                            imageDebug: group.imageDebug,
                           }}
                           debugMode={debugMode}
                           onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}

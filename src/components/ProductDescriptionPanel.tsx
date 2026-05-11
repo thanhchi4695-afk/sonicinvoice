@@ -459,7 +459,6 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
               resized += s.resized || 0;
               skipped += s.skipped || 0;
             }
-            if (processed === 0 && resized === 0 && skipped === 0) return null;
             return (
               <div
                 className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border bg-muted/40 text-[11px] font-mono"
@@ -796,12 +795,18 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                               </span>
                             )}
                           </div>
-                          {r.ai_raw_preview && (
-                            <div className="pt-1">
-                              <span className="text-muted-foreground">AI raw (first 200 chars):</span>{" "}
-                              <span className="text-foreground">{r.ai_raw_preview}</span>
-                            </div>
-                          )}
+                          <div className="pt-1">
+                            <span className="text-muted-foreground">AI input preview:</span>{" "}
+                            {r.ai_raw_preview ? (
+                              <code className="text-foreground bg-background/60 px-1 py-0.5 rounded">
+                                {r.ai_raw_preview}
+                              </code>
+                            ) : (
+                              <span className="text-muted-foreground italic">
+                                n/a — description scraped directly
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                     </TableRow>

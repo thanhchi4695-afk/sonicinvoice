@@ -231,7 +231,7 @@ function StatusBadge({
 
 // ── Component ─────────────────────────────────────────────
 const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
-  const { results, loading, fetchDescription, fetchAll, updateDescription } =
+  const { results, loading, fetchDescription, fetchAll, updateDescription, clearCache } =
     useProductDescriptions();
   const [running, setRunning] = useState(false);
   const [format, setFormat] = useState<ExportFormat>("shopify");

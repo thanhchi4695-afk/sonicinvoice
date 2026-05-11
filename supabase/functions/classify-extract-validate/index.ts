@@ -859,6 +859,18 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     }
   }
 
+  // ─────── Forward Purchase Order / JOOR signals from parse-invoice ───────
+  // These fields originate in parse-invoice's PO short-circuit branch. The client
+  // (InvoiceFlow.tsx) reads po_warning / source_platform / po_number / document_type
+  // / cost_pending to render the amber banner and lock Shopify export.
+  const poFields = {
+    document_type: extraction?.document_type ?? null,
+    source_platform: extraction?.source_platform ?? null,
+    cost_pending: extraction?.cost_pending ?? false,
+    po_number: extraction?.po_number ?? null,
+    po_warning: extraction?.po_warning ?? null,
+  };
+
   return {
     ...extraction,
     products: validatedProducts,
@@ -873,6 +885,8 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
     invoice_subtotal: claudeInvoiceSubtotal,
     cache_creation_tokens: cacheCreationTokens,
     cache_read_tokens: cacheReadTokens,
+    // Explicit PO passthrough (overrides nulls from non-parse-invoice extractors)
+    ...poFields,
   };
 }
 

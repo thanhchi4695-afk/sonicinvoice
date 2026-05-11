@@ -587,49 +587,73 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" /> Checking Gmail connection…
             </div>
-          ) : connection ? (
-            <div>
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-success/15 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-5 h-5 text-success" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold">Connected: {connection.email_address}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {connection.last_checked_at
-                      ? `Last scanned ${relTime(new Date(connection.last_checked_at))}`
-                      : "Not scanned yet"}
-                  </p>
-                  {(() => {
-                    if (!connection.last_checked_at) return null;
-                    const ageMin = (Date.now() - new Date(connection.last_checked_at).getTime()) / 60000;
-                    const healthy = ageMin < 10;
-                    return (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="relative flex h-2 w-2">
-                          {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
-                          <span className={`relative inline-flex rounded-full h-2 w-2 ${healthy ? "bg-success" : "bg-muted-foreground"}`} />
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {healthy ? "Auto-scan active · every 5 min" : `Auto-scan idle (${Math.round(ageMin)}m since last run)`}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-              <div className="flex gap-2 mt-3">
-                <Button size="sm" variant="teal" className="flex-1 h-9" onClick={handleScanNow} disabled={scanning}>
+          ) : connections.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">
+                  Connected Gmail accounts ({connections.length})
+                </p>
+                <Button size="sm" variant="teal" className="h-8" onClick={handleScanNow} disabled={scanning}>
                   {scanning
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Scanning…</>
-                    : <><RefreshCw className="w-4 h-4 mr-2" /> Scan now</>}
-                </Button>
-                <Button size="sm" variant="outline" className="h-9" onClick={handleDisconnect}>
-                  <LogOut className="w-4 h-4 mr-1" /> Disconnect
+                    ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Scanning…</>
+                    : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Scan all</>}
                 </Button>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-2">
-                Scans the last 30 days for emails with PDF / XLSX / CSV / image attachments matching invoice, PO, packing slip, receipt, statement or bill.
+              <ul className="divide-y divide-border rounded-md border border-border">
+                {connections.map(c => {
+                  const ageMin = c.last_checked_at
+                    ? (Date.now() - new Date(c.last_checked_at).getTime()) / 60000
+                    : null;
+                  const healthy = ageMin !== null && ageMin < 10;
+                  return (
+                    <li key={c.id} className="flex items-center gap-3 px-3 py-2">
+                      <div className="w-8 h-8 rounded-full bg-success/15 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-4 h-4 text-success" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{c.email_address}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="relative flex h-2 w-2">
+                            {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
+                            <span className={`relative inline-flex rounded-full h-2 w-2 ${healthy ? "bg-success" : "bg-muted-foreground"}`} />
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {c.last_checked_at
+                              ? (healthy ? "Auto-scan active · every 5 min" : `Idle ${Math.round(ageMin!)}m`)
+                              : "Not scanned yet"}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs shrink-0"
+                        onClick={() => handleDisconnect(c)}
+                      >
+                        <LogOut className="w-3 h-3 mr-1" /> Remove
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 flex-1 min-w-[160px]"
+                  onClick={handleConnectGmail}
+                  disabled={connecting}
+                >
+                  {connecting
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening Google…</>
+                    : <><Mail className="w-4 h-4 mr-2" /> Connect another Gmail</>}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-9" onClick={() => handleDisconnect()}>
+                  Remove all
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Scans the last 180 days of each inbox (up to 250 messages per account per scan) for invoice / PO / packing slip / receipt / statement / bill attachments.
               </p>
             </div>
           ) : (
@@ -641,7 +665,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold mb-1">Connect Gmail to auto-pull invoices</p>
                   <p className="text-xs text-muted-foreground">
-                    Read-only access. Sonic Invoices scans your inbox for supplier invoices and queues them here.
+                    Read-only access. Sonic Invoices scans your inbox for supplier invoices and queues them here. You can connect multiple Gmail accounts.
                   </p>
                 </div>
               </div>

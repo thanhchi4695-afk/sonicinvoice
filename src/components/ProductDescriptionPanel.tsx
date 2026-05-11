@@ -9,6 +9,9 @@ import {
   ChevronDown,
   ChevronUp,
   Pencil,
+  Bug,
+  ImageOff,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +24,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   useProductDescriptions,
   type DescriptionResult,
+  type Attempt,
 } from "@/hooks/use-product-descriptions";
 import type { PriceMatchLineItem } from "@/lib/price-match-utils";
 import EnrichProductButton from "@/components/EnrichProductButton";

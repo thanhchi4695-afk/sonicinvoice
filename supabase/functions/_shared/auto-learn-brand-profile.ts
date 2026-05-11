@@ -299,7 +299,7 @@ Be factual and precise. Only write what you can confirm from the invoice. Do not
       system: systemPrompt,
       messages: [{
         role: "user",
-        content: [docBlock, { type: "text", text: userText }],
+        content: [...batches[0], { type: "text", text: userText }],
       }],
     }),
   });

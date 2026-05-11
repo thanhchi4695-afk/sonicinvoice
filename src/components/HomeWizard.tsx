@@ -248,7 +248,7 @@ const HomeWizard = ({
             </div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-foreground">
-                Upload {docType === "invoice" ? "invoice" : "packing slip"}
+                Upload {docType === "invoice" ? "invoice" : docType === "joor" ? "JOOR / wholesale order" : "packing slip"}
               </p>
               <p className="text-xs text-muted-foreground">
                 PDF, Excel, CSV, or photo · drop a file in the next screen

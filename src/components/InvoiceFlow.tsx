@@ -6917,11 +6917,35 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
       <button onClick={() => setExpanded(!expanded)} className="w-full px-4 py-3 text-left">
         <div className="flex items-start gap-3">
           {/* Image thumbnail */}
-          <div className="shrink-0 w-11 h-11 rounded bg-muted border border-border flex items-center justify-center overflow-hidden">
-            {product.imageSrc ? (
-              <img src={product.imageSrc} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <div className="shrink-0 w-11 h-11 rounded bg-muted border border-border flex items-center justify-center overflow-hidden relative">
+            {product.enriching || product.imageStatus === 'searching' ? (
+              <span className="text-base text-muted-foreground animate-pulse" aria-label="Searching for image">🔍</span>
+            ) : product.imageSrc ? (
+              <img
+                src={product.imageSrc}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  img.style.display = 'none';
+                  const parent = img.parentElement;
+                  if (parent && !parent.querySelector('[data-img-fallback]')) {
+                    const span = document.createElement('span');
+                    span.setAttribute('data-img-fallback', 'true');
+                    span.className = 'text-base text-warning';
+                    span.title = 'Image URL broken';
+                    span.textContent = '⚠️';
+                    parent.appendChild(span);
+                  }
+                }}
+              />
             ) : (
-              <span className="text-base text-muted-foreground">📷</span>
+              <span
+                className={`text-base ${product.imageStatus === 'not_found' ? 'text-warning' : 'text-muted-foreground'}`}
+                aria-label={product.imageStatus === 'not_found' ? 'No image found' : 'No image yet'}
+              >
+                {product.imageStatus === 'not_found' ? '⚠️' : '📷'}
+              </span>
             )}
           </div>
           <div className="flex-1 min-w-0">

@@ -413,8 +413,40 @@ Deno.serve(async (req) => {
     // Success
     attempts.push({ url: search.url, status: fetched.status, reason: "ok", found: true, selector: ex.selector });
     const absImg = makeAbsolute(ex.imageUrl, search.url);
+    let imageStats: ResponsePayload["image_stats"] = { processed: 0, resized: 0, skipped: 0 };
+    let safeImg: string | null = absImg;
     if (absImg) {
-      imageAttempts.push({ url: absImg, status: fetched.status, reason: "ok", found: true, selector: ex.selector });
+      // Dimension-check & downscale to keep us safely under Claude's 2000px limit
+      // for any downstream vision call. Best-effort — failures fall through to
+      // returning the raw URL with a "skipped" status.
+      try {
+        const p = await processImageForAI(absImg, body.style_name || "image");
+        imageStats = {
+          processed: p.ok ? 1 : 0,
+          resized: p.resized ? 1 : 0,
+          skipped: p.ok ? 0 : 1,
+          last_error: p.error,
+          original_width: p.originalWidth,
+          original_height: p.originalHeight,
+          final_width: p.finalWidth,
+          final_height: p.finalHeight,
+        };
+        if (!p.ok) {
+          safeImg = null;
+          imageAttempts.push({
+            url: absImg,
+            status: fetched.status,
+            reason: "fetch_error",
+            found: false,
+            selector: "image-resize:" + (p.error || "failed"),
+          });
+        } else {
+          imageAttempts.push({ url: absImg, status: fetched.status, reason: "ok", found: true, selector: ex.selector });
+        }
+      } catch (e) {
+        imageStats = { processed: 0, resized: 0, skipped: 1, last_error: (e as Error).message };
+        imageAttempts.push({ url: absImg, status: fetched.status, reason: "fetch_error", found: false });
+      }
     } else {
       imageAttempts.push({ url: search.url, status: fetched.status, reason: "selector_not_matched", found: false, selector: ex.selector });
     }
@@ -427,10 +459,11 @@ Deno.serve(async (req) => {
       word_count: wordCount(desc),
       raw_word_count: wc,
       confidence: site.type === "supplier" ? "high" : "medium",
-      image_url: absImg,
+      image_url: safeImg,
       image_source_url: search.url,
       attempts,
       image_attempts: imageAttempts,
+      image_stats: imageStats,
     };
     break;
   }

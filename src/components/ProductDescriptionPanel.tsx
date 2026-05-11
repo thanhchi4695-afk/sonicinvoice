@@ -231,7 +231,7 @@ function StatusBadge({
 
 // ── Component ─────────────────────────────────────────────
 const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
-  const { results, loading, fetchDescription, fetchAll, updateDescription, clearCache } =
+  const { results, loading, fetchDescription, fetchAll, updateDescription, clearCache, clearOne } =
     useProductDescriptions();
   const [running, setRunning] = useState(false);
   const [format, setFormat] = useState<ExportFormat>("shopify");
@@ -299,16 +299,16 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
       "Published",
       "Option1 Name",
       "Option1 Value",
-      "Variant SKU",
-      "Variant Price",
-      "Variant Cost",
+      "Image Src",
+      "Image Position",
+      "Image Alt Text",
       "Variant Inventory Tracker",
       "Variant Inventory Qty",
       "Variant Requires Shipping",
       "Variant Taxable",
-      "Image Src",
-      "Image Position",
-      "Image Alt Text",
+      "Variant SKU",
+      "Variant Price",
+      "Variant Cost",
     ];
     const rows: string[][] = [headers];
     let exported = 0;
@@ -318,6 +318,8 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
       if (!desc) continue;
       const fullName = r?.full_product_name?.trim() || item.style_name;
       const imgSrc = r?.image_url || "";
+      const colour = (item as { colour?: string }).colour?.trim() || "";
+      const altText = imgSrc ? (colour ? `${fullName} — ${colour}` : fullName) : "";
       rows.push([
         slugify(item.style_number || fullName),
         fullName,
@@ -328,16 +330,16 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
         "TRUE",
         "Title",
         "Default Title",
-        item.style_number,
-        Number(item.rrp_incl_gst || 0).toFixed(2),
-        Number(item.cost_ex_gst || 0).toFixed(2),
+        imgSrc,
+        imgSrc ? "1" : "",
+        altText,
         "shopify",
         "0",
         "TRUE",
         "TRUE",
-        imgSrc,
-        imgSrc ? "1" : "",
-        imgSrc ? fullName : "",
+        item.style_number,
+        Number(item.rrp_incl_gst || 0).toFixed(2),
+        Number(item.cost_ex_gst || 0).toFixed(2),
       ]);
       exported++;
     }
@@ -456,18 +458,18 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
             )}
             Fetch All
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
+          <button
+            type="button"
             onClick={() => {
               clearCache();
-              toast.success("Cache cleared — Fetch All will re-fetch every row from scratch");
+              toast.success("Cleared all cached results — all rows reset to Pending");
             }}
             disabled={running}
-            title="Wipe the 24h session cache so the next Fetch pulls fresh data (use after a resolver fix)"
+            className="text-[11px] underline text-muted-foreground hover:text-foreground disabled:opacity-50"
+            title="Wipe all cached enrichment results so rows return to Pending. Then click Fetch All."
           >
-            Clear cache &amp; refetch
-          </Button>
+            Clear all cache
+          </button>
           <Button
             variant={debugMode ? "default" : "outline"}
             size="sm"
@@ -769,6 +771,24 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                           {r ? <RefreshCcw className="w-3 h-3" /> : null}
                           {r ? "Refetch" : "Fetch"}
                         </Button>
+                        {r && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-[11px]"
+                            disabled={isLoading}
+                            title="Delete cached result for this row and fetch fresh"
+                            onClick={() => {
+                              const id = item.style_number || item.style_name;
+                              // eslint-disable-next-line no-console
+                              console.log(`[cache] Cleared ${id} — refetching fresh`);
+                              clearOne(key);
+                              fetchDescription(item, { forceRefresh: true });
+                            }}
+                          >
+                            🗑️ Clear &amp; refetch
+                          </Button>
+                        )}
                         <EnrichProductButton
                           invoiceProduct={{
                             brand: item.brand,

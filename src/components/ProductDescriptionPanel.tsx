@@ -223,6 +223,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
   const [format, setFormat] = useState<ExportFormat>("shopify");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Set<string>>(new Set());
+  const [debugMode, setDebugMode] = useState(false);
 
   const toggleExpand = (k: string) =>
     setExpanded((p) => {

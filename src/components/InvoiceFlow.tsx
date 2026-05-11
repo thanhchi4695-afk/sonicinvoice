@@ -3988,6 +3988,18 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const written = updated[idx];
       const stateWriteLog = `[enrich] STATE WRITE "${written.name}" → desc=${written.descStatus || 'n/a'} (${(written.desc || '').length} chars) imageSrc=${written.imageSrc || '—'}`;
       console.log(stateWriteLog);
+      console.log(
+        `[image] STATE WRITE "${written.name}" → status=${written.imageStatus || 'n/a'} src=${written.imageSrc || '—'} (source=${written.imageSource || 'n/a'})`,
+      );
+
+      // If the image fetch resolved to a real URL, log the Shopify CSV "Image Src"
+      // column so the user can verify it lands in the right export field.
+      if (written.imageStatus === 'found' && written.imageSrc) {
+        console.log(`[image] EXPORT ROW (Shopify CSV "Image Src") "${written.name}":`, {
+          Handle: (written.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+          'Image Src': written.imageSrc,
+        });
+      }
 
       // Build the same Body (HTML) the CSV exporter will use, and log a sample row
       // so the user can verify the description actually flows into the export.

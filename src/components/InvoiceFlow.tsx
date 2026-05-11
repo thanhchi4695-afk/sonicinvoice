@@ -3355,9 +3355,16 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     imageSource?: "cascade" | "llm" | "shopify" | "none";
     descStatus?: "ready" | "generating" | "failed";
     descError?: string | null;
+    descLength?: number;
+    // Debug-mode trace captured during last enrichment run
+    debugAiInput?: unknown;
+    debugHttpStatus?: number;
+    debugAiRaw?: unknown;
+    debugStateWrite?: string;
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
+  const [debugMode, setDebugMode] = useState(false);
   const [enrichAllRunning, setEnrichAllRunning] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
   const [brandDirVersion, setBrandDirVersion] = useState(0);
@@ -3790,6 +3797,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {
+    let aiInput: Record<string, unknown> = { title: group.name || '', vendor: group.brand || '' };
     try {
       const storeConfig = JSON.parse(localStorage.getItem('store_config_sonic_invoice') || '{}');
       const storeName = storeConfig.name || 'My Store';
@@ -3802,21 +3810,26 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
       // Validate context BEFORE the network call so we can show a precise reason.
       const missing: string[] = [];
-      if (!group.name || !group.name.trim()) missing.push('product name');
-      if (!group.brand || !group.brand.trim()) missing.push('brand');
+      if (!group.name || !group.name.trim()) missing.push('title');
+      if (!group.brand || !group.brand.trim()) missing.push('vendor');
       if (missing.length > 0) {
-        const msg = `Missing ${missing.join(', ')}`;
+        const msg = `Missing required field(s): ${missing.join(', ')}`;
         console.warn(`[enrich] ABORT "${group.name || '(no name)'}" — ${msg}`);
         return {
           enrichConfidence: 'low',
           enrichNote: msg,
           descStatus: 'failed',
           descError: msg,
+          descLength: 0,
           imageStatus: group.imageSrc ? 'found' : 'not_found',
+          debugAiInput: { aborted: true, reason: msg, title: group.name || '', vendor: group.brand || '' },
+          debugHttpStatus: 0,
+          debugAiRaw: null,
+          debugStateWrite: `ABORTED — ${msg}`,
         };
       }
 
-      const aiInput = {
+      aiInput = {
         title: group.name,
         vendor: group.brand,
         type: group.type,
@@ -3849,7 +3862,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           enrichNote: err.error || 'Enrichment failed',
           descStatus: 'failed',
           descError: err.error || `HTTP ${response.status}`,
+          descLength: 0,
           imageStatus: group.imageSrc ? 'found' : 'not_found',
+          debugAiInput: aiInput,
+          debugHttpStatus: response.status,
+          debugAiRaw: err,
+          debugStateWrite: `HTTP ${response.status} — ${err.error || 'failed'}`,
         };
       }
 
@@ -3882,7 +3900,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         : 'failed';
       const descError: string | null = descStatus === 'ready'
         ? null
-        : (result.descriptionError || (incomingDesc ? `Description too short (${incomingDesc.length} chars)` : 'AI returned empty response'));
+        : (result.descriptionError || (incomingDesc ? `Description too short (${incomingDesc.length} chars; threshold is 40)` : 'AI returned empty response'));
 
       console.log(
         `[enrich] DONE "${group.name}" → desc=${descStatus} (${incomingDesc.length} chars) | image=${finalStatus} src=${finalSource} url=${newImageSrc || '—'}${descError ? ` | descError="${descError}"` : ''}`,
@@ -3905,6 +3923,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         imageSource: finalSource,
         descStatus,
         descError,
+        descLength: incomingDesc.length,
+        debugAiInput: aiInput,
+        debugHttpStatus: response.status,
+        debugAiRaw: result,
+        debugStateWrite: `desc=${descStatus} (${incomingDesc.length} chars) image=${finalStatus} src=${finalSource}`,
       };
     } catch (e) {
       console.error('[enrich] network error:', e);
@@ -3914,7 +3937,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         enrichNote: msg,
         descStatus: 'failed',
         descError: msg,
+        descLength: 0,
         imageStatus: group.imageSrc ? 'found' : 'not_found',
+        debugAiInput: aiInput,
+        debugHttpStatus: 0,
+        debugAiRaw: null,
+        debugStateWrite: `NETWORK ERROR — ${msg}`,
       };
     }
   };
@@ -3925,9 +3953,28 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     setProductGroups(prev => {
       const updated = prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g);
       const written = updated[idx];
-      console.log(
-        `[enrich] STATE WRITE "${written.name}" → desc=${written.descStatus || 'n/a'} (${(written.desc || '').length} chars) imageSrc=${written.imageSrc || '—'}`,
-      );
+      const stateWriteLog = `[enrich] STATE WRITE "${written.name}" → desc=${written.descStatus || 'n/a'} (${(written.desc || '').length} chars) imageSrc=${written.imageSrc || '—'}`;
+      console.log(stateWriteLog);
+
+      // Build the same Body (HTML) the CSV exporter will use, and log a sample row
+      // so the user can verify the description actually flows into the export.
+      if (written.descStatus === 'ready' && written.desc) {
+        const bodyParts: string[] = [`<p>${written.desc}</p>`];
+        if (written.fabric) bodyParts.push(`<p><strong>Fabric:</strong> ${written.fabric}</p>`);
+        if (written.care) bodyParts.push(`<p><strong>Care:</strong> ${written.care}</p>`);
+        if (written.origin) bodyParts.push(`<p><strong>Origin:</strong> ${written.origin}</p>`);
+        const bodyHtml = bodyParts.join('');
+        const exportRow = {
+          Handle: (written.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+          Title: written.name,
+          'Body (HTML)': bodyHtml,
+          Vendor: written.brand,
+          Type: written.type,
+          'Image Src': written.imageSrc || '',
+        };
+        console.log(`[enrich] EXPORT ROW (Shopify CSV preview) "${written.name}":`, exportRow);
+      }
+
       // Persist enriched products for Image Download Helper
       const enrichedForStorage = updated.filter(g => g.enriched && (g.imageSrc || (g.imageUrls && g.imageUrls.length > 0)))
         .map(g => ({
@@ -3938,6 +3985,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           imageUrls: g.imageUrls || [],
         }));
       try { localStorage.setItem('last_enriched_products', JSON.stringify(enrichedForStorage)); } catch {}
+      // Stash the state-write log onto the product so Debug Mode UI can read it
+      updated[idx] = { ...updated[idx], debugStateWrite: stateWriteLog };
       return updated;
     });
     addAuditEntry(
@@ -5631,6 +5680,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             </div>
             <div className="flex gap-2">
               <Button
+                variant={debugMode ? "teal" : "outline"}
+                size="sm"
+                onClick={() => setDebugMode(v => !v)}
+                className="gap-1"
+                title="Show enrichment trace (AI input, HTTP status, raw response, state write) on each product card"
+              >
+                🔬 Debug Mode {debugMode ? "ON" : "OFF"}
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={runEnrichAll}
@@ -5749,7 +5807,17 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                             productPageUrl: group.productPageUrl,
                             enrichConfidence: group.enrichConfidence,
                             enrichNote: group.enrichNote,
+                            imageStatus: group.imageStatus,
+                            imageSource: group.imageSource,
+                            descStatus: group.descStatus,
+                            descError: group.descError,
+                            descLength: group.descLength,
+                            debugAiInput: group.debugAiInput,
+                            debugHttpStatus: group.debugHttpStatus,
+                            debugAiRaw: group.debugAiRaw,
+                            debugStateWrite: group.debugStateWrite,
                           }}
+                          debugMode={debugMode}
                           onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
                           onEnrich={() => runEnrichment(i)}
                           onSetImage={(url) => setProductImage(i, url)}
@@ -6947,7 +7015,7 @@ const VariantGroupCard = ({ group, onSplit, onPreview, onQtyChange }: {
   );
 };
 
-const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean; enriched?: boolean; enriching?: boolean; imageSrc?: string; imageUrls?: string[]; desc?: string; fabric?: string; care?: string; origin?: string; productPageUrl?: string; enrichConfidence?: string; enrichNote?: string; imageStatus?: "found" | "searching" | "not_found"; imageSource?: "cascade" | "llm" | "shopify" | "none"; descStatus?: "ready" | "generating" | "failed"; descError?: string | null }; onPreview?: () => void; onEnrich?: () => void; onSetImage?: (url: string) => void }) => {
+const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean; enriched?: boolean; enriching?: boolean; imageSrc?: string; imageUrls?: string[]; desc?: string; fabric?: string; care?: string; origin?: string; productPageUrl?: string; enrichConfidence?: string; enrichNote?: string; imageStatus?: "found" | "searching" | "not_found"; imageSource?: "cascade" | "llm" | "shopify" | "none"; descStatus?: "ready" | "generating" | "failed"; descError?: string | null; descLength?: number; debugAiInput?: unknown; debugHttpStatus?: number; debugAiRaw?: unknown; debugStateWrite?: string }; debugMode?: boolean; onPreview?: () => void; onEnrich?: () => void; onSetImage?: (url: string) => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [savedToBarcodeCatalog, setSavedToBarcodeCatalog] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
@@ -7097,6 +7165,44 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
                 </span>
               );
             })()}
+            {/* Short-description note — surfaced when the AI returned text but it
+                fell under the 40-char threshold (likely a too-short product name). */}
+            {product.descStatus === 'failed'
+              && typeof product.descLength === 'number'
+              && product.descLength > 0
+              && product.descLength < 40 && (
+              <p className="mt-1 text-[10px] text-warning">
+                Note: AI returned only {product.descLength} chars (threshold is 40). Consider lowering the threshold or enriching the title.
+              </p>
+            )}
+            {/* 🔬 Debug Mode — render the full enrichment trace inline. */}
+            {debugMode && (product.debugAiInput || product.debugStateWrite) && (
+              <div
+                className="mt-2 rounded border border-border bg-muted/30 p-2 space-y-1 text-[10px] font-mono-data text-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div>
+                  <span className="text-muted-foreground">[enrich] AI INPUT →</span>{' '}
+                  <code className="break-all">{JSON.stringify(product.debugAiInput)}</code>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">HTTP status →</span>{' '}
+                  <code>{product.debugHttpStatus ?? 'n/a'}</code>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">AI RAW RESPONSE →</span>{' '}
+                  <code className="break-all">{(() => { try { return JSON.stringify(product.debugAiRaw); } catch { return String(product.debugAiRaw); } })()}</code>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">STATE WRITE →</span>{' '}
+                  <code className="break-all">{product.debugStateWrite || '—'}</code>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">DONE →</span>{' '}
+                  <code>desc={product.descStatus || 'n/a'} ({product.descLength ?? 0} chars){product.descError ? ` · ${product.descError}` : ''}</code>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />

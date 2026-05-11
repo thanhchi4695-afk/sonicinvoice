@@ -186,18 +186,18 @@ const PhaseFiveSixPanel = ({
                     </a>
                   </Button>
                 ) : (
-                  <Button size="lg" variant="teal" onClick={onPushToShopify} disabled={accepted.length === 0 || shopifyConnected === null || exportLocked} title={exportLocked ? exportLockReason : undefined} className="shadow-lg w-full sm:w-auto">
+                  <Button size="lg" variant="teal" onClick={onPushToShopify} disabled={accepted.length === 0 || shopifyConnected === null || exportLocked} title={exportLocked ? exportLockReason : undefined} className={`shadow-lg w-full sm:w-auto ${exportLocked ? "opacity-50 cursor-not-allowed" : ""}`}>
                     <ShoppingBag className="w-4 h-4" />
                     Push to Shopify
                   </Button>
                 )}
-                <Button size="lg" variant="outline" onClick={onExportCSV} disabled={accepted.length === 0 || exportLocked} title={exportLocked ? exportLockReason : undefined} className="w-full sm:w-auto">
+                <Button size="lg" variant="outline" onClick={onExportCSV} disabled={accepted.length === 0 || exportLocked} title={exportLocked ? exportLockReason : undefined} className={`w-full sm:w-auto ${exportLocked ? "opacity-50 cursor-not-allowed" : ""}`}>
                   <Download className="w-4 h-4" />
                   Export CSV
                 </Button>
               </>
             ) : (
-              <Button size="lg" variant="teal" onClick={onExportCSV} disabled={accepted.length === 0 || exportLocked} title={exportLocked ? exportLockReason : undefined} className="shadow-lg w-full sm:w-auto">
+              <Button size="lg" variant="teal" onClick={onExportCSV} disabled={accepted.length === 0 || exportLocked} title={exportLocked ? exportLockReason : undefined} className={`shadow-lg w-full sm:w-auto ${exportLocked ? "opacity-50 cursor-not-allowed" : ""}`}>
                 <Download className="w-4 h-4" />
                 Export Lightspeed CSV
               </Button>

@@ -231,7 +231,7 @@ function StatusBadge({
 
 // ── Component ─────────────────────────────────────────────
 const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
-  const { results, loading, fetchDescription, fetchAll, updateDescription } =
+  const { results, loading, fetchDescription, fetchAll, updateDescription, clearCache } =
     useProductDescriptions();
   const [running, setRunning] = useState(false);
   const [format, setFormat] = useState<ExportFormat>("shopify");
@@ -302,6 +302,13 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
       "Variant SKU",
       "Variant Price",
       "Variant Cost",
+      "Variant Inventory Tracker",
+      "Variant Inventory Qty",
+      "Variant Requires Shipping",
+      "Variant Taxable",
+      "Image Src",
+      "Image Position",
+      "Image Alt Text",
     ];
     const rows: string[][] = [headers];
     let exported = 0;
@@ -310,6 +317,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
       const desc = r?.description?.trim();
       if (!desc) continue;
       const fullName = r?.full_product_name?.trim() || item.style_name;
+      const imgSrc = r?.image_url || "";
       rows.push([
         slugify(item.style_number || fullName),
         fullName,
@@ -318,11 +326,18 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
         item.product_type || "",
         "",
         "TRUE",
-        "",
-        "",
+        "Title",
+        "Default Title",
         item.style_number,
         Number(item.rrp_incl_gst || 0).toFixed(2),
         Number(item.cost_ex_gst || 0).toFixed(2),
+        "shopify",
+        "0",
+        "TRUE",
+        "TRUE",
+        imgSrc,
+        imgSrc ? "1" : "",
+        imgSrc ? fullName : "",
       ]);
       exported++;
     }
@@ -440,6 +455,18 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
               <RefreshCcw className="w-3.5 h-3.5" />
             )}
             Fetch All
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              clearCache();
+              toast.success("Cache cleared — Fetch All will re-fetch every row from scratch");
+            }}
+            disabled={running}
+            title="Wipe the 24h session cache so the next Fetch pulls fresh data (use after a resolver fix)"
+          >
+            Clear cache &amp; refetch
           </Button>
           <Button
             variant={debugMode ? "default" : "outline"}

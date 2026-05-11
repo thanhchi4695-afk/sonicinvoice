@@ -51,6 +51,7 @@ export type DescriptionResult = {
 
 // 24h session cache keyed by style_number (or brand|style_name fallback)
 const sessionCache = new Map<string, DescriptionResult>();
+sessionCache.delete("bound352e");
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function cacheKey(item: Pick<PriceMatchLineItem, "style_number" | "brand" | "style_name">) {

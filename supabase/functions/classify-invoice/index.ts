@@ -40,6 +40,17 @@ Layout pattern guide:
 - G_ecommerce_receipt: Shopify/Squarespace/etc. order/receipt format.
 - H_handwritten_low_structure: handwritten or photographed loose-format docket.
 
+document_type guide:
+- purchase_order: header says "Purchase Order" / "PO #" / "Wholesale Order" / "Order Sheet"; usually shows RRP and/or wholesale unit price but NO GST footer dollar total; deposit/balance terms; final costs pending. JOOR exports almost always fall here.
+
+source_platform guide — set when you can detect the originating system:
+- joor: footer or any visible text contains "JOOR", "joor.com", "Powered by JOOR", or "JOOR Pay". Summi Summi POs are typically JOOR.
+- cin7: footer/URL contains "cin7" or "go.cin7.com".
+- shopify / xero / myob / quickbooks: branded headers/footers.
+- manual / unknown: otherwise.
+
+cost_pending: true when the document is a purchase_order or any other doc where wholesale costs are not finalised on this page (e.g. RRP-only JOOR POs). false for normal tax invoices.
+
 GST guide:
 - excluded_per_line: line costs are ex-GST; GST shown only at footer.
 - included_per_line: line costs already include GST.

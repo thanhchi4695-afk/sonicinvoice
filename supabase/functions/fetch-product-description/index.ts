@@ -372,11 +372,29 @@ Deno.serve(async (req) => {
 
   let result: ResponsePayload | null = null;
 
+  const styleNum = (body.style_number || "").trim();
+  const styleNumLower = styleNum.toLowerCase();
+
   for (const site of sites) {
     // 1) Find a product URL on this site via Brave Search
     const search = await braveFindProductUrl(query, site.host);
     if (!search.url) {
       attempts.push({ url: `site:${site.host}`, status: 0, reason: "no_search_results", found: false });
+      continue;
+    }
+
+    // 1b) BUG 4 fix — when an invoice style_number is supplied, require it to
+    // appear verbatim in the resolved URL. Prevents fuzzy collisions like
+    // BOUND352E → bound234e-nina-crop on bond-eye.com.au. If no exact match,
+    // fall through to the next site/AI fallback rather than serving a wrong page.
+    if (styleNumLower && !search.url.toLowerCase().includes(styleNumLower)) {
+      attempts.push({
+        url: search.url,
+        status: 0,
+        reason: "no_search_results",
+        found: false,
+        selector: `style_number_mismatch:${styleNum}`,
+      });
       continue;
     }
 

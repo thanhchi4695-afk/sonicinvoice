@@ -54,6 +54,7 @@ function getPreferredPos(): Pos {
 
 const PhaseFiveSixPanel = ({
   products, supplierName, onExportCSV, onPushToShopify, onProcessAnother, shopifyConnected = null,
+  exportLocked = false, exportLockReason,
 }: PhaseFiveSixPanelProps) => {
   const pos = useMemo<Pos>(() => getPreferredPos(), []);
   const [tab, setTab] = useState("products");

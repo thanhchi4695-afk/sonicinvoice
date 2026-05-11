@@ -147,6 +147,7 @@ export function useProductDescriptions() {
           attempts: payload?.attempts ?? [],
           image_attempts: payload?.image_attempts ?? [],
           ai_raw_preview: payload?.ai_raw_preview,
+          image_stats: (payload as { image_stats?: DescriptionResult["image_stats"] })?.image_stats,
         };
         // Console diagnostics
         try {

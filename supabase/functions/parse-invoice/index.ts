@@ -41,7 +41,15 @@ interface ParsedRow {
 }
 
 interface InvoiceMeta {
-  documentType?: "tax_invoice" | "packing_list" | "credit_note" | "quote" | "unknown";
+  documentType?:
+    | "tax_invoice"
+    | "packing_list"
+    | "credit_note"
+    | "quote"
+    | "purchase_order"
+    | "unknown";
+  sourcePlatform?: "joor" | "cin7" | "shopify" | "xero" | "myob" | "quickbooks" | "manual" | "unknown" | null;
+  costPending?: boolean;
   supplier?: string | null;
   invoiceNumber?: string | null;
   invoiceDate?: string | null;
@@ -126,7 +134,9 @@ const RETURN_INVOICE_TOOL = {
       meta: {
         type: "object",
         properties: {
-          documentType: { type: "string", enum: ["tax_invoice", "packing_list", "credit_note", "quote", "unknown"] },
+          documentType: { type: "string", enum: ["tax_invoice", "packing_list", "credit_note", "quote", "purchase_order", "unknown"] },
+          sourcePlatform: { type: ["string", "null"], enum: ["joor", "cin7", "shopify", "xero", "myob", "quickbooks", "manual", "unknown", null] },
+          costPending: { type: ["boolean", "null"] },
           supplier: { type: ["string", "null"] },
           invoiceNumber: { type: ["string", "null"] },
           invoiceDate: { type: ["string", "null"] },
@@ -774,6 +784,42 @@ Deno.serve(async (req) => {
             documentType: "packing_list",
             warning: "No cost data — find the matching tax invoice.",
             rows: [],
+            meta: invoiceMeta,
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+        }
+
+        // Short-circuit Purchase Orders (e.g. JOOR Summi Summi) — RRP-only,
+        // wholesale costs pending. Persist what we have, mark cost_pending,
+        // skip cost-based stages 2/3, and gate export until a matching
+        // commercial/tax invoice arrives.
+        if (invoiceMeta.documentType === "purchase_order") {
+          const isJoor = invoiceMeta.sourcePlatform === "joor";
+          const poRows = (claudeOut.rows || []).map((r) => ({
+            ...r,
+            costPrice: null,           // explicit: no wholesale cost yet
+            costPending: true,
+          }));
+          const warning = isJoor
+            ? "JOOR Purchase Order detected — RRP captured but wholesale costs are pending. Reconcile against the matching commercial invoice before publishing to Shopify."
+            : "Purchase Order detected — RRP captured but wholesale costs are pending. Reconcile against the matching final invoice before publishing.";
+          await admin.from("parse_jobs").update({
+            status: "needs_reconciliation",
+            stage1_output: poRows,
+            stage2_output: [],
+            stage3_output: [],
+            output_rows: poRows,
+            invoice_number: invoiceMeta.invoiceNumber ?? null,
+            error_message: warning,
+          }).eq("id", jobId);
+          return new Response(JSON.stringify({
+            jobId,
+            status: "needs_reconciliation",
+            documentType: "purchase_order",
+            sourcePlatform: invoiceMeta.sourcePlatform ?? "unknown",
+            costPending: true,
+            warning,
+            action: "await_final_invoice",
+            rows: poRows,
             meta: invoiceMeta,
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
         }

@@ -17,7 +17,9 @@ Return STRICT JSON — no markdown fences, no commentary:
 
 {
   "supplier_name": string | null,
-  "document_type": "invoice" | "packing_slip" | "order_confirmation" | "credit_note" | "receipt" | "unknown",
+  "document_type": "invoice" | "packing_slip" | "order_confirmation" | "purchase_order" | "credit_note" | "receipt" | "unknown",
+  "source_platform": "joor" | "cin7" | "shopify" | "xero" | "myob" | "quickbooks" | "manual" | "unknown",
+  "cost_pending": boolean,
   "currency": "AUD" | "NZD" | "USD" | "GBP" | string,
   "gst_treatment": "excluded_per_line" | "included_per_line" | "at_total_only" | "no_gst" | "unknown",
   "layout_pattern": "A_flat_rows" | "B_parent_child_size_columns" | "C_sku_per_size_rows" | "D_name_embedded_variants" | "E_code_only_rows" | "F_multi_invoice_pdf" | "G_ecommerce_receipt" | "H_handwritten_low_structure",
@@ -37,6 +39,17 @@ Layout pattern guide:
 - F_multi_invoice_pdf: multiple distinct invoices concatenated in one PDF.
 - G_ecommerce_receipt: Shopify/Squarespace/etc. order/receipt format.
 - H_handwritten_low_structure: handwritten or photographed loose-format docket.
+
+document_type guide:
+- purchase_order: header says "Purchase Order" / "PO #" / "Wholesale Order" / "Order Sheet"; usually shows RRP and/or wholesale unit price but NO GST footer dollar total; deposit/balance terms; final costs pending. JOOR exports almost always fall here.
+
+source_platform guide — set when you can detect the originating system:
+- joor: footer or any visible text contains "JOOR", "joor.com", "Powered by JOOR", or "JOOR Pay". Summi Summi POs are typically JOOR.
+- cin7: footer/URL contains "cin7" or "go.cin7.com".
+- shopify / xero / myob / quickbooks: branded headers/footers.
+- manual / unknown: otherwise.
+
+cost_pending: true when the document is a purchase_order or any other doc where wholesale costs are not finalised on this page (e.g. RRP-only JOOR POs). false for normal tax invoices.
 
 GST guide:
 - excluded_per_line: line costs are ex-GST; GST shown only at footer.
@@ -101,6 +114,10 @@ Deno.serve(async (req) => {
     // Normalise / defaults
     classification.supplier_name = (classification.supplier_name as string) || null;
     classification.document_type = (classification.document_type as string) || "unknown";
+    classification.source_platform = (classification.source_platform as string) || "unknown";
+    classification.cost_pending = classification.document_type === "purchase_order"
+      ? true
+      : !!classification.cost_pending;
     classification.currency = (classification.currency as string) || "AUD";
     classification.gst_treatment = (classification.gst_treatment as string) || "unknown";
     classification.layout_pattern = (classification.layout_pattern as string) || "A_flat_rows";

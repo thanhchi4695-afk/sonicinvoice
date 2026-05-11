@@ -56,8 +56,21 @@ First, determine what kind of document this is. Look at the header and footer ca
 | No Price, Rate, Cost, or Wholesale column visible | ❌ Packing list or order confirmation | STOP — same as above |
 | "Credit Note" / "Credit Memo" in header | ⚠️ Credit note | Extract as negative quantities |
 | "Quote" / "Proforma Invoice" | ⚠️ Not a final invoice | Flag — costs may not be final |
+| "Purchase Order" / "PO #" / "Order Confirmation" header AND "Wholesale Price" / RRP-only column AND no GST/Total dollar footer (esp. JOOR-generated docs — footer or URL contains `joor.com`, "Powered by JOOR", or "JOOR Pay") | ⚠️ Purchase Order (RRP-only, costs pending) | Extract products + RRP; set `document_type: purchase_order`, `source_platform: "joor"` if JOOR signals present, `cost_pending: true`. Leave `cost_ex_gst` null. Do NOT block — final wholesale costs arrive on a later commercial/tax invoice. |
 | "Certificate of Registration" + "Motor Vehicle Registry" / "Number Plate" | ❌ Vehicle registration | STOP — return document_type: vehicle_registration, action: discard |
 | Sky Gazer document with no price column | ❌ Order confirmation | STOP — return document_type: order_confirmation |
+
+**JOOR Purchase Order recognition cues** (Summi Summi and other wholesale-platform brands):
+- Footer/header text contains `JOOR`, `joor.com`, "Powered by JOOR", or "JOOR Pay"
+- Document titled "Purchase Order", "PO Confirmation", "Order Sheet", or "Wholesale Order"
+- Size matrix layout (Type C — sizes as column headers, qty cells) with a single Wholesale/RRP price per style row
+- Often shows deposit % / balance terms instead of a GST-inclusive total
+- The `cost_ex_gst` column is missing or labelled "TBC" / "Pending" — final costs are issued separately on the commercial invoice
+
+When detected, return:
+```json
+{ "document_type": "purchase_order", "source_platform": "joor", "cost_pending": true, "supplier": "...", "products": [...with rrp_incl_gst, cost_ex_gst: null...], "warning": "JOOR Purchase Order — wholesale costs pending; reconcile against the matching commercial invoice before publishing." }
+```
 
 If this is a packing list, stop extraction and return:
 ```json

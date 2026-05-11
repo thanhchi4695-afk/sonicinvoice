@@ -133,14 +133,33 @@ export function useProductDescriptions() {
           full_product_name: payload?.full_product_name?.trim() || null,
           source_url: payload?.source_url || "",
           source_name: payload?.source_name || "",
-          source_type: (payload?.source_type as "supplier" | "retailer") || "retailer",
+          source_type:
+            (payload?.source_type as "supplier" | "retailer" | "ai_generated") || "retailer",
           word_count: payload?.word_count || 0,
           raw_word_count: payload?.raw_word_count || 0,
           confidence: (payload?.confidence as "high" | "medium" | "low") || "low",
           status: description ? "found" : "not_found",
           fetched_at: new Date().toISOString(),
           edited: false,
+          image_url: payload?.image_url ?? null,
+          image_source_url: payload?.image_source_url ?? null,
+          attempts: payload?.attempts ?? [],
+          image_attempts: payload?.image_attempts ?? [],
+          ai_raw_preview: payload?.ai_raw_preview,
         };
+        // Console diagnostics
+        try {
+          // eslint-disable-next-line no-console
+          console.log("[enrich] AI INPUT", { brand: item.brand, name: item.style_name, sku: item.style_number });
+          // eslint-disable-next-line no-console
+          console.log("[enrich] AI RAW RESPONSE", payload);
+          // eslint-disable-next-line no-console
+          console.log("[enrich] STATE WRITE", result);
+          // eslint-disable-next-line no-console
+          console.log("[image] STATE WRITE", { image_url: result.image_url, attempts: result.image_attempts });
+          // eslint-disable-next-line no-console
+          console.log("[enrich] DONE", { status: result.status });
+        } catch { /* ignore */ }
         sessionCache.set(key, result);
         setRes(key, result);
         return result;

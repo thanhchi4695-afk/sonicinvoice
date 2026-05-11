@@ -448,6 +448,32 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
         </p>
       </div>
 
+      {/* Image processing counter */}
+      {(() => {
+        let processed = 0, resized = 0, skipped = 0;
+        for (const r of results.values()) {
+          const s = r.image_stats;
+          if (!s) continue;
+          processed += s.processed || 0;
+          resized += s.resized || 0;
+          skipped += s.skipped || 0;
+        }
+        if (processed === 0 && resized === 0 && skipped === 0) return null;
+        return (
+          <div className="bg-muted/40 border border-border rounded-lg px-3 py-2 mb-4 flex items-center gap-4 text-xs font-mono">
+            <span className="text-foreground">
+              Images processed: <strong>{processed}</strong>
+            </span>
+            <span className="text-amber-600 dark:text-amber-400">
+              Resized: <strong>{resized}</strong>
+            </span>
+            <span className="text-destructive">
+              Skipped: <strong>{skipped}</strong>
+            </span>
+          </div>
+        );
+      })()}
+
       {/* Summary */}
       {results.size > 0 && (
         <div className="flex flex-wrap gap-2 mb-3 text-xs">

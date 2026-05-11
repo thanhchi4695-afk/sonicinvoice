@@ -3353,6 +3353,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     enrichNote?: string;
     imageStatus?: "found" | "searching" | "not_found";
     imageSource?: "cascade" | "llm" | "shopify" | "none";
+    descStatus?: "ready" | "generating" | "failed";
+    descError?: string | null;
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
@@ -3798,7 +3800,35 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const brandMatch = matchVendor(group.brand);
       const brandWebsite = brandMatch?.brand.website || '';
 
-      console.log(`[enrich] → ${group.name} | brand=${group.brand} | brandWebsite=${brandWebsite || '—'}`);
+      // Validate context BEFORE the network call so we can show a precise reason.
+      const missing: string[] = [];
+      if (!group.name || !group.name.trim()) missing.push('product name');
+      if (!group.brand || !group.brand.trim()) missing.push('brand');
+      if (missing.length > 0) {
+        const msg = `Missing ${missing.join(', ')}`;
+        console.warn(`[enrich] ABORT "${group.name || '(no name)'}" — ${msg}`);
+        return {
+          enrichConfidence: 'low',
+          enrichNote: msg,
+          descStatus: 'failed',
+          descError: msg,
+          imageStatus: group.imageSrc ? 'found' : 'not_found',
+        };
+      }
+
+      const aiInput = {
+        title: group.name,
+        vendor: group.brand,
+        type: group.type,
+        colour: group.colour || '',
+        rrp: typeof group.rrp === 'number' ? group.rrp : undefined,
+        brandWebsite,
+        styleNumber: (group as any).vendorCode || (group as any).styleGroup || '',
+        storeName,
+        storeCity,
+        customInstructions: customInstr,
+      };
+      console.log(`[enrich] AI INPUT for "${group.name}":`, aiInput);
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-product`, {
         method: 'POST',
@@ -3806,16 +3836,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           'Content-Type': 'application/json',
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({
-          title: group.name,
-          vendor: group.brand,
-          type: group.type,
-          brandWebsite,
-          styleNumber: (group as any).vendorCode || (group as any).styleGroup || '',
-          storeName,
-          storeCity,
-          customInstructions: customInstr,
-        }),
+        body: JSON.stringify(aiInput),
       });
 
       console.log(`[enrich] HTTP ${response.status} for "${group.name}"`);
@@ -3826,11 +3847,22 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         return {
           enrichConfidence: 'low',
           enrichNote: err.error || 'Enrichment failed',
+          descStatus: 'failed',
+          descError: err.error || `HTTP ${response.status}`,
           imageStatus: group.imageSrc ? 'found' : 'not_found',
         };
       }
 
       const result = await response.json();
+      console.log(`[enrich] AI RAW RESPONSE for "${group.name}":`, {
+        descStatus: result.descriptionStatus,
+        descError: result.descriptionError,
+        descLen: typeof result.description === 'string' ? result.description.length : 0,
+        imageStatus: result.imageStatus,
+        imageCount: Array.isArray(result.imageUrls) ? result.imageUrls.length : 0,
+        confidence: result.confidence,
+      });
+
       const absUrls: string[] = Array.isArray(result.imageUrls)
         ? result.imageUrls.filter((u: unknown): u is string => typeof u === 'string' && /^https?:\/\//i.test(u))
         : [];
@@ -3843,12 +3875,22 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           ? (result.imageSource === 'llm' ? 'llm' : 'cascade')
           : (group.imageSrc ? 'shopify' : 'none');
 
+      // Description handling — write back only when valid; surface a clear reason otherwise.
+      const incomingDesc: string = typeof result.description === 'string' ? result.description.trim() : '';
+      const descStatus: 'ready' | 'failed' = result.descriptionStatus === 'ready' && incomingDesc.length >= 40
+        ? 'ready'
+        : 'failed';
+      const descError: string | null = descStatus === 'ready'
+        ? null
+        : (result.descriptionError || (incomingDesc ? `Description too short (${incomingDesc.length} chars)` : 'AI returned empty response'));
+
       console.log(
-        `[enrich] DONE "${group.name}" → status=${finalStatus} source=${finalSource} url=${newImageSrc || '—'}`,
+        `[enrich] DONE "${group.name}" → desc=${descStatus} (${incomingDesc.length} chars) | image=${finalStatus} src=${finalSource} url=${newImageSrc || '—'}${descError ? ` | descError="${descError}"` : ''}`,
       );
 
       return {
-        desc: result.description && result.description.length > 20 ? result.description : undefined,
+        // Only overwrite desc when AI returned a usable description; preserve any existing desc otherwise.
+        desc: descStatus === 'ready' ? incomingDesc : group.desc,
         imageUrls: absUrls.length > 0 ? absUrls : group.imageUrls,
         imageSrc: newImageSrc,
         fabric: result.fabric || undefined,
@@ -3861,22 +3903,31 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           : (result.note || ''),
         imageStatus: finalStatus,
         imageSource: finalSource,
+        descStatus,
+        descError,
       };
     } catch (e) {
       console.error('[enrich] network error:', e);
+      const msg = e instanceof Error ? e.message : 'Network error';
       return {
         enrichConfidence: 'low',
-        enrichNote: e instanceof Error ? e.message : 'Network error',
+        enrichNote: msg,
+        descStatus: 'failed',
+        descError: msg,
         imageStatus: group.imageSrc ? 'found' : 'not_found',
       };
     }
   };
 
   const runEnrichment = async (idx: number) => {
-    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, enriching: true, imageStatus: 'searching' } : g));
+    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, enriching: true, imageStatus: 'searching', descStatus: 'generating', descError: null } : g));
     const result = await enrichProduct(productGroups[idx]);
     setProductGroups(prev => {
       const updated = prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g);
+      const written = updated[idx];
+      console.log(
+        `[enrich] STATE WRITE "${written.name}" → desc=${written.descStatus || 'n/a'} (${(written.desc || '').length} chars) imageSrc=${written.imageSrc || '—'}`,
+      );
       // Persist enriched products for Image Download Helper
       const enrichedForStorage = updated.filter(g => g.enriched && (g.imageSrc || (g.imageUrls && g.imageUrls.length > 0)))
         .map(g => ({
@@ -3889,7 +3940,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       try { localStorage.setItem('last_enriched_products', JSON.stringify(enrichedForStorage)); } catch {}
       return updated;
     });
-    addAuditEntry('Enriched', `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence · image=${result.imageStatus || 'n/a'}`);
+    addAuditEntry(
+      'Enriched',
+      `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence · desc=${result.descStatus || 'n/a'}${result.descError ? ` (${result.descError})` : ''} · image=${result.imageStatus || 'n/a'}`,
+    );
   };
 
   const runEnrichAll = async () => {
@@ -6893,7 +6947,7 @@ const VariantGroupCard = ({ group, onSplit, onPreview, onQtyChange }: {
   );
 };
 
-const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean; enriched?: boolean; enriching?: boolean; imageSrc?: string; imageUrls?: string[]; desc?: string; fabric?: string; care?: string; origin?: string; productPageUrl?: string; enrichConfidence?: string; enrichNote?: string; imageStatus?: "found" | "searching" | "not_found"; imageSource?: "cascade" | "llm" | "shopify" | "none" }; onPreview?: () => void; onEnrich?: () => void; onSetImage?: (url: string) => void }) => {
+const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean; enriched?: boolean; enriching?: boolean; imageSrc?: string; imageUrls?: string[]; desc?: string; fabric?: string; care?: string; origin?: string; productPageUrl?: string; enrichConfidence?: string; enrichNote?: string; imageStatus?: "found" | "searching" | "not_found"; imageSource?: "cascade" | "llm" | "shopify" | "none"; descStatus?: "ready" | "generating" | "failed"; descError?: string | null }; onPreview?: () => void; onEnrich?: () => void; onSetImage?: (url: string) => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [savedToBarcodeCatalog, setSavedToBarcodeCatalog] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
@@ -7018,6 +7072,26 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
                 <span
                   className={`inline-block mt-1 ml-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${cls}`}
                   title={status === 'not_found' ? 'No image returned by brand site or AI cascade.' : undefined}
+                >
+                  {label}
+                </span>
+              );
+            })()}
+            {/* Description status badge */}
+            {(product.enriching || product.descStatus) && (() => {
+              const status = product.enriching && !product.descStatus ? 'generating' : product.descStatus!;
+              const cls =
+                status === 'ready' ? 'bg-success/15 text-success' :
+                status === 'generating' ? 'bg-secondary/30 text-foreground animate-pulse' :
+                'bg-destructive/15 text-destructive';
+              const label =
+                status === 'ready' ? '✅ Description ready' :
+                status === 'generating' ? '⏳ Generating…' :
+                '❌ Description failed';
+              return (
+                <span
+                  className={`inline-block mt-1 ml-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${cls}`}
+                  title={status === 'failed' ? (product.descError || 'AI did not return a usable description') : undefined}
                 >
                   {label}
                 </span>

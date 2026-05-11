@@ -114,14 +114,34 @@ serve(async (req) => {
       type,
       brandWebsite,
       styleNumber,
+      colour,
+      rrp,
       storeName,
       storeCity,
       customInstructions,
     } = await req.json();
 
     console.log(
-      `[enrich-product] REQ title="${title}" vendor="${vendor}" brandWebsite="${brandWebsite || "—"}" styleNumber="${styleNumber || "—"}"`,
+      `[enrich-product] REQ title="${title}" vendor="${vendor}" type="${type || "—"}" colour="${colour || "—"}" rrp=${rrp ?? "—"} brandWebsite="${brandWebsite || "—"}" styleNumber="${styleNumber || "—"}"`,
     );
+
+    // Validate required context up front so we can fail fast with a clear message.
+    const missing: string[] = [];
+    if (!title || !String(title).trim()) missing.push("title");
+    if (!vendor || !String(vendor).trim()) missing.push("vendor");
+    if (missing.length > 0) {
+      const msg = `Missing required field(s): ${missing.join(", ")}`;
+      console.warn(`[enrich-product] ABORT — ${msg}`);
+      return new Response(JSON.stringify({
+        error: msg,
+        description: "",
+        imageUrls: [],
+        confidence: "low",
+        descriptionStatus: "failed",
+        descriptionError: msg,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (!brandWebsite) {
       console.warn(`[enrich-product] no brandWebsite for vendor="${vendor}" — image cascade will be skipped`);
     }
@@ -136,6 +156,9 @@ serve(async (req) => {
     });
 
     const brandSiteHint = brandWebsite ? `Brand website: ${brandWebsite}` : '';
+    const colourLine = colour ? `  Colour: ${colour}\n` : '';
+    const rrpLine = (typeof rrp === "number" && rrp > 0) ? `  RRP:    $${rrp.toFixed(2)}\n` : '';
+    const styleLine = styleNumber ? `  Style#: ${styleNumber}\n` : '';
     const customSection = customInstructions?.trim()
       ? `\nSTORE INSTRUCTIONS:\n${customInstructions}\n`
       : '';
@@ -148,7 +171,7 @@ PRODUCT:
   Title:  ${title}
   Brand:  ${vendor}
   Type:   ${type || 'General'}
-  ${brandSiteHint}
+${colourLine}${rrpLine}${styleLine}  ${brandSiteHint}
 
 STEP 1 — FIND THE PRODUCT PAGE:
 Search for this exact product on the brand's website.
@@ -167,6 +190,7 @@ STEP 3 — WRITE A STORE DESCRIPTION:
 Rewrite the description in the voice of ${storeName || 'My Store'}.
 Rules:
   - 60–120 words
+  - Mention the colour (${colour || 'as labelled'}) and category (${type || 'product'}) naturally
   - Mention key features (underwire, chlorine resistant, cup sizes etc. if present)
   - End with a call to action: "Shop online or visit us in ${storeCity || 'store'}."
   - Australian English
@@ -185,6 +209,8 @@ RESPOND WITH JSON ONLY, no other text:
   "note": "any issue encountered or empty string"
 }`;
 
+    console.log(`[enrich-product] AI prompt prepared (${prompt.length} chars) — calling model…`);
+
     const data = await callAIForJob("product.enrich", {
       messages: [
         { role: "system", content: "You are a product data enrichment assistant. Always respond with valid JSON only." },
@@ -193,17 +219,27 @@ RESPOND WITH JSON ONLY, no other text:
     });
 
     const rawText = getContent(data);
+    console.log(`[enrich-product] AI raw response (${rawText.length} chars): ${rawText.slice(0, 280)}${rawText.length > 280 ? "…" : ""}`);
     const clean = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
+
     let parsed: Record<string, unknown> = {};
+    let parseError: string | null = null;
     try {
       parsed = JSON.parse(clean);
-    } catch {
+    } catch (err) {
       const m = clean.match(/\{[\s\S]*\}/);
       if (m) {
-        try { parsed = JSON.parse(m[0]); } catch { /* leave parsed empty */ }
+        try {
+          parsed = JSON.parse(m[0]);
+        } catch (err2) {
+          parseError = `JSON parse failed: ${(err2 as Error).message}`;
+        }
+      } else {
+        parseError = `No JSON object found in response: ${(err as Error).message}`;
       }
     }
+    if (parseError) console.warn(`[enrich-product] ${parseError}`);
 
     // ── Step B: merge cascade results — REAL images take precedence over
     // any LLM-hallucinated URLs, and the on-page description (if any) is
@@ -233,8 +269,24 @@ RESPOND WITH JSON ONLY, no other text:
     const imageStatus: "found" | "not_found" =
       imageUrls.length > 0 ? "found" : "not_found";
 
+    // ── Description status — strict checks so the UI can show ✅ / ❌ + reason.
+    const description = typeof parsed.description === "string" ? parsed.description.trim() : "";
+    let descriptionStatus: "ready" | "failed" = "ready";
+    let descriptionError: string | null = null;
+    if (!description) {
+      descriptionStatus = "failed";
+      descriptionError = parseError ?? "AI returned empty description";
+    } else if (description.length < 40) {
+      descriptionStatus = "failed";
+      descriptionError = `Description too short (${description.length} chars)`;
+    }
+
+    console.log(
+      `[enrich-product] description status=${descriptionStatus} length=${description.length} ${descriptionError ? `error="${descriptionError}"` : ""}`,
+    );
+
     const result = {
-      description: parsed.description || '',
+      description,
       imageUrls,
       fabric: parsed.fabric || '',
       care: parsed.care || '',
@@ -247,10 +299,12 @@ RESPOND WITH JSON ONLY, no other text:
       imageSource,
       imageStrategy: cascade?.strategy ?? null,
       imageStatus,
+      descriptionStatus,
+      descriptionError,
     };
 
     console.log(
-      `[enrich-product] DONE title="${title}" vendor="${vendor}" → imageStatus=${imageStatus} imageSource=${imageSource} count=${imageUrls.length} firstUrl=${imageUrls[0] ?? "—"}`,
+      `[enrich-product] DONE title="${title}" vendor="${vendor}" → desc=${descriptionStatus} imageStatus=${imageStatus} imageSource=${imageSource} count=${imageUrls.length} firstUrl=${imageUrls[0] ?? "—"}`,
     );
 
     return new Response(JSON.stringify(result), {

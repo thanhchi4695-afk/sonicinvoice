@@ -287,5 +287,13 @@ export function useProductDescriptions() {
       sessionCache.clear();
       setResults(new Map());
     }, []),
+    clearOne: useCallback((key: string) => {
+      sessionCache.delete(key);
+      setResults((prev) => {
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      });
+    }, []),
   };
 }

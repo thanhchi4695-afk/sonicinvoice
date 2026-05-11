@@ -50,6 +50,9 @@ async function fetchRealImagesViaCascade(opts: {
 
   // Step 1 — find the product page URL on the brand site
   let pageUrl: string | null = null;
+  let findUrlStatus = 0;
+  let extractStatus = 0;
+  const brandWebsiteTried = opts.brandWebsite || "";
   try {
     const findRes = await fetch(`${SUPABASE_URL}/functions/v1/find-product-url`, {
       method: "POST",
@@ -61,18 +64,28 @@ async function fetchRealImagesViaCascade(opts: {
         vendor: opts.vendor,
       }),
     });
+    findUrlStatus = findRes.status;
     if (findRes.ok) {
       const j = await findRes.json();
       pageUrl = typeof j?.url === "string" ? j.url : null;
-      console.log(`[enrich-product] find-product-url → ${pageUrl ?? "(not found)"} (${j?.strategy_used ?? "n/a"})`);
+      console.log(`[enrich-product] [image] SEARCHING URL → brand="${brandWebsiteTried}" → find-product-url HTTP ${findUrlStatus} → page=${pageUrl ?? "(not found)"} (${j?.strategy_used ?? "n/a"})`);
     } else {
-      console.warn("[enrich-product] find-product-url HTTP", findRes.status);
+      console.warn(`[enrich-product] [image] find-product-url HTTP ${findUrlStatus} for brand="${brandWebsiteTried}"`);
     }
   } catch (e) {
-    console.warn("[enrich-product] find-product-url failed:", (e as Error).message);
+    console.warn("[enrich-product] [image] find-product-url failed:", (e as Error).message);
   }
 
-  if (!pageUrl) return null;
+  if (!pageUrl) {
+    return {
+      imageUrls: [],
+      productPageUrl: "",
+      description: null,
+      source: "cascade",
+      strategy: null,
+      debug: { brandWebsite: brandWebsiteTried, findUrlStatus, pageUrl: null, extractStatus: 0 },
+    };
+  }
 
   // Step 2 — extract real images via the same cascade as URL importer
   try {
@@ -81,20 +94,37 @@ async function fetchRealImagesViaCascade(opts: {
       headers,
       body: JSON.stringify({ url: pageUrl }),
     });
+    extractStatus = extractRes.status;
     if (!extractRes.ok) {
-      console.warn("[enrich-product] product-extract HTTP", extractRes.status);
-      return null;
+      console.warn(`[enrich-product] [image] product-extract HTTP ${extractStatus}`);
+      return {
+        imageUrls: [],
+        productPageUrl: pageUrl,
+        description: null,
+        source: "cascade",
+        strategy: null,
+        debug: { brandWebsite: brandWebsiteTried, findUrlStatus, pageUrl, extractStatus },
+      };
     }
     const j = await extractRes.json();
     const product = j?.product;
-    if (!product || !Array.isArray(product.images)) return null;
+    if (!product || !Array.isArray(product.images)) {
+      return {
+        imageUrls: [],
+        productPageUrl: pageUrl,
+        description: null,
+        source: "cascade",
+        strategy: null,
+        debug: { brandWebsite: brandWebsiteTried, findUrlStatus, pageUrl, extractStatus },
+      };
+    }
 
     const imageUrls: string[] = product.images
       .map((img: { storedUrl?: string }) => img?.storedUrl)
       .filter((u: unknown): u is string => typeof u === "string" && u.length > 0);
 
     console.log(
-      `[enrich-product] product-extract → ${imageUrls.length} real image(s) via "${product.strategyUsed}"`,
+      `[enrich-product] [image] product-extract HTTP ${extractStatus} → ${imageUrls.length} real image(s) via "${product.strategyUsed}"`,
     );
 
     return {
@@ -103,10 +133,18 @@ async function fetchRealImagesViaCascade(opts: {
       description: typeof product.description === "string" ? product.description : null,
       source: "cascade",
       strategy: product.strategyUsed ?? null,
+      debug: { brandWebsite: brandWebsiteTried, findUrlStatus, pageUrl, extractStatus },
     };
   } catch (e) {
-    console.warn("[enrich-product] product-extract failed:", (e as Error).message);
-    return null;
+    console.warn("[enrich-product] [image] product-extract failed:", (e as Error).message);
+    return {
+      imageUrls: [],
+      productPageUrl: pageUrl,
+      description: null,
+      source: "cascade",
+      strategy: null,
+      debug: { brandWebsite: brandWebsiteTried, findUrlStatus, pageUrl, extractStatus },
+    };
   }
 }
 

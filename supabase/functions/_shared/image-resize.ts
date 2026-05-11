@@ -181,3 +181,70 @@ export function toClaudeImageBlock(p: ProcessedImage) {
     source: { type: "base64" as const, media_type: p.mediaType, data: p.base64 },
   };
 }
+
+/**
+ * Build a Claude content block (image or document) from a single base64 file,
+ * applying the image-resize safety check when needed.
+ *
+ * - PDFs (`application/pdf`) pass through untouched as a `document` block.
+ * - Images are decoded; if any dimension > 1568px the image is downscaled
+ *   and re-encoded as JPEG. Logs a single line per image.
+ * - On failure, returns the original image block so the caller never crashes.
+ */
+export async function buildSafeClaudeDocBlock(
+  fileBase64: string,
+  mimeType: string,
+  filenameHint = "document",
+): Promise<{
+  block: {
+    type: "document" | "image";
+    source: { type: "base64"; media_type: string; data: string };
+  };
+  resized: boolean;
+  skipped: boolean;
+}> {
+  if (mimeType === "application/pdf") {
+    console.log(`[image] PDF document — resize check skipped (${filenameHint})`);
+    return {
+      block: {
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: fileBase64 },
+      },
+      resized: false,
+      skipped: false,
+    };
+  }
+
+  // Image path — decode/resize via the shared helper. We have to round-trip
+  // through a data URL so processImageForAI (which expects a URL) can fetch it.
+  try {
+    const dataUrl = `data:${mimeType};base64,${fileBase64}`;
+    const processed = await processImageForAI(dataUrl, filenameHint);
+    if (processed.ok && processed.base64) {
+      return {
+        block: {
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: processed.mediaType,
+            data: processed.base64,
+          },
+        },
+        resized: processed.resized,
+        skipped: false,
+      };
+    }
+    console.warn(`[image] Resize failed for ${filenameHint} — sending original (may be rejected by Claude)`);
+  } catch (e) {
+    console.warn(`[image] buildSafeClaudeDocBlock error:`, (e as Error).message);
+  }
+  // Best-effort fallback: original image, unresized.
+  return {
+    block: {
+      type: "image",
+      source: { type: "base64", media_type: mimeType, data: fileBase64 },
+    },
+    resized: false,
+    skipped: true,
+  };
+}

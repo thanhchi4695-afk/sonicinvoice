@@ -459,7 +459,6 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
               resized += s.resized || 0;
               skipped += s.skipped || 0;
             }
-            if (processed === 0 && resized === 0 && skipped === 0) return null;
             return (
               <div
                 className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border bg-muted/40 text-[11px] font-mono"

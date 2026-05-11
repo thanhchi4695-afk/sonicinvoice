@@ -458,18 +458,18 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
             )}
             Fetch All
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
+          <button
+            type="button"
             onClick={() => {
               clearCache();
-              toast.success("Cache cleared — Fetch All will re-fetch every row from scratch");
+              toast.success("Cleared all cached results — all rows reset to Pending");
             }}
             disabled={running}
-            title="Wipe the 24h session cache so the next Fetch pulls fresh data (use after a resolver fix)"
+            className="text-[11px] underline text-muted-foreground hover:text-foreground disabled:opacity-50"
+            title="Wipe all cached enrichment results so rows return to Pending. Then click Fetch All."
           >
-            Clear cache &amp; refetch
-          </Button>
+            Clear all cache
+          </button>
           <Button
             variant={debugMode ? "default" : "outline"}
             size="sm"

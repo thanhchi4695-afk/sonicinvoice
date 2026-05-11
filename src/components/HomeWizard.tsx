@@ -181,7 +181,7 @@ const HomeWizard = ({
           <h2 className="text-sm font-semibold text-foreground">
             1. What are you uploading?
           </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Tile
               selected={docType === "invoice"}
               onClick={() => { setDocType("invoice"); setEditing(null); }}
@@ -195,6 +195,17 @@ const HomeWizard = ({
               icon={Package}
               label="Packing slip"
               description="Quantities only — for stock check + qty update."
+            />
+            <Tile
+              selected={docType === "joor"}
+              onClick={() => {
+                setDocType("joor");
+                setEditing(null);
+                onStartJoor?.();
+              }}
+              icon={Briefcase}
+              label="JOOR / Wholesale order"
+              description="Import a JOOR, NuOrder, or wholesale platform order."
             />
           </div>
         </section>

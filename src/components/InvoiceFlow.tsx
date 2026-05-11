@@ -7001,9 +7001,28 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
                 product.enrichConfidence === 'medium' ? 'bg-warning/15 text-warning' :
                 'bg-destructive/15 text-destructive'
               }`}>
-                ✦ {product.enrichConfidence} confidence
               </span>
             )}
+            {/* Image status badge */}
+            {(product.enriching || product.imageStatus) && (() => {
+              const status = product.enriching ? 'searching' : product.imageStatus!;
+              const cls =
+                status === 'found' ? 'bg-success/15 text-success' :
+                status === 'searching' ? 'bg-secondary/30 text-foreground animate-pulse' :
+                'bg-warning/15 text-warning';
+              const label =
+                status === 'found' ? `✅ Image found${product.imageSource && product.imageSource !== 'cascade' ? ` (${product.imageSource})` : ''}` :
+                status === 'searching' ? '🔍 Searching' :
+                '⚠️ No image found';
+              return (
+                <span
+                  className={`inline-block mt-1 ml-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${cls}`}
+                  title={status === 'not_found' ? 'No image returned by brand site or AI cascade.' : undefined}
+                >
+                  {label}
+                </span>
+              );
+            })()}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />

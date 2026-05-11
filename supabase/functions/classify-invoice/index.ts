@@ -17,7 +17,9 @@ Return STRICT JSON — no markdown fences, no commentary:
 
 {
   "supplier_name": string | null,
-  "document_type": "invoice" | "packing_slip" | "order_confirmation" | "credit_note" | "receipt" | "unknown",
+  "document_type": "invoice" | "packing_slip" | "order_confirmation" | "purchase_order" | "credit_note" | "receipt" | "unknown",
+  "source_platform": "joor" | "cin7" | "shopify" | "xero" | "myob" | "quickbooks" | "manual" | "unknown",
+  "cost_pending": boolean,
   "currency": "AUD" | "NZD" | "USD" | "GBP" | string,
   "gst_treatment": "excluded_per_line" | "included_per_line" | "at_total_only" | "no_gst" | "unknown",
   "layout_pattern": "A_flat_rows" | "B_parent_child_size_columns" | "C_sku_per_size_rows" | "D_name_embedded_variants" | "E_code_only_rows" | "F_multi_invoice_pdf" | "G_ecommerce_receipt" | "H_handwritten_low_structure",

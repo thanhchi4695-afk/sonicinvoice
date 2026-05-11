@@ -2,19 +2,40 @@ import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { PriceMatchLineItem } from "@/lib/price-match-utils";
 
+export type Attempt = {
+  url: string;
+  status: number;
+  reason:
+    | "ok"
+    | "empty_response"
+    | "blocked"
+    | "selector_not_matched"
+    | "too_short"
+    | "no_search_results"
+    | "fetch_error"
+    | "skipped";
+  found: boolean;
+  selector?: string;
+};
+
 export type DescriptionResult = {
   description: string | null;
   full_product_name: string | null;
   source_url: string;
   source_name: string;
-  source_type: "supplier" | "retailer";
+  source_type: "supplier" | "retailer" | "ai_generated";
   word_count: number;
   raw_word_count: number;
   confidence: "high" | "medium" | "low";
   status: "found" | "not_found" | "error";
-  fetched_at: string; // ISO timestamp
+  fetched_at: string;
   edited: boolean;
   error_message?: string;
+  image_url: string | null;
+  image_source_url: string | null;
+  attempts: Attempt[];
+  image_attempts: Attempt[];
+  ai_raw_preview?: string;
 };
 
 // 24h session cache keyed by style_number (or brand|style_name fallback)

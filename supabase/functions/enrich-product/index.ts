@@ -224,14 +224,22 @@ RESPOND WITH JSON ONLY, no other text:
 
 
     let parsed: Record<string, unknown> = {};
+    let parseError: string | null = null;
     try {
       parsed = JSON.parse(clean);
-    } catch {
+    } catch (err) {
       const m = clean.match(/\{[\s\S]*\}/);
       if (m) {
-        try { parsed = JSON.parse(m[0]); } catch { /* leave parsed empty */ }
+        try {
+          parsed = JSON.parse(m[0]);
+        } catch (err2) {
+          parseError = `JSON parse failed: ${(err2 as Error).message}`;
+        }
+      } else {
+        parseError = `No JSON object found in response: ${(err as Error).message}`;
       }
     }
+    if (parseError) console.warn(`[enrich-product] ${parseError}`);
 
     // ── Step B: merge cascade results — REAL images take precedence over
     // any LLM-hallucinated URLs, and the on-page description (if any) is
@@ -261,8 +269,24 @@ RESPOND WITH JSON ONLY, no other text:
     const imageStatus: "found" | "not_found" =
       imageUrls.length > 0 ? "found" : "not_found";
 
+    // ── Description status — strict checks so the UI can show ✅ / ❌ + reason.
+    const description = typeof parsed.description === "string" ? parsed.description.trim() : "";
+    let descriptionStatus: "ready" | "failed" = "ready";
+    let descriptionError: string | null = null;
+    if (!description) {
+      descriptionStatus = "failed";
+      descriptionError = parseError ?? "AI returned empty description";
+    } else if (description.length < 40) {
+      descriptionStatus = "failed";
+      descriptionError = `Description too short (${description.length} chars)`;
+    }
+
+    console.log(
+      `[enrich-product] description status=${descriptionStatus} length=${description.length} ${descriptionError ? `error="${descriptionError}"` : ""}`,
+    );
+
     const result = {
-      description: parsed.description || '',
+      description,
       imageUrls,
       fabric: parsed.fabric || '',
       care: parsed.care || '',
@@ -275,10 +299,12 @@ RESPOND WITH JSON ONLY, no other text:
       imageSource,
       imageStrategy: cascade?.strategy ?? null,
       imageStatus,
+      descriptionStatus,
+      descriptionError,
     };
 
     console.log(
-      `[enrich-product] DONE title="${title}" vendor="${vendor}" → imageStatus=${imageStatus} imageSource=${imageSource} count=${imageUrls.length} firstUrl=${imageUrls[0] ?? "—"}`,
+      `[enrich-product] DONE title="${title}" vendor="${vendor}" → desc=${descriptionStatus} imageStatus=${imageStatus} imageSource=${imageSource} count=${imageUrls.length} firstUrl=${imageUrls[0] ?? "—"}`,
     );
 
     return new Response(JSON.stringify(result), {

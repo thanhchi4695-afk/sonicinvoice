@@ -3924,6 +3924,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     const result = await enrichProduct(productGroups[idx]);
     setProductGroups(prev => {
       const updated = prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g);
+      const written = updated[idx];
+      console.log(
+        `[enrich] STATE WRITE "${written.name}" → desc=${written.descStatus || 'n/a'} (${(written.desc || '').length} chars) imageSrc=${written.imageSrc || '—'}`,
+      );
       // Persist enriched products for Image Download Helper
       const enrichedForStorage = updated.filter(g => g.enriched && (g.imageSrc || (g.imageUrls && g.imageUrls.length > 0)))
         .map(g => ({
@@ -3936,7 +3940,10 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       try { localStorage.setItem('last_enriched_products', JSON.stringify(enrichedForStorage)); } catch {}
       return updated;
     });
-    addAuditEntry('Enriched', `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence · image=${result.imageStatus || 'n/a'}`);
+    addAuditEntry(
+      'Enriched',
+      `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence · desc=${result.descStatus || 'n/a'}${result.descError ? ` (${result.descError})` : ''} · image=${result.imageStatus || 'n/a'}`,
+    );
   };
 
   const runEnrichAll = async () => {

@@ -427,6 +427,15 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
             )}
             Fetch All
           </Button>
+          <Button
+            variant={debugMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setDebugMode((v) => !v)}
+            title="Show fetch URLs, HTTP statuses, selectors and AI raw response"
+          >
+            <Bug className="w-3.5 h-3.5" />
+            🔬 Debug Mode {debugMode ? "ON" : "OFF"}
+          </Button>
         </div>
       </div>
 

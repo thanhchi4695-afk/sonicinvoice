@@ -383,8 +383,7 @@ Deno.serve(async (req) => {
 
   let result: ResponsePayload | null = null;
 
-  const styleNum = (body.style_number || "").trim();
-  const styleNumLower = styleNum.toLowerCase();
+  const styleNumber = (body.style_number || "").trim();
 
   for (const site of sites) {
     // 1) Find a product URL on this site via Brave Search
@@ -398,14 +397,15 @@ Deno.serve(async (req) => {
     // appear verbatim in the resolved URL. Prevents fuzzy collisions like
     // BOUND352E → bound234e-nina-crop on bond-eye.com.au. If no exact match,
     // fall through to the next site/AI fallback rather than serving a wrong page.
-    if (styleNumLower && !search.url.toLowerCase().includes(styleNumLower)) {
-      console.log(`[match] REJECTED: ${search.url} does not contain ${styleNum}`);
+    const resolvedUrl = search.url;
+    if (styleNumber && !resolvedUrl.toLowerCase().includes(styleNumber.toLowerCase())) {
+      console.log(`[match] REJECTED: ${resolvedUrl} does not contain ${styleNumber}`);
       attempts.push({
-        url: search.url,
+        url: resolvedUrl,
         status: 0,
         reason: "no_search_results",
         found: false,
-        selector: `style_number_mismatch:${styleNum}`,
+        selector: `style_number_mismatch:${styleNumber}`,
       });
       continue;
     }

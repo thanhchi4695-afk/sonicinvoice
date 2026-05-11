@@ -346,7 +346,43 @@ async function validateAndMaybeReExtract(
     console.warn("[validate] re-extract failed:", (e as Error).message);
   }
   return { rows, validation: { passed: false, expected, actual, delta, reExtracted: true } };
-}
+        }
+
+        // Short-circuit Purchase Orders (e.g. JOOR Summi Summi) — RRP-only,
+        // wholesale costs pending. Persist what we have, mark cost_pending,
+        // skip cost-based stages 2/3, and gate export until a matching
+        // commercial/tax invoice arrives.
+        if (invoiceMeta.documentType === "purchase_order") {
+          const isJoor = invoiceMeta.sourcePlatform === "joor";
+          const poRows = (claudeOut.rows || []).map((r) => ({
+            ...r,
+            costPrice: null,           // explicit: no wholesale cost yet
+            costPending: true,
+          }));
+          const warning = isJoor
+            ? "JOOR Purchase Order detected — RRP captured but wholesale costs are pending. Reconcile against the matching commercial invoice before publishing to Shopify."
+            : "Purchase Order detected — RRP captured but wholesale costs are pending. Reconcile against the matching final invoice before publishing.";
+          await admin.from("parse_jobs").update({
+            status: "needs_reconciliation",
+            stage1_output: poRows,
+            stage2_output: [],
+            stage3_output: [],
+            output_rows: poRows,
+            invoice_number: invoiceMeta.invoiceNumber ?? null,
+            error_message: warning,
+          }).eq("id", jobId);
+          return new Response(JSON.stringify({
+            jobId,
+            status: "needs_reconciliation",
+            documentType: "purchase_order",
+            sourcePlatform: invoiceMeta.sourcePlatform ?? "unknown",
+            costPending: true,
+            warning,
+            action: "await_final_invoice",
+            rows: poRows,
+            meta: invoiceMeta,
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+        }
 
 
 async function stage1Gemini(fileBase64: string, mimeType: string, supplierName: string, brandHints = "") {

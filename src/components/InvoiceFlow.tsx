@@ -5807,7 +5807,17 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                             productPageUrl: group.productPageUrl,
                             enrichConfidence: group.enrichConfidence,
                             enrichNote: group.enrichNote,
+                            imageStatus: group.imageStatus,
+                            imageSource: group.imageSource,
+                            descStatus: group.descStatus,
+                            descError: group.descError,
+                            descLength: group.descLength,
+                            debugAiInput: group.debugAiInput,
+                            debugHttpStatus: group.debugHttpStatus,
+                            debugAiRaw: group.debugAiRaw,
+                            debugStateWrite: group.debugStateWrite,
                           }}
+                          debugMode={debugMode}
                           onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
                           onEnrich={() => runEnrichment(i)}
                           onSetImage={(url) => setProductImage(i, url)}

@@ -56,6 +56,7 @@ const confidenceBadge = (c: "high" | "medium" | "low") => {
 };
 
 interface GmailConnection {
+  id: string;
   email_address: string;
   last_checked_at: string | null;
   is_active: boolean;

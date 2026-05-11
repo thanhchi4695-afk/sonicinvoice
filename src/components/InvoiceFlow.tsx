@@ -7165,6 +7165,44 @@ const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { 
                 </span>
               );
             })()}
+            {/* Short-description note — surfaced when the AI returned text but it
+                fell under the 40-char threshold (likely a too-short product name). */}
+            {product.descStatus === 'failed'
+              && typeof product.descLength === 'number'
+              && product.descLength > 0
+              && product.descLength < 40 && (
+              <p className="mt-1 text-[10px] text-warning">
+                Note: AI returned only {product.descLength} chars (threshold is 40). Consider lowering the threshold or enriching the title.
+              </p>
+            )}
+            {/* 🔬 Debug Mode — render the full enrichment trace inline. */}
+            {debugMode && (product.debugAiInput || product.debugStateWrite) && (
+              <div
+                className="mt-2 rounded border border-border bg-muted/30 p-2 space-y-1 text-[10px] font-mono-data text-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div>
+                  <span className="text-muted-foreground">[enrich] AI INPUT →</span>{' '}
+                  <code className="break-all">{JSON.stringify(product.debugAiInput)}</code>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">HTTP status →</span>{' '}
+                  <code>{product.debugHttpStatus ?? 'n/a'}</code>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">AI RAW RESPONSE →</span>{' '}
+                  <code className="break-all">{(() => { try { return JSON.stringify(product.debugAiRaw); } catch { return String(product.debugAiRaw); } })()}</code>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">STATE WRITE →</span>{' '}
+                  <code className="break-all">{product.debugStateWrite || '—'}</code>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">DONE →</span>{' '}
+                  <code>desc={product.descStatus || 'n/a'} ({product.descLength ?? 0} chars){product.descError ? ` · ${product.descError}` : ''}</code>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />

@@ -119,6 +119,13 @@ serve(async (req) => {
       customInstructions,
     } = await req.json();
 
+    console.log(
+      `[enrich-product] REQ title="${title}" vendor="${vendor}" brandWebsite="${brandWebsite || "—"}" styleNumber="${styleNumber || "—"}"`,
+    );
+    if (!brandWebsite) {
+      console.warn(`[enrich-product] no brandWebsite for vendor="${vendor}" — image cascade will be skipped`);
+    }
+
     // ── Step A: Real image fetch via find-product-url → product-extract cascade.
     // Runs in parallel with the LLM description call below for speed.
     const cascadePromise = fetchRealImagesViaCascade({

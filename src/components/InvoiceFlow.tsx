@@ -1745,6 +1745,13 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const handlePushToShopify = async (skipIdempotency = false): Promise<boolean> => {
     if (pushingShopify) return false;
 
+    if (poWarning) {
+      toast.error("Locked — Purchase Order, costs pending", {
+        description: "Upload the matching commercial invoice first to unlock Shopify push.",
+      });
+      return false;
+    }
+
     const accepted = (validatedProducts || []).filter((p) => !p._rejected);
     if (accepted.length === 0) {
       toast.error("Nothing to push", { description: "No accepted products available." });

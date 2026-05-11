@@ -665,10 +665,22 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge
-                        status={r?.status || "pending"}
-                        isLoading={isLoading}
-                      />
+                      {r?.status === "not_found" || r?.status === "error" ? (
+                        <FailureTooltip
+                          attempts={r.attempts || []}
+                          label={
+                            <StatusBadge
+                              status={r?.status || "pending"}
+                              isLoading={isLoading}
+                            />
+                          }
+                        />
+                      ) : (
+                        <StatusBadge
+                          status={r?.status || "pending"}
+                          isLoading={isLoading}
+                        />
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex flex-col items-end gap-1">
@@ -698,6 +710,53 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                       </div>
                     </TableCell>
                   </TableRow>
+                  {debugMode && r && (
+                    <TableRow key={key + "_debug"} className="bg-muted/30">
+                      <TableCell colSpan={7} className="text-[10px] font-mono">
+                        <div className="space-y-1 p-2">
+                          <div className="font-semibold text-foreground">🔬 Debug trace</div>
+                          {(r.attempts || []).map((a, i) => (
+                            <div key={i} className="pl-2">
+                              <span className="text-muted-foreground">{i + 1}.</span>{" "}
+                              <span className="text-primary">{a.url}</span>
+                              {" → "}
+                              <span className={a.found ? "text-success" : "text-destructive"}>
+                                HTTP {a.status || "n/a"}
+                              </span>
+                              {" — "}
+                              <span>{reasonLabel(a.reason)}</span>
+                              {a.selector ? <span className="text-muted-foreground"> [selector: {a.selector}]</span> : null}
+                              {" — "}
+                              <span>
+                                {a.found ? "description found in HTML" : "no description"}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="pt-1">
+                            <span className="text-muted-foreground">Final status:</span>{" "}
+                            <span className="text-foreground">
+                              {r.status === "found"
+                                ? r.word_count < 8
+                                  ? "too-short"
+                                  : "ready"
+                                : "failed"}
+                            </span>
+                            {r.status === "found" && r.word_count < 8 && (
+                              <span className="text-warning ml-2">
+                                ⚠ AI returned only {r.word_count} words — threshold is normally 40+. Consider editing manually.
+                              </span>
+                            )}
+                          </div>
+                          {r.ai_raw_preview && (
+                            <div className="pt-1">
+                              <span className="text-muted-foreground">AI raw (first 200 chars):</span>{" "}
+                              <span className="text-foreground">{r.ai_raw_preview}</span>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 );
               })}
             </TableBody>

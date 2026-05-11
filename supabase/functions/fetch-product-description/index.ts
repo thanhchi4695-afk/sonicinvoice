@@ -1,8 +1,16 @@
-// Fetch a clean product description from supplier/retailer websites
-// Uses Lovable AI Gateway (google/gemini-2.5-pro) with web grounding.
+// Fetch a clean product description AND product image for an invoice line item.
+//
+// Real fetch chain (in order):
+//   1) Brand's own website (guessed from brand name)
+//   2) theiconic.com.au (Australian retailer fallback)
+//   3) davidjones.com (Australian retailer fallback)
+//   4) AI-generated description (always succeeds)
+//
+// Each attempt is recorded with {url, status, reason, found} so the UI can
+// show "Tried: [url] — Status: [code] — Reason: [...]" diagnostics — even
+// when we end up succeeding on a later step.
+
 import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
-import { loadSkillsForTask, asSkillsPreamble } from "../_shared/claude-skills.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,188 +24,445 @@ interface RequestBody {
   style_number?: string;
   brand: string;
   product_type?: string;
+  colour?: string;
 }
 
-interface DescriptionPayload {
+type Reason =
+  | "ok"
+  | "empty_response"
+  | "blocked"
+  | "selector_not_matched"
+  | "too_short"
+  | "no_search_results"
+  | "fetch_error"
+  | "skipped";
+
+interface Attempt {
+  url: string;
+  status: number; // 0 if never executed
+  reason: Reason;
+  found: boolean;
+  selector?: string;
+}
+
+interface ResponsePayload {
   description: string | null;
   full_product_name: string | null;
   source_url: string;
   source_name: string;
-  source_type: "supplier" | "retailer";
+  source_type: "supplier" | "retailer" | "ai_generated";
   word_count: number;
   raw_word_count: number;
   confidence: "high" | "medium" | "low";
+  image_url: string | null;
+  image_source_url: string | null;
+  attempts: Attempt[];
+  image_attempts: Attempt[];
+  ai_raw_preview?: string;
 }
 
-const SYSTEM_PROMPT = `You are a retail copy researcher for an Australian boutique fashion retailer.
-Your job: find the official product description for a product so it can be imported into Shopify or Lightspeed.
+// ─── Helpers ────────────────────────────────────────────────
+const BROWSER_UAS = [
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+];
 
-SEARCH ORDER (strict):
-1. The official supplier/brand website FIRST (e.g. seafolly.com, baku.com.au, sunseeker.com.au, bondeyeswim.com, jets.com.au, zimmermann.com).
-2. If not found on the brand site, search Australian retailers in this order: The Iconic, Surfstitch, City Beach, David Jones, Myer.
-3. If still not found, treat as not_found.
-
-EXTRACTION RULES:
-- Extract ONLY the marketing/product description text.
-- Do NOT include: specs/tech sheets, size guide, reviews, breadcrumbs, FAQs, shipping info.
-- Strip HTML tags. Strip any leading repetition of the brand name.
-- Remove text containing: "free shipping", "add to cart", "buy now", "in stock", "out of stock", "sale", "% off", "RRP", promotional banners.
-- Remove size-guide content — any sentence containing "size 8", "size 10", "fits true to size", "model is wearing", "model wears", measurements like "bust 86cm".
-- Strip mentions of competitor brand names (only the searched brand may appear).
-
-FULL PRODUCT NAME RULES:
-- Also capture the OFFICIAL FULL product name as displayed on the source page (the H1 / product title).
-- This is often longer than the invoice's short name. Example: invoice says "Kokomo Ultra High" but the brand site shows "Kokomo Ultra High Pant" → return "Kokomo Ultra High Pant".
-- Title Case. Do NOT include the brand prefix (e.g. return "Kokomo Ultra High Pant", not "Baku Kokomo Ultra High Pant").
-- Do NOT include color, size, SKU, price, or promotional words ("NEW", "SALE").
-- If the page only shows the same short name as the invoice, return that short name unchanged.
-- If no product page is found, set full_product_name to null.
-
-LENGTH RULES:
-- If cleaned description is under 20 words → too short, treat as not_found and try the next source.
-- Prefer 40–150 words. If a source gives more than 200 words, truncate at the last full sentence before the 150-word mark.
-- raw_word_count = original word count BEFORE truncation. word_count = final word count after cleaning + truncation.
-
-PRIORITY:
-- ALWAYS prefer the supplier/brand site description over the retailer description, regardless of length (as long as it passes the rules above).
-
-CONFIDENCE:
-- "high" = found on the brand's own website.
-- "medium" = found on a major Australian retailer (Iconic, Surfstitch, City Beach, David Jones, Myer).
-- "low" = found on a secondary source.
-
-OUTPUT:
-Return ONLY a JSON object — no preamble, no markdown fences, no commentary:
-{
-  "description": string | null,
-  "full_product_name": string | null,
-  "source_url": string,
-  "source_name": string,
-  "source_type": "supplier" | "retailer",
-  "word_count": number,
-  "raw_word_count": number,
-  "confidence": "high" | "medium" | "low"
+function browserHeaders(): Record<string, string> {
+  return {
+    "User-Agent": BROWSER_UAS[Math.floor(Math.random() * BROWSER_UAS.length)],
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-AU,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "no-cache",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Upgrade-Insecure-Requests": "1",
+  };
 }
-If nothing usable is found, set description and full_product_name to null and other fields to empty string / 0.`;
 
-function safeJSON(text: string): DescriptionPayload | null {
-  if (!text) return null;
-  // Strip markdown fences if any model slipped them in
-  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/, "").trim();
-  try {
-    const obj = JSON.parse(cleaned);
-    return obj as DescriptionPayload;
-  } catch {
-    // Try to find a JSON block inside the text
-    const m = cleaned.match(/\{[\s\S]*\}/);
-    if (m) {
-      try {
-        return JSON.parse(m[0]) as DescriptionPayload;
-      } catch {
-        return null;
+function slug(s: string): string {
+  return (s || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[''’`]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function brandDomainGuesses(brand: string): string[] {
+  const s = slug(brand);
+  if (!s) return [];
+  const flat = s.replace(/-/g, "");
+  const bases = flat === s ? [s] : [s, flat];
+  const out: string[] = [];
+  for (const tld of ["com.au", "com"]) {
+    for (const base of bases) out.push(`${base}.${tld}`);
+  }
+  // Common pattern: <brand>swim.com (Bond Eye → bondeyeswim.com)
+  out.push(`${flat}swim.com`);
+  return Array.from(new Set(out));
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)));
+}
+
+function stripHtml(s: string): string {
+  return decodeHtmlEntities(
+    s
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+}
+
+function wordCount(s: string): number {
+  return s.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function isChallengeStub(html: string): boolean {
+  if (!html) return true;
+  if (html.length < 600) return true;
+  return /KPSDK|kasada|cf-browser-verification|challenge-platform|Just a moment\.\.\./i.test(html);
+}
+
+// ─── Fetch with Firecrawl fallback ───────────────────────────
+async function fetchHtml(url: string): Promise<{ html: string; status: number; via: "direct" | "firecrawl" }> {
+  // Direct fetch with browser-like headers
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { headers: browserHeaders(), redirect: "follow" });
+      const status = res.status;
+      if (res.ok) {
+        const html = await res.text();
+        if (!isChallengeStub(html)) return { html, status, via: "direct" };
       }
+      if ([403, 429, 503].includes(status)) {
+        await new Promise((r) => setTimeout(r, 400 + attempt * 300));
+        continue;
+      }
+      // Other non-2xx → break to firecrawl
+      if (!res.ok) {
+        // try firecrawl
+        return tryFirecrawl(url, status);
+      }
+    } catch (_e) {
+      await new Promise((r) => setTimeout(r, 300));
     }
+  }
+  return tryFirecrawl(url, 429);
+}
+
+async function tryFirecrawl(url: string, lastStatus: number): Promise<{ html: string; status: number; via: "direct" | "firecrawl" }> {
+  const key = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!key) return { html: "", status: lastStatus, via: "direct" };
+  try {
+    const res = await fetch("https://api.firecrawl.dev/v2/scrape", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        formats: ["html"],
+        onlyMainContent: false,
+        proxy: "stealth",
+        waitFor: 2000,
+      }),
+    });
+    const j = await res.json().catch(() => null) as Record<string, unknown> | null;
+    const data = (j?.data ?? j) as Record<string, unknown> | undefined;
+    const html = (data?.html as string) || (data?.rawHtml as string) || "";
+    const upstream = (data?.metadata as Record<string, unknown> | undefined)?.statusCode as number | undefined;
+    if (html && !isChallengeStub(html)) {
+      return { html, status: upstream ?? 200, via: "firecrawl" };
+    }
+    return { html: "", status: upstream ?? lastStatus, via: "firecrawl" };
+  } catch {
+    return { html: "", status: lastStatus, via: "direct" };
+  }
+}
+
+// ─── Brave Search to find product URL on a domain ───────────
+async function braveFindProductUrl(query: string, site?: string): Promise<{ url: string | null; results: number }> {
+  const key = Deno.env.get("BRAVE_SEARCH_API_KEY");
+  if (!key) return { url: null, results: 0 };
+  const q = site ? `${query} site:${site}` : query;
+  try {
+    const res = await fetch(
+      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(q)}&count=8&country=au`,
+      { headers: { "X-Subscription-Token": key, Accept: "application/json" } },
+    );
+    if (!res.ok) return { url: null, results: 0 };
+    const j = await res.json() as { web?: { results?: { url: string }[] } };
+    const results = j.web?.results ?? [];
+    if (!results.length) return { url: null, results: 0 };
+    // Prefer URLs that look like product pages
+    const productLike = results.find((r) =>
+      /\/product[s]?\/|\/p\/|\/dp\//i.test(r.url)
+    );
+    return { url: (productLike ?? results[0]).url, results: results.length };
+  } catch {
+    return { url: null, results: 0 };
+  }
+}
+
+// ─── Selector-based extraction ──────────────────────────────
+interface Extracted {
+  description: string | null;
+  fullName: string | null;
+  imageUrl: string | null;
+  selector: string;
+}
+
+function extractFromHtml(html: string): Extracted {
+  const out: Extracted = { description: null, fullName: null, imageUrl: null, selector: "none" };
+  if (!html) return out;
+
+  // 1) JSON-LD product schema (most reliable)
+  const ldMatches = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) ?? [];
+  for (const block of ldMatches) {
+    const inner = block.replace(/^[\s\S]*?>/, "").replace(/<\/script>$/i, "").trim();
+    try {
+      const parsed = JSON.parse(inner);
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+      for (const node of items) {
+        const list = node?.["@graph"] && Array.isArray(node["@graph"]) ? node["@graph"] : [node];
+        for (const it of list) {
+          const t = it?.["@type"];
+          const isProduct = t === "Product" || (Array.isArray(t) && t.includes("Product"));
+          if (!isProduct) continue;
+          const desc = typeof it.description === "string" ? stripHtml(it.description) : null;
+          const name = typeof it.name === "string" ? it.name.trim() : null;
+          let img: string | null = null;
+          if (typeof it.image === "string") img = it.image;
+          else if (Array.isArray(it.image) && it.image.length) img = typeof it.image[0] === "string" ? it.image[0] : it.image[0]?.url ?? null;
+          else if (it.image?.url) img = it.image.url;
+          if (desc) out.description = desc;
+          if (name) out.fullName = name;
+          if (img) out.imageUrl = img;
+          if (out.description) {
+            out.selector = "json-ld:Product";
+            return out;
+          }
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 2) og:description / og:image / og:title
+  const ogDesc = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)?.[1]
+    ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/i)?.[1] ?? null;
+  const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? null;
+  const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1] ?? null;
+  if (ogDesc) {
+    out.description = decodeHtmlEntities(ogDesc).trim();
+    out.selector = "og:description";
+  }
+  if (ogTitle && !out.fullName) out.fullName = decodeHtmlEntities(ogTitle).trim();
+  if (ogImage && !out.imageUrl) out.imageUrl = ogImage;
+
+  // 3) meta description fallback
+  if (!out.description) {
+    const metaDesc = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i)?.[1];
+    if (metaDesc) {
+      out.description = decodeHtmlEntities(metaDesc).trim();
+      out.selector = "meta:description";
+    }
+  }
+
+  return out;
+}
+
+function makeAbsolute(url: string | null, base: string): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("//")) return "https:" + url;
+  try {
+    return new URL(url, base).toString();
+  } catch {
     return null;
   }
 }
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+// ─── AI fallback description generator ──────────────────────
+async function aiGenerateDescription(body: RequestBody): Promise<string | null> {
+  const sys = `You are a retail copywriter for an Australian boutique fashion store.
+Write a 50-90 word product description in Australian English. Two short paragraphs max.
+No emojis, no hype words, no price/shipping/sale mentions. Plain text only — no markdown, no quotes.
+Use only the facts given; do not invent fabric, sizing, or care details.`;
+  const user = `Product: ${body.style_name}
+Brand: ${body.brand}
+Product type: ${body.product_type || "(unknown)"}
+Colour: ${body.colour || "(unknown)"}
+Style number: ${body.style_number || "(none)"}`;
+  try {
+    const r = await callAI({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: user },
+      ],
+      temperature: 0.5,
+      max_tokens: 400,
+    });
+    const txt = (getContent(r) || "").trim();
+    return txt || null;
+  } catch (e) {
+    console.error("[fetch-desc] aiGenerateDescription failed", e);
+    return null;
   }
+}
+
+// ─── Main handler ───────────────────────────────────────────
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   let body: RequestBody;
-  try {
-    body = await req.json();
-  } catch {
+  try { body = await req.json(); }
+  catch {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   if (!body.style_name || !body.brand) {
-    return new Response(
-      JSON.stringify({ error: "style_name and brand are required" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "style_name and brand are required" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
-  const userPrompt = `Find the official product description for:
-Brand: ${body.brand}
-Product name: ${body.style_name}
-Style number / SKU: ${body.style_number || "(none)"}
-Product type: ${body.product_type || "(unknown)"}
+  const attempts: Attempt[] = [];
+  const imageAttempts: Attempt[] = [];
 
-Search the brand's official website first, then Australian retailers as instructed.
-Return ONLY the JSON object — no other text.`;
+  // Build site list: brand domain guesses → retailer fallbacks
+  const brandDomains = brandDomainGuesses(body.brand);
+  const retailerDomains = ["theiconic.com.au", "davidjones.com"];
+  const sites: Array<{ host: string; type: "supplier" | "retailer" }> = [
+    ...brandDomains.map((h) => ({ host: h, type: "supplier" as const })),
+    ...retailerDomains.map((h) => ({ host: h, type: "retailer" as const })),
+  ];
 
-  try {
-    // Resolve user (best-effort) and load Claude Skills for enrichment.
-    let userId: string | null = null;
-    try {
-      const auth = req.headers.get("Authorization") || "";
-      if (auth.startsWith("Bearer ")) {
-        const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-          global: { headers: { Authorization: auth } },
-        });
-        const { data } = await sb.auth.getUser();
-        userId = data.user?.id ?? null;
-      }
-    } catch { /* ignore */ }
-    const skillsMd = await loadSkillsForTask(userId, "enrichment", body.brand);
-    const skillsPreamble = asSkillsPreamble(skillsMd, "product description research");
+  const query = `${body.brand} ${body.style_name}${body.style_number ? " " + body.style_number : ""}`;
 
-    const aiRes = await callAI({
-      model: "google/gemini-2.5-pro",
-      messages: [
-        { role: "system", content: skillsPreamble + SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.2,
-      max_tokens: 1500,
-    });
+  let result: ResponsePayload | null = null;
 
-    const raw = getContent(aiRes);
-    const parsed = safeJSON(raw);
-
-    if (!parsed) {
-      console.warn("Could not parse AI response:", raw?.slice(0, 200));
-      return new Response(
-        JSON.stringify({
-          description: null,
-          full_product_name: null,
-          source_url: "",
-          source_name: "",
-          source_type: "retailer",
-          word_count: 0,
-          raw_word_count: 0,
-          confidence: "low",
-        } satisfies DescriptionPayload),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+  for (const site of sites) {
+    // 1) Find a product URL on this site via Brave Search
+    const search = await braveFindProductUrl(query, site.host);
+    if (!search.url) {
+      attempts.push({ url: `site:${site.host}`, status: 0, reason: "no_search_results", found: false });
+      continue;
     }
 
-    return new Response(JSON.stringify(parsed), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    if (err instanceof AIGatewayError) {
-      return new Response(JSON.stringify({ error: err.message }), {
-        status: err.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // 2) Fetch the page
+    const fetched = await fetchHtml(search.url);
+    if (!fetched.html) {
+      attempts.push({
+        url: search.url,
+        status: fetched.status,
+        reason: fetched.status === 403 || fetched.status === 429 ? "blocked" : "empty_response",
+        found: false,
       });
+      continue;
     }
-    console.error("fetch-product-description error:", err);
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+
+    // 3) Extract
+    const ex = extractFromHtml(fetched.html);
+    const desc = ex.description?.trim() || "";
+    const wc = wordCount(desc);
+
+    if (!desc) {
+      attempts.push({
+        url: search.url, status: fetched.status, reason: "selector_not_matched", found: false, selector: ex.selector,
+      });
+      continue;
+    }
+    if (wc < 12) {
+      attempts.push({
+        url: search.url, status: fetched.status, reason: "too_short", found: false, selector: ex.selector,
+      });
+      continue;
+    }
+
+    // Success
+    attempts.push({ url: search.url, status: fetched.status, reason: "ok", found: true, selector: ex.selector });
+    const absImg = makeAbsolute(ex.imageUrl, search.url);
+    if (absImg) {
+      imageAttempts.push({ url: absImg, status: fetched.status, reason: "ok", found: true, selector: ex.selector });
+    } else {
+      imageAttempts.push({ url: search.url, status: fetched.status, reason: "selector_not_matched", found: false, selector: ex.selector });
+    }
+    result = {
+      description: desc.length > 1200 ? desc.slice(0, 1200).replace(/\s+\S*$/, "…") : desc,
+      full_product_name: ex.fullName,
+      source_url: search.url,
+      source_name: site.host,
+      source_type: site.type,
+      word_count: wordCount(desc),
+      raw_word_count: wc,
+      confidence: site.type === "supplier" ? "high" : "medium",
+      image_url: absImg,
+      image_source_url: search.url,
+      attempts,
+      image_attempts: imageAttempts,
+    };
+    break;
   }
+
+  // 4) Final AI fallback — must always produce something usable
+  if (!result) {
+    const aiDesc = await aiGenerateDescription(body);
+    if (aiDesc) {
+      result = {
+        description: aiDesc,
+        full_product_name: null,
+        source_url: "",
+        source_name: "AI generated",
+        source_type: "ai_generated",
+        word_count: wordCount(aiDesc),
+        raw_word_count: wordCount(aiDesc),
+        confidence: "low",
+        image_url: null,
+        image_source_url: null,
+        attempts,
+        image_attempts: imageAttempts,
+        ai_raw_preview: aiDesc.slice(0, 200),
+      };
+    } else {
+      // Truly unrecoverable
+      result = {
+        description: null,
+        full_product_name: null,
+        source_url: "",
+        source_name: "",
+        source_type: "ai_generated",
+        word_count: 0,
+        raw_word_count: 0,
+        confidence: "low",
+        image_url: null,
+        image_source_url: null,
+        attempts,
+        image_attempts: imageAttempts,
+      };
+    }
+  }
+
+  return new Response(JSON.stringify(result), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 });

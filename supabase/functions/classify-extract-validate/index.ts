@@ -6,6 +6,7 @@
 // ───────────────────────────────────────────────────────────────
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { loadSkillsForTask } from "../_shared/claude-skills.ts";
+import { buildSafeClaudeDocBlock, chunkForClaude } from "../_shared/image-resize.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -971,6 +972,22 @@ async function runClaudePdfDirect(opts: {
 
   const fileBase64 = String(opts.fileBase64 || "").replace(/^data:[^;]+;base64,/, "");
 
+  // Always passes through buildSafeClaudeDocBlock — for PDFs it's a no-op,
+  // for images it enforces ≤1568px before sending. chunkForClaude guarantees
+  // we never exceed 20 image blocks per Claude call.
+  const { block: rawBlock } = await buildSafeClaudeDocBlock(
+    fileBase64,
+    "application/pdf",
+    "classify-extract-pdf",
+  );
+  const docBlockWithCache = {
+    ...rawBlock,
+    // Cache breakpoint on the PDF — it's the largest static block
+    // (~3,500+ tokens), well above Anthropic's 1,024-token minimum.
+    cache_control: { type: "ephemeral" },
+  };
+  const batches = chunkForClaude([docBlockWithCache], 20);
+
   const response = await fetch(ANTHROPIC_API_URL, {
     method: "POST",
     headers: {
@@ -988,14 +1005,7 @@ async function runClaudePdfDirect(opts: {
       messages: [{
         role: "user",
         content: [
-          {
-            type: "document",
-            source: { type: "base64", media_type: "application/pdf", data: fileBase64 },
-            // Cache breakpoint on the PDF — it's the largest static block
-            // (~3,500+ tokens), well above Anthropic's 1,024-token minimum.
-            // Tools + system get cached as part of the same prefix.
-            cache_control: { type: "ephemeral" },
-          },
+          ...batches[0],
           { type: "text", text: userPrompt },
         ],
       }],

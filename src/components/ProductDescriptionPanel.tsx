@@ -144,9 +144,17 @@ function reasonLabel(r: Attempt["reason"]): string {
   }
 }
 
-function FailureTooltip({ attempts, label }: { attempts: Attempt[]; label: React.ReactNode }) {
+function FailureTooltip({
+  attempts,
+  label,
+  overrideMessage,
+}: {
+  attempts: Attempt[];
+  label: React.ReactNode;
+  overrideMessage?: string;
+}) {
   const last = attempts[attempts.length - 1];
-  if (!last) return <>{label}</>;
+  if (!last && !overrideMessage) return <>{label}</>;
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
@@ -154,20 +162,26 @@ function FailureTooltip({ attempts, label }: { attempts: Attempt[]; label: React
           <span className="cursor-help underline decoration-dotted">{label}</span>
         </TooltipTrigger>
         <TooltipContent className="max-w-[340px] text-[10px] leading-snug">
-          <div>
-            <span className="font-semibold">Tried:</span> {last.url}
-          </div>
-          <div>
-            <span className="font-semibold">Status:</span> {last.status || "—"}
-          </div>
-          <div>
-            <span className="font-semibold">Reason:</span> {reasonLabel(last.reason)}
-          </div>
-          {attempts.length > 1 && (
-            <div className="mt-1 pt-1 border-t border-border/40 opacity-80">
-              {attempts.length} attempts total
-            </div>
-          )}
+          {overrideMessage ? (
+            <div>{overrideMessage}</div>
+          ) : last ? (
+            <>
+              <div>
+                <span className="font-semibold">Tried:</span> {last.url}
+              </div>
+              <div>
+                <span className="font-semibold">Status:</span> {last.status || "—"}
+              </div>
+              <div>
+                <span className="font-semibold">Reason:</span> {reasonLabel(last.reason)}
+              </div>
+              {attempts.length > 1 && (
+                <div className="mt-1 pt-1 border-t border-border/40 opacity-80">
+                  {attempts.length} attempts total
+                </div>
+              )}
+            </>
+          ) : null}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -436,6 +450,35 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
             <Bug className="w-3.5 h-3.5" />
             🔬 Debug Mode {debugMode ? "ON" : "OFF"}
           </Button>
+          {(() => {
+            let processed = 0, resized = 0, skipped = 0;
+            for (const r of results.values()) {
+              const s = r.image_stats;
+              if (!s) continue;
+              processed += s.processed || 0;
+              resized += s.resized || 0;
+              skipped += s.skipped || 0;
+            }
+            if (processed === 0 && resized === 0 && skipped === 0) return null;
+            return (
+              <div
+                className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-border bg-muted/40 text-[11px] font-mono"
+                title="Live counter — updates as each Fetch completes"
+              >
+                <span className="text-foreground">
+                  Images processed: <strong>{processed}</strong>
+                </span>
+                <span className="text-muted-foreground">|</span>
+                <span className="text-amber-600 dark:text-amber-400">
+                  Resized: <strong>{resized}</strong>
+                </span>
+                <span className="text-muted-foreground">|</span>
+                <span className="text-destructive">
+                  Skipped: <strong>{skipped}</strong>
+                </span>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -447,32 +490,6 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
           retailers. Always review before publishing.
         </p>
       </div>
-
-      {/* Image processing counter */}
-      {(() => {
-        let processed = 0, resized = 0, skipped = 0;
-        for (const r of results.values()) {
-          const s = r.image_stats;
-          if (!s) continue;
-          processed += s.processed || 0;
-          resized += s.resized || 0;
-          skipped += s.skipped || 0;
-        }
-        if (processed === 0 && resized === 0 && skipped === 0) return null;
-        return (
-          <div className="bg-muted/40 border border-border rounded-lg px-3 py-2 mb-4 flex items-center gap-4 text-xs font-mono">
-            <span className="text-foreground">
-              Images processed: <strong>{processed}</strong>
-            </span>
-            <span className="text-amber-600 dark:text-amber-400">
-              Resized: <strong>{resized}</strong>
-            </span>
-            <span className="text-destructive">
-              Skipped: <strong>{skipped}</strong>
-            </span>
-          </div>
-        );
-      })()}
 
       {/* Summary */}
       {results.size > 0 && (
@@ -568,6 +585,11 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                           <ImageOff className="w-4 h-4 text-muted-foreground" />
                           <FailureTooltip
                             attempts={r.image_attempts || []}
+                            overrideMessage={
+                              (r.image_stats?.skipped ?? 0) > 0
+                                ? "Image too large to process — resize failed"
+                                : undefined
+                            }
                             label={
                               <Badge
                                 variant="outline"

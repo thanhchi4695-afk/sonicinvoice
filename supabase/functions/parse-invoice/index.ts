@@ -10,6 +10,7 @@ import {
   findBrandProfile,
   autoLearnBrandProfile,
 } from "../_shared/auto-learn-brand-profile.ts";
+import { buildSafeClaudeDocBlock, chunkForClaude } from "../_shared/image-resize.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -274,12 +275,11 @@ async function stage1ClaudePdf(
     `Extract every product line item from this invoice. Follow the master prompt steps in order. ` +
     `Return via the return_invoice tool only.`;
 
-  const isPdf = mimeType === "application/pdf";
-  const docBlock = isPdf
-    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
-    : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
-
-  return await callClaudeInvoice([docBlock, { type: "text", text: userText }], systemBlocks, model);
+  const { block: docBlock } = await buildSafeClaudeDocBlock(fileBase64, mimeType, "invoice");
+  // Single document per call — chunkForClaude is a no-op here but enforces the
+  // ≤20-images-per-call invariant if this ever batches multiple images.
+  const batches = chunkForClaude([docBlock], 20);
+  return await callClaudeInvoice([...batches[0], { type: "text", text: userText }], systemBlocks, model);
 }
 
 // Validation pass — sums extracted cost*qty against invoice subtotal.
@@ -310,14 +310,12 @@ async function validateAndMaybeReExtract(
   const correctionPrompt = systemPromptBase +
     `\n\n## RE-EXTRACTION REQUIRED\nA prior extraction summed cost_ex_gst × qty to ${actual.toFixed(2)} but the invoice subtotal ex-GST is ${expected.toFixed(2)} (Δ ${delta.toFixed(2)}). Re-examine the document and return a corrected row set via return_invoice. Common causes: missed lines, wrong column treated as cost, GST-inclusive cost not divided by 1.1, dual-size rows not split, matrix cells skipped.`;
 
-  const isPdf = mimeType === "application/pdf";
-  const docBlock = isPdf
-    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
-    : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
+  const { block: docBlock } = await buildSafeClaudeDocBlock(fileBase64, mimeType, "invoice-revalidate");
+  const batches = chunkForClaude([docBlock], 20);
 
   try {
     const { rows: fixedRows, meta: fixedMeta } = await callClaudeInvoice(
-      [docBlock, { type: "text", text: "Re-examine and return the corrected row set." }],
+      [...batches[0], { type: "text", text: "Re-examine and return the corrected row set." }],
       correctionPrompt,
       model,
     );

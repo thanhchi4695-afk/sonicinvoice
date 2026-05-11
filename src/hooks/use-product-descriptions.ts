@@ -283,5 +283,9 @@ export function useProductDescriptions() {
     fetchAll,
     updateDescription,
     cacheKey,
+    clearCache: useCallback(() => {
+      sessionCache.clear();
+      setResults(new Map());
+    }, []),
   };
 }

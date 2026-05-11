@@ -3797,6 +3797,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
   // ── Product Enrichment via AI ────────────────────────────
   const enrichProduct = async (group: ProductGroup): Promise<Partial<ProductGroup>> => {
+    let aiInput: Record<string, unknown> = { title: group.name || '', vendor: group.brand || '' };
     try {
       const storeConfig = JSON.parse(localStorage.getItem('store_config_sonic_invoice') || '{}');
       const storeName = storeConfig.name || 'My Store';

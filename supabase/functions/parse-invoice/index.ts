@@ -310,10 +310,8 @@ async function validateAndMaybeReExtract(
   const correctionPrompt = systemPromptBase +
     `\n\n## RE-EXTRACTION REQUIRED\nA prior extraction summed cost_ex_gst × qty to ${actual.toFixed(2)} but the invoice subtotal ex-GST is ${expected.toFixed(2)} (Δ ${delta.toFixed(2)}). Re-examine the document and return a corrected row set via return_invoice. Common causes: missed lines, wrong column treated as cost, GST-inclusive cost not divided by 1.1, dual-size rows not split, matrix cells skipped.`;
 
-  const isPdf = mimeType === "application/pdf";
-  const docBlock = isPdf
-    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
-    : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
+  const { block: docBlock } = await buildSafeClaudeDocBlock(fileBase64, mimeType, "invoice-revalidate");
+  const batches = chunkForClaude([docBlock], 20);
 
   try {
     const { rows: fixedRows, meta: fixedMeta } = await callClaudeInvoice(

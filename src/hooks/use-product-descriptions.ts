@@ -36,6 +36,7 @@ export type DescriptionResult = {
   attempts: Attempt[];
   image_attempts: Attempt[];
   ai_raw_preview?: string;
+  image_stats?: { processed: number; resized: number; skipped: number };
 };
 
 // 24h session cache keyed by style_number (or brand|style_name fallback)

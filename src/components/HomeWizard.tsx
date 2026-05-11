@@ -81,6 +81,7 @@ const HomeWizard = ({
   const proceed = () => {
     if (!docType) return;
     if (docType === "invoice") onStartInvoice();
+    else if (docType === "joor") onStartJoor?.();
     else onStartPackingSlip();
   };
 

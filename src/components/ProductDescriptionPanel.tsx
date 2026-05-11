@@ -519,8 +519,44 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                         )}
                     </TableCell>
                     <TableCell className="text-xs">{item.brand || "—"}</TableCell>
+                    <TableCell className="min-w-[80px]">
+                      {isLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                      ) : r?.image_url ? (
+                        <div className="flex flex-col items-start gap-1">
+                          <img
+                            src={r.image_url}
+                            alt={item.style_name || ""}
+                            className="w-12 h-12 rounded object-cover border border-border"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                          <Badge className="text-[9px] bg-success text-success-foreground hover:bg-success/80">
+                            <ImageIcon className="w-2.5 h-2.5 mr-0.5" /> Found
+                          </Badge>
+                        </div>
+                      ) : r ? (
+                        <div className="flex items-center gap-1">
+                          <ImageOff className="w-4 h-4 text-muted-foreground" />
+                          <FailureTooltip
+                            attempts={r.image_attempts || []}
+                            label={
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] text-muted-foreground"
+                              >
+                                ⚠️ No image
+                              </Badge>
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="min-w-[140px]">
-                      {r && r.status === "found" ? (
+                      {r && (r.status === "found" || r.source_type === "ai_generated") ? (
                         <div className="flex flex-col gap-0.5">
                           <SourceBadge result={r} />
                           {r.source_url ? (

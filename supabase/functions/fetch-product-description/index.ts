@@ -11,6 +11,7 @@
 // when we end up succeeding on a later step.
 
 import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
+import { processImageForAI } from "../_shared/image-resize.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

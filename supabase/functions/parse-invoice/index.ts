@@ -10,6 +10,7 @@ import {
   findBrandProfile,
   autoLearnBrandProfile,
 } from "../_shared/auto-learn-brand-profile.ts";
+import { buildSafeClaudeDocBlock, chunkForClaude } from "../_shared/image-resize.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

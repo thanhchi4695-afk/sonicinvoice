@@ -812,20 +812,28 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                         <div className="space-y-1 p-2">
                           <div className="font-semibold text-foreground">🔬 Debug trace</div>
                           {(r.attempts || []).map((a, i) => (
-                            <div key={i} className="pl-2">
-                              <span className="text-muted-foreground">{i + 1}.</span>{" "}
-                              <span className="text-primary">{a.url}</span>
-                              {" → "}
-                              <span className={a.found ? "text-success" : "text-destructive"}>
-                                HTTP {a.status || "n/a"}
-                              </span>
-                              {" — "}
-                              <span>{reasonLabel(a.reason)}</span>
-                              {a.selector ? <span className="text-muted-foreground"> [selector: {a.selector}]</span> : null}
-                              {" — "}
-                              <span>
-                                {a.found ? "description found in HTML" : "no description"}
-                              </span>
+                            <div key={i} className="pl-2 space-y-0.5">
+                              <div>
+                                <span className="text-muted-foreground">{i + 1}.</span>{" "}
+                                <span className="text-primary">{a.url}</span>
+                                {" → "}
+                                <span className={a.found ? "text-success" : "text-destructive"}>
+                                  HTTP {a.status || "n/a"}
+                                </span>
+                                {" — "}
+                                <span>{reasonLabel(a.reason)}</span>
+                                {a.selector ? <span className="text-muted-foreground"> [selector: {a.selector}]</span> : null}
+                                {" — "}
+                                <span>
+                                  {a.found ? "description found in HTML" : "no description"}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">AI input preview:</span>{" "}
+                                <code className="text-foreground bg-background/60 px-1 py-0.5 rounded">
+                                  {a.aiRawPreview || "n/a — description scraped directly"}
+                                </code>
+                              </div>
                             </div>
                           ))}
                           <div className="pt-1">

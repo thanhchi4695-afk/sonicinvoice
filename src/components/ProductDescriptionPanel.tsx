@@ -501,7 +501,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                   desc.length > 120 ? `${desc.slice(0, 120)}…` : desc;
 
                 return (
-                  <FragmentRow keyId={key}>
+                  <Fragment key={key}>
                   <TableRow className="align-top">
                     <TableCell className="max-w-[220px]">
                       <p className="text-xs font-medium">{item.style_name || "—"}</p>

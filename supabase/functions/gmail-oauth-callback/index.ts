@@ -116,7 +116,7 @@ Deno.serve(async (req) => {
           expires_at: expiresAt,
           is_active: true,
         },
-        { onConflict: "user_id" },
+        { onConflict: "user_id,email_address" },
       );
 
     if (upsertErr) {

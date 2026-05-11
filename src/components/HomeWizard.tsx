@@ -151,8 +151,16 @@ const HomeWizard = ({
             onClick={() => setEditing("doc")}
             className="inline-flex items-center gap-1.5 rounded-md bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted"
           >
-            {docType === "invoice" ? <FileText className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
-            {docType === "invoice" ? "Invoice" : "Packing slip"}
+            {docType === "invoice"
+              ? <FileText className="h-3.5 w-3.5" />
+              : docType === "joor"
+                ? <Briefcase className="h-3.5 w-3.5" />
+                : <Package className="h-3.5 w-3.5" />}
+            {docType === "invoice"
+              ? "Invoice"
+              : docType === "joor"
+                ? "JOOR / Wholesale order"
+                : "Packing slip"}
             <Pencil className="h-3 w-3 text-muted-foreground" />
           </button>
           <button

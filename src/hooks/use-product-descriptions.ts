@@ -36,6 +36,7 @@ export type DescriptionResult = {
   attempts: Attempt[];
   image_attempts: Attempt[];
   ai_raw_preview?: string;
+  image_stats?: { processed: number; resized: number; skipped: number };
 };
 
 // 24h session cache keyed by style_number (or brand|style_name fallback)
@@ -146,6 +147,7 @@ export function useProductDescriptions() {
           attempts: payload?.attempts ?? [],
           image_attempts: payload?.image_attempts ?? [],
           ai_raw_preview: payload?.ai_raw_preview,
+          image_stats: (payload as { image_stats?: DescriptionResult["image_stats"] })?.image_stats,
         };
         // Console diagnostics
         try {

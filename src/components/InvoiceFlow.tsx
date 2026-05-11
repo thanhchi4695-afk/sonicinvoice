@@ -3361,6 +3361,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     debugHttpStatus?: number;
     debugAiRaw?: unknown;
     debugStateWrite?: string;
+    // Image fetch trace
+    imageDebug?: {
+      brandWebsite?: string;
+      findUrlStatus?: number;
+      pageUrl?: string | null;
+      extractStatus?: number;
+      firstUrl?: string | null;
+      stateWrite?: string;
+    };
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);

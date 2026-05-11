@@ -134,7 +134,9 @@ const RETURN_INVOICE_TOOL = {
       meta: {
         type: "object",
         properties: {
-          documentType: { type: "string", enum: ["tax_invoice", "packing_list", "credit_note", "quote", "unknown"] },
+          documentType: { type: "string", enum: ["tax_invoice", "packing_list", "credit_note", "quote", "purchase_order", "unknown"] },
+          sourcePlatform: { type: ["string", "null"], enum: ["joor", "cin7", "shopify", "xero", "myob", "quickbooks", "manual", "unknown", null] },
+          costPending: { type: ["boolean", "null"] },
           supplier: { type: ["string", "null"] },
           invoiceNumber: { type: ["string", "null"] },
           invoiceDate: { type: ["string", "null"] },

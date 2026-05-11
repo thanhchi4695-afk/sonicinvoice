@@ -6,6 +6,7 @@
 // ───────────────────────────────────────────────────────────────
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { loadSkillsForTask } from "../_shared/claude-skills.ts";
+import { buildSafeClaudeDocBlock, chunkForClaude } from "../_shared/image-resize.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

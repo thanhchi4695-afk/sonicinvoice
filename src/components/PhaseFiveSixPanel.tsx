@@ -41,6 +41,10 @@ interface PhaseFiveSixPanelProps {
   onProcessAnother?: () => void;
   /** When false, replaces the Push to Shopify button with a Connect prompt. `null` = still loading. */
   shopifyConnected?: boolean | null;
+  /** When true, all export/publish buttons are disabled (e.g. unreconciled Purchase Order). */
+  exportLocked?: boolean;
+  /** Tooltip/explanation shown when exportLocked is true. */
+  exportLockReason?: string;
 }
 
 function getPreferredPos(): Pos {
@@ -50,6 +54,7 @@ function getPreferredPos(): Pos {
 
 const PhaseFiveSixPanel = ({
   products, supplierName, onExportCSV, onPushToShopify, onProcessAnother, shopifyConnected = null,
+  exportLocked = false, exportLockReason,
 }: PhaseFiveSixPanelProps) => {
   const pos = useMemo<Pos>(() => getPreferredPos(), []);
   const [tab, setTab] = useState("products");
@@ -181,18 +186,18 @@ const PhaseFiveSixPanel = ({
                     </a>
                   </Button>
                 ) : (
-                  <Button size="lg" variant="teal" onClick={onPushToShopify} disabled={accepted.length === 0 || shopifyConnected === null} className="shadow-lg w-full sm:w-auto">
+                  <Button size="lg" variant="teal" onClick={onPushToShopify} disabled={accepted.length === 0 || shopifyConnected === null || exportLocked} title={exportLocked ? exportLockReason : undefined} className="shadow-lg w-full sm:w-auto">
                     <ShoppingBag className="w-4 h-4" />
                     Push to Shopify
                   </Button>
                 )}
-                <Button size="lg" variant="outline" onClick={onExportCSV} disabled={accepted.length === 0} className="w-full sm:w-auto">
+                <Button size="lg" variant="outline" onClick={onExportCSV} disabled={accepted.length === 0 || exportLocked} title={exportLocked ? exportLockReason : undefined} className="w-full sm:w-auto">
                   <Download className="w-4 h-4" />
                   Export CSV
                 </Button>
               </>
             ) : (
-              <Button size="lg" variant="teal" onClick={onExportCSV} disabled={accepted.length === 0} className="shadow-lg w-full sm:w-auto">
+              <Button size="lg" variant="teal" onClick={onExportCSV} disabled={accepted.length === 0 || exportLocked} title={exportLocked ? exportLockReason : undefined} className="shadow-lg w-full sm:w-auto">
                 <Download className="w-4 h-4" />
                 Export Lightspeed CSV
               </Button>
@@ -400,7 +405,7 @@ const PhaseFiveSixPanel = ({
                   </a>
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" onClick={onPushToShopify} disabled={shopifyConnected === null}>
+                <Button size="sm" variant="outline" onClick={onPushToShopify} disabled={shopifyConnected === null || exportLocked} title={exportLocked ? exportLockReason : undefined}>
                   <ShoppingBag className="w-3.5 h-3.5" />
                   Push to Shopify (live)
                 </Button>
@@ -414,7 +419,7 @@ const PhaseFiveSixPanel = ({
             description="SKU + qty-to-add CSV. Adds quantities to existing inventory (does not replace)."
             icon={<RefreshCw className="w-4 h-4" />}
           >
-            <Button size="sm" variant="outline" onClick={onExportCSV}>
+            <Button size="sm" variant="outline" onClick={onExportCSV} disabled={exportLocked} title={exportLocked ? exportLockReason : undefined}>
               <Download className="w-3.5 h-3.5" />
               Export stock update CSV
             </Button>
@@ -426,7 +431,7 @@ const PhaseFiveSixPanel = ({
             description="Adds new colourways/sizes to existing products (uses Handle of existing product)."
             icon={<Sparkles className="w-4 h-4" />}
           >
-            <Button size="sm" variant="outline" onClick={onExportCSV}>
+            <Button size="sm" variant="outline" onClick={onExportCSV} disabled={exportLocked} title={exportLocked ? exportLockReason : undefined}>
               <Download className="w-3.5 h-3.5" />
               Export new variants CSV
             </Button>

@@ -5656,6 +5656,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                 finalizeQualityMetrics(); persistInvoiceToDb(); setStep(4);
               }}
               shopifyConnected={shopifyConnected}
+              exportLocked={!!poWarning}
+              exportLockReason={poWarning ? `Export locked: ${poSourcePlatform === "joor" ? "JOOR " : ""}Purchase Order${poNumber ? ` ${poNumber}` : ""} awaiting matching final invoice.` : undefined}
               onPushToShopify={() => {
                 void (async () => {
                   const ok = await handlePushToShopify();

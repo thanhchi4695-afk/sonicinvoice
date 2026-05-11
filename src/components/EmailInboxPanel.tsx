@@ -56,6 +56,7 @@ const confidenceBadge = (c: "high" | "medium" | "low") => {
 };
 
 interface GmailConnection {
+  id: string;
   email_address: string;
   last_checked_at: string | null;
   is_active: boolean;
@@ -113,7 +114,7 @@ const guessType = (filename: string): InboxItem["attachmentType"] => {
 
 const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => {
   const { toast } = useToast();
-  const [connection, setConnection] = useState<GmailConnection | null>(null);
+  const [connections, setConnections] = useState<GmailConnection[]>([]);
   const [loadingConn, setLoadingConn] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -135,15 +136,16 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     try { localStorage.setItem("sonic_smart_bulk_enabled", smartBulk ? "1" : "0"); } catch {}
   }, [smartBulk]);
   const demo = isDemoMode();
+  const connection = connections[0] ?? null; // back-compat for legacy refs
 
   const loadConnection = useCallback(async () => {
     setLoadingConn(true);
     const { data, error } = await supabase
       .from("gmail_connections")
-      .select("email_address, last_checked_at, is_active")
+      .select("id, email_address, last_checked_at, is_active")
       .eq("is_active", true)
-      .maybeSingle();
-    if (!error) setConnection(data as GmailConnection | null);
+      .order("created_at", { ascending: true });
+    if (!error) setConnections((data as GmailConnection[]) ?? []);
     setLoadingConn(false);
   }, []);
 
@@ -152,7 +154,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       .from("gmail_found_invoices")
       .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed")
       .order("received_at", { ascending: false })
-      .limit(50);
+      .limit(1000);
     if (error) return;
     const items: InboxItem[] = [];
     for (const row of data ?? []) {
@@ -242,35 +244,36 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!confirm("Disconnect Gmail? Inbox history for this account will be cleared. You can reconnect any time.")) return;
-    // Delete the connection row entirely so reconnecting with a different
-    // Google account cleanly replaces it (the upsert in the OAuth callback
-    // keys on user_id, which works either way — but a stale row with
-    // is_active=false leaves the new row's email_address ambiguous in some
-    // edge cases).
-    const { error: delConnErr } = await supabase
-      .from("gmail_connections")
-      .delete()
-      .eq("is_active", true);
+  const handleDisconnect = async (target?: GmailConnection) => {
+    const all = !target;
+    const label = all
+      ? "Disconnect ALL Gmail accounts? Inbox history will be cleared. You can reconnect any time."
+      : `Disconnect ${target!.email_address}? Other connected Gmail accounts (if any) stay connected.`;
+    if (!confirm(label)) return;
+
+    let delQuery = supabase.from("gmail_connections").delete();
+    delQuery = target
+      ? delQuery.eq("id", target.id)
+      : delQuery.eq("is_active", true);
+    const { error: delConnErr } = await delQuery;
     if (delConnErr) {
       toast({ title: "Failed", description: delConnErr.message, variant: "destructive" });
       return;
     }
-    // Wipe the found-invoices queue so the next account starts fresh and
-    // the sender column doesn't keep showing items from the old inbox.
-    const { error: delInvErr } = await supabase
-      .from("gmail_found_invoices")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000"); // RLS scopes to user
-    if (delInvErr) {
-      console.warn("[gmail] failed to clear found invoices", delInvErr);
+    if (all) {
+      const { error: delInvErr } = await supabase
+        .from("gmail_found_invoices")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+      if (delInvErr) console.warn("[gmail] failed to clear found invoices", delInvErr);
+      setGmailItems([]);
+      setAutoProcessedIds(new Set());
     }
-    addAuditEntry("Email", "Disconnected Gmail and cleared inbox queue");
-    setConnection(null);
-    setGmailItems([]);
-    setAutoProcessedIds(new Set());
-    toast({ title: "Gmail disconnected", description: "Inbox queue cleared." });
+    addAuditEntry("Email", all
+      ? "Disconnected all Gmail accounts and cleared inbox queue"
+      : `Disconnected Gmail: ${target!.email_address}`);
+    await loadConnection();
+    toast({ title: "Gmail disconnected", description: all ? "Inbox queue cleared." : target!.email_address });
   };
 
   const handleScanNow = async () => {
@@ -584,49 +587,73 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" /> Checking Gmail connection…
             </div>
-          ) : connection ? (
-            <div>
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-success/15 flex items-center justify-center shrink-0">
-                  <CheckCircle2 className="w-5 h-5 text-success" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold">Connected: {connection.email_address}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {connection.last_checked_at
-                      ? `Last scanned ${relTime(new Date(connection.last_checked_at))}`
-                      : "Not scanned yet"}
-                  </p>
-                  {(() => {
-                    if (!connection.last_checked_at) return null;
-                    const ageMin = (Date.now() - new Date(connection.last_checked_at).getTime()) / 60000;
-                    const healthy = ageMin < 10;
-                    return (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="relative flex h-2 w-2">
-                          {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
-                          <span className={`relative inline-flex rounded-full h-2 w-2 ${healthy ? "bg-success" : "bg-muted-foreground"}`} />
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {healthy ? "Auto-scan active · every 5 min" : `Auto-scan idle (${Math.round(ageMin)}m since last run)`}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-              <div className="flex gap-2 mt-3">
-                <Button size="sm" variant="teal" className="flex-1 h-9" onClick={handleScanNow} disabled={scanning}>
+          ) : connections.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">
+                  Connected Gmail accounts ({connections.length})
+                </p>
+                <Button size="sm" variant="teal" className="h-8" onClick={handleScanNow} disabled={scanning}>
                   {scanning
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Scanning…</>
-                    : <><RefreshCw className="w-4 h-4 mr-2" /> Scan now</>}
-                </Button>
-                <Button size="sm" variant="outline" className="h-9" onClick={handleDisconnect}>
-                  <LogOut className="w-4 h-4 mr-1" /> Disconnect
+                    ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Scanning…</>
+                    : <><RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Scan all</>}
                 </Button>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-2">
-                Scans the last 30 days for emails with PDF / XLSX / CSV / image attachments matching invoice, PO, packing slip, receipt, statement or bill.
+              <ul className="divide-y divide-border rounded-md border border-border">
+                {connections.map(c => {
+                  const ageMin = c.last_checked_at
+                    ? (Date.now() - new Date(c.last_checked_at).getTime()) / 60000
+                    : null;
+                  const healthy = ageMin !== null && ageMin < 10;
+                  return (
+                    <li key={c.id} className="flex items-center gap-3 px-3 py-2">
+                      <div className="w-8 h-8 rounded-full bg-success/15 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-4 h-4 text-success" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{c.email_address}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="relative flex h-2 w-2">
+                            {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
+                            <span className={`relative inline-flex rounded-full h-2 w-2 ${healthy ? "bg-success" : "bg-muted-foreground"}`} />
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {c.last_checked_at
+                              ? (healthy ? "Auto-scan active · every 5 min" : `Idle ${Math.round(ageMin!)}m`)
+                              : "Not scanned yet"}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs shrink-0"
+                        onClick={() => handleDisconnect(c)}
+                      >
+                        <LogOut className="w-3 h-3 mr-1" /> Remove
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 flex-1 min-w-[160px]"
+                  onClick={handleConnectGmail}
+                  disabled={connecting}
+                >
+                  {connecting
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening Google…</>
+                    : <><Mail className="w-4 h-4 mr-2" /> Connect another Gmail</>}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-9" onClick={() => handleDisconnect()}>
+                  Remove all
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Scans the last 180 days of each inbox (up to 250 messages per account per scan) for invoice / PO / packing slip / receipt / statement / bill attachments.
               </p>
             </div>
           ) : (
@@ -638,7 +665,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold mb-1">Connect Gmail to auto-pull invoices</p>
                   <p className="text-xs text-muted-foreground">
-                    Read-only access. Sonic Invoices scans your inbox for supplier invoices and queues them here.
+                    Read-only access. Sonic Invoices scans your inbox for supplier invoices and queues them here. You can connect multiple Gmail accounts.
                   </p>
                 </div>
               </div>

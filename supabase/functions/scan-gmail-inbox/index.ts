@@ -22,7 +22,8 @@ const corsHeaders = {
 };
 
 const GMAIL_QUERY =
-  'has:attachment (invoice OR "tax invoice" OR "purchase order" OR "packing slip" OR receipt OR statement OR bill) newer_than:30d';
+  'has:attachment (invoice OR "tax invoice" OR "purchase order" OR "packing slip" OR receipt OR statement OR bill) newer_than:180d';
+const MAX_MESSAGES_PER_SCAN = 250;
 
 const INVOICE_MIME_TYPES = new Set([
   "application/pdf",
@@ -81,24 +82,24 @@ Deno.serve(async (req) => {
       }
       const { data, error } = await admin
         .from("gmail_connections")
-        .select("user_id, email_address, access_token, refresh_token, expires_at")
+        .select("user_id, email_address, access_token, refresh_token, expires_at, last_email_id")
         .eq("user_id", userData.user.id)
-        .eq("is_active", true)
-        .maybeSingle();
+        .eq("is_active", true);
       if (error) throw error;
-      if (!data) return json({ error: "No Gmail connection" }, 404);
-      connections = [data as GmailConnection];
+      if (!data || data.length === 0) return json({ error: "No Gmail connection" }, 404);
+      connections = data as GmailConnection[];
     }
 
     const results = [];
     for (const conn of connections) {
       try {
         const r = await scanInbox(admin, conn, { autoProcess, supabaseUrl, serviceKey });
-        results.push({ user_id: conn.user_id, ...r });
+        results.push({ user_id: conn.user_id, email: conn.email_address, ...r });
       } catch (err) {
-        console.error("[scan-gmail-inbox] user failed", conn.user_id, err);
+        console.error("[scan-gmail-inbox] user failed", conn.user_id, conn.email_address, err);
         results.push({
           user_id: conn.user_id,
+          email: conn.email_address,
           error: String((err as Error)?.message ?? err),
         });
       }
@@ -107,8 +108,17 @@ Deno.serve(async (req) => {
     if (scanAll) {
       return json({ scanned_users: results.length, results });
     }
-    // Single-user response shape the UI expects
-    return json(results[0]);
+    // Per-user response: aggregate across all of this user's Gmail accounts
+    const aggregate = results.reduce(
+      (acc, r: any) => {
+        acc.emails_scanned += r.emails_scanned ?? 0;
+        if (Array.isArray(r.invoices_found)) acc.invoices_found.push(...r.invoices_found);
+        if (r.error) acc.errors.push({ email: r.email, error: r.error });
+        return acc;
+      },
+      { emails_scanned: 0, invoices_found: [] as any[], errors: [] as any[], accounts: results.length },
+    );
+    return json(aggregate);
   } catch (err) {
     console.error("[scan-gmail-inbox] error", err);
     return json({ error: String((err as Error)?.message ?? err) }, 500);
@@ -141,20 +151,32 @@ async function scanInbox(
     accessToken = await refreshAccessToken(admin, conn);
   }
 
-  // 2. List recent invoice-like emails
-  const listUrl = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
-  listUrl.searchParams.set("q", GMAIL_QUERY);
-  listUrl.searchParams.set("maxResults", "20");
-
-  const listResp = await fetch(listUrl.toString(), {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!listResp.ok) {
-    const t = await listResp.text();
-    throw new Error(`Gmail list failed: ${listResp.status} ${t.slice(0, 200)}`);
+  // 2. List recent invoice-like emails (paginate up to MAX_MESSAGES_PER_SCAN)
+  const messageIds: string[] = [];
+  let pageToken: string | undefined;
+  while (messageIds.length < MAX_MESSAGES_PER_SCAN) {
+    const listUrl = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
+    listUrl.searchParams.set("q", GMAIL_QUERY);
+    listUrl.searchParams.set("maxResults", "100");
+    if (pageToken) listUrl.searchParams.set("pageToken", pageToken);
+    const listResp = await fetch(listUrl.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!listResp.ok) {
+      const t = await listResp.text();
+      throw new Error(`Gmail list failed: ${listResp.status} ${t.slice(0, 200)}`);
+    }
+    const listJson = await listResp.json() as {
+      messages?: Array<{ id: string }>;
+      nextPageToken?: string;
+    };
+    for (const m of listJson.messages ?? []) {
+      if (messageIds.length >= MAX_MESSAGES_PER_SCAN) break;
+      messageIds.push(m.id);
+    }
+    if (!listJson.nextPageToken) break;
+    pageToken = listJson.nextPageToken;
   }
-  const listJson = await listResp.json() as { messages?: Array<{ id: string }> };
-  const messageIds = (listJson.messages ?? []).map((m) => m.id);
 
   // 3. Load supplier email_domains for matching
   const { data: supplierRows } = await admin

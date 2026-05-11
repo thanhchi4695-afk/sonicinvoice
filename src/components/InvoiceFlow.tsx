@@ -7077,6 +7077,26 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
                 </span>
               );
             })()}
+            {/* Description status badge */}
+            {(product.enriching || product.descStatus) && (() => {
+              const status = product.enriching && !product.descStatus ? 'generating' : product.descStatus!;
+              const cls =
+                status === 'ready' ? 'bg-success/15 text-success' :
+                status === 'generating' ? 'bg-secondary/30 text-foreground animate-pulse' :
+                'bg-destructive/15 text-destructive';
+              const label =
+                status === 'ready' ? '✅ Description ready' :
+                status === 'generating' ? '⏳ Generating…' :
+                '❌ Description failed';
+              return (
+                <span
+                  className={`inline-block mt-1 ml-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${cls}`}
+                  title={status === 'failed' ? (product.descError || 'AI did not return a usable description') : undefined}
+                >
+                  {label}
+                </span>
+              );
+            })()}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />

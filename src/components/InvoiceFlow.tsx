@@ -3351,6 +3351,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     productPageUrl?: string;
     enrichConfidence?: string;
     enrichNote?: string;
+    imageStatus?: "found" | "searching" | "not_found";
+    imageSource?: "cascade" | "llm" | "shopify" | "none";
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);

@@ -283,10 +283,8 @@ Be factual and precise. Only write what you can confirm from the invoice. Do not
     ? `A profile already exists for this supplier. Here is the current version:\n\n${existingMd}\n\n---\n\nA new invoice has just been processed. Update and improve the profile with any new information. Supplier hint: ${meta.supplierName}. Invoice date: ${meta.invoiceDate ?? "unknown"}. Layout type identified: ${meta.layoutType ?? "unknown"}. Cost column found: ${meta.costColumnName ?? "unknown"}. RRP on invoice: ${meta.rrpOnInvoice}. GST-inclusive pricing: ${meta.gstInclusivePricing}. Sizes seen: ${[...new Set(rows.map(r => r.size))].join(", ")}. Return only the updated .md content.`
     : `Write a brand intelligence profile for this supplier. Supplier hint: ${meta.supplierName}. Invoice date: ${meta.invoiceDate ?? "unknown"}. Layout type identified: ${meta.layoutType ?? "unknown"}. Cost column found: ${meta.costColumnName ?? "unknown"}. RRP on invoice: ${meta.rrpOnInvoice}. GST-inclusive pricing: ${meta.gstInclusivePricing}. Products extracted: ${rows.length} rows. Sizes seen: ${[...new Set(rows.map(r => r.size))].join(", ")}. Return only the .md content.`;
 
-  const isPdf = mimeType === "application/pdf";
-  const docBlock = isPdf
-    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
-    : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
+  const { block: docBlock } = await buildSafeClaudeDocBlock(fileBase64, mimeType, "brand-profile-source");
+  const batches = chunkForClaude([docBlock], 20);
 
   const resp = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

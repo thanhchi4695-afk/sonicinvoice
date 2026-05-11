@@ -165,30 +165,30 @@ export function useProductDescriptions() {
           console.log("[enrich] AI INPUT", { brand: item.brand, name: item.style_name, sku: item.style_number });
           // eslint-disable-next-line no-console
           console.log("[enrich] AI RAW RESPONSE", payload);
-          // eslint-disable-next-line no-console
-          console.log("[enrich] STATE WRITE", result);
           // Human-readable image dimension log (BUG 2 fix) — fires BEFORE STATE WRITE-style object dumps
           {
             const s = result.image_stats;
-            if (s && (s.processed || s.resized || s.skipped)) {
-              const ow = (s as { original_width?: number }).original_width;
-              const oh = (s as { original_height?: number }).original_height;
-              const fw = (s as { final_width?: number }).final_width;
-              const fh = (s as { final_height?: number }).final_height;
-              if (s.resized && ow && oh && fw && fh) {
+            if (s) {
+              const ow = s.original_width;
+              const oh = s.original_height;
+              const fw = s.final_width;
+              const fh = s.final_height;
+              if (s.resized > 0 && ow && oh && fw && fh) {
                 // eslint-disable-next-line no-console
                 console.log(`[image] Original size: ${ow}x${oh}px`);
                 // eslint-disable-next-line no-console
                 console.log(`[image] Resized to: ${fw}x${fh}px`);
-              } else if (s.processed && ow && oh) {
+              } else if (s.processed > 0 && ow && oh) {
                 // eslint-disable-next-line no-console
                 console.log(`[image] Within limits: ${ow}x${oh}px — no resize`);
-              } else if (s.skipped) {
+              } else if (s.skipped > 0) {
                 // eslint-disable-next-line no-console
                 console.log(`[image] Skipped — resize/fetch failed`);
               }
             }
           }
+          // eslint-disable-next-line no-console
+          console.log("[enrich] STATE WRITE", result);
           // eslint-disable-next-line no-console
           console.log("[image] STATE WRITE", { image_url: result.image_url, attempts: result.image_attempts });
           // eslint-disable-next-line no-console

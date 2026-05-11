@@ -7182,10 +7182,21 @@ const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { 
                 status === 'found' ? `✅ Image found${product.imageSource && product.imageSource !== 'cascade' ? ` (${product.imageSource})` : ''}` :
                 status === 'searching' ? '🔍 Searching' :
                 '⚠️ No image found';
+              const dbg = product.imageDebug;
+              const triedUrl = dbg?.pageUrl || dbg?.brandWebsite || '';
+              const triedStatus = dbg?.pageUrl ? dbg?.extractStatus : dbg?.findUrlStatus;
+              const tooltip =
+                status === 'not_found'
+                  ? (triedUrl
+                      ? `Tried: ${triedUrl} — Status: ${triedStatus ?? 'n/a'}`
+                      : 'No image returned by brand site or AI cascade.')
+                  : status === 'found' && dbg?.firstUrl
+                    ? `Image: ${dbg.firstUrl}`
+                    : undefined;
               return (
                 <span
                   className={`inline-block mt-1 ml-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${cls}`}
-                  title={status === 'not_found' ? 'No image returned by brand site or AI cascade.' : undefined}
+                  title={tooltip}
                 >
                   {label}
                 </span>

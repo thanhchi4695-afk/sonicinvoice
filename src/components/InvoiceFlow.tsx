@@ -3400,6 +3400,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [detectedDocType, setDetectedDocType] = useState<
     "tax_invoice" | "packing_slip" | "handwritten_invoice" | "statement" | "unknown" | null
   >(null);
+  // Purchase Order (e.g. JOOR) state — set when parse-invoice returns po_warning.
+  // While set, Shopify push/export are locked until a matching commercial invoice arrives.
+  const [poWarning, setPoWarning] = useState<string | null>(null);
+  const [poSourcePlatform, setPoSourcePlatform] = useState<string | null>(null);
+  const [poNumber, setPoNumber] = useState<string | null>(null);
   const [packingSlipPromptShown, setPackingSlipPromptShown] = useState(false);
   const [imageHelperActive, setImageHelperActive] = useState(false);
   const [collectionSeoActive, setCollectionSeoActive] = useState(false);

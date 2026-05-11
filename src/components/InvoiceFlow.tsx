@@ -3829,7 +3829,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         };
       }
 
-      const aiInput = {
+      aiInput = {
         title: group.name,
         vendor: group.brand,
         type: group.type,

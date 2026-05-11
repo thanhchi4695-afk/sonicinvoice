@@ -3361,6 +3361,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     debugHttpStatus?: number;
     debugAiRaw?: unknown;
     debugStateWrite?: string;
+    // Image fetch trace
+    imageDebug?: {
+      brandWebsite?: string;
+      findUrlStatus?: number;
+      pageUrl?: string | null;
+      extractStatus?: number;
+      firstUrl?: string | null;
+      stateWrite?: string;
+    };
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
@@ -3902,9 +3911,24 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         ? null
         : (result.descriptionError || (incomingDesc ? `Description too short (${incomingDesc.length} chars; threshold is 40)` : 'AI returned empty response'));
 
+      // ── Image trace logging — emit the 4-stage [image] sequence so the user
+      //    can verify the fetch end-to-end without opening Network tab.
+      const dbg = result.imageDebug || {};
+      console.log(
+        `[image] SEARCHING URL → brand="${dbg.brandWebsite || '—'}" page="${dbg.pageUrl || '—'}"`,
+      );
+      console.log(
+        `[image] HTTP status → find-product-url=${dbg.findUrlStatus ?? 'n/a'} product-extract=${dbg.extractStatus ?? 'n/a'}`,
+      );
+      console.log(
+        `[image] ${absUrls.length > 0 ? 'IMAGE FOUND' : 'NOT FOUND'} → count=${absUrls.length} firstUrl=${absUrls[0] || result.imageFirstUrl || '—'}`,
+      );
+
       console.log(
         `[enrich] DONE "${group.name}" → desc=${descStatus} (${incomingDesc.length} chars) | image=${finalStatus} src=${finalSource} url=${newImageSrc || '—'}${descError ? ` | descError="${descError}"` : ''}`,
       );
+
+      const imageStateWrite = `image=${finalStatus} src=${finalSource} url=${newImageSrc || '—'}`;
 
       return {
         // Only overwrite desc when AI returned a usable description; preserve any existing desc otherwise.
@@ -3921,13 +3945,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           : (result.note || ''),
         imageStatus: finalStatus,
         imageSource: finalSource,
+        imageDebug: {
+          brandWebsite: dbg.brandWebsite || '',
+          findUrlStatus: dbg.findUrlStatus ?? 0,
+          pageUrl: dbg.pageUrl ?? null,
+          extractStatus: dbg.extractStatus ?? 0,
+          firstUrl: absUrls[0] || result.imageFirstUrl || null,
+          stateWrite: imageStateWrite,
+        },
         descStatus,
         descError,
         descLength: incomingDesc.length,
         debugAiInput: aiInput,
         debugHttpStatus: response.status,
         debugAiRaw: result,
-        debugStateWrite: `desc=${descStatus} (${incomingDesc.length} chars) image=${finalStatus} src=${finalSource}`,
+        debugStateWrite: `desc=${descStatus} (${incomingDesc.length} chars) ${imageStateWrite}`,
       };
     } catch (e) {
       console.error('[enrich] network error:', e);
@@ -3939,6 +3971,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         descError: msg,
         descLength: 0,
         imageStatus: group.imageSrc ? 'found' : 'not_found',
+        imageDebug: { brandWebsite: '', findUrlStatus: 0, pageUrl: null, extractStatus: 0, firstUrl: null, stateWrite: `NETWORK ERROR — ${msg}` },
         debugAiInput: aiInput,
         debugHttpStatus: 0,
         debugAiRaw: null,
@@ -3955,6 +3988,18 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const written = updated[idx];
       const stateWriteLog = `[enrich] STATE WRITE "${written.name}" → desc=${written.descStatus || 'n/a'} (${(written.desc || '').length} chars) imageSrc=${written.imageSrc || '—'}`;
       console.log(stateWriteLog);
+      console.log(
+        `[image] STATE WRITE "${written.name}" → status=${written.imageStatus || 'n/a'} src=${written.imageSrc || '—'} (source=${written.imageSource || 'n/a'})`,
+      );
+
+      // If the image fetch resolved to a real URL, log the Shopify CSV "Image Src"
+      // column so the user can verify it lands in the right export field.
+      if (written.imageStatus === 'found' && written.imageSrc) {
+        console.log(`[image] EXPORT ROW (Shopify CSV "Image Src") "${written.name}":`, {
+          Handle: (written.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+          'Image Src': written.imageSrc,
+        });
+      }
 
       // Build the same Body (HTML) the CSV exporter will use, and log a sample row
       // so the user can verify the description actually flows into the export.
@@ -5816,6 +5861,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                             debugHttpStatus: group.debugHttpStatus,
                             debugAiRaw: group.debugAiRaw,
                             debugStateWrite: group.debugStateWrite,
+                            imageDebug: group.imageDebug,
                           }}
                           debugMode={debugMode}
                           onPreview={() => setPreviewProduct(mockProducts.find(p => p.name === group.name) || mockProducts[0])}
@@ -7015,7 +7061,7 @@ const VariantGroupCard = ({ group, onSplit, onPreview, onQtyChange }: {
   );
 };
 
-const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean; enriched?: boolean; enriching?: boolean; imageSrc?: string; imageUrls?: string[]; desc?: string; fabric?: string; care?: string; origin?: string; productPageUrl?: string; enrichConfidence?: string; enrichNote?: string; imageStatus?: "found" | "searching" | "not_found"; imageSource?: "cascade" | "llm" | "shopify" | "none"; descStatus?: "ready" | "generating" | "failed"; descError?: string | null; descLength?: number; debugAiInput?: unknown; debugHttpStatus?: number; debugAiRaw?: unknown; debugStateWrite?: string }; debugMode?: boolean; onPreview?: () => void; onEnrich?: () => void; onSetImage?: (url: string) => void }) => {
+const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean; enriched?: boolean; enriching?: boolean; imageSrc?: string; imageUrls?: string[]; desc?: string; fabric?: string; care?: string; origin?: string; productPageUrl?: string; enrichConfidence?: string; enrichNote?: string; imageStatus?: "found" | "searching" | "not_found"; imageSource?: "cascade" | "llm" | "shopify" | "none"; descStatus?: "ready" | "generating" | "failed"; descError?: string | null; descLength?: number; debugAiInput?: unknown; debugHttpStatus?: number; debugAiRaw?: unknown; debugStateWrite?: string; imageDebug?: { brandWebsite?: string; findUrlStatus?: number; pageUrl?: string | null; extractStatus?: number; firstUrl?: string | null; stateWrite?: string } }; debugMode?: boolean; onPreview?: () => void; onEnrich?: () => void; onSetImage?: (url: string) => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [savedToBarcodeCatalog, setSavedToBarcodeCatalog] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
@@ -7136,10 +7182,21 @@ const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { 
                 status === 'found' ? `✅ Image found${product.imageSource && product.imageSource !== 'cascade' ? ` (${product.imageSource})` : ''}` :
                 status === 'searching' ? '🔍 Searching' :
                 '⚠️ No image found';
+              const dbg = product.imageDebug;
+              const triedUrl = dbg?.pageUrl || dbg?.brandWebsite || '';
+              const triedStatus = dbg?.pageUrl ? dbg?.extractStatus : dbg?.findUrlStatus;
+              const tooltip =
+                status === 'not_found'
+                  ? (triedUrl
+                      ? `Tried: ${triedUrl} — Status: ${triedStatus ?? 'n/a'}`
+                      : 'No image returned by brand site or AI cascade.')
+                  : status === 'found' && dbg?.firstUrl
+                    ? `Image: ${dbg.firstUrl}`
+                    : undefined;
               return (
                 <span
                   className={`inline-block mt-1 ml-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${cls}`}
-                  title={status === 'not_found' ? 'No image returned by brand site or AI cascade.' : undefined}
+                  title={tooltip}
                 >
                   {label}
                 </span>
@@ -7201,6 +7258,27 @@ const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { 
                   <span className="text-muted-foreground">DONE →</span>{' '}
                   <code>desc={product.descStatus || 'n/a'} ({product.descLength ?? 0} chars){product.descError ? ` · ${product.descError}` : ''}</code>
                 </div>
+                {/* Image fetch trace — independent of description trace */}
+                {product.imageDebug && (
+                  <div className="mt-1 pt-1 border-t border-border/40 space-y-1">
+                    <div>
+                      <span className="text-muted-foreground">[image] SEARCHING URL →</span>{' '}
+                      <code className="break-all">brand={product.imageDebug.brandWebsite || '—'} · page={product.imageDebug.pageUrl || '—'}</code>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">HTTP status →</span>{' '}
+                      <code>find-product-url={product.imageDebug.findUrlStatus ?? 'n/a'} · product-extract={product.imageDebug.extractStatus ?? 'n/a'}</code>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">{product.imageStatus === 'found' ? 'IMAGE FOUND →' : 'NOT FOUND →'}</span>{' '}
+                      <code className="break-all">{product.imageDebug.firstUrl || product.imageSrc || '—'}</code>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">STATE WRITE →</span>{' '}
+                      <code className="break-all">{product.imageDebug.stateWrite || '—'}</code>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

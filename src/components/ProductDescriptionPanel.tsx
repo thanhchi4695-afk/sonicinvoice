@@ -238,6 +238,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Set<string>>(new Set());
   const [debugMode, setDebugMode] = useState(false);
+  const [image_stats] = useState({ processed: 0, resized: 0, skipped: 0 });
 
   const toggleExpand = (k: string) =>
     setExpanded((p) => {
@@ -480,7 +481,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
             🔬 Debug Mode {debugMode ? "ON" : "OFF"}
           </Button>
           {(() => {
-            let processed = 0, resized = 0, skipped = 0;
+            let { processed, resized, skipped } = image_stats;
             for (const r of results.values()) {
               const s = r.image_stats;
               if (!s) continue;

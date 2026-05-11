@@ -2633,6 +2633,32 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         }
       }
 
+      // ── Purchase Order (e.g. JOOR Summi Summi) — surface warning + lock export ──
+      if (data.po_warning || aiDocType === "purchase_order" || data.cost_pending === true) {
+        const platform =
+          (data.source_platform as string | undefined) ||
+          (data.meta?.sourcePlatform as string | undefined) ||
+          "wholesale platform";
+        const poNo =
+          (data.po_number as string | undefined) ||
+          (data.meta?.invoiceNumber as string | undefined) ||
+          null;
+        const warning =
+          (data.po_warning as string | undefined) ||
+          `Purchase Order detected from ${platform}. Wholesale costs are not confirmed yet — Shopify export is locked until you upload the matching commercial invoice.`;
+        setPoWarning(warning);
+        setPoSourcePlatform(platform);
+        setPoNumber(poNo);
+        toast.warning("Purchase Order detected — export locked", {
+          description: "Costs are pending. You can review and save to catalog. Upload the matching commercial invoice to unlock Shopify export.",
+          duration: 14000,
+        });
+      } else {
+        setPoWarning(null);
+        setPoSourcePlatform(null);
+        setPoNumber(null);
+      }
+
       // OCR fallback notifications
       if (data.ocr_fallback_used) {
         toast.info("OCR fallback was used for better extraction accuracy", {

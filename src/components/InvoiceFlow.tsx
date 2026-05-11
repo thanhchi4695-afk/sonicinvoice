@@ -5454,6 +5454,51 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             </div>
           )}
 
+          {/* ── Purchase Order banner (JOOR / wholesale platforms) ── */}
+          {poWarning && validatedProducts.length > 0 && (
+            <div className="mb-4 rounded-lg border-2 border-amber-500/50 bg-amber-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl leading-none">⚠️</span>
+                <div className="flex-1 space-y-1">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                    Purchase Order detected — not a final invoice
+                  </p>
+                  <p className="text-xs text-amber-900/90 dark:text-amber-100/90">
+                    This document is a Purchase Order from{" "}
+                    <span className="font-semibold">{poSourcePlatform || "a wholesale platform"}</span>
+                    {poNumber ? <> (PO <span className="font-mono">{poNumber}</span>)</> : null}.
+                    Wholesale costs are not confirmed yet. You can review the order lines and save to catalog,
+                    but Shopify export is locked until you upload the matching commercial invoice.
+                  </p>
+                  <div className="pt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        try {
+                          if (supplierName) sessionStorage.setItem("pending_po_supplier", supplierName);
+                          if (poNumber) sessionStorage.setItem("pending_po_number", poNumber);
+                        } catch { /* ignore */ }
+                        setUploadedFile(null);
+                        setFileName("");
+                        setValidatedProducts([]);
+                        setProductGroups([]);
+                        setPoWarning(null);
+                        setStep(1);
+                        toast("Upload the matching commercial invoice", {
+                          description: `Supplier: ${supplierName || "—"}${poNumber ? ` · PO ${poNumber}` : ""}`,
+                        });
+                      }}
+                    >
+                      Upload matching invoice →
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── Phase 3 + 4 — Stock check & enrichment (additive, mounts above review) ── */}
           {validatedProducts.length > 0 && (
             <PhaseThreeFourPanel

@@ -244,35 +244,36 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     }
   };
 
-  const handleDisconnect = async () => {
-    if (!confirm("Disconnect Gmail? Inbox history for this account will be cleared. You can reconnect any time.")) return;
-    // Delete the connection row entirely so reconnecting with a different
-    // Google account cleanly replaces it (the upsert in the OAuth callback
-    // keys on user_id, which works either way — but a stale row with
-    // is_active=false leaves the new row's email_address ambiguous in some
-    // edge cases).
-    const { error: delConnErr } = await supabase
-      .from("gmail_connections")
-      .delete()
-      .eq("is_active", true);
+  const handleDisconnect = async (target?: GmailConnection) => {
+    const all = !target;
+    const label = all
+      ? "Disconnect ALL Gmail accounts? Inbox history will be cleared. You can reconnect any time."
+      : `Disconnect ${target!.email_address}? Other connected Gmail accounts (if any) stay connected.`;
+    if (!confirm(label)) return;
+
+    let delQuery = supabase.from("gmail_connections").delete();
+    delQuery = target
+      ? delQuery.eq("id", target.id)
+      : delQuery.eq("is_active", true);
+    const { error: delConnErr } = await delQuery;
     if (delConnErr) {
       toast({ title: "Failed", description: delConnErr.message, variant: "destructive" });
       return;
     }
-    // Wipe the found-invoices queue so the next account starts fresh and
-    // the sender column doesn't keep showing items from the old inbox.
-    const { error: delInvErr } = await supabase
-      .from("gmail_found_invoices")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000"); // RLS scopes to user
-    if (delInvErr) {
-      console.warn("[gmail] failed to clear found invoices", delInvErr);
+    if (all) {
+      const { error: delInvErr } = await supabase
+        .from("gmail_found_invoices")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+      if (delInvErr) console.warn("[gmail] failed to clear found invoices", delInvErr);
+      setGmailItems([]);
+      setAutoProcessedIds(new Set());
     }
-    addAuditEntry("Email", "Disconnected Gmail and cleared inbox queue");
-    setConnection(null);
-    setGmailItems([]);
-    setAutoProcessedIds(new Set());
-    toast({ title: "Gmail disconnected", description: "Inbox queue cleared." });
+    addAuditEntry("Email", all
+      ? "Disconnected all Gmail accounts and cleared inbox queue"
+      : `Disconnected Gmail: ${target!.email_address}`);
+    await loadConnection();
+    toast({ title: "Gmail disconnected", description: all ? "Inbox queue cleared." : target!.email_address });
   };
 
   const handleScanNow = async () => {

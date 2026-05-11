@@ -5680,6 +5680,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             </div>
             <div className="flex gap-2">
               <Button
+                variant={debugMode ? "teal" : "outline"}
+                size="sm"
+                onClick={() => setDebugMode(v => !v)}
+                className="gap-1"
+                title="Show enrichment trace (AI input, HTTP status, raw response, state write) on each product card"
+              >
+                🔬 Debug Mode {debugMode ? "ON" : "OFF"}
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={runEnrichAll}

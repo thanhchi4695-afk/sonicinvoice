@@ -3793,10 +3793,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const storeName = storeConfig.name || 'My Store';
       const storeCity = storeConfig.city || '';
       const customInstr = storeConfig.defaultInstructions || '';
-      
+
       // Look up brand website from brand directory (alias-aware)
       const brandMatch = matchVendor(group.brand);
       const brandWebsite = brandMatch?.brand.website || '';
+
+      console.log(`[enrich] → ${group.name} | brand=${group.brand} | brandWebsite=${brandWebsite || '—'}`);
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-product`, {
         method: 'POST',
@@ -3816,16 +3818,39 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         }),
       });
 
+      console.log(`[enrich] HTTP ${response.status} for "${group.name}"`);
+
       if (!response.ok) {
         const err = await response.json().catch(() => ({ error: 'Failed' }));
-        return { enrichConfidence: 'low', enrichNote: err.error || 'Enrichment failed' };
+        console.warn(`[enrich] failed for "${group.name}":`, err.error);
+        return {
+          enrichConfidence: 'low',
+          enrichNote: err.error || 'Enrichment failed',
+          imageStatus: group.imageSrc ? 'found' : 'not_found',
+        };
       }
 
       const result = await response.json();
+      const absUrls: string[] = Array.isArray(result.imageUrls)
+        ? result.imageUrls.filter((u: unknown): u is string => typeof u === 'string' && /^https?:\/\//i.test(u))
+        : [];
+
+      // Fallback chain: cascade images → existing Shopify-matched image → none
+      const newImageSrc = absUrls[0] || group.imageSrc || undefined;
+      const finalStatus: "found" | "not_found" = newImageSrc ? 'found' : 'not_found';
+      const finalSource: "cascade" | "llm" | "shopify" | "none" =
+        absUrls.length > 0
+          ? (result.imageSource === 'llm' ? 'llm' : 'cascade')
+          : (group.imageSrc ? 'shopify' : 'none');
+
+      console.log(
+        `[enrich] DONE "${group.name}" → status=${finalStatus} source=${finalSource} url=${newImageSrc || '—'}`,
+      );
+
       return {
         desc: result.description && result.description.length > 20 ? result.description : undefined,
-        imageUrls: result.imageUrls?.length > 0 ? result.imageUrls : undefined,
-        imageSrc: result.imageUrls?.[0] || undefined,
+        imageUrls: absUrls.length > 0 ? absUrls : group.imageUrls,
+        imageSrc: newImageSrc,
         fabric: result.fabric || undefined,
         care: result.care || undefined,
         origin: result.origin || undefined,
@@ -3834,14 +3859,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         enrichNote: result.imageSource === 'cascade'
           ? `${result.note || 'Real images via ' + (result.imageStrategy || 'cascade')}`
           : (result.note || ''),
+        imageStatus: finalStatus,
+        imageSource: finalSource,
       };
     } catch (e) {
-      return { enrichConfidence: 'low', enrichNote: e instanceof Error ? e.message : 'Network error' };
+      console.error('[enrich] network error:', e);
+      return {
+        enrichConfidence: 'low',
+        enrichNote: e instanceof Error ? e.message : 'Network error',
+        imageStatus: group.imageSrc ? 'found' : 'not_found',
+      };
     }
   };
 
   const runEnrichment = async (idx: number) => {
-    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, enriching: true } : g));
+    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, enriching: true, imageStatus: 'searching' } : g));
     const result = await enrichProduct(productGroups[idx]);
     setProductGroups(prev => {
       const updated = prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g);
@@ -3857,7 +3889,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       try { localStorage.setItem('last_enriched_products', JSON.stringify(enrichedForStorage)); } catch {}
       return updated;
     });
-    addAuditEntry('Enriched', `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence`);
+    addAuditEntry('Enriched', `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence · image=${result.imageStatus || 'n/a'}`);
   };
 
   const runEnrichAll = async () => {

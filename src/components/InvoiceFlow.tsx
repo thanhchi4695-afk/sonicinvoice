@@ -3861,7 +3861,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           enrichNote: err.error || 'Enrichment failed',
           descStatus: 'failed',
           descError: err.error || `HTTP ${response.status}`,
+          descLength: 0,
           imageStatus: group.imageSrc ? 'found' : 'not_found',
+          debugAiInput: aiInput,
+          debugHttpStatus: response.status,
+          debugAiRaw: err,
+          debugStateWrite: `HTTP ${response.status} — ${err.error || 'failed'}`,
         };
       }
 
@@ -3894,7 +3899,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         : 'failed';
       const descError: string | null = descStatus === 'ready'
         ? null
-        : (result.descriptionError || (incomingDesc ? `Description too short (${incomingDesc.length} chars)` : 'AI returned empty response'));
+        : (result.descriptionError || (incomingDesc ? `Description too short (${incomingDesc.length} chars; threshold is 40)` : 'AI returned empty response'));
 
       console.log(
         `[enrich] DONE "${group.name}" → desc=${descStatus} (${incomingDesc.length} chars) | image=${finalStatus} src=${finalSource} url=${newImageSrc || '—'}${descError ? ` | descError="${descError}"` : ''}`,
@@ -3917,6 +3922,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         imageSource: finalSource,
         descStatus,
         descError,
+        descLength: incomingDesc.length,
+        debugAiInput: aiInput,
+        debugHttpStatus: response.status,
+        debugAiRaw: result,
+        debugStateWrite: `desc=${descStatus} (${incomingDesc.length} chars) image=${finalStatus} src=${finalSource}`,
       };
     } catch (e) {
       console.error('[enrich] network error:', e);
@@ -3926,7 +3936,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         enrichNote: msg,
         descStatus: 'failed',
         descError: msg,
+        descLength: 0,
         imageStatus: group.imageSrc ? 'found' : 'not_found',
+        debugAiInput: aiInput,
+        debugHttpStatus: 0,
+        debugAiRaw: null,
+        debugStateWrite: `NETWORK ERROR — ${msg}`,
       };
     }
   };

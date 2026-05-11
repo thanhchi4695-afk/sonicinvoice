@@ -41,6 +41,10 @@ interface PhaseFiveSixPanelProps {
   onProcessAnother?: () => void;
   /** When false, replaces the Push to Shopify button with a Connect prompt. `null` = still loading. */
   shopifyConnected?: boolean | null;
+  /** When true, all export/publish buttons are disabled (e.g. unreconciled Purchase Order). */
+  exportLocked?: boolean;
+  /** Tooltip/explanation shown when exportLocked is true. */
+  exportLockReason?: string;
 }
 
 function getPreferredPos(): Pos {

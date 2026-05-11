@@ -315,7 +315,7 @@ async function validateAndMaybeReExtract(
 
   try {
     const { rows: fixedRows, meta: fixedMeta } = await callClaudeInvoice(
-      [docBlock, { type: "text", text: "Re-examine and return the corrected row set." }],
+      [...batches[0], { type: "text", text: "Re-examine and return the corrected row set." }],
       correctionPrompt,
       model,
     );

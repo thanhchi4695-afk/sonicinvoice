@@ -229,6 +229,10 @@ export function useProductDescriptions() {
             status: newText.trim() ? "found" : "not_found",
             fetched_at: new Date().toISOString(),
             edited: true,
+            image_url: null,
+            image_source_url: null,
+            attempts: [],
+            image_attempts: [],
           });
         }
         // Also reflect into cache so it survives navigation

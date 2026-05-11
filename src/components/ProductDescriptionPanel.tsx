@@ -758,6 +758,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                       </TableCell>
                     </TableRow>
                   )}
+                  </>
                 );
               })}
             </TableBody>

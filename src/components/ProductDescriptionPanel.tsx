@@ -771,6 +771,24 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                           {r ? <RefreshCcw className="w-3 h-3" /> : null}
                           {r ? "Refetch" : "Fetch"}
                         </Button>
+                        {r && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-[11px]"
+                            disabled={isLoading}
+                            title="Delete cached result for this row and fetch fresh"
+                            onClick={() => {
+                              const id = item.style_number || item.style_name;
+                              // eslint-disable-next-line no-console
+                              console.log(`[cache] Cleared ${id} — refetching fresh`);
+                              clearOne(key);
+                              fetchDescription(item, { forceRefresh: true });
+                            }}
+                          >
+                            🗑️ Clear &amp; refetch
+                          </Button>
+                        )}
                         <EnrichProductButton
                           invoiceProduct={{
                             brand: item.brand,

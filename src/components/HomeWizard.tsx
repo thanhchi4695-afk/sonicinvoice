@@ -28,7 +28,7 @@ import AgentPipelineShowcase from "@/components/AgentPipelineShowcase";
 import EnrichmentAgentsShowcase from "@/components/EnrichmentAgentsShowcase";
 import ConditionBuilderShowcase from "@/components/ConditionBuilderShowcase";
 
-export type DocType = "invoice" | "packing_slip";
+export type DocType = "invoice" | "packing_slip" | "joor";
 export type PosChoice = "shopify" | "lightspeed";
 
 interface HomeWizardProps {
@@ -81,6 +81,7 @@ const HomeWizard = ({
   const proceed = () => {
     if (!docType) return;
     if (docType === "invoice") onStartInvoice();
+    else if (docType === "joor") onStartJoor?.();
     else onStartPackingSlip();
   };
 
@@ -150,8 +151,16 @@ const HomeWizard = ({
             onClick={() => setEditing("doc")}
             className="inline-flex items-center gap-1.5 rounded-md bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted"
           >
-            {docType === "invoice" ? <FileText className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
-            {docType === "invoice" ? "Invoice" : "Packing slip"}
+            {docType === "invoice"
+              ? <FileText className="h-3.5 w-3.5" />
+              : docType === "joor"
+                ? <Briefcase className="h-3.5 w-3.5" />
+                : <Package className="h-3.5 w-3.5" />}
+            {docType === "invoice"
+              ? "Invoice"
+              : docType === "joor"
+                ? "JOOR / Wholesale order"
+                : "Packing slip"}
             <Pencil className="h-3 w-3 text-muted-foreground" />
           </button>
           <button
@@ -172,7 +181,7 @@ const HomeWizard = ({
           <h2 className="text-sm font-semibold text-foreground">
             1. What are you uploading?
           </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Tile
               selected={docType === "invoice"}
               onClick={() => { setDocType("invoice"); setEditing(null); }}
@@ -186,6 +195,17 @@ const HomeWizard = ({
               icon={Package}
               label="Packing slip"
               description="Quantities only — for stock check + qty update."
+            />
+            <Tile
+              selected={docType === "joor"}
+              onClick={() => {
+                setDocType("joor");
+                setEditing(null);
+                onStartJoor?.();
+              }}
+              icon={Briefcase}
+              label="JOOR / Wholesale order"
+              description="Import a JOOR, NuOrder, or wholesale platform order."
             />
           </div>
         </section>
@@ -228,7 +248,7 @@ const HomeWizard = ({
             </div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-foreground">
-                Upload {docType === "invoice" ? "invoice" : "packing slip"}
+                Upload {docType === "invoice" ? "invoice" : docType === "joor" ? "JOOR / wholesale order" : "packing slip"}
               </p>
               <p className="text-xs text-muted-foreground">
                 PDF, Excel, CSV, or photo · drop a file in the next screen

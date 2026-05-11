@@ -1315,10 +1315,45 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     ACCEPTED_EXT.test(file.name) ||
     /^(application\/pdf|image\/|application\/vnd\.|text\/csv|application\/msword)/.test(file.type);
 
+  // JOOR / wholesale-platform filename heuristics — used to offer a redirect
+  // to the dedicated JoorFlow when the user drops a JOOR order export here.
+  const JOOR_NAME_HINTS = /\b(joor|linesheet|order\s*confirmation|order\s*sheet|wholesale\s*order|purchase\s*order|po[-_ ]?\d)/i;
+  const isLikelyJoorFile = (file: File): boolean => {
+    const name = file.name || "";
+    const ext = (name.split(".").pop() || "").toLowerCase();
+    if (ext === "xlsx" || ext === "xls") {
+      return JOOR_NAME_HINTS.test(name);
+    }
+    if (ext === "pdf") {
+      // We can't peek at PDF text here without parsing — filename hints only.
+      return /\bjoor\b/i.test(name);
+    }
+    return false;
+  };
+
   const acceptInvoiceFile = (file: File) => {
     if (!isAcceptedFile(file)) {
       toast.error("Unsupported file type", {
         description: "Please upload a PDF, Excel, CSV, Word, or image file.",
+      });
+      return;
+    }
+    if (isLikelyJoorFile(file)) {
+      toast("This looks like a JOOR order file", {
+        description: "Open it in the JOOR importer for the best result, or parse it as an invoice anyway.",
+        duration: 16000,
+        action: {
+          label: "Open in JOOR Import →",
+          onClick: () => onNavigate?.("joor"),
+        },
+        cancel: {
+          label: "Parse as invoice anyway",
+          onClick: () => {
+            setUploadedFile(file);
+            setFileName(file.name);
+            void uploadOriginalToStorage(file);
+          },
+        },
       });
       return;
     }
@@ -1709,6 +1744,13 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   }, []);
   const handlePushToShopify = async (skipIdempotency = false): Promise<boolean> => {
     if (pushingShopify) return false;
+
+    if (poWarning) {
+      toast.error("Locked — Purchase Order, costs pending", {
+        description: "Upload the matching commercial invoice first to unlock Shopify push.",
+      });
+      return false;
+    }
 
     const accepted = (validatedProducts || []).filter((p) => !p._rejected);
     if (accepted.length === 0) {
@@ -2633,6 +2675,32 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         }
       }
 
+      // ── Purchase Order (e.g. JOOR Summi Summi) — surface warning + lock export ──
+      if (data.po_warning || aiDocType === "purchase_order" || data.cost_pending === true) {
+        const platform =
+          (data.source_platform as string | undefined) ||
+          (data.meta?.sourcePlatform as string | undefined) ||
+          "wholesale platform";
+        const poNo =
+          (data.po_number as string | undefined) ||
+          (data.meta?.invoiceNumber as string | undefined) ||
+          null;
+        const warning =
+          (data.po_warning as string | undefined) ||
+          `Purchase Order detected from ${platform}. Wholesale costs are not confirmed yet — Shopify export is locked until you upload the matching commercial invoice.`;
+        setPoWarning(warning);
+        setPoSourcePlatform(platform);
+        setPoNumber(poNo);
+        toast.warning("Purchase Order detected — export locked", {
+          description: "Costs are pending. You can review and save to catalog. Upload the matching commercial invoice to unlock Shopify export.",
+          duration: 14000,
+        });
+      } else {
+        setPoWarning(null);
+        setPoSourcePlatform(null);
+        setPoNumber(null);
+      }
+
       // OCR fallback notifications
       if (data.ocr_fallback_used) {
         toast.info("OCR fallback was used for better extraction accuracy", {
@@ -3400,6 +3468,11 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [detectedDocType, setDetectedDocType] = useState<
     "tax_invoice" | "packing_slip" | "handwritten_invoice" | "statement" | "unknown" | null
   >(null);
+  // Purchase Order (e.g. JOOR) state — set when parse-invoice returns po_warning.
+  // While set, Shopify push/export are locked until a matching commercial invoice arrives.
+  const [poWarning, setPoWarning] = useState<string | null>(null);
+  const [poSourcePlatform, setPoSourcePlatform] = useState<string | null>(null);
+  const [poNumber, setPoNumber] = useState<string | null>(null);
   const [packingSlipPromptShown, setPackingSlipPromptShown] = useState(false);
   const [imageHelperActive, setImageHelperActive] = useState(false);
   const [collectionSeoActive, setCollectionSeoActive] = useState(false);
@@ -5378,6 +5451,51 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
             <div className="bg-success/10 border border-success/20 rounded-lg p-2 mb-3 flex items-center gap-2">
               <Check className="w-3.5 h-3.5 text-success" />
               <span className="text-xs text-success font-medium">Template saved — future {supplierName} invoices will parse faster</span>
+            </div>
+          )}
+
+          {/* ── Purchase Order banner (JOOR / wholesale platforms) ── */}
+          {poWarning && validatedProducts.length > 0 && (
+            <div className="mb-4 rounded-lg border-2 border-amber-500/50 bg-amber-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl leading-none">⚠️</span>
+                <div className="flex-1 space-y-1">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                    Purchase Order detected — not a final invoice
+                  </p>
+                  <p className="text-xs text-amber-900/90 dark:text-amber-100/90">
+                    This document is a Purchase Order from{" "}
+                    <span className="font-semibold">{poSourcePlatform || "a wholesale platform"}</span>
+                    {poNumber ? <> (PO <span className="font-mono">{poNumber}</span>)</> : null}.
+                    Wholesale costs are not confirmed yet. You can review the order lines and save to catalog,
+                    but Shopify export is locked until you upload the matching commercial invoice.
+                  </p>
+                  <div className="pt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        try {
+                          if (supplierName) sessionStorage.setItem("pending_po_supplier", supplierName);
+                          if (poNumber) sessionStorage.setItem("pending_po_number", poNumber);
+                        } catch { /* ignore */ }
+                        setUploadedFile(null);
+                        setFileName("");
+                        setValidatedProducts([]);
+                        setProductGroups([]);
+                        setPoWarning(null);
+                        setStep(1);
+                        toast("Upload the matching commercial invoice", {
+                          description: `Supplier: ${supplierName || "—"}${poNumber ? ` · PO ${poNumber}` : ""}`,
+                        });
+                      }}
+                    >
+                      Upload matching invoice →
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

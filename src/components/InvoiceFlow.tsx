@@ -3809,17 +3809,22 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
 
       // Validate context BEFORE the network call so we can show a precise reason.
       const missing: string[] = [];
-      if (!group.name || !group.name.trim()) missing.push('product name');
-      if (!group.brand || !group.brand.trim()) missing.push('brand');
+      if (!group.name || !group.name.trim()) missing.push('title');
+      if (!group.brand || !group.brand.trim()) missing.push('vendor');
       if (missing.length > 0) {
-        const msg = `Missing ${missing.join(', ')}`;
+        const msg = `Missing required field(s): ${missing.join(', ')}`;
         console.warn(`[enrich] ABORT "${group.name || '(no name)'}" — ${msg}`);
         return {
           enrichConfidence: 'low',
           enrichNote: msg,
           descStatus: 'failed',
           descError: msg,
+          descLength: 0,
           imageStatus: group.imageSrc ? 'found' : 'not_found',
+          debugAiInput: { aborted: true, reason: msg, title: group.name || '', vendor: group.brand || '' },
+          debugHttpStatus: 0,
+          debugAiRaw: null,
+          debugStateWrite: `ABORTED — ${msg}`,
         };
       }
 

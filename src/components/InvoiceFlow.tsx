@@ -3953,9 +3953,28 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     setProductGroups(prev => {
       const updated = prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g);
       const written = updated[idx];
-      console.log(
-        `[enrich] STATE WRITE "${written.name}" → desc=${written.descStatus || 'n/a'} (${(written.desc || '').length} chars) imageSrc=${written.imageSrc || '—'}`,
-      );
+      const stateWriteLog = `[enrich] STATE WRITE "${written.name}" → desc=${written.descStatus || 'n/a'} (${(written.desc || '').length} chars) imageSrc=${written.imageSrc || '—'}`;
+      console.log(stateWriteLog);
+
+      // Build the same Body (HTML) the CSV exporter will use, and log a sample row
+      // so the user can verify the description actually flows into the export.
+      if (written.descStatus === 'ready' && written.desc) {
+        const bodyParts: string[] = [`<p>${written.desc}</p>`];
+        if (written.fabric) bodyParts.push(`<p><strong>Fabric:</strong> ${written.fabric}</p>`);
+        if (written.care) bodyParts.push(`<p><strong>Care:</strong> ${written.care}</p>`);
+        if (written.origin) bodyParts.push(`<p><strong>Origin:</strong> ${written.origin}</p>`);
+        const bodyHtml = bodyParts.join('');
+        const exportRow = {
+          Handle: (written.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+          Title: written.name,
+          'Body (HTML)': bodyHtml,
+          Vendor: written.brand,
+          Type: written.type,
+          'Image Src': written.imageSrc || '',
+        };
+        console.log(`[enrich] EXPORT ROW (Shopify CSV preview) "${written.name}":`, exportRow);
+      }
+
       // Persist enriched products for Image Download Helper
       const enrichedForStorage = updated.filter(g => g.enriched && (g.imageSrc || (g.imageUrls && g.imageUrls.length > 0)))
         .map(g => ({
@@ -3966,6 +3985,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           imageUrls: g.imageUrls || [],
         }));
       try { localStorage.setItem('last_enriched_products', JSON.stringify(enrichedForStorage)); } catch {}
+      // Stash the state-write log onto the product so Debug Mode UI can read it
+      updated[idx] = { ...updated[idx], debugStateWrite: stateWriteLog };
       return updated;
     });
     addAuditEntry(

@@ -60,6 +60,16 @@ interface ResponsePayload {
   attempts: Attempt[];
   image_attempts: Attempt[];
   ai_raw_preview?: string;
+  image_stats: {
+    processed: number;
+    resized: number;
+    skipped: number;
+    last_error?: string;
+    original_width?: number;
+    original_height?: number;
+    final_width?: number;
+    final_height?: number;
+  };
 }
 
 // ─── Helpers ────────────────────────────────────────────────

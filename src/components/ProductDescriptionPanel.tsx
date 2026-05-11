@@ -109,24 +109,68 @@ function downloadCSV(rows: string[][], filename: string) {
 
 // ── Confidence / source badges ────────────────────────────
 function SourceBadge({ result }: { result: DescriptionResult }) {
-  if (result.confidence === "high") {
+  if (result.source_type === "ai_generated") {
+    return (
+      <Badge className="text-[10px] bg-accent text-accent-foreground hover:bg-accent/80">
+        AI generated
+      </Badge>
+    );
+  }
+  if (result.source_type === "supplier") {
     return (
       <Badge className="text-[10px] bg-success text-success-foreground hover:bg-success/80">
         Supplier site
       </Badge>
     );
   }
-  if (result.confidence === "medium") {
-    return (
-      <Badge className="text-[10px] bg-primary text-primary-foreground hover:bg-primary/80">
-        Retailer site
-      </Badge>
-    );
-  }
   return (
-    <Badge className="text-[10px] bg-warning text-warning-foreground hover:bg-warning/80">
-      Secondary source
+    <Badge className="text-[10px] bg-primary text-primary-foreground hover:bg-primary/80">
+      Retailer site
     </Badge>
+  );
+}
+
+// ── Reason explainers ─────────────────────────────────────
+function reasonLabel(r: Attempt["reason"]): string {
+  switch (r) {
+    case "ok": return "ok";
+    case "empty_response": return "empty response";
+    case "blocked": return "blocked";
+    case "selector_not_matched": return "selector not matched";
+    case "too_short": return "too short";
+    case "no_search_results": return "no search results";
+    case "fetch_error": return "fetch error";
+    case "skipped": return "skipped";
+  }
+}
+
+function FailureTooltip({ attempts, label }: { attempts: Attempt[]; label: React.ReactNode }) {
+  const last = attempts[attempts.length - 1];
+  if (!last) return <>{label}</>;
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-help underline decoration-dotted">{label}</span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[340px] text-[10px] leading-snug">
+          <div>
+            <span className="font-semibold">Tried:</span> {last.url}
+          </div>
+          <div>
+            <span className="font-semibold">Status:</span> {last.status || "—"}
+          </div>
+          <div>
+            <span className="font-semibold">Reason:</span> {reasonLabel(last.reason)}
+          </div>
+          {attempts.length > 1 && (
+            <div className="mt-1 pt-1 border-t border-border/40 opacity-80">
+              {attempts.length} attempts total
+            </div>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

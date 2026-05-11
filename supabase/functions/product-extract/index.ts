@@ -479,23 +479,62 @@ async function extractWithLLM(html: string, sourceUrl: string): Promise<Extracte
 // ────────────────────────────────────────────────────────────────
 // Orchestrator + HTTP handler
 // ────────────────────────────────────────────────────────────────
+// Realistic browser UAs — many sites (Speedo, Cloudflare-fronted shops) block
+// non-browser/bot user agents with 403/429. Rotate through a small pool.
+const BROWSER_UAS = [
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+];
+
+function browserHeaders(url: string, uaIndex = 0): HeadersInit {
+  const u = new URL(url);
+  return {
+    "User-Agent": BROWSER_UAS[uaIndex % BROWSER_UAS.length],
+    "Accept":
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-AU,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+    "Referer": `${u.origin}/`,
+  };
+}
+
 async function fetchHtml(url: string): Promise<string> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  try {
-    const r = await fetch(url, {
-      signal: ctrl.signal,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; SonicInvoiceBot/1.0; +https://sonicinvoices.com)",
-        Accept: "text/html,application/xhtml+xml",
-      },
-    });
-    if (!r.ok) throw new Error(`Source returned ${r.status}`);
-    return await r.text();
-  } finally {
-    clearTimeout(timer);
+  let lastStatus = 0;
+  let lastErr: string | null = null;
+  for (let attempt = 0; attempt < BROWSER_UAS.length; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    try {
+      const r = await fetch(url, {
+        signal: ctrl.signal,
+        redirect: "follow",
+        headers: browserHeaders(url, attempt),
+      });
+      lastStatus = r.status;
+      if (r.ok) return await r.text();
+      // Retry on bot-block status codes with a different UA
+      if (r.status === 403 || r.status === 429 || r.status === 503) {
+        lastErr = `Source returned ${r.status}`;
+        await new Promise((res) => setTimeout(res, 400 + attempt * 300));
+        continue;
+      }
+      throw new Error(`Source returned ${r.status}`);
+    } catch (e) {
+      lastErr = (e as Error).message;
+      if (attempt === BROWSER_UAS.length - 1) break;
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  throw new Error(lastErr || `Source returned ${lastStatus || "error"}`);
 }
 
 function isHttpUrl(value: unknown): value is string {

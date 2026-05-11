@@ -7258,6 +7258,27 @@ const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { 
                   <span className="text-muted-foreground">DONE →</span>{' '}
                   <code>desc={product.descStatus || 'n/a'} ({product.descLength ?? 0} chars){product.descError ? ` · ${product.descError}` : ''}</code>
                 </div>
+                {/* Image fetch trace — independent of description trace */}
+                {product.imageDebug && (
+                  <div className="mt-1 pt-1 border-t border-border/40 space-y-1">
+                    <div>
+                      <span className="text-muted-foreground">[image] SEARCHING URL →</span>{' '}
+                      <code className="break-all">brand={product.imageDebug.brandWebsite || '—'} · page={product.imageDebug.pageUrl || '—'}</code>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">HTTP status →</span>{' '}
+                      <code>find-product-url={product.imageDebug.findUrlStatus ?? 'n/a'} · product-extract={product.imageDebug.extractStatus ?? 'n/a'}</code>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">{product.imageStatus === 'found' ? 'IMAGE FOUND →' : 'NOT FOUND →'}</span>{' '}
+                      <code className="break-all">{product.imageDebug.firstUrl || product.imageSrc || '—'}</code>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">STATE WRITE →</span>{' '}
+                      <code className="break-all">{product.imageDebug.stateWrite || '—'}</code>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

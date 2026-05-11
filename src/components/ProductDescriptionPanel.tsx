@@ -585,6 +585,11 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                           <ImageOff className="w-4 h-4 text-muted-foreground" />
                           <FailureTooltip
                             attempts={r.image_attempts || []}
+                            overrideMessage={
+                              (r.image_stats?.skipped ?? 0) > 0
+                                ? "Image too large to process — resize failed"
+                                : undefined
+                            }
                             label={
                               <Badge
                                 variant="outline"

@@ -9,6 +9,7 @@ export interface PriceMatchLineItem {
   rrp_incl_gst: number;
   barcode?: string;
   product_type?: string;
+  colour?: string;
 }
 
 // Loose shape of an InvoiceFlow productGroup — kept permissive on purpose so
@@ -22,7 +23,8 @@ interface InvoiceProductGroup {
   barcode?: string;
   product_type?: string;
   type?: string;
-  variants?: Array<{ sku?: string }>;
+  colour?: string;
+  variants?: Array<{ sku?: string; colour?: string }>;
 }
 
 /**

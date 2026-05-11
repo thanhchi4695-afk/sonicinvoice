@@ -30,6 +30,12 @@ async function fetchRealImagesViaCascade(opts: {
       description: string | null;
       source: "cascade";
       strategy: string | null;
+      debug: {
+        brandWebsite: string;
+        findUrlStatus: number;
+        pageUrl: string | null;
+        extractStatus: number;
+      };
     }
   | null
 > {

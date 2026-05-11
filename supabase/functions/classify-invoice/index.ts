@@ -114,6 +114,10 @@ Deno.serve(async (req) => {
     // Normalise / defaults
     classification.supplier_name = (classification.supplier_name as string) || null;
     classification.document_type = (classification.document_type as string) || "unknown";
+    classification.source_platform = (classification.source_platform as string) || "unknown";
+    classification.cost_pending = classification.document_type === "purchase_order"
+      ? true
+      : !!classification.cost_pending;
     classification.currency = (classification.currency as string) || "AUD";
     classification.gst_treatment = (classification.gst_treatment as string) || "unknown";
     classification.layout_pattern = (classification.layout_pattern as string) || "A_flat_rows";

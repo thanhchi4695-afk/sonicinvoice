@@ -1315,10 +1315,45 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     ACCEPTED_EXT.test(file.name) ||
     /^(application\/pdf|image\/|application\/vnd\.|text\/csv|application\/msword)/.test(file.type);
 
+  // JOOR / wholesale-platform filename heuristics — used to offer a redirect
+  // to the dedicated JoorFlow when the user drops a JOOR order export here.
+  const JOOR_NAME_HINTS = /\b(joor|linesheet|order\s*confirmation|order\s*sheet|wholesale\s*order|purchase\s*order|po[-_ ]?\d)/i;
+  const isLikelyJoorFile = (file: File): boolean => {
+    const name = file.name || "";
+    const ext = (name.split(".").pop() || "").toLowerCase();
+    if (ext === "xlsx" || ext === "xls") {
+      return JOOR_NAME_HINTS.test(name);
+    }
+    if (ext === "pdf") {
+      // We can't peek at PDF text here without parsing — filename hints only.
+      return /\bjoor\b/i.test(name);
+    }
+    return false;
+  };
+
   const acceptInvoiceFile = (file: File) => {
     if (!isAcceptedFile(file)) {
       toast.error("Unsupported file type", {
         description: "Please upload a PDF, Excel, CSV, Word, or image file.",
+      });
+      return;
+    }
+    if (isLikelyJoorFile(file)) {
+      toast("This looks like a JOOR order file", {
+        description: "Open it in the JOOR importer for the best result, or parse it as an invoice anyway.",
+        duration: 16000,
+        action: {
+          label: "Open in JOOR Import →",
+          onClick: () => onNavigate?.("joor"),
+        },
+        cancel: {
+          label: "Parse as invoice anyway",
+          onClick: () => {
+            setUploadedFile(file);
+            setFileName(file.name);
+            void uploadOriginalToStorage(file);
+          },
+        },
       });
       return;
     }

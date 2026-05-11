@@ -151,20 +151,32 @@ async function scanInbox(
     accessToken = await refreshAccessToken(admin, conn);
   }
 
-  // 2. List recent invoice-like emails
-  const listUrl = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
-  listUrl.searchParams.set("q", GMAIL_QUERY);
-  listUrl.searchParams.set("maxResults", "20");
-
-  const listResp = await fetch(listUrl.toString(), {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!listResp.ok) {
-    const t = await listResp.text();
-    throw new Error(`Gmail list failed: ${listResp.status} ${t.slice(0, 200)}`);
+  // 2. List recent invoice-like emails (paginate up to MAX_MESSAGES_PER_SCAN)
+  const messageIds: string[] = [];
+  let pageToken: string | undefined;
+  while (messageIds.length < MAX_MESSAGES_PER_SCAN) {
+    const listUrl = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
+    listUrl.searchParams.set("q", GMAIL_QUERY);
+    listUrl.searchParams.set("maxResults", "100");
+    if (pageToken) listUrl.searchParams.set("pageToken", pageToken);
+    const listResp = await fetch(listUrl.toString(), {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!listResp.ok) {
+      const t = await listResp.text();
+      throw new Error(`Gmail list failed: ${listResp.status} ${t.slice(0, 200)}`);
+    }
+    const listJson = await listResp.json() as {
+      messages?: Array<{ id: string }>;
+      nextPageToken?: string;
+    };
+    for (const m of listJson.messages ?? []) {
+      if (messageIds.length >= MAX_MESSAGES_PER_SCAN) break;
+      messageIds.push(m.id);
+    }
+    if (!listJson.nextPageToken) break;
+    pageToken = listJson.nextPageToken;
   }
-  const listJson = await listResp.json() as { messages?: Array<{ id: string }> };
-  const messageIds = (listJson.messages ?? []).map((m) => m.id);
 
   // 3. Load supplier email_domains for matching
   const { data: supplierRows } = await admin

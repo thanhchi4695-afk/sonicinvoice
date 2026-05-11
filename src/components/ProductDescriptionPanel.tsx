@@ -501,6 +501,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                   desc.length > 120 ? `${desc.slice(0, 120)}…` : desc;
 
                 return (
+                  <>
                   <TableRow key={key} className="align-top">
                     <TableCell className="max-w-[220px]">
                       <p className="text-xs font-medium">{item.style_name || "—"}</p>

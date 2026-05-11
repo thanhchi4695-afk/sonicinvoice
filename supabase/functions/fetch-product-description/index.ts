@@ -399,6 +399,7 @@ Deno.serve(async (req) => {
     // BOUND352E → bound234e-nina-crop on bond-eye.com.au. If no exact match,
     // fall through to the next site/AI fallback rather than serving a wrong page.
     if (styleNumLower && !search.url.toLowerCase().includes(styleNumLower)) {
+      console.log(`[match] REJECTED: ${search.url} does not contain ${styleNum}`);
       attempts.push({
         url: search.url,
         status: 0,
@@ -490,16 +491,17 @@ Deno.serve(async (req) => {
       confidence: site.type === "supplier" ? "high" : "medium",
       image_url: safeImg,
       image_source_url: search.url,
-      attempts,
+      attempts: withAiRawPreview(attempts, SCRAPED_AI_PREVIEW),
       image_attempts: imageAttempts,
       image_stats: imageStats,
+      ai_raw_preview: SCRAPED_AI_PREVIEW,
     };
     break;
   }
 
   // 4) Final AI fallback — must always produce something usable
   if (!result) {
-    const aiDesc = await aiGenerateDescription(body);
+    const { description: aiDesc, preview: aiPreview } = await aiGenerateDescription(body);
     const emptyStats = { processed: 0, resized: 0, skipped: 0 };
     if (aiDesc) {
       result = {
@@ -513,10 +515,10 @@ Deno.serve(async (req) => {
         confidence: "low",
         image_url: null,
         image_source_url: null,
-        attempts,
+        attempts: withAiRawPreview(attempts, aiPreview),
         image_attempts: imageAttempts,
         image_stats: emptyStats,
-        ai_raw_preview: aiDesc.slice(0, 200),
+        ai_raw_preview: aiPreview,
       };
     } else {
       result = {
@@ -530,9 +532,10 @@ Deno.serve(async (req) => {
         confidence: "low",
         image_url: null,
         image_source_url: null,
-        attempts,
+        attempts: withAiRawPreview(attempts, aiPreview),
         image_attempts: imageAttempts,
         image_stats: emptyStats,
+        ai_raw_preview: aiPreview,
       };
     }
   }

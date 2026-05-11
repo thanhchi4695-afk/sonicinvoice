@@ -42,5 +42,6 @@ export function mapInvoiceItemsToPriceMatch(
     rrp_incl_gst: g.rrp || 0,
     barcode: g.barcode || undefined,
     product_type: g.product_type || g.type || undefined,
+    colour: g.colour || g.variants?.[0]?.colour || undefined,
   }));
 }

@@ -95,6 +95,10 @@ export function useProductDescriptions() {
           fetched_at: new Date().toISOString(),
           edited: false,
           error_message: "Missing style name or brand",
+          image_url: null,
+          image_source_url: null,
+          attempts: [],
+          image_attempts: [],
         };
         setRes(key, result);
         return result;

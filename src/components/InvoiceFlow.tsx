@@ -3355,9 +3355,16 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     imageSource?: "cascade" | "llm" | "shopify" | "none";
     descStatus?: "ready" | "generating" | "failed";
     descError?: string | null;
+    descLength?: number;
+    // Debug-mode trace captured during last enrichment run
+    debugAiInput?: unknown;
+    debugHttpStatus?: number;
+    debugAiRaw?: unknown;
+    debugStateWrite?: string;
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
+  const [debugMode, setDebugMode] = useState(false);
   const [enrichAllRunning, setEnrichAllRunning] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
   const [brandDirVersion, setBrandDirVersion] = useState(0);

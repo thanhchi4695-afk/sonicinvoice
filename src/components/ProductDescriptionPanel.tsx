@@ -238,6 +238,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Set<string>>(new Set());
   const [debugMode, setDebugMode] = useState(false);
+  const [image_stats] = useState({ processed: 0, resized: 0, skipped: 0 });
 
   const toggleExpand = (k: string) =>
     setExpanded((p) => {
@@ -480,7 +481,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
             🔬 Debug Mode {debugMode ? "ON" : "OFF"}
           </Button>
           {(() => {
-            let processed = 0, resized = 0, skipped = 0;
+            let { processed, resized, skipped } = image_stats;
             for (const r of results.values()) {
               const s = r.image_stats;
               if (!s) continue;
@@ -811,20 +812,28 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                         <div className="space-y-1 p-2">
                           <div className="font-semibold text-foreground">🔬 Debug trace</div>
                           {(r.attempts || []).map((a, i) => (
-                            <div key={i} className="pl-2">
-                              <span className="text-muted-foreground">{i + 1}.</span>{" "}
-                              <span className="text-primary">{a.url}</span>
-                              {" → "}
-                              <span className={a.found ? "text-success" : "text-destructive"}>
-                                HTTP {a.status || "n/a"}
-                              </span>
-                              {" — "}
-                              <span>{reasonLabel(a.reason)}</span>
-                              {a.selector ? <span className="text-muted-foreground"> [selector: {a.selector}]</span> : null}
-                              {" — "}
-                              <span>
-                                {a.found ? "description found in HTML" : "no description"}
-                              </span>
+                            <div key={i} className="pl-2 space-y-0.5">
+                              <div>
+                                <span className="text-muted-foreground">{i + 1}.</span>{" "}
+                                <span className="text-primary">{a.url}</span>
+                                {" → "}
+                                <span className={a.found ? "text-success" : "text-destructive"}>
+                                  HTTP {a.status || "n/a"}
+                                </span>
+                                {" — "}
+                                <span>{reasonLabel(a.reason)}</span>
+                                {a.selector ? <span className="text-muted-foreground"> [selector: {a.selector}]</span> : null}
+                                {" — "}
+                                <span>
+                                  {a.found ? "description found in HTML" : "no description"}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">AI input preview:</span>{" "}
+                                <code className="text-foreground bg-background/60 px-1 py-0.5 rounded">
+                                  {a.aiRawPreview || "n/a — description scraped directly"}
+                                </code>
+                              </div>
                             </div>
                           ))}
                           <div className="pt-1">

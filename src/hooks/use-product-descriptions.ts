@@ -16,6 +16,7 @@ export type Attempt = {
     | "skipped";
   found: boolean;
   selector?: string;
+  aiRawPreview?: string;
 };
 
 export type DescriptionResult = {
@@ -36,11 +37,21 @@ export type DescriptionResult = {
   attempts: Attempt[];
   image_attempts: Attempt[];
   ai_raw_preview?: string;
-  image_stats?: { processed: number; resized: number; skipped: number };
+  image_stats?: {
+    processed: number;
+    resized: number;
+    skipped: number;
+    last_error?: string;
+    original_width?: number;
+    original_height?: number;
+    final_width?: number;
+    final_height?: number;
+  };
 };
 
 // 24h session cache keyed by style_number (or brand|style_name fallback)
 const sessionCache = new Map<string, DescriptionResult>();
+sessionCache.delete("bound352e");
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function cacheKey(item: Pick<PriceMatchLineItem, "style_number" | "brand" | "style_name">) {
@@ -155,30 +166,30 @@ export function useProductDescriptions() {
           console.log("[enrich] AI INPUT", { brand: item.brand, name: item.style_name, sku: item.style_number });
           // eslint-disable-next-line no-console
           console.log("[enrich] AI RAW RESPONSE", payload);
-          // eslint-disable-next-line no-console
-          console.log("[enrich] STATE WRITE", result);
           // Human-readable image dimension log (BUG 2 fix) — fires BEFORE STATE WRITE-style object dumps
           {
             const s = result.image_stats;
-            if (s && (s.processed || s.resized || s.skipped)) {
-              const ow = (s as { original_width?: number }).original_width;
-              const oh = (s as { original_height?: number }).original_height;
-              const fw = (s as { final_width?: number }).final_width;
-              const fh = (s as { final_height?: number }).final_height;
-              if (s.resized && ow && oh && fw && fh) {
+            if (s) {
+              const ow = s.original_width;
+              const oh = s.original_height;
+              const fw = s.final_width;
+              const fh = s.final_height;
+              if (s.resized > 0 && ow && oh && fw && fh) {
                 // eslint-disable-next-line no-console
                 console.log(`[image] Original size: ${ow}x${oh}px`);
                 // eslint-disable-next-line no-console
                 console.log(`[image] Resized to: ${fw}x${fh}px`);
-              } else if (s.processed && ow && oh) {
+              } else if (s.processed > 0 && ow && oh) {
                 // eslint-disable-next-line no-console
                 console.log(`[image] Within limits: ${ow}x${oh}px — no resize`);
-              } else if (s.skipped) {
+              } else if (s.skipped > 0) {
                 // eslint-disable-next-line no-console
                 console.log(`[image] Skipped — resize/fetch failed`);
               }
             }
           }
+          // eslint-disable-next-line no-console
+          console.log("[enrich] STATE WRITE", result);
           // eslint-disable-next-line no-console
           console.log("[image] STATE WRITE", { image_url: result.image_url, attempts: result.image_attempts });
           // eslint-disable-next-line no-console

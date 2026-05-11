@@ -44,6 +44,7 @@ interface Attempt {
   reason: Reason;
   found: boolean;
   selector?: string;
+  aiRawPreview?: string;
 }
 
 interface ResponsePayload {
@@ -70,6 +71,15 @@ interface ResponsePayload {
     final_width?: number;
     final_height?: number;
   };
+}
+
+const SCRAPED_AI_PREVIEW = "n/a — description scraped directly";
+
+function withAiRawPreview(attempts: Attempt[], preview: string): Attempt[] {
+  return attempts.map((attempt) => ({
+    ...attempt,
+    aiRawPreview: attempt.aiRawPreview || preview,
+  }));
 }
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -306,7 +316,7 @@ function makeAbsolute(url: string | null, base: string): string | null {
 }
 
 // ─── AI fallback description generator ──────────────────────
-async function aiGenerateDescription(body: RequestBody): Promise<string | null> {
+async function aiGenerateDescription(body: RequestBody): Promise<{ description: string | null; preview: string }> {
   const sys = `You are a retail copywriter for an Australian boutique fashion store.
 Write a 50-90 word product description in Australian English. Two short paragraphs max.
 No emojis, no hype words, no price/shipping/sale mentions. Plain text only — no markdown, no quotes.
@@ -316,6 +326,7 @@ Brand: ${body.brand}
 Product type: ${body.product_type || "(unknown)"}
 Colour: ${body.colour || "(unknown)"}
 Style number: ${body.style_number || "(none)"}`;
+  const preview = user.slice(0, 200);
   try {
     const r = await callAI({
       model: "google/gemini-2.5-flash",
@@ -327,10 +338,10 @@ Style number: ${body.style_number || "(none)"}`;
       max_tokens: 400,
     });
     const txt = (getContent(r) || "").trim();
-    return txt || null;
+    return { description: txt || null, preview };
   } catch (e) {
     console.error("[fetch-desc] aiGenerateDescription failed", e);
-    return null;
+    return { description: null, preview };
   }
 }
 
@@ -372,8 +383,7 @@ Deno.serve(async (req) => {
 
   let result: ResponsePayload | null = null;
 
-  const styleNum = (body.style_number || "").trim();
-  const styleNumLower = styleNum.toLowerCase();
+  const styleNumber = (body.style_number || "").trim();
 
   for (const site of sites) {
     // 1) Find a product URL on this site via Brave Search
@@ -387,13 +397,15 @@ Deno.serve(async (req) => {
     // appear verbatim in the resolved URL. Prevents fuzzy collisions like
     // BOUND352E → bound234e-nina-crop on bond-eye.com.au. If no exact match,
     // fall through to the next site/AI fallback rather than serving a wrong page.
-    if (styleNumLower && !search.url.toLowerCase().includes(styleNumLower)) {
+    const resolvedUrl = search.url;
+    if (styleNumber && !resolvedUrl.toLowerCase().includes(styleNumber.toLowerCase())) {
+      console.log(`[match] REJECTED: ${resolvedUrl} does not contain ${styleNumber}`);
       attempts.push({
-        url: search.url,
+        url: resolvedUrl,
         status: 0,
         reason: "no_search_results",
         found: false,
-        selector: `style_number_mismatch:${styleNum}`,
+        selector: `style_number_mismatch:${styleNumber}`,
       });
       continue;
     }
@@ -479,16 +491,17 @@ Deno.serve(async (req) => {
       confidence: site.type === "supplier" ? "high" : "medium",
       image_url: safeImg,
       image_source_url: search.url,
-      attempts,
+      attempts: withAiRawPreview(attempts, SCRAPED_AI_PREVIEW),
       image_attempts: imageAttempts,
       image_stats: imageStats,
+      ai_raw_preview: SCRAPED_AI_PREVIEW,
     };
     break;
   }
 
   // 4) Final AI fallback — must always produce something usable
   if (!result) {
-    const aiDesc = await aiGenerateDescription(body);
+    const { description: aiDesc, preview: aiPreview } = await aiGenerateDescription(body);
     const emptyStats = { processed: 0, resized: 0, skipped: 0 };
     if (aiDesc) {
       result = {
@@ -502,10 +515,10 @@ Deno.serve(async (req) => {
         confidence: "low",
         image_url: null,
         image_source_url: null,
-        attempts,
+        attempts: withAiRawPreview(attempts, aiPreview),
         image_attempts: imageAttempts,
         image_stats: emptyStats,
-        ai_raw_preview: aiDesc.slice(0, 200),
+        ai_raw_preview: aiPreview,
       };
     } else {
       result = {
@@ -519,9 +532,10 @@ Deno.serve(async (req) => {
         confidence: "low",
         image_url: null,
         image_source_url: null,
-        attempts,
+        attempts: withAiRawPreview(attempts, aiPreview),
         image_attempts: imageAttempts,
         image_stats: emptyStats,
+        ai_raw_preview: aiPreview,
       };
     }
   }

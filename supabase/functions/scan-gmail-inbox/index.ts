@@ -22,7 +22,8 @@ const corsHeaders = {
 };
 
 const GMAIL_QUERY =
-  'has:attachment (invoice OR "tax invoice" OR "purchase order" OR "packing slip" OR receipt OR statement OR bill) newer_than:30d';
+  'has:attachment (invoice OR "tax invoice" OR "purchase order" OR "packing slip" OR receipt OR statement OR bill) newer_than:180d';
+const MAX_MESSAGES_PER_SCAN = 250;
 
 const INVOICE_MIME_TYPES = new Set([
   "application/pdf",

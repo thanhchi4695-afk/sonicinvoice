@@ -41,7 +41,15 @@ interface ParsedRow {
 }
 
 interface InvoiceMeta {
-  documentType?: "tax_invoice" | "packing_list" | "credit_note" | "quote" | "unknown";
+  documentType?:
+    | "tax_invoice"
+    | "packing_list"
+    | "credit_note"
+    | "quote"
+    | "purchase_order"
+    | "unknown";
+  sourcePlatform?: "joor" | "cin7" | "shopify" | "xero" | "myob" | "quickbooks" | "manual" | "unknown" | null;
+  costPending?: boolean;
   supplier?: string | null;
   invoiceNumber?: string | null;
   invoiceDate?: string | null;

@@ -2,19 +2,40 @@ import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { PriceMatchLineItem } from "@/lib/price-match-utils";
 
+export type Attempt = {
+  url: string;
+  status: number;
+  reason:
+    | "ok"
+    | "empty_response"
+    | "blocked"
+    | "selector_not_matched"
+    | "too_short"
+    | "no_search_results"
+    | "fetch_error"
+    | "skipped";
+  found: boolean;
+  selector?: string;
+};
+
 export type DescriptionResult = {
   description: string | null;
   full_product_name: string | null;
   source_url: string;
   source_name: string;
-  source_type: "supplier" | "retailer";
+  source_type: "supplier" | "retailer" | "ai_generated";
   word_count: number;
   raw_word_count: number;
   confidence: "high" | "medium" | "low";
   status: "found" | "not_found" | "error";
-  fetched_at: string; // ISO timestamp
+  fetched_at: string;
   edited: boolean;
   error_message?: string;
+  image_url: string | null;
+  image_source_url: string | null;
+  attempts: Attempt[];
+  image_attempts: Attempt[];
+  ai_raw_preview?: string;
 };
 
 // 24h session cache keyed by style_number (or brand|style_name fallback)
@@ -74,6 +95,10 @@ export function useProductDescriptions() {
           fetched_at: new Date().toISOString(),
           edited: false,
           error_message: "Missing style name or brand",
+          image_url: null,
+          image_source_url: null,
+          attempts: [],
+          image_attempts: [],
         };
         setRes(key, result);
         return result;
@@ -108,14 +133,33 @@ export function useProductDescriptions() {
           full_product_name: payload?.full_product_name?.trim() || null,
           source_url: payload?.source_url || "",
           source_name: payload?.source_name || "",
-          source_type: (payload?.source_type as "supplier" | "retailer") || "retailer",
+          source_type:
+            (payload?.source_type as "supplier" | "retailer" | "ai_generated") || "retailer",
           word_count: payload?.word_count || 0,
           raw_word_count: payload?.raw_word_count || 0,
           confidence: (payload?.confidence as "high" | "medium" | "low") || "low",
           status: description ? "found" : "not_found",
           fetched_at: new Date().toISOString(),
           edited: false,
+          image_url: payload?.image_url ?? null,
+          image_source_url: payload?.image_source_url ?? null,
+          attempts: payload?.attempts ?? [],
+          image_attempts: payload?.image_attempts ?? [],
+          ai_raw_preview: payload?.ai_raw_preview,
         };
+        // Console diagnostics
+        try {
+          // eslint-disable-next-line no-console
+          console.log("[enrich] AI INPUT", { brand: item.brand, name: item.style_name, sku: item.style_number });
+          // eslint-disable-next-line no-console
+          console.log("[enrich] AI RAW RESPONSE", payload);
+          // eslint-disable-next-line no-console
+          console.log("[enrich] STATE WRITE", result);
+          // eslint-disable-next-line no-console
+          console.log("[image] STATE WRITE", { image_url: result.image_url, attempts: result.image_attempts });
+          // eslint-disable-next-line no-console
+          console.log("[enrich] DONE", { status: result.status });
+        } catch { /* ignore */ }
         sessionCache.set(key, result);
         setRes(key, result);
         return result;
@@ -133,6 +177,10 @@ export function useProductDescriptions() {
           fetched_at: new Date().toISOString(),
           edited: false,
           error_message: err instanceof Error ? err.message : "Fetch failed",
+          image_url: null,
+          image_source_url: null,
+          attempts: [],
+          image_attempts: [],
         };
         setRes(key, result);
         return result;
@@ -181,6 +229,10 @@ export function useProductDescriptions() {
             status: newText.trim() ? "found" : "not_found",
             fetched_at: new Date().toISOString(),
             edited: true,
+            image_url: null,
+            image_source_url: null,
+            attempts: [],
+            image_attempts: [],
           });
         }
         // Also reflect into cache so it survives navigation

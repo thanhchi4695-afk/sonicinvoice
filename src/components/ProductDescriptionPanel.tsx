@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Download,
@@ -9,6 +9,9 @@ import {
   ChevronDown,
   ChevronUp,
   Pencil,
+  Bug,
+  ImageOff,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +24,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   useProductDescriptions,
   type DescriptionResult,
+  type Attempt,
 } from "@/hooks/use-product-descriptions";
 import type { PriceMatchLineItem } from "@/lib/price-match-utils";
 import EnrichProductButton from "@/components/EnrichProductButton";
@@ -99,24 +109,68 @@ function downloadCSV(rows: string[][], filename: string) {
 
 // ── Confidence / source badges ────────────────────────────
 function SourceBadge({ result }: { result: DescriptionResult }) {
-  if (result.confidence === "high") {
+  if (result.source_type === "ai_generated") {
+    return (
+      <Badge className="text-[10px] bg-accent text-accent-foreground hover:bg-accent/80">
+        AI generated
+      </Badge>
+    );
+  }
+  if (result.source_type === "supplier") {
     return (
       <Badge className="text-[10px] bg-success text-success-foreground hover:bg-success/80">
         Supplier site
       </Badge>
     );
   }
-  if (result.confidence === "medium") {
-    return (
-      <Badge className="text-[10px] bg-primary text-primary-foreground hover:bg-primary/80">
-        Retailer site
-      </Badge>
-    );
-  }
   return (
-    <Badge className="text-[10px] bg-warning text-warning-foreground hover:bg-warning/80">
-      Secondary source
+    <Badge className="text-[10px] bg-primary text-primary-foreground hover:bg-primary/80">
+      Retailer site
     </Badge>
+  );
+}
+
+// ── Reason explainers ─────────────────────────────────────
+function reasonLabel(r: Attempt["reason"]): string {
+  switch (r) {
+    case "ok": return "ok";
+    case "empty_response": return "empty response";
+    case "blocked": return "blocked";
+    case "selector_not_matched": return "selector not matched";
+    case "too_short": return "too short";
+    case "no_search_results": return "no search results";
+    case "fetch_error": return "fetch error";
+    case "skipped": return "skipped";
+  }
+}
+
+function FailureTooltip({ attempts, label }: { attempts: Attempt[]; label: React.ReactNode }) {
+  const last = attempts[attempts.length - 1];
+  if (!last) return <>{label}</>;
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-help underline decoration-dotted">{label}</span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[340px] text-[10px] leading-snug">
+          <div>
+            <span className="font-semibold">Tried:</span> {last.url}
+          </div>
+          <div>
+            <span className="font-semibold">Status:</span> {last.status || "—"}
+          </div>
+          <div>
+            <span className="font-semibold">Reason:</span> {reasonLabel(last.reason)}
+          </div>
+          {attempts.length > 1 && (
+            <div className="mt-1 pt-1 border-t border-border/40 opacity-80">
+              {attempts.length} attempts total
+            </div>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -169,6 +223,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
   const [format, setFormat] = useState<ExportFormat>("shopify");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<Set<string>>(new Set());
+  const [debugMode, setDebugMode] = useState(false);
 
   const toggleExpand = (k: string) =>
     setExpanded((p) => {
@@ -372,6 +427,15 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
             )}
             Fetch All
           </Button>
+          <Button
+            variant={debugMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setDebugMode((v) => !v)}
+            title="Show fetch URLs, HTTP statuses, selectors and AI raw response"
+          >
+            <Bug className="w-3.5 h-3.5" />
+            🔬 Debug Mode {debugMode ? "ON" : "OFF"}
+          </Button>
         </div>
       </div>
 
@@ -418,6 +482,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
               <TableRow>
                 <TableHead>Product</TableHead>
                 <TableHead>Brand</TableHead>
+                <TableHead>Image</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Status</TableHead>
@@ -436,7 +501,8 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                   desc.length > 120 ? `${desc.slice(0, 120)}…` : desc;
 
                 return (
-                  <TableRow key={key} className="align-top">
+                  <Fragment key={key}>
+                  <TableRow className="align-top">
                     <TableCell className="max-w-[220px]">
                       <p className="text-xs font-medium">{item.style_name || "—"}</p>
                       {item.style_number && (
@@ -454,8 +520,44 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                         )}
                     </TableCell>
                     <TableCell className="text-xs">{item.brand || "—"}</TableCell>
+                    <TableCell className="min-w-[80px]">
+                      {isLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                      ) : r?.image_url ? (
+                        <div className="flex flex-col items-start gap-1">
+                          <img
+                            src={r.image_url}
+                            alt={item.style_name || ""}
+                            className="w-12 h-12 rounded object-cover border border-border"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
+                          />
+                          <Badge className="text-[9px] bg-success text-success-foreground hover:bg-success/80">
+                            <ImageIcon className="w-2.5 h-2.5 mr-0.5" /> Found
+                          </Badge>
+                        </div>
+                      ) : r ? (
+                        <div className="flex items-center gap-1">
+                          <ImageOff className="w-4 h-4 text-muted-foreground" />
+                          <FailureTooltip
+                            attempts={r.image_attempts || []}
+                            label={
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] text-muted-foreground"
+                              >
+                                ⚠️ No image
+                              </Badge>
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="min-w-[140px]">
-                      {r && r.status === "found" ? (
+                      {r && (r.status === "found" || r.source_type === "ai_generated") ? (
                         <div className="flex flex-col gap-0.5">
                           <SourceBadge result={r} />
                           {r.source_url ? (
@@ -564,10 +666,22 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge
-                        status={r?.status || "pending"}
-                        isLoading={isLoading}
-                      />
+                      {r?.status === "not_found" || r?.status === "error" ? (
+                        <FailureTooltip
+                          attempts={r.attempts || []}
+                          label={
+                            <StatusBadge
+                              status={r?.status || "pending"}
+                              isLoading={isLoading}
+                            />
+                          }
+                        />
+                      ) : (
+                        <StatusBadge
+                          status={r?.status || "pending"}
+                          isLoading={isLoading}
+                        />
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex flex-col items-end gap-1">
@@ -597,6 +711,54 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
                       </div>
                     </TableCell>
                   </TableRow>
+                  {debugMode && r && (
+                    <TableRow key={key + "_debug"} className="bg-muted/30">
+                      <TableCell colSpan={7} className="text-[10px] font-mono">
+                        <div className="space-y-1 p-2">
+                          <div className="font-semibold text-foreground">🔬 Debug trace</div>
+                          {(r.attempts || []).map((a, i) => (
+                            <div key={i} className="pl-2">
+                              <span className="text-muted-foreground">{i + 1}.</span>{" "}
+                              <span className="text-primary">{a.url}</span>
+                              {" → "}
+                              <span className={a.found ? "text-success" : "text-destructive"}>
+                                HTTP {a.status || "n/a"}
+                              </span>
+                              {" — "}
+                              <span>{reasonLabel(a.reason)}</span>
+                              {a.selector ? <span className="text-muted-foreground"> [selector: {a.selector}]</span> : null}
+                              {" — "}
+                              <span>
+                                {a.found ? "description found in HTML" : "no description"}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="pt-1">
+                            <span className="text-muted-foreground">Final status:</span>{" "}
+                            <span className="text-foreground">
+                              {r.status === "found"
+                                ? r.word_count < 8
+                                  ? "too-short"
+                                  : "ready"
+                                : "failed"}
+                            </span>
+                            {r.status === "found" && r.word_count < 8 && (
+                              <span className="text-warning ml-2">
+                                ⚠ AI returned only {r.word_count} words — threshold is normally 40+. Consider editing manually.
+                              </span>
+                            )}
+                          </div>
+                          {r.ai_raw_preview && (
+                            <div className="pt-1">
+                              <span className="text-muted-foreground">AI raw (first 200 chars):</span>{" "}
+                              <span className="text-foreground">{r.ai_raw_preview}</span>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  </Fragment>
                 );
               })}
             </TableBody>

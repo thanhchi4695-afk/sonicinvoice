@@ -20,6 +20,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildSafeClaudeDocBlock, chunkForClaude } from "./image-resize.ts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

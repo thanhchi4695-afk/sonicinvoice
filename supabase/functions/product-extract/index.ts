@@ -540,7 +540,7 @@ async function fetchHtml(url: string): Promise<string> {
     try {
       console.log("[product-extract] direct fetch blocked, trying Firecrawl fallback");
       const fcCtrl = new AbortController();
-      const fcTimer = setTimeout(() => fcCtrl.abort(), 25_000);
+      const fcTimer = setTimeout(() => fcCtrl.abort(), 35_000);
       const fcResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
         method: "POST",
         signal: fcCtrl.signal,
@@ -552,20 +552,28 @@ async function fetchHtml(url: string): Promise<string> {
           url,
           formats: ["html"],
           onlyMainContent: false,
+          waitFor: 2500,
+          proxy: "stealth",
         }),
       }).finally(() => clearTimeout(fcTimer));
       if (fcResp.ok) {
         const j = await fcResp.json();
+        const upstreamStatus = j?.data?.metadata?.statusCode;
         const html =
           j?.data?.html ||
           j?.data?.rawHtml ||
           j?.html ||
           j?.rawHtml ||
           null;
-        if (html && typeof html === "string" && html.length > 200) {
+        // Reject Kasada/Cloudflare challenge stubs (very small or status != 2xx)
+        const looksLikeChallenge =
+          typeof html === "string" &&
+          (html.length < 1500 ||
+            /KPSDK|kasada|cf-browser-verification|challenge-platform/i.test(html));
+        if (html && typeof html === "string" && !looksLikeChallenge && (!upstreamStatus || upstreamStatus < 400)) {
           return html;
         }
-        console.warn("[product-extract] Firecrawl returned no html", JSON.stringify(j).slice(0, 300));
+        console.warn("[product-extract] Firecrawl returned challenge/empty (upstream", upstreamStatus, ")");
       } else {
         console.warn("[product-extract] Firecrawl error", fcResp.status, (await fcResp.text()).slice(0, 300));
       }

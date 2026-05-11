@@ -4673,14 +4673,61 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                     : typeof product.price === "string"
                       ? parseFloat(product.price) || 0
                       : 0;
-              addUrlItemToDraft({
+
+              const imageUrls = (product.images || []).map((i) => i.storedUrl).filter(Boolean);
+              const variants = (product.variants && product.variants.length > 0)
+                ? product.variants
+                : [{ colour: "", size: "", qty: 1 }];
+
+              const totalQty = variants.reduce((s, v) => s + (v.qty || 0), 0) || 1;
+              const colourSummary = Array.from(new Set(variants.map(v => v.colour).filter(Boolean))).join(" / ");
+              const sizeSummary = Array.from(new Set(variants.map(v => v.size).filter(Boolean))).join(", ");
+
+              const newGroup: ProductGroup = {
+                styleGroup: null as any,
                 name: product.name || "Untitled product",
-                description: product.description,
-                price,
-                currency: product.currency,
-                imageUrls: (product.images || []).map((i) => i.storedUrl).filter(Boolean),
-                sourceUrl: product.sourceUrl || "",
-              });
+                brand: "",
+                type: "",
+                colour: colourSummary,
+                size: sizeSummary,
+                price: 0,
+                rrp: price,
+                status: "new",
+                metafields: {},
+                isGrouped: variants.length > 1,
+                variants: variants.map(v => ({
+                  sku: "",
+                  option1Name: "Size",
+                  option1Value: v.size || "",
+                  option2Name: "Colour",
+                  option2Value: v.colour || "",
+                  qty: v.qty,
+                  price: 0,
+                  rrp: price,
+                })),
+                desc: product.description,
+                imageSrc: imageUrls[0],
+                imageUrls,
+                productPageUrl: product.sourceUrl,
+              };
+              setProductGroups((prev) => [...prev, newGroup]);
+              setParsedNames((prev) => [...prev, newGroup.name]);
+              setInvoiceSessionProducts(
+                [
+                  {
+                    product_title: newGroup.name,
+                    sku: "",
+                    vendor: "",
+                    unit_cost: 0,
+                    rrp: price,
+                    margin_pct: 0,
+                    qty: totalQty,
+                  },
+                ],
+                supplierName || "",
+              );
+              toast.success(`Added "${newGroup.name}" (${totalQty} unit${totalQty === 1 ? "" : "s"}) to invoice`);
+              setStep(3);
               setFetchUrlOpen(false);
             }}
           />

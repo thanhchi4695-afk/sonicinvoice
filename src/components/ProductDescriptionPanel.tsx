@@ -482,6 +482,7 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
               <TableRow>
                 <TableHead>Product</TableHead>
                 <TableHead>Brand</TableHead>
+                <TableHead>Image</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Status</TableHead>

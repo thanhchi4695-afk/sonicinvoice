@@ -275,12 +275,11 @@ async function stage1ClaudePdf(
     `Extract every product line item from this invoice. Follow the master prompt steps in order. ` +
     `Return via the return_invoice tool only.`;
 
-  const isPdf = mimeType === "application/pdf";
-  const docBlock = isPdf
-    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } }
-    : { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } };
-
-  return await callClaudeInvoice([docBlock, { type: "text", text: userText }], systemBlocks, model);
+  const { block: docBlock } = await buildSafeClaudeDocBlock(fileBase64, mimeType, "invoice");
+  // Single document per call — chunkForClaude is a no-op here but enforces the
+  // ≤20-images-per-call invariant if this ever batches multiple images.
+  const batches = chunkForClaude([docBlock], 20);
+  return await callClaudeInvoice([...batches[0], { type: "text", text: userText }], systemBlocks, model);
 }
 
 // Validation pass — sums extracted cost*qty against invoice subtotal.

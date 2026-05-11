@@ -44,6 +44,7 @@ interface Attempt {
   reason: Reason;
   found: boolean;
   selector?: string;
+  aiRawPreview: string;
 }
 
 interface ResponsePayload {
@@ -306,7 +307,7 @@ function makeAbsolute(url: string | null, base: string): string | null {
 }
 
 // ─── AI fallback description generator ──────────────────────
-async function aiGenerateDescription(body: RequestBody): Promise<string | null> {
+async function aiGenerateDescription(body: RequestBody): Promise<{ description: string | null; preview: string }> {
   const sys = `You are a retail copywriter for an Australian boutique fashion store.
 Write a 50-90 word product description in Australian English. Two short paragraphs max.
 No emojis, no hype words, no price/shipping/sale mentions. Plain text only — no markdown, no quotes.
@@ -316,6 +317,7 @@ Brand: ${body.brand}
 Product type: ${body.product_type || "(unknown)"}
 Colour: ${body.colour || "(unknown)"}
 Style number: ${body.style_number || "(none)"}`;
+  const preview = user.slice(0, 200);
   try {
     const r = await callAI({
       model: "google/gemini-2.5-flash",
@@ -327,10 +329,10 @@ Style number: ${body.style_number || "(none)"}`;
       max_tokens: 400,
     });
     const txt = (getContent(r) || "").trim();
-    return txt || null;
+    return { description: txt || null, preview };
   } catch (e) {
     console.error("[fetch-desc] aiGenerateDescription failed", e);
-    return null;
+    return { description: null, preview };
   }
 }
 

@@ -343,6 +343,13 @@ RESPOND WITH JSON ONLY, no other text:
       imageSource,
       imageStrategy: cascade?.strategy ?? null,
       imageStatus,
+      imageDebug: cascade?.debug ?? {
+        brandWebsite: brandWebsite || "",
+        findUrlStatus: 0,
+        pageUrl: null,
+        extractStatus: 0,
+      },
+      imageFirstUrl: imageUrls[0] || null,
       descriptionStatus,
       descriptionError,
     };

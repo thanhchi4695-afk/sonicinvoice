@@ -3351,6 +3351,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     productPageUrl?: string;
     enrichConfidence?: string;
     enrichNote?: string;
+    imageStatus?: "found" | "searching" | "not_found";
+    imageSource?: "cascade" | "llm" | "shopify" | "none";
   }
 
   const [productGroups, setProductGroups] = useState<ProductGroup[]>([]);
@@ -3791,10 +3793,12 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       const storeName = storeConfig.name || 'My Store';
       const storeCity = storeConfig.city || '';
       const customInstr = storeConfig.defaultInstructions || '';
-      
+
       // Look up brand website from brand directory (alias-aware)
       const brandMatch = matchVendor(group.brand);
       const brandWebsite = brandMatch?.brand.website || '';
+
+      console.log(`[enrich] → ${group.name} | brand=${group.brand} | brandWebsite=${brandWebsite || '—'}`);
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/enrich-product`, {
         method: 'POST',
@@ -3814,16 +3818,39 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         }),
       });
 
+      console.log(`[enrich] HTTP ${response.status} for "${group.name}"`);
+
       if (!response.ok) {
         const err = await response.json().catch(() => ({ error: 'Failed' }));
-        return { enrichConfidence: 'low', enrichNote: err.error || 'Enrichment failed' };
+        console.warn(`[enrich] failed for "${group.name}":`, err.error);
+        return {
+          enrichConfidence: 'low',
+          enrichNote: err.error || 'Enrichment failed',
+          imageStatus: group.imageSrc ? 'found' : 'not_found',
+        };
       }
 
       const result = await response.json();
+      const absUrls: string[] = Array.isArray(result.imageUrls)
+        ? result.imageUrls.filter((u: unknown): u is string => typeof u === 'string' && /^https?:\/\//i.test(u))
+        : [];
+
+      // Fallback chain: cascade images → existing Shopify-matched image → none
+      const newImageSrc = absUrls[0] || group.imageSrc || undefined;
+      const finalStatus: "found" | "not_found" = newImageSrc ? 'found' : 'not_found';
+      const finalSource: "cascade" | "llm" | "shopify" | "none" =
+        absUrls.length > 0
+          ? (result.imageSource === 'llm' ? 'llm' : 'cascade')
+          : (group.imageSrc ? 'shopify' : 'none');
+
+      console.log(
+        `[enrich] DONE "${group.name}" → status=${finalStatus} source=${finalSource} url=${newImageSrc || '—'}`,
+      );
+
       return {
         desc: result.description && result.description.length > 20 ? result.description : undefined,
-        imageUrls: result.imageUrls?.length > 0 ? result.imageUrls : undefined,
-        imageSrc: result.imageUrls?.[0] || undefined,
+        imageUrls: absUrls.length > 0 ? absUrls : group.imageUrls,
+        imageSrc: newImageSrc,
         fabric: result.fabric || undefined,
         care: result.care || undefined,
         origin: result.origin || undefined,
@@ -3832,14 +3859,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         enrichNote: result.imageSource === 'cascade'
           ? `${result.note || 'Real images via ' + (result.imageStrategy || 'cascade')}`
           : (result.note || ''),
+        imageStatus: finalStatus,
+        imageSource: finalSource,
       };
     } catch (e) {
-      return { enrichConfidence: 'low', enrichNote: e instanceof Error ? e.message : 'Network error' };
+      console.error('[enrich] network error:', e);
+      return {
+        enrichConfidence: 'low',
+        enrichNote: e instanceof Error ? e.message : 'Network error',
+        imageStatus: group.imageSrc ? 'found' : 'not_found',
+      };
     }
   };
 
   const runEnrichment = async (idx: number) => {
-    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, enriching: true } : g));
+    setProductGroups(prev => prev.map((g, i) => i === idx ? { ...g, enriching: true, imageStatus: 'searching' } : g));
     const result = await enrichProduct(productGroups[idx]);
     setProductGroups(prev => {
       const updated = prev.map((g, i) => i === idx ? { ...g, ...result, enriched: true, enriching: false } : g);
@@ -3855,7 +3889,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       try { localStorage.setItem('last_enriched_products', JSON.stringify(enrichedForStorage)); } catch {}
       return updated;
     });
-    addAuditEntry('Enriched', `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence`);
+    addAuditEntry('Enriched', `${productGroups[idx].name} — ${result.enrichConfidence || 'low'} confidence · image=${result.imageStatus || 'n/a'}`);
   };
 
   const runEnrichAll = async () => {
@@ -6859,7 +6893,7 @@ const VariantGroupCard = ({ group, onSplit, onPreview, onQtyChange }: {
   );
 };
 
-const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean; enriched?: boolean; enriching?: boolean; imageSrc?: string; imageUrls?: string[]; desc?: string; fabric?: string; care?: string; origin?: string; productPageUrl?: string; enrichConfidence?: string; enrichNote?: string }; onPreview?: () => void; onEnrich?: () => void; onSetImage?: (url: string) => void }) => {
+const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { name: string; sku?: string; barcode?: string; gtin?: string; matchSource?: MatchSource; brand: string; type: string; colour?: string; size?: string; price: number; rrp: number; status: string; metafields?: Record<string, string>; costChange?: { prev: number; changeAmount: number; changePct: number; prevDate: string } | null; isNew?: boolean; enriched?: boolean; enriching?: boolean; imageSrc?: string; imageUrls?: string[]; desc?: string; fabric?: string; care?: string; origin?: string; productPageUrl?: string; enrichConfidence?: string; enrichNote?: string; imageStatus?: "found" | "searching" | "not_found"; imageSource?: "cascade" | "llm" | "shopify" | "none" }; onPreview?: () => void; onEnrich?: () => void; onSetImage?: (url: string) => void }) => {
   const [expanded, setExpanded] = useState(false);
   const [savedToBarcodeCatalog, setSavedToBarcodeCatalog] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
@@ -6883,11 +6917,35 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
       <button onClick={() => setExpanded(!expanded)} className="w-full px-4 py-3 text-left">
         <div className="flex items-start gap-3">
           {/* Image thumbnail */}
-          <div className="shrink-0 w-11 h-11 rounded bg-muted border border-border flex items-center justify-center overflow-hidden">
-            {product.imageSrc ? (
-              <img src={product.imageSrc} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <div className="shrink-0 w-11 h-11 rounded bg-muted border border-border flex items-center justify-center overflow-hidden relative">
+            {product.enriching || product.imageStatus === 'searching' ? (
+              <span className="text-base text-muted-foreground animate-pulse" aria-label="Searching for image">🔍</span>
+            ) : product.imageSrc ? (
+              <img
+                src={product.imageSrc}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  img.style.display = 'none';
+                  const parent = img.parentElement;
+                  if (parent && !parent.querySelector('[data-img-fallback]')) {
+                    const span = document.createElement('span');
+                    span.setAttribute('data-img-fallback', 'true');
+                    span.className = 'text-base text-warning';
+                    span.title = 'Image URL broken';
+                    span.textContent = '⚠️';
+                    parent.appendChild(span);
+                  }
+                }}
+              />
             ) : (
-              <span className="text-base text-muted-foreground">📷</span>
+              <span
+                className={`text-base ${product.imageStatus === 'not_found' ? 'text-warning' : 'text-muted-foreground'}`}
+                aria-label={product.imageStatus === 'not_found' ? 'No image found' : 'No image yet'}
+              >
+                {product.imageStatus === 'not_found' ? '⚠️' : '📷'}
+              </span>
             )}
           </div>
           <div className="flex-1 min-w-0">
@@ -6943,9 +7001,28 @@ const ProductCard = ({ product, onPreview, onEnrich, onSetImage }: { product: { 
                 product.enrichConfidence === 'medium' ? 'bg-warning/15 text-warning' :
                 'bg-destructive/15 text-destructive'
               }`}>
-                ✦ {product.enrichConfidence} confidence
               </span>
             )}
+            {/* Image status badge */}
+            {(product.enriching || product.imageStatus) && (() => {
+              const status = product.enriching ? 'searching' : product.imageStatus!;
+              const cls =
+                status === 'found' ? 'bg-success/15 text-success' :
+                status === 'searching' ? 'bg-secondary/30 text-foreground animate-pulse' :
+                'bg-warning/15 text-warning';
+              const label =
+                status === 'found' ? `✅ Image found${product.imageSource && product.imageSource !== 'cascade' ? ` (${product.imageSource})` : ''}` :
+                status === 'searching' ? '🔍 Searching' :
+                '⚠️ No image found';
+              return (
+                <span
+                  className={`inline-block mt-1 ml-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${cls}`}
+                  title={status === 'not_found' ? 'No image returned by brand site or AI cascade.' : undefined}
+                >
+                  {label}
+                </span>
+              );
+            })()}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
             <span className={`w-2 h-2 rounded-full ${product.status === "ready" ? "bg-success" : "bg-secondary"}`} />

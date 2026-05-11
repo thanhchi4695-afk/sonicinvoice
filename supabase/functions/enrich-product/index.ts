@@ -119,6 +119,13 @@ serve(async (req) => {
       customInstructions,
     } = await req.json();
 
+    console.log(
+      `[enrich-product] REQ title="${title}" vendor="${vendor}" brandWebsite="${brandWebsite || "—"}" styleNumber="${styleNumber || "—"}"`,
+    );
+    if (!brandWebsite) {
+      console.warn(`[enrich-product] no brandWebsite for vendor="${vendor}" — image cascade will be skipped`);
+    }
+
     // ── Step A: Real image fetch via find-product-url → product-extract cascade.
     // Runs in parallel with the LLM description call below for speed.
     const cascadePromise = fetchRealImagesViaCascade({
@@ -205,16 +212,26 @@ RESPOND WITH JSON ONLY, no other text:
     let imageSource: "cascade" | "llm" | "none" = "none";
     let imageUrls: string[] = [];
 
+    // Only accept absolute https(s) URLs — guard against relative paths
+    // accidentally bubbling up from the cascade or LLM.
+    const isAbsoluteHttp = (u: unknown): u is string =>
+      typeof u === "string" && /^https?:\/\//i.test(u);
+
     if (cascade && cascade.imageUrls.length > 0) {
-      imageUrls = cascade.imageUrls;
-      imageSource = "cascade";
+      imageUrls = cascade.imageUrls.filter(isAbsoluteHttp);
+      imageSource = imageUrls.length > 0 ? "cascade" : "none";
+      console.log(`[enrich-product] cascade returned ${cascade.imageUrls.length} url(s), ${imageUrls.length} absolute`);
     } else if (Array.isArray(parsed.imageUrls)) {
       // Backwards-compat: fall back to whatever the LLM produced (often unreliable).
-      imageUrls = (parsed.imageUrls as unknown[]).filter(
-        (u): u is string => typeof u === "string" && /^https?:\/\//i.test(u),
-      );
+      imageUrls = (parsed.imageUrls as unknown[]).filter(isAbsoluteHttp);
       if (imageUrls.length > 0) imageSource = "llm";
+      console.log(`[enrich-product] LLM image fallback → ${imageUrls.length} absolute url(s)`);
+    } else {
+      console.log(`[enrich-product] no images found for "${title}" (vendor=${vendor}, brand=${brandWebsite || "—"})`);
     }
+
+    const imageStatus: "found" | "not_found" =
+      imageUrls.length > 0 ? "found" : "not_found";
 
     const result = {
       description: parsed.description || '',
@@ -229,7 +246,12 @@ RESPOND WITH JSON ONLY, no other text:
       note: parsed.note || '',
       imageSource,
       imageStrategy: cascade?.strategy ?? null,
+      imageStatus,
     };
+
+    console.log(
+      `[enrich-product] DONE title="${title}" vendor="${vendor}" → imageStatus=${imageStatus} imageSource=${imageSource} count=${imageUrls.length} firstUrl=${imageUrls[0] ?? "—"}`,
+    );
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -471,6 +471,7 @@ Deno.serve(async (req) => {
   // 4) Final AI fallback — must always produce something usable
   if (!result) {
     const aiDesc = await aiGenerateDescription(body);
+    const emptyStats = { processed: 0, resized: 0, skipped: 0 };
     if (aiDesc) {
       result = {
         description: aiDesc,
@@ -485,10 +486,10 @@ Deno.serve(async (req) => {
         image_source_url: null,
         attempts,
         image_attempts: imageAttempts,
+        image_stats: emptyStats,
         ai_raw_preview: aiDesc.slice(0, 200),
       };
     } else {
-      // Truly unrecoverable
       result = {
         description: null,
         full_product_name: null,
@@ -502,6 +503,7 @@ Deno.serve(async (req) => {
         image_source_url: null,
         attempts,
         image_attempts: imageAttempts,
+        image_stats: emptyStats,
       };
     }
   }

@@ -114,7 +114,7 @@ const guessType = (filename: string): InboxItem["attachmentType"] => {
 
 const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => {
   const { toast } = useToast();
-  const [connection, setConnection] = useState<GmailConnection | null>(null);
+  const [connections, setConnections] = useState<GmailConnection[]>([]);
   const [loadingConn, setLoadingConn] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -136,15 +136,16 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     try { localStorage.setItem("sonic_smart_bulk_enabled", smartBulk ? "1" : "0"); } catch {}
   }, [smartBulk]);
   const demo = isDemoMode();
+  const connection = connections[0] ?? null; // back-compat for legacy refs
 
   const loadConnection = useCallback(async () => {
     setLoadingConn(true);
     const { data, error } = await supabase
       .from("gmail_connections")
-      .select("email_address, last_checked_at, is_active")
+      .select("id, email_address, last_checked_at, is_active")
       .eq("is_active", true)
-      .maybeSingle();
-    if (!error) setConnection(data as GmailConnection | null);
+      .order("created_at", { ascending: true });
+    if (!error) setConnections((data as GmailConnection[]) ?? []);
     setLoadingConn(false);
   }, []);
 
@@ -153,7 +154,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       .from("gmail_found_invoices")
       .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed")
       .order("received_at", { ascending: false })
-      .limit(50);
+      .limit(1000);
     if (error) return;
     const items: InboxItem[] = [];
     for (const row of data ?? []) {

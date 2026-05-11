@@ -457,6 +457,18 @@ const ProductDescriptionPanel = ({ lineItems, onBack }: Props) => {
             Fetch All
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              clearCache();
+              toast.success("Cache cleared — Fetch All will re-fetch every row from scratch");
+            }}
+            disabled={running}
+            title="Wipe the 24h session cache so the next Fetch pulls fresh data (use after a resolver fix)"
+          >
+            Clear cache &amp; refetch
+          </Button>
+          <Button
             variant={debugMode ? "default" : "outline"}
             size="sm"
             onClick={() => setDebugMode((v) => !v)}

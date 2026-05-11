@@ -3911,9 +3911,24 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         ? null
         : (result.descriptionError || (incomingDesc ? `Description too short (${incomingDesc.length} chars; threshold is 40)` : 'AI returned empty response'));
 
+      // ── Image trace logging — emit the 4-stage [image] sequence so the user
+      //    can verify the fetch end-to-end without opening Network tab.
+      const dbg = result.imageDebug || {};
+      console.log(
+        `[image] SEARCHING URL → brand="${dbg.brandWebsite || '—'}" page="${dbg.pageUrl || '—'}"`,
+      );
+      console.log(
+        `[image] HTTP status → find-product-url=${dbg.findUrlStatus ?? 'n/a'} product-extract=${dbg.extractStatus ?? 'n/a'}`,
+      );
+      console.log(
+        `[image] ${absUrls.length > 0 ? 'IMAGE FOUND' : 'NOT FOUND'} → count=${absUrls.length} firstUrl=${absUrls[0] || result.imageFirstUrl || '—'}`,
+      );
+
       console.log(
         `[enrich] DONE "${group.name}" → desc=${descStatus} (${incomingDesc.length} chars) | image=${finalStatus} src=${finalSource} url=${newImageSrc || '—'}${descError ? ` | descError="${descError}"` : ''}`,
       );
+
+      const imageStateWrite = `image=${finalStatus} src=${finalSource} url=${newImageSrc || '—'}`;
 
       return {
         // Only overwrite desc when AI returned a usable description; preserve any existing desc otherwise.
@@ -3930,13 +3945,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
           : (result.note || ''),
         imageStatus: finalStatus,
         imageSource: finalSource,
+        imageDebug: {
+          brandWebsite: dbg.brandWebsite || '',
+          findUrlStatus: dbg.findUrlStatus ?? 0,
+          pageUrl: dbg.pageUrl ?? null,
+          extractStatus: dbg.extractStatus ?? 0,
+          firstUrl: absUrls[0] || result.imageFirstUrl || null,
+          stateWrite: imageStateWrite,
+        },
         descStatus,
         descError,
         descLength: incomingDesc.length,
         debugAiInput: aiInput,
         debugHttpStatus: response.status,
         debugAiRaw: result,
-        debugStateWrite: `desc=${descStatus} (${incomingDesc.length} chars) image=${finalStatus} src=${finalSource}`,
+        debugStateWrite: `desc=${descStatus} (${incomingDesc.length} chars) ${imageStateWrite}`,
       };
     } catch (e) {
       console.error('[enrich] network error:', e);
@@ -3948,6 +3971,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         descError: msg,
         descLength: 0,
         imageStatus: group.imageSrc ? 'found' : 'not_found',
+        imageDebug: { brandWebsite: '', findUrlStatus: 0, pageUrl: null, extractStatus: 0, firstUrl: null, stateWrite: `NETWORK ERROR — ${msg}` },
         debugAiInput: aiInput,
         debugHttpStatus: 0,
         debugAiRaw: null,

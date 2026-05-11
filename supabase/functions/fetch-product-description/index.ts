@@ -44,7 +44,7 @@ interface Attempt {
   reason: Reason;
   found: boolean;
   selector?: string;
-  aiRawPreview: string;
+  aiRawPreview?: string;
 }
 
 interface ResponsePayload {
@@ -71,6 +71,15 @@ interface ResponsePayload {
     final_width?: number;
     final_height?: number;
   };
+}
+
+const SCRAPED_AI_PREVIEW = "n/a — description scraped directly";
+
+function withAiRawPreview(attempts: Attempt[], preview: string): Attempt[] {
+  return attempts.map((attempt) => ({
+    ...attempt,
+    aiRawPreview: attempt.aiRawPreview || preview,
+  }));
 }
 
 // ─── Helpers ────────────────────────────────────────────────

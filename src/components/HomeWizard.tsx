@@ -28,7 +28,7 @@ import AgentPipelineShowcase from "@/components/AgentPipelineShowcase";
 import EnrichmentAgentsShowcase from "@/components/EnrichmentAgentsShowcase";
 import ConditionBuilderShowcase from "@/components/ConditionBuilderShowcase";
 
-export type DocType = "invoice" | "packing_slip";
+export type DocType = "invoice" | "packing_slip" | "joor";
 export type PosChoice = "shopify" | "lightspeed";
 
 interface HomeWizardProps {

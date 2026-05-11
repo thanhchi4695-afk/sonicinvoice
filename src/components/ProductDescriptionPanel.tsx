@@ -144,9 +144,17 @@ function reasonLabel(r: Attempt["reason"]): string {
   }
 }
 
-function FailureTooltip({ attempts, label }: { attempts: Attempt[]; label: React.ReactNode }) {
+function FailureTooltip({
+  attempts,
+  label,
+  overrideMessage,
+}: {
+  attempts: Attempt[];
+  label: React.ReactNode;
+  overrideMessage?: string;
+}) {
   const last = attempts[attempts.length - 1];
-  if (!last) return <>{label}</>;
+  if (!last && !overrideMessage) return <>{label}</>;
   return (
     <TooltipProvider delayDuration={150}>
       <Tooltip>
@@ -154,20 +162,26 @@ function FailureTooltip({ attempts, label }: { attempts: Attempt[]; label: React
           <span className="cursor-help underline decoration-dotted">{label}</span>
         </TooltipTrigger>
         <TooltipContent className="max-w-[340px] text-[10px] leading-snug">
-          <div>
-            <span className="font-semibold">Tried:</span> {last.url}
-          </div>
-          <div>
-            <span className="font-semibold">Status:</span> {last.status || "—"}
-          </div>
-          <div>
-            <span className="font-semibold">Reason:</span> {reasonLabel(last.reason)}
-          </div>
-          {attempts.length > 1 && (
-            <div className="mt-1 pt-1 border-t border-border/40 opacity-80">
-              {attempts.length} attempts total
-            </div>
-          )}
+          {overrideMessage ? (
+            <div>{overrideMessage}</div>
+          ) : last ? (
+            <>
+              <div>
+                <span className="font-semibold">Tried:</span> {last.url}
+              </div>
+              <div>
+                <span className="font-semibold">Status:</span> {last.status || "—"}
+              </div>
+              <div>
+                <span className="font-semibold">Reason:</span> {reasonLabel(last.reason)}
+              </div>
+              {attempts.length > 1 && (
+                <div className="mt-1 pt-1 border-t border-border/40 opacity-80">
+                  {attempts.length} attempts total
+                </div>
+              )}
+            </>
+          ) : null}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

@@ -405,7 +405,7 @@ const PhaseFiveSixPanel = ({
                   </a>
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" onClick={onPushToShopify} disabled={shopifyConnected === null || exportLocked} title={exportLocked ? exportLockReason : undefined}>
+                <Button size="sm" variant="outline" onClick={onPushToShopify} disabled={shopifyConnected === null || exportLocked} title={exportLocked ? exportLockReason : undefined} className={exportLocked ? "opacity-50 cursor-not-allowed" : ""}>
                   <ShoppingBag className="w-3.5 h-3.5" />
                   Push to Shopify (live)
                 </Button>
@@ -419,7 +419,7 @@ const PhaseFiveSixPanel = ({
             description="SKU + qty-to-add CSV. Adds quantities to existing inventory (does not replace)."
             icon={<RefreshCw className="w-4 h-4" />}
           >
-            <Button size="sm" variant="outline" onClick={onExportCSV} disabled={exportLocked} title={exportLocked ? exportLockReason : undefined}>
+            <Button size="sm" variant="outline" onClick={onExportCSV} disabled={exportLocked} title={exportLocked ? exportLockReason : undefined} className={exportLocked ? "opacity-50 cursor-not-allowed" : ""}>
               <Download className="w-3.5 h-3.5" />
               Export stock update CSV
             </Button>
@@ -431,7 +431,7 @@ const PhaseFiveSixPanel = ({
             description="Adds new colourways/sizes to existing products (uses Handle of existing product)."
             icon={<Sparkles className="w-4 h-4" />}
           >
-            <Button size="sm" variant="outline" onClick={onExportCSV} disabled={exportLocked} title={exportLocked ? exportLockReason : undefined}>
+            <Button size="sm" variant="outline" onClick={onExportCSV} disabled={exportLocked} title={exportLocked ? exportLockReason : undefined} className={exportLocked ? "opacity-50 cursor-not-allowed" : ""}>
               <Download className="w-3.5 h-3.5" />
               Export new variants CSV
             </Button>

@@ -520,7 +520,6 @@ async function fetchHtml(url: string): Promise<string> {
       });
       lastStatus = r.status;
       if (r.ok) return await r.text();
-      // Retry on bot-block status codes with a different UA
       if (r.status === 403 || r.status === 429 || r.status === 503) {
         lastErr = `Source returned ${r.status}`;
         await new Promise((res) => setTimeout(res, 400 + attempt * 300));
@@ -533,6 +532,53 @@ async function fetchHtml(url: string): Promise<string> {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  // Fallback: Firecrawl (renders JS, bypasses most bot protections)
+  const fcKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (fcKey) {
+    try {
+      console.log("[product-extract] direct fetch blocked, trying Firecrawl fallback");
+      const fcCtrl = new AbortController();
+      const fcTimer = setTimeout(() => fcCtrl.abort(), 25_000);
+      const fcResp = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        method: "POST",
+        signal: fcCtrl.signal,
+        headers: {
+          Authorization: `Bearer ${fcKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url,
+          formats: ["html"],
+          onlyMainContent: false,
+        }),
+      }).finally(() => clearTimeout(fcTimer));
+      if (fcResp.ok) {
+        const j = await fcResp.json();
+        const html =
+          j?.data?.html ||
+          j?.data?.rawHtml ||
+          j?.html ||
+          j?.rawHtml ||
+          null;
+        if (html && typeof html === "string" && html.length > 200) {
+          return html;
+        }
+        console.warn("[product-extract] Firecrawl returned no html", JSON.stringify(j).slice(0, 300));
+      } else {
+        console.warn("[product-extract] Firecrawl error", fcResp.status, (await fcResp.text()).slice(0, 300));
+      }
+    } catch (e) {
+      console.warn("[product-extract] Firecrawl fallback failed:", (e as Error).message);
+    }
+  }
+
+  // Friendlier message for bot-blocks
+  if (lastStatus === 429 || lastStatus === 403 || lastStatus === 503) {
+    throw new Error(
+      `This site (${new URL(url).hostname}) is blocking automated fetches (HTTP ${lastStatus}). Try uploading the product image or pasting the title manually.`,
+    );
   }
   throw new Error(lastErr || `Source returned ${lastStatus || "error"}`);
 }

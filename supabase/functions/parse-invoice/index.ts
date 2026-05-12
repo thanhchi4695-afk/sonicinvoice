@@ -1157,6 +1157,12 @@ Deno.serve(async (req) => {
       console.warn("brand learning upsert failed:", (learnErr as Error)?.message);
     }
 
+    // Phase 4 — bookkeeping for the brand_pattern row that was injected
+    if (activeBrandPattern?.id) {
+      const succeeded = stage1Rows.length > 0 && completeness >= 0.4;
+      await updateBrandPatternFromParse(admin, activeBrandPattern.id, succeeded, completeness);
+    }
+
     return new Response(
       JSON.stringify({
         jobId,
@@ -1167,6 +1173,8 @@ Deno.serve(async (req) => {
         claudeModel: extractor === "claude-pdf" ? claudeModel : null,
         meta: invoiceMeta,
         validation,
+        requires_review: injectionRequiresReview || confidence === "low",
+        brandContextInjected: !!activeBrandPattern,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );

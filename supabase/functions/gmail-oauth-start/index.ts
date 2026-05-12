@@ -20,6 +20,8 @@ const allowedReturnOrigins = new Set([
   "https://id-preview--ed921f87-40d3-4abb-9b71-c7f63c3b06fb.lovable.app",
 ]);
 
+const defaultReturnOrigin = "https://sonicinvoices.com";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -55,7 +57,7 @@ Deno.serve(async (req) => {
   // Strip path from referer if needed
   try { originHint = new URL(originHint).origin; } catch { originHint = ""; }
   if (!allowedReturnOrigins.has(originHint)) {
-    originHint = Deno.env.get("APP_URL")?.replace(/\/$/, "") || "https://sonicinvoices.com";
+    originHint = defaultReturnOrigin;
   }
 
   const statePayload = originHint

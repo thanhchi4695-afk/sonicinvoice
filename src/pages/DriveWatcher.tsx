@@ -92,8 +92,17 @@ export default function DriveWatcher() {
     try {
       const { data, error } = await supabase.functions.invoke("drive-invoice-watcher", { body: {} });
       if (error) throw error;
-      toast({ title: "Sync complete", description: `Scanned ${data?.scanned ?? 0}, new ${data?.new ?? 0}, errors ${data?.errors ?? 0}` });
-      load();
+      if (data?.started) {
+        toast({ title: "Sync started", description: "Processing in background. History will refresh as files complete." });
+        // Poll history a few times so the user sees results appear.
+        for (let i = 0; i < 12; i++) {
+          await new Promise((r) => setTimeout(r, 5000));
+          await load();
+        }
+      } else {
+        toast({ title: "Sync complete", description: `Scanned ${data?.scanned ?? 0}, new ${data?.new ?? 0}, errors ${data?.errors ?? 0}` });
+        load();
+      }
     } catch (e: any) {
       toast({ title: "Sync failed", description: e?.message || String(e), variant: "destructive" });
     } finally {

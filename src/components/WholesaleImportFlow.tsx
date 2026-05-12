@@ -211,9 +211,12 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
       reader.onload = async (ev) => {
         const wb = XLSX.read(ev.target?.result, { type: "array" });
 
-        // ── NuOrder detection: sheet name "NuORDER Item Data" OR matching headers ──
+        // ── NuOrder detection: sheet name "NuORDER Item Data"/"NuORDER Order Data" OR matching headers ──
         const nuorderSheetName = wb.SheetNames.find(
-          (n) => n.trim().toLowerCase() === "nuorder item data",
+          (n) => {
+            const norm = n.trim().toLowerCase();
+            return norm === "nuorder item data" || norm === "nuorder order data";
+          },
         );
         const firstSheet = wb.Sheets[nuorderSheetName || wb.SheetNames[0]];
         const firstRows = XLSX.utils.sheet_to_json<Record<string, string>>(firstSheet, { defval: "" });

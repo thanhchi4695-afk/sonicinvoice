@@ -929,8 +929,10 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="text-sm font-medium truncate">{item.from}</p>
                           <span className="text-[10px] text-muted-foreground shrink-0">{item.received}</span>
-                          {item.source === "gmail" && (
-                            <span className="text-[9px] px-1 py-0.5 rounded bg-success/15 text-success border border-success/20 shrink-0">GMAIL</span>
+                          {(item.source === "gmail" || item.source === "outlook" || item.source === "imap") && (
+                            <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${providerBadgeCls(item.source)}`}>
+                              {providerLabel(item.source).toUpperCase()}
+                            </span>
                           )}
                           {item.source === "sim" && demo && (
                             <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning border border-warning/20 shrink-0">DEMO</span>

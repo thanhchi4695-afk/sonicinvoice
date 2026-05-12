@@ -1622,6 +1622,19 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                       <Plus className="w-4 h-4 mr-1.5" />
                       Merge {bulkRows.filter((r) => r.status === "success").length} into invoice
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleExportBulkCSV}
+                      disabled={
+                        bulkRunning ||
+                        pushingShopify ||
+                        bulkRows.filter((r) => r.status === "success").length === 0
+                      }
+                    >
+                      <Download className="w-4 h-4 mr-1.5" />
+                      Download {bulkRows.filter((r) => r.status === "success").length} as CSV
+                    </Button>
                     {shopifyConnected === false ? (
                       <Button size="sm" variant="outline" asChild>
                         <a href="/dashboard?tab=connections">

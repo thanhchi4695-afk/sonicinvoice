@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://sonicinvoice.lovable.app/sitemap.xml
+Sitemap: https://sonicinvoices.com/sitemap.xml

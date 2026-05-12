@@ -384,7 +384,8 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     // Auto-learn: if this is an unknown Gmail sender, ask whether to save the
     // domain to a supplier profile so future emails are tagged KNOWN.
     let resolvedSupplier = item.supplierName ?? null;
-    if (item.source === "gmail" && !item.knownSupplier && item.fromEmail) {
+    const isEmail = item.source === "gmail" || item.source === "outlook" || item.source === "imap";
+    if (isEmail && !item.knownSupplier && item.fromEmail) {
       const domain = item.fromEmail.split("@")[1]?.toLowerCase();
       if (domain) {
         const guess = domain.split(".")[0].replace(/^./, c => c.toUpperCase());
@@ -431,19 +432,20 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       || (item.fromEmail.split("@")[1]?.split(".")[0] ?? "Supplier"));
     const niceSupplier = supplierName.charAt(0).toUpperCase() + supplierName.slice(1);
 
-    if (item.source === "gmail") {
-      // Mark as processing in UI immediately
+    if (isEmail) {
       setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, status: "processing" } : i));
       addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
 
       try {
         if (!item.messageId || !item.attachmentId) {
-          throw new Error("Missing Gmail attachment reference");
+          throw new Error("Missing attachment reference");
         }
 
-        // 1. Fetch attachment bytes (base64) via existing edge function
+        const fetchFn = item.source === "outlook" ? "outlook-fetch-attachment"
+          : item.source === "imap" ? "imap-fetch-attachment"
+          : "gmail-fetch-attachment";
         const { data: attData, error: attErr } = await supabase.functions.invoke(
-          "gmail-fetch-attachment",
+          fetchFn,
           { body: { message_id: item.messageId, attachment_id: item.attachmentId } },
         );
         if (attErr) throw attErr;

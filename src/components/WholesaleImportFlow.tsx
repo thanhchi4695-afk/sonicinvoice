@@ -204,10 +204,30 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext === "xlsx" || ext === "xls") {
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         const wb = XLSX.read(ev.target?.result, { type: "array" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
+        // Try JOOR-spec detection first (works even when file has multi-row headers)
+        const looksLikeJoor =
+          activePlatform === "joor" ||
+          (rows.length > 0 && detectPlatform(Object.keys(rows[0])) === "joor");
+        if (looksLikeJoor) {
+          try {
+            const { parseJoorFile } = await import("@/lib/joor-file-parser");
+            const result = await parseJoorFile(file);
+            if (result.detected && result.orders.length > 0) {
+              setOrders(result.orders);
+              const grouped = result.rawProducts.length;
+              toast.success(`JOOR catalog detected — ${grouped} products grouped from ${result.rawRowCount ?? rows.length} rows`);
+              import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "wholesale", productCount: grouped }));
+              setScreen("orders");
+              return;
+            }
+          } catch (err) {
+            console.warn("JOOR parser failed, falling back to generic:", err);
+          }
+        }
         processCSVRows(rows);
       };
       reader.readAsArrayBuffer(file);
@@ -242,7 +262,11 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
 
     setOrders(parsed);
     const totalItems = parsed.reduce((s, o) => s + o.lineItems.length, 0);
-    toast.success(`${parsed.length} order(s) imported (${totalItems} line items)`);
+    if (platform === "joor") {
+      toast.success(`JOOR catalog detected — ${parsed.length} order(s), ${totalItems} line items`);
+    } else {
+      toast.success(`${parsed.length} order(s) imported (${totalItems} line items)`);
+    }
     import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "wholesale", productCount: totalItems }));
     setScreen("orders");
   };

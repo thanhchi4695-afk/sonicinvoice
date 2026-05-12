@@ -17,6 +17,8 @@ export interface JoorFileParseResult {
   poNumber: string;
   orders: WholesaleOrder[];
   rawProducts: JoorParsedProduct[];
+  rawRowCount?: number;
+  detected?: boolean;
 }
 
 export interface JoorParsedProduct {
@@ -28,6 +30,8 @@ export interface JoorParsedProduct {
   materials: string;
   category: string;
   subcategory: string;
+  silhouette?: string;
+  countryOfOrigin?: string;
   description: string;
   wholesale: number;
   rrp: number;
@@ -36,6 +40,67 @@ export interface JoorParsedProduct {
   totalUnits: number;
   totalValue: number;
   imageUrl: string;
+  deliveryStart?: string;
+  deliveryEnd?: string;
+  autoTags?: string[];
+}
+
+/**
+ * Detect a JOOR catalog export by checking for the 4 marker columns.
+ * Spec rule: Style Number + Wholesale Price + Sugg. Retail Price + Delivery Start Date.
+ * Also accepts the older variants ("Wholesale (AUD)", "Sugg. Retail (AUD)").
+ */
+export function isJoorHeaderRow(headers: string[]): boolean {
+  const h = headers.map((s) => String(s || "").trim().toLowerCase());
+  const hasStyleNum = h.includes("style number") || h.includes("style_number");
+  const hasWholesale = h.some((c) => c === "wholesale price" || c === "wholesale" || c.startsWith("wholesale (") || c.startsWith("wholesale price ("));
+  const hasRetail = h.some((c) => c === "sugg. retail price" || c === "sugg. retail" || c.startsWith("sugg. retail price (") || c.startsWith("sugg. retail ("));
+  const hasDelivery = h.some((c) => c === "delivery start date" || c === "delivery start" || c === "delivery name");
+  return hasStyleNum && hasWholesale && hasRetail && hasDelivery;
+}
+
+export function isJoorRecordSet(rows: Record<string, string>[]): boolean {
+  if (!rows || rows.length === 0) return false;
+  return isJoorHeaderRow(Object.keys(rows[0]));
+}
+
+/** Extract the AU/UK number from "8 AU/UK (4 US)" → "8". */
+function normaliseSizeLabel(raw: string): string {
+  if (!raw) return raw;
+  const auMatch = raw.match(/^(\d+)\s*AU\/UK/i);
+  if (auMatch) return auMatch[1];
+  const m = raw.match(/^(\d+|OS|XXS|XS|S|M|L|XL|XXL|FREE)/i);
+  return m ? m[1] : raw;
+}
+
+/** Format a date string as "MMM YYYY" for arrival tags (e.g. "arriving-jun-2026"). */
+function arrivalFromDate(input: string): string {
+  if (!input) return "";
+  const d = new Date(input);
+  if (isNaN(d.getTime())) return "";
+  const month = d.toLocaleString("en-US", { month: "short" }).toLowerCase();
+  return `arriving-${month}-${d.getFullYear()}`;
+}
+
+function slugTag(s: string): string {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+/** Build the auto-tag list per spec: vendor, category, material-X, fabric, drop, arriving, country. */
+function buildAutoTags(p: Partial<JoorParsedProduct> & { brand?: string }): string[] {
+  const tags: string[] = [];
+  if (p.brand) tags.push(slugTag(p.brand));
+  if (p.subcategory) tags.push(slugTag(p.subcategory));
+  else if (p.category) tags.push(slugTag(p.category));
+  if (p.materials) tags.push(`material-${slugTag(p.materials)}`);
+  if (p.fabrication) tags.push(slugTag(p.fabrication));
+  if (p.silhouette) tags.push(slugTag(p.silhouette));
+  if (p.countryOfOrigin) tags.push(`made-in-${slugTag(p.countryOfOrigin)}`);
+  if (p.deliveryStart) {
+    const t = arrivalFromDate(p.deliveryStart);
+    if (t) tags.push(t);
+  }
+  return Array.from(new Set(tags.filter(Boolean)));
 }
 
 // ── Main entry point ──
@@ -106,18 +171,24 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
 
   const styleNameIdx = col("Style Name");
   const styleNumIdx = col("Style Number");
-  const colorIdx = colAny("Color", "Colour");
+  const colorIdx = colAny("Color Name", "Color", "Colour");
   const colorCodeIdx = colAny("Color Code", "Colour Code");
-  const fabricIdx = colAny("Fabrication", "Fab. Code");
+  const fabricIdx = colAny("Fabrication Name", "Fabrication", "Fab. Code");
   const materialsIdx = col("Materials");
   const categoryIdx = col("Category");
-  const subcategoryIdx = col("Subcategory");
+  const subcategoryIdx = colAny("Sub Category", "Subcategory");
+  const silhouetteIdx = colAny("Silhouette Name", "Silhouette");
+  const countryIdx = colAny("Country of Origin", "Country");
   const descriptionIdx = col("Description");
-  const wholesaleIdx = colAny("Wholesale (AUD)", "WholeSale (AUD)", "Wholesale");
-  const retailIdx = colAny("Sugg. Retail (AUD)", "Sugg. Retail", "Retail");
-  const unitsIdx = col("Units");
+  const wholesaleIdx = colAny("Wholesale Price", "Wholesale (AUD)", "WholeSale (AUD)", "Wholesale");
+  const retailIdx = colAny("Sugg. Retail Price", "Sugg. Retail (AUD)", "Sugg. Retail", "Retail");
+  const unitsIdx = colAny("Units Ordered", "Units");
+  const sizeColIdx = colAny("Size");
+  const deliveryStartIdx = colAny("Delivery Start Date", "Delivery Start");
+  const deliveryEndIdx = colAny("Delivery End Date", "Delivery End");
+  const brandIdx = colAny("Brand Name", "Brand");
 
-  // Detect size columns (between last metadata col and Wholesale col)
+  // Detect wide-format size columns (one column per size, "8 AU/UK (4 US)" etc.)
   const sizeColumns: { idx: number; label: string }[] = [];
   const sizePattern = /^\d+\s*(AU|US|UK)|^OS$|^XXS$|^XS$|^S$|^M$|^L$|^XL$|^XXL$/i;
   for (let j = 0; j < headers.length; j++) {
@@ -125,9 +196,11 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
       sizeColumns.push({ idx: j, label: headers[j] });
     }
   }
+  const isLongFormat = sizeColIdx >= 0 && sizeColumns.length === 0;
 
   // Parse product rows
   const products: JoorParsedProduct[] = [];
+  let rawRows = 0;
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
     const styleName = String(row[styleNameIdx] || "").trim();
@@ -137,32 +210,40 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
     const wholesale = parseFloat(String(row[wholesaleIdx] || "0").replace(/[,$]/g, "")) || 0;
     const rrp = parseFloat(String(row[retailIdx] || "0").replace(/[,$]/g, "")) || 0;
     if (wholesale === 0 && rrp === 0) continue;
+    rawRows++;
 
-    // Extract sizes and quantities
+    // Extract sizes and quantities (wide vs long format)
     const sizes: string[] = [];
     const quantities: number[] = [];
-    for (const sc of sizeColumns) {
-      const qty = parseInt(String(row[sc.idx] || "0")) || 0;
-      if (qty > 0) {
-        // Clean size label: "8 AU/UK (4 US)" → "8"
-        const sizeLabel = sc.label.match(/^(\d+|OS|XXS|XS|S|M|L|XL|XXL)/i)?.[1] || sc.label;
-        sizes.push(sizeLabel);
+    if (isLongFormat) {
+      const sz = normaliseSizeLabel(String(row[sizeColIdx] || "").trim());
+      const qty = parseInt(String(row[unitsIdx] || "0")) || 0;
+      if (sz) {
+        sizes.push(sz);
         quantities.push(qty);
+      }
+    } else {
+      for (const sc of sizeColumns) {
+        const qty = parseInt(String(row[sc.idx] || "0")) || 0;
+        if (qty > 0) {
+          sizes.push(normaliseSizeLabel(sc.label));
+          quantities.push(qty);
+        }
       }
     }
 
-    const totalUnits = unitsIdx >= 0
+    const totalUnits = unitsIdx >= 0 && !isLongFormat
       ? (parseInt(String(row[unitsIdx] || "0")) || quantities.reduce((a, b) => a + b, 0))
       : quantities.reduce((a, b) => a + b, 0);
 
-    // Try to detect brand from style name or first row
-    if (!brand && styleName) {
-      // Brand is usually from PO metadata, try to detect from file name
-      const fileMatch = file.name.match(/\d+-([A-Z][A-Za-z\s]+)-/);
-      if (fileMatch) brand = fileMatch[1].trim();
-    }
+    // Per-row brand wins; otherwise inferred from filename later
+    const rowBrand = brandIdx >= 0 ? String(row[brandIdx] || "").trim() : "";
+    if (!brand && rowBrand) brand = rowBrand;
 
-    products.push({
+    const deliveryStart = deliveryStartIdx >= 0 ? String(row[deliveryStartIdx] || "").trim() : "";
+    const deliveryEnd = deliveryEndIdx >= 0 ? String(row[deliveryEndIdx] || "").trim() : "";
+
+    const product: JoorParsedProduct = {
       styleName,
       styleNumber: styleNum,
       colour: String(row[colorIdx] || "").trim(),
@@ -171,6 +252,8 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
       materials: materialsIdx >= 0 ? String(row[materialsIdx] || "").trim() : "",
       category: categoryIdx >= 0 ? String(row[categoryIdx] || "").trim() : "",
       subcategory: subcategoryIdx >= 0 ? String(row[subcategoryIdx] || "").trim() : "",
+      silhouette: silhouetteIdx >= 0 ? String(row[silhouetteIdx] || "").trim() : "",
+      countryOfOrigin: countryIdx >= 0 ? String(row[countryIdx] || "").trim() : "",
       description: descriptionIdx >= 0 ? String(row[descriptionIdx] || "").trim() : "",
       wholesale,
       rrp,
@@ -179,10 +262,14 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
       totalUnits,
       totalValue: totalUnits * wholesale,
       imageUrl: "",
-    });
+      deliveryStart,
+      deliveryEnd,
+    };
+    product.autoTags = buildAutoTags({ ...product, brand: rowBrand || brand });
+    products.push(product);
   }
 
-  // Detect brand from filename if not found
+  // Detect brand from filename if still missing
   if (!brand) {
     const parts = file.name.replace(/\.[^.]+$/, "").split(/[-_]/);
     for (const p of parts) {
@@ -193,8 +280,23 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
     }
   }
 
-  // Convert to WholesaleOrder
-  const order = productsToWholesaleOrder(products, { brand, season, poNumber });
+  // If long-format, merge rows sharing styleNumber+colour into one product with multiple sizes
+  let finalProducts = products;
+  if (isLongFormat) {
+    const merged = new Map<string, JoorParsedProduct>();
+    for (const p of products) {
+      const key = `${p.styleNumber}||${p.colour}`;
+      const existing = merged.get(key);
+      if (!existing) { merged.set(key, p); continue; }
+      existing.sizes.push(...p.sizes);
+      existing.quantities.push(...p.quantities);
+      existing.totalUnits += p.totalUnits;
+      existing.totalValue += p.totalValue;
+    }
+    finalProducts = Array.from(merged.values());
+  }
+
+  const order = productsToWholesaleOrder(finalProducts, { brand, season, poNumber });
 
   return {
     format: isLinesheet ? "xlsx_linesheet" : "xlsx_order",
@@ -202,7 +304,9 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
     season,
     poNumber,
     orders: [order],
-    rawProducts: products,
+    rawProducts: finalProducts,
+    rawRowCount: rawRows,
+    detected: true,
   };
 }
 

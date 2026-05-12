@@ -246,7 +246,13 @@ function parseCSVWithPlatform(
 
 // Auto-detect which platform a CSV likely came from based on column headers
 export function detectPlatform(headers: string[]): string {
-  const h = headers.map((s) => s.toLowerCase());
+  const h = headers.map((s) => s.toLowerCase().trim());
+  // JOOR catalog spec: Style Number + Wholesale Price + Sugg. Retail Price + Delivery Start Date
+  const hasStyleNum = h.includes("style number") || h.includes("style_number");
+  const hasJoorWholesale = h.some((c) => c === "wholesale price" || c.startsWith("wholesale ("));
+  const hasJoorRetail = h.some((c) => c === "sugg. retail price" || c.startsWith("sugg. retail"));
+  const hasJoorDelivery = h.some((c) => c === "delivery start date" || c === "delivery start");
+  if (hasStyleNum && hasJoorWholesale && hasJoorRetail && hasJoorDelivery) return "joor";
   if (h.some((c) => c.includes("style_number") || c.includes("silhouette")) && h.some((c) => c.includes("upc")))
     return "joor";
   if (h.some((c) => c.includes("ship start") || c.includes("ship end")))

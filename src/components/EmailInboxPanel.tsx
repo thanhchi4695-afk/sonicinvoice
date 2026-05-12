@@ -126,10 +126,10 @@ const guessType = (filename: string): InboxItem["attachmentType"] => {
 
 const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => {
   const { toast } = useToast();
-  const [connections, setConnections] = useState<GmailConnection[]>([]);
+  const [connections, setConnections] = useState<ProviderConnection[]>([]);
   const [loadingConn, setLoadingConn] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [connecting, setConnecting] = useState<Provider | null>(null);
   const [gmailItems, setGmailItems] = useState<InboxItem[]>([]);
   const [simItems, setSimItems] = useState<InboxItem[]>(getSimItems);
   const [showSimulator, setShowSimulator] = useState(false);
@@ -143,6 +143,11 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     try { return localStorage.getItem("sonic_smart_bulk_enabled") === "1"; } catch { return false; }
   });
   const [autoProcessedIds, setAutoProcessedIds] = useState<Set<string>>(() => new Set());
+  const [showYahooModal, setShowYahooModal] = useState(false);
+  const [yahooEmail, setYahooEmail] = useState("");
+  const [yahooPassword, setYahooPassword] = useState("");
+  const [yahooProvider, setYahooProvider] = useState<"yahoo" | "icloud" | "outlook">("yahoo");
+  const [yahooSubmitting, setYahooSubmitting] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem("sonic_smart_bulk_enabled", smartBulk ? "1" : "0"); } catch {}
@@ -152,19 +157,24 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
 
   const loadConnection = useCallback(async () => {
     setLoadingConn(true);
-    const { data, error } = await supabase
-      .from("gmail_connections")
-      .select("id, email_address, last_checked_at, is_active")
-      .eq("is_active", true)
-      .order("created_at", { ascending: true });
-    if (!error) setConnections((data as GmailConnection[]) ?? []);
+    const [g, o, i] = await Promise.all([
+      supabase.from("gmail_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
+      supabase.from("outlook_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
+      supabase.from("imap_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
+    ]);
+    const all: ProviderConnection[] = [
+      ...((g.data as any[]) ?? []).map(r => ({ ...r, provider: "gmail" as Provider })),
+      ...((o.data as any[]) ?? []).map(r => ({ ...r, provider: "outlook" as Provider })),
+      ...((i.data as any[]) ?? []).map(r => ({ ...r, provider: "imap" as Provider })),
+    ];
+    setConnections(all);
     setLoadingConn(false);
   }, []);
 
   const loadFoundInvoices = useCallback(async () => {
     const { data, error } = await supabase
       .from("gmail_found_invoices")
-      .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed")
+      .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed, provider")
       .order("received_at", { ascending: false })
       .limit(1000);
     if (error) return;
@@ -174,9 +184,10 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       const first = atts[0];
       if (!first) continue;
       const recDate = row.received_at ? new Date(row.received_at) : new Date();
+      const provider = ((row as any).provider ?? "gmail") as Provider;
       items.push({
         id: row.id,
-        source: "gmail",
+        source: provider,
         from: row.supplier_name || row.from_email?.split("@")[0] || "(unknown)",
         fromEmail: row.from_email ?? "",
         subject: row.subject ?? "(no subject)",
@@ -197,19 +208,23 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     setGmailItems(items);
   }, []);
 
-  // On mount + handle ?gmail=connected redirect
+  // On mount + handle ?gmail/?outlook=connected redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const gParam = params.get("gmail");
-    if (gParam === "connected") {
-      toast({ title: "Gmail connected", description: params.get("email") ?? "" });
-      addAuditEntry("Email", `Connected Gmail: ${params.get("email") ?? ""}`);
-      params.delete("gmail"); params.delete("email");
-      const url = window.location.pathname + (params.toString() ? `?${params}` : "");
-      window.history.replaceState({}, "", url);
-    } else if (gParam === "error") {
-      toast({ title: "Gmail connection failed", description: params.get("reason") ?? "", variant: "destructive" });
+    for (const key of ["gmail", "outlook"]) {
+      const v = params.get(key);
+      const labelMap: Record<string, string> = { gmail: "Gmail", outlook: "Outlook" };
+      if (v === "connected") {
+        toast({ title: `${labelMap[key]} connected`, description: params.get("email") ?? "" });
+        addAuditEntry("Email", `Connected ${labelMap[key]}: ${params.get("email") ?? ""}`);
+        params.delete(key); params.delete("email");
+      } else if (v === "error") {
+        toast({ title: `${labelMap[key]} connection failed`, description: params.get("reason") ?? "", variant: "destructive" });
+        params.delete(key); params.delete("reason");
+      }
     }
+    const url = window.location.pathname + (params.toString() ? `?${params}` : "");
+    window.history.replaceState({}, "", url);
     loadConnection();
     loadFoundInvoices();
   }, [loadConnection, loadFoundInvoices, toast]);

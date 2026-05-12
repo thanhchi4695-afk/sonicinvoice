@@ -818,6 +818,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                     }}
                     className="w-full h-9 rounded-md bg-input border border-border px-2 text-sm"
                   >
+                    <option value="gmail">Gmail / Google Workspace</option>
                     <option value="yahoo">Yahoo Mail (Ymail)</option>
                     <option value="icloud">iCloud Mail</option>
                     <option value="outlook">Outlook (IMAP fallback)</option>

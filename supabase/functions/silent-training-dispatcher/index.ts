@@ -42,7 +42,17 @@ Deno.serve(async (req) => {
   const auth = req.headers.get("authorization") || "";
   const cronSecret = await getCronSecret(admin);
   const ok = (cronSecret && cronHeader === cronSecret) || auth === `Bearer ${SERVICE_KEY}`;
+  console.log(JSON.stringify({
+    msg: "auth_check",
+    has_cron_header: cronHeader.length > 0,
+    cron_header_len: cronHeader.length,
+    has_secret: !!cronSecret,
+    secret_len: cronSecret?.length ?? 0,
+    has_auth_bearer: auth.startsWith("Bearer "),
+    ok,
+  }));
   if (!ok) return json({ error: "Unauthorized" }, 401);
+
 
 
   // 1. Kill switch

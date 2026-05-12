@@ -75,6 +75,10 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
   const [pushing, setPushing] = useState(false);
   const [pushProgress, setPushProgress] = useState({ current: 0, total: 0 });
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
+  const [detectionBanner, setDetectionBanner] = useState<
+    | { kind: "joor" | "nuorder"; products: number; rows: number }
+    | null
+  >(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 

@@ -587,16 +587,27 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     return () => { timers.forEach(clearTimeout); };
   }, [gmailItems, smartBulk, autoProcessedIds]);
 
-  const handleProcessAllKnown = async () => {
+  const handleProcessAll = async (mode: "high" | "any" = "high") => {
     const targets = [...gmailItems, ...simItems].filter(
-      i =>
-        (i.confidence ?? computeConfidence(i)) === "high" &&
-        i.status !== "done" &&
-        i.status !== "processing",
+      i => {
+        if (i.status === "done" || i.status === "processing") return false;
+        if (mode === "high") {
+          return (i.confidence ?? computeConfidence(i)) === "high";
+        }
+        return true;
+      },
     );
     if (targets.length === 0) {
-      toast({ title: "Nothing to process", description: "No High-confidence invoices ready. Medium and Low items need manual review." });
+      toast({ title: "Nothing to process", description: mode === "high" ? "No High-confidence invoices ready. Switch to Process All (any) to include Medium and Low." : "Queue is empty." });
       return;
+    }
+    if (mode === "any") {
+      const lowMed = targets.filter(t => (t.confidence ?? computeConfidence(t)) !== "high").length;
+      const ok = window.confirm(
+        `Process ALL ${targets.length} queued invoices, including ${lowMed} Medium/Low confidence?\n\n` +
+        `Medium and Low items have unrecognised senders, so parsed results may need editing afterwards in Review.`,
+      );
+      if (!ok) return;
     }
     setBulkProgress({ current: 0, total: targets.length });
     let success = 0;
@@ -617,10 +628,12 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     setBulkProgress(null);
     toast({
       title: "Bulk processing complete",
-      description: `${success} processed${failed ? `, ${failed} failed` : ""} from known suppliers.`,
+      description: `${success} processed${failed ? `, ${failed} failed` : ""}${mode === "any" ? " (all confidence levels)" : " from known suppliers"}.`,
     });
-    addAuditEntry("Email", `Bulk processed ${success} known-supplier invoices${failed ? ` (${failed} failed)` : ""}`);
+    addAuditEntry("Email", `Bulk processed ${success} invoices [${mode}]${failed ? ` (${failed} failed)` : ""}`);
   };
+  const handleProcessAllKnown = () => handleProcessAll("high");
+  const handleProcessAllAny = () => handleProcessAll("any");
 
   const handleSimulateSend = () => {
     if (!simFrom.trim()) return;

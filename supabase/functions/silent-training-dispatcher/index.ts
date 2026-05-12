@@ -35,13 +35,15 @@ const MIN_DELAY_MS = 500;
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Auth: cron secret OR service role
+  const admin: any = createClient(SUPABASE_URL, SERVICE_KEY);
+
+  // Auth: cron secret (env or vault) OR service role
   const cronHeader = req.headers.get("x-cron-secret") || "";
   const auth = req.headers.get("authorization") || "";
-  const ok = (CRON_SECRET && cronHeader === CRON_SECRET) || auth === `Bearer ${SERVICE_KEY}`;
+  const cronSecret = await getCronSecret(admin);
+  const ok = (cronSecret && cronHeader === cronSecret) || auth === `Bearer ${SERVICE_KEY}`;
   if (!ok) return json({ error: "Unauthorized" }, 401);
 
-  const admin: any = createClient(SUPABASE_URL, SERVICE_KEY);
 
   // 1. Kill switch
   const { data: settings } = await admin

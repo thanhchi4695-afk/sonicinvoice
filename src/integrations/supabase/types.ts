@@ -1795,6 +1795,78 @@ export type Database = {
           },
         ]
       }
+      drive_ingested_files: {
+        Row: {
+          drive_file_id: string
+          drive_file_name: string | null
+          error: string | null
+          id: string
+          ingested_at: string
+          mime_type: string | null
+          parse_job_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          drive_file_id: string
+          drive_file_name?: string | null
+          error?: string | null
+          id?: string
+          ingested_at?: string
+          mime_type?: string | null
+          parse_job_id?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          drive_file_id?: string
+          drive_file_name?: string | null
+          error?: string | null
+          id?: string
+          ingested_at?: string
+          mime_type?: string | null
+          parse_job_id?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      drive_watch_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          folder_id: string
+          folder_name: string | null
+          id: string
+          last_error: string | null
+          last_sync_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          folder_id: string
+          folder_name?: string | null
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          folder_id?: string
+          folder_name?: string | null
+          id?: string
+          last_error?: string | null
+          last_sync_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string

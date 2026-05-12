@@ -66,18 +66,21 @@ export default function DriveWatcher() {
     const folderId = extractFolderId(folderInput);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast({ title: "Sign in first" }); setSaving(false); return; }
-    const payload = {
+    const folderChanged = !!row && row.folder_id !== folderId;
+    const payload: any = {
       user_id: user.id,
       folder_id: folderId,
       folder_name: folderName || null,
       enabled: true,
     };
+    // Reset last_sync_at when folder changes so the new folder is fully re-scanned.
+    if (folderChanged || !row) payload.last_sync_at = null;
     const { error } = await supabase
       .from("drive_watch_settings")
       .upsert(payload, { onConflict: "user_id" });
     setSaving(false);
     if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
-    toast({ title: "Drive folder saved" });
+    toast({ title: folderChanged ? "Folder changed — next sync will re-scan everything" : "Drive folder saved" });
     load();
   }
 

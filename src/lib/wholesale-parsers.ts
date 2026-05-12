@@ -256,7 +256,12 @@ export function detectPlatform(headers: string[]): string {
   const hasNuRetailAud = h.some((c) => c === "retail aud" || c === "retail (aud)");
   const hasNuMedia = h.includes("media url 1");
   const hasNuAvailable = h.includes("available from");
+  const hasNuMsrp = h.some((c) => c === "m.s.r.p (aud)" || c === "msrp (aud)" || c === "m.s.r.p aud");
   if (hasStyleNum && hasNuWholesaleAud && hasNuRetailAud && hasNuMedia && hasNuAvailable) {
+    return "nuorder";
+  }
+  // NuOrder Order Data (wide format) — Style Number + Wholesale (AUD) + M.S.R.P (AUD) + Available From
+  if (hasStyleNum && hasNuWholesaleAud && hasNuMsrp && hasNuAvailable) {
     return "nuorder";
   }
   // JOOR catalog spec: Style Number + Wholesale Price + Sugg. Retail Price + Delivery Start Date

@@ -1324,6 +1324,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                   <Download className="w-4 h-4 mr-1.5" />
                   Download CSV
                 </Button>
+                {shopifyConnected === false ? (
                   <Button size="sm" variant="outline" asChild>
                      <a href="/account?subtab=connections">
                       <ShoppingBag className="w-4 h-4 mr-1.5" />

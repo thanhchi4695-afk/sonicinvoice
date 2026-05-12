@@ -235,10 +235,11 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     return /FBAN|FBAV|FB_IAB|Messenger|Instagram|Line\/|MicroMessenger|WeChat|TikTok|Snapchat|Twitter|LinkedInApp|GSA\//i.test(ua);
   })();
 
-  const handleConnectGmail = async () => {
-    setConnecting(true);
+  const startOAuth = async (provider: "gmail" | "outlook") => {
+    setConnecting(provider);
     try {
-      const { data, error } = await supabase.functions.invoke("gmail-oauth-start", {
+      const fn = provider === "gmail" ? "gmail-oauth-start" : "outlook-oauth-start";
+      const { data, error } = await supabase.functions.invoke(fn, {
         body: { origin: window.location.origin },
       });
       if (error) throw error;
@@ -246,90 +247,130 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       if (!url) throw new Error("No OAuth URL returned");
 
       if (isInAppBrowser) {
-        // Google blocks OAuth in embedded webviews ("disallowed_useragent").
-        // Copy the link and prompt the user to open it in Safari/Chrome.
         try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
         toast({
           title: "Open in Safari or Chrome",
-          description: "Google blocks sign-in inside Messenger/Instagram. The link is copied — paste it into your browser.",
+          description: `${providerLabel(provider)} sign-in is blocked inside in-app browsers. The link is copied — paste it into your browser.`,
         });
-        // Best-effort escape attempts (iOS Safari & Android Chrome intent)
         const isAndroid = /Android/i.test(navigator.userAgent);
         if (isAndroid) {
           window.location.href = `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
         } else {
           window.open(url, "_blank");
         }
-        setConnecting(false);
+        setConnecting(null);
         return;
       }
-
       window.location.href = url;
     } catch (err: any) {
-      toast({ title: "Couldn't start Gmail connect", description: err?.message ?? String(err), variant: "destructive" });
-      setConnecting(false);
+      toast({ title: `Couldn't start ${providerLabel(provider)} connect`, description: err?.message ?? String(err), variant: "destructive" });
+      setConnecting(null);
     }
   };
 
-  const handleDisconnect = async (target?: GmailConnection) => {
+  const handleConnectYahoo = async () => {
+    if (!yahooEmail.trim() || !yahooPassword.trim()) return;
+    setYahooSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("imap-connect", {
+        body: {
+          email: yahooEmail.trim(),
+          app_password: yahooPassword.trim(),
+          provider: yahooProvider,
+        },
+      });
+      if (error) throw error;
+      if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "IMAP login failed");
+      toast({ title: `${providerLabel("imap")} connected`, description: yahooEmail.trim() });
+      addAuditEntry("Email", `Connected IMAP (${yahooProvider}): ${yahooEmail.trim()}`);
+      setShowYahooModal(false);
+      setYahooEmail(""); setYahooPassword("");
+      await loadConnection();
+    } catch (err: any) {
+      toast({ title: "Couldn't connect", description: err?.message ?? String(err), variant: "destructive" });
+    } finally {
+      setYahooSubmitting(false);
+    }
+  };
+
+  const handleDisconnect = async (target?: ProviderConnection) => {
     const all = !target;
     const label = all
-      ? "Disconnect ALL Gmail accounts? Inbox history will be cleared. You can reconnect any time."
-      : `Disconnect ${target!.email_address}? Other connected Gmail accounts (if any) stay connected.`;
+      ? "Disconnect ALL email accounts? Inbox history will be cleared. You can reconnect any time."
+      : `Disconnect ${target!.email_address}? Other connected accounts stay connected.`;
     if (!confirm(label)) return;
 
-    let delQuery = supabase.from("gmail_connections").delete();
-    delQuery = target
-      ? delQuery.eq("id", target.id)
-      : delQuery.eq("is_active", true);
-    const { error: delConnErr } = await delQuery;
-    if (delConnErr) {
-      toast({ title: "Failed", description: delConnErr.message, variant: "destructive" });
-      return;
-    }
-    if (all) {
+    const tableFor = (p: Provider) =>
+      p === "gmail" ? "gmail_connections" : p === "outlook" ? "outlook_connections" : "imap_connections";
+
+    if (target) {
+      const { error: delConnErr } = await supabase.from(tableFor(target.provider)).delete().eq("id", target.id);
+      if (delConnErr) {
+        toast({ title: "Failed", description: delConnErr.message, variant: "destructive" });
+        return;
+      }
+    } else {
+      await Promise.all([
+        supabase.from("gmail_connections").delete().eq("is_active", true),
+        supabase.from("outlook_connections").delete().eq("is_active", true),
+        supabase.from("imap_connections").delete().eq("is_active", true),
+      ]);
       const { error: delInvErr } = await supabase
         .from("gmail_found_invoices")
         .delete()
         .neq("id", "00000000-0000-0000-0000-000000000000");
-      if (delInvErr) console.warn("[gmail] failed to clear found invoices", delInvErr);
+      if (delInvErr) console.warn("[email] failed to clear found invoices", delInvErr);
       setGmailItems([]);
       setAutoProcessedIds(new Set());
     }
     addAuditEntry("Email", all
-      ? "Disconnected all Gmail accounts and cleared inbox queue"
-      : `Disconnected Gmail: ${target!.email_address}`);
+      ? "Disconnected all email accounts and cleared inbox queue"
+      : `Disconnected ${providerLabel(target!.provider)}: ${target!.email_address}`);
     await loadConnection();
-    toast({ title: "Gmail disconnected", description: all ? "Inbox queue cleared." : target!.email_address });
+    toast({ title: "Disconnected", description: all ? "Inbox queue cleared." : target!.email_address });
   };
 
   const handleScanNow = async () => {
     setScanning(true);
     try {
-      const { data, error } = await supabase.functions.invoke("scan-gmail-inbox", {
-        body: {},
-      });
-      if (error) throw error;
-      // The function returns 200 with { error } on reauth required, so check the body too
-      if (data && (data as any).error) {
-        const msg = String((data as any).error);
-        if (/reauth|authoris|invalid_grant/i.test(msg)) {
-          toast({
-            title: "Reconnect Gmail",
-            description: "Your Gmail authorisation expired. Please connect again.",
-            variant: "destructive",
-          });
-          await loadConnection();
-          return;
+      // Run all three scans in parallel; report aggregate.
+      const providers = Array.from(new Set(connections.map(c => c.provider)));
+      const results = await Promise.all(
+        providers.map(async (p) => {
+          const fn = p === "gmail" ? "scan-gmail-inbox" : p === "outlook" ? "scan-outlook-inbox" : "scan-imap-inbox";
+          try {
+            const { data, error } = await supabase.functions.invoke(fn, { body: {} });
+            if (error) throw error;
+            return { provider: p, data };
+          } catch (e: any) {
+            return { provider: p, error: e?.message ?? String(e) };
+          }
+        }),
+      );
+      let totalScanned = 0, totalFound = 0;
+      const reauthProviders: Provider[] = [];
+      for (const r of results) {
+        const data: any = (r as any).data;
+        if (data?.error) {
+          const msg = String(data.error);
+          if (/reauth|authoris|invalid_grant/i.test(msg)) reauthProviders.push((r as any).provider);
+          continue;
         }
-        throw new Error(msg);
+        totalScanned += data?.emails_scanned ?? 0;
+        totalFound += data?.invoices_found?.length ?? 0;
       }
-      const found = (data as any)?.invoices_found?.length ?? 0;
-      const scanned = (data as any)?.emails_scanned ?? 0;
-      addAuditEntry("Email", `Scanned Gmail inbox — ${scanned} email(s), ${found} with invoice attachments`);
+      if (reauthProviders.length) {
+        toast({
+          title: `Reconnect ${reauthProviders.map(p => providerLabel(p)).join(", ")}`,
+          description: "Authorisation expired. Please connect again.",
+          variant: "destructive",
+        });
+        await loadConnection();
+      }
+      addAuditEntry("Email", `Scanned all inboxes — ${totalScanned} email(s), ${totalFound} with invoice attachments`);
       toast({
         title: "Scan complete",
-        description: `Scanned ${scanned} email${scanned === 1 ? "" : "s"}, ${found} with invoice attachment${found === 1 ? "" : "s"}`,
+        description: `Scanned ${totalScanned} email${totalScanned === 1 ? "" : "s"}, ${totalFound} with invoice attachment${totalFound === 1 ? "" : "s"}`,
       });
       await Promise.all([loadConnection(), loadFoundInvoices()]);
     } catch (err: any) {

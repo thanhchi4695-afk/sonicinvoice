@@ -611,22 +611,15 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       toast({ title: "Nothing to process", description: mode === "high" ? "No High-confidence invoices ready. Switch to Process All (any) to include Medium and Low." : "Queue is empty." });
       return;
     }
-    if (mode === "any") {
-      const lowMed = targets.filter(t => (t.confidence ?? computeConfidence(t)) !== "high").length;
-      const ok = window.confirm(
-        `Process ALL ${targets.length} queued invoices, including ${lowMed} Medium/Low confidence?\n\n` +
-        `Medium and Low items have unrecognised senders, so parsed results may need editing afterwards in Review.`,
-      );
-      if (!ok) return;
-    }
     setBulkProgress({ current: 0, total: targets.length });
     let success = 0;
     let failed = 0;
     for (let i = 0; i < targets.length; i++) {
       setBulkProgress({ current: i + 1, total: targets.length });
       try {
-        await handleProcess(targets[i]);
-        success++;
+        const ok = await handleProcess(targets[i], { skipSupplierPrompt: mode === "any" });
+        if (ok) success++;
+        else failed++;
       } catch (err) {
         console.warn("Bulk process failed for", targets[i].id, err);
         failed++;

@@ -447,7 +447,133 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     };
   };
 
-  // Push one or many imported items to Shopify as draft products.
+  // ── Shopify Product CSV export ─────────────────────────────────
+  // Builds a Shopify-compatible product import CSV from imported items.
+  // Honors Colour-first / Size-second variant ordering per project rules.
+  const SHOPIFY_CSV_HEADERS = [
+    "Handle","Title","Body (HTML)","Vendor","Type","Tags","Published",
+    "Option1 Name","Option1 Value","Option2 Name","Option2 Value","Option3 Name","Option3 Value",
+    "Variant SKU","Variant Grams","Variant Inventory Tracker","Variant Inventory Qty",
+    "Variant Inventory Policy","Variant Fulfillment Service","Variant Price","Variant Compare At Price",
+    "Variant Requires Shipping","Variant Taxable","Variant Barcode",
+    "Image Src","Image Position","Image Alt Text","Gift Card","SEO Title","SEO Description","Status",
+  ];
+
+  const csvEscape = (v: unknown): string => {
+    if (v === null || v === undefined) return "";
+    const s = String(v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const slugifyHandle = (s: string): string =>
+    (s || "product")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "product";
+
+  const itemsToShopifyCSV = (items: ImportedLineItem[]): string => {
+    const rows: string[][] = [SHOPIFY_CSV_HEADERS.slice()];
+    const usedHandles = new Set<string>();
+
+    for (const item of items) {
+      let handle = slugifyHandle(item.name);
+      let suffix = 2;
+      while (usedHandles.has(handle)) handle = `${slugifyHandle(item.name)}-${suffix++}`;
+      usedHandles.add(handle);
+
+      const colors = (item.colors ?? []).filter(Boolean);
+      const sizes = (item.sizes ?? []).filter(Boolean);
+      const priceStr =
+        item.price !== undefined && Number.isFinite(item.price) ? String(item.price) : "";
+
+      let opt1Name = "", opt2Name = "";
+      let variants: Array<{ o1: string; o2: string }> = [{ o1: "", o2: "" }];
+      if (colors.length && sizes.length) {
+        opt1Name = "Colour"; opt2Name = "Size";
+        variants = colors.flatMap((c) => sizes.map((s) => ({ o1: c, o2: s })));
+      } else if (colors.length) {
+        opt1Name = "Colour";
+        variants = colors.map((c) => ({ o1: c, o2: "" }));
+      } else if (sizes.length) {
+        opt1Name = "Size";
+        variants = sizes.map((s) => ({ o1: s, o2: "" }));
+      }
+
+      const images = (item.imageUrls || []).filter(Boolean);
+      const maxRows = Math.max(variants.length, images.length, 1);
+
+      for (let i = 0; i < maxRows; i++) {
+        const v = variants[i];
+        const img = images[i];
+        const isFirst = i === 0;
+
+        rows.push([
+          handle,
+          isFirst ? (item.name || "Imported product") : "",
+          isFirst ? (item.description || "") : "",
+          isFirst ? "" : "",         // Vendor
+          isFirst ? "" : "",         // Type
+          isFirst ? "" : "",         // Tags
+          isFirst ? "TRUE" : "",     // Published
+          v ? opt1Name : "",
+          v ? v.o1 : "",
+          v ? opt2Name : "",
+          v ? v.o2 : "",
+          "", "",                    // Option3 Name/Value
+          "",                        // Variant SKU
+          v ? "0" : "",              // Variant Grams
+          v ? "shopify" : "",        // Inventory Tracker
+          v ? "0" : "",              // Inventory Qty
+          v ? "deny" : "",           // Inventory Policy
+          v ? "manual" : "",         // Fulfillment Service
+          v ? priceStr : "",         // Variant Price
+          "",                        // Compare At Price
+          v ? "TRUE" : "",           // Requires Shipping
+          v ? "TRUE" : "",           // Taxable
+          "",                        // Barcode
+          img || "",                 // Image Src
+          img ? String(i + 1) : "",  // Image Position
+          img ? (item.name || "") : "",// Image Alt Text
+          isFirst ? "FALSE" : "",    // Gift Card
+          "", "",                    // SEO Title / Description
+          isFirst ? "draft" : "",    // Status
+        ]);
+      }
+    }
+
+    return rows.map((r) => r.map(csvEscape).join(",")).join("\r\n");
+  };
+
+  const downloadCSV = (filename: string, csv: string) => {
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportItemsAsCSV = (items: ImportedLineItem[]) => {
+    if (items.length === 0) {
+      toast.error("Nothing to export");
+      return;
+    }
+    const csv = itemsToShopifyCSV(items);
+    const ts = new Date().toISOString().slice(0, 10);
+    const name = items.length === 1
+      ? `${slugifyHandle(items[0].name)}-${ts}.csv`
+      : `url-import-${items.length}-products-${ts}.csv`;
+    downloadCSV(name, csv);
+    addAuditEntry("url_import", `Exported ${items.length} product${items.length === 1 ? "" : "s"} as Shopify CSV`);
+    toast.success(`Downloaded ${items.length} product${items.length === 1 ? "" : "s"} as CSV`, {
+      description: "Shopify-ready import file saved to your downloads.",
+    });
+  };
+
   const pushItemsToShopify = async (items: ImportedLineItem[]): Promise<boolean> => {
     if (items.length === 0) return false;
     if (pushingShopify) return false;

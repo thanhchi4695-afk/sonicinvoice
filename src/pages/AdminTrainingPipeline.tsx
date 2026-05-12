@@ -278,7 +278,7 @@ export default function AdminTrainingPipeline() {
                     {m.provider}: <strong>{m.email_address}</strong> — {m.last_error?.slice(0, 120)}
                   </p>
                 ))}
-                <Link to="/settings" className="text-xs underline mt-1 inline-block">Reconnect in Email Connections →</Link>
+                <Link to="/dashboard?flow=email_inbox" className="text-xs underline mt-1 inline-block">Reconnect in Email Connections →</Link>
               </div>
             </CardContent>
           </Card>

@@ -146,7 +146,9 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [showYahooModal, setShowYahooModal] = useState(false);
   const [yahooEmail, setYahooEmail] = useState("");
   const [yahooPassword, setYahooPassword] = useState("");
-  const [yahooProvider, setYahooProvider] = useState<"yahoo" | "icloud" | "outlook">("yahoo");
+  const [yahooProvider, setYahooProvider] = useState<"yahoo" | "icloud" | "outlook" | "ventraip" | "fastmail" | "custom">("yahoo");
+  const [yahooHost, setYahooHost] = useState("");
+  const [yahooPort, setYahooPort] = useState("993");
   const [yahooSubmitting, setYahooSubmitting] = useState(false);
 
   useEffect(() => {
@@ -268,15 +270,34 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     }
   };
 
+  const PROVIDER_PRESETS: Record<string, { host: string; port: number } | null> = {
+    yahoo: { host: "imap.mail.yahoo.com", port: 993 },
+    icloud: { host: "imap.mail.me.com", port: 993 },
+    outlook: { host: "outlook.office365.com", port: 993 },
+    ventraip: { host: "mail.ventraip.email", port: 993 },
+    fastmail: { host: "imap.fastmail.com", port: 993 },
+    custom: null,
+  };
+
   const handleConnectYahoo = async () => {
     if (!yahooEmail.trim() || !yahooPassword.trim()) return;
+    const preset = PROVIDER_PRESETS[yahooProvider];
+    const host = (yahooHost.trim() || preset?.host || "").trim();
+    const port = Number(yahooPort) || preset?.port || 993;
+    if (!host) {
+      toast({ title: "IMAP host required", description: "Enter your provider's incoming mail server.", variant: "destructive" });
+      return;
+    }
     setYahooSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("imap-connect", {
         body: {
           email: yahooEmail.trim(),
           app_password: yahooPassword.trim(),
-          provider: yahooProvider,
+          provider: yahooProvider === "ventraip" || yahooProvider === "fastmail" || yahooProvider === "custom" ? "custom" : yahooProvider,
+          imap_host: host,
+          imap_port: port,
+          imap_tls: true,
         },
       });
       if (error) throw error;
@@ -284,7 +305,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       toast({ title: `${providerLabel("imap")} connected`, description: yahooEmail.trim() });
       addAuditEntry("Email", `Connected IMAP (${yahooProvider}): ${yahooEmail.trim()}`);
       setShowYahooModal(false);
-      setYahooEmail(""); setYahooPassword("");
+      setYahooEmail(""); setYahooPassword(""); setYahooHost(""); setYahooPort("993");
       await loadConnection();
     } catch (err: any) {
       toast({ title: "Couldn't connect", description: err?.message ?? String(err), variant: "destructive" });
@@ -787,12 +808,21 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                   <label className="text-[11px] text-muted-foreground mb-1 block">Provider</label>
                   <select
                     value={yahooProvider}
-                    onChange={e => setYahooProvider(e.target.value as any)}
+                    onChange={e => {
+                      const v = e.target.value as any;
+                      setYahooProvider(v);
+                      const preset = PROVIDER_PRESETS[v];
+                      setYahooHost(preset?.host ?? "");
+                      setYahooPort(String(preset?.port ?? 993));
+                    }}
                     className="w-full h-9 rounded-md bg-input border border-border px-2 text-sm"
                   >
                     <option value="yahoo">Yahoo Mail (Ymail)</option>
                     <option value="icloud">iCloud Mail</option>
                     <option value="outlook">Outlook (IMAP fallback)</option>
+                    <option value="ventraip">VentraIP / Splash</option>
+                    <option value="fastmail">Fastmail</option>
+                    <option value="custom">Custom IMAP server</option>
                   </select>
                 </div>
                 <div>
@@ -801,21 +831,51 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                     type="email"
                     value={yahooEmail}
                     onChange={e => setYahooEmail(e.target.value)}
-                    placeholder="you@yahoo.com"
+                    placeholder="you@yourdomain.com"
                     className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm"
                   />
                 </div>
+                <div className="grid grid-cols-[1fr,90px] gap-2">
+                  <div>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">IMAP host</label>
+                    <input
+                      type="text"
+                      value={yahooHost}
+                      onChange={e => setYahooHost(e.target.value)}
+                      placeholder={PROVIDER_PRESETS[yahooProvider]?.host ?? "mail.example.com"}
+                      className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">Port</label>
+                    <input
+                      type="number"
+                      value={yahooPort}
+                      onChange={e => setYahooPort(e.target.value)}
+                      placeholder="993"
+                      className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm font-mono"
+                    />
+                  </div>
+                </div>
                 <div>
-                  <label className="text-[11px] text-muted-foreground mb-1 block">App password (16 chars)</label>
+                  <label className="text-[11px] text-muted-foreground mb-1 block">
+                    {yahooProvider === "yahoo" || yahooProvider === "icloud" ? "App password (16 chars)" : "Mailbox password"}
+                  </label>
                   <input
                     type="password"
                     value={yahooPassword}
                     onChange={e => setYahooPassword(e.target.value)}
-                    placeholder="xxxx xxxx xxxx xxxx"
+                    placeholder={yahooProvider === "yahoo" || yahooProvider === "icloud" ? "xxxx xxxx xxxx xxxx" : "your mailbox password"}
                     className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm font-mono"
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">
-                    Yahoo: <a href="https://login.yahoo.com/account/security" target="_blank" rel="noopener noreferrer" className="underline">login.yahoo.com/account/security</a> → "Generate app password". The password is encrypted at rest.
+                    {yahooProvider === "yahoo" && <>Yahoo: <a href="https://login.yahoo.com/account/security" target="_blank" rel="noopener noreferrer" className="underline">login.yahoo.com/account/security</a> → "Generate app password". </>}
+                    {yahooProvider === "icloud" && <>iCloud: <a href="https://appleid.apple.com" target="_blank" rel="noopener noreferrer" className="underline">appleid.apple.com</a> → Sign-In Security → App-Specific Passwords. </>}
+                    {yahooProvider === "ventraip" && <>VentraIP Splash: use your normal mailbox password. Confirm host in VIPControl → Email Hosting → Manage. </>}
+                    {yahooProvider === "fastmail" && <>Fastmail: Settings → Privacy & Security → App passwords. </>}
+                    {yahooProvider === "outlook" && <>Outlook IMAP requires an app password from your Microsoft account security page. </>}
+                    {yahooProvider === "custom" && <>Use the IMAP host & password from your email provider's control panel. </>}
+                    The password is encrypted at rest.
                   </p>
                 </div>
                 <div className="flex gap-2 pt-2">

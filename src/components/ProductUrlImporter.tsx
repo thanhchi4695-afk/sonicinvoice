@@ -816,7 +816,20 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     await pushItemsToShopify(items);
   };
 
-  // ── Bulk mode ──────────────────────────────────────────────────
+  const handleExportSingleCSV = () => {
+    const item = buildItemFromEdit();
+    if (!item) return;
+    exportItemsAsCSV([item]);
+  };
+
+  const handleExportBulkCSV = () => {
+    const items = bulkRows
+      .filter((r) => r.status === "success" && r.product)
+      .map((r) => productToItem(r.product as ExtractedProduct, r.url));
+    exportItemsAsCSV(items);
+  };
+
+
   const productToItem = (p: ExtractedProduct, fallbackUrl: string): ImportedLineItem => {
     const numericPrice =
       typeof p.price === "number"

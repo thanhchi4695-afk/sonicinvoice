@@ -300,9 +300,13 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
 
   // Parse product rows
   const products: JoorParsedProduct[] = [];
+  const productRowIdx: number[] = []; // 1-based xlsx row for each product (for image lookup)
   let rawRows = 0;
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
+    const styleName = String(row[styleNameIdx] || "").trim();
+    const styleNum = String(row[styleNumIdx] || "").trim();
+    if (!styleName && !styleNum) continue;
     const styleName = String(row[styleNameIdx] || "").trim();
     const styleNum = String(row[styleNumIdx] || "").trim();
     if (!styleName && !styleNum) continue;

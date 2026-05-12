@@ -63,15 +63,17 @@ confidence is 0.0–1.0. Be honest; if you cannot extract products, return [] an
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Auth: either internal CRON_SECRET header OR service-role key in Authorization
+  const admin: any = createClient(SUPABASE_URL, SERVICE_KEY);
+
+  // Auth: either CRON_SECRET (env or vault) OR service-role bearer
   const authHeader = req.headers.get("authorization") || "";
   const cronHeader = req.headers.get("x-cron-secret") || "";
+  const cronSecret = await getCronSecret(admin);
   const isAuthorized =
-    (CRON_SECRET && cronHeader === CRON_SECRET) ||
+    (cronSecret && cronHeader === cronSecret) ||
     authHeader === `Bearer ${SERVICE_KEY}`;
   if (!isAuthorized) return json({ error: "Unauthorized" }, 401);
 
-  const admin: any = createClient(SUPABASE_URL, SERVICE_KEY);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }

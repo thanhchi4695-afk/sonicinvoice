@@ -247,8 +247,19 @@ function parseCSVWithPlatform(
 // Auto-detect which platform a CSV likely came from based on column headers
 export function detectPlatform(headers: string[]): string {
   const h = headers.map((s) => s.toLowerCase().trim());
-  // JOOR catalog spec: Style Number + Wholesale Price + Sugg. Retail Price + Delivery Start Date
+  // NuOrder "Download Product Data XLS" — Style Number + Wholesale AUD +
+  // Retail AUD + Media URL 1 + available from. Check first because NuOrder
+  // also has a "Style Number" column that would otherwise match the JOOR
+  // signature below.
   const hasStyleNum = h.includes("style number") || h.includes("style_number");
+  const hasNuWholesaleAud = h.some((c) => c === "wholesale aud" || c === "wholesale (aud)");
+  const hasNuRetailAud = h.some((c) => c === "retail aud" || c === "retail (aud)");
+  const hasNuMedia = h.includes("media url 1");
+  const hasNuAvailable = h.includes("available from");
+  if (hasStyleNum && hasNuWholesaleAud && hasNuRetailAud && hasNuMedia && hasNuAvailable) {
+    return "nuorder";
+  }
+  // JOOR catalog spec: Style Number + Wholesale Price + Sugg. Retail Price + Delivery Start Date
   const hasJoorWholesale = h.some((c) => c === "wholesale price" || c.startsWith("wholesale ("));
   const hasJoorRetail = h.some((c) => c === "sugg. retail price" || c.startsWith("sugg. retail"));
   const hasJoorDelivery = h.some((c) => c === "delivery start date" || c === "delivery start");

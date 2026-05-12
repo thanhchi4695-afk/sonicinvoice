@@ -75,6 +75,10 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
   const [pushing, setPushing] = useState(false);
   const [pushProgress, setPushProgress] = useState({ current: 0, total: 0 });
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
+  const [detectionBanner, setDetectionBanner] = useState<
+    | { kind: "joor" | "nuorder"; products: number; rows: number }
+    | null
+  >(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -206,9 +210,40 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const wb = XLSX.read(ev.target?.result, { type: "array" });
+
+        // ── NuOrder detection: sheet name "NuORDER Item Data" OR matching headers ──
+        const nuorderSheetName = wb.SheetNames.find(
+          (n) => n.trim().toLowerCase() === "nuorder item data",
+        );
+        const firstSheet = wb.Sheets[nuorderSheetName || wb.SheetNames[0]];
+        const firstRows = XLSX.utils.sheet_to_json<Record<string, string>>(firstSheet, { defval: "" });
+        const looksLikeNuOrder =
+          activePlatform === "nuorder" ||
+          !!nuorderSheetName ||
+          (firstRows.length > 0 && detectPlatform(Object.keys(firstRows[0])) === "nuorder");
+
+        if (looksLikeNuOrder) {
+          try {
+            const { parseNuOrderFile } = await import("@/lib/nuorder-file-parser");
+            const result = await parseNuOrderFile(file);
+            if (result.detected && result.orders.length > 0) {
+              setOrders(result.orders);
+              const grouped = result.rawProducts.length;
+              const rowCount = result.rawRowCount ?? firstRows.length;
+              setDetectionBanner({ kind: "nuorder", products: grouped, rows: rowCount });
+              toast.success(`NuOrder catalog detected — ${grouped} products grouped from ${rowCount} rows`);
+              import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "wholesale", productCount: grouped }));
+              setScreen("orders");
+              return;
+            }
+          } catch (err) {
+            console.warn("NuOrder parser failed, falling back to generic:", err);
+          }
+        }
+
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
-        // Try JOOR-spec detection first (works even when file has multi-row headers)
+        // Try JOOR-spec detection (works even when file has multi-row headers)
         const looksLikeJoor =
           activePlatform === "joor" ||
           (rows.length > 0 && detectPlatform(Object.keys(rows[0])) === "joor");
@@ -219,6 +254,7 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
             if (result.detected && result.orders.length > 0) {
               setOrders(result.orders);
               const grouped = result.rawProducts.length;
+              setDetectionBanner({ kind: "joor", products: grouped, rows: result.rawRowCount ?? rows.length });
               toast.success(`JOOR catalog detected — ${grouped} products grouped from ${result.rawRowCount ?? rows.length} rows`);
               import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "wholesale", productCount: grouped }));
               setScreen("orders");
@@ -745,6 +781,24 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
           </Button>
         )}
       </div>
+
+      {detectionBanner && (
+        <div
+          className={`rounded-lg border p-3 mb-4 flex items-center gap-2 ${
+            detectionBanner.kind === "nuorder"
+              ? "bg-primary/10 border-primary/30 text-primary-foreground"
+              : "bg-success/10 border-success/30"
+          }`}
+        >
+          <Check className={`w-4 h-4 shrink-0 ${detectionBanner.kind === "nuorder" ? "text-primary" : "text-success"}`} />
+          <p className="text-sm">
+            <span className="font-medium">
+              {detectionBanner.kind === "nuorder" ? "NuOrder" : "JOOR"} catalog detected
+            </span>{" "}
+            — {detectionBanner.products} products grouped from {detectionBanner.rows} rows.
+          </p>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 mb-4">
         <h1 className="text-xl font-semibold font-display">Orders</h1>

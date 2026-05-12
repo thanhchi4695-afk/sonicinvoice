@@ -2087,12 +2087,14 @@ export type Database = {
         Row: {
           agent_run_id: string | null
           attachments: Json
+          connection_id: string | null
           created_at: string
           from_email: string | null
           id: string
           known_supplier: boolean
           message_id: string
           processed: boolean
+          provider: string
           received_at: string | null
           subject: string | null
           supplier_name: string | null
@@ -2101,12 +2103,14 @@ export type Database = {
         Insert: {
           agent_run_id?: string | null
           attachments?: Json
+          connection_id?: string | null
           created_at?: string
           from_email?: string | null
           id?: string
           known_supplier?: boolean
           message_id: string
           processed?: boolean
+          provider?: string
           received_at?: string | null
           subject?: string | null
           supplier_name?: string | null
@@ -2115,12 +2119,14 @@ export type Database = {
         Update: {
           agent_run_id?: string | null
           attachments?: Json
+          connection_id?: string | null
           created_at?: string
           from_email?: string | null
           id?: string
           known_supplier?: boolean
           message_id?: string
           processed?: boolean
+          provider?: string
           received_at?: string | null
           subject?: string | null
           supplier_name?: string | null
@@ -2214,6 +2220,60 @@ export type Database = {
           user_id?: string
           vendor?: string | null
           width?: number | null
+        }
+        Relationships: []
+      }
+      imap_connections: {
+        Row: {
+          created_at: string
+          email_address: string
+          id: string
+          imap_host: string
+          imap_port: number
+          imap_tls: boolean
+          imap_username: string
+          is_active: boolean
+          last_checked_at: string | null
+          last_uid: number | null
+          password_encrypted: string
+          password_iv: string
+          provider_label: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_address: string
+          id?: string
+          imap_host: string
+          imap_port?: number
+          imap_tls?: boolean
+          imap_username: string
+          is_active?: boolean
+          last_checked_at?: string | null
+          last_uid?: number | null
+          password_encrypted: string
+          password_iv: string
+          provider_label?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_address?: string
+          id?: string
+          imap_host?: string
+          imap_port?: number
+          imap_tls?: boolean
+          imap_username?: string
+          is_active?: boolean
+          last_checked_at?: string | null
+          last_uid?: number | null
+          password_encrypted?: string
+          password_iv?: string
+          provider_label?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -2956,6 +3016,48 @@ export type Database = {
           created_at?: string
           id?: string
           invoice_company_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      outlook_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          email_address: string
+          expires_at: string
+          id: string
+          is_active: boolean
+          last_checked_at: string | null
+          last_email_id: string | null
+          refresh_token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          email_address: string
+          expires_at: string
+          id?: string
+          is_active?: boolean
+          last_checked_at?: string | null
+          last_email_id?: string | null
+          refresh_token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          email_address?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          last_checked_at?: string | null
+          last_email_id?: string | null
+          refresh_token?: string
           updated_at?: string
           user_id?: string
         }

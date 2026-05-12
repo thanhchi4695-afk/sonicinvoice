@@ -274,7 +274,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     yahoo: { host: "imap.mail.yahoo.com", port: 993 },
     icloud: { host: "imap.mail.me.com", port: 993 },
     outlook: { host: "outlook.office365.com", port: 993 },
-    ventraip: { host: "mail.ventraip.email", port: 993 },
+    ventraip: { host: "ventraip.email", port: 993 },
     fastmail: { host: "imap.fastmail.com", port: 993 },
     custom: null,
   };

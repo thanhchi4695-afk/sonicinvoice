@@ -183,28 +183,34 @@ function buildNuOrderTags(p: {
 
 export async function parseNuOrderFile(file: File): Promise<NuOrderFileParseResult> {
   const buffer = await file.arrayBuffer();
-  // cellDates ensures "available from" comes back as a JS Date.
   const wb = XLSX.read(buffer, { type: "array", cellDates: true });
 
-  // Prefer the named NuORDER Item Data sheet; fall back to the first sheet.
-  const sheetName =
-    wb.SheetNames.find((n) => n.trim().toLowerCase() === NUORDER_SHEET_NAME.toLowerCase()) ||
-    wb.SheetNames[0];
+  // Prefer named NuORDER sheets; fall back to first sheet.
+  const itemSheet = wb.SheetNames.find((n) => n.trim().toLowerCase() === NUORDER_ITEM_SHEET.toLowerCase());
+  const orderSheet = wb.SheetNames.find((n) => n.trim().toLowerCase() === NUORDER_ORDER_SHEET.toLowerCase());
+  const sheetName = itemSheet || orderSheet || wb.SheetNames[0];
   if (!sheetName) {
     return { format: "unknown", brand: "", season: "", poNumber: "", orders: [], rawProducts: [] };
   }
   const ws = wb.Sheets[sheetName];
 
-  // Parse as objects so we can address by header name (NuOrder always uses a
-  // single header row at the top of the sheet).
   const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
   if (rows.length === 0) {
     return { format: "unknown", brand: "", season: "", poNumber: "", orders: [], rawProducts: [] };
   }
 
   const headers = Object.keys(rows[0]);
-  const sheetMatches = sheetName.trim().toLowerCase() === NUORDER_SHEET_NAME.toLowerCase();
-  if (!sheetMatches && !isNuOrderHeaderRow(headers)) {
+  const h = headers.map((s) => s.trim().toLowerCase());
+  const isOrderFormat =
+    sheetName.trim().toLowerCase() === NUORDER_ORDER_SHEET.toLowerCase() ||
+    REQUIRED_HEADERS_ORDER.every((req) => h.includes(req));
+  const isItemFormat =
+    !isOrderFormat &&
+    (sheetName.trim().toLowerCase() === NUORDER_ITEM_SHEET.toLowerCase() ||
+      REQUIRED_HEADERS_ITEM.every((req) => h.includes(req)));
+
+  if (isOrderFormat) return parseOrderFormat(rows, headers, file);
+  if (!isItemFormat) {
     return { format: "unknown", brand: "", season: "", poNumber: "", orders: [], rawProducts: [] };
   }
 

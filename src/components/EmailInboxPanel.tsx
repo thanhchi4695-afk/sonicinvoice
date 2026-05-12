@@ -861,16 +861,17 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                 </div>
                 <div>
                   <label className="text-[11px] text-muted-foreground mb-1 block">
-                    {yahooProvider === "yahoo" || yahooProvider === "icloud" ? "App password (16 chars)" : "Mailbox password"}
+                    {yahooProvider === "yahoo" || yahooProvider === "icloud" || yahooProvider === "gmail" ? "App password (16 chars)" : "Mailbox password"}
                   </label>
                   <input
                     type="password"
                     value={yahooPassword}
                     onChange={e => setYahooPassword(e.target.value)}
-                    placeholder={yahooProvider === "yahoo" || yahooProvider === "icloud" ? "xxxx xxxx xxxx xxxx" : "your mailbox password"}
+                    placeholder={yahooProvider === "yahoo" || yahooProvider === "icloud" || yahooProvider === "gmail" ? "xxxx xxxx xxxx xxxx" : "your mailbox password"}
                     className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm font-mono"
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">
+                    {yahooProvider === "gmail" && <>Gmail / Workspace requires an App Password (regular password won't work). 2-Step Verification must be ON, then go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="underline">myaccount.google.com/apppasswords</a> → name it "Sonic Invoices" → copy the 16-char password. </>}
                     {yahooProvider === "yahoo" && <>Yahoo: <a href="https://login.yahoo.com/account/security" target="_blank" rel="noopener noreferrer" className="underline">login.yahoo.com/account/security</a> → "Generate app password". </>}
                     {yahooProvider === "icloud" && <>iCloud: <a href="https://appleid.apple.com" target="_blank" rel="noopener noreferrer" className="underline">appleid.apple.com</a> → Sign-In Security → App-Specific Passwords. </>}
                     {yahooProvider === "ventraip" && <>VentraIP Splash: use your normal mailbox password. Confirm host in VIPControl → Email Hosting → Manage. </>}

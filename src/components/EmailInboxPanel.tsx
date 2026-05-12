@@ -295,7 +295,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
         body: {
           email: yahooEmail.trim(),
           app_password: yahooPassword.trim(),
-          provider: yahooProvider === "ventraip" || yahooProvider === "fastmail" || yahooProvider === "custom" ? "custom" : yahooProvider,
+          provider: yahooProvider === "gmail" || yahooProvider === "ventraip" || yahooProvider === "fastmail" || yahooProvider === "custom" ? "custom" : yahooProvider,
           imap_host: host,
           imap_port: port,
           imap_tls: true,

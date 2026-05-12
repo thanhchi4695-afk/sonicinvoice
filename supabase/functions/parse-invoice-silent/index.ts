@@ -142,8 +142,10 @@ Deno.serve(async (req) => {
     }
 
     // 6. Fetch attachment bytes
-    const fileBytes = await fetchAttachment(admin, found, att);
-    if (!fileBytes) throw new Error("attachment fetch returned empty");
+    const fetched = await fetchAttachment(admin, found, att);
+    if (!fetched?.bytes?.byteLength) throw new Error("attachment fetch returned empty");
+    const fileBytes = fetched.bytes;
+    const emailAccount = fetched.emailAccount;
 
     // 7. SHA-256 dedup
     const sha = await sha256Hex(fileBytes);
@@ -171,7 +173,7 @@ Deno.serve(async (req) => {
       user_id: found.user_id,
       mailbox_provider: found.provider,
       mailbox_connection_id: found.connection_id,
-      email_account: null,
+      email_account: emailAccount,
       sender_domain: senderDomain || null,
       email_message_id: found.message_id,
       attachment_filename: att.filename,

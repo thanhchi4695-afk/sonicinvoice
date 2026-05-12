@@ -356,6 +356,18 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     }
   }, []);
 
+  // Deep-link handler: /dashboard?flow=<flowId> opens that flow directly
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const flowId = params.get("flow");
+    if (flowId && (FLOW_KEYS as Record<string, boolean>)[flowId]) {
+      setActiveFlow(flowId as ActiveFlow);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("flow");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
   // Handle Shopify OAuth login callback (standalone Shopify login, not embedded)
   useEffect(() => {
     if (isEmbedded) return;

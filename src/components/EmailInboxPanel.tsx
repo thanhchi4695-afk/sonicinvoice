@@ -649,17 +649,17 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       </div>
 
       <div className="px-4 pt-4 space-y-4">
-        {/* Gmail connection card */}
+        {/* Email connection card */}
         <div className="bg-card rounded-lg border border-border p-4">
           {loadingConn ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" /> Checking Gmail connection…
+              <Loader2 className="w-4 h-4 animate-spin" /> Checking connections…
             </div>
           ) : connections.length > 0 ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold">
-                  Connected Gmail accounts ({connections.length})
+                  Connected inboxes ({connections.length})
                 </p>
                 <Button size="sm" variant="teal" className="h-8" onClick={handleScanNow} disabled={scanning}>
                   {scanning
@@ -674,12 +674,17 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                     : null;
                   const healthy = ageMin !== null && ageMin < 10;
                   return (
-                    <li key={c.id} className="flex items-center gap-3 px-3 py-2">
+                    <li key={`${c.provider}:${c.id}`} className="flex items-center gap-3 px-3 py-2">
                       <div className="w-8 h-8 rounded-full bg-success/15 flex items-center justify-center shrink-0">
                         <CheckCircle2 className="w-4 h-4 text-success" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{c.email_address}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium truncate">{c.email_address}</p>
+                          <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${providerBadgeCls(c.provider)}`}>
+                            {providerLabel(c.provider).toUpperCase()}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="relative flex h-2 w-2">
                             {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
@@ -704,19 +709,23 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                   );
                 })}
               </ul>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-9 flex-1 min-w-[160px]"
-                  onClick={handleConnectGmail}
-                  disabled={connecting}
-                >
-                  {connecting
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening Google…</>
-                    : <><Mail className="w-4 h-4 mr-2" /> Connect another Gmail</>}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <Button size="sm" variant="outline" className="h-9" onClick={() => startOAuth("gmail")} disabled={connecting === "gmail"}>
+                  {connecting === "gmail"
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening…</>
+                    : <><Mail className="w-4 h-4 mr-2" /> Add Gmail</>}
                 </Button>
-                <Button size="sm" variant="ghost" className="h-9" onClick={() => handleDisconnect()}>
+                <Button size="sm" variant="outline" className="h-9" onClick={() => startOAuth("outlook")} disabled={connecting === "outlook"}>
+                  {connecting === "outlook"
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening…</>
+                    : <><Mail className="w-4 h-4 mr-2" /> Add Outlook</>}
+                </Button>
+                <Button size="sm" variant="outline" className="h-9" onClick={() => setShowYahooModal(true)}>
+                  <Mail className="w-4 h-4 mr-2" /> Add Yahoo / IMAP
+                </Button>
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleDisconnect()}>
                   Remove all
                 </Button>
               </div>
@@ -731,25 +740,97 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                   <Mail className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold mb-1">Connect Gmail to auto-pull invoices</p>
+                  <p className="text-sm font-semibold mb-1">Connect your email to auto-pull invoices</p>
                   <p className="text-xs text-muted-foreground">
-                    Read-only access. Sonic Invoices scans your inbox for supplier invoices and queues them here. You can connect multiple Gmail accounts.
+                    Read-only access. Sonic Invoices scans your inbox for supplier invoices and queues them here. You can connect Gmail, Outlook, or Yahoo (and other IMAP providers).
                   </p>
                 </div>
               </div>
               {isInAppBrowser && (
                 <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] text-amber-200">
-                  <strong>Open in Safari or Chrome.</strong> Google blocks sign-in inside Messenger, Instagram, TikTok and other in-app browsers. Tap the <span className="font-mono">•••</span> menu → "Open in browser".
+                  <strong>Open in Safari or Chrome.</strong> Gmail and Outlook block sign-in inside Messenger, Instagram, TikTok and other in-app browsers. Tap the <span className="font-mono">•••</span> menu → "Open in browser".
                 </div>
               )}
-              <Button variant="teal" className="w-full h-10 mt-3" onClick={handleConnectGmail} disabled={connecting}>
-                {connecting
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening Google…</>
-                  : <><Mail className="w-4 h-4 mr-2" /> Connect Gmail</>}
-              </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+                <Button variant="teal" className="h-10" onClick={() => startOAuth("gmail")} disabled={connecting === "gmail"}>
+                  {connecting === "gmail"
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening…</>
+                    : <><Mail className="w-4 h-4 mr-2" /> Connect Gmail</>}
+                </Button>
+                <Button variant="teal" className="h-10" onClick={() => startOAuth("outlook")} disabled={connecting === "outlook"}>
+                  {connecting === "outlook"
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening…</>
+                    : <><Mail className="w-4 h-4 mr-2" /> Connect Outlook</>}
+                </Button>
+                <Button variant="teal" className="h-10" onClick={() => setShowYahooModal(true)}>
+                  <Mail className="w-4 h-4 mr-2" /> Connect Yahoo / IMAP
+                </Button>
+              </div>
             </div>
           )}
         </div>
+
+        {/* Yahoo / IMAP modal */}
+        {showYahooModal && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !yahooSubmitting && setShowYahooModal(false)}>
+            <div className="bg-card rounded-lg border border-border p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold">Connect via app password</h3>
+                <button onClick={() => setShowYahooModal(false)} disabled={yahooSubmitting} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] text-muted-foreground mb-1 block">Provider</label>
+                  <select
+                    value={yahooProvider}
+                    onChange={e => setYahooProvider(e.target.value as any)}
+                    className="w-full h-9 rounded-md bg-input border border-border px-2 text-sm"
+                  >
+                    <option value="yahoo">Yahoo Mail (Ymail)</option>
+                    <option value="icloud">iCloud Mail</option>
+                    <option value="outlook">Outlook (IMAP fallback)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground mb-1 block">Email</label>
+                  <input
+                    type="email"
+                    value={yahooEmail}
+                    onChange={e => setYahooEmail(e.target.value)}
+                    placeholder="you@yahoo.com"
+                    className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground mb-1 block">App password (16 chars)</label>
+                  <input
+                    type="password"
+                    value={yahooPassword}
+                    onChange={e => setYahooPassword(e.target.value)}
+                    placeholder="xxxx xxxx xxxx xxxx"
+                    className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm font-mono"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Yahoo: <a href="https://login.yahoo.com/account/security" target="_blank" rel="noopener noreferrer" className="underline">login.yahoo.com/account/security</a> → "Generate app password". The password is encrypted at rest.
+                  </p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" className="flex-1 h-9" onClick={() => setShowYahooModal(false)} disabled={yahooSubmitting}>
+                    Cancel
+                  </Button>
+                  <Button variant="teal" className="flex-1 h-9" onClick={handleConnectYahoo} disabled={yahooSubmitting || !yahooEmail.trim() || !yahooPassword.trim()}>
+                    {yahooSubmitting
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Testing…</>
+                      : <>Connect</>}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* Inbox queue */}
         <div>

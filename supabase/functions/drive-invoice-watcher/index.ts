@@ -42,6 +42,7 @@ interface WatchRow {
   id: string;
   user_id: string;
   folder_id: string;
+  folder_name?: string | null;
   enabled: boolean;
   last_sync_at: string | null;
 }
@@ -105,11 +106,24 @@ async function downloadFileBase64(fileId: string): Promise<string> {
   return btoa(binary);
 }
 
+async function getFolderName(folderId: string): Promise<string | null> {
+  const fields = encodeURIComponent("id,name,mimeType");
+  const res = await driveFetch(`/files/${folderId}?fields=${fields}`);
+  if (!res.ok) return null;
+  const data = await res.json().catch(() => null);
+  return typeof data?.name === "string" ? data.name : null;
+}
+
 async function processOneWatch(admin: any, watch: WatchRow): Promise<{ scanned: number; new: number; errors: number }> {
   const sinceIso = watch.last_sync_at;
   let scanned = 0;
   let added = 0;
   let errors = 0;
+
+  const resolvedFolderName = await getFolderName(watch.folder_id).catch(() => null);
+  if (resolvedFolderName && resolvedFolderName !== watch.folder_name) {
+    await admin.from("drive_watch_settings").update({ folder_name: resolvedFolderName }).eq("id", watch.id);
+  }
 
   let files: DriveFile[];
   try {
@@ -138,6 +152,7 @@ async function processOneWatch(admin: any, watch: WatchRow): Promise<{ scanned: 
     // Reserve the row first so concurrent runs don't double-process
     const { error: insertErr } = await admin.from("drive_ingested_files").insert({
       user_id: watch.user_id,
+      folder_id: watch.folder_id,
       drive_file_id: file.id,
       drive_file_name: file.name,
       mime_type: file.mimeType,
@@ -177,7 +192,7 @@ async function processOneWatch(admin: any, watch: WatchRow): Promise<{ scanned: 
       await admin.from("drive_ingested_files").update({
         status: "completed",
         parse_job_id: result?.jobId ?? result?.job_id ?? null,
-      }).eq("user_id", watch.user_id).eq("drive_file_id", file.id);
+      }).eq("user_id", watch.user_id).eq("drive_file_id", file.id).eq("folder_id", watch.folder_id);
 
       added += 1;
     } catch (err) {
@@ -185,13 +200,14 @@ async function processOneWatch(admin: any, watch: WatchRow): Promise<{ scanned: 
       await admin.from("drive_ingested_files").update({
         status: "error",
         error: err instanceof Error ? err.message : String(err),
-      }).eq("user_id", watch.user_id).eq("drive_file_id", file.id);
+      }).eq("user_id", watch.user_id).eq("drive_file_id", file.id).eq("folder_id", watch.folder_id);
     }
   }
 
   await admin.from("drive_watch_settings").update({
     last_sync_at: new Date().toISOString(),
     last_error: null,
+    ...(resolvedFolderName ? { folder_name: resolvedFolderName } : {}),
   }).eq("id", watch.id);
 
   return { scanned, new: added, errors };

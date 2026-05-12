@@ -5718,7 +5718,7 @@ export type Database = {
           brand_detected: string | null
           created_at: string
           document_type: string | null
-          email_account: string
+          email_account: string | null
           email_message_id: string
           error_message: string | null
           fields_detected: Json
@@ -5742,7 +5742,7 @@ export type Database = {
           brand_detected?: string | null
           created_at?: string
           document_type?: string | null
-          email_account: string
+          email_account?: string | null
           email_message_id: string
           error_message?: string | null
           fields_detected?: Json
@@ -5766,7 +5766,7 @@ export type Database = {
           brand_detected?: string | null
           created_at?: string
           document_type?: string | null
-          email_account?: string
+          email_account?: string | null
           email_message_id?: string
           error_message?: string | null
           fields_detected?: Json

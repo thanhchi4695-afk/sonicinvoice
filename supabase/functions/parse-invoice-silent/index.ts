@@ -310,7 +310,7 @@ async function incrementFailedStreak(admin: any, userId: string, brandName: stri
 
 // ─────────────────────────── attachment fetch ───────────────────────────
 
-async function fetchAttachment(admin: any, found: any, att: any): Promise<Uint8Array | null> {
+async function fetchAttachment(admin: any, found: any, att: any): Promise<{ bytes: Uint8Array; emailAccount: string | null }> {
   const provider = found.provider as string;
   if (provider === "gmail") return fetchGmail(admin, found, att);
   if (provider === "outlook") return fetchOutlook(admin, found, att);
@@ -318,26 +318,36 @@ async function fetchAttachment(admin: any, found: any, att: any): Promise<Uint8A
   throw new Error(`unsupported provider: ${provider}`);
 }
 
-async function fetchGmail(admin: any, found: any, att: any): Promise<Uint8Array> {
-  const { data: conn } = await admin
-    .from("gmail_connections")
-    .select("access_token, refresh_token, expires_at")
-    .eq("id", found.connection_id)
-    .maybeSingle();
+async function loadGmailConn(admin: any, found: any) {
+  // Try by connection_id first; fall back to user's active gmail conn (legacy rows)
+  if (found.connection_id) {
+    const { data } = await admin.from("gmail_connections")
+      .select("id, email_address, access_token, refresh_token, expires_at")
+      .eq("id", found.connection_id).maybeSingle();
+    if (data) return data;
+  }
+  const { data } = await admin.from("gmail_connections")
+    .select("id, email_address, access_token, refresh_token, expires_at")
+    .eq("user_id", found.user_id).eq("is_active", true).limit(1).maybeSingle();
+  return data;
+}
+
+async function fetchGmail(admin: any, found: any, att: any) {
+  const conn = await loadGmailConn(admin, found);
   if (!conn) throw new Error("gmail connection not found");
   let token = conn.access_token;
   const expMs = new Date(conn.expires_at).getTime();
   if (Number.isFinite(expMs) && expMs - Date.now() < 5 * 60 * 1000) {
-    token = await refreshGoogle(admin, found.connection_id, conn.refresh_token);
+    token = await refreshGoogle(admin, conn.id, conn.refresh_token);
   }
   const r = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(found.message_id)}/attachments/${encodeURIComponent(att.attachment_id)}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
-  if (!r.ok) throw new Error(`gmail attachment fetch ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw new Error(`gmail attachment fetch ${r.status}: ${(await r.text()).slice(0, 160)}`);
   const j = await r.json() as { data?: string };
   if (!j.data) throw new Error("gmail attachment empty");
-  return base64UrlToBytes(j.data);
+  return { bytes: base64UrlToBytes(j.data), emailAccount: conn.email_address ?? null };
 }
 
 async function refreshGoogle(admin: any, connId: string, refreshToken: string): Promise<string> {

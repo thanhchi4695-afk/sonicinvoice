@@ -137,7 +137,6 @@ async function invokeSilent(foundInvoiceId: string) {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${SERVICE_KEY}`,
-        ...(CRON_SECRET ? { "x-cron-secret": CRON_SECRET } : {}),
       },
       body: JSON.stringify({ found_invoice_id: foundInvoiceId }),
     });

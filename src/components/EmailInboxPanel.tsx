@@ -271,6 +271,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   };
 
   const PROVIDER_PRESETS: Record<string, { host: string; port: number } | null> = {
+    gmail: { host: "imap.gmail.com", port: 993 },
     yahoo: { host: "imap.mail.yahoo.com", port: 993 },
     icloud: { host: "imap.mail.me.com", port: 993 },
     outlook: { host: "outlook.office365.com", port: 993 },

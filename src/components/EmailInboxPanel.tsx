@@ -11,9 +11,11 @@ interface EmailInboxPanelProps {
   onProcessInvoice?: (supplierName: string) => void;
 }
 
+type Provider = "gmail" | "outlook" | "imap";
+
 interface InboxItem {
   id: string;
-  source: "gmail" | "sim";
+  source: "gmail" | "outlook" | "imap" | "sim";
   from: string;
   fromEmail: string;
   subject: string;
@@ -55,12 +57,22 @@ const confidenceBadge = (c: "high" | "medium" | "low") => {
   );
 };
 
-interface GmailConnection {
+interface ProviderConnection {
   id: string;
+  provider: Provider;
   email_address: string;
   last_checked_at: string | null;
   is_active: boolean;
 }
+
+const providerLabel = (p: Provider) =>
+  p === "gmail" ? "Gmail" : p === "outlook" ? "Outlook" : "Yahoo / IMAP";
+
+const providerBadgeCls = (p: Provider | "sim") =>
+  p === "gmail" ? "bg-success/15 text-success border-success/20"
+  : p === "outlook" ? "bg-primary/15 text-primary border-primary/20"
+  : p === "imap" ? "bg-purple-500/15 text-purple-300 border-purple-500/20"
+  : "bg-warning/15 text-warning border-warning/20";
 
 const SIM_KEY = "email_inbox_sim";
 const isDemoMode = () =>

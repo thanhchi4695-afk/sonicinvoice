@@ -587,16 +587,27 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     return () => { timers.forEach(clearTimeout); };
   }, [gmailItems, smartBulk, autoProcessedIds]);
 
-  const handleProcessAllKnown = async () => {
+  const handleProcessAll = async (mode: "high" | "any" = "high") => {
     const targets = [...gmailItems, ...simItems].filter(
-      i =>
-        (i.confidence ?? computeConfidence(i)) === "high" &&
-        i.status !== "done" &&
-        i.status !== "processing",
+      i => {
+        if (i.status === "done" || i.status === "processing") return false;
+        if (mode === "high") {
+          return (i.confidence ?? computeConfidence(i)) === "high";
+        }
+        return true;
+      },
     );
     if (targets.length === 0) {
-      toast({ title: "Nothing to process", description: "No High-confidence invoices ready. Medium and Low items need manual review." });
+      toast({ title: "Nothing to process", description: mode === "high" ? "No High-confidence invoices ready. Switch to Process All (any) to include Medium and Low." : "Queue is empty." });
       return;
+    }
+    if (mode === "any") {
+      const lowMed = targets.filter(t => (t.confidence ?? computeConfidence(t)) !== "high").length;
+      const ok = window.confirm(
+        `Process ALL ${targets.length} queued invoices, including ${lowMed} Medium/Low confidence?\n\n` +
+        `Medium and Low items have unrecognised senders, so parsed results may need editing afterwards in Review.`,
+      );
+      if (!ok) return;
     }
     setBulkProgress({ current: 0, total: targets.length });
     let success = 0;
@@ -617,10 +628,12 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     setBulkProgress(null);
     toast({
       title: "Bulk processing complete",
-      description: `${success} processed${failed ? `, ${failed} failed` : ""} from known suppliers.`,
+      description: `${success} processed${failed ? `, ${failed} failed` : ""}${mode === "any" ? " (all confidence levels)" : " from known suppliers"}.`,
     });
-    addAuditEntry("Email", `Bulk processed ${success} known-supplier invoices${failed ? ` (${failed} failed)` : ""}`);
+    addAuditEntry("Email", `Bulk processed ${success} invoices [${mode}]${failed ? ` (${failed} failed)` : ""}`);
   };
+  const handleProcessAllKnown = () => handleProcessAll("high");
+  const handleProcessAllAny = () => handleProcessAll("any");
 
   const handleSimulateSend = () => {
     if (!simFrom.trim()) return;
@@ -903,23 +916,30 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
             <h3 className="text-sm font-semibold">Inbox queue</h3>
             <div className="flex items-center gap-2">
               {(() => {
+                const allQueued = items.filter(i => i.status !== "done" && i.status !== "processing").length;
                 const highQueued = items.filter(i => (i.confidence ?? computeConfidence(i)) === "high" && i.status !== "done" && i.status !== "processing").length;
                 if (bulkProgress) {
                   return (
                     <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      Processing {bulkProgress.current} of {bulkProgress.total} High-confidence invoices…
+                      Processing {bulkProgress.current} of {bulkProgress.total} invoices…
                     </span>
                   );
                 }
-                if (highQueued > 0) {
-                  return (
-                    <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown} title="Auto-processes High confidence only. Medium and Low stay for manual review.">
-                      Process all High ({highQueued})
-                    </Button>
-                  );
-                }
-                return null;
+                return (
+                  <>
+                    {highQueued > 0 && (
+                      <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown} title="Auto-processes High confidence only. Medium and Low stay for manual review.">
+                        Process all High ({highQueued})
+                      </Button>
+                    )}
+                    {allQueued > highQueued && (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleProcessAllAny} title="Process every queued invoice regardless of confidence. Medium/Low results may need editing in Review.">
+                        Process all ({allQueued})
+                      </Button>
+                    )}
+                  </>
+                );
               })()}
               <label className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none" title="Auto-process newly arrived High-confidence invoices">
                 <input

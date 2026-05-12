@@ -876,8 +876,21 @@ Deno.serve(async (req) => {
 
   try {
     // Strategy 1 Step 4 — load known patterns for this brand
-    const brandPattern = await loadBrandPattern(admin, userId, supplierName);
-    const brandHints = brandHintsBlock(brandPattern);
+    // Phase 4 — gated rich brand context injection. Defaults to legacy hints.
+    const injectionEnabled = await isBrandInjectionEnabled(admin);
+    let activeBrandPattern: BrandPattern | null = null;
+    let brandHints = "";
+    let injectionRequiresReview = false;
+    if (injectionEnabled) {
+      activeBrandPattern = await loadBrandPatternsRich(admin, userId, supplierName, senderDomain);
+      const inj = brandContextInjection(activeBrandPattern);
+      brandHints = inj.block;
+      injectionRequiresReview = inj.requiresReview;
+      console.log(`[brand-inject] enabled · pattern=${activeBrandPattern?.id ?? "none"} tier=${inj.block ? (inj.requiresReview ? "deep" : "full/light") : "skipped"}`);
+    } else {
+      const legacy = await loadBrandPattern(admin, userId, supplierName);
+      brandHints = brandHintsBlock(legacy);
+    }
 
     // Stage 1 — prefer Claude native PDF extraction (master prompt v2 +
     // schema-first + validation). Falls back to Gemini for non-PDF inputs

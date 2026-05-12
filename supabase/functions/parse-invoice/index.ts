@@ -90,14 +90,79 @@ function computeConfidence(rows: ParsedRow[]): {
   return { level, completeness };
 }
 
-// Brand-pattern context — Strategy 1 Step 4 (Flywheel)
+// Brand-pattern context — Strategy 1 Step 4 (Flywheel) + Phase 4 injection
 interface BrandPattern {
+  id?: string;
+  user_id?: string | null;
+  brand_name?: string | null;
   supplier_sku_format?: string | null;
   size_schema?: string | null;
   invoice_layout_fingerprint?: unknown;
   sample_count?: number | null;
   accuracy_rate?: number | null;
+  column_map?: Record<string, unknown> | null;
+  header_row?: number | null;
+  is_global?: boolean | null;
+  avg_confidence?: number | null;
+  failed_streak?: number | null;
+  paused_until?: string | null;
+  sender_domains?: string[] | null;
 }
+
+async function isBrandInjectionEnabled(admin: any): Promise<boolean> {
+  try {
+    const { data } = await admin
+      .from("app_settings")
+      .select("brand_context_injection_enabled")
+      .eq("singleton", true)
+      .maybeSingle();
+    return !!data?.brand_context_injection_enabled;
+  } catch { return false; }
+}
+
+/**
+ * Phase 4: load best brand pattern for a parse.
+ * Per-user pattern wins over global. Skips paused patterns.
+ * Matches by sender_domain (preferred) or brand_name ILIKE.
+ */
+async function loadBrandPatternsRich(
+  admin: any,
+  userId: string,
+  brandName: string,
+  senderDomain: string | null,
+): Promise<BrandPattern | null> {
+  const brand = (brandName || "").trim();
+  const domain = (senderDomain || "").trim().toLowerCase();
+  if (!brand && !domain) return null;
+
+  // Build OR filter: domain match OR brand name match
+  const orParts: string[] = [];
+  if (domain) orParts.push(`sender_domains.cs.{${domain}}`);
+  if (brand) orParts.push(`brand_name.ilike.${brand.replace(/[,()]/g, "")}`);
+  if (orParts.length === 0) return null;
+
+  const { data } = await admin
+    .from("brand_patterns")
+    .select("id, user_id, brand_name, supplier_sku_format, size_schema, invoice_layout_fingerprint, sample_count, accuracy_rate, column_map, header_row, is_global, avg_confidence, failed_streak, paused_until, sender_domains")
+    .or(orParts.join(","))
+    .or(`user_id.eq.${userId},is_global.eq.true`)
+    .limit(20);
+
+  const rows: BrandPattern[] = (data || []) as BrandPattern[];
+  const now = Date.now();
+  const eligible = rows.filter(r => !r.paused_until || new Date(r.paused_until).getTime() < now);
+  if (eligible.length === 0) return null;
+  // Prefer user-scoped over global, then highest sample_count
+  eligible.sort((a, b) => {
+    const userA = a.user_id === userId ? 1 : 0;
+    const userB = b.user_id === userId ? 1 : 0;
+    if (userA !== userB) return userB - userA;
+    return (b.sample_count ?? 0) - (a.sample_count ?? 0);
+  });
+  return eligible[0];
+}
+
+/** Legacy hint block — used when injection flag is OFF (light, additive only). */
 async function loadBrandPattern(admin: any, userId: string, brandName: string): Promise<BrandPattern | null> {
   if (!brandName?.trim()) return null;
   const { data } = await admin
@@ -116,6 +181,84 @@ function brandHintsBlock(p: BrandPattern | null): string {
   if (p.invoice_layout_fingerprint) lines.push(`- Layout fingerprint: ${JSON.stringify(p.invoice_layout_fingerprint).slice(0, 400)}`);
   if (p.sample_count) lines.push(`- Learned from ${p.sample_count} prior invoice(s) (accuracy ${Math.round((p.accuracy_rate ?? 1) * 100)}%)`);
   return lines.join("\n");
+}
+
+/**
+ * Phase 4 — confidence-scaled BRAND CONTEXT injection.
+ * >0.85 last conf  → light hint
+ * 0.6–0.85         → full column map
+ * <0.6             → full column map + flag requires_review
+ */
+function brandContextInjection(p: BrandPattern | null): { block: string; requiresReview: boolean } {
+  if (!p) return { block: "", requiresReview: false };
+  const count = p.sample_count ?? 0;
+  const conf = Number(p.avg_confidence ?? p.accuracy_rate ?? 0);
+  if (count <= 3 || conf <= 0.7) return { block: "", requiresReview: false };
+
+  const tier: "light" | "full" | "deep" = conf > 0.85 ? "light" : conf >= 0.6 ? "full" : "deep";
+  const lines: string[] = [
+    "",
+    `BRAND CONTEXT (from ${count} previous parses, avg confidence ${conf.toFixed(2)}):`,
+    `Brand: ${p.brand_name ?? "?"}`,
+  ];
+  if (p.supplier_sku_format) lines.push(`SKU format: ${p.supplier_sku_format}`);
+  if (p.size_schema) lines.push(`Size format: ${p.size_schema}`);
+  if (tier !== "light") {
+    if (p.column_map && Object.keys(p.column_map).length) {
+      lines.push(`Known column mappings: ${JSON.stringify(p.column_map)}`);
+    }
+    if (typeof p.header_row === "number") lines.push(`Header row: ${p.header_row}`);
+    if (p.invoice_layout_fingerprint) {
+      lines.push(`Typical document format: ${JSON.stringify(p.invoice_layout_fingerprint).slice(0, 300)}`);
+    }
+  }
+  lines.push("Use these mappings as your primary extraction guide.");
+  return { block: lines.join("\n"), requiresReview: tier === "deep" };
+}
+
+/**
+ * Phase 4 — after a live parse, update brand_patterns with rolling
+ * avg_confidence, parse_count, last_seen_at, and backoff bookkeeping.
+ */
+async function updateBrandPatternFromParse(
+  admin: any,
+  patternId: string | undefined,
+  succeeded: boolean,
+  newConfidence: number,
+) {
+  if (!patternId) return;
+  try {
+    const { data: cur } = await admin
+      .from("brand_patterns")
+      .select("sample_count, avg_confidence, failed_streak")
+      .eq("id", patternId)
+      .maybeSingle();
+    if (!cur) return;
+    if (succeeded) {
+      const n = (cur.sample_count ?? 0) + 1;
+      const avg = ((Number(cur.avg_confidence ?? 0)) * (n - 1) + Number(newConfidence || 0)) / n;
+      await admin.from("brand_patterns").update({
+        sample_count: n,
+        avg_confidence: avg,
+        failed_streak: 0,
+        paused_until: null,
+        last_seen_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq("id", patternId);
+    } else {
+      const streak = (cur.failed_streak ?? 0) + 1;
+      const paused_until = streak >= 3
+        ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        : null;
+      await admin.from("brand_patterns").update({
+        failed_streak: streak,
+        paused_until,
+        updated_at: new Date().toISOString(),
+      }).eq("id", patternId);
+    }
+  } catch (e) {
+    console.warn("[brand-pattern] update failed:", (e as Error).message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -695,6 +838,9 @@ Deno.serve(async (req) => {
   const inputFilename: string | null = body?.inputFilename || null;
   const inputFileRef: string | null = body?.inputFileRef || null;
   const source: string | null = body?.source || null;
+  const senderDomain: string | null = (body?.senderDomain || body?.sender_domain || null)
+    ? String(body?.senderDomain || body?.sender_domain).toLowerCase()
+    : null;
   const requestedModel: string = typeof body?.claudeModel === "string" ? body.claudeModel : DEFAULT_CLAUDE_MODEL;
   const claudeModel: string = ALLOWED_CLAUDE_MODELS.has(requestedModel) ? requestedModel : DEFAULT_CLAUDE_MODEL;
 
@@ -730,8 +876,21 @@ Deno.serve(async (req) => {
 
   try {
     // Strategy 1 Step 4 — load known patterns for this brand
-    const brandPattern = await loadBrandPattern(admin, userId, supplierName);
-    const brandHints = brandHintsBlock(brandPattern);
+    // Phase 4 — gated rich brand context injection. Defaults to legacy hints.
+    const injectionEnabled = await isBrandInjectionEnabled(admin);
+    let activeBrandPattern: BrandPattern | null = null;
+    let brandHints = "";
+    let injectionRequiresReview = false;
+    if (injectionEnabled) {
+      activeBrandPattern = await loadBrandPatternsRich(admin, userId, supplierName, senderDomain);
+      const inj = brandContextInjection(activeBrandPattern);
+      brandHints = inj.block;
+      injectionRequiresReview = inj.requiresReview;
+      console.log(`[brand-inject] enabled · pattern=${activeBrandPattern?.id ?? "none"} tier=${inj.block ? (inj.requiresReview ? "deep" : "full/light") : "skipped"}`);
+    } else {
+      const legacy = await loadBrandPattern(admin, userId, supplierName);
+      brandHints = brandHintsBlock(legacy);
+    }
 
     // Stage 1 — prefer Claude native PDF extraction (master prompt v2 +
     // schema-first + validation). Falls back to Gemini for non-PDF inputs
@@ -998,6 +1157,12 @@ Deno.serve(async (req) => {
       console.warn("brand learning upsert failed:", (learnErr as Error)?.message);
     }
 
+    // Phase 4 — bookkeeping for the brand_pattern row that was injected
+    if (activeBrandPattern?.id) {
+      const succeeded = stage1Rows.length > 0 && completeness >= 0.4;
+      await updateBrandPatternFromParse(admin, activeBrandPattern.id, succeeded, completeness);
+    }
+
     return new Response(
       JSON.stringify({
         jobId,
@@ -1008,6 +1173,8 @@ Deno.serve(async (req) => {
         claudeModel: extractor === "claude-pdf" ? claudeModel : null,
         meta: invoiceMeta,
         validation,
+        requires_review: injectionRequiresReview || confidence === "low",
+        brandContextInjected: !!activeBrandPattern,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );

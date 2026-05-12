@@ -26,6 +26,7 @@ import { CaseStudyPage } from "./pages/CaseStudy.tsx";
 import Health from "./pages/Health.tsx";
 import AdminSecrets from "./pages/AdminSecrets.tsx";
 import AdminAIModels from "./pages/AdminAIModels.tsx";
+import AdminTrainingPipeline from "./pages/AdminTrainingPipeline.tsx";
 import Rules from "./pages/Rules.tsx";
 import RulesSetup from "./pages/RulesSetup.tsx";
 import SonicKnowledge from "./pages/SonicKnowledge.tsx";
@@ -76,6 +77,7 @@ const App = () => (
                   <Route path="/health" element={<Health />} />
                   <Route path="/admin/secrets" element={<AdminSecrets />} />
                   <Route path="/admin/ai-models" element={<AdminAIModels />} />
+                  <Route path="/admin/training-pipeline" element={<RequireAuth><AdminTrainingPipeline /></RequireAuth>} />
                   <Route path="/rules" element={<Rules />} />
                   <Route path="/rules/setup" element={<RulesSetup />} />
                   <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />

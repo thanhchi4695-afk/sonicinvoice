@@ -692,12 +692,35 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
   if (step === "file_review" && fileProducts.length > 0) {
     const totalUnits = fileProducts.reduce((s, p) => s + p.totalUnits, 0);
     const totalValue = fileProducts.reduce((s, p) => s + p.totalValue, 0);
+    const imagesFound = fileProducts.filter((p) => p.imageUrl).length;
+    const rawRowCount = fileParseResult?.rawRowCount;
+
+    const fmtDelivery = (start?: string, end?: string) => {
+      if (!start && !end) return "—";
+      const fmt = (s?: string) => {
+        if (!s) return "";
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? s : d.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
+      };
+      const a = fmt(start); const b = fmt(end);
+      return a && b ? `${a} → ${b}` : (a || b);
+    };
+    const margin = (w: number, r: number) => (r > 0 ? Math.round(((r - w) / r) * 1000) / 10 : 0);
 
     return (
-      <div className="px-4 pt-4 pb-24 animate-fade-in max-w-4xl mx-auto">
+      <div className="px-4 pt-4 pb-24 animate-fade-in max-w-5xl mx-auto">
         <button onClick={() => { setStep("orders"); setFileProducts([]); setFileParseResult(null); }} className="flex items-center gap-1 text-muted-foreground text-sm mb-4 hover:text-foreground">
           <ArrowLeft className="w-4 h-4" /> Back to orders
         </button>
+
+        {/* JOOR detection banner */}
+        <div className="bg-success/10 border border-success/30 rounded-lg p-3 mb-4 flex items-center gap-2">
+          <Check className="w-4 h-4 text-success shrink-0" />
+          <p className="text-sm">
+            <span className="font-medium">JOOR catalog detected</span> — {fileProducts.length} products
+            {rawRowCount ? ` grouped from ${rawRowCount} rows` : ""}. Columns mapped automatically.
+          </p>
+        </div>
 
         {/* Header */}
         <div className="bg-card rounded-lg border border-border p-5 mb-4">
@@ -710,6 +733,7 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
                 {fileParseResult?.poNumber && <span>PO# {fileParseResult.poNumber}</span>}
                 {fileParseResult?.season && <span>{fileParseResult.season}</span>}
                 <span className="capitalize">{fileParseResult?.format.replace("_", " ")}</span>
+                <span>{imagesFound}/{fileProducts.length} with images</span>
               </div>
             </div>
             <div className="text-right text-sm">
@@ -749,52 +773,56 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
                   <th className="text-left p-3 font-medium">Style</th>
                   <th className="text-left p-3 font-medium">Style #</th>
                   <th className="text-left p-3 font-medium">Colour</th>
-                  <th className="text-left p-3 font-medium">Fabrication</th>
                   <th className="text-left p-3 font-medium">Sizes</th>
-                  <th className="text-right p-3 font-medium">RRP</th>
+                  <th className="text-left p-3 font-medium">Delivery window</th>
                   <th className="text-right p-3 font-medium">Wholesale</th>
+                  <th className="text-right p-3 font-medium">RRP</th>
+                  <th className="text-right p-3 font-medium">Margin</th>
                   <th className="text-right p-3 font-medium">Units</th>
                 </tr>
               </thead>
               <tbody>
-                {fileProducts.map((p, i) => (
-                  <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30">
-                    <td className="p-3">
-                      {p.imageUrl ? (
-                        <img
-                          src={p.imageUrl}
-                          alt={p.styleName}
-                          className="w-12 h-12 object-cover rounded border border-border"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded border border-dashed border-border flex items-center justify-center bg-muted/30">
-                          <Eye className="w-4 h-4 text-muted-foreground/40" />
+                {fileProducts.map((p, i) => {
+                  const m = margin(p.wholesale, p.rrp);
+                  const marginColor = m >= 50 ? "text-success" : m >= 35 ? "text-foreground" : "text-destructive";
+                  return (
+                    <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30 align-top">
+                      <td className="p-3">
+                        {p.imageUrl ? (
+                          <img
+                            src={p.imageUrl}
+                            alt={p.styleName}
+                            className="w-12 h-12 object-cover rounded border border-border"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded border border-dashed border-border flex items-center justify-center bg-muted/30" title="No image — click Enrich with AI to fetch">
+                            <AlertTriangle className="w-4 h-4 text-muted-foreground/60" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <div>
+                          <span className="font-medium">{p.styleName}</span>
+                          {p.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>
+                          )}
+                          {p.autoTags && p.autoTags.length > 0 && (
+                            <p className="text-xs text-primary/70 mt-0.5">{p.autoTags.join(" · ")}</p>
+                          )}
                         </div>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <div>
-                        <span className="font-medium">{p.styleName}</span>
-                        {p.description && (
-                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>
-                        )}
-                        {(p as any).tags && (
-                          <p className="text-xs text-primary/70 mt-0.5">{(p as any).tags}</p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-3 font-mono text-xs">{p.styleNumber}</td>
-                    <td className="p-3">{p.colour}</td>
-                    <td className="p-3 text-xs max-w-[150px] truncate" title={p.fabrication || p.materials}>
-                      {p.fabrication || p.materials || "—"}
-                    </td>
-                    <td className="p-3 text-xs">{p.sizes.join(", ") || "—"}</td>
-                    <td className="p-3 text-right">${p.rrp.toFixed(2)}</td>
-                    <td className="p-3 text-right text-muted-foreground">${p.wholesale.toFixed(2)}</td>
-                    <td className="p-3 text-right">{p.totalUnits}</td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="p-3 font-mono text-xs">{p.styleNumber}</td>
+                      <td className="p-3">{p.colour}</td>
+                      <td className="p-3 text-xs">{p.sizes.join(", ") || "—"}</td>
+                      <td className="p-3 text-xs text-muted-foreground whitespace-nowrap">{fmtDelivery(p.deliveryStart, p.deliveryEnd)}</td>
+                      <td className="p-3 text-right text-muted-foreground">${p.wholesale.toFixed(2)}</td>
+                      <td className="p-3 text-right">${p.rrp.toFixed(2)}</td>
+                      <td className={`p-3 text-right font-medium ${marginColor}`}>{m > 0 ? `${m}%` : "—"}</td>
+                      <td className="p-3 text-right">{p.totalUnits}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

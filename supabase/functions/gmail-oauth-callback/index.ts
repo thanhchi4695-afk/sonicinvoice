@@ -19,6 +19,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
+const allowedReturnOrigins = new Set([
+  "https://sonicinvoices.com",
+  "https://www.sonicinvoices.com",
+  "https://sonicinvoice.lovable.app",
+  "https://id-preview--ed921f87-40d3-4abb-9b71-c7f63c3b06fb.lovable.app",
+]);
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -35,7 +42,8 @@ Deno.serve(async (req) => {
   if (originB64) {
     try {
       const decoded = atob(originB64);
-      if (/^https?:\/\//.test(decoded)) returnOrigin = decoded.replace(/\/$/, "");
+      const decodedOrigin = new URL(decoded).origin;
+      if (allowedReturnOrigins.has(decodedOrigin)) returnOrigin = decodedOrigin.replace(/\/$/, "");
     } catch { /* ignore */ }
   }
 

@@ -19,6 +19,7 @@ interface WatchRow {
 interface IngestRow {
   drive_file_id: string;
   drive_file_name: string | null;
+  folder_id: string | null;
   status: string;
   error: string | null;
   ingested_at: string;
@@ -50,11 +51,15 @@ export default function DriveWatcher() {
       setFolderInput((w as WatchRow).folder_id);
       setFolderName((w as WatchRow).folder_name || "");
     }
-    const { data: h } = await supabase
+    let historyQuery = supabase
       .from("drive_ingested_files")
-      .select("drive_file_id,drive_file_name,status,error,ingested_at")
+      .select("drive_file_id,drive_file_name,folder_id,status,error,ingested_at")
       .order("ingested_at", { ascending: false })
       .limit(25);
+    if ((w as WatchRow | null)?.folder_id) {
+      historyQuery = historyQuery.eq("folder_id", (w as WatchRow).folder_id);
+    }
+    const { data: h } = await historyQuery;
     setHistory((h as IngestRow[]) || []);
     setLoading(false);
   }
@@ -67,10 +72,11 @@ export default function DriveWatcher() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast({ title: "Sign in first" }); setSaving(false); return; }
     const folderChanged = !!row && row.folder_id !== folderId;
+    const resolvedName = folderChanged ? "" : folderName;
     const payload: any = {
       user_id: user.id,
       folder_id: folderId,
-      folder_name: folderName || null,
+      folder_name: resolvedName || null,
       enabled: true,
     };
     // Reset last_sync_at when folder changes so the new folder is fully re-scanned.

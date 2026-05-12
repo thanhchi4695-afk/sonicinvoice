@@ -916,23 +916,30 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
             <h3 className="text-sm font-semibold">Inbox queue</h3>
             <div className="flex items-center gap-2">
               {(() => {
+                const allQueued = items.filter(i => i.status !== "done" && i.status !== "processing").length;
                 const highQueued = items.filter(i => (i.confidence ?? computeConfidence(i)) === "high" && i.status !== "done" && i.status !== "processing").length;
                 if (bulkProgress) {
                   return (
                     <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      Processing {bulkProgress.current} of {bulkProgress.total} High-confidence invoices…
+                      Processing {bulkProgress.current} of {bulkProgress.total} invoices…
                     </span>
                   );
                 }
-                if (highQueued > 0) {
-                  return (
-                    <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown} title="Auto-processes High confidence only. Medium and Low stay for manual review.">
-                      Process all High ({highQueued})
-                    </Button>
-                  );
-                }
-                return null;
+                return (
+                  <>
+                    {highQueued > 0 && (
+                      <Button size="sm" variant="teal" className="h-7 text-xs" onClick={handleProcessAllKnown} title="Auto-processes High confidence only. Medium and Low stay for manual review.">
+                        Process all High ({highQueued})
+                      </Button>
+                    )}
+                    {allQueued > highQueued && (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleProcessAllAny} title="Process every queued invoice regardless of confidence. Medium/Low results may need editing in Review.">
+                        Process all ({allQueued})
+                      </Button>
+                    )}
+                  </>
+                );
               })()}
               <label className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none" title="Auto-process newly arrived High-confidence invoices">
                 <input

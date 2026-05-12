@@ -243,7 +243,9 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
   // Find header row (contains "Style Name" and "Style Number")
   let headerIdx = -1;
   let headers: string[] = [];
-  for (let i = 0; i < Math.min(15, rows.length); i++) {
+  // Bulk "Export Order to Size" sheets place the header on row ~19 (after
+  // customer + ship + terms metadata blocks). Scan up to 30 rows to catch it.
+  for (let i = 0; i < Math.min(30, rows.length); i++) {
     const row = rows[i].map((v: any) => String(v || "").trim());
     if (row.includes("Style Name") && row.includes("Style Number")) {
       headerIdx = i;

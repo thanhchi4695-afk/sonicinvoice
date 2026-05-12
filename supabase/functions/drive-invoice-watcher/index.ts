@@ -241,6 +241,11 @@ Deno.serve(async (req) => {
   if (rowErr) return jsonResponse({ error: rowErr.message }, 500);
   if (!row) return jsonResponse({ error: "No drive watch configured" }, 404);
 
-  const result = await processOneWatch(admin, row as WatchRow);
-  return jsonResponse({ ok: true, ...result });
+  // Run in background to avoid request timeout — first sync can scan dozens of files
+  // and each invoice takes 10-60s through classify-extract-validate.
+  // @ts-ignore - EdgeRuntime is provided by Supabase Edge runtime
+  EdgeRuntime.waitUntil(processOneWatch(admin, row as WatchRow).catch((e) => {
+    console.error("[drive-invoice-watcher] background error:", e);
+  }));
+  return jsonResponse({ ok: true, started: true, message: "Sync started in background. Refresh history in a minute." }, 202);
 });

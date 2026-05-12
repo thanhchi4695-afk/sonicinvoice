@@ -288,6 +288,15 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
           option2: sz,
         }));
 
+        // 1. Make sure embedded data: URLs are hosted before sending to Shopify.
+        const hostedImageUrl = await ensurePublicImageUrl(p.imageUrl);
+
+        // 2. Build a single tag set: parser auto-tags (material, fabric, arriving-*)
+        //    + the basics. De-duped, slug-style preserved as-is.
+        const baseTags = [p.brand || p.vendor, p.colour, p.collection, "full_price", "new"]
+          .filter(Boolean) as string[];
+        const tagSet = new Set<string>([...(p.tags || []), ...baseTags].map((t) => String(t).trim()).filter(Boolean));
+
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error("Not authenticated");
 
@@ -308,13 +317,13 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
                 product_type: p.productType,
                 body_html: p.description,
                 status: "draft",
-                tags: [p.brand, p.colour, p.collection, "full_price", "new"].filter(Boolean).join(", "),
+                tags: Array.from(tagSet).join(", "),
                 variants,
                 options: [
                   { name: "Colour", values: [p.colour] },
                   { name: "Size", values: p.sizes || [p.size] },
                 ],
-                images: p.imageUrl ? [{ src: p.imageUrl }] : [],
+                images: hostedImageUrl ? [{ src: hostedImageUrl }] : [],
               },
             }),
           }

@@ -51,3 +51,10 @@ verify_jwt = false
 [functions.drive-invoice-watcher]
 verify_jwt = false
 
+[functions.parse-invoice-silent]
+verify_jwt = false
+
+[functions.silent-training-dispatcher]
+verify_jwt = false
+
+

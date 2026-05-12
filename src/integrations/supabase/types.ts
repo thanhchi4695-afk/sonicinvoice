@@ -2147,6 +2147,10 @@ export type Database = {
           processed: boolean
           provider: string
           received_at: string | null
+          silent_attempt_count: number
+          silent_last_error: string | null
+          silent_processed_at: string | null
+          silent_status: string | null
           subject: string | null
           supplier_name: string | null
           user_id: string
@@ -2163,6 +2167,10 @@ export type Database = {
           processed?: boolean
           provider?: string
           received_at?: string | null
+          silent_attempt_count?: number
+          silent_last_error?: string | null
+          silent_processed_at?: string | null
+          silent_status?: string | null
           subject?: string | null
           supplier_name?: string | null
           user_id: string
@@ -2179,6 +2187,10 @@ export type Database = {
           processed?: boolean
           provider?: string
           received_at?: string | null
+          silent_attempt_count?: number
+          silent_last_error?: string | null
+          silent_processed_at?: string | null
+          silent_status?: string | null
           subject?: string | null
           supplier_name?: string | null
           user_id?: string

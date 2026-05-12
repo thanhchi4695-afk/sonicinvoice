@@ -104,6 +104,43 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
     setLoading(false);
   };
 
+  /**
+   * Shopify's product image API requires a publicly-fetchable URL.
+   * Inline `data:` URLs (from JOOR-embedded XLSX images) silently fail to
+   * attach. Upload them to the public `compressed-images` bucket and return
+   * the hosted URL. Plain http(s) URLs pass through unchanged.
+   */
+  const ensurePublicImageUrl = async (src: string | undefined | null): Promise<string> => {
+    if (!src) return "";
+    if (!src.startsWith("data:")) return src;
+    try {
+      const m = src.match(/^data:(image\/[^;]+);base64,(.+)$/);
+      if (!m) return "";
+      const mime = m[1];
+      const b64 = m[2];
+      const ext = mime.split("/")[1]?.split("+")[0] || "png";
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: mime });
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || "anon";
+      const path = `joor/${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error } = await supabase.storage
+        .from("compressed-images")
+        .upload(path, blob, { contentType: mime, upsert: false });
+      if (error) {
+        console.warn("[JoorFlow] storage upload failed for embedded image", error);
+        return "";
+      }
+      const { data } = supabase.storage.from("compressed-images").getPublicUrl(path);
+      return data.publicUrl;
+    } catch (e) {
+      console.warn("[JoorFlow] ensurePublicImageUrl error", e);
+      return "";
+    }
+  };
+
   const callJoorProxy = async (action: string, params?: Record<string, unknown>) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Not authenticated");

@@ -79,6 +79,13 @@ const isDemoMode = () =>
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("demo") === "1";
 
+const OAUTH_RETURN_ORIGIN =
+  typeof window !== "undefined" && window.location.hostname.endsWith("lovableproject.com")
+    ? "https://id-preview--ed921f87-40d3-4abb-9b71-c7f63c3b06fb.lovable.app"
+    : typeof window !== "undefined"
+      ? window.location.origin
+      : "https://sonicinvoices.com";
+
 function getSimItems(): InboxItem[] {
   try { return JSON.parse(localStorage.getItem(SIM_KEY) || "[]"); } catch { return []; }
 }
@@ -242,7 +249,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     try {
       const fn = provider === "gmail" ? "gmail-oauth-start" : "outlook-oauth-start";
       const { data, error } = await supabase.functions.invoke(fn, {
-        body: { origin: window.location.origin },
+        body: { origin: OAUTH_RETURN_ORIGIN },
       });
       if (error) throw error;
       const url = (data as any)?.url;

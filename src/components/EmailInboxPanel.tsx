@@ -409,12 +409,12 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     }
   };
 
-  const handleProcess = async (item: InboxItem) => {
+  const handleProcess = async (item: InboxItem, options: { skipSupplierPrompt?: boolean } = {}): Promise<boolean> => {
     // Auto-learn: if this is an unknown Gmail sender, ask whether to save the
     // domain to a supplier profile so future emails are tagged KNOWN.
     let resolvedSupplier = item.supplierName ?? null;
     const isEmail = item.source === "gmail" || item.source === "outlook" || item.source === "imap";
-    if (isEmail && !item.knownSupplier && item.fromEmail) {
+    if (isEmail && !options.skipSupplierPrompt && !item.knownSupplier && item.fromEmail) {
       const domain = item.fromEmail.split("@")[1]?.toLowerCase();
       if (domain) {
         const guess = domain.split(".")[0].replace(/^./, c => c.toUpperCase());
@@ -516,6 +516,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
         });
         addAuditEntry("Email", `Parsed ${rowCount} variants from ${niceSupplier} (${confLabel})`);
         onProcessInvoice?.(niceSupplier);
+        return true;
       } catch (err: any) {
         console.error("parse-invoice failed", err);
         setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, status: "ready" } : i));
@@ -524,6 +525,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
           description: err?.message ?? String(err),
           variant: "destructive",
         });
+        return false;
       }
     } else {
       const updated = simItems.map(i => i.id === item.id ? { ...i, status: "processing" as const } : i);
@@ -531,6 +533,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       saveSimItems(updated);
       addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
       onProcessInvoice?.(niceSupplier);
+      return true;
     }
   };
 

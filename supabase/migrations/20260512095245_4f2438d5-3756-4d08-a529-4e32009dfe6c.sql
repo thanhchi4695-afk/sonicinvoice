@@ -1,0 +1,1 @@
+ALTER TABLE public.training_parses ALTER COLUMN email_account DROP NOT NULL;

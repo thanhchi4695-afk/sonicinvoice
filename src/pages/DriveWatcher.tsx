@@ -53,13 +53,11 @@ export default function DriveWatcher() {
     }
     let historyQuery = supabase
       .from("drive_ingested_files")
-      .select("drive_file_id,drive_file_name,folder_id,status,error,ingested_at")
-      .order("ingested_at", { ascending: false })
-      .limit(25);
+      .select("drive_file_id,drive_file_name,folder_id,status,error,ingested_at");
     if ((w as WatchRow | null)?.folder_id) {
       historyQuery = historyQuery.eq("folder_id", (w as WatchRow).folder_id);
     }
-    const { data: h } = await historyQuery;
+    const { data: h } = await historyQuery.order("ingested_at", { ascending: false }).limit(25);
     setHistory((h as IngestRow[]) || []);
     setLoading(false);
   }

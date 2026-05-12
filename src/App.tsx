@@ -29,6 +29,7 @@ import AdminAIModels from "./pages/AdminAIModels.tsx";
 import Rules from "./pages/Rules.tsx";
 import RulesSetup from "./pages/RulesSetup.tsx";
 import SonicKnowledge from "./pages/SonicKnowledge.tsx";
+import DriveWatcher from "./pages/DriveWatcher.tsx";
 import { lazy, Suspense } from "react";
 const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleShoppingHub.tsx"));
 const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx"));

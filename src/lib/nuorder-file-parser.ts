@@ -38,7 +38,7 @@ export interface NuOrderParsedProduct {
 }
 
 export interface NuOrderFileParseResult {
-  format: "xlsx_item_data" | "unknown";
+  format: "xlsx_item_data" | "xlsx_order_data" | "unknown";
   brand: string;
   season: string;
   poNumber: string;
@@ -50,9 +50,10 @@ export interface NuOrderFileParseResult {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-const NUORDER_SHEET_NAME = "NuORDER Item Data";
+const NUORDER_ITEM_SHEET = "NuORDER Item Data";
+const NUORDER_ORDER_SHEET = "NuORDER Order Data";
 
-const REQUIRED_HEADERS = [
+const REQUIRED_HEADERS_ITEM = [
   "style number",
   "wholesale aud",
   "retail aud",
@@ -60,10 +61,20 @@ const REQUIRED_HEADERS = [
   "available from",
 ] as const;
 
+const REQUIRED_HEADERS_ORDER = [
+  "style number",
+  "wholesale (aud)",
+  "m.s.r.p (aud)",
+  "available from",
+] as const;
+
 /** Detection: matches the spec's marker columns (case-insensitive). */
 export function isNuOrderHeaderRow(headers: string[]): boolean {
   const h = headers.map((s) => String(s || "").trim().toLowerCase());
-  return REQUIRED_HEADERS.every((req) => h.includes(req));
+  return (
+    REQUIRED_HEADERS_ITEM.every((req) => h.includes(req)) ||
+    REQUIRED_HEADERS_ORDER.every((req) => h.includes(req))
+  );
 }
 
 export function isNuOrderRecordSet(rows: Record<string, unknown>[]): boolean {

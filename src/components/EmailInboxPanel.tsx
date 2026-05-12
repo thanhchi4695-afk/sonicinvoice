@@ -146,7 +146,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [showYahooModal, setShowYahooModal] = useState(false);
   const [yahooEmail, setYahooEmail] = useState("");
   const [yahooPassword, setYahooPassword] = useState("");
-  const [yahooProvider, setYahooProvider] = useState<"yahoo" | "icloud" | "outlook" | "ventraip" | "fastmail" | "custom">("yahoo");
+  const [yahooProvider, setYahooProvider] = useState<"gmail" | "yahoo" | "icloud" | "outlook" | "ventraip" | "fastmail" | "custom">("gmail");
   const [yahooHost, setYahooHost] = useState("");
   const [yahooPort, setYahooPort] = useState("993");
   const [yahooSubmitting, setYahooSubmitting] = useState(false);
@@ -271,6 +271,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   };
 
   const PROVIDER_PRESETS: Record<string, { host: string; port: number } | null> = {
+    gmail: { host: "imap.gmail.com", port: 993 },
     yahoo: { host: "imap.mail.yahoo.com", port: 993 },
     icloud: { host: "imap.mail.me.com", port: 993 },
     outlook: { host: "outlook.office365.com", port: 993 },
@@ -294,7 +295,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
         body: {
           email: yahooEmail.trim(),
           app_password: yahooPassword.trim(),
-          provider: yahooProvider === "ventraip" || yahooProvider === "fastmail" || yahooProvider === "custom" ? "custom" : yahooProvider,
+          provider: yahooProvider === "gmail" || yahooProvider === "ventraip" || yahooProvider === "fastmail" || yahooProvider === "custom" ? "custom" : yahooProvider,
           imap_host: host,
           imap_port: port,
           imap_tls: true,
@@ -817,6 +818,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                     }}
                     className="w-full h-9 rounded-md bg-input border border-border px-2 text-sm"
                   >
+                    <option value="gmail">Gmail / Google Workspace</option>
                     <option value="yahoo">Yahoo Mail (Ymail)</option>
                     <option value="icloud">iCloud Mail</option>
                     <option value="outlook">Outlook (IMAP fallback)</option>
@@ -859,16 +861,17 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                 </div>
                 <div>
                   <label className="text-[11px] text-muted-foreground mb-1 block">
-                    {yahooProvider === "yahoo" || yahooProvider === "icloud" ? "App password (16 chars)" : "Mailbox password"}
+                    {yahooProvider === "yahoo" || yahooProvider === "icloud" || yahooProvider === "gmail" ? "App password (16 chars)" : "Mailbox password"}
                   </label>
                   <input
                     type="password"
                     value={yahooPassword}
                     onChange={e => setYahooPassword(e.target.value)}
-                    placeholder={yahooProvider === "yahoo" || yahooProvider === "icloud" ? "xxxx xxxx xxxx xxxx" : "your mailbox password"}
+                    placeholder={yahooProvider === "yahoo" || yahooProvider === "icloud" || yahooProvider === "gmail" ? "xxxx xxxx xxxx xxxx" : "your mailbox password"}
                     className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm font-mono"
                   />
                   <p className="text-[10px] text-muted-foreground mt-1">
+                    {yahooProvider === "gmail" && <>Gmail / Workspace requires an App Password (regular password won't work). 2-Step Verification must be ON, then go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="underline">myaccount.google.com/apppasswords</a> → name it "Sonic Invoices" → copy the 16-char password. </>}
                     {yahooProvider === "yahoo" && <>Yahoo: <a href="https://login.yahoo.com/account/security" target="_blank" rel="noopener noreferrer" className="underline">login.yahoo.com/account/security</a> → "Generate app password". </>}
                     {yahooProvider === "icloud" && <>iCloud: <a href="https://appleid.apple.com" target="_blank" rel="noopener noreferrer" className="underline">appleid.apple.com</a> → Sign-In Security → App-Specific Passwords. </>}
                     {yahooProvider === "ventraip" && <>VentraIP Splash: use your normal mailbox password. Confirm host in VIPControl → Email Hosting → Manage. </>}

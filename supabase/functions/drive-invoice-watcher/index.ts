@@ -218,7 +218,8 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
   const cronHeader = req.headers.get("x-cron-secret") || "";
-  const isCron = !!CRON_SECRET && cronHeader === CRON_SECRET;
+  const authBearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  const isCron = (!!CRON_SECRET && cronHeader === CRON_SECRET) || (!!SERVICE_KEY && authBearer === SERVICE_KEY);
 
   // Cron path: scan ALL enabled watch rows
   if (isCron) {

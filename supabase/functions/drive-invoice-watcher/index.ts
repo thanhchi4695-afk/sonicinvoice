@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
   if (isCron) {
     const { data: rows, error } = await admin
       .from("drive_watch_settings")
-      .select("id,user_id,folder_id,enabled,last_sync_at")
+      .select("id,user_id,folder_id,folder_name,enabled,last_sync_at")
       .eq("enabled", true);
     if (error) return jsonResponse({ error: error.message }, 500);
 
@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
 
   const { data: row, error: rowErr } = await admin
     .from("drive_watch_settings")
-    .select("id,user_id,folder_id,enabled,last_sync_at")
+    .select("id,user_id,folder_id,folder_name,enabled,last_sync_at")
     .eq("user_id", userId)
     .maybeSingle();
   if (rowErr) return jsonResponse({ error: rowErr.message }, 500);

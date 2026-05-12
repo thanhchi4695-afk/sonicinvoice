@@ -177,9 +177,10 @@ export default function AdminTrainingPipeline() {
 
   const updateSetting = async (key: keyof AppSettings, value: boolean) => {
     if (!settings.id) return;
+    const patch: Record<string, boolean> = { [key]: value };
     const { error } = await supabase
       .from("app_settings")
-      .update({ [key]: value })
+      .update(patch as never)
       .eq("id", settings.id);
     if (error) {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });

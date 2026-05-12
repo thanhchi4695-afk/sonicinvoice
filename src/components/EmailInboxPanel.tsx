@@ -270,15 +270,34 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     }
   };
 
+  const PROVIDER_PRESETS: Record<string, { host: string; port: number } | null> = {
+    yahoo: { host: "imap.mail.yahoo.com", port: 993 },
+    icloud: { host: "imap.mail.me.com", port: 993 },
+    outlook: { host: "outlook.office365.com", port: 993 },
+    ventraip: { host: "mail.ventraip.email", port: 993 },
+    fastmail: { host: "imap.fastmail.com", port: 993 },
+    custom: null,
+  };
+
   const handleConnectYahoo = async () => {
     if (!yahooEmail.trim() || !yahooPassword.trim()) return;
+    const preset = PROVIDER_PRESETS[yahooProvider];
+    const host = (yahooHost.trim() || preset?.host || "").trim();
+    const port = Number(yahooPort) || preset?.port || 993;
+    if (!host) {
+      toast({ title: "IMAP host required", description: "Enter your provider's incoming mail server.", variant: "destructive" });
+      return;
+    }
     setYahooSubmitting(true);
     try {
       const { data, error } = await supabase.functions.invoke("imap-connect", {
         body: {
           email: yahooEmail.trim(),
           app_password: yahooPassword.trim(),
-          provider: yahooProvider,
+          provider: yahooProvider === "ventraip" || yahooProvider === "fastmail" || yahooProvider === "custom" ? "custom" : yahooProvider,
+          imap_host: host,
+          imap_port: port,
+          imap_tls: true,
         },
       });
       if (error) throw error;
@@ -286,7 +305,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       toast({ title: `${providerLabel("imap")} connected`, description: yahooEmail.trim() });
       addAuditEntry("Email", `Connected IMAP (${yahooProvider}): ${yahooEmail.trim()}`);
       setShowYahooModal(false);
-      setYahooEmail(""); setYahooPassword("");
+      setYahooEmail(""); setYahooPassword(""); setYahooHost(""); setYahooPort("993");
       await loadConnection();
     } catch (err: any) {
       toast({ title: "Couldn't connect", description: err?.message ?? String(err), variant: "destructive" });

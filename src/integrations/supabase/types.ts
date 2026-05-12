@@ -1800,6 +1800,7 @@ export type Database = {
           drive_file_id: string
           drive_file_name: string | null
           error: string | null
+          folder_id: string | null
           id: string
           ingested_at: string
           mime_type: string | null
@@ -1811,6 +1812,7 @@ export type Database = {
           drive_file_id: string
           drive_file_name?: string | null
           error?: string | null
+          folder_id?: string | null
           id?: string
           ingested_at?: string
           mime_type?: string | null
@@ -1822,6 +1824,7 @@ export type Database = {
           drive_file_id?: string
           drive_file_name?: string | null
           error?: string | null
+          folder_id?: string | null
           id?: string
           ingested_at?: string
           mime_type?: string | null

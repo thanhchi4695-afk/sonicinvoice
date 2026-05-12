@@ -219,7 +219,15 @@ Deno.serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
   const cronHeader = req.headers.get("x-cron-secret") || "";
   const authBearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  const isCron = (!!CRON_SECRET && cronHeader === CRON_SECRET) || (!!SERVICE_KEY && authBearer === SERVICE_KEY);
+  let dbCronSecret = "";
+  if (cronHeader) {
+    const { data: cfg } = await admin.from("cron_config").select("value").eq("key", "drive_watcher_secret").maybeSingle();
+    dbCronSecret = (cfg as any)?.value || "";
+  }
+  const isCron =
+    (!!CRON_SECRET && cronHeader === CRON_SECRET) ||
+    (!!dbCronSecret && cronHeader === dbCronSecret) ||
+    (!!SERVICE_KEY && authBearer === SERVICE_KEY);
 
   // Cron path: scan ALL enabled watch rows
   if (isCron) {

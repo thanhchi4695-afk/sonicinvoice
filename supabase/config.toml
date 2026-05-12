@@ -44,3 +44,7 @@ verify_jwt = false
 
 [functions.debug-secrets]
 verify_jwt = false
+
+[functions.drive-invoice-watcher]
+verify_jwt = false
+

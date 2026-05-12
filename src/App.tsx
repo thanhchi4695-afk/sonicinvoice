@@ -78,6 +78,7 @@ const App = () => (
                   <Route path="/admin/ai-models" element={<AdminAIModels />} />
                   <Route path="/rules" element={<Rules />} />
                   <Route path="/rules/setup" element={<RulesSetup />} />
+                  <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
                   <Route
                     path="/google-shopping"

@@ -104,6 +104,43 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
     setLoading(false);
   };
 
+  /**
+   * Shopify's product image API requires a publicly-fetchable URL.
+   * Inline `data:` URLs (from JOOR-embedded XLSX images) silently fail to
+   * attach. Upload them to the public `compressed-images` bucket and return
+   * the hosted URL. Plain http(s) URLs pass through unchanged.
+   */
+  const ensurePublicImageUrl = async (src: string | undefined | null): Promise<string> => {
+    if (!src) return "";
+    if (!src.startsWith("data:")) return src;
+    try {
+      const m = src.match(/^data:(image\/[^;]+);base64,(.+)$/);
+      if (!m) return "";
+      const mime = m[1];
+      const b64 = m[2];
+      const ext = mime.split("/")[1]?.split("+")[0] || "png";
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: mime });
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id || "anon";
+      const path = `joor/${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error } = await supabase.storage
+        .from("compressed-images")
+        .upload(path, blob, { contentType: mime, upsert: false });
+      if (error) {
+        console.warn("[JoorFlow] storage upload failed for embedded image", error);
+        return "";
+      }
+      const { data } = supabase.storage.from("compressed-images").getPublicUrl(path);
+      return data.publicUrl;
+    } catch (e) {
+      console.warn("[JoorFlow] ensurePublicImageUrl error", e);
+      return "";
+    }
+  };
+
   const callJoorProxy = async (action: string, params?: Record<string, unknown>) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("Not authenticated");
@@ -251,6 +288,15 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
           option2: sz,
         }));
 
+        // 1. Make sure embedded data: URLs are hosted before sending to Shopify.
+        const hostedImageUrl = await ensurePublicImageUrl(p.imageUrl);
+
+        // 2. Build a single tag set: parser auto-tags (material, fabric, arriving-*)
+        //    + the basics. De-duped, slug-style preserved as-is.
+        const baseTags = [p.brand || p.vendor, p.colour, p.collection, "full_price", "new"]
+          .filter(Boolean) as string[];
+        const tagSet = new Set<string>([...(p.tags || []), ...baseTags].map((t) => String(t).trim()).filter(Boolean));
+
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error("Not authenticated");
 
@@ -271,13 +317,13 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
                 product_type: p.productType,
                 body_html: p.description,
                 status: "draft",
-                tags: [p.brand, p.colour, p.collection, "full_price", "new"].filter(Boolean).join(", "),
+                tags: Array.from(tagSet).join(", "),
                 variants,
                 options: [
                   { name: "Colour", values: [p.colour] },
                   { name: "Size", values: p.sizes || [p.size] },
                 ],
-                images: p.imageUrl ? [{ src: p.imageUrl }] : [],
+                images: hostedImageUrl ? [{ src: hostedImageUrl }] : [],
               },
             }),
           }
@@ -377,7 +423,34 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
           season_code: order.season,
           delivery_name: order.collection,
         });
-        setFileGroupedProducts(grouped);
+
+        // PO-level arrival tag from earliest deliveryStart in the file metadata
+        // (bulk "Order to Size" exports omit per-row dates but the linesheet header carries them).
+        const dates = result.rawProducts
+          .map((p) => p.deliveryStart)
+          .filter((d): d is string => !!d)
+          .map((d) => new Date(d).getTime())
+          .filter((t) => !isNaN(t));
+        let poArrivalTag = "";
+        if (dates.length > 0) {
+          const earliest = new Date(Math.min(...dates));
+          const month = earliest.toLocaleString("en-US", { month: "short" }).toLowerCase();
+          poArrivalTag = `arriving-${month}-${earliest.getFullYear()}`;
+        }
+
+        // Merge parser autoTags + poArrivalTag onto each grouped product.
+        const enrichedGrouped = grouped.map((gp) => {
+          const match = result.rawProducts.find(
+            (rp) => rp.styleName === gp.title || rp.styleNumber === gp.sku?.split("-")?.[0]
+          );
+          const merged = new Set<string>([
+            ...(gp.tags || []),
+            ...((match?.autoTags) || []),
+          ]);
+          if (poArrivalTag) merged.add(poArrivalTag);
+          return { ...gp, tags: Array.from(merged) };
+        });
+        setFileGroupedProducts(enrichedGrouped);
       }
 
       const embeddedCount = result.rawProducts.filter((p) => p.imageUrl).length;

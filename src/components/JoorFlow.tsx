@@ -423,7 +423,34 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
           season_code: order.season,
           delivery_name: order.collection,
         });
-        setFileGroupedProducts(grouped);
+
+        // PO-level arrival tag from earliest deliveryStart in the file metadata
+        // (bulk "Order to Size" exports omit per-row dates but the linesheet header carries them).
+        const dates = result.rawProducts
+          .map((p) => p.deliveryStart)
+          .filter((d): d is string => !!d)
+          .map((d) => new Date(d).getTime())
+          .filter((t) => !isNaN(t));
+        let poArrivalTag = "";
+        if (dates.length > 0) {
+          const earliest = new Date(Math.min(...dates));
+          const month = earliest.toLocaleString("en-US", { month: "short" }).toLowerCase();
+          poArrivalTag = `arriving-${month}-${earliest.getFullYear()}`;
+        }
+
+        // Merge parser autoTags + poArrivalTag onto each grouped product.
+        const enrichedGrouped = grouped.map((gp) => {
+          const match = result.rawProducts.find(
+            (rp) => rp.styleName === gp.title || rp.styleNumber === gp.sku?.split("-")?.[0]
+          );
+          const merged = new Set<string>([
+            ...(gp.tags || []),
+            ...((match?.autoTags) || []),
+          ]);
+          if (poArrivalTag) merged.add(poArrivalTag);
+          return { ...gp, tags: Array.from(merged) };
+        });
+        setFileGroupedProducts(enrichedGrouped);
       }
 
       const embeddedCount = result.rawProducts.filter((p) => p.imageUrl).length;

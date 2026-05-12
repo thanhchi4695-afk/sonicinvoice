@@ -16,7 +16,17 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const CRON_SECRET = Deno.env.get("CRON_SECRET");
+const ENV_CRON_SECRET = Deno.env.get("CRON_SECRET");
+let CACHED_CRON_SECRET: string | null = null;
+async function getCronSecret(admin: any): Promise<string | null> {
+  if (CACHED_CRON_SECRET) return CACHED_CRON_SECRET;
+  if (ENV_CRON_SECRET) { CACHED_CRON_SECRET = ENV_CRON_SECRET; return CACHED_CRON_SECRET; }
+  try {
+    const { data } = await admin.rpc("get_cron_secret");
+    if (typeof data === "string" && data.length > 0) { CACHED_CRON_SECRET = data; return data; }
+  } catch { /* */ }
+  return null;
+}
 
 const PER_MAILBOX_DAILY_LIMIT = 50;
 const MAX_BATCH_PER_RUN = 25;

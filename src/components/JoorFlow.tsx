@@ -380,8 +380,49 @@ const JoorFlow = ({ onBack }: JoorFlowProps) => {
         setFileGroupedProducts(grouped);
       }
 
-      toast.success(`Parsed ${result.rawProducts.length} products from ${result.format.replace("_", " ")} (${result.brand})`);
+      const embeddedCount = result.rawProducts.filter((p) => p.imageUrl).length;
+      const missingCount = result.rawProducts.length - embeddedCount;
+      toast.success(
+        `Parsed ${result.rawProducts.length} products from ${result.format.replace("_", " ")} (${result.brand})` +
+          (embeddedCount > 0 ? ` — ${embeddedCount} embedded image${embeddedCount === 1 ? "" : "s"} extracted` : "")
+      );
       setStep("file_review");
+
+      // ── Auto-trigger background image enrichment for products with no embedded image ──
+      // Don't wait for the user to click "Run AI Enrichment". Use Brand + Style Name as
+      // the search input via the existing image-search edge function.
+      if (missingCount > 0) {
+        const brand = result.brand || "";
+        toast.info(`Searching the web for ${missingCount} missing product image${missingCount === 1 ? "" : "s"}…`);
+        (async () => {
+          const enriched = await Promise.all(
+            result.rawProducts.map(async (p) => {
+              if (p.imageUrl) return p;
+              try {
+                const { findColourImage } = await import("@/lib/colour-image-finder");
+                const hit = await findColourImage(brand, p.styleName, p.colour);
+                if (hit?.url) return { ...p, imageUrl: hit.url };
+              } catch (err) {
+                console.warn("[JoorFlow] auto-enrichment image search failed for", p.styleName, err);
+              }
+              return p;
+            })
+          );
+          setFileProducts(enriched);
+          // Also push image URLs onto the grouped products used for export.
+          setFileGroupedProducts((prev) =>
+            prev.map((gp) => {
+              if (gp.imageUrl) return gp;
+              const match = enriched.find(
+                (ep) => ep.styleName === gp.title || ep.styleNumber === gp.sku?.split("-")?.[0]
+              );
+              return match?.imageUrl ? { ...gp, imageUrl: match.imageUrl } : gp;
+            })
+          );
+          const finalCount = enriched.filter((p) => p.imageUrl).length;
+          toast.success(`Image enrichment complete — ${finalCount}/${enriched.length} products have images`);
+        })();
+      }
     } catch (err: any) {
       toast.error(err.message || "Failed to parse file");
       setStep("orders");

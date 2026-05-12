@@ -7,8 +7,108 @@
  */
 
 import * as XLSX from "xlsx";
+import JSZip from "jszip";
 import type { WholesaleOrder, WholesaleLineItem } from "./wholesale-mapper";
 import { deriveArrivalMonth } from "./wholesale-mapper";
+
+// ── Embedded image extraction (Excel image objects in xl/media/) ──
+// JOOR "Export Order to Size" embeds product photos as drawings anchored to
+// each product row. We unzip the .xlsx, walk drawings → rels → media, and
+// build a Map<rowIndex (1-based), dataUrl>. The active sheet's drawing is
+// resolved via xl/_rels/workbook.xml.rels + xl/worksheets/_rels/sheetN.xml.rels.
+async function extractEmbeddedRowImages(
+  buffer: ArrayBuffer,
+  activeSheetIndex: number,
+): Promise<Map<number, string>> {
+  const out = new Map<number, string>();
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+
+    // Resolve sheet target path from workbook rels (preserves order of <sheet>)
+    const wbRelsFile = zip.file("xl/_rels/workbook.xml.rels");
+    const wbXmlFile = zip.file("xl/workbook.xml");
+    if (!wbRelsFile || !wbXmlFile) return out;
+    const wbRels = await wbRelsFile.async("string");
+    const wbXml = await wbXmlFile.async("string");
+
+    // Map sheet order → rId → target. <sheet name="..." sheetId="..." r:id="rIdN"/>
+    const sheetRids: string[] = [];
+    const sheetTagRe = /<sheet[^>]*r:id="([^"]+)"/g;
+    let m: RegExpExecArray | null;
+    while ((m = sheetTagRe.exec(wbXml)) !== null) sheetRids.push(m[1]);
+    const targetRid = sheetRids[activeSheetIndex];
+    if (!targetRid) return out;
+
+    const relRe = new RegExp(`<Relationship[^>]*Id="${targetRid}"[^>]*Target="([^"]+)"`);
+    const relMatch = relRe.exec(wbRels);
+    if (!relMatch) return out;
+    // Target is e.g. "worksheets/sheet1.xml" → sheet basename
+    const sheetPath = relMatch[1].replace(/^\/?xl\//, "");
+    const sheetBase = sheetPath.split("/").pop() || ""; // sheet1.xml
+    const sheetRelsPath = `xl/worksheets/_rels/${sheetBase}.rels`;
+
+    const sheetRelsFile = zip.file(sheetRelsPath);
+    if (!sheetRelsFile) return out;
+    const sheetRels = await sheetRelsFile.async("string");
+    const drawingMatch = /<Relationship[^>]*Type="[^"]*\/drawing"[^>]*Target="([^"]+)"/.exec(sheetRels);
+    if (!drawingMatch) return out;
+    // Target like "../drawings/drawing1.xml"
+    const drawingFile = drawingMatch[1].split("/").pop() || ""; // drawing1.xml
+    const drawingPath = `xl/drawings/${drawingFile}`;
+    const drawingRelsPath = `xl/drawings/_rels/${drawingFile}.rels`;
+
+    const drawingZip = zip.file(drawingPath);
+    const drawingRelsZip = zip.file(drawingRelsPath);
+    if (!drawingZip || !drawingRelsZip) return out;
+    const drawingXml = await drawingZip.async("string");
+    const drawingRels = await drawingRelsZip.async("string");
+
+    // rId → media path
+    const ridToMedia = new Map<string, string>();
+    const ridRe = /<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g;
+    while ((m = ridRe.exec(drawingRels)) !== null) {
+      if (/image/i.test(m[2]) || /media/i.test(m[2])) {
+        const target = m[2].replace(/^\.\.\//, "");
+        ridToMedia.set(m[1], `xl/${target}`);
+      }
+    }
+
+    // Anchor → row + rId. JOOR uses oneCellAnchor; also handle twoCellAnchor.
+    const anchorRe = /<xdr:(?:oneCellAnchor|twoCellAnchor)[^>]*>([\s\S]*?)<\/xdr:(?:oneCellAnchor|twoCellAnchor)>/g;
+    while ((m = anchorRe.exec(drawingXml)) !== null) {
+      const block = m[1];
+      const rowMatch = /<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/.exec(block);
+      const blipMatch = /<a:blip[^>]*r:embed="([^"]+)"/.exec(block);
+      if (!rowMatch || !blipMatch) continue;
+      const xdrRow = parseInt(rowMatch[1], 10); // 0-based
+      const xlsxRow = xdrRow + 1; // 1-based, matches openpyxl/sheet_to_json row index when origin=1
+      const mediaPath = ridToMedia.get(blipMatch[1]);
+      if (!mediaPath) continue;
+      // Skip JOOR's footer logo (small png like joor6.png)
+      if (/joor\d*\.png$/i.test(mediaPath)) continue;
+
+      const mediaFile = zip.file(mediaPath);
+      if (!mediaFile) continue;
+      const bytes = await mediaFile.async("uint8array");
+      // Skip blanks / tiny placeholders
+      if (bytes.byteLength < 800) continue;
+      const ext = (mediaPath.split(".").pop() || "jpg").toLowerCase();
+      const mime = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
+      // Convert to base64 (chunked to avoid stack overflow)
+      let bin = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+      }
+      const dataUrl = `data:${mime};base64,${btoa(bin)}`;
+      // Only set the FIRST image found per row (some rows have multiple anchors).
+      if (!out.has(xlsxRow)) out.set(xlsxRow, dataUrl);
+    }
+  } catch (err) {
+    console.warn("[joor-file-parser] Embedded image extraction failed:", err);
+  }
+  return out;
+}
 
 export interface JoorFileParseResult {
   format: "xlsx_order" | "xlsx_linesheet" | "pdf_order" | "unknown";
@@ -143,7 +243,9 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
   // Find header row (contains "Style Name" and "Style Number")
   let headerIdx = -1;
   let headers: string[] = [];
-  for (let i = 0; i < Math.min(15, rows.length); i++) {
+  // Bulk "Export Order to Size" sheets place the header on row ~19 (after
+  // customer + ship + terms metadata blocks). Scan up to 30 rows to catch it.
+  for (let i = 0; i < Math.min(30, rows.length); i++) {
     const row = rows[i].map((v: any) => String(v || "").trim());
     if (row.includes("Style Name") && row.includes("Style Number")) {
       headerIdx = i;
@@ -200,6 +302,7 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
 
   // Parse product rows
   const products: JoorParsedProduct[] = [];
+  const productRowIdx: number[] = []; // 1-based xlsx row for each product (for image lookup)
   let rawRows = 0;
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
@@ -267,7 +370,21 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
     };
     product.autoTags = buildAutoTags({ ...product, brand: rowBrand || brand });
     products.push(product);
+    productRowIdx.push(i + 1); // 1-based xlsx row index for image lookup
   }
+
+  // ── Attach embedded Excel images to products by row ──
+  // sheet_to_json with header:1 returns rows in their original order from index 0,
+  // matching the visible row index (i + 1 == 1-based xlsx row).
+  const imageMap = await extractEmbeddedRowImages(buffer, 0);
+  if (imageMap.size > 0) {
+    for (let pi = 0; pi < products.length; pi++) {
+      const r = productRowIdx[pi];
+      const dataUrl = imageMap.get(r);
+      if (dataUrl) products[pi].imageUrl = dataUrl;
+    }
+  }
+
 
   // Detect brand from filename if still missing
   if (!brand) {
@@ -288,6 +405,8 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
       const key = `${p.styleNumber}||${p.colour}`;
       const existing = merged.get(key);
       if (!existing) { merged.set(key, p); continue; }
+      // Prefer the first non-empty image found
+      if (!existing.imageUrl && p.imageUrl) existing.imageUrl = p.imageUrl;
       existing.sizes.push(...p.sizes);
       existing.quantities.push(...p.quantities);
       existing.totalUnits += p.totalUnits;

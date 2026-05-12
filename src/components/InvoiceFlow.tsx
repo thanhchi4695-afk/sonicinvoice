@@ -1633,19 +1633,87 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
     const MAX_MS = 6 * 60_000; // 6 min — beyond this the edge function has almost certainly hit IDLE_TIMEOUT
     const POLL_MS = 3_000;
     const STALL_MS = 90_000; // No heartbeat in 90s while "running" → worker is dead
+    const PER_POLL_MS = 8_000; // Per-request timeout — embedded Shopify iframes can silently hang fetches
     let lastStatus = "running";
+    let consecutiveFailures = 0;
+    let consecutiveNullJobs = 0;
 
     setEnrichLines([{ name: label, status: "searching", action: "Reading safely in the background…", confidence: 0 }]);
 
     while (Date.now() - started < MAX_MS) {
-      const { data: job, error } = await supabase
-        .from("invoice_processing_jobs")
-        .select("status, result, error_message, started_at")
-        .eq("id", jobId)
-        .maybeSingle();
+      // Per-poll AbortController so one stuck request can never wedge the loop
+      // (Shopify embedded iframes occasionally drop fetches without rejecting).
+      const ac = new AbortController();
+      const killSwitch = setTimeout(() => ac.abort(), PER_POLL_MS);
+      let job: { status?: string; result?: unknown; error_message?: string | null; started_at?: string | null } | null = null;
+      let error: unknown = null;
+      try {
+        const res = await supabase
+          .from("invoice_processing_jobs")
+          .select("status, result, error_message, started_at")
+          .eq("id", jobId)
+          .abortSignal(ac.signal)
+          .maybeSingle();
+        job = res.data as typeof job;
+        error = res.error;
+      } catch (e) {
+        error = e;
+      } finally {
+        clearTimeout(killSwitch);
+      }
 
       if (error) {
-        console.warn("[InvoiceFlow] Invoice read job poll failed:", error);
+        consecutiveFailures += 1;
+        console.warn(`[InvoiceFlow] Invoice read job poll failed (${consecutiveFailures}/4):`, error);
+        if (consecutiveFailures >= 4) {
+          // ~32s of solid failures — almost certainly an embedded-iframe / network
+          // / RLS issue. Try a service-role fallback via edge function before giving up.
+          try {
+            const fb = await supabase.functions.invoke("classify-extract-validate", {
+              body: { jobStatusCheck: jobId },
+            });
+            const fbJob = (fb?.data as { job?: typeof job })?.job;
+            if (fbJob?.status === "done") return (fbJob.result || {}) as Record<string, any>;
+            if (fbJob?.status === "failed") {
+              toast.error("Reading failed", { description: fbJob.error_message || "Background reader could not finish." });
+              setEnrichLines([]); setProcessStartTime(null);
+              return null;
+            }
+            // Reset counter if fallback succeeded — keep polling
+            if (fbJob) consecutiveFailures = 0;
+          } catch (fbErr) {
+            console.warn("[InvoiceFlow] Job-status fallback also failed:", fbErr);
+            toast.error("Can't reach the reader", {
+              description: "Your network or the embedded Shopify session blocked the status check. Open Sonic in a new tab and try again.",
+              duration: 12000,
+            });
+            setEnrichLines([]); setProcessStartTime(null);
+            return null;
+          }
+        }
+      } else {
+        consecutiveFailures = 0;
+        if (!job) {
+          // RLS may be hiding the row (e.g. embedded session has no Supabase JWT).
+          consecutiveNullJobs += 1;
+          if (consecutiveNullJobs >= 4) {
+            try {
+              const fb = await supabase.functions.invoke("classify-extract-validate", {
+                body: { jobStatusCheck: jobId },
+              });
+              const fbJob = (fb?.data as { job?: typeof job })?.job;
+              if (fbJob?.status === "done") return (fbJob.result || {}) as Record<string, any>;
+              if (fbJob?.status === "failed") {
+                toast.error("Reading failed", { description: fbJob.error_message || "Background reader could not finish." });
+                setEnrichLines([]); setProcessStartTime(null);
+                return null;
+              }
+              if (fbJob) { job = fbJob; consecutiveNullJobs = 0; }
+            } catch { /* keep polling */ }
+          }
+        } else {
+          consecutiveNullJobs = 0;
+        }
       }
 
       if (job?.status && job.status !== lastStatus) {

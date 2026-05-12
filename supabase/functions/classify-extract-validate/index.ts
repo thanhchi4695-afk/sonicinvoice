@@ -57,6 +57,33 @@ Deno.serve(async (req) => {
     const fileContent = body?.fileContent;
     const fileName = body?.fileName;
 
+    // Lightweight job-status check used by the embedded Shopify iframe when
+    // PostgREST polling is blocked (CSP / third-party cookies / silent fetch
+    // hangs). Looks up the job with the service role and returns its status.
+    if (body?.jobStatusCheck && typeof body.jobStatusCheck === "string") {
+      const adminCheck = createClient(supabaseUrl, serviceKey);
+      const { data: jobRow, error: jobErr } = await adminCheck
+        .from("invoice_processing_jobs")
+        .select("id, user_id, status, result, error_message, started_at, completed_at")
+        .eq("id", body.jobStatusCheck)
+        .maybeSingle();
+      if (jobErr) return json({ error: jobErr.message }, 500);
+      if (!jobRow) return json({ job: null }, 200);
+      // Verify caller owns the job (best-effort — same logic as below).
+      let callerId: string | null = null;
+      try {
+        const userClient = createClient(supabaseUrl, anonKey, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data } = await userClient.auth.getUser();
+        callerId = data?.user?.id ?? null;
+      } catch { /* anonymous */ }
+      if (callerId && jobRow.user_id && callerId !== jobRow.user_id) {
+        return json({ job: null }, 200);
+      }
+      return json({ job: jobRow }, 200);
+    }
+
     if (!fileContent || !fileName) {
       return json({ error: "fileContent and fileName are required" }, 400);
     }

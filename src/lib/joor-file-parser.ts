@@ -403,6 +403,8 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
       const key = `${p.styleNumber}||${p.colour}`;
       const existing = merged.get(key);
       if (!existing) { merged.set(key, p); continue; }
+      // Prefer the first non-empty image found
+      if (!existing.imageUrl && p.imageUrl) existing.imageUrl = p.imageUrl;
       existing.sizes.push(...p.sizes);
       existing.quantities.push(...p.quantities);
       existing.totalUnits += p.totalUnits;

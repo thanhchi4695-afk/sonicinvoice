@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.gmail-oauth-callback]
 verify_jwt = false
 
+[functions.outlook-oauth-callback]
+verify_jwt = false
+
 [functions.scan-gmail-inbox]
 verify_jwt = false
 

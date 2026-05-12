@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, Copy, Check, Upload, Mail, Paperclip, ChevronDown, Loader2, FileText, Image, RefreshCw, LogOut, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Copy, Check, Upload, Mail, Paperclip, ChevronDown, Loader2, FileText, Image, RefreshCw, LogOut, CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { addAuditEntry } from "@/lib/audit-log";
 import { getInvoiceParserModel } from "@/lib/invoice-parser-model";
@@ -11,9 +11,11 @@ interface EmailInboxPanelProps {
   onProcessInvoice?: (supplierName: string) => void;
 }
 
+type Provider = "gmail" | "outlook" | "imap";
+
 interface InboxItem {
   id: string;
-  source: "gmail" | "sim";
+  source: "gmail" | "outlook" | "imap" | "sim";
   from: string;
   fromEmail: string;
   subject: string;
@@ -55,12 +57,22 @@ const confidenceBadge = (c: "high" | "medium" | "low") => {
   );
 };
 
-interface GmailConnection {
+interface ProviderConnection {
   id: string;
+  provider: Provider;
   email_address: string;
   last_checked_at: string | null;
   is_active: boolean;
 }
+
+const providerLabel = (p: Provider) =>
+  p === "gmail" ? "Gmail" : p === "outlook" ? "Outlook" : "Yahoo / IMAP";
+
+const providerBadgeCls = (p: Provider | "sim") =>
+  p === "gmail" ? "bg-success/15 text-success border-success/20"
+  : p === "outlook" ? "bg-primary/15 text-primary border-primary/20"
+  : p === "imap" ? "bg-purple-500/15 text-purple-300 border-purple-500/20"
+  : "bg-warning/15 text-warning border-warning/20";
 
 const SIM_KEY = "email_inbox_sim";
 const isDemoMode = () =>
@@ -114,10 +126,10 @@ const guessType = (filename: string): InboxItem["attachmentType"] => {
 
 const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => {
   const { toast } = useToast();
-  const [connections, setConnections] = useState<GmailConnection[]>([]);
+  const [connections, setConnections] = useState<ProviderConnection[]>([]);
   const [loadingConn, setLoadingConn] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [connecting, setConnecting] = useState<Provider | null>(null);
   const [gmailItems, setGmailItems] = useState<InboxItem[]>([]);
   const [simItems, setSimItems] = useState<InboxItem[]>(getSimItems);
   const [showSimulator, setShowSimulator] = useState(false);
@@ -131,6 +143,11 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     try { return localStorage.getItem("sonic_smart_bulk_enabled") === "1"; } catch { return false; }
   });
   const [autoProcessedIds, setAutoProcessedIds] = useState<Set<string>>(() => new Set());
+  const [showYahooModal, setShowYahooModal] = useState(false);
+  const [yahooEmail, setYahooEmail] = useState("");
+  const [yahooPassword, setYahooPassword] = useState("");
+  const [yahooProvider, setYahooProvider] = useState<"yahoo" | "icloud" | "outlook">("yahoo");
+  const [yahooSubmitting, setYahooSubmitting] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem("sonic_smart_bulk_enabled", smartBulk ? "1" : "0"); } catch {}
@@ -140,19 +157,24 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
 
   const loadConnection = useCallback(async () => {
     setLoadingConn(true);
-    const { data, error } = await supabase
-      .from("gmail_connections")
-      .select("id, email_address, last_checked_at, is_active")
-      .eq("is_active", true)
-      .order("created_at", { ascending: true });
-    if (!error) setConnections((data as GmailConnection[]) ?? []);
+    const [g, o, i] = await Promise.all([
+      supabase.from("gmail_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
+      supabase.from("outlook_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
+      supabase.from("imap_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
+    ]);
+    const all: ProviderConnection[] = [
+      ...((g.data as any[]) ?? []).map(r => ({ ...r, provider: "gmail" as Provider })),
+      ...((o.data as any[]) ?? []).map(r => ({ ...r, provider: "outlook" as Provider })),
+      ...((i.data as any[]) ?? []).map(r => ({ ...r, provider: "imap" as Provider })),
+    ];
+    setConnections(all);
     setLoadingConn(false);
   }, []);
 
   const loadFoundInvoices = useCallback(async () => {
     const { data, error } = await supabase
       .from("gmail_found_invoices")
-      .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed")
+      .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed, provider")
       .order("received_at", { ascending: false })
       .limit(1000);
     if (error) return;
@@ -162,9 +184,10 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       const first = atts[0];
       if (!first) continue;
       const recDate = row.received_at ? new Date(row.received_at) : new Date();
+      const provider = ((row as any).provider ?? "gmail") as Provider;
       items.push({
         id: row.id,
-        source: "gmail",
+        source: provider,
         from: row.supplier_name || row.from_email?.split("@")[0] || "(unknown)",
         fromEmail: row.from_email ?? "",
         subject: row.subject ?? "(no subject)",
@@ -185,19 +208,23 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     setGmailItems(items);
   }, []);
 
-  // On mount + handle ?gmail=connected redirect
+  // On mount + handle ?gmail/?outlook=connected redirect
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const gParam = params.get("gmail");
-    if (gParam === "connected") {
-      toast({ title: "Gmail connected", description: params.get("email") ?? "" });
-      addAuditEntry("Email", `Connected Gmail: ${params.get("email") ?? ""}`);
-      params.delete("gmail"); params.delete("email");
-      const url = window.location.pathname + (params.toString() ? `?${params}` : "");
-      window.history.replaceState({}, "", url);
-    } else if (gParam === "error") {
-      toast({ title: "Gmail connection failed", description: params.get("reason") ?? "", variant: "destructive" });
+    for (const key of ["gmail", "outlook"]) {
+      const v = params.get(key);
+      const labelMap: Record<string, string> = { gmail: "Gmail", outlook: "Outlook" };
+      if (v === "connected") {
+        toast({ title: `${labelMap[key]} connected`, description: params.get("email") ?? "" });
+        addAuditEntry("Email", `Connected ${labelMap[key]}: ${params.get("email") ?? ""}`);
+        params.delete(key); params.delete("email");
+      } else if (v === "error") {
+        toast({ title: `${labelMap[key]} connection failed`, description: params.get("reason") ?? "", variant: "destructive" });
+        params.delete(key); params.delete("reason");
+      }
     }
+    const url = window.location.pathname + (params.toString() ? `?${params}` : "");
+    window.history.replaceState({}, "", url);
     loadConnection();
     loadFoundInvoices();
   }, [loadConnection, loadFoundInvoices, toast]);
@@ -208,10 +235,11 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     return /FBAN|FBAV|FB_IAB|Messenger|Instagram|Line\/|MicroMessenger|WeChat|TikTok|Snapchat|Twitter|LinkedInApp|GSA\//i.test(ua);
   })();
 
-  const handleConnectGmail = async () => {
-    setConnecting(true);
+  const startOAuth = async (provider: "gmail" | "outlook") => {
+    setConnecting(provider);
     try {
-      const { data, error } = await supabase.functions.invoke("gmail-oauth-start", {
+      const fn = provider === "gmail" ? "gmail-oauth-start" : "outlook-oauth-start";
+      const { data, error } = await supabase.functions.invoke(fn, {
         body: { origin: window.location.origin },
       });
       if (error) throw error;
@@ -219,90 +247,130 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       if (!url) throw new Error("No OAuth URL returned");
 
       if (isInAppBrowser) {
-        // Google blocks OAuth in embedded webviews ("disallowed_useragent").
-        // Copy the link and prompt the user to open it in Safari/Chrome.
         try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
         toast({
           title: "Open in Safari or Chrome",
-          description: "Google blocks sign-in inside Messenger/Instagram. The link is copied — paste it into your browser.",
+          description: `${providerLabel(provider)} sign-in is blocked inside in-app browsers. The link is copied — paste it into your browser.`,
         });
-        // Best-effort escape attempts (iOS Safari & Android Chrome intent)
         const isAndroid = /Android/i.test(navigator.userAgent);
         if (isAndroid) {
           window.location.href = `intent://${url.replace(/^https?:\/\//, "")}#Intent;scheme=https;package=com.android.chrome;end`;
         } else {
           window.open(url, "_blank");
         }
-        setConnecting(false);
+        setConnecting(null);
         return;
       }
-
       window.location.href = url;
     } catch (err: any) {
-      toast({ title: "Couldn't start Gmail connect", description: err?.message ?? String(err), variant: "destructive" });
-      setConnecting(false);
+      toast({ title: `Couldn't start ${providerLabel(provider)} connect`, description: err?.message ?? String(err), variant: "destructive" });
+      setConnecting(null);
     }
   };
 
-  const handleDisconnect = async (target?: GmailConnection) => {
+  const handleConnectYahoo = async () => {
+    if (!yahooEmail.trim() || !yahooPassword.trim()) return;
+    setYahooSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("imap-connect", {
+        body: {
+          email: yahooEmail.trim(),
+          app_password: yahooPassword.trim(),
+          provider: yahooProvider,
+        },
+      });
+      if (error) throw error;
+      if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "IMAP login failed");
+      toast({ title: `${providerLabel("imap")} connected`, description: yahooEmail.trim() });
+      addAuditEntry("Email", `Connected IMAP (${yahooProvider}): ${yahooEmail.trim()}`);
+      setShowYahooModal(false);
+      setYahooEmail(""); setYahooPassword("");
+      await loadConnection();
+    } catch (err: any) {
+      toast({ title: "Couldn't connect", description: err?.message ?? String(err), variant: "destructive" });
+    } finally {
+      setYahooSubmitting(false);
+    }
+  };
+
+  const handleDisconnect = async (target?: ProviderConnection) => {
     const all = !target;
     const label = all
-      ? "Disconnect ALL Gmail accounts? Inbox history will be cleared. You can reconnect any time."
-      : `Disconnect ${target!.email_address}? Other connected Gmail accounts (if any) stay connected.`;
+      ? "Disconnect ALL email accounts? Inbox history will be cleared. You can reconnect any time."
+      : `Disconnect ${target!.email_address}? Other connected accounts stay connected.`;
     if (!confirm(label)) return;
 
-    let delQuery = supabase.from("gmail_connections").delete();
-    delQuery = target
-      ? delQuery.eq("id", target.id)
-      : delQuery.eq("is_active", true);
-    const { error: delConnErr } = await delQuery;
-    if (delConnErr) {
-      toast({ title: "Failed", description: delConnErr.message, variant: "destructive" });
-      return;
-    }
-    if (all) {
+    const tableFor = (p: Provider) =>
+      p === "gmail" ? "gmail_connections" : p === "outlook" ? "outlook_connections" : "imap_connections";
+
+    if (target) {
+      const { error: delConnErr } = await supabase.from(tableFor(target.provider)).delete().eq("id", target.id);
+      if (delConnErr) {
+        toast({ title: "Failed", description: delConnErr.message, variant: "destructive" });
+        return;
+      }
+    } else {
+      await Promise.all([
+        supabase.from("gmail_connections").delete().eq("is_active", true),
+        supabase.from("outlook_connections").delete().eq("is_active", true),
+        supabase.from("imap_connections").delete().eq("is_active", true),
+      ]);
       const { error: delInvErr } = await supabase
         .from("gmail_found_invoices")
         .delete()
         .neq("id", "00000000-0000-0000-0000-000000000000");
-      if (delInvErr) console.warn("[gmail] failed to clear found invoices", delInvErr);
+      if (delInvErr) console.warn("[email] failed to clear found invoices", delInvErr);
       setGmailItems([]);
       setAutoProcessedIds(new Set());
     }
     addAuditEntry("Email", all
-      ? "Disconnected all Gmail accounts and cleared inbox queue"
-      : `Disconnected Gmail: ${target!.email_address}`);
+      ? "Disconnected all email accounts and cleared inbox queue"
+      : `Disconnected ${providerLabel(target!.provider)}: ${target!.email_address}`);
     await loadConnection();
-    toast({ title: "Gmail disconnected", description: all ? "Inbox queue cleared." : target!.email_address });
+    toast({ title: "Disconnected", description: all ? "Inbox queue cleared." : target!.email_address });
   };
 
   const handleScanNow = async () => {
     setScanning(true);
     try {
-      const { data, error } = await supabase.functions.invoke("scan-gmail-inbox", {
-        body: {},
-      });
-      if (error) throw error;
-      // The function returns 200 with { error } on reauth required, so check the body too
-      if (data && (data as any).error) {
-        const msg = String((data as any).error);
-        if (/reauth|authoris|invalid_grant/i.test(msg)) {
-          toast({
-            title: "Reconnect Gmail",
-            description: "Your Gmail authorisation expired. Please connect again.",
-            variant: "destructive",
-          });
-          await loadConnection();
-          return;
+      // Run all three scans in parallel; report aggregate.
+      const providers = Array.from(new Set(connections.map(c => c.provider)));
+      const results = await Promise.all(
+        providers.map(async (p) => {
+          const fn = p === "gmail" ? "scan-gmail-inbox" : p === "outlook" ? "scan-outlook-inbox" : "scan-imap-inbox";
+          try {
+            const { data, error } = await supabase.functions.invoke(fn, { body: {} });
+            if (error) throw error;
+            return { provider: p, data };
+          } catch (e: any) {
+            return { provider: p, error: e?.message ?? String(e) };
+          }
+        }),
+      );
+      let totalScanned = 0, totalFound = 0;
+      const reauthProviders: Provider[] = [];
+      for (const r of results) {
+        const data: any = (r as any).data;
+        if (data?.error) {
+          const msg = String(data.error);
+          if (/reauth|authoris|invalid_grant/i.test(msg)) reauthProviders.push((r as any).provider);
+          continue;
         }
-        throw new Error(msg);
+        totalScanned += data?.emails_scanned ?? 0;
+        totalFound += data?.invoices_found?.length ?? 0;
       }
-      const found = (data as any)?.invoices_found?.length ?? 0;
-      const scanned = (data as any)?.emails_scanned ?? 0;
-      addAuditEntry("Email", `Scanned Gmail inbox — ${scanned} email(s), ${found} with invoice attachments`);
+      if (reauthProviders.length) {
+        toast({
+          title: `Reconnect ${reauthProviders.map(p => providerLabel(p)).join(", ")}`,
+          description: "Authorisation expired. Please connect again.",
+          variant: "destructive",
+        });
+        await loadConnection();
+      }
+      addAuditEntry("Email", `Scanned all inboxes — ${totalScanned} email(s), ${totalFound} with invoice attachments`);
       toast({
         title: "Scan complete",
-        description: `Scanned ${scanned} email${scanned === 1 ? "" : "s"}, ${found} with invoice attachment${found === 1 ? "" : "s"}`,
+        description: `Scanned ${totalScanned} email${totalScanned === 1 ? "" : "s"}, ${totalFound} with invoice attachment${totalFound === 1 ? "" : "s"}`,
       });
       await Promise.all([loadConnection(), loadFoundInvoices()]);
     } catch (err: any) {
@@ -316,7 +384,8 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     // Auto-learn: if this is an unknown Gmail sender, ask whether to save the
     // domain to a supplier profile so future emails are tagged KNOWN.
     let resolvedSupplier = item.supplierName ?? null;
-    if (item.source === "gmail" && !item.knownSupplier && item.fromEmail) {
+    const isEmail = item.source === "gmail" || item.source === "outlook" || item.source === "imap";
+    if (isEmail && !item.knownSupplier && item.fromEmail) {
       const domain = item.fromEmail.split("@")[1]?.toLowerCase();
       if (domain) {
         const guess = domain.split(".")[0].replace(/^./, c => c.toUpperCase());
@@ -363,19 +432,20 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       || (item.fromEmail.split("@")[1]?.split(".")[0] ?? "Supplier"));
     const niceSupplier = supplierName.charAt(0).toUpperCase() + supplierName.slice(1);
 
-    if (item.source === "gmail") {
-      // Mark as processing in UI immediately
+    if (isEmail) {
       setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, status: "processing" } : i));
       addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
 
       try {
         if (!item.messageId || !item.attachmentId) {
-          throw new Error("Missing Gmail attachment reference");
+          throw new Error("Missing attachment reference");
         }
 
-        // 1. Fetch attachment bytes (base64) via existing edge function
+        const fetchFn = item.source === "outlook" ? "outlook-fetch-attachment"
+          : item.source === "imap" ? "imap-fetch-attachment"
+          : "gmail-fetch-attachment";
         const { data: attData, error: attErr } = await supabase.functions.invoke(
-          "gmail-fetch-attachment",
+          fetchFn,
           { body: { message_id: item.messageId, attachment_id: item.attachmentId } },
         );
         if (attErr) throw attErr;
@@ -581,17 +651,17 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       </div>
 
       <div className="px-4 pt-4 space-y-4">
-        {/* Gmail connection card */}
+        {/* Email connection card */}
         <div className="bg-card rounded-lg border border-border p-4">
           {loadingConn ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" /> Checking Gmail connection…
+              <Loader2 className="w-4 h-4 animate-spin" /> Checking connections…
             </div>
           ) : connections.length > 0 ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold">
-                  Connected Gmail accounts ({connections.length})
+                  Connected inboxes ({connections.length})
                 </p>
                 <Button size="sm" variant="teal" className="h-8" onClick={handleScanNow} disabled={scanning}>
                   {scanning
@@ -606,12 +676,17 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                     : null;
                   const healthy = ageMin !== null && ageMin < 10;
                   return (
-                    <li key={c.id} className="flex items-center gap-3 px-3 py-2">
+                    <li key={`${c.provider}:${c.id}`} className="flex items-center gap-3 px-3 py-2">
                       <div className="w-8 h-8 rounded-full bg-success/15 flex items-center justify-center shrink-0">
                         <CheckCircle2 className="w-4 h-4 text-success" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{c.email_address}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium truncate">{c.email_address}</p>
+                          <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${providerBadgeCls(c.provider)}`}>
+                            {providerLabel(c.provider).toUpperCase()}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="relative flex h-2 w-2">
                             {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
@@ -636,19 +711,23 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                   );
                 })}
               </ul>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-9 flex-1 min-w-[160px]"
-                  onClick={handleConnectGmail}
-                  disabled={connecting}
-                >
-                  {connecting
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening Google…</>
-                    : <><Mail className="w-4 h-4 mr-2" /> Connect another Gmail</>}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <Button size="sm" variant="outline" className="h-9" onClick={() => startOAuth("gmail")} disabled={connecting === "gmail"}>
+                  {connecting === "gmail"
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening…</>
+                    : <><Mail className="w-4 h-4 mr-2" /> Add Gmail</>}
                 </Button>
-                <Button size="sm" variant="ghost" className="h-9" onClick={() => handleDisconnect()}>
+                <Button size="sm" variant="outline" className="h-9" onClick={() => startOAuth("outlook")} disabled={connecting === "outlook"}>
+                  {connecting === "outlook"
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening…</>
+                    : <><Mail className="w-4 h-4 mr-2" /> Add Outlook</>}
+                </Button>
+                <Button size="sm" variant="outline" className="h-9" onClick={() => setShowYahooModal(true)}>
+                  <Mail className="w-4 h-4 mr-2" /> Add Yahoo / IMAP
+                </Button>
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => handleDisconnect()}>
                   Remove all
                 </Button>
               </div>
@@ -663,25 +742,97 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                   <Mail className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold mb-1">Connect Gmail to auto-pull invoices</p>
+                  <p className="text-sm font-semibold mb-1">Connect your email to auto-pull invoices</p>
                   <p className="text-xs text-muted-foreground">
-                    Read-only access. Sonic Invoices scans your inbox for supplier invoices and queues them here. You can connect multiple Gmail accounts.
+                    Read-only access. Sonic Invoices scans your inbox for supplier invoices and queues them here. You can connect Gmail, Outlook, or Yahoo (and other IMAP providers).
                   </p>
                 </div>
               </div>
               {isInAppBrowser && (
                 <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] text-amber-200">
-                  <strong>Open in Safari or Chrome.</strong> Google blocks sign-in inside Messenger, Instagram, TikTok and other in-app browsers. Tap the <span className="font-mono">•••</span> menu → "Open in browser".
+                  <strong>Open in Safari or Chrome.</strong> Gmail and Outlook block sign-in inside Messenger, Instagram, TikTok and other in-app browsers. Tap the <span className="font-mono">•••</span> menu → "Open in browser".
                 </div>
               )}
-              <Button variant="teal" className="w-full h-10 mt-3" onClick={handleConnectGmail} disabled={connecting}>
-                {connecting
-                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening Google…</>
-                  : <><Mail className="w-4 h-4 mr-2" /> Connect Gmail</>}
-              </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+                <Button variant="teal" className="h-10" onClick={() => startOAuth("gmail")} disabled={connecting === "gmail"}>
+                  {connecting === "gmail"
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening…</>
+                    : <><Mail className="w-4 h-4 mr-2" /> Connect Gmail</>}
+                </Button>
+                <Button variant="teal" className="h-10" onClick={() => startOAuth("outlook")} disabled={connecting === "outlook"}>
+                  {connecting === "outlook"
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Opening…</>
+                    : <><Mail className="w-4 h-4 mr-2" /> Connect Outlook</>}
+                </Button>
+                <Button variant="teal" className="h-10" onClick={() => setShowYahooModal(true)}>
+                  <Mail className="w-4 h-4 mr-2" /> Connect Yahoo / IMAP
+                </Button>
+              </div>
             </div>
           )}
         </div>
+
+        {/* Yahoo / IMAP modal */}
+        {showYahooModal && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !yahooSubmitting && setShowYahooModal(false)}>
+            <div className="bg-card rounded-lg border border-border p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold">Connect via app password</h3>
+                <button onClick={() => setShowYahooModal(false)} disabled={yahooSubmitting} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] text-muted-foreground mb-1 block">Provider</label>
+                  <select
+                    value={yahooProvider}
+                    onChange={e => setYahooProvider(e.target.value as any)}
+                    className="w-full h-9 rounded-md bg-input border border-border px-2 text-sm"
+                  >
+                    <option value="yahoo">Yahoo Mail (Ymail)</option>
+                    <option value="icloud">iCloud Mail</option>
+                    <option value="outlook">Outlook (IMAP fallback)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground mb-1 block">Email</label>
+                  <input
+                    type="email"
+                    value={yahooEmail}
+                    onChange={e => setYahooEmail(e.target.value)}
+                    placeholder="you@yahoo.com"
+                    className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground mb-1 block">App password (16 chars)</label>
+                  <input
+                    type="password"
+                    value={yahooPassword}
+                    onChange={e => setYahooPassword(e.target.value)}
+                    placeholder="xxxx xxxx xxxx xxxx"
+                    className="w-full h-9 rounded-md bg-input border border-border px-3 text-sm font-mono"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Yahoo: <a href="https://login.yahoo.com/account/security" target="_blank" rel="noopener noreferrer" className="underline">login.yahoo.com/account/security</a> → "Generate app password". The password is encrypted at rest.
+                  </p>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" className="flex-1 h-9" onClick={() => setShowYahooModal(false)} disabled={yahooSubmitting}>
+                    Cancel
+                  </Button>
+                  <Button variant="teal" className="flex-1 h-9" onClick={handleConnectYahoo} disabled={yahooSubmitting || !yahooEmail.trim() || !yahooPassword.trim()}>
+                    {yahooSubmitting
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Testing…</>
+                      : <>Connect</>}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* Inbox queue */}
         <div>
@@ -778,8 +929,10 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                         <div className="flex items-center gap-2 mb-0.5">
                           <p className="text-sm font-medium truncate">{item.from}</p>
                           <span className="text-[10px] text-muted-foreground shrink-0">{item.received}</span>
-                          {item.source === "gmail" && (
-                            <span className="text-[9px] px-1 py-0.5 rounded bg-success/15 text-success border border-success/20 shrink-0">GMAIL</span>
+                          {(item.source === "gmail" || item.source === "outlook" || item.source === "imap") && (
+                            <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${providerBadgeCls(item.source)}`}>
+                              {providerLabel(item.source).toUpperCase()}
+                            </span>
                           )}
                           {item.source === "sim" && demo && (
                             <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning border border-warning/20 shrink-0">DEMO</span>

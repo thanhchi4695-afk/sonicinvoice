@@ -630,33 +630,42 @@ export type Database = {
       }
       app_settings: {
         Row: {
+          brand_context_injection_enabled: boolean
           brand_sync_last_run_at: string | null
           brand_sync_last_status: string | null
           brand_sync_schedule: string
           brand_sync_sheet_url: string | null
           created_at: string
+          daily_silent_parse_cap: number
           id: string
           singleton: boolean
+          training_pipeline_enabled: boolean
           updated_at: string
         }
         Insert: {
+          brand_context_injection_enabled?: boolean
           brand_sync_last_run_at?: string | null
           brand_sync_last_status?: string | null
           brand_sync_schedule?: string
           brand_sync_sheet_url?: string | null
           created_at?: string
+          daily_silent_parse_cap?: number
           id?: string
           singleton?: boolean
+          training_pipeline_enabled?: boolean
           updated_at?: string
         }
         Update: {
+          brand_context_injection_enabled?: boolean
           brand_sync_last_run_at?: string | null
           brand_sync_last_status?: string | null
           brand_sync_schedule?: string
           brand_sync_sheet_url?: string | null
           created_at?: string
+          daily_silent_parse_cap?: number
           id?: string
           singleton?: boolean
+          training_pipeline_enabled?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -742,15 +751,23 @@ export type Database = {
       brand_patterns: {
         Row: {
           accuracy_rate: number
+          avg_confidence: number
           brand_name: string | null
           colour_column_name: string | null
+          column_map: Json
           created_at: string
+          failed_streak: number
+          header_row: number | null
           id: string
           invoice_layout_fingerprint: Json | null
+          is_global: boolean
+          last_seen_at: string | null
+          paused_until: string | null
           price_band_max: number | null
           price_band_min: number | null
           product_type_keywords: Json
           sample_count: number
+          sender_domains: string[]
           size_scale_examples: Json
           size_schema: string | null
           sku_format_regex: string | null
@@ -759,19 +776,27 @@ export type Database = {
           supplier_profile_id: string | null
           supplier_sku_format: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           accuracy_rate?: number
+          avg_confidence?: number
           brand_name?: string | null
           colour_column_name?: string | null
+          column_map?: Json
           created_at?: string
+          failed_streak?: number
+          header_row?: number | null
           id?: string
           invoice_layout_fingerprint?: Json | null
+          is_global?: boolean
+          last_seen_at?: string | null
+          paused_until?: string | null
           price_band_max?: number | null
           price_band_min?: number | null
           product_type_keywords?: Json
           sample_count?: number
+          sender_domains?: string[]
           size_scale_examples?: Json
           size_schema?: string | null
           sku_format_regex?: string | null
@@ -780,19 +805,27 @@ export type Database = {
           supplier_profile_id?: string | null
           supplier_sku_format?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           accuracy_rate?: number
+          avg_confidence?: number
           brand_name?: string | null
           colour_column_name?: string | null
+          column_map?: Json
           created_at?: string
+          failed_streak?: number
+          header_row?: number | null
           id?: string
           invoice_layout_fingerprint?: Json | null
+          is_global?: boolean
+          last_seen_at?: string | null
+          paused_until?: string | null
           price_band_max?: number | null
           price_band_min?: number | null
           product_type_keywords?: Json
           sample_count?: number
+          sender_domains?: string[]
           size_scale_examples?: Json
           size_schema?: string | null
           sku_format_regex?: string | null
@@ -801,7 +834,7 @@ export type Database = {
           supplier_profile_id?: string | null
           supplier_sku_format?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -2047,11 +2080,17 @@ export type Database = {
           created_at: string
           email_address: string
           expires_at: string
+          historical_sweep_completed_at: string | null
+          historical_sweep_started_at: string | null
+          historical_sweep_status: string
           id: string
           is_active: boolean
           last_checked_at: string | null
           last_email_id: string | null
           refresh_token: string
+          silent_parses_today: number
+          silent_parses_today_date: string | null
+          training_pipeline_enabled: boolean
           updated_at: string
           user_id: string
         }
@@ -2060,11 +2099,17 @@ export type Database = {
           created_at?: string
           email_address: string
           expires_at: string
+          historical_sweep_completed_at?: string | null
+          historical_sweep_started_at?: string | null
+          historical_sweep_status?: string
           id?: string
           is_active?: boolean
           last_checked_at?: string | null
           last_email_id?: string | null
           refresh_token: string
+          silent_parses_today?: number
+          silent_parses_today_date?: string | null
+          training_pipeline_enabled?: boolean
           updated_at?: string
           user_id: string
         }
@@ -2073,11 +2118,17 @@ export type Database = {
           created_at?: string
           email_address?: string
           expires_at?: string
+          historical_sweep_completed_at?: string | null
+          historical_sweep_started_at?: string | null
+          historical_sweep_status?: string
           id?: string
           is_active?: boolean
           last_checked_at?: string | null
           last_email_id?: string | null
           refresh_token?: string
+          silent_parses_today?: number
+          silent_parses_today_date?: string | null
+          training_pipeline_enabled?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -2227,6 +2278,9 @@ export type Database = {
         Row: {
           created_at: string
           email_address: string
+          historical_sweep_completed_at: string | null
+          historical_sweep_started_at: string | null
+          historical_sweep_status: string
           id: string
           imap_host: string
           imap_port: number
@@ -2238,12 +2292,18 @@ export type Database = {
           password_encrypted: string
           password_iv: string
           provider_label: string
+          silent_parses_today: number
+          silent_parses_today_date: string | null
+          training_pipeline_enabled: boolean
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
           email_address: string
+          historical_sweep_completed_at?: string | null
+          historical_sweep_started_at?: string | null
+          historical_sweep_status?: string
           id?: string
           imap_host: string
           imap_port?: number
@@ -2255,12 +2315,18 @@ export type Database = {
           password_encrypted: string
           password_iv: string
           provider_label?: string
+          silent_parses_today?: number
+          silent_parses_today_date?: string | null
+          training_pipeline_enabled?: boolean
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
           email_address?: string
+          historical_sweep_completed_at?: string | null
+          historical_sweep_started_at?: string | null
+          historical_sweep_status?: string
           id?: string
           imap_host?: string
           imap_port?: number
@@ -2272,6 +2338,9 @@ export type Database = {
           password_encrypted?: string
           password_iv?: string
           provider_label?: string
+          silent_parses_today?: number
+          silent_parses_today_date?: string | null
+          training_pipeline_enabled?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -3027,11 +3096,17 @@ export type Database = {
           created_at: string
           email_address: string
           expires_at: string
+          historical_sweep_completed_at: string | null
+          historical_sweep_started_at: string | null
+          historical_sweep_status: string
           id: string
           is_active: boolean
           last_checked_at: string | null
           last_email_id: string | null
           refresh_token: string
+          silent_parses_today: number
+          silent_parses_today_date: string | null
+          training_pipeline_enabled: boolean
           updated_at: string
           user_id: string
         }
@@ -3040,11 +3115,17 @@ export type Database = {
           created_at?: string
           email_address: string
           expires_at: string
+          historical_sweep_completed_at?: string | null
+          historical_sweep_started_at?: string | null
+          historical_sweep_status?: string
           id?: string
           is_active?: boolean
           last_checked_at?: string | null
           last_email_id?: string | null
           refresh_token: string
+          silent_parses_today?: number
+          silent_parses_today_date?: string | null
+          training_pipeline_enabled?: boolean
           updated_at?: string
           user_id: string
         }
@@ -3053,11 +3134,17 @@ export type Database = {
           created_at?: string
           email_address?: string
           expires_at?: string
+          historical_sweep_completed_at?: string | null
+          historical_sweep_started_at?: string | null
+          historical_sweep_status?: string
           id?: string
           is_active?: boolean
           last_checked_at?: string | null
           last_email_id?: string | null
           refresh_token?: string
+          silent_parses_today?: number
+          silent_parses_today_date?: string | null
+          training_pipeline_enabled?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -5574,6 +5661,117 @@ export type Database = {
         }
         Relationships: []
       }
+      training_logs: {
+        Row: {
+          brand_name: string | null
+          created_at: string
+          event_type: string
+          id: string
+          mailbox_connection_id: string | null
+          message: string
+          metadata: Json
+          severity: string
+          user_id: string | null
+        }
+        Insert: {
+          brand_name?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          mailbox_connection_id?: string | null
+          message: string
+          metadata?: Json
+          severity?: string
+          user_id?: string | null
+        }
+        Update: {
+          brand_name?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          mailbox_connection_id?: string | null
+          message?: string
+          metadata?: Json
+          severity?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      training_parses: {
+        Row: {
+          attachment_bytes: number | null
+          attachment_filename: string
+          attachment_mime: string | null
+          attachment_sha256: string
+          brand_detected: string | null
+          created_at: string
+          document_type: string | null
+          email_account: string
+          email_message_id: string
+          error_message: string | null
+          fields_detected: Json
+          id: string
+          invoice_date: string | null
+          mailbox_connection_id: string | null
+          mailbox_provider: string
+          parse_confidence: number
+          parse_status: string
+          products_extracted: Json
+          raw_text: string | null
+          raw_text_purged_at: string | null
+          sender_domain: string | null
+          user_id: string
+        }
+        Insert: {
+          attachment_bytes?: number | null
+          attachment_filename: string
+          attachment_mime?: string | null
+          attachment_sha256: string
+          brand_detected?: string | null
+          created_at?: string
+          document_type?: string | null
+          email_account: string
+          email_message_id: string
+          error_message?: string | null
+          fields_detected?: Json
+          id?: string
+          invoice_date?: string | null
+          mailbox_connection_id?: string | null
+          mailbox_provider: string
+          parse_confidence?: number
+          parse_status?: string
+          products_extracted?: Json
+          raw_text?: string | null
+          raw_text_purged_at?: string | null
+          sender_domain?: string | null
+          user_id: string
+        }
+        Update: {
+          attachment_bytes?: number | null
+          attachment_filename?: string
+          attachment_mime?: string | null
+          attachment_sha256?: string
+          brand_detected?: string | null
+          created_at?: string
+          document_type?: string | null
+          email_account?: string
+          email_message_id?: string
+          error_message?: string | null
+          fields_detected?: Json
+          id?: string
+          invoice_date?: string | null
+          mailbox_connection_id?: string | null
+          mailbox_provider?: string
+          parse_confidence?: number
+          parse_status?: string
+          products_extracted?: Json
+          raw_text?: string | null
+          raw_text_purged_at?: string | null
+          sender_domain?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       transfer_order_lines: {
         Row: {
           barcode: string | null
@@ -6070,6 +6268,7 @@ export type Database = {
         Returns: number
       }
       normalise_vendor: { Args: { raw: string }; Returns: string }
+      purge_old_training_raw_text: { Args: never; Returns: number }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {

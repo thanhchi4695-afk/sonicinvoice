@@ -307,9 +307,6 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
     const styleName = String(row[styleNameIdx] || "").trim();
     const styleNum = String(row[styleNumIdx] || "").trim();
     if (!styleName && !styleNum) continue;
-    const styleName = String(row[styleNameIdx] || "").trim();
-    const styleNum = String(row[styleNumIdx] || "").trim();
-    if (!styleName && !styleNum) continue;
 
     const wholesale = parseFloat(String(row[wholesaleIdx] || "0").replace(/[,$]/g, "")) || 0;
     const rrp = parseFloat(String(row[retailIdx] || "0").replace(/[,$]/g, "")) || 0;
@@ -371,7 +368,21 @@ async function parseJoorXLSX(file: File): Promise<JoorFileParseResult> {
     };
     product.autoTags = buildAutoTags({ ...product, brand: rowBrand || brand });
     products.push(product);
+    productRowIdx.push(i + 1); // 1-based xlsx row index for image lookup
   }
+
+  // ── Attach embedded Excel images to products by row ──
+  // sheet_to_json with header:1 returns rows in their original order from index 0,
+  // matching the visible row index (i + 1 == 1-based xlsx row).
+  const imageMap = await extractEmbeddedRowImages(buffer, 0);
+  if (imageMap.size > 0) {
+    for (let pi = 0; pi < products.length; pi++) {
+      const r = productRowIdx[pi];
+      const dataUrl = imageMap.get(r);
+      if (dataUrl) products[pi].imageUrl = dataUrl;
+    }
+  }
+
 
   // Detect brand from filename if still missing
   if (!brand) {

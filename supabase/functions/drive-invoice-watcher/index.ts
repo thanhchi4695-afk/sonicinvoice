@@ -241,28 +241,35 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: true, watches: summary.length, summary });
   }
 
-  // User path: authenticated user triggering an immediate sync of their own folder
-  const authHeader = req.headers.get("Authorization") || "";
+  // User path: authenticated user triggering an immediate sync of their own folder(s)
   const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
+    global: { headers: { Authorization: req.headers.get("Authorization") || "" } },
   });
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData?.user) return jsonResponse({ error: "Unauthorized" }, 401);
   const userId = userData.user.id;
 
-  const { data: row, error: rowErr } = await admin
+  // Optional: client may pass { folder_id } to sync just one folder; otherwise sync all enabled
+  const body = await req.json().catch(() => ({} as any));
+  const onlyFolderId: string | undefined = body?.folder_id;
+
+  let q = admin
     .from("drive_watch_settings")
     .select("id,user_id,folder_id,folder_name,enabled,last_sync_at")
     .eq("user_id", userId)
-    .maybeSingle();
+    .eq("enabled", true);
+  if (onlyFolderId) q = q.eq("folder_id", onlyFolderId);
+  const { data: rows, error: rowErr } = await q;
   if (rowErr) return jsonResponse({ error: rowErr.message }, 500);
-  if (!row) return jsonResponse({ error: "No drive watch configured" }, 404);
+  if (!rows || rows.length === 0) return jsonResponse({ error: "No drive watch configured" }, 404);
 
-  // Run in background to avoid request timeout — first sync can scan dozens of files
-  // and each invoice takes 10-60s through classify-extract-validate.
+  // Run all in background to avoid request timeout
   // @ts-ignore - EdgeRuntime is provided by Supabase Edge runtime
-  EdgeRuntime.waitUntil(processOneWatch(admin, row as WatchRow).catch((e) => {
-    console.error("[drive-invoice-watcher] background error:", e);
-  }));
-  return jsonResponse({ ok: true, started: true, message: "Sync started in background. Refresh history in a minute." }, 202);
+  EdgeRuntime.waitUntil((async () => {
+    for (const row of rows as WatchRow[]) {
+      try { await processOneWatch(admin, row); }
+      catch (e) { console.error("[drive-invoice-watcher] background error:", e); }
+    }
+  })());
+  return jsonResponse({ ok: true, started: true, folders: rows.length, message: "Sync started in background. Refresh history in a minute." }, 202);
 });

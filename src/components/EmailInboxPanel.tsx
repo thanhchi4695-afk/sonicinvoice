@@ -146,7 +146,9 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [showYahooModal, setShowYahooModal] = useState(false);
   const [yahooEmail, setYahooEmail] = useState("");
   const [yahooPassword, setYahooPassword] = useState("");
-  const [yahooProvider, setYahooProvider] = useState<"yahoo" | "icloud" | "outlook">("yahoo");
+  const [yahooProvider, setYahooProvider] = useState<"yahoo" | "icloud" | "outlook" | "ventraip" | "fastmail" | "custom">("yahoo");
+  const [yahooHost, setYahooHost] = useState("");
+  const [yahooPort, setYahooPort] = useState("993");
   const [yahooSubmitting, setYahooSubmitting] = useState(false);
 
   useEffect(() => {

@@ -20,7 +20,17 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-const CRON_SECRET = Deno.env.get("CRON_SECRET");
+const ENV_CRON_SECRET = Deno.env.get("CRON_SECRET");
+let CACHED_CRON_SECRET: string | null = null;
+async function getCronSecret(admin: any): Promise<string | null> {
+  if (CACHED_CRON_SECRET) return CACHED_CRON_SECRET;
+  if (ENV_CRON_SECRET) { CACHED_CRON_SECRET = ENV_CRON_SECRET; return CACHED_CRON_SECRET; }
+  try {
+    const { data } = await admin.rpc("get_cron_secret");
+    if (typeof data === "string" && data.length > 0) { CACHED_CRON_SECRET = data; return data; }
+  } catch { /* */ }
+  return null;
+}
 
 const SILENT_MODEL = "google/gemini-2.5-flash";
 const SILENT_FALLBACK_MODEL = "google/gemini-2.5-pro";
@@ -53,15 +63,17 @@ confidence is 0.0–1.0. Be honest; if you cannot extract products, return [] an
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Auth: either internal CRON_SECRET header OR service-role key in Authorization
+  const admin: any = createClient(SUPABASE_URL, SERVICE_KEY);
+
+  // Auth: either CRON_SECRET (env or vault) OR service-role bearer
   const authHeader = req.headers.get("authorization") || "";
   const cronHeader = req.headers.get("x-cron-secret") || "";
+  const cronSecret = await getCronSecret(admin);
   const isAuthorized =
-    (CRON_SECRET && cronHeader === CRON_SECRET) ||
+    (cronSecret && cronHeader === cronSecret) ||
     authHeader === `Bearer ${SERVICE_KEY}`;
   if (!isAuthorized) return json({ error: "Unauthorized" }, 401);
 
-  const admin: any = createClient(SUPABASE_URL, SERVICE_KEY);
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }

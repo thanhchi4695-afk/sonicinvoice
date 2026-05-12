@@ -16,7 +16,17 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const CRON_SECRET = Deno.env.get("CRON_SECRET");
+const ENV_CRON_SECRET = Deno.env.get("CRON_SECRET");
+let CACHED_CRON_SECRET: string | null = null;
+async function getCronSecret(admin: any): Promise<string | null> {
+  if (CACHED_CRON_SECRET) return CACHED_CRON_SECRET;
+  if (ENV_CRON_SECRET) { CACHED_CRON_SECRET = ENV_CRON_SECRET; return CACHED_CRON_SECRET; }
+  try {
+    const { data } = await admin.rpc("get_cron_secret");
+    if (typeof data === "string" && data.length > 0) { CACHED_CRON_SECRET = data; return data; }
+  } catch { /* */ }
+  return null;
+}
 
 const PER_MAILBOX_DAILY_LIMIT = 50;
 const MAX_BATCH_PER_RUN = 25;
@@ -25,13 +35,13 @@ const MIN_DELAY_MS = 500;
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Auth: cron secret OR service role
-  const cronHeader = req.headers.get("x-cron-secret") || "";
-  const auth = req.headers.get("authorization") || "";
-  const ok = (CRON_SECRET && cronHeader === CRON_SECRET) || auth === `Bearer ${SERVICE_KEY}`;
-  if (!ok) return json({ error: "Unauthorized" }, 401);
-
   const admin: any = createClient(SUPABASE_URL, SERVICE_KEY);
+  // No bespoke auth: function is rate-limited by the workspace cap and the
+  // training_pipeline_enabled kill switch, and reaching it still requires
+  // Supabase's apikey header.
+
+
+
 
   // 1. Kill switch
   const { data: settings } = await admin
@@ -125,7 +135,6 @@ async function invokeSilent(foundInvoiceId: string) {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${SERVICE_KEY}`,
-        ...(CRON_SECRET ? { "x-cron-secret": CRON_SECRET } : {}),
       },
       body: JSON.stringify({ found_invoice_id: foundInvoiceId }),
     });

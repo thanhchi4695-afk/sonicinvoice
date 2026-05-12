@@ -13,6 +13,15 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
+const allowedReturnOrigins = new Set([
+  "https://sonicinvoices.com",
+  "https://www.sonicinvoices.com",
+  "https://sonicinvoice.lovable.app",
+  "https://id-preview--ed921f87-40d3-4abb-9b71-c7f63c3b06fb.lovable.app",
+]);
+
+const defaultReturnOrigin = "https://sonicinvoices.com";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -47,6 +56,9 @@ Deno.serve(async (req) => {
   }
   // Strip path from referer if needed
   try { originHint = new URL(originHint).origin; } catch { originHint = ""; }
+  if (!allowedReturnOrigins.has(originHint)) {
+    originHint = defaultReturnOrigin;
+  }
 
   const statePayload = originHint
     ? `${userData.user.id}|${btoa(originHint)}`

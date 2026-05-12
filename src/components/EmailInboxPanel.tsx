@@ -79,6 +79,13 @@ const isDemoMode = () =>
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("demo") === "1";
 
+const OAUTH_RETURN_ORIGIN =
+  typeof window !== "undefined" && window.location.hostname.endsWith("lovableproject.com")
+    ? "https://id-preview--ed921f87-40d3-4abb-9b71-c7f63c3b06fb.lovable.app"
+    : typeof window !== "undefined"
+      ? window.location.origin
+      : "https://sonicinvoices.com";
+
 function getSimItems(): InboxItem[] {
   try { return JSON.parse(localStorage.getItem(SIM_KEY) || "[]"); } catch { return []; }
 }
@@ -242,7 +249,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     try {
       const fn = provider === "gmail" ? "gmail-oauth-start" : "outlook-oauth-start";
       const { data, error } = await supabase.functions.invoke(fn, {
-        body: { origin: window.location.origin },
+        body: { origin: OAUTH_RETURN_ORIGIN },
       });
       if (error) throw error;
       const url = (data as any)?.url;
@@ -402,12 +409,12 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     }
   };
 
-  const handleProcess = async (item: InboxItem) => {
+  const handleProcess = async (item: InboxItem, options: { skipSupplierPrompt?: boolean } = {}): Promise<boolean> => {
     // Auto-learn: if this is an unknown Gmail sender, ask whether to save the
     // domain to a supplier profile so future emails are tagged KNOWN.
     let resolvedSupplier = item.supplierName ?? null;
     const isEmail = item.source === "gmail" || item.source === "outlook" || item.source === "imap";
-    if (isEmail && !item.knownSupplier && item.fromEmail) {
+    if (isEmail && !options.skipSupplierPrompt && !item.knownSupplier && item.fromEmail) {
       const domain = item.fromEmail.split("@")[1]?.toLowerCase();
       if (domain) {
         const guess = domain.split(".")[0].replace(/^./, c => c.toUpperCase());
@@ -509,6 +516,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
         });
         addAuditEntry("Email", `Parsed ${rowCount} variants from ${niceSupplier} (${confLabel})`);
         onProcessInvoice?.(niceSupplier);
+        return true;
       } catch (err: any) {
         console.error("parse-invoice failed", err);
         setGmailItems(prev => prev.map(i => i.id === item.id ? { ...i, status: "ready" } : i));
@@ -517,6 +525,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
           description: err?.message ?? String(err),
           variant: "destructive",
         });
+        return false;
       }
     } else {
       const updated = simItems.map(i => i.id === item.id ? { ...i, status: "processing" as const } : i);
@@ -524,6 +533,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       saveSimItems(updated);
       addAuditEntry("Email", `Started processing email invoice from ${item.from}: ${item.subject}`);
       onProcessInvoice?.(niceSupplier);
+      return true;
     }
   };
 
@@ -601,22 +611,15 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       toast({ title: "Nothing to process", description: mode === "high" ? "No High-confidence invoices ready. Switch to Process All (any) to include Medium and Low." : "Queue is empty." });
       return;
     }
-    if (mode === "any") {
-      const lowMed = targets.filter(t => (t.confidence ?? computeConfidence(t)) !== "high").length;
-      const ok = window.confirm(
-        `Process ALL ${targets.length} queued invoices, including ${lowMed} Medium/Low confidence?\n\n` +
-        `Medium and Low items have unrecognised senders, so parsed results may need editing afterwards in Review.`,
-      );
-      if (!ok) return;
-    }
     setBulkProgress({ current: 0, total: targets.length });
     let success = 0;
     let failed = 0;
     for (let i = 0; i < targets.length; i++) {
       setBulkProgress({ current: i + 1, total: targets.length });
       try {
-        await handleProcess(targets[i]);
-        success++;
+        const ok = await handleProcess(targets[i], { skipSupplierPrompt: mode === "any" });
+        if (ok) success++;
+        else failed++;
       } catch (err) {
         console.warn("Bulk process failed for", targets[i].id, err);
         failed++;

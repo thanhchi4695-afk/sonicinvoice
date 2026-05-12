@@ -155,8 +155,11 @@ export default function GmailMonitoringPanel({ onRunComplete }: Props) {
       return;
     }
     try {
+      const origin = window.location.hostname.endsWith("lovableproject.com")
+        ? "https://id-preview--ed921f87-40d3-4abb-9b71-c7f63c3b06fb.lovable.app"
+        : window.location.origin;
       const { data, error } = await supabase.functions.invoke("gmail-oauth-start", {
-        body: { origin: window.location.origin },
+        body: { origin },
       });
       if (error) throw new Error(error.message);
       const url = (data as { url?: string })?.url;

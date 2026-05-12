@@ -6234,6 +6234,7 @@ export type Database = {
         Returns: number
       }
       get_brand_rules_text: { Args: { _supplier: string }; Returns: string }
+      get_cron_secret: { Args: never; Returns: string }
       get_public_brand_guide: {
         Args: never
         Returns: {

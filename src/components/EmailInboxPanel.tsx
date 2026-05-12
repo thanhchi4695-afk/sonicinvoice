@@ -1003,7 +1003,16 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                           {item.knownSupplier && (
                             <span className="text-[9px] px-1 py-0.5 rounded bg-primary/15 text-primary border border-primary/20 shrink-0">KNOWN</span>
                           )}
-                          {confidenceBadge(item.confidence ?? computeConfidence(item))}
+                          {(() => {
+                            const c = item.confidence ?? computeConfidence(item);
+                            const tip =
+                              c === "high"
+                                ? "High confidence — sender domain matches a known supplier and the filename looks invoice-like. Auto Process will run this row."
+                                : c === "medium"
+                                ? `Medium confidence — sender ${item.fromEmail || "domain"} is recognised but the supplier couldn't be matched exactly. Skipped by Auto Process; click Process → to confirm manually. Add this domain in Supplier Profiles → Email Domains to promote it to High.`
+                                : `Low confidence — sender ${item.fromEmail || "domain"} isn't linked to any supplier yet. Skipped by Auto Process; click Process → to review manually, or add the domain in Supplier Profiles → Email Domains.`;
+                            return <span title={tip}>{confidenceBadge(c)}</span>;
+                          })()}
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{item.subject}</p>
                         <div className="flex items-center gap-2 mt-1.5">

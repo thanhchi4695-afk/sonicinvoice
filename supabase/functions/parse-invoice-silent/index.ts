@@ -370,12 +370,20 @@ async function refreshGoogle(admin: any, connId: string, refreshToken: string): 
   return t.access_token;
 }
 
-async function fetchOutlook(admin: any, found: any, att: any): Promise<Uint8Array> {
-  const { data: conn } = await admin
-    .from("outlook_connections")
-    .select("access_token, refresh_token, expires_at")
-    .eq("id", found.connection_id)
-    .maybeSingle();
+async function fetchOutlook(admin: any, found: any, att: any) {
+  let conn: any = null;
+  if (found.connection_id) {
+    const { data } = await admin.from("outlook_connections")
+      .select("id, email_address, access_token, refresh_token, expires_at")
+      .eq("id", found.connection_id).maybeSingle();
+    conn = data;
+  }
+  if (!conn) {
+    const { data } = await admin.from("outlook_connections")
+      .select("id, email_address, access_token, refresh_token, expires_at")
+      .eq("user_id", found.user_id).eq("is_active", true).limit(1).maybeSingle();
+    conn = data;
+  }
   if (!conn) throw new Error("outlook connection not found");
   let token = conn.access_token;
   const expMs = new Date(conn.expires_at).getTime();
@@ -391,29 +399,37 @@ async function fetchOutlook(admin: any, found: any, att: any): Promise<Uint8Arra
         scope: "offline_access User.Read Mail.Read",
       }),
     });
-    if (!r.ok) throw new Error(`outlook refresh failed: ${await r.text()}`);
+    if (!r.ok) throw new Error(`outlook refresh failed: ${(await r.text()).slice(0, 160)}`);
     const t = await r.json() as { access_token: string; refresh_token?: string; expires_in: number };
     token = t.access_token;
     await admin.from("outlook_connections").update({
       access_token: t.access_token,
       refresh_token: t.refresh_token ?? conn.refresh_token,
       expires_at: new Date(Date.now() + (t.expires_in - 30) * 1000).toISOString(),
-    }).eq("id", found.connection_id);
+    }).eq("id", conn.id);
   }
   const r = await fetch(
     `https://graph.microsoft.com/v1.0/me/messages/${found.message_id}/attachments/${att.attachment_id}/$value`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
   if (!r.ok) throw new Error(`outlook attachment fetch ${r.status}`);
-  return new Uint8Array(await r.arrayBuffer());
+  return { bytes: new Uint8Array(await r.arrayBuffer()), emailAccount: conn.email_address ?? null };
 }
 
-async function fetchImap(admin: any, found: any, att: any): Promise<Uint8Array> {
-  const { data: conn } = await admin
-    .from("imap_connections")
-    .select("imap_host, imap_port, imap_tls, imap_username, password_encrypted, password_iv")
-    .eq("id", found.connection_id)
-    .maybeSingle();
+async function fetchImap(admin: any, found: any, att: any) {
+  let conn: any = null;
+  if (found.connection_id) {
+    const { data } = await admin.from("imap_connections")
+      .select("id, email_address, imap_host, imap_port, imap_tls, imap_username, password_encrypted, password_iv")
+      .eq("id", found.connection_id).maybeSingle();
+    conn = data;
+  }
+  if (!conn) {
+    const { data } = await admin.from("imap_connections")
+      .select("id, email_address, imap_host, imap_port, imap_tls, imap_username, password_encrypted, password_iv")
+      .eq("user_id", found.user_id).eq("is_active", true).limit(1).maybeSingle();
+    conn = data;
+  }
   if (!conn) throw new Error("imap connection not found");
   const password = await decryptString(conn.password_encrypted, conn.password_iv);
   const [uidStr, part] = String(att.attachment_id).split("|");
@@ -421,12 +437,8 @@ async function fetchImap(admin: any, found: any, att: any): Promise<Uint8Array> 
   if (!Number.isFinite(uid) || !part) throw new Error("invalid imap attachment_id");
 
   const client = new ImapFlow({
-    host: conn.imap_host,
-    port: conn.imap_port,
-    secure: !!conn.imap_tls,
-    auth: { user: conn.imap_username, pass: password },
-    logger: false,
-    socketTimeout: 30000,
+    host: conn.imap_host, port: conn.imap_port, secure: !!conn.imap_tls,
+    auth: { user: conn.imap_username, pass: password }, logger: false, socketTimeout: 30000,
   });
   await client.connect();
   try {
@@ -440,7 +452,7 @@ async function fetchImap(admin: any, found: any, att: any): Promise<Uint8Array> 
       const out = new Uint8Array(total);
       let off = 0;
       for (const c of chunks) { out.set(c, off); off += c.byteLength; }
-      return out;
+      return { bytes: out, emailAccount: conn.email_address ?? null };
     } finally { lock.release(); }
   } finally { try { await client.logout(); } catch { /* */ } }
 }

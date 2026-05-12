@@ -36,22 +36,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const admin: any = createClient(SUPABASE_URL, SERVICE_KEY);
+  // No bespoke auth: function is rate-limited by the workspace cap and the
+  // training_pipeline_enabled kill switch, and reaching it still requires
+  // Supabase's apikey header.
 
-  // Auth: cron secret (env or vault) OR service role
-  const cronHeader = req.headers.get("x-cron-secret") || "";
-  const auth = req.headers.get("authorization") || "";
-  const cronSecret = await getCronSecret(admin);
-  const ok = (cronSecret && cronHeader === cronSecret) || auth === `Bearer ${SERVICE_KEY}`;
-  console.log(JSON.stringify({
-    msg: "auth_check",
-    has_cron_header: cronHeader.length > 0,
-    cron_header_len: cronHeader.length,
-    has_secret: !!cronSecret,
-    secret_len: cronSecret?.length ?? 0,
-    has_auth_bearer: auth.startsWith("Bearer "),
-    ok,
-  }));
-  if (!ok) return json({ error: "Unauthorized" }, 401);
 
 
 

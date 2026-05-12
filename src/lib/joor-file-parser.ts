@@ -17,6 +17,8 @@ export interface JoorFileParseResult {
   poNumber: string;
   orders: WholesaleOrder[];
   rawProducts: JoorParsedProduct[];
+  rawRowCount?: number;
+  detected?: boolean;
 }
 
 export interface JoorParsedProduct {
@@ -28,6 +30,8 @@ export interface JoorParsedProduct {
   materials: string;
   category: string;
   subcategory: string;
+  silhouette?: string;
+  countryOfOrigin?: string;
   description: string;
   wholesale: number;
   rrp: number;
@@ -36,6 +40,67 @@ export interface JoorParsedProduct {
   totalUnits: number;
   totalValue: number;
   imageUrl: string;
+  deliveryStart?: string;
+  deliveryEnd?: string;
+  autoTags?: string[];
+}
+
+/**
+ * Detect a JOOR catalog export by checking for the 4 marker columns.
+ * Spec rule: Style Number + Wholesale Price + Sugg. Retail Price + Delivery Start Date.
+ * Also accepts the older variants ("Wholesale (AUD)", "Sugg. Retail (AUD)").
+ */
+export function isJoorHeaderRow(headers: string[]): boolean {
+  const h = headers.map((s) => String(s || "").trim().toLowerCase());
+  const hasStyleNum = h.includes("style number") || h.includes("style_number");
+  const hasWholesale = h.some((c) => c === "wholesale price" || c === "wholesale" || c.startsWith("wholesale (") || c.startsWith("wholesale price ("));
+  const hasRetail = h.some((c) => c === "sugg. retail price" || c === "sugg. retail" || c.startsWith("sugg. retail price (") || c.startsWith("sugg. retail ("));
+  const hasDelivery = h.some((c) => c === "delivery start date" || c === "delivery start" || c === "delivery name");
+  return hasStyleNum && hasWholesale && hasRetail && hasDelivery;
+}
+
+export function isJoorRecordSet(rows: Record<string, string>[]): boolean {
+  if (!rows || rows.length === 0) return false;
+  return isJoorHeaderRow(Object.keys(rows[0]));
+}
+
+/** Extract the AU/UK number from "8 AU/UK (4 US)" → "8". */
+function normaliseSizeLabel(raw: string): string {
+  if (!raw) return raw;
+  const auMatch = raw.match(/^(\d+)\s*AU\/UK/i);
+  if (auMatch) return auMatch[1];
+  const m = raw.match(/^(\d+|OS|XXS|XS|S|M|L|XL|XXL|FREE)/i);
+  return m ? m[1] : raw;
+}
+
+/** Format a date string as "MMM YYYY" for arrival tags (e.g. "arriving-jun-2026"). */
+function arrivalFromDate(input: string): string {
+  if (!input) return "";
+  const d = new Date(input);
+  if (isNaN(d.getTime())) return "";
+  const month = d.toLocaleString("en-US", { month: "short" }).toLowerCase();
+  return `arriving-${month}-${d.getFullYear()}`;
+}
+
+function slugTag(s: string): string {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+/** Build the auto-tag list per spec: vendor, category, material-X, fabric, drop, arriving, country. */
+function buildAutoTags(p: Partial<JoorParsedProduct> & { brand?: string }): string[] {
+  const tags: string[] = [];
+  if (p.brand) tags.push(slugTag(p.brand));
+  if (p.subcategory) tags.push(slugTag(p.subcategory));
+  else if (p.category) tags.push(slugTag(p.category));
+  if (p.materials) tags.push(`material-${slugTag(p.materials)}`);
+  if (p.fabrication) tags.push(slugTag(p.fabrication));
+  if (p.silhouette) tags.push(slugTag(p.silhouette));
+  if (p.countryOfOrigin) tags.push(`made-in-${slugTag(p.countryOfOrigin)}`);
+  if (p.deliveryStart) {
+    const t = arrivalFromDate(p.deliveryStart);
+    if (t) tags.push(t);
+  }
+  return Array.from(new Set(tags.filter(Boolean)));
 }
 
 // ── Main entry point ──

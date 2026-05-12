@@ -421,3 +421,135 @@ function productsToWholesaleOrder(
     importedAt: new Date().toISOString(),
   };
 }
+
+
+// ── Format B: NuORDER Order Data (wide format) ─────────────────────────────
+
+const SIZE_COL_RE = /^AU\s*\d+\s*\/\s*US\s*\d+$/i;
+const SIZE_PRICE_RE = /size\s*price$/i;
+
+function parseOrderFormat(
+  rows: Record<string, unknown>[],
+  headers: string[],
+  file: File,
+): NuOrderFileParseResult {
+  const headerMap = new Map<string, string>();
+  for (const h of headers) headerMap.set(h.trim().toLowerCase(), h);
+  const get = (row: Record<string, unknown>, name: string): unknown => {
+    const real = headerMap.get(name.toLowerCase());
+    return real ? row[real] : "";
+  };
+
+  // Discover dynamic size columns; skip "{size} size price" twins.
+  const sizeColumns = headers.filter(
+    (col) => SIZE_COL_RE.test(col.trim()) && !SIZE_PRICE_RE.test(col.trim()),
+  );
+
+  const groups = new Map<string, NuOrderParsedProduct>();
+  let rawRows = 0;
+  let topBrand = "";
+  let topSeason = "";
+
+  for (const row of rows) {
+    const styleNumber = str(get(row, "Style Number"));
+    if (!styleNumber) continue;
+    const colour = str(get(row, "Color"));
+    const wholesale = num(get(row, "Wholesale (AUD)"));
+    const rrp = num(get(row, "M.S.R.P (AUD)"));
+    if (wholesale === 0 && rrp === 0) continue;
+    rawRows++;
+
+    const sizes: string[] = [];
+    const quantities: number[] = [];
+    let totalUnits = 0;
+    for (const col of sizeColumns) {
+      const raw = row[col];
+      if (raw == null || raw === "") continue;
+      // Skip cells whose value is a formula string (NuOrder totals).
+      if (typeof raw === "string" && raw.trim().startsWith("=")) continue;
+      const qty = Math.max(0, Math.round(num(raw)));
+      if (qty <= 0) continue;
+      sizes.push(normaliseSize(col));
+      quantities.push(qty);
+      totalUnits += qty;
+    }
+
+    const brand = str(get(row, "Brands")) || str(get(row, "Brand"));
+    const category = str(get(row, "Category"));
+    const subcategory = str(get(row, "Subcategory"));
+    const department = str(get(row, "Department"));
+    const division = str(get(row, "Division"));
+    const season = str(get(row, "Season"));
+    const arrivalIso = toIsoDate(get(row, "Available From"));
+    const description = str(get(row, "Description"));
+    const styleName = titleCase(str(get(row, "Name")));
+
+    if (!topBrand && brand) topBrand = brand;
+    if (!topSeason && season) topSeason = season;
+
+    const key = `${styleNumber}||${colour}`;
+    const existing = groups.get(key);
+    if (existing) {
+      // Merge sizes if same style+colour appears twice.
+      for (let i = 0; i < sizes.length; i++) {
+        existing.sizes.push(sizes[i]);
+        existing.quantities.push(quantities[i]);
+        existing.barcodes.push("");
+        existing.totalUnits += quantities[i];
+        existing.totalValue += quantities[i] * wholesale;
+      }
+      continue;
+    }
+
+    groups.set(key, {
+      styleNumber,
+      styleName,
+      description,
+      brand,
+      category,
+      subcategory,
+      department,
+      division,
+      season,
+      colour,
+      wholesale,
+      rrp,
+      arrivalDate: arrivalIso,
+      sizes,
+      quantities,
+      barcodes: sizes.map(() => ""),
+      images: [], // Format B has no image URLs — enrichment cascade fills these in
+      totalUnits,
+      totalValue: totalUnits * wholesale,
+      autoTags: buildNuOrderTags({
+        brand, category, subcategory, department, division, season, colour, arrivalIso,
+      }),
+    });
+  }
+
+  const products = Array.from(groups.values());
+
+  let brand = topBrand;
+  if (!brand) {
+    const cleaned = file.name.replace(/\.[^.]+$/, "").split(/[-_]/);
+    for (const part of cleaned) {
+      if (part.length > 2 && !/^\d+$/.test(part) && !/^products?$/i.test(part) && !/^export$/i.test(part) && !/^order$/i.test(part)) {
+        brand = part.trim().replace(/\s+/g, " ");
+        break;
+      }
+    }
+  }
+
+  const order = productsToWholesaleOrder(products, { brand, season: topSeason, poNumber: "" });
+
+  return {
+    format: "xlsx_order_data",
+    brand,
+    season: topSeason,
+    poNumber: "",
+    orders: products.length > 0 ? [order] : [],
+    rawProducts: products,
+    rawRowCount: rawRows,
+    detected: true,
+  };
+}

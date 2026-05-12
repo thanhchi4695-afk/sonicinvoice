@@ -187,7 +187,9 @@ Deno.serve(async (req) => {
       parse_confidence: aiResult.confidence ?? 0,
       fields_detected: aiResult.fields_detected ?? [],
       raw_text: null,
-      parse_status: (aiResult.products?.length ?? 0) > 0 ? "ok" : "low_signal",
+      parse_status: (aiResult.products?.length ?? 0) > 0
+        ? ((aiResult.confidence ?? 0) >= 0.6 ? "success" : "low_confidence")
+        : "low_confidence",
       error_message: null,
     };
     const { data: tpRow, error: tpErr } = await admin

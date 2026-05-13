@@ -154,11 +154,12 @@ export default function SeoEngine() {
               <thead className="bg-muted/40 text-left">
                 <tr>
                   <th className="p-2">Collection</th>
+                  <th className="p-2">L</th>
+                  <th className="p-2">Score</th>
                   <th className="p-2">Type</th>
                   <th className="p-2">Products</th>
-                  <th className="p-2">Layer</th>
-                  <th className="p-2">SEO Title (chars)</th>
-                  <th className="p-2">Meta (chars)</th>
+                  <th className="p-2">Title</th>
+                  <th className="p-2">Meta</th>
                   <th className="p-2">Status</th>
                   <th className="p-2">Rules</th>
                   <th className="p-2">Action</th>

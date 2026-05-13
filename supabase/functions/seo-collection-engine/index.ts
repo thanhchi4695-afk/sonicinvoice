@@ -507,7 +507,7 @@ ${kwList || "  (none)"}
 
 RELATED COLLECTIONS for internal links (pick 3-5 from this list):
 ${linkList || "  (none — link to the collection's own handle as last resort)"}
-${iconicBlock}${brand ? `\nBRAND VOICE: ${brand.brand_voice ?? ""}\nBRAND VALUE PROP: ${brand.value_proposition ?? ""}\n` : ""}${previousBlock}
+${iconicBlock}${nicheGuard}${brand ? `\nBRAND VOICE: ${brand.brand_voice ?? ""}\nBRAND VALUE PROP: ${brand.value_proposition ?? ""}\n` : ""}${previousBlock}
 
 OUTPUT JSON SCHEMA (strict):
 {

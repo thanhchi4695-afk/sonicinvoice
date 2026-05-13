@@ -497,7 +497,8 @@ Deno.serve(async (req) => {
         lastIssues = [{ field: "_parse", message: "Model did not return JSON" }];
         continue;
       }
-      const description_html = stitchDescription(parsed.formula_parts || {}, isBrandPage, voice);
+      const _handle = suggestion.shopify_handle || suggestion.suggested_handle;
+      const description_html = stitchDescription(parsed.formula_parts || {}, isBrandPage, voice, vertical, _handle);
       lastIssues = validateSeoOutputV2({
         seo_title: parsed.seo_title,
         meta_description: parsed.meta_description,

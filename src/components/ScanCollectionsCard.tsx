@@ -95,7 +95,7 @@ export default function ScanCollectionsCard() {
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               {loading ? "Loading…" : lastScan
-                ? `Last scan ${timeAgo(lastScan.completed_at ?? lastScan.created_at)} · ${lastScan.products_scanned ?? 0} products · ${lastScan.suggestions_created ?? 0} suggestions${lastScan.archive_candidates ? ` · ${lastScan.archive_candidates} archive` : ""}`
+                ? `Last scan ${timeAgo(lastScan.completed_at ?? lastScan.started_at)} · ${lastScan.products_scanned ?? 0} products · ${lastScan.suggestions_created ?? 0} suggestions${lastScan.archive_candidates ? ` · ${lastScan.archive_candidates} archive` : ""}`
                 : "No scans yet — discover new collections from your catalogue."}
             </p>
           </div>

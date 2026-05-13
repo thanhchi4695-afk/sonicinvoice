@@ -159,6 +159,9 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [yahooHost, setYahooHost] = useState("");
   const [yahooPort, setYahooPort] = useState("993");
   const [yahooSubmitting, setYahooSubmitting] = useState(false);
+  const [editingConnId, setEditingConnId] = useState<string | null>(null);
+  const [rescanningId, setRescanningId] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     try { localStorage.setItem("sonic_smart_bulk_enabled", smartBulk ? "1" : "0"); } catch {}

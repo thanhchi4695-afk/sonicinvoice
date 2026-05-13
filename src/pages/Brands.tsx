@@ -274,7 +274,7 @@ export default function Brands() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {filteredRows.map((r) => {
                 const stale = r.last_crawled_at && (Date.now() - new Date(r.last_crawled_at).getTime() > 90 * 24 * 60 * 60 * 1000);
                 return (
                   <tr key={r.id} className="border-t hover:bg-muted/30">

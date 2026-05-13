@@ -78,7 +78,46 @@ function safeParseJson(raw: string): any {
   return null;
 }
 
-function stitchDescription(parts: any, isBrandPage: boolean, voice: VoiceStyle): string {
+// Detect a JEWELLERY-vertical Edit / gifting collection from its handle
+function isJewelleryEditHandle(handle: string | undefined | null): boolean {
+  const h = (handle || "").toLowerCase();
+  return /(^|[-/])(edit|gifting|gifts?|bridal|christmas|valentines|mothers-day|birthday|anniversary|graduation|summer|winter|workwear|everyday|statement|picks)([-/]|$)/.test(h);
+}
+
+// Detect a JEWELLERY brand × type|metal intersection (gwg_intersection)
+function isJewelleryIntersectionHandle(handle: string | undefined | null): boolean {
+  const h = (handle || "").toLowerCase();
+  return /-(earrings|necklaces|bracelets|rings|jewellery|gold|silver|sterling-silver|18k-gold|14k-gold|vermeil|pearl)$/.test(h);
+}
+
+function stitchDescription(parts: any, isBrandPage: boolean, voice: VoiceStyle, vertical?: string, handle?: string): string {
+  // GWG (jewellery) brand page — 5-part meaningful brand story
+  if (vertical === "JEWELLERY" && isBrandPage && voice === "gwg_meaningful") {
+    return [
+      `<p>${parts.gwg_origin ?? parts.brand_origin ?? ""}</p>`,
+      `<p>${parts.gwg_aesthetic ?? ""}</p>`,
+      `<p>${parts.gwg_product_material ?? ""}</p>`,
+      `<p>${parts.gwg_keyword_repetition ?? parts.brand_authority ?? ""}</p>`,
+      `<p>${parts.gwg_sub_links_cta ?? parts.brand_sub_links ?? ""}</p>`,
+    ].join("\n");
+  }
+  // GWG Edits / gifting — 3-part lifestyle
+  if (vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryEditHandle(handle)) {
+    return [
+      `<p>${parts.gwg_edit_lifestyle ?? parts.part1_opener ?? ""}</p>`,
+      `<p>${parts.gwg_edit_snapshot ?? parts.part3_brands ?? ""}</p>`,
+      `<p>${parts.gwg_edit_cta ?? parts.part5_links ?? ""}</p>`,
+    ].join("\n");
+  }
+  // GWG brand × type|metal intersection — 4-part
+  if (vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryIntersectionHandle(handle)) {
+    return [
+      `<p>${parts.gwg_intersection_opener ?? parts.part1_opener ?? ""}</p>`,
+      `<p>${parts.gwg_intersection_styles ?? parts.part2_materials ?? ""}</p>`,
+      `<p>${parts.gwg_intersection_care ?? parts.part4_styling ?? ""}</p>`,
+      `<p>${parts.gwg_intersection_links ?? parts.part5_links ?? ""}</p>`,
+    ].join("\n");
+  }
   // Louenhide brand page (aussie_accessible + isBrandPage) — dedicated 4-part schema
   if (isBrandPage && voice === "aussie_accessible") {
     return [

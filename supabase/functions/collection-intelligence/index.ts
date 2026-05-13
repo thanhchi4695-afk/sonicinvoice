@@ -343,6 +343,43 @@ function buildSuggestions(
     }
   }
 
+  // 4b. Cross-dimension intersections (Mathers pattern)
+  // For each product_type with >=10 products, intersect with each taxonomy
+  // dimension value. Emits e.g. "Womens Shoes — Heels", "Womens Shoes — Comfort".
+  // Threshold: >=5 products in the intersection. Skips trivial dims (gender, size).
+  const SKIP_DIMS = new Set(["gender", "size", "cup_size", "gender_use"]);
+  for (const [type, typeList] of byType) {
+    if (typeList.length < 10) continue;
+    for (const dim of dimensions) {
+      if (SKIP_DIMS.has(dim.dimension_name)) continue;
+      for (const value of dim.dimension_values) {
+        const matched = typeList.filter((p) => productMatchesValue(p, value));
+        if (matched.length < 5) continue;
+        if (matched.length === typeList.length) continue;
+        const title = `${titleCase(type)} — ${titleCase(value)}`;
+        addIfNew({
+          collection_type: "intersection",
+          suggested_title: title,
+          suggested_handle: slug(`${type}-${value}`),
+          rule_set: {
+            applied_disjunctively: false,
+            parent_type: type,
+            dimension: dim.dimension_name,
+            value,
+            vertical,
+            rules: [
+              { column: "type", relation: "equals", condition: type },
+              { column: "tag", relation: "equals", condition: value },
+            ],
+          },
+          product_count: matched.length,
+          confidence_score: confidence("dimension", matched.length),
+          ...sampleFor(matched),
+        });
+      }
+    }
+  }
+
   // 5. Archive — empty existing collections
   for (const c of collections) {
     if ((c.products_count ?? -1) === 0) {

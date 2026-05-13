@@ -78,7 +78,46 @@ function safeParseJson(raw: string): any {
   return null;
 }
 
-function stitchDescription(parts: any, isBrandPage: boolean, voice: VoiceStyle): string {
+// Detect a JEWELLERY-vertical Edit / gifting collection from its handle
+function isJewelleryEditHandle(handle: string | undefined | null): boolean {
+  const h = (handle || "").toLowerCase();
+  return /(^|[-/])(edit|gifting|gifts?|bridal|christmas|valentines|mothers-day|birthday|anniversary|graduation|summer|winter|workwear|everyday|statement|picks)([-/]|$)/.test(h);
+}
+
+// Detect a JEWELLERY brand × type|metal intersection (gwg_intersection)
+function isJewelleryIntersectionHandle(handle: string | undefined | null): boolean {
+  const h = (handle || "").toLowerCase();
+  return /-(earrings|necklaces|bracelets|rings|jewellery|gold|silver|sterling-silver|18k-gold|14k-gold|vermeil|pearl)$/.test(h);
+}
+
+function stitchDescription(parts: any, isBrandPage: boolean, voice: VoiceStyle, vertical?: string, handle?: string): string {
+  // GWG (jewellery) brand page — 5-part meaningful brand story
+  if (vertical === "JEWELLERY" && isBrandPage && voice === "gwg_meaningful") {
+    return [
+      `<p>${parts.gwg_origin ?? parts.brand_origin ?? ""}</p>`,
+      `<p>${parts.gwg_aesthetic ?? ""}</p>`,
+      `<p>${parts.gwg_product_material ?? ""}</p>`,
+      `<p>${parts.gwg_keyword_repetition ?? parts.brand_authority ?? ""}</p>`,
+      `<p>${parts.gwg_sub_links_cta ?? parts.brand_sub_links ?? ""}</p>`,
+    ].join("\n");
+  }
+  // GWG Edits / gifting — 3-part lifestyle
+  if (vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryEditHandle(handle)) {
+    return [
+      `<p>${parts.gwg_edit_lifestyle ?? parts.part1_opener ?? ""}</p>`,
+      `<p>${parts.gwg_edit_snapshot ?? parts.part3_brands ?? ""}</p>`,
+      `<p>${parts.gwg_edit_cta ?? parts.part5_links ?? ""}</p>`,
+    ].join("\n");
+  }
+  // GWG brand × type|metal intersection — 4-part
+  if (vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryIntersectionHandle(handle)) {
+    return [
+      `<p>${parts.gwg_intersection_opener ?? parts.part1_opener ?? ""}</p>`,
+      `<p>${parts.gwg_intersection_styles ?? parts.part2_materials ?? ""}</p>`,
+      `<p>${parts.gwg_intersection_care ?? parts.part4_styling ?? ""}</p>`,
+      `<p>${parts.gwg_intersection_links ?? parts.part5_links ?? ""}</p>`,
+    ].join("\n");
+  }
   // Louenhide brand page (aussie_accessible + isBrandPage) — dedicated 4-part schema
   if (isBrandPage && voice === "aussie_accessible") {
     return [
@@ -132,7 +171,8 @@ type VoiceStyle =
   | "local_warmth"
   | "luxury_refined"
   | "luxury_authority"   // David Jones
-  | "aussie_accessible"; // Louenhide / Megantic
+  | "aussie_accessible"  // Louenhide / Megantic
+  | "gwg_meaningful";    // Girls With Gems (jewellery)
 
 function stitchFaqHtml(faq: Array<{ q: string; a: string }>): string {
   return [
@@ -192,12 +232,21 @@ function normaliseMeta(meta: string, storeName: string, storeCity: string | null
   return m;
 }
 
-function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: VoiceStyle, primaryKeyword: string, storeName: string, storeCity: string | null): Record<string, string> {
+function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: VoiceStyle, primaryKeyword: string, storeName: string, storeCity: string | null, vertical?: string, handle?: string): Record<string, string> {
   const out = { ...parts };
   const usesWfFormula = voice === "aspirational_youth" || voice === "local_warmth";
   const usesLouenhideBrand = isBrandPage && voice === "aussie_accessible";
   const usesDavidJones = !isBrandPage && voice === "luxury_authority";
-  const slot = usesLouenhideBrand
+  const usesGwgBrand = vertical === "JEWELLERY" && isBrandPage && voice === "gwg_meaningful";
+  const usesGwgEdit  = vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryEditHandle(handle);
+  const usesGwgInter = vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryIntersectionHandle(handle);
+  const slot = usesGwgBrand
+    ? "gwg_keyword_repetition"
+    : usesGwgEdit
+    ? "gwg_edit_snapshot"
+    : usesGwgInter
+    ? "gwg_intersection_styles"
+    : usesLouenhideBrand
     ? "lh_keyword_repetition"
     : usesDavidJones
     ? "dj_faq_prose"
@@ -206,7 +255,13 @@ function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: 
     : usesWfFormula
     ? "wf_utility"
     : "part4_styling";
-  const fillers = voice === "aussie_accessible"
+  const fillers = voice === "gwg_meaningful"
+    ? [
+        `Every piece in our ${primaryKeyword} edit is chosen by hand for the way it wears every day — layered, stacked, gifted, or worn solo.`,
+        `Visit ${storeName}${storeCity ? ` in ${storeCity}` : ""} for a personal styling session, or order online with free shipping over $199 and gift packaging at checkout.`,
+        `From dainty everyday pieces to statement designs that mark a milestone, the range covers gold, silver, vermeil, and pearl in styles you'll reach for season after season.`,
+      ]
+    : voice === "aussie_accessible"
     ? [
         `Whether you're ${storeCity ? `shopping in ${storeCity}` : "browsing online"} or grabbing a last-minute gift, our ${primaryKeyword} are built for real life — designed to carry everything you need without the fuss.`,
         `Pop into ${storeName}${storeCity ? ` in ${storeCity}` : ""} and our team will help you find the perfect fit, or order online and we'll have it on its way the same day.`,
@@ -224,7 +279,7 @@ function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: 
         `From everyday essentials to standout pieces, the collection is built around what real customers actually wear day to day.`,
       ];
   for (const filler of fillers) {
-    if (countWords(stitchDescription(out, isBrandPage, voice)) >= 200) break;
+    if (countWords(stitchDescription(out, isBrandPage, voice, vertical, handle)) >= 200) break;
     out[slot] = ((out[slot] ?? "") + " " + filler).trim();
   }
   return out;
@@ -442,7 +497,8 @@ Deno.serve(async (req) => {
         lastIssues = [{ field: "_parse", message: "Model did not return JSON" }];
         continue;
       }
-      const description_html = stitchDescription(parsed.formula_parts || {}, isBrandPage, voice);
+      const _handle = suggestion.shopify_handle || suggestion.suggested_handle;
+      const description_html = stitchDescription(parsed.formula_parts || {}, isBrandPage, voice, vertical, _handle);
       lastIssues = validateSeoOutputV2({
         seo_title: parsed.seo_title,
         meta_description: parsed.meta_description,
@@ -479,8 +535,8 @@ Deno.serve(async (req) => {
         parsed.meta_description = normaliseMeta(parsed.meta_description ?? "", storeName, storeCity);
       }
       if (lengthIssueFields.has("description_html")) {
-        parsed.formula_parts = extendBody(parsed.formula_parts || {}, isBrandPage, voice, primaryKeyword, storeName, storeCity);
-        parsed.__description_html = stitchDescription(parsed.formula_parts, isBrandPage, voice);
+        parsed.formula_parts = extendBody(parsed.formula_parts || {}, isBrandPage, voice, primaryKeyword, storeName, storeCity, vertical, _handle);
+        parsed.__description_html = stitchDescription(parsed.formula_parts, isBrandPage, voice, vertical, _handle);
       }
       if (lengthIssueFields.has("faq")) {
         parsed.faq = extendFaq(parsed.faq || [], primaryKeyword, storeName, storeCity);
@@ -624,8 +680,11 @@ function buildPrompt(opts: {
 
   // Niche-keyword guard (Megantic Innovation 2): never use broad standalone keywords as primary
   const broadBlocklist = new Set(["bags","accessories","wallets","handbags","online shopping"]);
+  const jewelleryBroadBlocklist = new Set(["jewellery","jewelry","earrings","necklaces","bracelets","rings","gold","silver"]);
   const nicheGuard = vertical === "ACCESSORIES"
     ? `\nNICHE KEYWORD GUARD: never use any of these as the primary keyword on its own — ${[...broadBlocklist].join(", ")}. Always combine with brand + type, feature, or location signal (e.g. "louenhide crossbody bag", "rfid blocking wallet women", "bags darwin").\n`
+    : vertical === "JEWELLERY"
+    ? `\nNICHE KEYWORD GUARD: never use any of these as the primary keyword on its own — ${[...jewelleryBroadBlocklist].join(", ")}. Always combine with brand + type, metal, occasion, gifting, or location (e.g. "by charlotte lotus necklace", "18k gold vermeil hoop earrings", "bridesmaid gift jewellery australia", "jewellery double bay").\n`
     : "";
 
   const previousBlock = previousIssues.length
@@ -641,11 +700,36 @@ function buildPrompt(opts: {
     .map((k) => `  - T${k.tier} (${k.placement_hint ?? ""}) ${k.keyword}`)
     .join("\n");
 
-  // Dedicated schemas for the two ACCESSORIES competitor playbooks.
+  // Dedicated schemas for the JEWELLERY (GWG) and ACCESSORIES competitor playbooks.
+  const _handleStr = suggestion.shopify_handle || suggestion.suggested_handle || "";
+  const useGwgBrand        = vertical === "JEWELLERY" && isBrandPage && voice === "gwg_meaningful";
+  const useGwgEdit         = vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryEditHandle(_handleStr);
+  const useGwgIntersection = vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryIntersectionHandle(_handleStr);
   const useLouenhideBrand = isBrandPage && voice === "aussie_accessible";
   const useDavidJonesCol  = !isBrandPage && voice === "luxury_authority" && vertical === "ACCESSORIES";
 
-  const formulaSchema = useLouenhideBrand
+  const formulaSchema = useGwgBrand
+    ? `{
+  "gwg_origin": "2 sentences. Sentence 1: country/city of origin, founding year, founder name. Sentence 2: founder intent / what makes the brand distinct.",
+  "gwg_aesthetic": "2 sentences on brand aesthetic + design inspiration — the visual and emotional world (e.g. Mediterranean summers, celestial symbols, mindful mantras).",
+  "gwg_product_material": "2 sentences naming what they make (necklaces, earrings, bracelets, rings) and what it's made from (18k gold vermeil, 14k gold, sterling silver, freshwater pearls, gemstones). SEO-loaded with materials.",
+  "gwg_keyword_repetition": "3-4 sentences. The exact 'brand + jewellery type' phrase (e.g. 'By Charlotte necklaces') must appear at least 3 times naturally across these sentences. Cover the brand's earrings, necklaces, bracelets, rings, and gifts.",
+  "gwg_sub_links_cta": "1-2 sentences containing 3-5 inline <a href='/collections/{handle}'>{title}</a> links picked ONLY from the RELATED COLLECTIONS list (brand × type intersections preferred), ending with a local CTA to ${storeName}${storeCity ? ' in ' + storeCity : ''}."
+}`
+    : useGwgEdit
+    ? `{
+  "gwg_edit_lifestyle": "2 sentences. Lifestyle moment opener: '[Edit Name] is ${storeName}'s curated selection of [occasion/style] pieces chosen by our ${storeCity ?? 'in-store'} stylists.' Set the emotional scene.",
+  "gwg_edit_snapshot": "3 sentences naming specific products/brands from sample_titles and their role in the occasion (e.g. 'delicate By Charlotte necklaces for the bride, bold Amber Sceats statement earrings for the mother of the bride').",
+  "gwg_edit_cta": "1-2 sentences with a gifting/occasion CTA + 2-3 inline <a href='/collections/{handle}'>{title}</a> links to related type collections, free shipping note, in-store ${storeCity ?? 'visit'} invitation."
+}`
+    : useGwgIntersection
+    ? `{
+  "gwg_intersection_opener": "2 sentences (~45 words). Sentence 1 contains the exact intersection keyword (e.g. 'By Charlotte necklaces' or '18k gold vermeil earrings') in the first 10 words. Sentence 2 expands on the brand's design signature for this type/metal.",
+  "gwg_intersection_styles": "2 sentences (~50 words) naming 3-5 specific style names from sample_titles, materials, and gemstone/finish details.",
+  "gwg_intersection_care": "2 sentences on care, sizing, layering or gifting guidance for this intersection.",
+  "gwg_intersection_links": "1-2 sentences containing 3-5 inline <a href='/collections/{handle}'>{title}</a> links chosen ONLY from the RELATED COLLECTIONS list (sibling brand × type or sibling metal collections), ending with a CTA to ${storeName}."
+}`
+    : useLouenhideBrand
     ? `{
   "lh_brisbane_origin": "2 sentences. Sentence 1 names the brand and its Brisbane (or actual home-city) founding story with a year. Sentence 2 names the founder's intent.",
   "lh_mission": "2 sentences on the brand mission — accessible everyday luxury, considered design, vegan-friendly materials. No fluff, plain Aussie tone.",

@@ -195,7 +195,17 @@ function normaliseMeta(meta: string, storeName: string, storeCity: string | null
 function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: VoiceStyle, primaryKeyword: string, storeName: string, storeCity: string | null): Record<string, string> {
   const out = { ...parts };
   const usesWfFormula = voice === "aspirational_youth" || voice === "local_warmth";
-  const slot = isBrandPage ? "brand_authority" : usesWfFormula ? "wf_utility" : "part4_styling";
+  const usesLouenhideBrand = isBrandPage && voice === "aussie_accessible";
+  const usesDavidJones = !isBrandPage && voice === "luxury_authority";
+  const slot = usesLouenhideBrand
+    ? "lh_keyword_repetition"
+    : usesDavidJones
+    ? "dj_faq_prose"
+    : isBrandPage
+    ? "brand_authority"
+    : usesWfFormula
+    ? "wf_utility"
+    : "part4_styling";
   const fillers = voice === "aussie_accessible"
     ? [
         `Whether you're ${storeCity ? `shopping in ${storeCity}` : "browsing online"} or grabbing a last-minute gift, our ${primaryKeyword} are built for real life — designed to carry everything you need without the fuss.`,

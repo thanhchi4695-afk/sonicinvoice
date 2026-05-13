@@ -87,6 +87,9 @@ const App = () => (
                   <Route path="/rules/setup" element={<RulesSetup />} />
                   <Route path="/collections" element={<Suspense fallback={null}><Collections /></Suspense>} />
                   <Route path="/brands" element={<Suspense fallback={null}><Brands /></Suspense>} />
+                  <Route path="/seo-engine" element={<RequireAuth><Suspense fallback={null}><SeoEngine /></Suspense></RequireAuth>} />
+                  <Route path="/seo-keywords" element={<RequireAuth><Suspense fallback={null}><SeoKeywords /></Suspense></RequireAuth>} />
+                  <Route path="/seo-blog-plans" element={<RequireAuth><Suspense fallback={null}><SeoBlogPlans /></Suspense></RequireAuth>} />
                   <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
                   <Route

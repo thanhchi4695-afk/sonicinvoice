@@ -56,12 +56,58 @@ function titleCase(s: string): string {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Hardcoded vertical mapping by store_url substring (Phase 1 decision).
-function detectVerticalFromStore(storeUrl: string): string {
-  const u = storeUrl.toLowerCase();
-  if (u.includes("splash")) return "SWIMWEAR";
-  if (u.includes("stomp")) return "MULTI";
-  return "UNKNOWN";
+// 40%-distribution vertical detection.
+// Classifies each product by signature keywords across vertical-specific
+// product_type / title / tags, then returns any verticals with >=40% share.
+// - 0 verticals over threshold => "UNKNOWN"
+// - 1 vertical over threshold  => that vertical (e.g. "SWIMWEAR")
+// - 2+ verticals over threshold => "MULTI"
+const VERTICAL_SIGNATURES: Record<string, string[]> = {
+  SWIMWEAR: ["swim", "bikini", "one-piece", "one piece", "rashie", "rash vest", "boardshort", "board short", "trunk", "tankini", "swimsuit", "swimwear", "bather"],
+  FOOTWEAR: ["shoe", "sneaker", "boot", "sandal", "heel", "loafer", "mule", "slipper", "thong", "flip flop", "trainer", "pump", "wedge", "espadrille", "clog"],
+  CLOTHING: ["dress", "top", "shirt", "blouse", "skirt", "pant", "trouser", "jean", "jacket", "coat", "knit", "jumper", "sweater", "tee", "t-shirt", "hoodie", "cardigan", "blazer", "short", "playsuit", "jumpsuit", "romper"],
+  ACCESSORIES: ["bag", "tote", "clutch", "handbag", "backpack", "wallet", "purse", "belt", "hat", "cap", "scarf", "sunglass", "glove", "umbrella"],
+  JEWELLERY: ["ring", "necklace", "bracelet", "earring", "pendant", "anklet", "charm", "brooch", "jewellery", "jewelry"],
+  LIFESTYLE: ["candle", "diffuser", "perfume", "fragrance", "soap", "lotion", "mug", "homeware", "cushion", "throw", "blanket"],
+};
+
+function classifyProductVertical(p: ShopifyProduct): string | null {
+  const hay = [p.product_type || "", p.title || "", p.tags || ""].join(" ").toLowerCase();
+  if (!hay.trim()) return null;
+  let best: string | null = null;
+  let bestLen = 0;
+  for (const [vert, words] of Object.entries(VERTICAL_SIGNATURES)) {
+    for (const w of words) {
+      if (hay.includes(w) && w.length > bestLen) {
+        best = vert;
+        bestLen = w.length;
+      }
+    }
+  }
+  return best;
+}
+
+function detectVerticalFromProducts(products: ShopifyProduct[]): { vertical: string; distribution: Record<string, number>; classified: number } {
+  const counts: Record<string, number> = {};
+  let classified = 0;
+  for (const p of products) {
+    const v = classifyProductVertical(p);
+    if (!v) continue;
+    counts[v] = (counts[v] ?? 0) + 1;
+    classified++;
+  }
+  if (classified === 0) return { vertical: "UNKNOWN", distribution: {}, classified: 0 };
+  const distribution: Record<string, number> = {};
+  const overThreshold: string[] = [];
+  for (const [v, n] of Object.entries(counts)) {
+    const share = n / classified;
+    distribution[v] = Math.round(share * 1000) / 1000;
+    if (share >= 0.4) overThreshold.push(v);
+  }
+  let vertical = "UNKNOWN";
+  if (overThreshold.length === 1) vertical = overThreshold[0];
+  else if (overThreshold.length >= 2) vertical = "MULTI";
+  return { vertical, distribution, classified };
 }
 
 async function fetchAllProducts(storeUrl: string, token: string, apiVersion: string): Promise<ShopifyProduct[]> {
@@ -348,11 +394,19 @@ Deno.serve(async (req) => {
 
     try {
       const { accessToken, storeUrl, apiVersion } = await getValidShopifyToken(admin, userId);
-      const vertical = verticalOverride ?? detectVerticalFromStore(storeUrl);
 
-      // Load taxonomy dimensions for this vertical (or all if MULTI)
+      // Fetch products + collections first so we can run distribution-based vertical detection.
+      const [products, collections] = await Promise.all([
+        fetchAllProducts(storeUrl, accessToken, apiVersion),
+        fetchAllCollections(storeUrl, accessToken, apiVersion),
+      ]);
+
+      const detection = detectVerticalFromProducts(products);
+      const vertical = verticalOverride ?? detection.vertical;
+
+      // Load taxonomy dimensions for this vertical (or all signature verticals if MULTI)
       const verticalsToLoad = vertical === "MULTI"
-        ? ["FOOTWEAR", "SWIMWEAR", "CLOTHING", "ACCESSORIES", "LIFESTYLE"]
+        ? Object.keys(VERTICAL_SIGNATURES)
         : vertical === "UNKNOWN" ? [] : [vertical];
 
       const { data: taxRows } = verticalsToLoad.length > 0
@@ -377,11 +431,6 @@ Deno.serve(async (req) => {
         .eq("user_id", userId)
         .gte("crawl_confidence", 0.6);
       const brands = (brandRows ?? []) as BrandRow[];
-
-      const [products, collections] = await Promise.all([
-        fetchAllProducts(storeUrl, accessToken, apiVersion),
-        fetchAllCollections(storeUrl, accessToken, apiVersion),
-      ]);
 
       const suggestions = buildSuggestions(products, collections, vertical, dimensions, brands);
 
@@ -414,6 +463,13 @@ Deno.serve(async (req) => {
         success: true,
         scan_id: scanId,
         vertical,
+        vertical_detection: {
+          detected: detection.vertical,
+          override: verticalOverride ?? null,
+          classified_products: detection.classified,
+          distribution: detection.distribution,
+          threshold: 0.4,
+        },
         products_scanned: products.length,
         dimensions_loaded: dimensions.length,
         brands_loaded: brands.length,

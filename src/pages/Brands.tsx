@@ -64,6 +64,7 @@ interface BrandRow {
   last_crawled_at: string | null;
   manually_verified: boolean;
   iconic_reference?: any;
+  whitefox_reference?: any;
 }
 
 export default function Brands() {
@@ -76,6 +77,7 @@ export default function Brands() {
   const [verticalFilter, setVerticalFilter] = useState<"ALL" | Vertical>("ALL");
   const [killSwitch, setKillSwitch] = useState<boolean>(true);
   const [iconicRefreshingId, setIconicRefreshingId] = useState<string | null>(null);
+  const [whitefoxRefreshingId, setWhitefoxRefreshingId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -151,6 +153,24 @@ export default function Brands() {
       toast.error(`${name}: ${e instanceof Error ? e.message : "ICONIC refresh failed"}`);
     } finally {
       setIconicRefreshingId(null);
+    }
+  }
+
+  async function refreshWhitefox(id: string, name: string) {
+    setWhitefoxRefreshingId(id);
+    try {
+      const { data, error } = await supabase.functions.invoke("whitefox-reference-refresh", { body: { brand_id: id } });
+      if (error) throw error;
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      const d = data as { hasChanges?: boolean; changes?: string[]; pages_scraped?: number };
+      toast.success(`${name}: White Fox refreshed (${d.pages_scraped ?? 0} pages)`, {
+        description: (d.changes ?? []).slice(0, 3).join(" • ") || "No changes detected",
+      });
+      await load();
+    } catch (e) {
+      toast.error(`${name}: ${e instanceof Error ? e.message : "White Fox refresh failed"}`);
+    } finally {
+      setWhitefoxRefreshingId(null);
     }
   }
 
@@ -323,6 +343,11 @@ export default function Brands() {
                       {r.industry_vertical === "FOOTWEAR" && (
                         <Button size="sm" variant="ghost" disabled={iconicRefreshingId === r.id} onClick={() => refreshIconic(r.id, r.brand_name)} title="Refresh ICONIC reference">
                           {iconicRefreshingId === r.id ? <Loader2 className="h-3 w-3 animate-spin text-amber-500" /> : <Zap className="h-3 w-3 text-amber-500" />}
+                        </Button>
+                      )}
+                      {(r.industry_vertical === "CLOTHING" || r.industry_vertical === "SWIMWEAR") && (
+                        <Button size="sm" variant="ghost" disabled={whitefoxRefreshingId === r.id} onClick={() => refreshWhitefox(r.id, r.brand_name)} title="Refresh White Fox reference">
+                          {whitefoxRefreshingId === r.id ? <Loader2 className="h-3 w-3 animate-spin text-teal-500" /> : <Zap className="h-3 w-3 text-teal-500" />}
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" onClick={() => setSelected(r)}>View</Button>

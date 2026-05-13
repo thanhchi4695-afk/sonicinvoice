@@ -446,10 +446,53 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Step 7D: White Fox reference (CLOTHING / SWIMWEAR) — captures nested
+    // collection structure, opening copy patterns, sub-types, and trend
+    // vocabulary from whitefoxboutique.com (Australia's leading single-brand
+    // DTC fashion site). Used to train voice and nested-handle generation.
+    let whitefoxRef: any = null;
+    if (vertical === "CLOTHING" || vertical === "SWIMWEAR") {
+      try {
+        const wfPages = [
+          "https://www.whitefoxboutique.com/collections/dresses",
+          "https://www.whitefoxboutique.com/collections/tops",
+          "https://www.whitefoxboutique.com/collections/sets",
+        ];
+        const captured: any[] = [];
+        const TREND_WORDS = ["y2k","balletcore","coquette","westerncore","coastal","quiet luxury","old money","festival","resort","mob wife","grunge","preppy","minimalist","cottagecore"];
+        for (const url of wfPages) {
+          await sleep(FETCH_DELAY_MS);
+          const wf = await firecrawlScrape(url, ["markdown", "links"]);
+          pages++;
+          if (!wf.success || !wf.data?.markdown) continue;
+          const md: string = wf.data.markdown;
+          const links: string[] = wf.data.links ?? [];
+          const h1 = md.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? null;
+          const opening = md.replace(/[#*_>`]/g, "").split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(s => s.length > 30).slice(0, 2).join(" ").slice(0, 600);
+          const nested = links
+            .filter((u) => /whitefoxboutique\.com\/collections\//i.test(u))
+            .filter((u) => u.split("/collections/")[1]?.split("/").filter(Boolean).length >= 2)
+            .map((u) => u.split("?")[0].split("#")[0])
+            .filter((v, i, a) => a.indexOf(v) === i)
+            .slice(0, 30);
+          captured.push({ url, h1, opening_copy: opening, nested_handles: nested });
+        }
+        if (captured.length) {
+          const allMd = captured.map(p => `${p.h1 ?? ""} ${p.opening_copy ?? ""}`).join(" ").toLowerCase();
+          const trendVocab = TREND_WORDS.filter(t => allMd.includes(t));
+          const allNested = Array.from(new Set(captured.flatMap(p => p.nested_handles))).slice(0, 80);
+          whitefoxRef = { pages: captured, nested_handles: allNested, trend_vocabulary: trendVocab, captured_at: new Date().toISOString() };
+        }
+      } catch (e) {
+        console.warn("whitefox reference fetch failed", e);
+      }
+    }
+
     const confidence = scoreConfidence(extracted);
     await supabase.from("brand_intelligence").update({
       competitor_reference_styletread: styletreadRef,
       iconic_reference: iconicRef,
+      whitefox_reference: whitefoxRef,
       brand_domain: domain,
       industry_vertical: vertical,
       collection_nav_urls: allCollectionUrls,

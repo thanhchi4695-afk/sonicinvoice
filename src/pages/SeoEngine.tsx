@@ -14,6 +14,8 @@ interface Suggestion {
   collection_type: string;
   product_count: number;
   status: string;
+  completeness_score?: number | null;
+  taxonomy_level?: number | null;
 }
 interface Output {
   suggestion_id: string;

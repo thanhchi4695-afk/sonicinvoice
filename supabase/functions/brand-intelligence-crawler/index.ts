@@ -217,15 +217,27 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Kill switch
+    const { data: settings } = await supabase
+      .from("app_settings")
+      .select("brand_intelligence_enabled")
+      .eq("singleton", true)
+      .maybeSingle();
+    if (settings && settings.brand_intelligence_enabled === false) {
+      return new Response(JSON.stringify({ error: "Brand Intelligence is disabled in app settings." }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = (await req.json()) as CrawlBody;
     if (!body.brand_name) {
       return new Response(JSON.stringify({ error: "brand_name required" }), { status: 400, headers: corsHeaders });
     }
+    const vertical = (body.industry_vertical || "UNKNOWN").toUpperCase();
 
-    // Upsert row in 'crawling' state
     const { data: existing } = await supabase
       .from("brand_intelligence")
-      .select("id, brand_domain")
+      .select("id, brand_domain, industry_vertical")
       .eq("user_id", user.id)
       .eq("brand_name", body.brand_name)
       .maybeSingle();
@@ -237,7 +249,7 @@ Deno.serve(async (req) => {
       domain = await resolveDomain(body.brand_name);
     }
     if (!domain) {
-      const errPayload = { user_id: user.id, brand_name: body.brand_name, crawl_status: "failed", crawl_error: "Could not resolve domain", last_crawled_at: new Date().toISOString() };
+      const errPayload = { user_id: user.id, brand_name: body.brand_name, industry_vertical: vertical, crawl_status: "failed", crawl_error: "Could not resolve domain", last_crawled_at: new Date().toISOString() };
       if (recordId) await supabase.from("brand_intelligence").update(errPayload).eq("id", recordId);
       else await supabase.from("brand_intelligence").insert(errPayload);
       return new Response(JSON.stringify({ error: "Could not resolve domain. Please provide brand_domain." }), {
@@ -249,6 +261,7 @@ Deno.serve(async (req) => {
       user_id: user.id,
       brand_name: body.brand_name,
       brand_domain: domain,
+      industry_vertical: vertical,
       crawl_status: "crawling",
       crawl_error: null,
     };

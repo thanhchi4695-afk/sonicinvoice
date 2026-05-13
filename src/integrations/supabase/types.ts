@@ -1271,6 +1271,56 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_blogs: {
+        Row: {
+          blog_type: string
+          content_html: string
+          created_at: string
+          id: string
+          shopify_article_id: string | null
+          shopify_blog_id: string | null
+          status: string
+          suggestion_id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          blog_type: string
+          content_html: string
+          created_at?: string
+          id?: string
+          shopify_article_id?: string | null
+          shopify_blog_id?: string | null
+          status?: string
+          suggestion_id: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          blog_type?: string
+          content_html?: string
+          created_at?: string
+          id?: string
+          shopify_article_id?: string | null
+          shopify_blog_id?: string | null
+          status?: string
+          suggestion_id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_blogs_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "collection_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_memory: {
         Row: {
           collection_handle: string
@@ -1303,6 +1353,114 @@ export type Database = {
           shop_domain?: string
           shopify_collection_id?: string | null
           source_invoice?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      collection_scans: {
+        Row: {
+          archive_candidates: number
+          completed_at: string | null
+          error: string | null
+          id: string
+          products_scanned: number
+          started_at: string
+          store_domain: string | null
+          suggestions_created: number
+          triggered_by: string
+          user_id: string
+        }
+        Insert: {
+          archive_candidates?: number
+          completed_at?: string | null
+          error?: string | null
+          id?: string
+          products_scanned?: number
+          started_at?: string
+          store_domain?: string | null
+          suggestions_created?: number
+          triggered_by: string
+          user_id: string
+        }
+        Update: {
+          archive_candidates?: number
+          completed_at?: string | null
+          error?: string | null
+          id?: string
+          products_scanned?: number
+          started_at?: string
+          store_domain?: string | null
+          suggestions_created?: number
+          triggered_by?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      collection_suggestions: {
+        Row: {
+          collection_type: string
+          confidence_score: number
+          created_at: string
+          description_html: string | null
+          error_message: string | null
+          id: string
+          product_count: number
+          rule_set: Json
+          sample_images: string[]
+          sample_product_ids: string[]
+          sample_titles: string[]
+          seo_description: string | null
+          seo_title: string | null
+          shopify_collection_id: string | null
+          status: string
+          store_domain: string | null
+          suggested_handle: string
+          suggested_title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          collection_type: string
+          confidence_score?: number
+          created_at?: string
+          description_html?: string | null
+          error_message?: string | null
+          id?: string
+          product_count?: number
+          rule_set?: Json
+          sample_images?: string[]
+          sample_product_ids?: string[]
+          sample_titles?: string[]
+          seo_description?: string | null
+          seo_title?: string | null
+          shopify_collection_id?: string | null
+          status?: string
+          store_domain?: string | null
+          suggested_handle: string
+          suggested_title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          collection_type?: string
+          confidence_score?: number
+          created_at?: string
+          description_html?: string | null
+          error_message?: string | null
+          id?: string
+          product_count?: number
+          rule_set?: Json
+          sample_images?: string[]
+          sample_product_ids?: string[]
+          sample_titles?: string[]
+          seo_description?: string | null
+          seo_title?: string | null
+          shopify_collection_id?: string | null
+          status?: string
+          store_domain?: string | null
+          suggested_handle?: string
+          suggested_title?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

@@ -163,16 +163,52 @@ export default function Brands() {
   }
 
   const seeded = new Set(rows.map((r) => r.brand_name.toLowerCase()));
-  const unseeded = PRIORITY_BRANDS.filter((b) => !seeded.has(b.name.toLowerCase()));
+  const unseededAll = PRIORITY_BRANDS.filter((b) => !seeded.has(b.name.toLowerCase()));
+  const matchesVertical = (v: string | null | undefined) =>
+    verticalFilter === "ALL" || (v ?? "").toUpperCase() === verticalFilter;
+  const unseeded = unseededAll.filter((b) => matchesVertical(b.vertical));
+  const filteredRows = rows.filter((r) => matchesVertical(r.industry_vertical));
+  const verticalCount = (v: "ALL" | Vertical) =>
+    v === "ALL" ? rows.length : rows.filter((r) => (r.industry_vertical ?? "").toUpperCase() === v).length;
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Brand Intelligence</h1>
-        <p className="text-muted-foreground mt-1">
-          Sonic learns each brand's category vocabulary, collection structure, tone, and blog topics from their official website.
-          This intelligence drives brand-native collections and content.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Brand Intelligence</h1>
+          <p className="text-muted-foreground mt-1">
+            Sonic learns each brand's category vocabulary, collection structure, tone, and blog topics from their official website.
+            This intelligence drives brand-native collections and content.
+          </p>
+        </div>
+        <Button
+          variant={killSwitch ? "outline" : "destructive"}
+          size="sm"
+          onClick={toggleKillSwitch}
+          title="Globally pause/enable brand-aware collection generation"
+        >
+          {killSwitch ? "Brand intel: ON" : "Brand intel: PAUSED"}
+        </Button>
+      </div>
+
+      {/* Vertical filter tabs */}
+      <div className="flex flex-wrap gap-1 mb-4 border-b">
+        {VERTICALS.map((v) => {
+          const active = verticalFilter === v;
+          const count = verticalCount(v);
+          return (
+            <button
+              key={v}
+              onClick={() => setVerticalFilter(v)}
+              className={`px-3 py-2 text-sm border-b-2 -mb-px transition-colors ${
+                active ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {v === "ALL" ? "All" : v[0] + v.slice(1).toLowerCase()}
+              <span className="ml-1.5 text-xs text-muted-foreground">{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {unseeded.length > 0 && (
@@ -216,9 +252,11 @@ export default function Brands() {
 
       {loading ? (
         <div className="flex items-center justify-center p-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
-      ) : rows.length === 0 ? (
+      ) : filteredRows.length === 0 ? (
         <Card className="p-8 text-center text-muted-foreground">
-          No brands yet. Pre-seed one above or add a custom brand to get started.
+          {rows.length === 0
+            ? "No brands yet. Pre-seed one above or add a custom brand to get started."
+            : `No brands in the ${verticalFilter === "ALL" ? "selected" : verticalFilter.toLowerCase()} vertical.`}
         </Card>
       ) : (
         <Card className="overflow-hidden">

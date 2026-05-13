@@ -19,9 +19,10 @@ const FETCH_DELAY_MS = 500;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface CrawlBody {
-  brand_id?: string;        // existing record to refresh
+  brand_id?: string;
   brand_name: string;
-  brand_domain?: string;    // optional, will resolve if missing
+  brand_domain?: string;
+  industry_vertical?: string; // FOOTWEAR | SWIMWEAR | CLOTHING | ACCESSORIES | LIFESTYLE | MULTI | UNKNOWN
 }
 
 interface FirecrawlScrapeResult {

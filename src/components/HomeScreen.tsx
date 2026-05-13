@@ -485,7 +485,18 @@ const HomeScreen = ({
         <FeatureTile icon="🗓️" label="Seasons" onClick={onStartSeasons || (() => {})} />
       </CollapsibleSection>
 
-      <CollapsibleSection title="Marketing & SEO" icon="📢">
+      <CollapsibleSection title="SEO" icon="🔎">
+        <FeatureTile icon="🚀" label="SEO Engine" onClick={() => { window.location.href = "/seo-engine"; }} highlight />
+        <FeatureTile icon="🧠" label="Brand intelligence" onClick={() => { window.location.href = "/brands"; }} />
+        <FeatureTile icon="✨" label="Collection intelligence" onClick={() => { window.location.href = "/collections"; }} />
+        <FeatureTile icon="🔑" label="Keyword library" onClick={() => { window.location.href = "/seo-keywords"; }} />
+        <FeatureTile icon="📝" label="Blog plans" onClick={() => { window.location.href = "/seo-blog-plans"; }} />
+        <FeatureTile icon="📈" label="Organic SEO" onClick={onStartOrganicSEO} />
+        <FeatureTile icon="🗂️" label="Collection SEO" onClick={onStartCollectionSEO} />
+        <FeatureTile icon="🤝" label="Collab SEO" onClick={onStartCollabSEO} />
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Marketing & Ads" icon="📢">
         <FeatureTile icon="💚" label="Feed health" onClick={onStartFeedHealth} />
         <FeatureTile icon="✨" label="AI feed optimisation" onClick={onStartFeedOptimise} />
         <FeatureTile icon="🎨" label="Google colours" onClick={onStartGoogleColour} />

@@ -15,6 +15,21 @@ const ACCESSORY_VENDOR_HINTS = [
   "louenhide", "olga berg", "peta and jain", "peta & jain", "status anxiety",
 ];
 
+const JEWELLERY_VENDOR_HINTS = [
+  "amber sceats","by charlotte","mayol","arms of eve","emma pills","avant studio",
+  "noah the label","heaven mayhem","porter","lana wilkinson","midsummer star","olga de polga",
+];
+
+const JEWELLERY_TYPE_TOKENS = [
+  "earrings","earring","hoops","hoop","studs","stud","necklace","pendant","chain","choker",
+  "bracelet","bangle","cuff","ring","signet","anklet","charm",
+];
+
+const JEWELLERY_METAL_TOKENS = [
+  "gold-filled","gold filled","14k gold","18k gold","rose gold","sterling silver",
+  "vermeil","pearl","silver","gold",
+];
+
 export function slugify(s: string): string {
   return (s || "")
     .toLowerCase()
@@ -36,6 +51,29 @@ export function detectBagType(...sources: (string | null | undefined)[]): string
     if (new RegExp(`\\b${tok}\\b`).test(hay)) return tok;
   }
   return null;
+}
+
+export function detectJewelleryType(...sources: (string | null | undefined)[]): string | null {
+  const hay = sources.filter(Boolean).join(" ").toLowerCase();
+  for (const tok of JEWELLERY_TYPE_TOKENS) {
+    if (new RegExp(`\\b${tok}\\b`).test(hay)) return tok;
+  }
+  return null;
+}
+
+export function detectMetal(...sources: (string | null | undefined)[]): string | null {
+  const hay = sources.filter(Boolean).join(" ").toLowerCase();
+  for (const tok of JEWELLERY_METAL_TOKENS) {
+    if (hay.includes(tok)) return tok;
+  }
+  return null;
+}
+
+export function isJewelleryVendor(vendor: string | null | undefined, productType: string | null | undefined): boolean {
+  const v = (vendor || "").toLowerCase();
+  if (JEWELLERY_VENDOR_HINTS.some((h) => v.includes(h))) return true;
+  const t = (productType || "").toLowerCase();
+  return /jewellery|jewelry|earring|necklace|bracelet|ring|bangle|pendant|hoop|stud|chain|anklet|charm/.test(t);
 }
 
 export function isAccessoryVendor(vendor: string | null | undefined, productType: string | null | undefined): boolean {
@@ -84,6 +122,56 @@ export function optimiseProductSeo(input: OptimiserInput): OptimisedSeo {
   const brand = (input.brand || "").trim();
   const styleName = (input.title || "").trim();
   const colour = (input.colour || "").trim();
+
+  // JEWELLERY path — formula: {Brand} {Style Name} {Metal} {Jewellery Type}
+  const isJewel = isJewelleryVendor(input.brand, input.productType);
+  if (isJewel) {
+    const jewelType = detectJewelleryType(input.title, input.productType, brand);
+    const metal = detectMetal(input.title, input.productType, input.bodyHtml);
+    if (!jewelType) flags.push("no_jewellery_type_detected");
+    if (!metal) flags.push("no_metal_detected");
+
+    const handleParts = [brand, styleName, metal, jewelType].filter(Boolean).map(slugify).filter(Boolean);
+    const handle = handleParts.join("-").replace(/-{2,}/g, "-").slice(0, 80) || slugify(styleName) || "product";
+
+    const titleHay = `${brand} ${styleName}`.toLowerCase();
+    const titleBits = [
+      brand,
+      styleName,
+      metal && !titleHay.includes(metal.toLowerCase()) && metal.replace(/-/g, " "),
+      jewelType && !new RegExp(`\\b${jewelType}\\b`, "i").test(titleHay) && jewelType,
+    ].filter(Boolean) as string[];
+    const seoTitle = clampTitle(titleBits.join(" ").replace(/\s+/g, " ").trim());
+
+    const store = (input.storeName || "").trim();
+    const city = (input.storeCity || "").trim();
+    const ship = (input.freeShippingThreshold || "").trim();
+    const piece = [brand, styleName].filter(Boolean).join(" ");
+    const benefit = metal && jewelType
+      ? `Demi-fine ${metal.replace(/-/g, " ")} ${jewelType} crafted for everyday wear`
+      : jewelType
+      ? `Demi-fine ${jewelType} crafted for everyday wear`
+      : "Demi-fine jewellery crafted for everyday wear";
+    const shopBit = store
+      ? ` Shop at ${store}${city ? `, ${city}` : ""}${ship ? ` — free shipping over $${ship}.` : "."}`
+      : "";
+    let meta = `${benefit}. ${piece}.${shopBit}`.replace(/\s+/g, " ").trim();
+    if (meta.length < 150) {
+      const pad = " Gift boxed and ready to ship Australia-wide.";
+      meta = (meta + pad).slice(0, 160);
+    }
+    meta = clampMeta(meta);
+    if (meta.length < 150 || meta.length > 160) flags.push(`meta_length_${meta.length}`);
+
+    let bodyHtml = (input.bodyHtml || "").trim();
+    const wc = bodyHtml.replace(/<[^>]+>/g, " ").trim().split(/\s+/).filter(Boolean).length;
+    if (wc < 200) {
+      if (bodyHtml) flags.push(`body_padded_from_${wc}_words`);
+      bodyHtml = (bodyHtml ? bodyHtml + "\n\n" : "") + generateJewelleryBody({ brand, styleName, metal, jewelType, store, city });
+    }
+    return { handle, seoTitle, metaDescription: meta, bodyHtml, bagType: null, flags };
+  }
+
   const bagType = input.bagType || detectBagType(input.title, input.productType, brand);
 
   if (!bagType) flags.push("no_bag_type_detected");
@@ -148,5 +236,22 @@ function generateBody(o: {
     `<p>This ${bt} sits comfortably across work, weekend and travel. It carries the essentials without bulk — phone, wallet, keys, sunglasses, a small water bottle — and the interior layout keeps everything findable so you are not digging at the bottom for keys at the door.</p>`,
     `<p>${o.colour ? `The ${o.colour} colourway is a true everyday neutral that pairs back to denim, tailoring and weekend dressing equally well.` : "Available across a curated colour range that pairs back to most everyday outfits."} Care is straightforward — wipe the exterior with a soft damp cloth, store stuffed with tissue when not in use.</p>`,
     `<p>Shop the ${piece}${storePhrase} online or in-store, with fast Australia-wide shipping and easy returns.</p>`,
+  ].join("\n");
+}
+
+function generateJewelleryBody(o: {
+  brand: string; styleName: string; metal: string | null;
+  jewelType: string | null; store: string; city: string;
+}): string {
+  const piece = [o.brand, o.styleName].filter(Boolean).join(" ") || "This piece";
+  const jt = o.jewelType || "jewellery";
+  const metalPhrase = o.metal ? ` in ${o.metal.replace(/-/g, " ")}` : "";
+  const cityPhrase = o.city ? ` in ${o.city}` : "";
+  const storePhrase = o.store ? ` ${o.store}${cityPhrase}` : "";
+  return [
+    `<p>The ${piece} is a demi-fine ${jt}${metalPhrase} designed to be worn every day. ${o.brand ? `${o.brand} crafts each piece` : "It is crafted"} with considered detail and hard-wearing materials so the ${jt} keeps its finish through real life — showers, school runs, weekends away.</p>`,
+    `<p>Wear it solo as a quiet everyday piece, or stack and layer it with other ${jt} for a more considered look. The proportions sit comfortably for all-day wear and pair back to denim, tailoring and evening dressing equally well.</p>`,
+    `<p>Care is straightforward — store separately in the gift pouch, keep away from perfume and chlorine, and wipe with a soft cloth after wear. With everyday care the ${o.metal ? o.metal.replace(/-/g, " ") : "finish"} keeps its shine for years.</p>`,
+    `<p>Shop the ${piece}${storePhrase} online or in-store, with gift packaging at checkout, fast Australia-wide shipping, and easy returns.</p>`,
   ].join("\n");
 }

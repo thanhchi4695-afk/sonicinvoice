@@ -73,10 +73,62 @@ const ACC_OCCASIONS: Record<string, string[]> = {
 };
 
 // Niche keyword blocklist (Louenhide/Megantic Innovation 2)
-const BROAD_BLOCKLIST = new Set(["bags","accessories","wallets","handbags","online shopping"]);
+const BROAD_BLOCKLIST = new Set(["bags","accessories","wallets","handbags","online shopping","jewellery","jewelry","earrings","necklaces","bracelets","rings"]);
 function isAccessoriesVertical(productType: string): boolean {
   const t = productType.toLowerCase();
   return /bag|wallet|clutch|backpack|tote|crossbody|purse|accessor/.test(t);
+}
+
+// JEWELLERY vocabulary — Girls With Gems model
+const JEWELLERY_BRANDS = [
+  "amber sceats","by charlotte","mayol","arms of eve","emma pills","avant studio",
+  "noah the label","heaven mayhem","porter","lana wilkinson","midsummer star","olga de polga",
+];
+const JEWELLERY_TYPES: Record<string, string[]> = {
+  earrings: ["earring","earrings","hoop","hoops","stud","studs","drop earring","huggie"],
+  necklaces: ["necklace","pendant","chain","choker","layering"],
+  bracelets: ["bracelet","bangle","cuff","tennis"],
+  rings: ["ring","signet","stacker","stacking ring","band"],
+  anklets: ["anklet"],
+  charms: ["charm"],
+  sets: ["jewellery set","jewelry set","matching set"],
+};
+const JEWELLERY_METALS: Record<string, string[]> = {
+  gold: ["gold filled","14k gold","18k gold"," gold "],
+  silver: ["sterling silver","silver","925"],
+  rose_gold: ["rose gold"],
+  vermeil: ["vermeil"],
+  pearl: ["pearl","freshwater pearl"],
+};
+const JEWELLERY_GEMSTONES: Record<string, string[]> = {
+  diamond: ["diamond"], moonstone: ["moonstone"], turquoise: ["turquoise"],
+  opal: ["opal"], topaz: ["topaz"], amethyst: ["amethyst"], cz: ["cubic zirconia"," cz "],
+};
+const GIFT_RECIPIENTS: Record<string, string[]> = {
+  her: ["for her","womens","women's"],
+  mum: ["for mum","mothers day","mother's day"],
+  bridesmaid: ["bridesmaid","bridal party"],
+  him: ["for him","mens","men's"],
+};
+const GIFT_OCCASIONS: Record<string, string[]> = {
+  birthday: ["birthday"],
+  christmas: ["christmas","xmas"],
+  valentines: ["valentine","valentines"],
+  mothers_day: ["mothers day","mother's day"],
+  anniversary: ["anniversary"],
+  graduation: ["graduation"],
+  bridal: ["bridal","wedding"],
+};
+const GIFT_SIGNALS = ["gift","gift box","giftable","gift-ready","gift wrap","gift packaging"];
+
+function isJewelleryVertical(productType: string, vendor: string, title: string): boolean {
+  const t = (productType || "").toLowerCase();
+  const v = (vendor || "").toLowerCase();
+  const ti = (title || "").toLowerCase();
+  if (JEWELLERY_BRANDS.some((b) => v.includes(b))) return true;
+  if (/jewellery|jewelry|earring|necklace|bracelet|ring|bangle|pendant|hoop|stud|chain|anklet|charm/.test(t)) return true;
+  if (/\b(earring|earrings|necklace|bracelet|bangle|pendant|hoop|stud|chain|anklet)\b/.test(ti)) return true;
+  return false;
 }
 
 // ---- Helpers ---------------------------------------------------------------
@@ -170,10 +222,21 @@ Deno.serve(async (req) => {
       if (b.sample_ids.length < 5) b.sample_ids.push(productId);
     }
 
+    // Gifting aggregator: recipient/occasion/price/signal -> { count, sample_ids }
+    type GiftBucket = { count: number; sample_ids: string[]; kind: string; value: string; price_band?: string };
+    const giftBuckets: Record<string, GiftBucket> = {};
+    function gbump(kind: string, value: string, productId: string, price_band?: string) {
+      const key = `${kind}:${value}${price_band ? `|${price_band}` : ""}`;
+      giftBuckets[key] ??= { count: 0, sample_ids: [], kind, value, price_band };
+      giftBuckets[key].count++;
+      if (giftBuckets[key].sample_ids.length < 5) giftBuckets[key].sample_ids.push(productId);
+    }
+
     for (const p of rows) {
       const parent = (p.product_type || "").trim();
       if (!parent) continue;
       const text = `${p.title ?? ""} ${p.description ?? ""}`;
+      const vendor = (p as any).vendor ?? "";
 
       for (const c of detectIn(text, COLOURS)) bump(parent, `colour:${c}`, p.id);
       for (const o of detectMap(text, OCCASIONS)) bump(parent, `occasion:${o}`, p.id);
@@ -184,6 +247,17 @@ Deno.serve(async (req) => {
         for (const bt of detectMap(text, BAG_TYPES)) bump(parent, `bag_type:${bt}`, p.id);
         for (const f of detectMap(text, ACC_FEATURES)) bump(parent, `feature:${f}`, p.id);
         for (const o of detectMap(text, ACC_OCCASIONS)) bump(parent, `acc_occasion:${o}`, p.id);
+      }
+
+      // JEWELLERY — type / metal / gemstone / gifting
+      if (isJewelleryVertical(parent, vendor, p.title ?? "")) {
+        for (const jt of detectMap(text, JEWELLERY_TYPES)) bump(parent, `jewellery_type:${jt}`, p.id);
+        for (const m of detectMap(text, JEWELLERY_METALS)) bump(parent, `metal:${m}`, p.id);
+        for (const g of detectMap(text, JEWELLERY_GEMSTONES)) bump(parent, `gemstone:${g}`, p.id);
+        // Gifting signals (any jewellery product is potentially giftable)
+        for (const r of detectMap(text, GIFT_RECIPIENTS)) gbump("recipient", r, p.id);
+        for (const o of detectMap(text, GIFT_OCCASIONS)) gbump("occasion", o, p.id);
+        if (GIFT_SIGNALS.some((s) => text.toLowerCase().includes(s))) gbump("signal", "giftable", p.id);
       }
     }
 
@@ -250,6 +324,9 @@ Deno.serve(async (req) => {
         else if (kind === "bag_type") { title = `${titleCase(value)} ${parent}`;            collection_type = "bag_type"; }
         else if (kind === "feature")  { title = `${titleCase(value)} ${parent}`;            collection_type = "feature"; }
         else if (kind === "acc_occasion"){ title = `${titleCase(value)} ${parent}`;          collection_type = "occasion"; }
+        else if (kind === "jewellery_type") { title = `${titleCase(value)}`;                 collection_type = "jewellery_type"; }
+        else if (kind === "metal")    { title = `${titleCase(value)} ${parent}`;            collection_type = "metal"; }
+        else if (kind === "gemstone") { title = `${titleCase(value)} ${parent}`;            collection_type = "gemstone"; }
         else                          { title = `${titleCase(value)} ${parent}`;            collection_type = "trend"; }
 
         // Niche-keyword guard (Megantic Innovation 2): block standalone broad keywords as title
@@ -270,6 +347,35 @@ Deno.serve(async (req) => {
           sample_product_ids: info.sample_ids,
         });
       }
+    }
+
+    // GIFTING auto-generation (GWG model): recipient / occasion / signal collections
+    for (const [, gb] of Object.entries(giftBuckets)) {
+      if (gb.count < Math.max(3, minProducts)) continue;
+      const titleCase = (s: string) => s.replace(/_/g, " ").replace(/(^|\s)\S/g, (m) => m.toUpperCase());
+      let title = "";
+      let handle = "";
+      if (gb.kind === "recipient") {
+        title = `Jewellery Gifts For ${titleCase(gb.value)}`;
+        handle = `gifts/jewellery-for-${slug(gb.value)}`;
+      } else if (gb.kind === "occasion") {
+        title = `${titleCase(gb.value)} Jewellery Gifts`;
+        handle = `gifts/${slug(gb.value)}-jewellery`;
+      } else {
+        title = `Gift Boxed Jewellery`;
+        handle = `gifts/giftable-jewellery`;
+      }
+      suggestions.push({
+        user_id: userId,
+        suggested_title: title,
+        suggested_handle: handle,
+        shopify_handle: handle,
+        collection_type: "gifting",
+        product_count: gb.count,
+        status: "pending",
+        source: "seo-collection-detector",
+        sample_product_ids: gb.sample_ids,
+      });
     }
 
     // Static filter intersections (Megantic Innovation 1) — minimum 3 products

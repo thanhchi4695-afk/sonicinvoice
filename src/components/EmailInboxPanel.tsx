@@ -171,7 +171,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     const [g, o, i] = await Promise.all([
       supabase.from("gmail_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
       supabase.from("outlook_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
-      supabase.from("imap_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
+      supabase.from("imap_connections").select("id, email_address, last_checked_at, is_active, imap_host, imap_port").eq("is_active", true).order("created_at", { ascending: true }),
     ]);
     const all: ProviderConnection[] = [
       ...((g.data as any[]) ?? []).map(r => ({ ...r, provider: "gmail" as Provider })),

@@ -59,6 +59,29 @@ async function verifyHmac(query: URLSearchParams, secret: string): Promise<boole
   return computed === hmac;
 }
 
+async function ensureProductWebhooks(shop: string, accessToken: string): Promise<void> {
+  const callbackUrl = `${SUPABASE_URL}/functions/v1/shopify-webhook-products`;
+  const topics = ["products/create", "products/update"];
+  try {
+    // List existing webhooks once.
+    const listRes = await fetch(`https://${shop}/admin/api/${API_VERSION}/webhooks.json`, {
+      headers: { "X-Shopify-Access-Token": accessToken },
+    });
+    const existing = listRes.ok ? (await listRes.json()).webhooks ?? [] : [];
+    for (const topic of topics) {
+      const already = existing.some((w: { topic: string; address: string }) => w.topic === topic && w.address === callbackUrl);
+      if (already) continue;
+      await fetch(`https://${shop}/admin/api/${API_VERSION}/webhooks.json`, {
+        method: "POST",
+        headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" },
+        body: JSON.stringify({ webhook: { topic, address: callbackUrl, format: "json" } }),
+      });
+    }
+  } catch (e) {
+    console.error("ensureProductWebhooks failed:", e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405 });

@@ -870,11 +870,11 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
 
         {/* Yahoo / IMAP modal */}
         {showYahooModal && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !yahooSubmitting && setShowYahooModal(false)}>
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { if (!yahooSubmitting) { setShowYahooModal(false); setEditingConnId(null); } }}>
             <div className="bg-card rounded-lg border border-border p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-semibold">Connect via app password</h3>
-                <button onClick={() => setShowYahooModal(false)} disabled={yahooSubmitting} className="text-muted-foreground hover:text-foreground">
+                <h3 className="text-base font-semibold">{editingConnId ? "Edit IMAP settings" : "Connect via app password"}</h3>
+                <button onClick={() => { setShowYahooModal(false); setEditingConnId(null); }} disabled={yahooSubmitting} className="text-muted-foreground hover:text-foreground">
                   <X className="w-4 h-4" />
                 </button>
               </div>

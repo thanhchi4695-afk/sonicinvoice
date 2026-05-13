@@ -216,10 +216,27 @@ function CollectionsInner() {
             {lastScan ? `Last scan: ${new Date(lastScan).toLocaleString()}` : "No scans yet"}
           </p>
         </div>
-        <Button onClick={runScan} disabled={scanning}>
-          {scanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-          Scan store
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={voice}
+            onChange={(e) => saveVoice(e.target.value)}
+            disabled={savingVoice}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            title="Brand voice style — drives whether ICONIC or White Fox reference is used"
+          >
+            {VOICE_OPTIONS.map((v) => (
+              <option key={v.id} value={v.id}>{v.label}</option>
+            ))}
+          </select>
+          <Button variant="outline" onClick={runDetector} disabled={detecting}>
+            {detecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            Detect colour/occasion/trend
+          </Button>
+          <Button onClick={runScan} disabled={scanning}>
+            {scanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Scan store
+          </Button>
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>

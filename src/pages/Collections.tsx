@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Loader2, Sparkles, Trash2, CheckCircle2, RefreshCw } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
+import GapsTab from "@/components/GapsTab";
 
 type Suggestion = {
   id: string;
@@ -252,7 +253,12 @@ function CollectionsInner() {
           <TabsTrigger value="suggestions">Suggestions ({filtered.length})</TabsTrigger>
           <TabsTrigger value="active">Active</TabsTrigger>
           <TabsTrigger value="blogs">Blog drafts ({pendingBlogs.length})</TabsTrigger>
+          <TabsTrigger value="gaps">Competitor Gaps</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="gaps">
+          <GapsTab />
+        </TabsContent>
 
         <TabsContent value="suggestions" className="space-y-4">
           <div className="flex flex-wrap gap-2">

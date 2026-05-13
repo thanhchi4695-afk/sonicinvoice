@@ -1110,6 +1110,29 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
               />
             </div>
           )}
+          {items.length > 0 && accountOptions.length > 1 && (
+            <div className="flex items-center gap-1 mb-2 flex-wrap">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">Account:</span>
+              {(["all", ...accountOptions] as string[]).map(a => {
+                const active = accountFilter === a;
+                const count = a === "all" ? items.length : items.filter(i => (i.accountEmail ?? "Unassigned") === a).length;
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setAccountFilter(a)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted text-muted-foreground border-border hover:bg-muted/70"
+                    }`}
+                  >
+                    {a === "all" ? "All accounts" : a} <span className="opacity-70">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {items.length === 0 ? (
             <div className="bg-card rounded-lg border border-border p-8 text-center">
               <div className="w-14 h-14 rounded-full bg-muted mx-auto flex items-center justify-center mb-3">

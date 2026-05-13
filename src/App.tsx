@@ -37,6 +37,9 @@ const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx")
 const FeedHealthPanel = lazy(() => import("./components/FeedHealthPanel.tsx"));
 const Collections = lazy(() => import("./pages/Collections.tsx"));
 const Brands = lazy(() => import("./pages/Brands.tsx"));
+const SeoEngine = lazy(() => import("./pages/SeoEngine.tsx"));
+const SeoKeywords = lazy(() => import("./pages/SeoKeywords.tsx"));
+const SeoBlogPlans = lazy(() => import("./pages/SeoBlogPlans.tsx"));
 
 const queryClient = new QueryClient();
 

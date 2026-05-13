@@ -700,11 +700,36 @@ function buildPrompt(opts: {
     .map((k) => `  - T${k.tier} (${k.placement_hint ?? ""}) ${k.keyword}`)
     .join("\n");
 
-  // Dedicated schemas for the two ACCESSORIES competitor playbooks.
+  // Dedicated schemas for the JEWELLERY (GWG) and ACCESSORIES competitor playbooks.
+  const _handleStr = suggestion.shopify_handle || suggestion.suggested_handle || "";
+  const useGwgBrand        = vertical === "JEWELLERY" && isBrandPage && voice === "gwg_meaningful";
+  const useGwgEdit         = vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryEditHandle(_handleStr);
+  const useGwgIntersection = vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryIntersectionHandle(_handleStr);
   const useLouenhideBrand = isBrandPage && voice === "aussie_accessible";
   const useDavidJonesCol  = !isBrandPage && voice === "luxury_authority" && vertical === "ACCESSORIES";
 
-  const formulaSchema = useLouenhideBrand
+  const formulaSchema = useGwgBrand
+    ? `{
+  "gwg_origin": "2 sentences. Sentence 1: country/city of origin, founding year, founder name. Sentence 2: founder intent / what makes the brand distinct.",
+  "gwg_aesthetic": "2 sentences on brand aesthetic + design inspiration — the visual and emotional world (e.g. Mediterranean summers, celestial symbols, mindful mantras).",
+  "gwg_product_material": "2 sentences naming what they make (necklaces, earrings, bracelets, rings) and what it's made from (18k gold vermeil, 14k gold, sterling silver, freshwater pearls, gemstones). SEO-loaded with materials.",
+  "gwg_keyword_repetition": "3-4 sentences. The exact 'brand + jewellery type' phrase (e.g. 'By Charlotte necklaces') must appear at least 3 times naturally across these sentences. Cover the brand's earrings, necklaces, bracelets, rings, and gifts.",
+  "gwg_sub_links_cta": "1-2 sentences containing 3-5 inline <a href='/collections/{handle}'>{title}</a> links picked ONLY from the RELATED COLLECTIONS list (brand × type intersections preferred), ending with a local CTA to ${storeName}${storeCity ? ' in ' + storeCity : ''}."
+}`
+    : useGwgEdit
+    ? `{
+  "gwg_edit_lifestyle": "2 sentences. Lifestyle moment opener: '[Edit Name] is ${storeName}'s curated selection of [occasion/style] pieces chosen by our ${storeCity ?? 'in-store'} stylists.' Set the emotional scene.",
+  "gwg_edit_snapshot": "3 sentences naming specific products/brands from sample_titles and their role in the occasion (e.g. 'delicate By Charlotte necklaces for the bride, bold Amber Sceats statement earrings for the mother of the bride').",
+  "gwg_edit_cta": "1-2 sentences with a gifting/occasion CTA + 2-3 inline <a href='/collections/{handle}'>{title}</a> links to related type collections, free shipping note, in-store ${storeCity ?? 'visit'} invitation."
+}`
+    : useGwgIntersection
+    ? `{
+  "gwg_intersection_opener": "2 sentences (~45 words). Sentence 1 contains the exact intersection keyword (e.g. 'By Charlotte necklaces' or '18k gold vermeil earrings') in the first 10 words. Sentence 2 expands on the brand's design signature for this type/metal.",
+  "gwg_intersection_styles": "2 sentences (~50 words) naming 3-5 specific style names from sample_titles, materials, and gemstone/finish details.",
+  "gwg_intersection_care": "2 sentences on care, sizing, layering or gifting guidance for this intersection.",
+  "gwg_intersection_links": "1-2 sentences containing 3-5 inline <a href='/collections/{handle}'>{title}</a> links chosen ONLY from the RELATED COLLECTIONS list (sibling brand × type or sibling metal collections), ending with a CTA to ${storeName}."
+}`
+    : useLouenhideBrand
     ? `{
   "lh_brisbane_origin": "2 sentences. Sentence 1 names the brand and its Brisbane (or actual home-city) founding story with a year. Sentence 2 names the founder's intent.",
   "lh_mission": "2 sentences on the brand mission — accessible everyday luxury, considered design, vegan-friendly materials. No fluff, plain Aussie tone.",

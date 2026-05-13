@@ -388,6 +388,62 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Step 7C: THE ICONIC reference (FOOTWEAR only) — scrape the brand's
+    // ICONIC landing page to capture H1, opening copy, sub-collection links,
+    // FAQ Q&A pairs, and top phrases. Mirrors Australia's #1 fashion site
+    // taxonomy without copying their wording.
+    let iconicRef: any = null;
+    if (vertical === "FOOTWEAR") {
+      try {
+        const slug = body.brand_name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        const icUrl = `https://www.theiconic.com.au/${slug}/`;
+        await sleep(FETCH_DELAY_MS);
+        const ic = await firecrawlScrape(icUrl, ["markdown", "links", "html"]);
+        pages++;
+        if (ic.success && ic.data?.markdown) {
+          const md: string = ic.data.markdown;
+          const html: string = (ic.data as any).html ?? "";
+          const h1Match = md.match(/^#\s+(.+)$/m);
+          const h1 = h1Match ? h1Match[1].trim() : null;
+          const sentences = md.replace(/[#*_>`]/g, "").split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+          const opening = sentences.slice(0, 2).join(" ").slice(0, 600);
+          const subCollectionLinks = (ic.data.links ?? [])
+            .filter((u) => /theiconic\.com\.au\//i.test(u) && !/[?#]/.test(u))
+            .filter((u) => u.split("/").filter(Boolean).length >= 4)
+            .slice(0, 30);
+          // FAQ extraction: try common patterns "Q: ... A: ..." or H3 + paragraph
+          const faqPairs: Array<{ q: string; a: string }> = [];
+          const qaRe = /(?:^|\n)#{2,4}\s+([^\n?]+\?)\s*\n+([\s\S]+?)(?=\n#{2,4}\s|\n\n#{1,4}\s|$)/g;
+          let m: RegExpExecArray | null;
+          while ((m = qaRe.exec(md)) && faqPairs.length < 8) {
+            const a = m[2].split("\n\n")[0].trim();
+            if (a.length > 20) faqPairs.push({ q: m[1].trim(), a: a.slice(0, 400) });
+          }
+          // Top phrases: 2-3 word noun-ish phrases by frequency
+          const stop = new Set(["the","and","for","with","from","that","this","your","you","our","are","was","has","have","not","but","all","new","now","get","off","more","shop","womens","mens","women","men"]);
+          const tokens = md.toLowerCase().match(/[a-z][a-z'-]{2,}/g) ?? [];
+          const bigrams: Record<string, number> = {};
+          for (let i = 0; i < tokens.length - 1; i++) {
+            const a = tokens[i], b = tokens[i + 1];
+            if (stop.has(a) || stop.has(b)) continue;
+            const k = `${a} ${b}`;
+            bigrams[k] = (bigrams[k] || 0) + 1;
+          }
+          const topPhrases = Object.entries(bigrams).sort((x, y) => y[1] - x[1]).slice(0, 10).map(([p, n]) => ({ phrase: p, count: n }));
+
+          iconicRef = {
+            source_url: icUrl,
+            h1,
+            opening_copy: opening,
+            sub_collection_links: subCollectionLinks,
+            faq_pairs: faqPairs,
+            top_phrases: topPhrases,
+            captured_at: new Date().toISOString(),
+          };
+        }
+      } catch (e) {
+        console.warn("iconic reference fetch failed", e);
+      }
     const confidence = scoreConfidence(extracted);
     await supabase.from("brand_intelligence").update({
       competitor_reference_styletread: styletreadRef,

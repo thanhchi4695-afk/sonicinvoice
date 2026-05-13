@@ -77,7 +77,7 @@ function safeParseJson(raw: string): any {
   return null;
 }
 
-function stitchDescription(parts: FormulaParts, isBrandPage: boolean): string {
+function stitchDescription(parts: any, isBrandPage: boolean, voice: VoiceStyle): string {
   if (isBrandPage) {
     return [
       `<p>${parts.brand_origin ?? ""}</p>`,
@@ -86,6 +86,18 @@ function stitchDescription(parts: FormulaParts, isBrandPage: boolean): string {
       `<p>${parts.brand_sub_links ?? ""}</p>`,
     ].join("\n");
   }
+  if (voice === "aspirational_youth" || voice === "local_warmth") {
+    // White Fox 6-part formula
+    return [
+      `<p>${parts.wf_hook ?? parts.part1_opener ?? ""}</p>`,
+      `<p>${parts.wf_subtypes ?? parts.part2_materials ?? ""}</p>`,
+      `<p>${parts.wf_features ?? ""}</p>`,
+      `<p>${parts.wf_fit ?? ""}</p>`,
+      `<p>${parts.wf_cross_sell ?? parts.part5_links ?? ""}</p>`,
+      `<p>${parts.wf_utility ?? ""}</p>`,
+    ].join("\n");
+  }
+  // ICONIC 5-part formula (professional_editorial / luxury_refined)
   return [
     `<p>${parts.part1_opener ?? ""}</p>`,
     `<p>${parts.part2_materials ?? ""}</p>`,
@@ -94,6 +106,8 @@ function stitchDescription(parts: FormulaParts, isBrandPage: boolean): string {
     `<p>${parts.part5_links ?? ""}</p>`,
   ].join("\n");
 }
+
+type VoiceStyle = "aspirational_youth" | "professional_editorial" | "local_warmth" | "luxury_refined";
 
 function stitchFaqHtml(faq: Array<{ q: string; a: string }>): string {
   return [

@@ -66,7 +66,7 @@ export default function ScanCollectionsCard() {
     setScanning(true);
     try {
       const { data, error } = await supabase.functions.invoke("collection-intelligence", {
-        body: { triggered_by: "manual_dashboard" },
+        body: { triggered_by: "manual" },
       });
       if (error) throw error;
       const created = (data as any)?.suggestions_created ?? 0;

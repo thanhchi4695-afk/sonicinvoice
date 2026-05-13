@@ -155,6 +155,7 @@ Deno.serve(async (req) => {
     const shopEmail = shopData.shop?.email || `${shop.replace(".myshopify.com", "")}@shopify-login.local`;
     const shopName  = shopData.shop?.name || shop;
     const cleanShop = shop.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    await ensureProductWebhooks(cleanShop, accessToken);
 
     if (isLoginFlow || isShopifyInitiated) {
       // Prefer the currently logged-in user (if a Supabase session JWT was

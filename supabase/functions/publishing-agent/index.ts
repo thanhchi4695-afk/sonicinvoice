@@ -9,6 +9,7 @@
 //   (b) Service-role + X-User-Id header → trusted call from agent-watchdog
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { optimiseProductSeo, isAccessoryVendor } from "../_shared/product-seo-optimiser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -120,14 +121,45 @@ Deno.serve(async (req) => {
     // Group variants by parent style/title so we create one Shopify product per style
     const groups = groupProducts(products);
 
+    // Derive a friendly store name from shop_domain for SEO copy
+    const storeName = creds.shop_domain.replace(/\.myshopify\.com$/i, "").replace(/-/g, " ");
+
     const published: any[] = [];
     const failed: any[] = [];
+    const seoApplied: Array<{ title: string; handle: string; flags: string[] }> = [];
     for (const grp of groups) {
-      const payload = {
+      // ── Louenhide/Megantic optimiser: handle + SEO title + meta + body ──
+      // Only runs for accessories vendors so we don't rewrite footwear copy.
+      const accessoriesPush = isAccessoryVendor(grp.vendor, grp.variants[0]?.product_type);
+      const repColour = grp.variants.find((v) => v.color || v.colour)?.color
+        ?? grp.variants.find((v) => v.color || v.colour)?.colour ?? null;
+      const seo = accessoriesPush
+        ? optimiseProductSeo({
+            title: grp.title,
+            brand: grp.vendor,
+            colour: repColour,
+            productType: grp.variants[0]?.product_type ?? null,
+            storeName,
+            storeCity: null,
+            freeShippingThreshold: "99",
+            bodyHtml: grp.variants[0]?.body_html ?? null,
+          })
+        : null;
+      if (seo) seoApplied.push({ title: grp.title, handle: seo.handle, flags: seo.flags });
+
+      const payload: any = {
         product: {
-          title: grp.title,
+          title: seo?.seoTitle || grp.title,
+          handle: seo?.handle,
+          body_html: seo?.bodyHtml,
           vendor: grp.vendor || runRow.supplier_name || undefined,
           status: "active",
+          metafields: seo
+            ? [
+                { namespace: "seo", key: "description", type: "single_line_text_field", value: seo.metaDescription },
+                { namespace: "seo", key: "title_tag", type: "single_line_text_field", value: seo.seoTitle },
+              ]
+            : undefined,
           variants: grp.variants.map((v) => ({
             sku: v.sku ?? undefined,
             price: typeof v.retail_price === "number" ? v.retail_price.toFixed(2) : String(v.retail_price ?? "0"),
@@ -140,6 +172,8 @@ Deno.serve(async (req) => {
           options: buildOptions(grp.variants),
         },
       };
+      // Strip undefined to keep payload tidy
+      Object.keys(payload.product).forEach((k) => payload.product[k] === undefined && delete payload.product[k]);
       try {
         const resp = await fetch(`${baseUrl}/products.json`, {
           method: "POST",
@@ -150,7 +184,7 @@ Deno.serve(async (req) => {
         if (!resp.ok) {
           failed.push({ title: grp.title, status: resp.status, error: data?.errors ?? "Unknown" });
         } else {
-          published.push({ title: grp.title, shopify_id: data?.product?.id });
+          published.push({ title: grp.title, shopify_id: data?.product?.id, handle: data?.product?.handle });
         }
         // Rate-limit gently
         await new Promise((r) => setTimeout(r, 600));
@@ -172,6 +206,7 @@ Deno.serve(async (req) => {
             published_count: published.length,
             failed_count: failed.length,
             shopify_product_ids: published.map((p) => p.shopify_id).filter(Boolean),
+            seo_optimised: seoApplied,
             published_at: new Date().toISOString(),
           },
         },
@@ -184,6 +219,7 @@ Deno.serve(async (req) => {
       failed,
       skipped: 0,
       shopify_product_ids: published.map((p) => p.shopify_id).filter(Boolean),
+      seo_optimised: seoApplied,
     });
   } catch (err) {
     console.error("[publishing-agent] error", err);

@@ -687,7 +687,13 @@ HARD RULES (failure = retry):
 - 3-5 internal links of the form <a href="/collections/{handle}">{exact title}</a> chosen ONLY from the RELATED COLLECTIONS list - any other handle FAILS validation.
 - BANNED PHRASES (never use anywhere): ${BANNED_PHRASES.join(", ")}.
 - smart_rules_json: Shopify smart-collection ruleSet { appliedDisjunctively: boolean, rules: [{column, relation, condition}] }. Use TITLE/TAG/VENDOR/TYPE columns and CONTAINS/EQUALS/NOT_CONTAINS relations precise enough to match >=3 products.
-- faq: EXACTLY 4-6 entries, each {q,a}. Question phrased the way customers type into Google (must end with "?"). Answer 30-80 words, no banned phrases.
+- faq: ${vertical === "ACCESSORIES" ? `EXACTLY 6 entries (Louenhide accessories template). Use these 6 question slots in order, replacing {Brand}, {bag type}, {Store}, {City} with real values from this collection. Answers must be SPECIFIC — name actual product styles from sample_titles, real materials, real airline carry-on names (Qantas, Virgin) when relevant:
+    1. "What is the most popular ${brand?.brand_name ?? "{Brand}"} bag at ${storeName}?" — name a real best-selling style from sample_titles + key features.
+    2. "What colour ${brand?.brand_name ?? "{Brand}"} bag is most popular?" — name 2-3 actual colours stocked.
+    3. "What fits in a ${brand?.brand_name ?? "{Brand}"} {bag type}?" — specific dimensions, laptop size, carry-on compatibility.
+    4. "Is ${brand?.brand_name ?? "{Brand}"} vegan? What is it made from?" — material honesty (vegan leather, genuine leather, canvas).
+    5. "How do I care for my ${brand?.brand_name ?? "{Brand}"} bag?" — specific care steps (damp cloth, dust bag, eucalyptus oil for marks).
+    6. "Can I buy ${brand?.brand_name ?? "{Brand}"} bags in store${storeCity ? ` in ${storeCity}` : ""}?" — local availability + free shipping note.` : `EXACTLY 4-6 entries, each {q,a}. Question phrased the way customers type into Google (must end with "?")`}. Answer 30-80 words, no banned phrases.
 - blog_plans: 1-3 plans {title, target_keywords[], sections[]}.
 
 PRIMARY KEYWORD: "${primaryKeyword}"

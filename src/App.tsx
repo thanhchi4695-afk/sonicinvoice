@@ -40,6 +40,7 @@ const Brands = lazy(() => import("./pages/Brands.tsx"));
 const SeoEngine = lazy(() => import("./pages/SeoEngine.tsx"));
 const SeoKeywords = lazy(() => import("./pages/SeoKeywords.tsx"));
 const SeoBlogPlans = lazy(() => import("./pages/SeoBlogPlans.tsx"));
+const SeoLinkMesh = lazy(() => import("./pages/SeoLinkMesh.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,7 @@ const App = () => (
                   <Route path="/seo-engine" element={<RequireAuth><Suspense fallback={null}><SeoEngine /></Suspense></RequireAuth>} />
                   <Route path="/seo-keywords" element={<RequireAuth><Suspense fallback={null}><SeoKeywords /></Suspense></RequireAuth>} />
                   <Route path="/seo-blog-plans" element={<RequireAuth><Suspense fallback={null}><SeoBlogPlans /></Suspense></RequireAuth>} />
+                  <Route path="/seo-link-mesh" element={<RequireAuth><Suspense fallback={null}><SeoLinkMesh /></Suspense></RequireAuth>} />
                   <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
                   <Route

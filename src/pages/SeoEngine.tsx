@@ -14,6 +14,8 @@ interface Suggestion {
   collection_type: string;
   product_count: number;
   status: string;
+  completeness_score?: number | null;
+  taxonomy_level?: number | null;
 }
 interface Output {
   suggestion_id: string;
@@ -44,8 +46,8 @@ export default function SeoEngine() {
     setLoading(true);
     const { data: s } = await supabase
       .from("collection_suggestions")
-      .select("id,suggested_title,suggested_handle,collection_type,product_count,status")
-      .order("created_at", { ascending: false })
+      .select("id,suggested_title,suggested_handle,collection_type,product_count,status,completeness_score,taxonomy_level")
+      .order("completeness_score", { ascending: true, nullsFirst: true })
       .limit(200);
     setSuggestions((s ?? []) as Suggestion[]);
     const { data: o } = await supabase
@@ -152,11 +154,12 @@ export default function SeoEngine() {
               <thead className="bg-muted/40 text-left">
                 <tr>
                   <th className="p-2">Collection</th>
+                  <th className="p-2">L</th>
+                  <th className="p-2">Score</th>
                   <th className="p-2">Type</th>
                   <th className="p-2">Products</th>
-                  <th className="p-2">Layer</th>
-                  <th className="p-2">SEO Title (chars)</th>
-                  <th className="p-2">Meta (chars)</th>
+                  <th className="p-2">Title</th>
+                  <th className="p-2">Meta</th>
                   <th className="p-2">Status</th>
                   <th className="p-2">Rules</th>
                   <th className="p-2">Action</th>
@@ -170,10 +173,24 @@ export default function SeoEngine() {
                   const metaOk = metaLen >= 150 && metaLen <= 160;
                   return (
                     <tr key={s.id} className="border-t border-border/40 h-8">
-                      <td className="p-2 truncate max-w-[280px]">{s.suggested_title}</td>
+                      <td className="p-2 truncate max-w-[260px]">{s.suggested_title}</td>
+                      <td className="p-2 text-xs">{s.taxonomy_level ?? "—"}</td>
+                      <td className="p-2">
+                        {typeof s.completeness_score === "number" ? (
+                          <Badge
+                            variant={s.completeness_score >= 80 ? "secondary" : "outline"}
+                            className={
+                              s.completeness_score >= 80 ? "bg-emerald-500/15 text-emerald-500"
+                              : s.completeness_score >= 50 ? "bg-amber-500/15 text-amber-500"
+                              : "bg-destructive/15 text-destructive"
+                            }
+                          >
+                            {s.completeness_score}
+                          </Badge>
+                        ) : "—"}
+                      </td>
                       <td className="p-2 text-xs text-muted-foreground">{s.collection_type}</td>
                       <td className="p-2">{s.product_count}</td>
-                      <td className="p-2">{o?.layer ?? "—"}</td>
                       <td className="p-2">
                         {o?.seo_title ? (
                           <span className={titleLen > 60 ? "text-destructive" : ""}>

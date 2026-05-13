@@ -491,6 +491,7 @@ const HomeScreen = ({
         <FeatureTile icon="✨" label="Collection intelligence" onClick={() => { window.location.href = "/collections"; }} />
         <FeatureTile icon="🔑" label="Keyword library" onClick={() => { window.location.href = "/seo-keywords"; }} />
         <FeatureTile icon="📝" label="Blog plans" onClick={() => { window.location.href = "/seo-blog-plans"; }} />
+        <FeatureTile icon="🕸️" label="Link mesh" onClick={() => { window.location.href = "/seo-link-mesh"; }} />
         <FeatureTile icon="📈" label="Organic SEO" onClick={onStartOrganicSEO} />
         <FeatureTile icon="🗂️" label="Collection SEO" onClick={onStartCollectionSEO} />
         <FeatureTile icon="🤝" label="Collab SEO" onClick={onStartCollabSEO} />

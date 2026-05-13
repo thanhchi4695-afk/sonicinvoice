@@ -83,6 +83,7 @@ const App = () => (
                   <Route path="/rules" element={<Rules />} />
                   <Route path="/rules/setup" element={<RulesSetup />} />
                   <Route path="/collections" element={<Suspense fallback={null}><Collections /></Suspense>} />
+                  <Route path="/brands" element={<Suspense fallback={null}><Brands /></Suspense>} />
                   <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
                   <Route

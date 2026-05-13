@@ -94,6 +94,36 @@ Deno.serve(async (req) => {
       error_message: null,
     }).eq("id", suggestion_id);
 
+    // Fire Klaviyo "New Edit Live" event so merchants' Flows can announce the drop.
+    try {
+      fetch(`${SUPABASE_URL}/functions/v1/klaviyo-trigger`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          event_name: "Sonic: New Edit Live",
+          profile: { external_id: `shop:${storeUrl}` },
+          unique_id: `edit:${collectionId}`,
+          properties: {
+            shop_domain: storeUrl,
+            collection_id: collectionId,
+            collection_handle: s.suggested_handle,
+            collection_title: s.suggested_title,
+            collection_url: `https://${storeUrl}/collections/${s.suggested_handle}`,
+            hero_image: s.hero_image_url ?? null,
+            seo_title: s.seo_title ?? null,
+            seo_description: s.seo_description ?? null,
+            collection_type: s.collection_type ?? null,
+          },
+        }),
+      }).catch((e) => console.error("klaviyo-trigger New Edit Live failed:", e));
+    } catch (e) {
+      console.warn("klaviyo trigger skipped:", e);
+    }
+
     return new Response(JSON.stringify({ success: true, shopify_collection_id: collectionId }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("collection-publish error:", e);

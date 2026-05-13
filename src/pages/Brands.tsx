@@ -153,6 +153,7 @@ export default function Brands() {
       toast.error(`${name}: ${e instanceof Error ? e.message : "ICONIC refresh failed"}`);
     } finally {
       setIconicRefreshingId(null);
+    }
   }
 
   async function refreshWhitefox(id: string, name: string) {
@@ -171,7 +172,6 @@ export default function Brands() {
     } finally {
       setWhitefoxRefreshingId(null);
     }
-  }
   }
 
   async function addBrand() {

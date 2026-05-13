@@ -182,12 +182,16 @@ function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: 
     : voice === "luxury_authority"
     ? `Each piece in our ${primaryKeyword} edit has been selected for craftsmanship, materiality, and longevity. ${storeName} stocks the full range with complimentary delivery and dedicated styling support.`
     : `Visit ${storeName}${storeCity ? ` in ${storeCity}` : ""} to see the full ${primaryKeyword} range. Our team is on hand to help you find the right fit, and every order ships fast with easy returns.`;
-  // Append into the most appropriate "extra" slot per voice
+  // Append into the slot that matches the voice's stitchDescription routing.
+  // White Fox / aspirational / local-warmth uses the wf_* 6-part formula;
+  // everything else (aussie_accessible, luxury_authority, professional_editorial,
+  // luxury_refined) renders the ICONIC 5-part formula via stitchDescription.
   const out = { ...parts };
-  if (voice === "aussie_accessible" || voice === "aspirational_youth" || voice === "local_warmth") {
-    out.wf_utility = ((out.wf_utility ?? "") + " " + filler).trim();
-  } else if (isBrandPage) {
+  const usesWfFormula = voice === "aspirational_youth" || voice === "local_warmth";
+  if (isBrandPage) {
     out.brand_authority = ((out.brand_authority ?? "") + " " + filler).trim();
+  } else if (usesWfFormula) {
+    out.wf_utility = ((out.wf_utility ?? "") + " " + filler).trim();
   } else {
     out.part4_styling = ((out.part4_styling ?? "") + " " + filler).trim();
   }

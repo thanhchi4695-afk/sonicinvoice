@@ -7,8 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 
 interface MeshRow {
   id: string;
-  source_suggestion_id: string;
-  target_suggestion_id: string;
+  source_collection_id: string;
+  target_collection_id: string;
   link_type: string;
   anchor_text: string;
   source_title?: string;

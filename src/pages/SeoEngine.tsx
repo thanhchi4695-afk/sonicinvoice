@@ -158,6 +158,7 @@ export default function SeoEngine() {
                   <th className="p-2">SEO Title (chars)</th>
                   <th className="p-2">Meta (chars)</th>
                   <th className="p-2">Status</th>
+                  <th className="p-2">Rules</th>
                   <th className="p-2">Action</th>
                 </tr>
               </thead>

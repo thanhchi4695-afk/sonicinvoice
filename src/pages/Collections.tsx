@@ -97,18 +97,29 @@ function CollectionsInner() {
 
   async function load() {
     setLoading(true);
-    const [{ data: s }, { data: b }, { data: scan }] = await Promise.all([
+    const [{ data: s }, { data: b }, { data: scan }, { data: conn }] = await Promise.all([
       supabase.from("collection_suggestions").select("*").order("confidence_score", { ascending: false }),
       supabase.from("collection_blogs").select("*").order("created_at", { ascending: false }),
       supabase.from("collection_scans").select("*").order("started_at", { ascending: false }).limit(1),
+      supabase.from("shopify_connections").select("brand_voice_style").maybeSingle(),
     ]);
     setSuggestions((s as Suggestion[]) ?? []);
     setBlogs((b as Blog[]) ?? []);
     setLastScan(scan?.[0]?.started_at ?? null);
+    if (conn?.brand_voice_style) setVoice(conn.brand_voice_style as string);
     setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
+
+  async function saveVoice(next: string) {
+    setVoice(next);
+    setSavingVoice(true);
+    const { error } = await supabase.from("shopify_connections").update({ brand_voice_style: next as never }).neq("id", "00000000-0000-0000-0000-000000000000");
+    setSavingVoice(false);
+    if (error) toast.error(error.message);
+    else toast.success("Brand voice updated");
+  }
 
   const filtered = useMemo(() => {
     if (filter === "all") return suggestions.filter((s) => s.status !== "rejected");

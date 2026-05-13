@@ -27,17 +27,17 @@ export default function SeoLinkMesh() {
     setLoading(true);
     const { data: links } = await supabase
       .from("collection_link_mesh")
-      .select("id,source_suggestion_id,target_suggestion_id,link_type,anchor_text")
+      .select("id,source_collection_id,target_collection_id,link_type,anchor_text")
       .limit(500);
-    const ids = Array.from(new Set((links ?? []).flatMap(l => [l.source_suggestion_id, l.target_suggestion_id])));
+    const ids = Array.from(new Set((links ?? []).flatMap(l => [l.source_collection_id, l.target_collection_id])));
     const { data: sugs } = ids.length
       ? await supabase.from("collection_suggestions").select("id,suggested_title").in("id", ids)
       : { data: [] as any[] };
     const titleMap = new Map((sugs ?? []).map((s: any) => [s.id, s.suggested_title]));
     setRows((links ?? []).map((l: any) => ({
       ...l,
-      source_title: titleMap.get(l.source_suggestion_id),
-      target_title: titleMap.get(l.target_suggestion_id),
+      source_title: titleMap.get(l.source_collection_id),
+      target_title: titleMap.get(l.target_collection_id),
     })));
     setLoading(false);
   }
@@ -89,10 +89,10 @@ export default function SeoLinkMesh() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className="border-t border-border/40 h-8">
-                    <td className="p-2 truncate max-w-[260px]">{r.source_title ?? r.source_suggestion_id}</td>
+                    <td className="p-2 truncate max-w-[260px]">{r.source_title ?? r.source_collection_id}</td>
                     <td className="p-2"><Badge variant="outline">{r.link_type}</Badge></td>
                     <td className="p-2 text-muted-foreground">{r.anchor_text}</td>
-                    <td className="p-2 truncate max-w-[260px]">{r.target_title ?? r.target_suggestion_id}</td>
+                    <td className="p-2 truncate max-w-[260px]">{r.target_title ?? r.target_collection_id}</td>
                   </tr>
                 ))}
               </tbody>

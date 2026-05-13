@@ -1,151 +1,135 @@
-# AI Collection Automation Engine
 
-Build an end-to-end engine that scans Shopify products, detects collection gaps using a decision tree, generates SEO content + blog drafts via AI, and pushes them as drafts to Shopify for human review.
+# Universal SEO Collection Engine
 
-Note on existing code: the project already has `collection-agent-orchestrator`, `collection-seo`, and `collection_workflows` / `collection_approval_queue` tables. This plan **extends** that foundation rather than duplicating it — new tables and functions are additive and reuse the existing AI gateway + Shopify auth helpers.
+Build the four-layer SEO content engine on top of the existing brand intelligence + collection suggester, plus a new "SEO" navigation section grouping all collection/SEO tools.
 
----
+## 1. Navigation — new "SEO" section
 
-## 1. Database (new tables)
+Add a grouped **SEO** section to the sidebar/menu (`src/components/AppSidebar.tsx` or equivalent). Items:
 
-```sql
-collection_suggestions(
-  id, user_id, store_domain,
-  collection_type,        -- brand | brand_category | type | niche | print | archive
-  suggested_title, suggested_handle,
-  rule_set jsonb,         -- Shopify smart-collection ruleSet
-  product_count int, confidence_score numeric,
-  sample_product_ids text[], sample_titles text[],
-  seo_title, seo_description, description_html,
-  status,                 -- pending | approved | rejected | published | content_generating
-  shopify_collection_id, error_message,
-  created_at, updated_at,
-  unique(user_id, suggested_handle)
-)
+- **Collections** (existing `/collections`)
+- **Brand Intelligence** (existing `/brands`)
+- **SEO Engine** (new `/seo-engine`) — dashboard for the four-layer engine
+- **Keyword Library** (new `/seo-keywords`) — view/edit `seo_keyword_library`
+- **Blog Plans** (new `/seo-blog-plans`) — pending content plans awaiting approval
+- **Organic SEO** (existing `/seo-organic` if present, else link to topic-map flow)
 
-collection_blogs(
-  id, suggestion_id fk, user_id,
-  blog_type,              -- sizing | care | features | faq
-  title, content_html,
-  status, shopify_blog_id, shopify_article_id,
-  created_at, updated_at
-)
+Move the existing Collection / Brand tiles on HomeScreen into a single "SEO" tile that opens this section.
 
-collection_scans(
-  id, user_id, store_domain,
-  triggered_by,           -- product_push | manual | cron
-  products_scanned int, suggestions_created int,
-  archive_candidates int, started_at, completed_at, error
-)
+## 2. Database (one migration)
+
+```text
+seo_keyword_library
+  vertical (FOOTWEAR | SWIMWEAR | CLOTHING | ACCESSORIES | LIFESTYLE)
+  bucket   (high_volume | type_specific | local | brand_long_tail |
+            occasion | material | colour | feature)
+  keyword  text
+  region   text default 'AU'
+  city     text null
+  search_intent text
+  notes    text
+
+collection_seo_outputs           -- one row per (suggestion_id)
+  suggestion_id  fk -> collection_suggestions
+  layer          1..4
+  seo_title      text  (<=60)
+  meta_description text (150..160 enforced in app)
+  description_html text
+  smart_rules_json jsonb         -- Shopify ruleSet
+  rules_validated_count int      -- product hit count from preview
+  rules_status   ok|empty|needs_review
+  status         draft|approved|published
+  refreshed_at   timestamptz
+  expires_at     timestamptz     -- Layer 4 = +6 months
+
+collection_blog_plans
+  suggestion_id fk
+  blog_index    int
+  title         text
+  target_keywords text[]
+  sections      jsonb
+  faq           jsonb            -- [{q,a}]
+  status        plan|approved|generated
+  generated_html text null
+
+brand_intelligence
+  + competitor_reference_styletread jsonb
 ```
 
-RLS: each table scoped to `auth.uid() = user_id`. Standard `update_updated_at_column` triggers.
+Pre-seed `seo_keyword_library` with the FOOTWEAR + SWIMWEAR keyword sets from the brief (one INSERT per bucket).
 
----
+RLS: same pattern as existing collection tables (admin/buyer write, all auth read).
 
-## 2. Edge functions
+## 3. Edge functions
 
-### `collection-intelligence`
-Inputs: `{ user_id, triggered_by, store_domain? }`.
+### `seo-collection-engine` (new)
+Input: `{ suggestion_id }` or `{ store_id, layer }`.
+- Loads suggestion + brand_intelligence + matching keywords from `seo_keyword_library` (filtered by vertical + layer bucket).
+- If footwear & layer 2: pulls `competitor_reference_styletread` block.
+- Calls Lovable AI (`google/gemini-2.5-pro`, fallback `gemini-2.5-flash`) with a strict prompt enforcing the 5 outputs (title ≤60, meta 150-160, 200-280-word HTML with banned-phrases filter, smart rules JSON, blog plan + 6 FAQ).
+- Validates: char counts, banned phrase scan, primary keyword in first 12 words, exactly 2 internal `<a href="/collections/...">` links.
+- Calls `shopify-collection-rule-preview` to count matching products. If <3 → `rules_status='empty'`.
+- Persists to `collection_seo_outputs` + `collection_blog_plans`.
 
-Steps:
-1. Resolve Shopify creds from existing `shopify_stores` table.
-2. Paginate `products.json` (GraphQL preferred) + `custom_collections` + `smart_collections`.
-3. Run decision tree in TS:
-   - vendor count ≥ 3 → brand collection candidate
-   - vendor + product_type ≥ 5 → brand_category candidate
-   - product_type ≥ 3 → type candidate
-   - niche tag list (`tummy control, d-g, d-dd, mastectomy, chlorine resist, sun protection, eco, reduced-impact, high-waist, tie side bikini bottom, arriving-*`) ≥ 3 → niche candidate
-   - print/colour signal (`Black, White, Navy, Floral, Animal, Leopard, Stripe, Tropical, Abstract, Snake, Zebra`) in title/variant ≥ 3 → print candidate
-   - existing collection product_count = 0 → archive candidate
-4. Compute `confidence_score` per spec (drop < 0.5).
-5. Skip if `suggested_handle` already exists in `collection_suggestions` (any non-rejected status) or matches an existing Shopify handle.
-6. Insert rows, write a `collection_scans` record.
+### `seo-blog-writer` (new)
+Input: `{ plan_id }`. Generates full blog HTML from an approved plan (Aussie spelling, banned-phrase filter, internal links). Writes back to `collection_blog_plans.generated_html`, status=`generated`.
 
-Triggered by:
-- Manual: client invoke from `/collections` Scan button.
-- Product push: hook into existing Shopify push success path (single line `supabase.functions.invoke('collection-intelligence', { body: { triggered_by: 'product_push' }})`).
-- Cron: pg_cron at `0 16 * * *` UTC (≈ 2 AM ACST).
+### `brand-intelligence-crawler` (extend)
+Add **Step 7B — Styletread reference** when `industry_vertical = 'FOOTWEAR'`:
+- Web search `site:styletread.com.au {brand_name}`.
+- If hit, fetch via Firecrawl `scrape` (markdown + metadata).
+- Extract H1, meta description, sub-categories, brand copy → `competitor_reference_styletread`.
 
-### `collection-content-generator`
-Inputs: `{ suggestion_id }`.
+### `seo-quarterly-refresh` (new, cron-ready)
+Daily scan: any `collection_seo_outputs.layer=4` with `refreshed_at < now()-6 months` → set `rules_status='needs_review'`, surface in UI.
 
-1. Load suggestion + sample products + related collections.
-2. Use existing `_shared/ai-gateway.ts` with `google/gemini-2.5-pro` (Anthropic via existing `sonic-seo-writer` is also available; gateway preferred for fallback).
-3. Optional competitor research: skip live web search in MVP (rate/cost). Use the prompt block from spec but mark search as "internal knowledge only" to keep deterministic. (We can wire `websearch` later.)
-4. Prompt outputs JSON: `seo_title`, `seo_description`, `description_html`, `smart_collection_rules`, `blogs: [{type,title,content_html} x3]`.
-5. Update suggestion row + insert 3 `collection_blogs` rows (status=pending).
-6. Concurrency: in-process queue, max **5/min** — implement with a small token bucket using a `processed_at` row in a tiny `collection_content_throttle` table OR delay-then-process. Simplest: orchestrator function loops with `await sleep(12000)` between calls.
+## 4. Frontend
 
-### `collection-publish`
-Inputs: `{ suggestion_id }`.
+### `/seo-engine` page (new)
+- Header with vertical tabs (All / Footwear / Swimwear / Clothing / Accessories).
+- Table of suggestions × 4 layer columns; each cell shows status pill (draft/approved/published, char counts, rule hit count).
+- Bulk action: "Generate SEO for selected" → calls `seo-collection-engine` per row (sequential 500 ms delay per memory rule).
+- Row drawer: live preview of title (with character counter), meta (with 150–160 highlight), description HTML preview, smart rule JSON editor, blog plans list with "Generate full post" button.
+- Kill switch reused from `app_settings.brand_intelligence_enabled`.
 
-1. Approve path: create Shopify smart collection via Admin GraphQL with generated rules, title, descriptionHtml, seo, `published: false`.
-2. Store `shopify_collection_id`, set status=published.
-3. Push approved blog drafts to Shopify Blog API as drafts.
+### `/seo-keywords` page (new)
+- Filterable table of `seo_keyword_library` (by vertical/bucket/region).
+- Add/edit/delete (admin only).
 
----
+### `/seo-blog-plans` page (new)
+- Pending plans grouped by collection.
+- Approve → triggers `seo-blog-writer`.
+- Preview generated HTML with copy-to-Shopify button.
 
-## 3. Frontend
+### Wiring
+- Update `collection-content-generator` to defer to `seo-collection-engine` when a suggestion has `industry_vertical` set (back-compat: keep old path for unverticalised stores).
+- HomeScreen: replace separate brand/collection tiles with one **SEO** tile linking to `/seo-engine`.
 
-### New page `src/pages/Collections.tsx` route `/collections`
-Three tabs (`Tabs` from shadcn):
+## 5. Validation rules enforced in code (not just the prompt)
 
-**Tab 1 — Suggestions**
-- Filter chips: All / Brand / Brand+Category / Type / Niche / Print / Archive
-- Card grid: title, type badge, product count, confidence bar, 3 sample thumbnails
-- Expand → SEO title, meta description, description HTML preview, rule preview
-- Actions: Approve (calls `collection-publish`), Edit (inline), Reject (status=rejected)
+`supabase/functions/_shared/seo-validators.ts` (new):
+- `assertTitleLen`, `assertMetaLen` (150–160 strict).
+- `assertBannedPhrases` — wide range of, great selection, we have something for everyone, high quality, browse our collection.
+- `assertKeywordInFirst12Words(html, keyword)`.
+- `assertInternalLinks(html, count=2)`.
+- `assertLocalSignal(text, city)` for Layer 3.
 
-**Tab 2 — Active collections**
-- List Shopify collections + product counts; flag empty ones red
-- "Regenerate SEO" + "Generate blogs" buttons per row
+Engine retries the model up to 2× with the validator's error feedback before returning `status='draft'` with `validation_errors` field.
 
-**Tab 3 — Blog drafts**
-- List `collection_blogs` where status=pending; preview/edit/approve; bulk approve
+## 6. Out of scope this phase
 
-### Dashboard scan button
-Add card to `Dashboard` showing last scan + button → invoke `collection-intelligence` and toast results.
+- Auto-publishing collections to Shopify (separate future phase — UI gives "Copy/push" once user is ready).
+- Multi-language SEO.
+- Schema.org JSON-LD generation (will be follow-up).
 
----
+## Build order
 
-## 4. Initial Splash Swimwear run
-After deploy, manually click Scan once. Expected output matches spec list (Seafolly subcollections, niche collections, print collections, archive flags). No special seeding code needed — the engine produces them.
+1. Migration + keyword seed.
+2. `_shared/seo-validators.ts` + `seo-collection-engine`.
+3. Crawler Step 7B (Styletread).
+4. `/seo-engine`, `/seo-keywords`, `/seo-blog-plans` pages.
+5. Sidebar SEO group + HomeScreen tile cleanup.
+6. `seo-blog-writer` + approval flow.
+7. `seo-quarterly-refresh` cron.
 
----
-
-## Technical details
-
-- Reuse `_shared/ai-gateway.ts` (`callAI`, `getToolArgs`) with `google/gemini-2.5-pro` and Gemini Flash fallback.
-- Reuse Shopify admin token resolution from existing `collection-agent-orchestrator` / `shopify-*` functions.
-- Throttle: serial loop with 12s spacing for content generation triggered after batch approval. Single approve-one is unthrottled.
-- Smart collection rule shapes:
-  - brand: `[{column:'vendor', relation:'equals', condition:vendor}]`
-  - brand_category: `[{vendor=...},{type=...}]` AND
-  - type: `[{type=...}]`
-  - niche: `[{tag=tagname}]`
-  - print: `[{title contains 'Black'}]` etc.
-- Niche tag matching is case-insensitive substring on normalized tag list.
-- Print detection scans `product.title` + each `variant.title` lowercased.
-- Confidence formula:
-  - brand/type with N≥10 → 0.95
-  - brand_category/niche with N≥5 → 0.8
-  - print/niche with 3≤N<5 → 0.6
-  - else dropped.
-- Cron via `cron.schedule` + `net.http_post` per the schedule-jobs guidance, using the project anon key (inserted via `supabase--insert`, not migration, to keep user-specific data out of migrations).
-
-## Files to create
-- `supabase/migrations/<ts>_collection_engine.sql` — 3 tables + RLS + triggers.
-- `supabase/functions/collection-intelligence/index.ts`
-- `supabase/functions/collection-content-generator/index.ts`
-- `supabase/functions/collection-publish/index.ts`
-- `src/pages/Collections.tsx` + small components (`SuggestionCard`, `BlogDraftCard`).
-- Add route in `src/App.tsx`, nav entry, dashboard scan widget.
-- Hook one-line invoke into existing post-Shopify-push success path.
-
-## Out of scope (MVP)
-- Live competitor web scraping (deferred — can add via `websearch` later).
-- Auto-publishing without human review (always drafts).
-- Multi-store fanout (uses currently selected store only).
-
-Confirm and I'll build it. Given the size I'll ship in two passes: (1) DB + intelligence function + Suggestions tab + scan button; (2) content generator + publish + blogs tab + active collections tab.
+Reply **"go"** to start with steps 1–2 (migration + engine), or name specific phases to reorder.

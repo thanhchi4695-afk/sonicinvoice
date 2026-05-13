@@ -738,6 +738,7 @@ export type Database = {
           collection_nav_urls: Json | null
           collection_structure_secondary: string | null
           collection_structure_type: string | null
+          competitor_reference_styletread: Json | null
           competitor_urls: Json | null
           crawl_confidence: number | null
           crawl_error: string | null
@@ -769,6 +770,7 @@ export type Database = {
           collection_nav_urls?: Json | null
           collection_structure_secondary?: string | null
           collection_structure_type?: string | null
+          competitor_reference_styletread?: Json | null
           competitor_urls?: Json | null
           crawl_confidence?: number | null
           crawl_error?: string | null
@@ -800,6 +802,7 @@ export type Database = {
           collection_nav_urls?: Json | null
           collection_structure_secondary?: string | null
           collection_structure_type?: string | null
+          competitor_reference_styletread?: Json | null
           competitor_urls?: Json | null
           crawl_confidence?: number | null
           crawl_error?: string | null
@@ -1370,6 +1373,56 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_blog_plans: {
+        Row: {
+          blog_index: number
+          created_at: string
+          faq: Json | null
+          generated_html: string | null
+          id: string
+          sections: Json | null
+          status: string
+          suggestion_id: string
+          target_keywords: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          blog_index?: number
+          created_at?: string
+          faq?: Json | null
+          generated_html?: string | null
+          id?: string
+          sections?: Json | null
+          status?: string
+          suggestion_id: string
+          target_keywords?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          blog_index?: number
+          created_at?: string
+          faq?: Json | null
+          generated_html?: string | null
+          id?: string
+          sections?: Json | null
+          status?: string
+          suggestion_id?: string
+          target_keywords?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_blog_plans_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "collection_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_blogs: {
         Row: {
           blog_type: string
@@ -1494,6 +1547,68 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      collection_seo_outputs: {
+        Row: {
+          created_at: string
+          description_html: string | null
+          expires_at: string | null
+          id: string
+          layer: number
+          meta_description: string | null
+          refreshed_at: string
+          rules_status: string | null
+          rules_validated_count: number | null
+          seo_title: string | null
+          smart_rules_json: Json | null
+          status: string | null
+          suggestion_id: string
+          updated_at: string
+          validation_errors: Json | null
+        }
+        Insert: {
+          created_at?: string
+          description_html?: string | null
+          expires_at?: string | null
+          id?: string
+          layer: number
+          meta_description?: string | null
+          refreshed_at?: string
+          rules_status?: string | null
+          rules_validated_count?: number | null
+          seo_title?: string | null
+          smart_rules_json?: Json | null
+          status?: string | null
+          suggestion_id: string
+          updated_at?: string
+          validation_errors?: Json | null
+        }
+        Update: {
+          created_at?: string
+          description_html?: string | null
+          expires_at?: string | null
+          id?: string
+          layer?: number
+          meta_description?: string | null
+          refreshed_at?: string
+          rules_status?: string | null
+          rules_validated_count?: number | null
+          seo_title?: string | null
+          smart_rules_json?: Json | null
+          status?: string | null
+          suggestion_id?: string
+          updated_at?: string
+          validation_errors?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_seo_outputs_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: true
+            referencedRelation: "collection_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       collection_suggestions: {
         Row: {
@@ -4688,6 +4803,45 @@ export type Database = {
           query_used?: string | null
           raw_snippet?: string | null
           source?: string
+        }
+        Relationships: []
+      }
+      seo_keyword_library: {
+        Row: {
+          bucket: string
+          city: string | null
+          created_at: string
+          id: string
+          keyword: string
+          notes: string | null
+          region: string
+          search_intent: string | null
+          updated_at: string
+          vertical: string
+        }
+        Insert: {
+          bucket: string
+          city?: string | null
+          created_at?: string
+          id?: string
+          keyword: string
+          notes?: string | null
+          region?: string
+          search_intent?: string | null
+          updated_at?: string
+          vertical: string
+        }
+        Update: {
+          bucket?: string
+          city?: string | null
+          created_at?: string
+          id?: string
+          keyword?: string
+          notes?: string | null
+          region?: string
+          search_intent?: string | null
+          updated_at?: string
+          vertical?: string
         }
         Relationships: []
       }

@@ -236,7 +236,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const body = (await req.json()) as CrawlBody;
+    const body = rawBody;
     if (!body.brand_name) {
       return new Response(JSON.stringify({ error: "brand_name required" }), { status: 400, headers: corsHeaders });
     }

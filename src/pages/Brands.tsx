@@ -345,6 +345,11 @@ export default function Brands() {
                           {iconicRefreshingId === r.id ? <Loader2 className="h-3 w-3 animate-spin text-amber-500" /> : <Zap className="h-3 w-3 text-amber-500" />}
                         </Button>
                       )}
+                      {(r.industry_vertical === "CLOTHING" || r.industry_vertical === "SWIMWEAR") && (
+                        <Button size="sm" variant="ghost" disabled={whitefoxRefreshingId === r.id} onClick={() => refreshWhitefox(r.id, r.brand_name)} title="Refresh White Fox reference">
+                          {whitefoxRefreshingId === r.id ? <Loader2 className="h-3 w-3 animate-spin text-teal-500" /> : <Zap className="h-3 w-3 text-teal-500" />}
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => setSelected(r)}>View</Button>
                     </td>
                   </tr>

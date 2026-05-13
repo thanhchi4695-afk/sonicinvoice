@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
       .select("brand_voice_style")
       .eq("user_id", suggestion.user_id)
       .maybeSingle();
-    const voice: VoiceStyle = (conn?.brand_voice_style as VoiceStyle) || "local_warmth";
+    const voice: VoiceStyle = (body.voice as VoiceStyle) || (conn?.brand_voice_style as VoiceStyle) || "local_warmth";
 
     // Persist taxonomy_level for the row
     if (suggestion.taxonomy_level !== level) {

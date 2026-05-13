@@ -41,6 +41,24 @@ export default function SeoBlogPlans() {
     toast({ title: "Approved", description: "Ready to generate the full post." });
   }
 
+  async function generate(p: Plan) {
+    setBusy(p.id);
+    const { data, error } = await supabase.functions.invoke("seo-blog-writer", {
+      body: { plan_id: p.id },
+    });
+    setBusy(null);
+    if (error || (data as any)?.error) {
+      toast({
+        title: "Generation failed",
+        description: (data as any)?.error || error?.message || "Unknown error",
+        variant: "destructive",
+      });
+      return;
+    }
+    await load();
+    toast({ title: "Post generated", description: `${(data as any)?.length ?? 0} chars of HTML.` });
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground p-6">
       <div className="max-w-6xl mx-auto space-y-6">

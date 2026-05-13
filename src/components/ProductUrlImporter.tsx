@@ -514,6 +514,17 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
         variants = sizes.map((s) => ({ o1: s, o2: "" }));
       }
 
+      const qtyMap = item.variantQuantities ?? {};
+      const qtyForRow = (vRow: { o1: string; o2: string } | undefined): string => {
+        if (!vRow) return "";
+        let c = "", s = "";
+        if (colors.length && sizes.length) { c = vRow.o1; s = vRow.o2; }
+        else if (colors.length) { c = vRow.o1; }
+        else if (sizes.length) { s = vRow.o1; }
+        const n = qtyMap[variantQtyKey(c, s)];
+        return Number.isFinite(n) && (n as number) > 0 ? String(Math.floor(n as number)) : "0";
+      };
+
       const images = (item.imageUrls || []).filter(Boolean);
       const maxRows = Math.max(variants.length, images.length, 1);
 
@@ -538,7 +549,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
           "",                        // Variant SKU
           v ? "0" : "",              // Variant Grams
           v ? "shopify" : "",        // Inventory Tracker
-          v ? "0" : "",              // Inventory Qty
+          v ? qtyForRow(v) : "",     // Inventory Qty
           v ? "deny" : "",           // Inventory Policy
           v ? "manual" : "",         // Fulfillment Service
           v ? priceStr : "",         // Variant Price

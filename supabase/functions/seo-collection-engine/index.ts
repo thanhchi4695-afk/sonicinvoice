@@ -535,8 +535,8 @@ Deno.serve(async (req) => {
         parsed.meta_description = normaliseMeta(parsed.meta_description ?? "", storeName, storeCity);
       }
       if (lengthIssueFields.has("description_html")) {
-        parsed.formula_parts = extendBody(parsed.formula_parts || {}, isBrandPage, voice, primaryKeyword, storeName, storeCity);
-        parsed.__description_html = stitchDescription(parsed.formula_parts, isBrandPage, voice);
+        parsed.formula_parts = extendBody(parsed.formula_parts || {}, isBrandPage, voice, primaryKeyword, storeName, storeCity, vertical, _handle);
+        parsed.__description_html = stitchDescription(parsed.formula_parts, isBrandPage, voice, vertical, _handle);
       }
       if (lengthIssueFields.has("faq")) {
         parsed.faq = extendFaq(parsed.faq || [], primaryKeyword, storeName, storeCity);

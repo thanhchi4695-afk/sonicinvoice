@@ -222,10 +222,21 @@ Deno.serve(async (req) => {
       if (b.sample_ids.length < 5) b.sample_ids.push(productId);
     }
 
+    // Gifting aggregator: recipient/occasion/price/signal -> { count, sample_ids }
+    type GiftBucket = { count: number; sample_ids: string[]; kind: string; value: string; price_band?: string };
+    const giftBuckets: Record<string, GiftBucket> = {};
+    function gbump(kind: string, value: string, productId: string, price_band?: string) {
+      const key = `${kind}:${value}${price_band ? `|${price_band}` : ""}`;
+      giftBuckets[key] ??= { count: 0, sample_ids: [], kind, value, price_band };
+      giftBuckets[key].count++;
+      if (giftBuckets[key].sample_ids.length < 5) giftBuckets[key].sample_ids.push(productId);
+    }
+
     for (const p of rows) {
       const parent = (p.product_type || "").trim();
       if (!parent) continue;
       const text = `${p.title ?? ""} ${p.description ?? ""}`;
+      const vendor = (p as any).vendor ?? "";
 
       for (const c of detectIn(text, COLOURS)) bump(parent, `colour:${c}`, p.id);
       for (const o of detectMap(text, OCCASIONS)) bump(parent, `occasion:${o}`, p.id);
@@ -236,6 +247,17 @@ Deno.serve(async (req) => {
         for (const bt of detectMap(text, BAG_TYPES)) bump(parent, `bag_type:${bt}`, p.id);
         for (const f of detectMap(text, ACC_FEATURES)) bump(parent, `feature:${f}`, p.id);
         for (const o of detectMap(text, ACC_OCCASIONS)) bump(parent, `acc_occasion:${o}`, p.id);
+      }
+
+      // JEWELLERY — type / metal / gemstone / gifting
+      if (isJewelleryVertical(parent, vendor, p.title ?? "")) {
+        for (const jt of detectMap(text, JEWELLERY_TYPES)) bump(parent, `jewellery_type:${jt}`, p.id);
+        for (const m of detectMap(text, JEWELLERY_METALS)) bump(parent, `metal:${m}`, p.id);
+        for (const g of detectMap(text, JEWELLERY_GEMSTONES)) bump(parent, `gemstone:${g}`, p.id);
+        // Gifting signals (any jewellery product is potentially giftable)
+        for (const r of detectMap(text, GIFT_RECIPIENTS)) gbump("recipient", r, p.id);
+        for (const o of detectMap(text, GIFT_OCCASIONS)) gbump("occasion", o, p.id);
+        if (GIFT_SIGNALS.some((s) => text.toLowerCase().includes(s))) gbump("signal", "giftable", p.id);
       }
     }
 

@@ -956,13 +956,13 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                   </p>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" className="flex-1 h-9" onClick={() => setShowYahooModal(false)} disabled={yahooSubmitting}>
+                  <Button variant="outline" className="flex-1 h-9" onClick={() => { setShowYahooModal(false); setEditingConnId(null); }} disabled={yahooSubmitting}>
                     Cancel
                   </Button>
                   <Button variant="teal" className="flex-1 h-9" onClick={handleConnectYahoo} disabled={yahooSubmitting || !yahooEmail.trim() || !yahooPassword.trim()}>
                     {yahooSubmitting
                       ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Testing…</>
-                      : <>Connect</>}
+                      : <>{editingConnId ? "Save changes" : "Connect"}</>}
                   </Button>
                 </div>
               </div>

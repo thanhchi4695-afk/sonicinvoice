@@ -51,6 +51,9 @@ const TYPE_FILTERS = [
   { id: "colour", label: "Colour" },
   { id: "occasion", label: "Occasion" },
   { id: "trend", label: "Trend" },
+  { id: "bag_type", label: "Bag type" },
+  { id: "feature", label: "Feature" },
+  { id: "static_filter", label: "Static filter ⚡" },
   { id: "sale", label: "Sale" },
   { id: "back_in_stock", label: "Back in Stock" },
 ];
@@ -60,6 +63,8 @@ const VOICE_OPTIONS = [
   { id: "local_warmth", label: "Local warmth (boutique)" },
   { id: "professional_editorial", label: "Professional editorial (ICONIC)" },
   { id: "luxury_refined", label: "Luxury refined" },
+  { id: "luxury_authority", label: "Luxury authority (David Jones)" },
+  { id: "aussie_accessible", label: "Aussie accessible (Louenhide / Megantic)" },
 ];
 
 function typeBadgeColor(t: string) {

@@ -794,16 +794,22 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
         <div
           className={`rounded-lg border p-3 mb-4 flex items-center gap-2 ${
             detectionBanner.kind === "nuorder"
-              ? "bg-primary/10 border-primary/30 text-primary-foreground"
+              ? "bg-blue-500/10 border-blue-500/30 text-foreground"
               : "bg-success/10 border-success/30"
           }`}
         >
-          <Check className={`w-4 h-4 shrink-0 ${detectionBanner.kind === "nuorder" ? "text-primary" : "text-success"}`} />
+          <Check className={`w-4 h-4 shrink-0 ${detectionBanner.kind === "nuorder" ? "text-blue-500" : "text-success"}`} />
           <p className="text-sm">
             <span className="font-medium">
-              {detectionBanner.kind === "nuorder" ? "NuOrder" : "JOOR"} catalog detected
+              {detectionBanner.kind === "nuorder"
+                ? detectionBanner.format === "order"
+                  ? "NuOrder Order detected"
+                  : "NuOrder Product Data detected"
+                : "JOOR catalog detected"}
             </span>{" "}
-            — {detectionBanner.products} products grouped from {detectionBanner.rows} rows.
+            — {detectionBanner.kind === "nuorder" && detectionBanner.format === "order"
+              ? `${detectionBanner.products} products with size quantities.`
+              : `${detectionBanner.products} products grouped from ${detectionBanner.rows} rows.`}
           </p>
         </div>
       )}

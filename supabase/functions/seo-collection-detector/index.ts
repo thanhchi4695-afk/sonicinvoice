@@ -96,12 +96,25 @@ Deno.serve(async (req) => {
     // Pull products (cap to avoid timeouts)
     const { data: products, error: prodErr } = await supabase
       .from("products")
-      .select("id,title,product_type,vendor,tags,handle")
+      .select("id,title,product_type,vendor,description")
       .eq("user_id", userId)
       .limit(2000);
 
     if (prodErr) throw prodErr;
     const rows = products ?? [];
+
+    // Pull restock signals from catalog cache (optional)
+    const { data: cache } = await supabase
+      .from("product_catalog_cache")
+      .select("platform_product_id,product_title,vendor,restock_status")
+      .eq("user_id", userId)
+      .limit(2000);
+    const restockByTitle = new Map<string, string>();
+    for (const c of cache ?? []) {
+      if (c.product_title && c.restock_status) {
+        restockByTitle.set(c.product_title.toLowerCase(), c.restock_status);
+      }
+    }
 
     // Aggregators: parent (product_type) -> child (colour|occasion|trend) -> count
     type Bucket = { count: number; sample_ids: string[] };
@@ -119,27 +132,27 @@ Deno.serve(async (req) => {
     for (const p of rows) {
       const parent = (p.product_type || "").trim();
       if (!parent) continue;
-      const tags = Array.isArray(p.tags) ? p.tags.join(" ") : (p.tags || "");
-      const text = `${p.title ?? ""} ${tags}`;
+      const text = `${p.title ?? ""} ${p.description ?? ""}`;
 
       for (const c of detectIn(text, COLOURS)) bump(parent, `colour:${c}`, p.id);
       for (const o of detectMap(text, OCCASIONS)) bump(parent, `occasion:${o}`, p.id);
       for (const tr of detectMap(text, TRENDS)) bump(parent, `trend:${tr}`, p.id);
     }
 
-    // Sale + Back-in-stock detection (single-level scan)
+    // Sale + Back-in-stock detection from catalog cache restock_status
     const sale: Record<string, Bucket> = {};
     const backInStock: Record<string, Bucket> = {};
     for (const p of rows) {
-      const tags = (Array.isArray(p.tags) ? p.tags.join(" ") : (p.tags || "")).toLowerCase();
       const parent = (p.product_type || "").trim();
       if (!parent) continue;
-      if (tags.includes("sale") || tags.includes("markdown")) {
+      const status = restockByTitle.get((p.title || "").toLowerCase());
+      if (!status) continue;
+      if (status === "on_sale" || status === "markdown") {
         sale[parent] ??= { count: 0, sample_ids: [] };
         sale[parent].count++;
         if (sale[parent].sample_ids.length < 5) sale[parent].sample_ids.push(p.id);
       }
-      if (tags.includes("back-in-stock") || tags.includes("restocked")) {
+      if (status === "back_in_stock" || status === "restocked") {
         backInStock[parent] ??= { count: 0, sample_ids: [] };
         backInStock[parent].count++;
         if (backInStock[parent].sample_ids.length < 5) backInStock[parent].sample_ids.push(p.id);

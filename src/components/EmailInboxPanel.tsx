@@ -725,11 +725,17 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     setSimFrom(""); setSimSubject(""); setSimFile(null); setShowSimulator(false);
   };
 
-  const items = [...gmailItems, ...simItems];
+  const connectionMap = new Map(connections.map(c => [c.id, c.email_address]));
+  const itemsRaw = [...gmailItems, ...simItems];
+  const items = itemsRaw.map(i => ({
+    ...i,
+    accountEmail: i.connectionId ? connectionMap.get(i.connectionId) ?? null : (i.source === "sim" ? "Simulator" : null),
+  }));
   const filteredItems = items.filter(i => {
     if (filter === "known" && !i.knownSupplier) return false;
     if (filter === "unknown" && i.knownSupplier) return false;
     if (filter === "processed" && i.status !== "done") return false;
+    if (accountFilter !== "all" && (i.accountEmail ?? "Unassigned") !== accountFilter) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       const hay = `${i.from ?? ""} ${i.subject ?? ""} ${i.supplierName ?? ""}`.toLowerCase();
@@ -738,6 +744,19 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     return true;
   });
   const queuedCount = items.filter(i => i.status === "queued" || i.status === "ready").length;
+
+  // Group filtered items by account email for display
+  const groupedItems = (() => {
+    const groups = new Map<string, typeof filteredItems>();
+    for (const it of filteredItems) {
+      const key = it.accountEmail ?? "Unassigned";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(it);
+    }
+    return Array.from(groups.entries());
+  })();
+  const accountOptions = Array.from(new Set(items.map(i => i.accountEmail ?? "Unassigned")));
+
 
   return (
     <div className="min-h-screen pb-24 animate-fade-in">

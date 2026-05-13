@@ -757,6 +757,7 @@ export type Database = {
           updated_at: string
           user_id: string
           verified_at: string | null
+          whitefox_reference: Json | null
         }
         Insert: {
           blog_sample_titles?: Json | null
@@ -790,6 +791,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           verified_at?: string | null
+          whitefox_reference?: Json | null
         }
         Update: {
           blog_sample_titles?: Json | null
@@ -823,6 +825,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           verified_at?: string | null
+          whitefox_reference?: Json | null
         }
         Relationships: []
       }
@@ -1673,6 +1676,7 @@ export type Database = {
       collection_suggestions: {
         Row: {
           collection_type: string
+          colour_filter: string | null
           completeness_breakdown: Json | null
           completeness_score: number | null
           confidence_score: number
@@ -1680,6 +1684,8 @@ export type Database = {
           description_html: string | null
           error_message: string | null
           id: string
+          occasion_filter: string | null
+          parent_collection_id: string | null
           product_count: number
           rule_set: Json
           sample_images: string[]
@@ -1695,11 +1701,14 @@ export type Database = {
           suggested_handle: string
           suggested_title: string
           taxonomy_level: number | null
+          trend_review_after: string | null
+          trend_signal: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           collection_type: string
+          colour_filter?: string | null
           completeness_breakdown?: Json | null
           completeness_score?: number | null
           confidence_score?: number
@@ -1707,6 +1716,8 @@ export type Database = {
           description_html?: string | null
           error_message?: string | null
           id?: string
+          occasion_filter?: string | null
+          parent_collection_id?: string | null
           product_count?: number
           rule_set?: Json
           sample_images?: string[]
@@ -1722,11 +1733,14 @@ export type Database = {
           suggested_handle: string
           suggested_title: string
           taxonomy_level?: number | null
+          trend_review_after?: string | null
+          trend_signal?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           collection_type?: string
+          colour_filter?: string | null
           completeness_breakdown?: Json | null
           completeness_score?: number | null
           confidence_score?: number
@@ -1734,6 +1748,8 @@ export type Database = {
           description_html?: string | null
           error_message?: string | null
           id?: string
+          occasion_filter?: string | null
+          parent_collection_id?: string | null
           product_count?: number
           rule_set?: Json
           sample_images?: string[]
@@ -1749,10 +1765,20 @@ export type Database = {
           suggested_handle?: string
           suggested_title?: string
           taxonomy_level?: number | null
+          trend_review_after?: string | null
+          trend_signal?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "collection_suggestions_parent_collection_id_fkey"
+            columns: ["parent_collection_id"]
+            isOneToOne: false
+            referencedRelation: "collection_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       collection_workflows: {
         Row: {
@@ -3585,6 +3611,39 @@ export type Database = {
         }
         Relationships: []
       }
+      nested_handle_map: {
+        Row: {
+          child_label: string | null
+          child_slug: string
+          created_at: string
+          dimension: string | null
+          id: string
+          parent_slug: string
+          source: string
+          vertical: string
+        }
+        Insert: {
+          child_label?: string | null
+          child_slug: string
+          created_at?: string
+          dimension?: string | null
+          id?: string
+          parent_slug: string
+          source?: string
+          vertical: string
+        }
+        Update: {
+          child_label?: string | null
+          child_slug?: string
+          created_at?: string
+          dimension?: string | null
+          id?: string
+          parent_slug?: string
+          source?: string
+          vertical?: string
+        }
+        Relationships: []
+      }
       outlook_connections: {
         Row: {
           access_token: string
@@ -5149,6 +5208,7 @@ export type Database = {
         Row: {
           access_token: string
           api_version: string
+          brand_voice_style: string
           created_at: string
           default_location_id: string | null
           id: string
@@ -5165,6 +5225,7 @@ export type Database = {
         Insert: {
           access_token: string
           api_version?: string
+          brand_voice_style?: string
           created_at?: string
           default_location_id?: string | null
           id?: string
@@ -5181,6 +5242,7 @@ export type Database = {
         Update: {
           access_token?: string
           api_version?: string
+          brand_voice_style?: string
           created_at?: string
           default_location_id?: string | null
           id?: string

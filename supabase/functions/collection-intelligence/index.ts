@@ -1,5 +1,5 @@
-// AI Collection Automation — Decision Tree Scanner
-// Scans Shopify products + collections, produces collection_suggestions rows.
+// AI Collection Automation — Universal Decision Tree Scanner v2
+// Loads industry_taxonomy + brand_intelligence to suggest collections for ANY vertical.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getValidShopifyToken } from "../_shared/shopify-token.ts";
 
@@ -12,16 +12,6 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const NICHE_TAGS = [
-  "tummy control", "d-g", "d-dd", "mastectomy", "chlorine resist",
-  "sun protection", "upf 50", "eco", "reduced-impact", "high-waist",
-  "tie side bikini bottom", "sustainable",
-];
-const PRINT_SIGNALS = [
-  "Black", "White", "Navy", "Floral", "Animal", "Leopard",
-  "Stripe", "Tropical", "Abstract", "Snake", "Zebra",
-];
-
 interface ShopifyProduct {
   id: number;
   title: string;
@@ -31,7 +21,7 @@ interface ShopifyProduct {
   handle: string;
   status: string;
   image?: { src?: string };
-  variants?: Array<{ title?: string }>;
+  variants?: Array<{ title?: string; option1?: string; option2?: string }>;
 }
 
 interface ShopifyCollection {
@@ -41,8 +31,37 @@ interface ShopifyCollection {
   products_count?: number;
 }
 
+interface TaxonomyDimension {
+  vertical: string;
+  dimension_name: string;
+  dimension_values: string[];
+  min_products_to_trigger: number;
+  display_order: number;
+}
+
+interface BrandRow {
+  brand_name: string;
+  industry_vertical: string | null;
+  collection_structure_type: string | null;
+  category_vocabulary: Record<string, string> | null;
+  print_story_names: string[] | null;
+  crawl_confidence: number | null;
+}
+
 function slug(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+}
+
+function titleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Hardcoded vertical mapping by store_url substring (Phase 1 decision).
+function detectVerticalFromStore(storeUrl: string): string {
+  const u = storeUrl.toLowerCase();
+  if (u.includes("splash")) return "SWIMWEAR";
+  if (u.includes("stomp")) return "MULTI";
+  return "UNKNOWN";
 }
 
 async function fetchAllProducts(storeUrl: string, token: string, apiVersion: string): Promise<ShopifyProduct[]> {
@@ -93,8 +112,9 @@ function confidence(type: string, n: number): number {
     if (n >= 5) return 0.8;
     if (n >= 3) return 0.6;
   }
-  if (type === "print") {
-    if (n >= 10) return 0.7;
+  if (type === "print" || type === "dimension") {
+    if (n >= 10) return 0.85;
+    if (n >= 5) return 0.75;
     if (n >= 3) return 0.6;
   }
   if (type === "archive") return 0.85;
@@ -113,7 +133,26 @@ interface Suggestion {
   sample_images: string[];
 }
 
-function buildSuggestions(products: ShopifyProduct[], collections: ShopifyCollection[]): Suggestion[] {
+function productMatchesValue(p: ShopifyProduct, value: string): boolean {
+  const v = value.toLowerCase();
+  if ((p.title || "").toLowerCase().includes(v)) return true;
+  if ((p.tags || "").toLowerCase().split(",").some((t) => t.trim().includes(v))) return true;
+  if ((p.product_type || "").toLowerCase().includes(v)) return true;
+  if ((p.variants ?? []).some((vt) =>
+    (vt.title || "").toLowerCase().includes(v) ||
+    (vt.option1 || "").toLowerCase().includes(v) ||
+    (vt.option2 || "").toLowerCase().includes(v)
+  )) return true;
+  return false;
+}
+
+function buildSuggestions(
+  products: ShopifyProduct[],
+  collections: ShopifyCollection[],
+  vertical: string,
+  dimensions: TaxonomyDimension[],
+  brands: BrandRow[],
+): Suggestion[] {
   const existingHandles = new Set(collections.map((c) => c.handle.toLowerCase()));
   const existingTitles = new Set(collections.map((c) => c.title.toLowerCase()));
   const out: Suggestion[] = [];
@@ -131,7 +170,7 @@ function buildSuggestions(products: ShopifyProduct[], collections: ShopifyCollec
     sample_images: list.slice(0, 6).map((p) => p.image?.src ?? "").filter(Boolean),
   });
 
-  // Brand
+  // 1. Brand collections
   const byVendor = new Map<string, ShopifyProduct[]>();
   for (const p of products) {
     const v = (p.vendor || "").trim();
@@ -151,7 +190,7 @@ function buildSuggestions(products: ShopifyProduct[], collections: ShopifyCollec
         ...sampleFor(list),
       });
     }
-    // Brand+Category
+    // Brand + product_type
     const byType = new Map<string, ShopifyProduct[]>();
     for (const p of list) {
       const t = (p.product_type || "").trim();
@@ -181,7 +220,7 @@ function buildSuggestions(products: ShopifyProduct[], collections: ShopifyCollec
     }
   }
 
-  // Type
+  // 2. Generic product_type
   const byType = new Map<string, ShopifyProduct[]>();
   for (const p of products) {
     const t = (p.product_type || "").trim();
@@ -203,48 +242,62 @@ function buildSuggestions(products: ShopifyProduct[], collections: ShopifyCollec
     }
   }
 
-  // Niche
-  for (const tag of NICHE_TAGS) {
-    const lower = tag.toLowerCase();
-    const matched = products.filter((p) =>
-      (p.tags || "").toLowerCase().split(",").some((t) => t.trim().includes(lower))
-    );
-    if (matched.length >= 3) {
-      const title = tag.replace(/\b\w/g, (c) => c.toUpperCase()) + " Collection";
-      addIfNew({
-        collection_type: "niche",
-        suggested_title: title,
-        suggested_handle: slug(title),
-        rule_set: [{ column: "tag", relation: "equals", condition: tag }],
-        product_count: matched.length,
-        confidence_score: confidence("niche", matched.length),
-        ...sampleFor(matched),
-      });
+  // 3. Taxonomy-driven dimensions (vertical-aware)
+  for (const dim of dimensions) {
+    for (const value of dim.dimension_values) {
+      const matched = products.filter((p) => productMatchesValue(p, value));
+      if (matched.length >= dim.min_products_to_trigger) {
+        const title = `${titleCase(value)} ${titleCase(dim.dimension_name.replace(/_/g, " "))}`.replace(/\s+/g, " ").trim();
+        addIfNew({
+          collection_type: dim.dimension_name === "print_story" ? "print" : (dim.dimension_name === "function" ? "niche" : "dimension"),
+          suggested_title: title,
+          suggested_handle: slug(title),
+          rule_set: {
+            dimension: dim.dimension_name,
+            value,
+            vertical,
+            rules: [
+              { column: "tag", relation: "equals", condition: value },
+              { column: "title", relation: "contains", condition: value },
+            ],
+          },
+          product_count: matched.length,
+          confidence_score: confidence(dim.dimension_name === "print_story" ? "print" : "dimension", matched.length),
+          ...sampleFor(matched),
+        });
+      }
     }
   }
 
-  // Print / Colour
-  for (const word of PRINT_SIGNALS) {
-    const lower = word.toLowerCase();
-    const matched = products.filter((p) => {
-      if ((p.title || "").toLowerCase().includes(lower)) return true;
-      return (p.variants ?? []).some((v) => (v.title || "").toLowerCase().includes(lower));
-    });
-    if (matched.length >= 3) {
-      const title = `${word} Swimwear`;
-      addIfNew({
-        collection_type: "print",
-        suggested_title: title,
-        suggested_handle: slug(title),
-        rule_set: [{ column: "title", relation: "contains", condition: word }],
-        product_count: matched.length,
-        confidence_score: confidence("print", matched.length),
-        ...sampleFor(matched),
-      });
+  // 4. Brand print_story names (from crawl)
+  for (const b of brands) {
+    if (!b.print_story_names) continue;
+    const vendorProducts = byVendor.get(b.brand_name) ?? [];
+    if (vendorProducts.length === 0) continue;
+    for (const story of b.print_story_names.slice(0, 12)) {
+      const matched = vendorProducts.filter((p) => productMatchesValue(p, story));
+      if (matched.length >= 3) {
+        const title = `${b.brand_name} ${story}`;
+        addIfNew({
+          collection_type: "brand_print",
+          suggested_title: title,
+          suggested_handle: slug(title),
+          rule_set: {
+            applied_disjunctively: false,
+            rules: [
+              { column: "vendor", relation: "equals", condition: b.brand_name },
+              { column: "title", relation: "contains", condition: story },
+            ],
+          },
+          product_count: matched.length,
+          confidence_score: confidence("print", matched.length),
+          ...sampleFor(matched),
+        });
+      }
     }
   }
 
-  // Archive — empty existing collections
+  // 5. Archive — empty existing collections
   for (const c of collections) {
     if ((c.products_count ?? -1) === 0) {
       out.push({
@@ -278,6 +331,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const triggeredBy = (body.triggered_by ?? "manual") as string;
+    const verticalOverride = (body.industry_vertical as string | undefined)?.toUpperCase();
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: scanRow } = await admin
@@ -289,12 +343,42 @@ Deno.serve(async (req) => {
 
     try {
       const { accessToken, storeUrl, apiVersion } = await getValidShopifyToken(admin, userId);
+      const vertical = verticalOverride ?? detectVerticalFromStore(storeUrl);
+
+      // Load taxonomy dimensions for this vertical (or all if MULTI)
+      const verticalsToLoad = vertical === "MULTI"
+        ? ["FOOTWEAR", "SWIMWEAR", "CLOTHING", "ACCESSORIES", "LIFESTYLE"]
+        : vertical === "UNKNOWN" ? [] : [vertical];
+
+      const { data: taxRows } = verticalsToLoad.length > 0
+        ? await admin.from("industry_taxonomy")
+            .select("vertical, dimension_name, dimension_values, min_products_to_trigger, display_order")
+            .in("vertical", verticalsToLoad)
+            .eq("is_collection_trigger", true)
+            .order("display_order")
+        : { data: [] as TaxonomyDimension[] };
+
+      const dimensions: TaxonomyDimension[] = (taxRows ?? []).map((r: any) => ({
+        vertical: r.vertical,
+        dimension_name: r.dimension_name,
+        dimension_values: Array.isArray(r.dimension_values) ? r.dimension_values : [],
+        min_products_to_trigger: r.min_products_to_trigger ?? 5,
+        display_order: r.display_order ?? 0,
+      }));
+
+      // Load brand intelligence (for brand-specific print stories)
+      const { data: brandRows } = await admin.from("brand_intelligence")
+        .select("brand_name, industry_vertical, collection_structure_type, category_vocabulary, print_story_names, crawl_confidence")
+        .eq("user_id", userId)
+        .gte("crawl_confidence", 0.6);
+      const brands = (brandRows ?? []) as BrandRow[];
+
       const [products, collections] = await Promise.all([
         fetchAllProducts(storeUrl, accessToken, apiVersion),
         fetchAllCollections(storeUrl, accessToken, apiVersion),
       ]);
 
-      const suggestions = buildSuggestions(products, collections);
+      const suggestions = buildSuggestions(products, collections, vertical, dimensions, brands);
 
       let inserted = 0;
       let archives = 0;
@@ -324,7 +408,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         scan_id: scanId,
+        vertical,
         products_scanned: products.length,
+        dimensions_loaded: dimensions.length,
+        brands_loaded: brands.length,
         suggestions_created: inserted,
         archive_candidates: archives,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

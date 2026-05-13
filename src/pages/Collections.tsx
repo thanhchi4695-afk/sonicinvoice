@@ -86,11 +86,14 @@ function CollectionsInner() {
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, Partial<Suggestion>>>({});
   const [lastScan, setLastScan] = useState<string | null>(null);
+  const [voice, setVoice] = useState<string>("local_warmth");
+  const [savingVoice, setSavingVoice] = useState(false);
 
   async function load() {
     setLoading(true);

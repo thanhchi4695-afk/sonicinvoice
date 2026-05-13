@@ -79,12 +79,30 @@ function safeParseJson(raw: string): any {
 }
 
 function stitchDescription(parts: any, isBrandPage: boolean, voice: VoiceStyle): string {
+  // Louenhide brand page (aussie_accessible + isBrandPage) — dedicated 4-part schema
+  if (isBrandPage && voice === "aussie_accessible") {
+    return [
+      `<p>${parts.lh_brisbane_origin ?? parts.brand_origin ?? ""}</p>`,
+      `<p>${parts.lh_mission ?? parts.brand_seasonal ?? ""}</p>`,
+      `<p>${parts.lh_keyword_repetition ?? parts.brand_authority ?? ""}</p>`,
+      `<p>${parts.lh_collection_link_out ?? parts.brand_sub_links ?? ""}</p>`,
+    ].join("\n");
+  }
   if (isBrandPage) {
     return [
       `<p>${parts.brand_origin ?? ""}</p>`,
       `<p>${parts.brand_seasonal ?? ""}</p>`,
       `<p>${parts.brand_authority ?? ""}</p>`,
       `<p>${parts.brand_sub_links ?? ""}</p>`,
+    ].join("\n");
+  }
+  // David Jones 4-part (luxury_authority on ACCESSORIES collection page)
+  if (voice === "luxury_authority") {
+    return [
+      `<p>${parts.dj_authority_opener ?? parts.part1_opener ?? ""}</p>`,
+      `<p>${parts.dj_occasion_material ?? parts.part2_materials ?? ""}</p>`,
+      `<p>${parts.dj_faq_prose ?? parts.part4_styling ?? ""}</p>`,
+      `<p>${parts.dj_sub_collection_links ?? parts.part5_links ?? ""}</p>`,
     ].join("\n");
   }
   if (voice === "aspirational_youth" || voice === "local_warmth") {

@@ -135,7 +135,9 @@ function CollectionsInner() {
       // Save any edits before publish
       const e = edits[id];
       if (e) {
-        await supabase.from("collection_suggestions").update(e).eq("id", id);
+        const patch: Record<string, unknown> = { ...e };
+        delete patch.rule_set;
+        await supabase.from("collection_suggestions").update(patch as never).eq("id", id);
       }
       const { data, error } = await supabase.functions.invoke("collection-publish", { body: { suggestion_id: id } });
       if (error) throw error;

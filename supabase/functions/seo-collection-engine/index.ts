@@ -197,6 +197,14 @@ Deno.serve(async (req) => {
     const storeName = body.store_name || "Our Store";
     const storeCity = body.store_city || null;
 
+    // Load brand voice style from this user's shopify connection (default local_warmth)
+    const { data: conn } = await supabase
+      .from("shopify_connections")
+      .select("brand_voice_style")
+      .eq("user_id", suggestion.user_id)
+      .maybeSingle();
+    const voice: VoiceStyle = (conn?.brand_voice_style as VoiceStyle) || "local_warmth";
+
     // Persist taxonomy_level for the row
     if (suggestion.taxonomy_level !== level) {
       await supabase.from("collection_suggestions")

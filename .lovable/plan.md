@@ -88,6 +88,7 @@ Same order you approved for David Jones rounds — taxonomy → keyword library 
 - **Product title audit** in `_shared/product-seo-optimiser.ts` — `isJewelleryVendor`, `detectJewelleryType`, `detectMetal` helpers + a JEWELLERY branch in `optimiseProductSeo` enforcing `{Brand} {Style Name} {Metal} {Jewellery Type}`, raising `no_jewellery_type_detected` / `no_metal_detected` audit flags, and writing a 4-paragraph jewellery body when copy is missing.
 - Both edge functions redeployed (`seo-collection-detector`, `publishing-agent`).
 
-## Round 3 — deferred
+## Round 3 — partial (smoke-tested, pre-seed deferred)
 
-Splash Swimwear Darwin pre-seed still blocked on `user_id` / store connection (same blocker as Stomp).
+- Smoke test against connected `testing-d9eimunn` store (337 SWIMWEAR/CLOTHING products) confirms detector returns 6 colour collections and zero JEWELLERY/gifting suggestions — Round 1+2 add branches without regressing existing verticals.
+- Splash Swimwear Darwin (`b8dcf887-…`) is connected but `products` table is empty for that user — pre-seed deferred until catalogue syncs. Re-run `seo-collection-detector` with that user_id once Shopify products land.

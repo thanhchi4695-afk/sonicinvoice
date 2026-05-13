@@ -287,7 +287,7 @@ Deno.serve(async (req) => {
       const prompt = buildPrompt({
         suggestion, level, isBrandPage, vertical, storeName, storeCity,
         keywords: (tieredKws ?? []) as any, brand, linkOptions, primaryKeyword,
-        previousIssues: lastIssues,
+        previousIssues: lastIssues, voice,
       });
       const ai = await callAI({
         model: "google/gemini-2.5-pro",

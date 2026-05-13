@@ -3302,6 +3302,45 @@ export type Database = {
         }
         Relationships: []
       }
+      klaviyo_event_log: {
+        Row: {
+          created_at: string
+          error: string | null
+          event_name: string
+          http_status: number | null
+          id: string
+          payload: Json
+          profile_email: string | null
+          response_body: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          event_name: string
+          http_status?: number | null
+          id?: string
+          payload: Json
+          profile_email?: string | null
+          response_body?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          event_name?: string
+          http_status?: number | null
+          id?: string
+          payload?: Json
+          profile_email?: string | null
+          response_body?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       margin_agent_decisions: {
         Row: {
           action_taken: Json

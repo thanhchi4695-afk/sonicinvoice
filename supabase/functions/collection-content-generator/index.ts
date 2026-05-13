@@ -169,7 +169,8 @@ Deno.serve(async (req) => {
         }
 
         await admin.from("collection_suggestions").update({ status: "content_generating" }).eq("id", id);
-        const out = await generate(s as any, relatedTitles);
+        const matchedBrand = detectBrand(s as Record<string, unknown>, brands);
+        const out = await generate(s as any, relatedTitles, matchedBrand);
 
         await admin.from("collection_suggestions").update({
           seo_title: out.seo_title,

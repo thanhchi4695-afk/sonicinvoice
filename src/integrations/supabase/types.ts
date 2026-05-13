@@ -1378,6 +1378,7 @@ export type Database = {
           blog_index: number
           created_at: string
           faq: Json | null
+          generated_at: string | null
           generated_html: string | null
           id: string
           sections: Json | null
@@ -1391,6 +1392,7 @@ export type Database = {
           blog_index?: number
           created_at?: string
           faq?: Json | null
+          generated_at?: string | null
           generated_html?: string | null
           id?: string
           sections?: Json | null
@@ -1404,6 +1406,7 @@ export type Database = {
           blog_index?: number
           created_at?: string
           faq?: Json | null
+          generated_at?: string | null
           generated_html?: string | null
           id?: string
           sections?: Json | null

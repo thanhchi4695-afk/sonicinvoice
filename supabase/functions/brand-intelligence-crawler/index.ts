@@ -359,8 +359,38 @@ Deno.serve(async (req) => {
       }, {});
     }
 
+    // Step 7B: Styletread competitor reference (FOOTWEAR only) — pulls how
+    // Australia's leading footwear retailer categorises this brand so the
+    // SEO engine can mirror their proven taxonomy without plagiarising copy.
+    let styletreadRef: any = null;
+    if (vertical === "FOOTWEAR") {
+      try {
+        const slug = body.brand_name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        const stUrl = `https://www.styletread.com.au/brands/${slug}`;
+        await sleep(FETCH_DELAY_MS);
+        const st = await firecrawlScrape(stUrl, ["markdown", "links"]);
+        pages++;
+        if (st.success && st.data?.markdown) {
+          const md = st.data.markdown;
+          const headings = Array.from(md.matchAll(/^#{1,3}\s+(.+)$/gm)).map((m) => m[1].trim()).slice(0, 30);
+          const refineLinks = (st.data.links ?? [])
+            .filter((u) => /styletread\.com\.au\/(brands|collections|categories)\//i.test(u))
+            .slice(0, 40);
+          styletreadRef = {
+            source_url: stUrl,
+            page_headings: headings,
+            refine_facets: refineLinks,
+            captured_at: new Date().toISOString(),
+          };
+        }
+      } catch (e) {
+        console.warn("styletread reference fetch failed", e);
+      }
+    }
+
     const confidence = scoreConfidence(extracted);
     await supabase.from("brand_intelligence").update({
+      competitor_reference_styletread: styletreadRef,
       brand_domain: domain,
       industry_vertical: vertical,
       collection_nav_urls: allCollectionUrls,

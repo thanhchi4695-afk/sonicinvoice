@@ -229,9 +229,9 @@ Deno.serve(async (req) => {
       .order("tier", { ascending: true })
       .limit(40);
 
-    // Brand intelligence + ICONIC reference
+    // Brand intelligence + competitor reference (load whenever brand_id is supplied)
     let brand: any = null;
-    if (level === 5 && body.brand_id) {
+    if (body.brand_id) {
       const { data } = await supabase
         .from("brand_intelligence")
         .select("brand_name, brand_voice, value_proposition, hero_keywords, iconic_reference, whitefox_reference, davidjones_reference, louenhide_megantic_reference, competitor_reference_styletread")

@@ -324,6 +324,9 @@ Deno.serve(async (req) => {
         else if (kind === "bag_type") { title = `${titleCase(value)} ${parent}`;            collection_type = "bag_type"; }
         else if (kind === "feature")  { title = `${titleCase(value)} ${parent}`;            collection_type = "feature"; }
         else if (kind === "acc_occasion"){ title = `${titleCase(value)} ${parent}`;          collection_type = "occasion"; }
+        else if (kind === "jewellery_type") { title = `${titleCase(value)}`;                 collection_type = "jewellery_type"; }
+        else if (kind === "metal")    { title = `${titleCase(value)} ${parent}`;            collection_type = "metal"; }
+        else if (kind === "gemstone") { title = `${titleCase(value)} ${parent}`;            collection_type = "gemstone"; }
         else                          { title = `${titleCase(value)} ${parent}`;            collection_type = "trend"; }
 
         // Niche-keyword guard (Megantic Innovation 2): block standalone broad keywords as title
@@ -344,6 +347,35 @@ Deno.serve(async (req) => {
           sample_product_ids: info.sample_ids,
         });
       }
+    }
+
+    // GIFTING auto-generation (GWG model): recipient / occasion / signal collections
+    for (const [, gb] of Object.entries(giftBuckets)) {
+      if (gb.count < Math.max(3, minProducts)) continue;
+      const titleCase = (s: string) => s.replace(/_/g, " ").replace(/(^|\s)\S/g, (m) => m.toUpperCase());
+      let title = "";
+      let handle = "";
+      if (gb.kind === "recipient") {
+        title = `Jewellery Gifts For ${titleCase(gb.value)}`;
+        handle = `gifts/jewellery-for-${slug(gb.value)}`;
+      } else if (gb.kind === "occasion") {
+        title = `${titleCase(gb.value)} Jewellery Gifts`;
+        handle = `gifts/${slug(gb.value)}-jewellery`;
+      } else {
+        title = `Gift Boxed Jewellery`;
+        handle = `gifts/giftable-jewellery`;
+      }
+      suggestions.push({
+        user_id: userId,
+        suggested_title: title,
+        suggested_handle: handle,
+        shopify_handle: handle,
+        collection_type: "gifting",
+        product_count: gb.count,
+        status: "pending",
+        source: "seo-collection-detector",
+        sample_product_ids: gb.sample_ids,
+      });
     }
 
     // Static filter intersections (Megantic Innovation 1) — minimum 3 products

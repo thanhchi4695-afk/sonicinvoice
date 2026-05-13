@@ -233,7 +233,7 @@ Deno.serve(async (req) => {
     if (level === 5 && body.brand_id) {
       const { data } = await supabase
         .from("brand_intelligence")
-        .select("brand_name, brand_voice, value_proposition, hero_keywords, iconic_reference, whitefox_reference, competitor_reference_styletread")
+        .select("brand_name, brand_voice, value_proposition, hero_keywords, iconic_reference, whitefox_reference, davidjones_reference, louenhide_megantic_reference, competitor_reference_styletread")
         .eq("id", body.brand_id)
         .maybeSingle();
       brand = data;

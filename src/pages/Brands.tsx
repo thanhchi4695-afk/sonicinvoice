@@ -99,11 +99,11 @@ export default function Brands() {
     return data.id;
   }
 
-  async function crawl(name: string, domain: string | null, id?: string) {
+  async function crawl(name: string, domain: string | null, id?: string, vertical?: Vertical) {
     setCrawlingId(id ?? name);
     try {
       const { data, error } = await supabase.functions.invoke("brand-intelligence-crawler", {
-        body: { brand_id: id, brand_name: name, brand_domain: domain || undefined },
+        body: { brand_id: id, brand_name: name, brand_domain: domain || undefined, industry_vertical: vertical },
       });
       if (error) throw error;
       if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
@@ -116,9 +116,9 @@ export default function Brands() {
     }
   }
 
-  async function seedAndCrawl(b: { name: string; domain: string }) {
+  async function seedAndCrawl(b: { name: string; domain: string; vertical: Vertical }) {
     const id = await ensureSeedRow(b.name, b.domain);
-    if (id) await crawl(b.name, b.domain, id);
+    if (id) await crawl(b.name, b.domain, id, b.vertical);
   }
 
   async function addBrand() {

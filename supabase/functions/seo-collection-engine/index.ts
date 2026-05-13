@@ -304,12 +304,13 @@ Deno.serve(async (req) => {
         previousIssues: lastIssues, voice,
       });
       const ai = await callAI({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: prompt.system },
           { role: "user", content: prompt.user },
         ],
         temperature: 0.4,
+        timeoutMs: 120_000,
       });
       const raw = getContent(ai);
       parsed = safeParseJson(raw);

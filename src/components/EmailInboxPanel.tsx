@@ -192,9 +192,9 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const loadFoundInvoices = useCallback(async () => {
     const { data, error } = await supabase
       .from("gmail_found_invoices")
-      .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed, provider")
+      .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed, provider, connection_id")
       .order("received_at", { ascending: false })
-      .limit(1000);
+      .limit(2000);
     if (error) return;
     const items: InboxItem[] = [];
     for (const row of data ?? []) {

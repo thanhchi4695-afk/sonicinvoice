@@ -76,7 +76,7 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
   const [pushProgress, setPushProgress] = useState({ current: 0, total: 0 });
   const [stockCheckItems, setStockCheckItems] = useState<InvoiceLineItem[] | null>(null);
   const [detectionBanner, setDetectionBanner] = useState<
-    | { kind: "joor" | "nuorder"; products: number; rows: number }
+    | { kind: "joor" | "nuorder"; products: number; rows: number; format?: "item" | "order" }
     | null
   >(null);
 
@@ -233,8 +233,13 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
               setOrders(result.orders);
               const grouped = result.rawProducts.length;
               const rowCount = result.rawRowCount ?? firstRows.length;
-              setDetectionBanner({ kind: "nuorder", products: grouped, rows: rowCount });
-              toast.success(`NuOrder catalog detected — ${grouped} products grouped from ${rowCount} rows`);
+              const fmt: "item" | "order" = result.format === "xlsx_order_data" ? "order" : "item";
+              setDetectionBanner({ kind: "nuorder", products: grouped, rows: rowCount, format: fmt });
+              toast.success(
+                fmt === "order"
+                  ? `NuOrder Order detected — ${grouped} products with size quantities`
+                  : `NuOrder Product Data detected — ${grouped} products grouped from ${rowCount} rows`,
+              );
               import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "wholesale", productCount: grouped }));
               setScreen("orders");
               return;
@@ -789,16 +794,22 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
         <div
           className={`rounded-lg border p-3 mb-4 flex items-center gap-2 ${
             detectionBanner.kind === "nuorder"
-              ? "bg-primary/10 border-primary/30 text-primary-foreground"
+              ? "bg-blue-500/10 border-blue-500/30 text-foreground"
               : "bg-success/10 border-success/30"
           }`}
         >
-          <Check className={`w-4 h-4 shrink-0 ${detectionBanner.kind === "nuorder" ? "text-primary" : "text-success"}`} />
+          <Check className={`w-4 h-4 shrink-0 ${detectionBanner.kind === "nuorder" ? "text-blue-500" : "text-success"}`} />
           <p className="text-sm">
             <span className="font-medium">
-              {detectionBanner.kind === "nuorder" ? "NuOrder" : "JOOR"} catalog detected
+              {detectionBanner.kind === "nuorder"
+                ? detectionBanner.format === "order"
+                  ? "NuOrder Order detected"
+                  : "NuOrder Product Data detected"
+                : "JOOR catalog detected"}
             </span>{" "}
-            — {detectionBanner.products} products grouped from {detectionBanner.rows} rows.
+            — {detectionBanner.kind === "nuorder" && detectionBanner.format === "order"
+              ? `${detectionBanner.products} products with size quantities.`
+              : `${detectionBanner.products} products grouped from ${detectionBanner.rows} rows.`}
           </p>
         </div>
       )}

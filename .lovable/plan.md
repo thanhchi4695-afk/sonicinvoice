@@ -1,68 +1,53 @@
-# THE ICONIC SEO Architecture — Upgrade Plan
+# White Fox SEO Architecture — Implementation Plan
 
-Upgrades the existing Universal SEO Collection Engine to mirror THE ICONIC's URL taxonomy, 5-part description formula, brand-page formula, FAQ blocks, internal link mesh, keyword tiers, competitor reference, and completeness scoring.
+Extends the existing ICONIC reference system with White Fox's three signature techniques: nested Shopify handles, colour-dimension collections, and occasion/trend layers — plus voice-matched copy.
 
-Built in 4 deployable phases so we can verify each before stacking the next.
+## Phase A — Schema, voice & nested handle support
+
+**Migration:**
+- `collection_suggestions`: add `parent_collection_id uuid` (self-FK), `collection_type text` (`type | colour | occasion | trend | sale | restock | brand`), `colour_filter text`, `occasion_filter text`, `trend_signal text`.
+- `store_settings`: add `brand_voice_style text` default `local_warmth` (one of `aspirational_youth | professional_editorial | local_warmth | luxury_refined`).
+- `brand_intelligence`: add `whitefox_reference jsonb`.
+- `seo_keyword_tiers`: seed CLOTHING vertical (Tier 2–5 + TREND).
+- New table `nested_handle_map` (parent_slug, child_slug, vertical) — pre-seeded with the full White Fox / Sonic handle taxonomy from the spec.
+
+**Engine:**
+- Update `seo-collection-engine` to:
+  - emit `shopify_handle = parent-slug/child-slug` when `parent_collection_id` is set,
+  - select voice template by `brand_voice_style`,
+  - apply White Fox **6-part description formula** (`hook | sub-types | features | fit/body | cross-sell | utility`) for `aspirational_youth` and `local_warmth`,
+  - keep ICONIC 5-part formula for `professional_editorial`.
+
+## Phase B — Colour & occasion detectors
+
+New edge function `seo-collection-detector`:
+- **Colour pass:** scan products in each parent type collection for the 32-colour vocabulary (Black, White, Navy, Cream, Beige, Tan, Floral, Animal, etc.); when ≥5 solid / ≥3 print → suggest a colour child collection nested under the parent.
+- **Occasion pass:** scan tags + titles + descriptions for the universal/CLOTHING/SWIMWEAR/FOOTWEAR occasion sets in the spec; ≥5 matches → suggest occasion collection.
+- **Trend pass:** scan against quarterly trend vocabulary; ≥3 matches → `collection_type='trend'` with auto-review-after-90-days flag.
+- **Sale-by-category:** if ≥3 products in a type have `compare_at_price > 0` → emit `/collections/sale/{type}`.
+- **Back in Stock:** ensure one per store; bind to `tag IN ('back-in-stock','restocked','back-soon')`.
+
+Returns batch of `collection_suggestions` rows with the right `parent_collection_id`, `colour_filter`, `occasion_filter`, `trend_signal`.
+
+## Phase C — White Fox brand-intel scraper
+
+Extend `brand-intelligence-crawler` with a Step 7D (CLOTHING-only) that scrapes `whitefoxboutique.com.au/collections/{slug}` via Firecrawl. Captures opening line voice sample, sub-type list, description structure, and trend vocabulary into `brand_intelligence.whitefox_reference`.
+
+Add `whitefox-reference-refresh` edge function (mirror of `iconic-brand-refresh`) and a ⚡ button on CLOTHING brand rows in `/brands`.
+
+## Phase D — UI & competitor reference router
+
+- `/seo-engine`: add filters by `collection_type` (Type / Colour / Occasion / Trend / Sale / Restock) and a "Nested under" column showing parent.
+- `/seo-engine` row action: "Generate child collections" button (runs detector for one parent).
+- New "Voice" selector in store settings page.
+- Engine **decision router**: multi-brand store → ICONIC ref; single-brand DTC → White Fox ref; young fashion boutique → White Fox voice + ICONIC URL depth.
+
+## One-tap action for Splash Swimwear
+
+After Phases A–B deploy, add a "Generate White Fox-style swim collections" button on `/seo-engine` that creates the full nested set from the spec (bikinis, bikini-tops, bikini-bottoms, one-pieces, cover-ups, plus black/floral/navy/white colour children, plus resort-wear / tummy-control / back-in-stock / sale-by-type) for the active Splash store in one go.
 
 ---
 
-## Phase A — Schema + taxonomy + keyword tiers
+**Technical notes:** completeness trigger already auto-recomputes on `collection_seo_outputs` / `collection_link_mesh` / `collection_blog_plans` writes — no change needed. Existing `seo-link-mesh-builder` will pick up new sibling links once colour/occasion children exist (siblings rule already covers same-parent grouping). All edge functions remain Lovable AI Gateway → `gemini-2.5-pro` → `gemini-2.5-flash` fallback.
 
-One migration adds the structural pieces THE ICONIC's model needs:
-
-- `collection_suggestions.shopify_handle` (text) — handle Sonic will push to Shopify, validated unique per `user_id`.
-- `collection_suggestions.taxonomy_level` (smallint 2–6) — drives prompt formula selection.
-- `collection_suggestions.completeness_score` (smallint 0–100) + `completeness_breakdown` (jsonb) — populated by a trigger on every related write.
-- `collection_seo_outputs.faq_html` (text) — rendered FAQ block (4–6 Q/A).
-- `collection_seo_outputs.formula_parts` (jsonb) — stores the 5 description parts separately so we can re-stitch and re-link later without regenerating the model output.
-- `brand_intelligence.iconic_reference` (jsonb) — H1, opening paragraph, sub-collection links, FAQ, top phrases scraped from `theiconic.com.au/{handle}/`.
-- New table `collection_link_mesh` (`source_collection_id`, `target_collection_id`, `link_type` enum sibling/parent/child/occasion/material, `anchor_text`) with RLS scoped to `user_id`.
-- New table `seo_keyword_tiers` (`tier` 1-5, `vertical`, `keyword`, `region`, `placement_hint`) — pre-seeded with the Tier 1–5 list from the spec for FOOTWEAR (Stomp) and SWIMWEAR (Splash).
-- Seed-only insert (via insert tool, not migration) of the keyword tier list and the priority taxonomy rows for Stomp + Splash so the engine has something to plan against on day 1.
-
-## Phase B — Engine rewrite (`seo-collection-engine` v2)
-
-Replace the current single-shot prompt with a deterministic pipeline:
-
-1. **Resolve taxonomy_level** from `collection_type` and handle pattern (Level 2 broad / 3 type / 4 sub-type / 5 brand or brand+cat / 6 occasion).
-2. **Pick keyword tiers by level** per Part 6's mapping (Tier 1→title only, Tier 2→H1+opener, Tier 3→brand opener, Tier 4→Part 4+CTA, Tier 5→Part 2+FAQ).
-3. **Pull link mesh** rows (3–5) per Rules 1–5 in Part 5.
-4. **Pull `iconic_reference`** when level ≥ 5 brand pages.
-5. **Single Gemini 2.5 Pro call** asking for the 5 parts + 4–6 FAQ entries as separate JSON keys (not one HTML blob), plus brand-page variant when `taxonomy_level = 5`.
-6. **Validators** (extend `_shared/seo-validators.ts`):
-   - 200+ word body, 5 distinct part keys present, 3–5 internal links resolve to real handles,
-   - FAQ has 4–6 entries, each answer 30–80 words,
-   - banned phrases, local signal, keyword-in-first-12-words rules retained,
-   - brand-page variant must mention founding year + ≥2 sub-collection links.
-7. **Stitch** parts → `description_html` and FAQ → `faq_html` server-side; persist parts in `formula_parts` for reassembly.
-
-## Phase C — Link mesh + FAQ + ICONIC crawler
-
-- `seo-link-mesh-builder` edge function — given a `user_id`, recomputes `collection_link_mesh` from the user's `collection_suggestions` by applying Rules 1–5. Idempotent; safe to re-run after each new collection.
-- Extend `brand-intelligence-crawler` Step 7B → 7C: also fetch `https://www.theiconic.com.au/{slug}/` for FOOTWEAR brands using Firecrawl (`formats: ['markdown','links']`), extract H1, first 2 sentences, sub-collection links containing the brand slug, any Q/A pairs in markdown, and the top 10 phrases by frequency. Store in `brand_intelligence.iconic_reference`.
-- `seo-collection-engine` writes FAQ to `faq_html` and (best-effort) pushes to Shopify as a metafield `seo.faq_content` via existing `getValidShopifyToken` + `metafieldsSet` mutation. Failure to push does not block local save.
-
-## Phase D — Completeness scoring + admin UX
-
-- DB trigger on `collection_seo_outputs` and `collection_blog_plans` recomputes `collection_suggestions.completeness_score` using the 7-element rubric from Part 8.
-- `/seo-engine` page gains:
-  - taxonomy_level column,
-  - completeness badge (red/amber/green) per row,
-  - "Complete SEO" button per row that, for any score < 80, runs `seo-collection-engine` and `seo-rules-validator` in sequence to fill missing parts,
-  - filter chips: All / Incomplete / Partial / Complete.
-- New `/seo-link-mesh` page lists each collection with its outbound + inbound links and a "Rebuild mesh" button calling `seo-link-mesh-builder`.
-
-## Out of scope this round
-
-- Auto-creating Shopify collections from the taxonomy (Sonic will still suggest — push-to-Shopify stays a separate confirm step).
-- Multi-language / hreflang.
-- Automated detection of new ICONIC URL slugs we haven't pre-mapped.
-
-## Build order
-
-1. Phase A migration → seed keyword tiers + Stomp/Splash priority taxonomy.
-2. Phase B engine rewrite + validators (deploy + smoke test on one row).
-3. Phase C mesh builder + crawler upgrade (deploy + run once for Stomp).
-4. Phase D scoring trigger + UI updates.
-
-Reply **go** to start Phase A, or name a different starting phase.
+Reply **continue** to start Phase A.

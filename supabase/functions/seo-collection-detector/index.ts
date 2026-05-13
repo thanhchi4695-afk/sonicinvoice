@@ -347,8 +347,11 @@ Deno.serve(async (req) => {
         else if (kind === "gemstone") { title = `${titleCase(value)} ${parent}`;            collection_type = "gemstone"; }
         else                          { title = `${titleCase(value)} ${parent}`;            collection_type = "trend"; }
 
-        // Niche-keyword guard (Megantic Innovation 2): block standalone broad keywords as title
-        if (BROAD_BLOCKLIST.has(title.toLowerCase().trim())) continue;
+        // Niche-keyword guard (Megantic Innovation 2): block standalone broad keywords as title.
+        // Skip for jewellery_type/metal/gemstone — those titles are intentionally
+        // the canonical type word (e.g. /collections/necklaces is the legit type page).
+        if (kind !== "jewellery_type" && kind !== "metal" && kind !== "gemstone"
+            && BROAD_BLOCKLIST.has(title.toLowerCase().trim())) continue;
 
         suggestions.push({
           user_id: userId,

@@ -79,12 +79,30 @@ function safeParseJson(raw: string): any {
 }
 
 function stitchDescription(parts: any, isBrandPage: boolean, voice: VoiceStyle): string {
+  // Louenhide brand page (aussie_accessible + isBrandPage) — dedicated 4-part schema
+  if (isBrandPage && voice === "aussie_accessible") {
+    return [
+      `<p>${parts.lh_brisbane_origin ?? parts.brand_origin ?? ""}</p>`,
+      `<p>${parts.lh_mission ?? parts.brand_seasonal ?? ""}</p>`,
+      `<p>${parts.lh_keyword_repetition ?? parts.brand_authority ?? ""}</p>`,
+      `<p>${parts.lh_collection_link_out ?? parts.brand_sub_links ?? ""}</p>`,
+    ].join("\n");
+  }
   if (isBrandPage) {
     return [
       `<p>${parts.brand_origin ?? ""}</p>`,
       `<p>${parts.brand_seasonal ?? ""}</p>`,
       `<p>${parts.brand_authority ?? ""}</p>`,
       `<p>${parts.brand_sub_links ?? ""}</p>`,
+    ].join("\n");
+  }
+  // David Jones 4-part (luxury_authority on ACCESSORIES collection page)
+  if (voice === "luxury_authority") {
+    return [
+      `<p>${parts.dj_authority_opener ?? parts.part1_opener ?? ""}</p>`,
+      `<p>${parts.dj_occasion_material ?? parts.part2_materials ?? ""}</p>`,
+      `<p>${parts.dj_faq_prose ?? parts.part4_styling ?? ""}</p>`,
+      `<p>${parts.dj_sub_collection_links ?? parts.part5_links ?? ""}</p>`,
     ].join("\n");
   }
   if (voice === "aspirational_youth" || voice === "local_warmth") {
@@ -177,7 +195,17 @@ function normaliseMeta(meta: string, storeName: string, storeCity: string | null
 function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: VoiceStyle, primaryKeyword: string, storeName: string, storeCity: string | null): Record<string, string> {
   const out = { ...parts };
   const usesWfFormula = voice === "aspirational_youth" || voice === "local_warmth";
-  const slot = isBrandPage ? "brand_authority" : usesWfFormula ? "wf_utility" : "part4_styling";
+  const usesLouenhideBrand = isBrandPage && voice === "aussie_accessible";
+  const usesDavidJones = !isBrandPage && voice === "luxury_authority";
+  const slot = usesLouenhideBrand
+    ? "lh_keyword_repetition"
+    : usesDavidJones
+    ? "dj_faq_prose"
+    : isBrandPage
+    ? "brand_authority"
+    : usesWfFormula
+    ? "wf_utility"
+    : "part4_styling";
   const fillers = voice === "aussie_accessible"
     ? [
         `Whether you're ${storeCity ? `shopping in ${storeCity}` : "browsing online"} or grabbing a last-minute gift, our ${primaryKeyword} are built for real life — designed to carry everything you need without the fuss.`,
@@ -613,7 +641,25 @@ function buildPrompt(opts: {
     .map((k) => `  - T${k.tier} (${k.placement_hint ?? ""}) ${k.keyword}`)
     .join("\n");
 
-  const formulaSchema = isBrandPage
+  // Dedicated schemas for the two ACCESSORIES competitor playbooks.
+  const useLouenhideBrand = isBrandPage && voice === "aussie_accessible";
+  const useDavidJonesCol  = !isBrandPage && voice === "luxury_authority" && vertical === "ACCESSORIES";
+
+  const formulaSchema = useLouenhideBrand
+    ? `{
+  "lh_brisbane_origin": "2 sentences. Sentence 1 names the brand and its Brisbane (or actual home-city) founding story with a year. Sentence 2 names the founder's intent.",
+  "lh_mission": "2 sentences on the brand mission — accessible everyday luxury, considered design, vegan-friendly materials. No fluff, plain Aussie tone.",
+  "lh_keyword_repetition": "3-4 sentences. The exact primary keyword (brand + product type, e.g. 'louenhide crossbody bag') must appear at least 3 times naturally across these sentences. Cover sub-types, materials, occasions.",
+  "lh_collection_link_out": "1-2 sentences containing 3-5 inline <a href='/collections/{handle}'>{title}</a> links picked ONLY from the RELATED COLLECTIONS list, ending with a friendly CTA to ${storeName}."
+}`
+    : useDavidJonesCol
+    ? `{
+  "dj_authority_opener": "2 sentences (~45 words). Sentence 1 leads with curatorial authority ('At ${storeName}, our edit of ${primaryKeyword} brings together…') and contains the primary keyword. Sentence 2 names the breadth of brands/styles in the edit.",
+  "dj_occasion_material": "2 sentences (~50 words) loading occasion language (workwear, evening, weekend, race day, wedding) and materiality (Italian leather, vegan leather, suede, canvas) in the same passage.",
+  "dj_faq_prose": "3-4 sentences answering the top customer questions in flowing prose (not Q&A) — sizing, care, what's included, delivery — written for a premium reader.",
+  "dj_sub_collection_links": "1-2 sentences containing 3-5 inline <a href='/collections/{handle}'>{title}</a> links chosen ONLY from the RELATED COLLECTIONS list, ending with a refined CTA."
+}`
+    : isBrandPage
     ? `{
   "brand_origin": "2 sentences with founding year and origin",
   "brand_seasonal": "2-3 sentences naming summer + winter product types",

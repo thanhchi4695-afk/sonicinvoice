@@ -140,9 +140,19 @@ function CollectionsInner() {
     }
   }
 
-  async function generate(id: string) {
-    setGenerating(id);
+  async function runDetector() {
+    setDetecting(true);
     try {
+      const { data, error } = await supabase.functions.invoke("seo-collection-detector", { body: {} });
+      if (error) throw error;
+      toast.success(`Detector wrote ${data.suggestions_written ?? 0} colour/occasion/trend collections from ${data.products_scanned ?? 0} products`);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Detector failed");
+    } finally {
+      setDetecting(false);
+    }
+  }
       const { data, error } = await supabase.functions.invoke("collection-content-generator", { body: { suggestion_id: id } });
       if (error) throw error;
       const r = data?.results?.[0];

@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.shopify-webhook-products]
 verify_jwt = false
 
+[functions.collection-intelligence-cron]
+verify_jwt = false
+
 [functions.shopify-auth-callback]
 verify_jwt = false
 

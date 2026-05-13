@@ -758,6 +758,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
         availableSizes: product.sizes ?? [],
         selectedColors: product.colors ?? [],
         selectedSizes: product.sizes ?? [],
+        variantQuantities: {},
       });
       toast.success("Product details fetched — review and edit before adding");
     } catch (err) {

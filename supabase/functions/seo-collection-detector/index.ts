@@ -232,11 +232,30 @@ Deno.serve(async (req) => {
       if (giftBuckets[key].sample_ids.length < 5) giftBuckets[key].sample_ids.push(productId);
     }
 
+    // Infer a parent product_type from the title for jewellery items that
+    // have an empty product_type — otherwise they get silently skipped and
+    // every JEWELLERY/gifting branch goes dormant for those rows.
+    function inferJewelleryParent(title: string): string | null {
+      const t = (title || "").toLowerCase();
+      if (/\bnecklace|pendant|chain|choker\b/.test(t)) return "Necklaces";
+      if (/\bearring|earrings|hoop|hoops|stud|studs|huggie\b/.test(t)) return "Earrings";
+      if (/\bbracelet|bangle|cuff|tennis\b/.test(t)) return "Bracelets";
+      if (/\bring\b/.test(t) && !/ring front|ring-front|ring detail|o-ring|o ring/.test(t)) return "Rings";
+      if (/\banklet\b/.test(t)) return "Anklets";
+      if (/\bcharm\b/.test(t)) return "Charms";
+      return null;
+    }
+
     for (const p of rows) {
-      const parent = (p.product_type || "").trim();
-      if (!parent) continue;
-      const text = `${p.title ?? ""} ${p.description ?? ""}`;
+      let parent = (p.product_type || "").trim();
       const vendor = (p as any).vendor ?? "";
+      const title = p.title ?? "";
+      if (!parent) {
+        const inferred = inferJewelleryParent(title);
+        if (!inferred) continue;
+        parent = inferred;
+      }
+      const text = `${title} ${p.description ?? ""}`;
 
       for (const c of detectIn(text, COLOURS)) bump(parent, `colour:${c}`, p.id);
       for (const o of detectMap(text, OCCASIONS)) bump(parent, `occasion:${o}`, p.id);
@@ -250,11 +269,10 @@ Deno.serve(async (req) => {
       }
 
       // JEWELLERY — type / metal / gemstone / gifting
-      if (isJewelleryVertical(parent, vendor, p.title ?? "")) {
+      if (isJewelleryVertical(parent, vendor, title)) {
         for (const jt of detectMap(text, JEWELLERY_TYPES)) bump(parent, `jewellery_type:${jt}`, p.id);
         for (const m of detectMap(text, JEWELLERY_METALS)) bump(parent, `metal:${m}`, p.id);
         for (const g of detectMap(text, JEWELLERY_GEMSTONES)) bump(parent, `gemstone:${g}`, p.id);
-        // Gifting signals (any jewellery product is potentially giftable)
         for (const r of detectMap(text, GIFT_RECIPIENTS)) gbump("recipient", r, p.id);
         for (const o of detectMap(text, GIFT_OCCASIONS)) gbump("occasion", o, p.id);
         if (GIFT_SIGNALS.some((s) => text.toLowerCase().includes(s))) gbump("signal", "giftable", p.id);
@@ -329,8 +347,11 @@ Deno.serve(async (req) => {
         else if (kind === "gemstone") { title = `${titleCase(value)} ${parent}`;            collection_type = "gemstone"; }
         else                          { title = `${titleCase(value)} ${parent}`;            collection_type = "trend"; }
 
-        // Niche-keyword guard (Megantic Innovation 2): block standalone broad keywords as title
-        if (BROAD_BLOCKLIST.has(title.toLowerCase().trim())) continue;
+        // Niche-keyword guard (Megantic Innovation 2): block standalone broad keywords as title.
+        // Skip for jewellery_type/metal/gemstone — those titles are intentionally
+        // the canonical type word (e.g. /collections/necklaces is the legit type page).
+        if (kind !== "jewellery_type" && kind !== "metal" && kind !== "gemstone"
+            && BROAD_BLOCKLIST.has(title.toLowerCase().trim())) continue;
 
         suggestions.push({
           user_id: userId,

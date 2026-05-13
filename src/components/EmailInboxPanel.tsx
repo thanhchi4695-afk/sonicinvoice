@@ -414,6 +414,57 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     }
   };
 
+  const handleRescanOne = async (c: ProviderConnection) => {
+    setRescanningId(c.id);
+    setRowErrors(prev => ({ ...prev, [c.id]: null }));
+    try {
+      const fn = c.provider === "gmail" ? "scan-gmail-inbox" : c.provider === "outlook" ? "scan-outlook-inbox" : "scan-imap-inbox";
+      const { data, error } = await supabase.functions.invoke(fn, {
+        body: { connection_id: c.id, email_address: c.email_address },
+      });
+      if (error) throw error;
+      const d: any = data;
+      const accountErr = d?.error
+        ?? (Array.isArray(d?.errors) ? d.errors.find((e: any) => !e?.email || e.email?.toLowerCase() === c.email_address.toLowerCase())?.error : null)
+        ?? (Array.isArray(d?.errors) && d.errors.length ? d.errors[0]?.error : null);
+      if (accountErr) {
+        setRowErrors(prev => ({ ...prev, [c.id]: String(accountErr) }));
+        toast({ title: `Rescan failed: ${c.email_address}`, description: String(accountErr), variant: "destructive" });
+      } else {
+        const scanned = d?.emails_scanned ?? 0;
+        const found = d?.invoices_found?.length ?? 0;
+        toast({ title: `Rescanned ${c.email_address}`, description: `${scanned} email(s), ${found} with attachments` });
+        addAuditEntry("Email", `Rescanned ${c.email_address} — ${scanned} email(s), ${found} with invoice attachments`);
+      }
+      await Promise.all([loadConnection(), loadFoundInvoices()]);
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      setRowErrors(prev => ({ ...prev, [c.id]: msg }));
+      toast({ title: `Rescan failed: ${c.email_address}`, description: msg, variant: "destructive" });
+    } finally {
+      setRescanningId(null);
+    }
+  };
+
+  const handleEditConn = (c: ProviderConnection) => {
+    if (c.provider !== "imap") return;
+    const host = (c.imap_host ?? "").trim();
+    let provider: typeof yahooProvider = "custom";
+    if (host.includes("yahoo")) provider = "yahoo";
+    else if (host.includes("me.com") || host.includes("icloud")) provider = "icloud";
+    else if (host.includes("office365") || host.includes("outlook")) provider = "outlook";
+    else if (host.includes("gmail")) provider = "gmail";
+    else if (host.includes("ventraip")) provider = "ventraip";
+    else if (host.includes("fastmail")) provider = "fastmail";
+    setYahooProvider(provider);
+    setYahooEmail(c.email_address);
+    setYahooHost(host);
+    setYahooPort(String(c.imap_port ?? 993));
+    setYahooPassword("");
+    setEditingConnId(c.id);
+    setShowYahooModal(true);
+  };
+
   const handleProcess = async (item: InboxItem, options: { skipSupplierPrompt?: boolean } = {}): Promise<boolean> => {
     // Auto-learn: if this is an unknown Gmail sender, ask whether to save the
     // domain to a supplier profile so future emails are tagged KNOWN.

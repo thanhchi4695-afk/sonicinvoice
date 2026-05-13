@@ -10,7 +10,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const MAX_MESSAGES_PER_SCAN = 250;
+const MAX_MESSAGES_PER_SCAN = 500;
 const PAGE_SIZE = 50;
 // 180 days ago in ISO 8601
 const since = () => new Date(Date.now() - 180 * 24 * 3600 * 1000).toISOString();

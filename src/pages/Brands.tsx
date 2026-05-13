@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Loader2, RefreshCw, Plus, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, RefreshCw, Plus, CheckCircle2, AlertCircle, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 type Vertical = "FOOTWEAR" | "SWIMWEAR" | "CLOTHING" | "ACCESSORIES" | "LIFESTYLE";

@@ -415,6 +415,12 @@ export default function Brands() {
                     {crawlingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
                     Re-crawl
                   </Button>
+                  {selected.industry_vertical === "FOOTWEAR" && (
+                    <Button variant="secondary" onClick={() => refreshIconic(selected.id, selected.brand_name)} disabled={iconicRefreshingId === selected.id}>
+                      {iconicRefreshingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+                      Refresh ICONIC
+                    </Button>
+                  )}
                   <Button variant="outline" onClick={() => toggleVerified(selected)}>
                     {selected.manually_verified ? "Unverify" : "Mark verified"}
                   </Button>
@@ -422,6 +428,53 @@ export default function Brands() {
                     Remove
                   </Button>
                 </div>
+                {selected.iconic_reference && (
+                  <div className="border-t pt-3 mt-2">
+                    <div className="text-xs uppercase text-muted-foreground mb-2 flex items-center gap-1">
+                      <Zap className="h-3 w-3 text-amber-500" /> ICONIC Reference
+                      <span className="text-muted-foreground normal-case">{selected.iconic_reference.captured_at ? ` · ${new Date(selected.iconic_reference.captured_at).toLocaleDateString()}` : ""}</span>
+                    </div>
+                    {selected.iconic_reference.h1 && (
+                      <div className="mb-2"><span className="text-xs text-muted-foreground">H1:</span> <span className="font-medium">{selected.iconic_reference.h1}</span></div>
+                    )}
+                    {selected.iconic_reference.opening_copy && (
+                      <div className="mb-2 text-muted-foreground italic">{selected.iconic_reference.opening_copy}</div>
+                    )}
+                    {selected.iconic_reference.sub_collection_links?.length > 0 && (
+                      <div className="mb-2">
+                        <div className="text-xs text-muted-foreground mb-1">Sub-collections ({selected.iconic_reference.sub_collection_links.length})</div>
+                        <div className="flex flex-wrap gap-1">
+                          {selected.iconic_reference.sub_collection_links.slice(0, 8).map((u: string, i: number) => (
+                            <Badge key={i} variant="outline" className="text-xs">{u.split("/").pop() || u}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selected.iconic_reference.faq_pairs?.length > 0 && (
+                      <div className="mb-2">
+                        <div className="text-xs text-muted-foreground mb-1">FAQ ({selected.iconic_reference.faq_pairs.length})</div>
+                        <div className="space-y-1">
+                          {selected.iconic_reference.faq_pairs.slice(0, 3).map((p: any, i: number) => (
+                            <div key={i} className="text-xs bg-muted/30 p-1.5 rounded">
+                              <div className="font-medium">{p.q}</div>
+                              <div className="text-muted-foreground">{p.a}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selected.iconic_reference.top_phrases?.length > 0 && (
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Top phrases</div>
+                        <div className="flex flex-wrap gap-1">
+                          {selected.iconic_reference.top_phrases.slice(0, 6).map((p: any, i: number) => (
+                            <Badge key={i} variant="secondary" className="text-xs">{p.phrase}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}

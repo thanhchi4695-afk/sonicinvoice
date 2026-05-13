@@ -444,6 +444,8 @@ Deno.serve(async (req) => {
       } catch (e) {
         console.warn("iconic reference fetch failed", e);
       }
+    }
+
     const confidence = scoreConfidence(extracted);
     await supabase.from("brand_intelligence").update({
       competitor_reference_styletread: styletreadRef,

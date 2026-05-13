@@ -1561,6 +1561,7 @@ export type Database = {
           meta_description: string | null
           refreshed_at: string
           rules_status: string | null
+          rules_validated_at: string | null
           rules_validated_count: number | null
           seo_title: string | null
           smart_rules_json: Json | null
@@ -1578,6 +1579,7 @@ export type Database = {
           meta_description?: string | null
           refreshed_at?: string
           rules_status?: string | null
+          rules_validated_at?: string | null
           rules_validated_count?: number | null
           seo_title?: string | null
           smart_rules_json?: Json | null
@@ -1595,6 +1597,7 @@ export type Database = {
           meta_description?: string | null
           refreshed_at?: string
           rules_status?: string | null
+          rules_validated_at?: string | null
           rules_validated_count?: number | null
           seo_title?: string | null
           smart_rules_json?: Json | null

@@ -1,0 +1,3 @@
+ALTER TABLE public.collection_seo_outputs DROP CONSTRAINT IF EXISTS collection_seo_outputs_rules_status_check;
+ALTER TABLE public.collection_seo_outputs ADD CONSTRAINT collection_seo_outputs_rules_status_check CHECK (rules_status IN ('pending','validated','insufficient','error','ok','empty','needs_review'));
+ALTER TABLE public.collection_seo_outputs ADD COLUMN IF NOT EXISTS rules_validated_at timestamptz;

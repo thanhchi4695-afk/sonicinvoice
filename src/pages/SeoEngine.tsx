@@ -22,6 +22,7 @@ interface Output {
   meta_description: string | null;
   status: string;
   rules_status: string;
+  rules_validated_count?: number | null;
   validation_errors: any;
 }
 
@@ -49,11 +50,24 @@ export default function SeoEngine() {
     setSuggestions((s ?? []) as Suggestion[]);
     const { data: o } = await supabase
       .from("collection_seo_outputs")
-      .select("suggestion_id,layer,seo_title,meta_description,status,rules_status,validation_errors");
+      .select("suggestion_id,layer,seo_title,meta_description,status,rules_status,rules_validated_count,validation_errors");
     const m: Record<string, Output> = {};
     (o ?? []).forEach((row: any) => { m[row.suggestion_id] = row; });
     setOutputs(m);
     setLoading(false);
+  }
+
+  async function validateRules(ids?: string[]) {
+    try {
+      const { data, error } = await supabase.functions.invoke("seo-rules-validator", {
+        body: ids?.length ? { suggestion_ids: ids } : { limit: 25 },
+      });
+      if (error) throw error;
+      toast({ title: "Rules validated", description: `${data?.results?.length ?? 0} checked` });
+      await load();
+    } catch (e: any) {
+      toast({ title: "Validation failed", description: String(e?.message || e), variant: "destructive" });
+    }
   }
 
   async function generate(id: string) {
@@ -111,6 +125,9 @@ export default function SeoEngine() {
             <Button onClick={generateAll} disabled={!!running}>
               Generate all missing
             </Button>
+            <Button variant="outline" onClick={() => validateRules()}>
+              Validate rules
+            </Button>
           </div>
         </header>
 
@@ -141,6 +158,7 @@ export default function SeoEngine() {
                   <th className="p-2">SEO Title (chars)</th>
                   <th className="p-2">Meta (chars)</th>
                   <th className="p-2">Status</th>
+                  <th className="p-2">Rules</th>
                   <th className="p-2">Action</th>
                 </tr>
               </thead>
@@ -181,6 +199,20 @@ export default function SeoEngine() {
                         )}
                       </td>
                       <td className="p-2">
+                        {o ? (
+                          <Badge
+                            variant={
+                              o.rules_status === "validated" ? "secondary"
+                              : o.rules_status === "insufficient" ? "destructive"
+                              : o.rules_status === "error" ? "destructive"
+                              : "outline"
+                            }
+                          >
+                            {o.rules_status}{typeof o.rules_validated_count === "number" ? ` · ${o.rules_validated_count}` : ""}
+                          </Badge>
+                        ) : "—"}
+                      </td>
+                      <td className="p-2 space-x-1">
                         <Button
                           size="sm"
                           variant="outline"
@@ -189,6 +221,11 @@ export default function SeoEngine() {
                         >
                           {running === s.id ? "Generating…" : o ? "Regenerate" : "Generate"}
                         </Button>
+                        {o && (
+                          <Button size="sm" variant="ghost" onClick={() => validateRules([s.id])}>
+                            Validate
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   );

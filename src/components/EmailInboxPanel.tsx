@@ -1214,16 +1214,22 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                                   {statusBadge(item.status)}
                                 </div>
                               </div>
-                              <div className="shrink-0">
-                                {(item.status === "queued" || item.status === "ready") && (
+                              <div className="shrink-0 flex items-center gap-1.5">
+                                {item.status === "processing" && (
+                                  <span className="text-[10px] text-primary font-medium inline-flex items-center gap-1">
+                                    <Loader2 className="w-3 h-3 animate-spin" /> Processing…
+                                  </span>
+                                )}
+                                {item.status !== "processing" && item.status !== "done" && (
                                   <Button size="sm" variant="teal" className="h-7 text-xs" onClick={() => handleProcess(item)}>
                                     Process →
                                   </Button>
                                 )}
-                                {item.status === "done" && (
-                                  item.imported ? (
-                                    <span className="text-[10px] text-success font-medium">✓ Imported to Shopify</span>
-                                  ) : item.parseJobId ? (
+                                {item.status === "done" && item.imported && (
+                                  <span className="text-[10px] text-success font-medium">✓ Imported to Shopify</span>
+                                )}
+                                {item.status === "done" && !item.imported && item.parseJobId && (
+                                  <>
                                     <Button
                                       size="sm"
                                       variant="teal"
@@ -1236,9 +1242,27 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                                         ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Importing…</>
                                         : <>Import to Shopify{item.parsedVariantCount ? ` (${item.parsedVariantCount})` : ""}</>}
                                     </Button>
-                                  ) : (
-                                    <span className="text-[10px] text-muted-foreground">✓ Done</span>
-                                  )
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      onClick={() => handleProcess(item)}
+                                      title="Re-run the parser on this email"
+                                    >
+                                      Re-parse
+                                    </Button>
+                                  </>
+                                )}
+                                {item.status === "done" && !item.imported && !item.parseJobId && (
+                                  <Button
+                                    size="sm"
+                                    variant="teal"
+                                    className="h-7 text-xs"
+                                    onClick={() => handleProcess(item)}
+                                    title="No parse result saved yet — click to parse this invoice"
+                                  >
+                                    Process →
+                                  </Button>
                                 )}
                               </div>
                             </div>

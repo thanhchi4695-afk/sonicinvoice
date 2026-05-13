@@ -154,7 +154,13 @@ export interface ImportedLineItem {
   sourceUrl: string;
   colors?: string[];
   sizes?: string[];
+  /** Per-variant stock quantities, keyed `${colour}||${size}` (empty string if dimension absent). */
+  variantQuantities?: Record<string, number>;
 }
+
+/** Build the canonical key for variantQuantities lookups. */
+export const variantQtyKey = (colour: string, size: string): string =>
+  `${colour ?? ""}||${size ?? ""}`;
 
 export interface ExtractedProduct {
   name?: string;

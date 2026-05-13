@@ -14,7 +14,7 @@ interface LastScan {
   suggestions_created: number | null;
   archive_candidates: number | null;
   completed_at: string | null;
-  created_at: string;
+  started_at: string;
 }
 
 function timeAgo(iso: string | null): string {

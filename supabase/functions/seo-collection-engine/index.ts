@@ -107,7 +107,13 @@ function stitchDescription(parts: any, isBrandPage: boolean, voice: VoiceStyle):
   ].join("\n");
 }
 
-type VoiceStyle = "aspirational_youth" | "professional_editorial" | "local_warmth" | "luxury_refined";
+type VoiceStyle =
+  | "aspirational_youth"
+  | "professional_editorial"
+  | "local_warmth"
+  | "luxury_refined"
+  | "luxury_authority"   // David Jones
+  | "aussie_accessible"; // Louenhide / Megantic
 
 function stitchFaqHtml(faq: Array<{ q: string; a: string }>): string {
   return [

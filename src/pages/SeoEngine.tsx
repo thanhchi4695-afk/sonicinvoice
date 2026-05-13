@@ -125,6 +125,9 @@ export default function SeoEngine() {
             <Button onClick={generateAll} disabled={!!running}>
               Generate all missing
             </Button>
+            <Button variant="outline" onClick={() => validateRules()}>
+              Validate rules
+            </Button>
           </div>
         </header>
 

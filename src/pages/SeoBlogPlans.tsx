@@ -98,6 +98,26 @@ export default function SeoBlogPlans() {
                 {p.status === "plan" && (
                   <Button size="sm" disabled={busy === p.id} onClick={() => approve(p)}>Approve</Button>
                 )}
+                {p.status === "approved" && (
+                  <Button size="sm" disabled={busy === p.id} onClick={() => generate(p)}>
+                    {busy === p.id ? "Generating…" : "Generate post"}
+                  </Button>
+                )}
+                {p.status === "generated" && p.generated_html && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const w = window.open("", "_blank");
+                      if (w) {
+                        w.document.write(`<!doctype html><meta charset="utf-8"><title>${p.title}</title><body style="max-width:720px;margin:2rem auto;font-family:system-ui;padding:0 1rem">${p.generated_html}</body>`);
+                        w.document.close();
+                      }
+                    }}
+                  >
+                    Preview
+                  </Button>
+                )}
               </div>
             </div>
           </Card>

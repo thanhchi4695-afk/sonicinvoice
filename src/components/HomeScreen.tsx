@@ -504,10 +504,7 @@ const HomeScreen = ({
         <FeatureTile icon="🚀" label="Google Ads setup" onClick={onStartGoogleAdsSetup} />
         <FeatureTile icon="📱" label="Meta Ads setup" onClick={onStartMetaAdsSetup} />
         <FeatureTile icon="📊" label="Performance" onClick={onStartPerformance} />
-        <FeatureTile icon="📈" label="Organic SEO" onClick={onStartOrganicSEO} />
-        <FeatureTile icon="🗂️" label="Collection SEO" onClick={onStartCollectionSEO} />
         <FeatureTile icon="🤖" label="GEO & Agentic" onClick={onStartGeoAgentic} />
-        <FeatureTile icon="🤝" label="Collab SEO" onClick={onStartCollabSEO} />
         <FeatureTile icon="🔎" label="Competitor intel" onClick={onStartCompetitorIntel} />
         <FeatureTile icon="💰" label="Price monitor" onClick={() => onNavigateToTab?.("tools")} />
         <FeatureTile icon="📣" label="Social media" onClick={onStartSocialMedia} />

@@ -81,4 +81,13 @@ Same order you approved for David Jones rounds — taxonomy → keyword library 
 - `seo-collection-engine`: added `gwg_meaningful` voice + three new schemas (`gwg_brand_page`, `gwg_edits`, `gwg_intersection`) wired into `stitchDescription`, `extendBody`, `formulaSchema`. Niche-keyword guard extended to JEWELLERY. Edge function deployed.
 - Edit URL persistence rule already lives in the Louenhide/Megantic shipped logic — applies to GWG Edits without further changes.
 
-Round 2 (keyword library + gifting engine + product title audit) and Round 3 (Splash pre-seed) remain queued per the approved plan.
+## Round 2 status: SHIPPED ✅
+
+- **Keyword library** — 66 JEWELLERY rows seeded across high_volume, type_specific, brand_long_tail, local (Double Bay/Sydney/Darwin), metal, gemstone, style, theme, occasion, and a dedicated **gifting** tier (recipient/occasion/price-band/luxury).
+- **Gifting auto-generation** in `seo-collection-detector` — JEWELLERY vertical detection (brands + type + title), new vocab (JEWELLERY_TYPES/METALS/GEMSTONES, GIFT_RECIPIENTS/OCCASIONS/SIGNALS), and a gifting bucket loop emitting `gifts/jewellery-for-{recipient}`, `gifts/{occasion}-jewellery`, and `gifts/giftable-jewellery` with `collection_type='gifting'` (≥3 products).
+- **Product title audit** in `_shared/product-seo-optimiser.ts` — `isJewelleryVendor`, `detectJewelleryType`, `detectMetal` helpers + a JEWELLERY branch in `optimiseProductSeo` enforcing `{Brand} {Style Name} {Metal} {Jewellery Type}`, raising `no_jewellery_type_detected` / `no_metal_detected` audit flags, and writing a 4-paragraph jewellery body when copy is missing.
+- Both edge functions redeployed (`seo-collection-detector`, `publishing-agent`).
+
+## Round 3 — deferred
+
+Splash Swimwear Darwin pre-seed still blocked on `user_id` / store connection (same blocker as Stomp).

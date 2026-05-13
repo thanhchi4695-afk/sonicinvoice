@@ -721,6 +721,90 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_intelligence: {
+        Row: {
+          blog_sample_titles: Json | null
+          blog_topics_used: Json | null
+          brand_domain: string | null
+          brand_name: string
+          brand_tone: string | null
+          brand_tone_sample: string | null
+          category_vocabulary: Json | null
+          collection_nav_urls: Json | null
+          collection_structure_type: string | null
+          competitor_urls: Json | null
+          crawl_confidence: number | null
+          crawl_error: string | null
+          crawl_status: string
+          created_at: string
+          id: string
+          last_crawled_at: string | null
+          manually_verified: boolean
+          pages_fetched: number | null
+          print_story_names: Json | null
+          seo_primary_keyword: string | null
+          seo_secondary_keywords: Json | null
+          subcategory_list: Json | null
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          blog_sample_titles?: Json | null
+          blog_topics_used?: Json | null
+          brand_domain?: string | null
+          brand_name: string
+          brand_tone?: string | null
+          brand_tone_sample?: string | null
+          category_vocabulary?: Json | null
+          collection_nav_urls?: Json | null
+          collection_structure_type?: string | null
+          competitor_urls?: Json | null
+          crawl_confidence?: number | null
+          crawl_error?: string | null
+          crawl_status?: string
+          created_at?: string
+          id?: string
+          last_crawled_at?: string | null
+          manually_verified?: boolean
+          pages_fetched?: number | null
+          print_story_names?: Json | null
+          seo_primary_keyword?: string | null
+          seo_secondary_keywords?: Json | null
+          subcategory_list?: Json | null
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          blog_sample_titles?: Json | null
+          blog_topics_used?: Json | null
+          brand_domain?: string | null
+          brand_name?: string
+          brand_tone?: string | null
+          brand_tone_sample?: string | null
+          category_vocabulary?: Json | null
+          collection_nav_urls?: Json | null
+          collection_structure_type?: string | null
+          competitor_urls?: Json | null
+          crawl_confidence?: number | null
+          crawl_error?: string | null
+          crawl_status?: string
+          created_at?: string
+          id?: string
+          last_crawled_at?: string | null
+          manually_verified?: boolean
+          pages_fetched?: number | null
+          print_story_names?: Json | null
+          seo_primary_keyword?: string | null
+          seo_secondary_keywords?: Json | null
+          subcategory_list?: Json | null
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       brand_lookup_misses: {
         Row: {
           id: string

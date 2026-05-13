@@ -36,6 +36,7 @@ const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleS
 const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx"));
 const FeedHealthPanel = lazy(() => import("./components/FeedHealthPanel.tsx"));
 const Collections = lazy(() => import("./pages/Collections.tsx"));
+const Brands = lazy(() => import("./pages/Brands.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -82,6 +83,7 @@ const App = () => (
                   <Route path="/rules" element={<Rules />} />
                   <Route path="/rules/setup" element={<RulesSetup />} />
                   <Route path="/collections" element={<Suspense fallback={null}><Collections /></Suspense>} />
+                  <Route path="/brands" element={<Suspense fallback={null}><Brands /></Suspense>} />
                   <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
                   <Route

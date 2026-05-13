@@ -71,19 +71,31 @@ export default function Brands() {
   const [selected, setSelected] = useState<BrandRow | null>(null);
   const [newName, setNewName] = useState("");
   const [newDomain, setNewDomain] = useState("");
+  const [verticalFilter, setVerticalFilter] = useState<"ALL" | Vertical>("ALL");
+  const [killSwitch, setKillSwitch] = useState<boolean>(true);
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("brand_intelligence")
-      .select("*")
-      .order("brand_name");
+    const [{ data, error }, { data: settings }] = await Promise.all([
+      supabase.from("brand_intelligence").select("*").order("brand_name"),
+      supabase.from("app_settings").select("brand_intelligence_enabled").maybeSingle(),
+    ]);
     if (error) toast.error(error.message);
     setRows((data as unknown as BrandRow[]) || []);
+    setKillSwitch(settings?.brand_intelligence_enabled !== false);
     setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
+
+  async function toggleKillSwitch() {
+    const next = !killSwitch;
+    setKillSwitch(next);
+    const { error } = await supabase.from("app_settings").update({ brand_intelligence_enabled: next }).neq("id", "00000000-0000-0000-0000-000000000000");
+    if (error) { toast.error(error.message); setKillSwitch(!next); return; }
+    toast.success(`Brand intelligence ${next ? "enabled" : "paused"}`);
+  }
+
 
   async function ensureSeedRow(name: string, domain: string) {
     const existing = rows.find((r) => r.brand_name.toLowerCase() === name.toLowerCase());

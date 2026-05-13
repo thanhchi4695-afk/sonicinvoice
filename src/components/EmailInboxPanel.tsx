@@ -315,9 +315,11 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       });
       if (error) throw error;
       if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "IMAP login failed");
-      toast({ title: `${providerLabel("imap")} connected`, description: yahooEmail.trim() });
-      addAuditEntry("Email", `Connected IMAP (${yahooProvider}): ${yahooEmail.trim()}`);
+      toast({ title: editingConnId ? `${providerLabel("imap")} updated` : `${providerLabel("imap")} connected`, description: yahooEmail.trim() });
+      addAuditEntry("Email", `${editingConnId ? "Updated" : "Connected"} IMAP (${yahooProvider}): ${yahooEmail.trim()}`);
       setShowYahooModal(false);
+      setEditingConnId(null);
+      setRowErrors(prev => editingConnId ? { ...prev, [editingConnId]: null } : prev);
       setYahooEmail(""); setYahooPassword(""); setYahooHost(""); setYahooPort("993");
       await loadConnection();
     } catch (err: any) {

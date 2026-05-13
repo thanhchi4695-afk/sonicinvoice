@@ -427,6 +427,45 @@ Deno.serve(async (req) => {
 
     if (!parsed) return json({ error: "Model parse failure", issues: lastIssues }, 502);
 
+    // ---- Deterministic length normaliser (fixes the 3 chronic length issues
+    //      meta 150-160, body >=200 words, FAQ answers 30-80 words) ----
+    const lengthIssueFields = new Set(
+      lastIssues
+        .filter((i) =>
+          (i.field === "meta_description" && /chars/.test(i.message)) ||
+          (i.field === "description_html" && /words/.test(i.message)) ||
+          (i.field === "faq" && /answer \d+ words/.test(i.message))
+        )
+        .map((i) => i.field),
+    );
+    if (lengthIssueFields.size > 0) {
+      if (lengthIssueFields.has("meta_description")) {
+        parsed.meta_description = normaliseMeta(parsed.meta_description ?? "", storeName, storeCity);
+      }
+      if (lengthIssueFields.has("description_html")) {
+        parsed.formula_parts = extendBody(parsed.formula_parts || {}, isBrandPage, voice, primaryKeyword, storeName, storeCity);
+        parsed.__description_html = stitchDescription(parsed.formula_parts, isBrandPage, voice);
+      }
+      if (lengthIssueFields.has("faq")) {
+        parsed.faq = extendFaq(parsed.faq || [], primaryKeyword, storeName, storeCity);
+      }
+      // Re-validate after normaliser
+      lastIssues = validateSeoOutputV2({
+        seo_title: parsed.seo_title,
+        meta_description: parsed.meta_description,
+        formula_parts: parsed.formula_parts || {},
+        description_html: parsed.__description_html,
+        faq: parsed.faq || [],
+        smart_rules_json: parsed.smart_rules_json,
+      }, {
+        taxonomy_level: level,
+        primary_keyword: primaryKeyword,
+        city: storeCity,
+        is_brand_page: isBrandPage,
+        valid_handles: validHandles,
+      });
+    }
+
     const description_html = parsed.__description_html as string;
     const faq = (parsed.faq ?? []) as Array<{ q: string; a: string }>;
     const faq_html = stitchFaqHtml(faq);

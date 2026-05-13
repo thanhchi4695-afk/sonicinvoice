@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.collection-intelligence-cron]
 verify_jwt = false
 
+[functions.brand-crawl-queue-runner]
+verify_jwt = false
+
 [functions.klaviyo-trigger]
 verify_jwt = false
 

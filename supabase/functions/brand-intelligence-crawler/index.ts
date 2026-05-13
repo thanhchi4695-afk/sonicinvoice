@@ -111,6 +111,8 @@ function extractBlogUrls(links: string[], domain: string): string[] {
 interface ExtractedIntelligence {
   category_vocabulary: Record<string, string>;
   collection_structure_type: string;
+  collection_structure_secondary?: string;
+  collection_nav_structure: Array<{ label: string; children?: string[] }>;
   subcategory_list: string[];
   print_story_names: string[];
   seo_primary_keyword: string;
@@ -118,13 +120,28 @@ interface ExtractedIntelligence {
   brand_tone: string;
   brand_tone_sample: string;
   blog_topics_used: string[];
+  blog_topic_distribution?: Record<string, number>;
   blog_sample_titles: string[];
 }
 
-async function aiExtract(brandName: string, navTitles: string[], blogTitles: string[], toneSample: string): Promise<ExtractedIntelligence> {
-  const prompt = `You analyse fashion/swimwear brand websites for a retail intelligence system.
+const VERTICAL_CONTEXT: Record<string, string> = {
+  FOOTWEAR: "shoe categories (heels, sandals, boots, sneakers, loafers), heel height, toe shape, material, occasion, comfort technology, gender",
+  SWIMWEAR: "garment type (one piece, bikini top, bikini bottom), silhouette, cup size, function (tummy control, mastectomy, chlorine resistant), print stories, gender",
+  CLOTHING: "garment type (dress, top, pants), dress style (maxi, midi, mini), occasion, fit, fabric",
+  ACCESSORIES: "accessory type (tote, crossbody, clutch, jewellery), material, occasion, size, closure",
+  LIFESTYLE: "product type (candle, diffuser), scent family, size, occasion",
+  MULTI: "multiple product categories — analyse the actual nav to determine dominant ones",
+  UNKNOWN: "any retail category — infer from the nav titles",
+};
+
+const STRUCTURE_OPTIONS = '"silhouette" | "print_story" | "function" | "style_name" | "cup_size" | "technology" | "occasion" | "material" | "gender_age" | "mixed" | "unknown"';
+
+async function aiExtract(brandName: string, vertical: string, navTitles: string[], blogTitles: string[], toneSample: string): Promise<ExtractedIntelligence> {
+  const verticalContext = VERTICAL_CONTEXT[vertical] || VERTICAL_CONTEXT.UNKNOWN;
+  const prompt = `You analyse retail brand websites for a universal retail intelligence system.
 
 Brand: ${brandName}
+Industry vertical: ${vertical} — typical dimensions: ${verticalContext}
 
 Their navigation/collection page titles (extracted from their site):
 ${navTitles.map((t) => `- ${t}`).join("\n") || "(none extracted)"}
@@ -139,22 +156,27 @@ ${toneSample.slice(0, 1200)}
 
 Return STRICT JSON (no prose, no markdown fences) with this exact shape:
 {
-  "category_vocabulary": { "Their exact category name": "Generic equivalent (One Piece | Bikini Top | Bikini Bottom | Swimsuit | Cover Up | Accessory | Other)" },
-  "collection_structure_type": "silhouette" | "print_story" | "function" | "style_name" | "cup_size" | "mixed" | "unknown",
+  "category_vocabulary": { "Their exact category name": "Generic equivalent appropriate for ${vertical}" },
+  "collection_structure_type": ${STRUCTURE_OPTIONS},
+  "collection_structure_secondary": ${STRUCTURE_OPTIONS},
+  "collection_nav_structure": [{"label": "Top-level nav item", "children": ["sub-item 1", "sub-item 2"]}],
   "subcategory_list": ["..."],
   "print_story_names": ["..."],
-  "seo_primary_keyword": "e.g. ${brandName} swimwear Australia",
+  "seo_primary_keyword": "e.g. ${brandName} ${vertical.toLowerCase()} Australia",
   "seo_secondary_keywords": ["...", "..."],
-  "brand_tone": "aspirational" | "edgy" | "functional" | "luxurious" | "inclusive" | "playful" | "unknown",
-  "brand_tone_sample": "50-word excerpt of their voice",
-  "blog_topics_used": ["styling-guide" | "fit-guide" | "sustainability" | "care-guide" | "trend-report" | "brand-story" | "destination" | "other"],
+  "brand_tone": "aspirational" | "edgy" | "functional" | "luxurious" | "inclusive" | "playful" | "technical" | "lifestyle" | "sustainable" | "unknown",
+  "brand_tone_sample": "60-80 word excerpt of their voice",
+  "blog_topics_used": ["styling-guide" | "fit-guide" | "sizing-guide" | "sustainability" | "care-guide" | "trend-report" | "brand-story" | "destination" | "occasion-guide" | "technology-explainer" | "other"],
+  "blog_topic_distribution": {"sizing-guide": 2, "care-guide": 1},
   "blog_sample_titles": ["up to 5 of their actual titles"]
-}`;
+}
+
+Identify the PRIMARY structure type (the dominant axis the brand uses to organise products) and a SECONDARY if they clearly use two axes. Pick from the listed options exactly.`;
   const resp = await callAI({
     model: "google/gemini-2.5-pro",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.2,
-    max_tokens: 2000,
+    max_tokens: 2500,
   });
   let text = getContent(resp).trim();
   text = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
@@ -163,11 +185,11 @@ Return STRICT JSON (no prose, no markdown fences) with this exact shape:
 
 function scoreConfidence(x: ExtractedIntelligence): number {
   let s = 0;
-  if (x.category_vocabulary && Object.keys(x.category_vocabulary).length > 0) s += 0.3;
-  if (x.collection_structure_type && x.collection_structure_type !== "unknown") s += 0.2;
-  if (x.blog_topics_used?.length > 0) s += 0.2;
-  if (x.brand_tone_sample && x.brand_tone_sample.length > 30) s += 0.2;
-  if (x.print_story_names?.length > 0) s += 0.1;
+  if (x.category_vocabulary && Object.keys(x.category_vocabulary).length > 0) s += 0.25;
+  if (x.collection_structure_type && x.collection_structure_type !== "unknown") s += 0.20;
+  if (x.blog_topics_used?.length > 0) s += 0.20;
+  if (x.brand_tone_sample && x.brand_tone_sample.length > 30) s += 0.20;
+  if (x.print_story_names?.length > 0) s += 0.15;
   return Math.round(s * 100) / 100;
 }
 

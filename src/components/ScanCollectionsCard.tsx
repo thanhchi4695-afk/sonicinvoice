@@ -43,9 +43,9 @@ export default function ScanCollectionsCard() {
       if (!user) return;
       const [scanRes, sugRes] = await Promise.all([
         supabase.from("collection_scans")
-          .select("id, triggered_by, products_scanned, suggestions_created, archive_candidates, completed_at, created_at")
+          .select("id, triggered_by, products_scanned, suggestions_created, archive_candidates, completed_at, started_at")
           .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
+          .order("started_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
         supabase.from("collection_suggestions")
@@ -53,7 +53,7 @@ export default function ScanCollectionsCard() {
           .eq("user_id", user.id)
           .eq("status", "pending"),
       ]);
-      setLastScan((scanRes.data as LastScan | null) ?? null);
+      setLastScan((scanRes.data as unknown as LastScan | null) ?? null);
       setPendingCount(sugRes.count ?? 0);
     } finally {
       setLoading(false);

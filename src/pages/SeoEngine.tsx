@@ -50,11 +50,24 @@ export default function SeoEngine() {
     setSuggestions((s ?? []) as Suggestion[]);
     const { data: o } = await supabase
       .from("collection_seo_outputs")
-      .select("suggestion_id,layer,seo_title,meta_description,status,rules_status,validation_errors");
+      .select("suggestion_id,layer,seo_title,meta_description,status,rules_status,rules_validated_count,validation_errors");
     const m: Record<string, Output> = {};
     (o ?? []).forEach((row: any) => { m[row.suggestion_id] = row; });
     setOutputs(m);
     setLoading(false);
+  }
+
+  async function validateRules(ids?: string[]) {
+    try {
+      const { data, error } = await supabase.functions.invoke("seo-rules-validator", {
+        body: ids?.length ? { suggestion_ids: ids } : { limit: 25 },
+      });
+      if (error) throw error;
+      toast({ title: "Rules validated", description: `${data?.results?.length ?? 0} checked` });
+      await load();
+    } catch (e: any) {
+      toast({ title: "Validation failed", description: String(e?.message || e), variant: "destructive" });
+    }
   }
 
   async function generate(id: string) {

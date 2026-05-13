@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import ProductSeoAuditPanel from "@/components/ProductSeoAuditPanel";
 
 const VERTICALS = ["ALL", "FOOTWEAR", "SWIMWEAR", "CLOTHING", "ACCESSORIES", "LIFESTYLE"] as const;
 
@@ -251,6 +252,8 @@ export default function SeoEngine() {
             </table>
           )}
         </Card>
+
+        <ProductSeoAuditPanel defaultCity={storeCity} defaultStoreName={storeName} />
       </div>
     </div>
   );

@@ -1696,6 +1696,7 @@ export type Database = {
           shopify_collection_id: string | null
           shopify_handle: string | null
           smart_collection_rules: Json | null
+          source: string | null
           status: string
           store_domain: string | null
           suggested_handle: string
@@ -1728,6 +1729,7 @@ export type Database = {
           shopify_collection_id?: string | null
           shopify_handle?: string | null
           smart_collection_rules?: Json | null
+          source?: string | null
           status?: string
           store_domain?: string | null
           suggested_handle: string
@@ -1760,6 +1762,7 @@ export type Database = {
           shopify_collection_id?: string | null
           shopify_handle?: string | null
           smart_collection_rules?: Json | null
+          source?: string | null
           status?: string
           store_domain?: string | null
           suggested_handle?: string

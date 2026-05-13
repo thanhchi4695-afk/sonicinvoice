@@ -744,6 +744,7 @@ export type Database = {
           crawl_error: string | null
           crawl_status: string
           created_at: string
+          iconic_reference: Json | null
           id: string
           industry_vertical: string | null
           last_crawled_at: string | null
@@ -776,6 +777,7 @@ export type Database = {
           crawl_error?: string | null
           crawl_status?: string
           created_at?: string
+          iconic_reference?: Json | null
           id?: string
           industry_vertical?: string | null
           last_crawled_at?: string | null
@@ -808,6 +810,7 @@ export type Database = {
           crawl_error?: string | null
           crawl_status?: string
           created_at?: string
+          iconic_reference?: Json | null
           id?: string
           industry_vertical?: string | null
           last_crawled_at?: string | null
@@ -1476,6 +1479,51 @@ export type Database = {
           },
         ]
       }
+      collection_link_mesh: {
+        Row: {
+          anchor_text: string
+          created_at: string
+          id: string
+          link_type: string
+          source_collection_id: string
+          target_collection_id: string
+          user_id: string
+        }
+        Insert: {
+          anchor_text: string
+          created_at?: string
+          id?: string
+          link_type: string
+          source_collection_id: string
+          target_collection_id: string
+          user_id: string
+        }
+        Update: {
+          anchor_text?: string
+          created_at?: string
+          id?: string
+          link_type?: string
+          source_collection_id?: string
+          target_collection_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_link_mesh_source_collection_id_fkey"
+            columns: ["source_collection_id"]
+            isOneToOne: false
+            referencedRelation: "collection_suggestions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_link_mesh_target_collection_id_fkey"
+            columns: ["target_collection_id"]
+            isOneToOne: false
+            referencedRelation: "collection_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_memory: {
         Row: {
           collection_handle: string
@@ -1556,6 +1604,8 @@ export type Database = {
           created_at: string
           description_html: string | null
           expires_at: string | null
+          faq_html: string | null
+          formula_parts: Json | null
           id: string
           layer: number
           meta_description: string | null
@@ -1574,6 +1624,8 @@ export type Database = {
           created_at?: string
           description_html?: string | null
           expires_at?: string | null
+          faq_html?: string | null
+          formula_parts?: Json | null
           id?: string
           layer: number
           meta_description?: string | null
@@ -1592,6 +1644,8 @@ export type Database = {
           created_at?: string
           description_html?: string | null
           expires_at?: string | null
+          faq_html?: string | null
+          formula_parts?: Json | null
           id?: string
           layer?: number
           meta_description?: string | null
@@ -1619,6 +1673,8 @@ export type Database = {
       collection_suggestions: {
         Row: {
           collection_type: string
+          completeness_breakdown: Json | null
+          completeness_score: number | null
           confidence_score: number
           created_at: string
           description_html: string | null
@@ -1632,16 +1688,20 @@ export type Database = {
           seo_description: string | null
           seo_title: string | null
           shopify_collection_id: string | null
+          shopify_handle: string | null
           smart_collection_rules: Json | null
           status: string
           store_domain: string | null
           suggested_handle: string
           suggested_title: string
+          taxonomy_level: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
           collection_type: string
+          completeness_breakdown?: Json | null
+          completeness_score?: number | null
           confidence_score?: number
           created_at?: string
           description_html?: string | null
@@ -1655,16 +1715,20 @@ export type Database = {
           seo_description?: string | null
           seo_title?: string | null
           shopify_collection_id?: string | null
+          shopify_handle?: string | null
           smart_collection_rules?: Json | null
           status?: string
           store_domain?: string | null
           suggested_handle: string
           suggested_title: string
+          taxonomy_level?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
           collection_type?: string
+          completeness_breakdown?: Json | null
+          completeness_score?: number | null
           confidence_score?: number
           created_at?: string
           description_html?: string | null
@@ -1678,11 +1742,13 @@ export type Database = {
           seo_description?: string | null
           seo_title?: string | null
           shopify_collection_id?: string | null
+          shopify_handle?: string | null
           smart_collection_rules?: Json | null
           status?: string
           store_domain?: string | null
           suggested_handle?: string
           suggested_title?: string
+          taxonomy_level?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -4847,6 +4913,36 @@ export type Database = {
           region?: string
           search_intent?: string | null
           updated_at?: string
+          vertical?: string
+        }
+        Relationships: []
+      }
+      seo_keyword_tiers: {
+        Row: {
+          created_at: string
+          id: string
+          keyword: string
+          placement_hint: string | null
+          region: string | null
+          tier: number
+          vertical: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          keyword: string
+          placement_hint?: string | null
+          region?: string | null
+          tier: number
+          vertical: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          keyword?: string
+          placement_hint?: string | null
+          region?: string | null
+          tier?: number
           vertical?: string
         }
         Relationships: []

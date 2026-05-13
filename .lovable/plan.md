@@ -1,135 +1,68 @@
+# THE ICONIC SEO Architecture — Upgrade Plan
 
-# Universal SEO Collection Engine
+Upgrades the existing Universal SEO Collection Engine to mirror THE ICONIC's URL taxonomy, 5-part description formula, brand-page formula, FAQ blocks, internal link mesh, keyword tiers, competitor reference, and completeness scoring.
 
-Build the four-layer SEO content engine on top of the existing brand intelligence + collection suggester, plus a new "SEO" navigation section grouping all collection/SEO tools.
+Built in 4 deployable phases so we can verify each before stacking the next.
 
-## 1. Navigation — new "SEO" section
+---
 
-Add a grouped **SEO** section to the sidebar/menu (`src/components/AppSidebar.tsx` or equivalent). Items:
+## Phase A — Schema + taxonomy + keyword tiers
 
-- **Collections** (existing `/collections`)
-- **Brand Intelligence** (existing `/brands`)
-- **SEO Engine** (new `/seo-engine`) — dashboard for the four-layer engine
-- **Keyword Library** (new `/seo-keywords`) — view/edit `seo_keyword_library`
-- **Blog Plans** (new `/seo-blog-plans`) — pending content plans awaiting approval
-- **Organic SEO** (existing `/seo-organic` if present, else link to topic-map flow)
+One migration adds the structural pieces THE ICONIC's model needs:
 
-Move the existing Collection / Brand tiles on HomeScreen into a single "SEO" tile that opens this section.
+- `collection_suggestions.shopify_handle` (text) — handle Sonic will push to Shopify, validated unique per `user_id`.
+- `collection_suggestions.taxonomy_level` (smallint 2–6) — drives prompt formula selection.
+- `collection_suggestions.completeness_score` (smallint 0–100) + `completeness_breakdown` (jsonb) — populated by a trigger on every related write.
+- `collection_seo_outputs.faq_html` (text) — rendered FAQ block (4–6 Q/A).
+- `collection_seo_outputs.formula_parts` (jsonb) — stores the 5 description parts separately so we can re-stitch and re-link later without regenerating the model output.
+- `brand_intelligence.iconic_reference` (jsonb) — H1, opening paragraph, sub-collection links, FAQ, top phrases scraped from `theiconic.com.au/{handle}/`.
+- New table `collection_link_mesh` (`source_collection_id`, `target_collection_id`, `link_type` enum sibling/parent/child/occasion/material, `anchor_text`) with RLS scoped to `user_id`.
+- New table `seo_keyword_tiers` (`tier` 1-5, `vertical`, `keyword`, `region`, `placement_hint`) — pre-seeded with the Tier 1–5 list from the spec for FOOTWEAR (Stomp) and SWIMWEAR (Splash).
+- Seed-only insert (via insert tool, not migration) of the keyword tier list and the priority taxonomy rows for Stomp + Splash so the engine has something to plan against on day 1.
 
-## 2. Database (one migration)
+## Phase B — Engine rewrite (`seo-collection-engine` v2)
 
-```text
-seo_keyword_library
-  vertical (FOOTWEAR | SWIMWEAR | CLOTHING | ACCESSORIES | LIFESTYLE)
-  bucket   (high_volume | type_specific | local | brand_long_tail |
-            occasion | material | colour | feature)
-  keyword  text
-  region   text default 'AU'
-  city     text null
-  search_intent text
-  notes    text
+Replace the current single-shot prompt with a deterministic pipeline:
 
-collection_seo_outputs           -- one row per (suggestion_id)
-  suggestion_id  fk -> collection_suggestions
-  layer          1..4
-  seo_title      text  (<=60)
-  meta_description text (150..160 enforced in app)
-  description_html text
-  smart_rules_json jsonb         -- Shopify ruleSet
-  rules_validated_count int      -- product hit count from preview
-  rules_status   ok|empty|needs_review
-  status         draft|approved|published
-  refreshed_at   timestamptz
-  expires_at     timestamptz     -- Layer 4 = +6 months
+1. **Resolve taxonomy_level** from `collection_type` and handle pattern (Level 2 broad / 3 type / 4 sub-type / 5 brand or brand+cat / 6 occasion).
+2. **Pick keyword tiers by level** per Part 6's mapping (Tier 1→title only, Tier 2→H1+opener, Tier 3→brand opener, Tier 4→Part 4+CTA, Tier 5→Part 2+FAQ).
+3. **Pull link mesh** rows (3–5) per Rules 1–5 in Part 5.
+4. **Pull `iconic_reference`** when level ≥ 5 brand pages.
+5. **Single Gemini 2.5 Pro call** asking for the 5 parts + 4–6 FAQ entries as separate JSON keys (not one HTML blob), plus brand-page variant when `taxonomy_level = 5`.
+6. **Validators** (extend `_shared/seo-validators.ts`):
+   - 200+ word body, 5 distinct part keys present, 3–5 internal links resolve to real handles,
+   - FAQ has 4–6 entries, each answer 30–80 words,
+   - banned phrases, local signal, keyword-in-first-12-words rules retained,
+   - brand-page variant must mention founding year + ≥2 sub-collection links.
+7. **Stitch** parts → `description_html` and FAQ → `faq_html` server-side; persist parts in `formula_parts` for reassembly.
 
-collection_blog_plans
-  suggestion_id fk
-  blog_index    int
-  title         text
-  target_keywords text[]
-  sections      jsonb
-  faq           jsonb            -- [{q,a}]
-  status        plan|approved|generated
-  generated_html text null
+## Phase C — Link mesh + FAQ + ICONIC crawler
 
-brand_intelligence
-  + competitor_reference_styletread jsonb
-```
+- `seo-link-mesh-builder` edge function — given a `user_id`, recomputes `collection_link_mesh` from the user's `collection_suggestions` by applying Rules 1–5. Idempotent; safe to re-run after each new collection.
+- Extend `brand-intelligence-crawler` Step 7B → 7C: also fetch `https://www.theiconic.com.au/{slug}/` for FOOTWEAR brands using Firecrawl (`formats: ['markdown','links']`), extract H1, first 2 sentences, sub-collection links containing the brand slug, any Q/A pairs in markdown, and the top 10 phrases by frequency. Store in `brand_intelligence.iconic_reference`.
+- `seo-collection-engine` writes FAQ to `faq_html` and (best-effort) pushes to Shopify as a metafield `seo.faq_content` via existing `getValidShopifyToken` + `metafieldsSet` mutation. Failure to push does not block local save.
 
-Pre-seed `seo_keyword_library` with the FOOTWEAR + SWIMWEAR keyword sets from the brief (one INSERT per bucket).
+## Phase D — Completeness scoring + admin UX
 
-RLS: same pattern as existing collection tables (admin/buyer write, all auth read).
+- DB trigger on `collection_seo_outputs` and `collection_blog_plans` recomputes `collection_suggestions.completeness_score` using the 7-element rubric from Part 8.
+- `/seo-engine` page gains:
+  - taxonomy_level column,
+  - completeness badge (red/amber/green) per row,
+  - "Complete SEO" button per row that, for any score < 80, runs `seo-collection-engine` and `seo-rules-validator` in sequence to fill missing parts,
+  - filter chips: All / Incomplete / Partial / Complete.
+- New `/seo-link-mesh` page lists each collection with its outbound + inbound links and a "Rebuild mesh" button calling `seo-link-mesh-builder`.
 
-## 3. Edge functions
+## Out of scope this round
 
-### `seo-collection-engine` (new)
-Input: `{ suggestion_id }` or `{ store_id, layer }`.
-- Loads suggestion + brand_intelligence + matching keywords from `seo_keyword_library` (filtered by vertical + layer bucket).
-- If footwear & layer 2: pulls `competitor_reference_styletread` block.
-- Calls Lovable AI (`google/gemini-2.5-pro`, fallback `gemini-2.5-flash`) with a strict prompt enforcing the 5 outputs (title ≤60, meta 150-160, 200-280-word HTML with banned-phrases filter, smart rules JSON, blog plan + 6 FAQ).
-- Validates: char counts, banned phrase scan, primary keyword in first 12 words, exactly 2 internal `<a href="/collections/...">` links.
-- Calls `shopify-collection-rule-preview` to count matching products. If <3 → `rules_status='empty'`.
-- Persists to `collection_seo_outputs` + `collection_blog_plans`.
-
-### `seo-blog-writer` (new)
-Input: `{ plan_id }`. Generates full blog HTML from an approved plan (Aussie spelling, banned-phrase filter, internal links). Writes back to `collection_blog_plans.generated_html`, status=`generated`.
-
-### `brand-intelligence-crawler` (extend)
-Add **Step 7B — Styletread reference** when `industry_vertical = 'FOOTWEAR'`:
-- Web search `site:styletread.com.au {brand_name}`.
-- If hit, fetch via Firecrawl `scrape` (markdown + metadata).
-- Extract H1, meta description, sub-categories, brand copy → `competitor_reference_styletread`.
-
-### `seo-quarterly-refresh` (new, cron-ready)
-Daily scan: any `collection_seo_outputs.layer=4` with `refreshed_at < now()-6 months` → set `rules_status='needs_review'`, surface in UI.
-
-## 4. Frontend
-
-### `/seo-engine` page (new)
-- Header with vertical tabs (All / Footwear / Swimwear / Clothing / Accessories).
-- Table of suggestions × 4 layer columns; each cell shows status pill (draft/approved/published, char counts, rule hit count).
-- Bulk action: "Generate SEO for selected" → calls `seo-collection-engine` per row (sequential 500 ms delay per memory rule).
-- Row drawer: live preview of title (with character counter), meta (with 150–160 highlight), description HTML preview, smart rule JSON editor, blog plans list with "Generate full post" button.
-- Kill switch reused from `app_settings.brand_intelligence_enabled`.
-
-### `/seo-keywords` page (new)
-- Filterable table of `seo_keyword_library` (by vertical/bucket/region).
-- Add/edit/delete (admin only).
-
-### `/seo-blog-plans` page (new)
-- Pending plans grouped by collection.
-- Approve → triggers `seo-blog-writer`.
-- Preview generated HTML with copy-to-Shopify button.
-
-### Wiring
-- Update `collection-content-generator` to defer to `seo-collection-engine` when a suggestion has `industry_vertical` set (back-compat: keep old path for unverticalised stores).
-- HomeScreen: replace separate brand/collection tiles with one **SEO** tile linking to `/seo-engine`.
-
-## 5. Validation rules enforced in code (not just the prompt)
-
-`supabase/functions/_shared/seo-validators.ts` (new):
-- `assertTitleLen`, `assertMetaLen` (150–160 strict).
-- `assertBannedPhrases` — wide range of, great selection, we have something for everyone, high quality, browse our collection.
-- `assertKeywordInFirst12Words(html, keyword)`.
-- `assertInternalLinks(html, count=2)`.
-- `assertLocalSignal(text, city)` for Layer 3.
-
-Engine retries the model up to 2× with the validator's error feedback before returning `status='draft'` with `validation_errors` field.
-
-## 6. Out of scope this phase
-
-- Auto-publishing collections to Shopify (separate future phase — UI gives "Copy/push" once user is ready).
-- Multi-language SEO.
-- Schema.org JSON-LD generation (will be follow-up).
+- Auto-creating Shopify collections from the taxonomy (Sonic will still suggest — push-to-Shopify stays a separate confirm step).
+- Multi-language / hreflang.
+- Automated detection of new ICONIC URL slugs we haven't pre-mapped.
 
 ## Build order
 
-1. Migration + keyword seed.
-2. `_shared/seo-validators.ts` + `seo-collection-engine`.
-3. Crawler Step 7B (Styletread).
-4. `/seo-engine`, `/seo-keywords`, `/seo-blog-plans` pages.
-5. Sidebar SEO group + HomeScreen tile cleanup.
-6. `seo-blog-writer` + approval flow.
-7. `seo-quarterly-refresh` cron.
+1. Phase A migration → seed keyword tiers + Stomp/Splash priority taxonomy.
+2. Phase B engine rewrite + validators (deploy + smoke test on one row).
+3. Phase C mesh builder + crawler upgrade (deploy + run once for Stomp).
+4. Phase D scoring trigger + UI updates.
 
-Reply **"go"** to start with steps 1–2 (migration + engine), or name specific phases to reorder.
+Reply **go** to start Phase A, or name a different starting phase.

@@ -63,6 +63,8 @@ interface ProviderConnection {
   email_address: string;
   last_checked_at: string | null;
   is_active: boolean;
+  imap_host?: string | null;
+  imap_port?: number | null;
 }
 
 const providerLabel = (p: Provider) =>

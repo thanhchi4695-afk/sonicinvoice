@@ -772,37 +772,74 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                     : null;
                   const healthy = ageMin !== null && ageMin < 10;
                   return (
-                    <li key={`${c.provider}:${c.id}`} className="flex items-center gap-3 px-3 py-2">
-                      <div className="w-8 h-8 rounded-full bg-success/15 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="w-4 h-4 text-success" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-medium truncate">{c.email_address}</p>
-                          <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${providerBadgeCls(c.provider)}`}>
-                            {providerLabel(c.provider).toUpperCase()}
-                          </span>
+                    <li key={`${c.provider}:${c.id}`} className="px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full ${rowErrors[c.id] ? "bg-destructive/15" : "bg-success/15"} flex items-center justify-center shrink-0`}>
+                          {rowErrors[c.id]
+                            ? <AlertCircle className="w-4 h-4 text-destructive" />
+                            : <CheckCircle2 className="w-4 h-4 text-success" />}
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="relative flex h-2 w-2">
-                            {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
-                            <span className={`relative inline-flex rounded-full h-2 w-2 ${healthy ? "bg-success" : "bg-muted-foreground"}`} />
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {c.last_checked_at
-                              ? (healthy ? "Auto-scan active · every 5 min" : `Idle ${Math.round(ageMin!)}m`)
-                              : "Not scanned yet"}
-                          </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium truncate">{c.email_address}</p>
+                            <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${providerBadgeCls(c.provider)}`}>
+                              {providerLabel(c.provider).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="relative flex h-2 w-2">
+                              {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
+                              <span className={`relative inline-flex rounded-full h-2 w-2 ${healthy ? "bg-success" : "bg-muted-foreground"}`} />
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {c.last_checked_at
+                                ? (healthy ? "Auto-scan active · every 5 min" : `Idle ${Math.round(ageMin!)}m`)
+                                : "Not scanned yet"}
+                              {c.provider === "imap" && c.imap_host ? <span className="ml-1 opacity-60">· {c.imap_host}:{c.imap_port ?? 993}</span> : null}
+                            </span>
+                          </div>
                         </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => handleRescanOne(c)}
+                          disabled={rescanningId === c.id}
+                          title="Rescan this account"
+                        >
+                          {rescanningId === c.id
+                            ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Scanning</>
+                            : <><RefreshCw className="w-3 h-3 mr-1" /> Rescan</>}
+                        </Button>
+                        {c.provider === "imap" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs shrink-0"
+                            onClick={() => handleEditConn(c)}
+                            title="Edit IMAP host, port, or app password"
+                          >
+                            <Settings className="w-3 h-3 mr-1" /> Edit
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => handleDisconnect(c)}
+                        >
+                          <LogOut className="w-3 h-3 mr-1" /> Remove
+                        </Button>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs shrink-0"
-                        onClick={() => handleDisconnect(c)}
-                      >
-                        <LogOut className="w-3 h-3 mr-1" /> Remove
-                      </Button>
+                      {rowErrors[c.id] && (
+                        <div className="mt-1.5 ml-11 text-[11px] text-destructive flex items-start gap-1">
+                          <span className="font-medium shrink-0">Last scan error:</span>
+                          <span className="break-words">{rowErrors[c.id]}</span>
+                          {c.provider === "imap" && (
+                            <button onClick={() => handleEditConn(c)} className="underline shrink-0 ml-1">Fix settings</button>
+                          )}
+                        </div>
+                      )}
                     </li>
                   );
                 })}

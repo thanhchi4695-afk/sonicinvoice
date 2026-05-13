@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, Copy, Check, Upload, Mail, Paperclip, ChevronDown, Loader2, FileText, Image, RefreshCw, LogOut, CheckCircle2, X } from "lucide-react";
+import { ChevronLeft, Copy, Check, Upload, Mail, Paperclip, ChevronDown, Loader2, FileText, Image, RefreshCw, LogOut, CheckCircle2, X, Settings, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { addAuditEntry } from "@/lib/audit-log";
 import { getInvoiceParserModel } from "@/lib/invoice-parser-model";
@@ -63,6 +63,8 @@ interface ProviderConnection {
   email_address: string;
   last_checked_at: string | null;
   is_active: boolean;
+  imap_host?: string | null;
+  imap_port?: number | null;
 }
 
 const providerLabel = (p: Provider) =>
@@ -157,6 +159,9 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [yahooHost, setYahooHost] = useState("");
   const [yahooPort, setYahooPort] = useState("993");
   const [yahooSubmitting, setYahooSubmitting] = useState(false);
+  const [editingConnId, setEditingConnId] = useState<string | null>(null);
+  const [rescanningId, setRescanningId] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     try { localStorage.setItem("sonic_smart_bulk_enabled", smartBulk ? "1" : "0"); } catch {}
@@ -169,7 +174,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     const [g, o, i] = await Promise.all([
       supabase.from("gmail_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
       supabase.from("outlook_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
-      supabase.from("imap_connections").select("id, email_address, last_checked_at, is_active").eq("is_active", true).order("created_at", { ascending: true }),
+      supabase.from("imap_connections").select("id, email_address, last_checked_at, is_active, imap_host, imap_port").eq("is_active", true).order("created_at", { ascending: true }),
     ]);
     const all: ProviderConnection[] = [
       ...((g.data as any[]) ?? []).map(r => ({ ...r, provider: "gmail" as Provider })),
@@ -310,9 +315,11 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
       });
       if (error) throw error;
       if (!(data as any)?.ok) throw new Error((data as any)?.error ?? "IMAP login failed");
-      toast({ title: `${providerLabel("imap")} connected`, description: yahooEmail.trim() });
-      addAuditEntry("Email", `Connected IMAP (${yahooProvider}): ${yahooEmail.trim()}`);
+      toast({ title: editingConnId ? `${providerLabel("imap")} updated` : `${providerLabel("imap")} connected`, description: yahooEmail.trim() });
+      addAuditEntry("Email", `${editingConnId ? "Updated" : "Connected"} IMAP (${yahooProvider}): ${yahooEmail.trim()}`);
       setShowYahooModal(false);
+      setEditingConnId(null);
+      setRowErrors(prev => editingConnId ? { ...prev, [editingConnId]: null } : prev);
       setYahooEmail(""); setYahooPassword(""); setYahooHost(""); setYahooPort("993");
       await loadConnection();
     } catch (err: any) {
@@ -407,6 +414,57 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     } finally {
       setScanning(false);
     }
+  };
+
+  const handleRescanOne = async (c: ProviderConnection) => {
+    setRescanningId(c.id);
+    setRowErrors(prev => ({ ...prev, [c.id]: null }));
+    try {
+      const fn = c.provider === "gmail" ? "scan-gmail-inbox" : c.provider === "outlook" ? "scan-outlook-inbox" : "scan-imap-inbox";
+      const { data, error } = await supabase.functions.invoke(fn, {
+        body: { connection_id: c.id, email_address: c.email_address },
+      });
+      if (error) throw error;
+      const d: any = data;
+      const accountErr = d?.error
+        ?? (Array.isArray(d?.errors) ? d.errors.find((e: any) => !e?.email || e.email?.toLowerCase() === c.email_address.toLowerCase())?.error : null)
+        ?? (Array.isArray(d?.errors) && d.errors.length ? d.errors[0]?.error : null);
+      if (accountErr) {
+        setRowErrors(prev => ({ ...prev, [c.id]: String(accountErr) }));
+        toast({ title: `Rescan failed: ${c.email_address}`, description: String(accountErr), variant: "destructive" });
+      } else {
+        const scanned = d?.emails_scanned ?? 0;
+        const found = d?.invoices_found?.length ?? 0;
+        toast({ title: `Rescanned ${c.email_address}`, description: `${scanned} email(s), ${found} with attachments` });
+        addAuditEntry("Email", `Rescanned ${c.email_address} — ${scanned} email(s), ${found} with invoice attachments`);
+      }
+      await Promise.all([loadConnection(), loadFoundInvoices()]);
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      setRowErrors(prev => ({ ...prev, [c.id]: msg }));
+      toast({ title: `Rescan failed: ${c.email_address}`, description: msg, variant: "destructive" });
+    } finally {
+      setRescanningId(null);
+    }
+  };
+
+  const handleEditConn = (c: ProviderConnection) => {
+    if (c.provider !== "imap") return;
+    const host = (c.imap_host ?? "").trim();
+    let provider: typeof yahooProvider = "custom";
+    if (host.includes("yahoo")) provider = "yahoo";
+    else if (host.includes("me.com") || host.includes("icloud")) provider = "icloud";
+    else if (host.includes("office365") || host.includes("outlook")) provider = "outlook";
+    else if (host.includes("gmail")) provider = "gmail";
+    else if (host.includes("ventraip")) provider = "ventraip";
+    else if (host.includes("fastmail")) provider = "fastmail";
+    setYahooProvider(provider);
+    setYahooEmail(c.email_address);
+    setYahooHost(host);
+    setYahooPort(String(c.imap_port ?? 993));
+    setYahooPassword("");
+    setEditingConnId(c.id);
+    setShowYahooModal(true);
   };
 
   const handleProcess = async (item: InboxItem, options: { skipSupplierPrompt?: boolean } = {}): Promise<boolean> => {
@@ -714,37 +772,74 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                     : null;
                   const healthy = ageMin !== null && ageMin < 10;
                   return (
-                    <li key={`${c.provider}:${c.id}`} className="flex items-center gap-3 px-3 py-2">
-                      <div className="w-8 h-8 rounded-full bg-success/15 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="w-4 h-4 text-success" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-medium truncate">{c.email_address}</p>
-                          <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${providerBadgeCls(c.provider)}`}>
-                            {providerLabel(c.provider).toUpperCase()}
-                          </span>
+                    <li key={`${c.provider}:${c.id}`} className="px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full ${rowErrors[c.id] ? "bg-destructive/15" : "bg-success/15"} flex items-center justify-center shrink-0`}>
+                          {rowErrors[c.id]
+                            ? <AlertCircle className="w-4 h-4 text-destructive" />
+                            : <CheckCircle2 className="w-4 h-4 text-success" />}
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="relative flex h-2 w-2">
-                            {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
-                            <span className={`relative inline-flex rounded-full h-2 w-2 ${healthy ? "bg-success" : "bg-muted-foreground"}`} />
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {c.last_checked_at
-                              ? (healthy ? "Auto-scan active · every 5 min" : `Idle ${Math.round(ageMin!)}m`)
-                              : "Not scanned yet"}
-                          </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-sm font-medium truncate">{c.email_address}</p>
+                            <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${providerBadgeCls(c.provider)}`}>
+                              {providerLabel(c.provider).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="relative flex h-2 w-2">
+                              {healthy && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />}
+                              <span className={`relative inline-flex rounded-full h-2 w-2 ${healthy ? "bg-success" : "bg-muted-foreground"}`} />
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {c.last_checked_at
+                                ? (healthy ? "Auto-scan active · every 5 min" : `Idle ${Math.round(ageMin!)}m`)
+                                : "Not scanned yet"}
+                              {c.provider === "imap" && c.imap_host ? <span className="ml-1 opacity-60">· {c.imap_host}:{c.imap_port ?? 993}</span> : null}
+                            </span>
+                          </div>
                         </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => handleRescanOne(c)}
+                          disabled={rescanningId === c.id}
+                          title="Rescan this account"
+                        >
+                          {rescanningId === c.id
+                            ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Scanning</>
+                            : <><RefreshCw className="w-3 h-3 mr-1" /> Rescan</>}
+                        </Button>
+                        {c.provider === "imap" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs shrink-0"
+                            onClick={() => handleEditConn(c)}
+                            title="Edit IMAP host, port, or app password"
+                          >
+                            <Settings className="w-3 h-3 mr-1" /> Edit
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => handleDisconnect(c)}
+                        >
+                          <LogOut className="w-3 h-3 mr-1" /> Remove
+                        </Button>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs shrink-0"
-                        onClick={() => handleDisconnect(c)}
-                      >
-                        <LogOut className="w-3 h-3 mr-1" /> Remove
-                      </Button>
+                      {rowErrors[c.id] && (
+                        <div className="mt-1.5 ml-11 text-[11px] text-destructive flex items-start gap-1">
+                          <span className="font-medium shrink-0">Last scan error:</span>
+                          <span className="break-words">{rowErrors[c.id]}</span>
+                          {c.provider === "imap" && (
+                            <button onClick={() => handleEditConn(c)} className="underline shrink-0 ml-1">Fix settings</button>
+                          )}
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -812,11 +907,11 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
 
         {/* Yahoo / IMAP modal */}
         {showYahooModal && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !yahooSubmitting && setShowYahooModal(false)}>
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { if (!yahooSubmitting) { setShowYahooModal(false); setEditingConnId(null); } }}>
             <div className="bg-card rounded-lg border border-border p-5 w-full max-w-md" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-semibold">Connect via app password</h3>
-                <button onClick={() => setShowYahooModal(false)} disabled={yahooSubmitting} className="text-muted-foreground hover:text-foreground">
+                <h3 className="text-base font-semibold">{editingConnId ? "Edit IMAP settings" : "Connect via app password"}</h3>
+                <button onClick={() => { setShowYahooModal(false); setEditingConnId(null); }} disabled={yahooSubmitting} className="text-muted-foreground hover:text-foreground">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -898,13 +993,13 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
                   </p>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" className="flex-1 h-9" onClick={() => setShowYahooModal(false)} disabled={yahooSubmitting}>
+                  <Button variant="outline" className="flex-1 h-9" onClick={() => { setShowYahooModal(false); setEditingConnId(null); }} disabled={yahooSubmitting}>
                     Cancel
                   </Button>
                   <Button variant="teal" className="flex-1 h-9" onClick={handleConnectYahoo} disabled={yahooSubmitting || !yahooEmail.trim() || !yahooPassword.trim()}>
                     {yahooSubmitting
                       ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Testing…</>
-                      : <>Connect</>}
+                      : <>{editingConnId ? "Save changes" : "Connect"}</>}
                   </Button>
                 </div>
               </div>

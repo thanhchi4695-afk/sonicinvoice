@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Loader2, RefreshCw, Plus, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, RefreshCw, Plus, CheckCircle2, AlertCircle, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 type Vertical = "FOOTWEAR" | "SWIMWEAR" | "CLOTHING" | "ACCESSORIES" | "LIFESTYLE";
@@ -63,6 +63,7 @@ interface BrandRow {
   pages_fetched: number | null;
   last_crawled_at: string | null;
   manually_verified: boolean;
+  iconic_reference?: any;
 }
 
 export default function Brands() {
@@ -74,6 +75,7 @@ export default function Brands() {
   const [newDomain, setNewDomain] = useState("");
   const [verticalFilter, setVerticalFilter] = useState<"ALL" | Vertical>("ALL");
   const [killSwitch, setKillSwitch] = useState<boolean>(true);
+  const [iconicRefreshingId, setIconicRefreshingId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -132,6 +134,24 @@ export default function Brands() {
   async function seedAndCrawl(b: { name: string; domain: string; vertical: Vertical }) {
     const id = await ensureSeedRow(b.name, b.domain);
     if (id) await crawl(b.name, b.domain, id, b.vertical);
+  }
+
+  async function refreshIconic(id: string, name: string) {
+    setIconicRefreshingId(id);
+    try {
+      const { data, error } = await supabase.functions.invoke("iconic-brand-refresh", { body: { brand_id: id } });
+      if (error) throw error;
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      const d = data as { hasChanges?: boolean; changes?: string[]; captured_at?: string };
+      toast.success(`${name}: ICONIC refreshed`, {
+        description: (d.changes ?? []).slice(0, 3).join(" • ") || "No changes detected",
+      });
+      await load();
+    } catch (e) {
+      toast.error(`${name}: ${e instanceof Error ? e.message : "ICONIC refresh failed"}`);
+    } finally {
+      setIconicRefreshingId(null);
+    }
   }
 
   async function addBrand() {
@@ -297,9 +317,14 @@ export default function Brands() {
                       {stale && <Badge variant="outline" className="ml-2">Needs re-crawl</Badge>}
                     </td>
                     <td className="p-3 text-right space-x-2 whitespace-nowrap">
-                      <Button size="sm" variant="ghost" disabled={crawlingId === r.id} onClick={() => crawl(r.brand_name, r.brand_domain, r.id)}>
+                      <Button size="sm" variant="ghost" disabled={crawlingId === r.id} onClick={() => crawl(r.brand_name, r.brand_domain, r.id)} title="Re-crawl brand">
                         {crawlingId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                       </Button>
+                      {r.industry_vertical === "FOOTWEAR" && (
+                        <Button size="sm" variant="ghost" disabled={iconicRefreshingId === r.id} onClick={() => refreshIconic(r.id, r.brand_name)} title="Refresh ICONIC reference">
+                          {iconicRefreshingId === r.id ? <Loader2 className="h-3 w-3 animate-spin text-amber-500" /> : <Zap className="h-3 w-3 text-amber-500" />}
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => setSelected(r)}>View</Button>
                     </td>
                   </tr>
@@ -390,6 +415,12 @@ export default function Brands() {
                     {crawlingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
                     Re-crawl
                   </Button>
+                  {selected.industry_vertical === "FOOTWEAR" && (
+                    <Button variant="secondary" onClick={() => refreshIconic(selected.id, selected.brand_name)} disabled={iconicRefreshingId === selected.id}>
+                      {iconicRefreshingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+                      Refresh ICONIC
+                    </Button>
+                  )}
                   <Button variant="outline" onClick={() => toggleVerified(selected)}>
                     {selected.manually_verified ? "Unverify" : "Mark verified"}
                   </Button>
@@ -397,6 +428,53 @@ export default function Brands() {
                     Remove
                   </Button>
                 </div>
+                {selected.iconic_reference && (
+                  <div className="border-t pt-3 mt-2">
+                    <div className="text-xs uppercase text-muted-foreground mb-2 flex items-center gap-1">
+                      <Zap className="h-3 w-3 text-amber-500" /> ICONIC Reference
+                      <span className="text-muted-foreground normal-case">{selected.iconic_reference.captured_at ? ` · ${new Date(selected.iconic_reference.captured_at).toLocaleDateString()}` : ""}</span>
+                    </div>
+                    {selected.iconic_reference.h1 && (
+                      <div className="mb-2"><span className="text-xs text-muted-foreground">H1:</span> <span className="font-medium">{selected.iconic_reference.h1}</span></div>
+                    )}
+                    {selected.iconic_reference.opening_copy && (
+                      <div className="mb-2 text-muted-foreground italic">{selected.iconic_reference.opening_copy}</div>
+                    )}
+                    {selected.iconic_reference.sub_collection_links?.length > 0 && (
+                      <div className="mb-2">
+                        <div className="text-xs text-muted-foreground mb-1">Sub-collections ({selected.iconic_reference.sub_collection_links.length})</div>
+                        <div className="flex flex-wrap gap-1">
+                          {selected.iconic_reference.sub_collection_links.slice(0, 8).map((u: string, i: number) => (
+                            <Badge key={i} variant="outline" className="text-xs">{u.split("/").pop() || u}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selected.iconic_reference.faq_pairs?.length > 0 && (
+                      <div className="mb-2">
+                        <div className="text-xs text-muted-foreground mb-1">FAQ ({selected.iconic_reference.faq_pairs.length})</div>
+                        <div className="space-y-1">
+                          {selected.iconic_reference.faq_pairs.slice(0, 3).map((p: any, i: number) => (
+                            <div key={i} className="text-xs bg-muted/30 p-1.5 rounded">
+                              <div className="font-medium">{p.q}</div>
+                              <div className="text-muted-foreground">{p.a}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selected.iconic_reference.top_phrases?.length > 0 && (
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Top phrases</div>
+                        <div className="flex flex-wrap gap-1">
+                          {selected.iconic_reference.top_phrases.slice(0, 6).map((p: any, i: number) => (
+                            <Badge key={i} variant="secondary" className="text-xs">{p.phrase}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}

@@ -2627,6 +2627,7 @@ export type Database = {
       }
       gap_analysis_runs: {
         Row: {
+          brands_checked: number
           competitor_stores_checked: number
           completed_at: string | null
           current_step: string | null
@@ -2639,6 +2640,7 @@ export type Database = {
           vertical: string | null
         }
         Insert: {
+          brands_checked?: number
           competitor_stores_checked?: number
           completed_at?: string | null
           current_step?: string | null
@@ -2651,6 +2653,7 @@ export type Database = {
           vertical?: string | null
         }
         Update: {
+          brands_checked?: number
           competitor_stores_checked?: number
           completed_at?: string | null
           current_step?: string | null

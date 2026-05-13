@@ -136,6 +136,24 @@ export default function Brands() {
     if (id) await crawl(b.name, b.domain, id, b.vertical);
   }
 
+  async function refreshIconic(id: string, name: string) {
+    setIconicRefreshingId(id);
+    try {
+      const { data, error } = await supabase.functions.invoke("iconic-brand-refresh", { body: { brand_id: id } });
+      if (error) throw error;
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      const d = data as { hasChanges?: boolean; changes?: string[]; captured_at?: string };
+      toast.success(`${name}: ICONIC refreshed`, {
+        description: (d.changes ?? []).slice(0, 3).join(" • ") || "No changes detected",
+      });
+      await load();
+    } catch (e) {
+      toast.error(`${name}: ${e instanceof Error ? e.message : "ICONIC refresh failed"}`);
+    } finally {
+      setIconicRefreshingId(null);
+    }
+  }
+
   async function addBrand() {
     if (!newName.trim()) return;
     const id = await ensureSeedRow(newName.trim(), newDomain.trim());

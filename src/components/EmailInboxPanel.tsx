@@ -221,6 +221,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
         messageId: row.message_id,
         attachmentId: first.attachment_id,
         attachmentMime: first.mime_type,
+        connectionId: (row as any).connection_id ?? null,
       });
     }
     setGmailItems(items);

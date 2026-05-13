@@ -38,6 +38,47 @@ const TRENDS: Record<string, string[]> = {
   westerncore: ["western","cowgirl"],
 };
 
+// ACCESSORIES vocabulary — Louenhide model
+const BAG_TYPES: Record<string, string[]> = {
+  crossbody: ["crossbody","cross body","cross-body"],
+  shoulder: ["shoulder bag","shoulder-bag"],
+  tote: ["tote"],
+  clutch: ["clutch"],
+  backpack: ["backpack"],
+  sling: ["sling","bum bag","belt bag","fanny"],
+  bucket: ["bucket bag"],
+  hobo: ["hobo"],
+  satchel: ["satchel"],
+  weekender: ["weekender","duffle"],
+  laptop_bag: ["laptop bag","laptop-friendly","laptop sleeve"],
+  cosmetic_bag: ["cosmetic bag","makeup bag","toiletry"],
+  beach_bag: ["beach bag","straw bag"],
+  wallet: ["wallet","cardholder","card holder","purse"],
+};
+
+const ACC_FEATURES: Record<string, string[]> = {
+  rfid: ["rfid","rfid blocking","rfid-blocking"],
+  vegan_leather: ["vegan leather","vegan-leather"],
+  multi_wear: ["multi-wear","multi wear","convertible"],
+  laptop_friendly: ["13-inch","13 inch","14-inch","15-inch","16-inch","laptop"],
+  waterproof: ["waterproof","water-resistant","water resistant"],
+};
+
+const ACC_OCCASIONS: Record<string, string[]> = {
+  work: ["work bag","office","corporate"],
+  uni: ["uni","university","student","campus"],
+  travel: ["travel","carry-on","carry on","weekender"],
+  evening: ["evening","cocktail","gala","formal"],
+  beach: ["beach","poolside","resort"],
+};
+
+// Niche keyword blocklist (Louenhide/Megantic Innovation 2)
+const BROAD_BLOCKLIST = new Set(["bags","accessories","wallets","handbags","online shopping"]);
+function isAccessoriesVertical(productType: string): boolean {
+  const t = productType.toLowerCase();
+  return /bag|wallet|clutch|backpack|tote|crossbody|purse|accessor/.test(t);
+}
+
 // ---- Helpers ---------------------------------------------------------------
 
 function slug(s: string): string {

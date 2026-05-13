@@ -234,10 +234,17 @@ Deno.serve(async (req) => {
     if (body.brand_id) {
       const { data } = await supabase
         .from("brand_intelligence")
-        .select("brand_name, brand_voice, value_proposition, hero_keywords, iconic_reference, whitefox_reference, davidjones_reference, louenhide_megantic_reference, competitor_reference_styletread")
+        .select("brand_name, brand_tone, brand_tone_sample, seo_primary_keyword, seo_secondary_keywords, iconic_reference, whitefox_reference, davidjones_reference, louenhide_megantic_reference, competitor_reference_styletread")
         .eq("id", body.brand_id)
         .maybeSingle();
-      brand = data;
+      if (data) {
+        brand = {
+          ...data,
+          brand_voice: data.brand_tone,
+          value_proposition: data.brand_tone_sample,
+          hero_keywords: data.seo_secondary_keywords,
+        };
+      }
     }
 
     // Link mesh — pre-built sibling/parent/child set; otherwise fall back to siblings

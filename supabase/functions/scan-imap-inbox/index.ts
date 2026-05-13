@@ -12,7 +12,11 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const MAX_MESSAGES_PER_SCAN = 500;
+const MAX_MESSAGES_PER_SCAN = 150;
+const FUNCTION_BUDGET_MS = 45_000;
+const CONNECT_TIMEOUT_MS = 12_000;
+const SEARCH_TIMEOUT_MS = 15_000;
+const FETCH_TIMEOUT_MS = 4_000;
 const SUBJECT_TERMS = ["invoice", "tax invoice", "purchase order", "packing slip", "receipt", "statement", "bill"];
 const INVOICE_FILE_RE = /\.(pdf|xlsx?|csv|jpe?g|png|heic|webp)$/i;
 
@@ -96,6 +100,7 @@ async function loadSupplierMap(admin: any, userId: string): Promise<Map<string, 
 }
 
 async function scanOne(admin: any, conn: Conn, supplierMap: Map<string, string>) {
+  const startedAt = Date.now();
   const password = await decryptString(conn.password_encrypted, conn.password_iv);
   const client = new ImapFlow({
     host: conn.imap_host,
@@ -103,13 +108,14 @@ async function scanOne(admin: any, conn: Conn, supplierMap: Map<string, string>)
     secure: !!conn.imap_tls,
     auth: { user: conn.imap_username, pass: password },
     logger: false,
-    socketTimeout: 30000,
+    socketTimeout: 15000,
   });
 
   const invoicesFound: any[] = [];
   let scanned = 0;
+  let partialReason: string | null = null;
 
-  await client.connect();
+  await withTimeout(client.connect(), CONNECT_TIMEOUT_MS, `IMAP connect timed out after ${CONNECT_TIMEOUT_MS / 1000}s`);
   try {
     const lock = await client.getMailboxLock("INBOX");
     try {
@@ -121,12 +127,30 @@ async function scanOne(admin: any, conn: Conn, supplierMap: Map<string, string>)
         since: sinceDate,
         or: SUBJECT_TERMS.map((t) => ({ subject: t })),
       };
-      const uids = await client.search(searchCriteria, { uid: true });
+      const uids = await withTimeout(
+        client.search(searchCriteria, { uid: true }),
+        SEARCH_TIMEOUT_MS,
+        `IMAP search timed out after ${SEARCH_TIMEOUT_MS / 1000}s`,
+      );
       const recent = (uids ?? []).slice(-MAX_MESSAGES_PER_SCAN).reverse();
 
       for (const uid of recent) {
+        if (Date.now() - startedAt > FUNCTION_BUDGET_MS) {
+          partialReason = `Stopped early to avoid timeout after ${scanned} email(s); press Rescan to continue.`;
+          break;
+        }
         scanned++;
-        const msg = await client.fetchOne(uid, { envelope: true, bodyStructure: true, internalDate: true }, { uid: true });
+        let msg: any = null;
+        try {
+          msg = await withTimeout(
+            client.fetchOne(uid, { envelope: true, bodyStructure: true, internalDate: true }, { uid: true }),
+            FETCH_TIMEOUT_MS,
+            `Timed out reading message ${uid}`,
+          );
+        } catch (err) {
+          console.warn("[scan-imap] skipped slow message", conn.email_address, uid, String((err as Error)?.message ?? err));
+          continue;
+        }
         if (!msg) continue;
 
         const fromAddr = msg.envelope?.from?.[0];
@@ -171,7 +195,21 @@ async function scanOne(admin: any, conn: Conn, supplierMap: Map<string, string>)
   }
 
   await admin.from("imap_connections").update({ last_checked_at: new Date().toISOString() }).eq("id", conn.id);
-  return { emails_scanned: scanned, invoices_found: invoicesFound };
+  return { emails_scanned: scanned, invoices_found: invoicesFound, partial: !!partialReason, warning: partialReason };
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: number | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function collectAttachments(node: any, out: Array<{ part: string; filename: string; mime: string; size: number }> = []): typeof out {

@@ -30,6 +30,7 @@ interface RunBody {
   store_name?: string;
   store_city?: string;
   brand_id?: string;
+  voice?: VoiceStyle;
 }
 
 function inferTaxonomyLevel(s: any): { level: Level; isBrandPage: boolean } {

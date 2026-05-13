@@ -63,6 +63,7 @@ interface BrandRow {
   pages_fetched: number | null;
   last_crawled_at: string | null;
   manually_verified: boolean;
+  iconic_reference?: any;
 }
 
 export default function Brands() {

@@ -64,6 +64,7 @@ interface BrandRow {
   last_crawled_at: string | null;
   manually_verified: boolean;
   iconic_reference?: any;
+  whitefox_reference?: any;
 }
 
 export default function Brands() {

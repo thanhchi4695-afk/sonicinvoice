@@ -175,25 +175,29 @@ function normaliseMeta(meta: string, storeName: string, storeCity: string | null
 }
 
 function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: VoiceStyle, primaryKeyword: string, storeName: string, storeCity: string | null): Record<string, string> {
-  const stitched = stitchDescription(parts, isBrandPage, voice);
-  if (countWords(stitched) >= 200) return parts;
-  const filler = voice === "aussie_accessible"
-    ? `Whether you're ${storeCity ? `shopping in ${storeCity}` : "browsing online"} or grabbing a last-minute gift, our ${primaryKeyword} are built for real life — designed to carry everything you need without the fuss. Pop in store or order online; we'll have them on their way the same day.`
-    : voice === "luxury_authority"
-    ? `Each piece in our ${primaryKeyword} edit has been selected for craftsmanship, materiality, and longevity. ${storeName} stocks the full range with complimentary delivery and dedicated styling support.`
-    : `Visit ${storeName}${storeCity ? ` in ${storeCity}` : ""} to see the full ${primaryKeyword} range. Our team is on hand to help you find the right fit, and every order ships fast with easy returns.`;
-  // Append into the slot that matches the voice's stitchDescription routing.
-  // White Fox / aspirational / local-warmth uses the wf_* 6-part formula;
-  // everything else (aussie_accessible, luxury_authority, professional_editorial,
-  // luxury_refined) renders the ICONIC 5-part formula via stitchDescription.
   const out = { ...parts };
   const usesWfFormula = voice === "aspirational_youth" || voice === "local_warmth";
-  if (isBrandPage) {
-    out.brand_authority = ((out.brand_authority ?? "") + " " + filler).trim();
-  } else if (usesWfFormula) {
-    out.wf_utility = ((out.wf_utility ?? "") + " " + filler).trim();
-  } else {
-    out.part4_styling = ((out.part4_styling ?? "") + " " + filler).trim();
+  const slot = isBrandPage ? "brand_authority" : usesWfFormula ? "wf_utility" : "part4_styling";
+  const fillers = voice === "aussie_accessible"
+    ? [
+        `Whether you're ${storeCity ? `shopping in ${storeCity}` : "browsing online"} or grabbing a last-minute gift, our ${primaryKeyword} are built for real life — designed to carry everything you need without the fuss.`,
+        `Pop into ${storeName}${storeCity ? ` in ${storeCity}` : ""} and our team will help you find the perfect fit, or order online and we'll have it on its way the same day.`,
+        `Every piece is chosen with the everyday in mind: lightweight enough for the school run, smart enough for dinner, and tough enough for the weekend market.`,
+      ]
+    : voice === "luxury_authority"
+    ? [
+        `Each piece in our ${primaryKeyword} edit has been selected for craftsmanship, materiality, and longevity.`,
+        `${storeName} stocks the full range with complimentary delivery and dedicated styling support across ${storeCity ?? "Australia"}.`,
+        `Our buyers travel the world to bring you only the most considered designs — pieces built to be loved season after season.`,
+      ]
+    : [
+        `Visit ${storeName}${storeCity ? ` in ${storeCity}` : ""} to see the full ${primaryKeyword} range with our team on hand to help you find the right fit.`,
+        `Every order ships fast with easy returns, and our buyers update the range weekly with new styles in store and online.`,
+        `From everyday essentials to standout pieces, the collection is built around what real customers actually wear day to day.`,
+      ];
+  for (const filler of fillers) {
+    if (countWords(stitchDescription(out, isBrandPage, voice)) >= 200) break;
+    out[slot] = ((out[slot] ?? "") + " " + filler).trim();
   }
   return out;
 }

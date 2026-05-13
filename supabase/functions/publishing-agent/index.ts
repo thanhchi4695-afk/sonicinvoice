@@ -9,6 +9,7 @@
 //   (b) Service-role + X-User-Id header → trusted call from agent-watchdog
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { optimiseProductSeo, isAccessoryVendor } from "../_shared/product-seo-optimiser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

@@ -518,8 +518,6 @@ const HomeScreen = ({
         <FeatureTile icon="📤" label="Export collections" onClick={() => onNavigateToTab?.("tools")} />
         <FeatureTile icon="📥" label="Import collections" onClick={() => onNavigateToTab?.("tools")} />
         <FeatureTile icon="🤖" label="Auto collections AI" onClick={() => onNavigateToTab?.("tools")} />
-        <FeatureTile icon="🧠" label="Brand intelligence" onClick={() => { window.location.href = "/brands"; }} />
-        <FeatureTile icon="✨" label="Collection intelligence" onClick={() => { window.location.href = "/collections"; }} />
         <FeatureTile icon="🖼️" label="Image optimisation" onClick={onStartImageOptimise || (() => {})} />
         <FeatureTile icon="📚" label="Catalog memory" onClick={onStartCatalogMemory || (() => {})} />
         <FeatureTile icon="🧬" label="Supplier profile builder" onClick={onStartSupplierProfileBuilder || (() => {})} />

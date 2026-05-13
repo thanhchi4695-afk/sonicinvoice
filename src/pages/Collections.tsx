@@ -48,6 +48,18 @@ const TYPE_FILTERS = [
   { id: "niche", label: "Niche" },
   { id: "print", label: "Print" },
   { id: "archive", label: "Archive" },
+  { id: "colour", label: "Colour" },
+  { id: "occasion", label: "Occasion" },
+  { id: "trend", label: "Trend" },
+  { id: "sale", label: "Sale" },
+  { id: "back_in_stock", label: "Back in Stock" },
+];
+
+const VOICE_OPTIONS = [
+  { id: "aspirational_youth", label: "Aspirational youth (White Fox)" },
+  { id: "local_warmth", label: "Local warmth (boutique)" },
+  { id: "professional_editorial", label: "Professional editorial (ICONIC)" },
+  { id: "luxury_refined", label: "Luxury refined" },
 ];
 
 function typeBadgeColor(t: string) {
@@ -58,6 +70,11 @@ function typeBadgeColor(t: string) {
     niche: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
     print: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30",
     archive: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+    colour: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+    occasion: "bg-teal-500/15 text-teal-300 border-teal-500/30",
+    trend: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+    sale: "bg-red-500/15 text-red-300 border-red-500/30",
+    back_in_stock: "bg-lime-500/15 text-lime-300 border-lime-500/30",
   };
   return map[t] ?? "bg-muted text-muted-foreground";
 }

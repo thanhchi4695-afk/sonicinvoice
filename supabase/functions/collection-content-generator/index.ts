@@ -144,6 +144,14 @@ Deno.serve(async (req) => {
       .limit(20);
     const relatedTitles = (related ?? []).map((r: any) => r.suggested_title);
 
+    // Load brand intelligence profiles for this user (only ones with reasonable confidence)
+    const { data: brandRows } = await admin
+      .from("brand_intelligence")
+      .select("brand_name, brand_domain, category_vocabulary, collection_structure_type, print_story_names, seo_primary_keyword, seo_secondary_keywords, brand_tone, brand_tone_sample, blog_topics_used, blog_sample_titles, crawl_confidence, manually_verified")
+      .eq("user_id", userId)
+      .gte("crawl_confidence", 0.6);
+    const brands = (brandRows ?? []) as BrandProfile[];
+
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       try {

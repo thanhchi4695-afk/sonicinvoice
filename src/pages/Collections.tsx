@@ -48,6 +48,18 @@ const TYPE_FILTERS = [
   { id: "niche", label: "Niche" },
   { id: "print", label: "Print" },
   { id: "archive", label: "Archive" },
+  { id: "colour", label: "Colour" },
+  { id: "occasion", label: "Occasion" },
+  { id: "trend", label: "Trend" },
+  { id: "sale", label: "Sale" },
+  { id: "back_in_stock", label: "Back in Stock" },
+];
+
+const VOICE_OPTIONS = [
+  { id: "aspirational_youth", label: "Aspirational youth (White Fox)" },
+  { id: "local_warmth", label: "Local warmth (boutique)" },
+  { id: "professional_editorial", label: "Professional editorial (ICONIC)" },
+  { id: "luxury_refined", label: "Luxury refined" },
 ];
 
 function typeBadgeColor(t: string) {
@@ -58,6 +70,11 @@ function typeBadgeColor(t: string) {
     niche: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
     print: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30",
     archive: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+    colour: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+    occasion: "bg-teal-500/15 text-teal-300 border-teal-500/30",
+    trend: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+    sale: "bg-red-500/15 text-red-300 border-red-500/30",
+    back_in_stock: "bg-lime-500/15 text-lime-300 border-lime-500/30",
   };
   return map[t] ?? "bg-muted text-muted-foreground";
 }
@@ -69,26 +86,40 @@ function CollectionsInner() {
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [generating, setGenerating] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, Partial<Suggestion>>>({});
   const [lastScan, setLastScan] = useState<string | null>(null);
+  const [voice, setVoice] = useState<string>("local_warmth");
+  const [savingVoice, setSavingVoice] = useState(false);
 
   async function load() {
     setLoading(true);
-    const [{ data: s }, { data: b }, { data: scan }] = await Promise.all([
+    const [{ data: s }, { data: b }, { data: scan }, { data: conn }] = await Promise.all([
       supabase.from("collection_suggestions").select("*").order("confidence_score", { ascending: false }),
       supabase.from("collection_blogs").select("*").order("created_at", { ascending: false }),
       supabase.from("collection_scans").select("*").order("started_at", { ascending: false }).limit(1),
+      supabase.from("shopify_connections").select("brand_voice_style").maybeSingle(),
     ]);
     setSuggestions((s as Suggestion[]) ?? []);
     setBlogs((b as Blog[]) ?? []);
     setLastScan(scan?.[0]?.started_at ?? null);
+    if (conn?.brand_voice_style) setVoice(conn.brand_voice_style as string);
     setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
+
+  async function saveVoice(next: string) {
+    setVoice(next);
+    setSavingVoice(true);
+    const { error } = await supabase.from("shopify_connections").update({ brand_voice_style: next as never }).neq("id", "00000000-0000-0000-0000-000000000000");
+    setSavingVoice(false);
+    if (error) toast.error(error.message);
+    else toast.success("Brand voice updated");
+  }
 
   const filtered = useMemo(() => {
     if (filter === "all") return suggestions.filter((s) => s.status !== "rejected");
@@ -106,6 +137,20 @@ function CollectionsInner() {
       toast.error(e instanceof Error ? e.message : "Scan failed");
     } finally {
       setScanning(false);
+    }
+  }
+
+  async function runDetector() {
+    setDetecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("seo-collection-detector", { body: {} });
+      if (error) throw error;
+      toast.success(`Detector wrote ${data.suggestions_written ?? 0} colour/occasion/trend collections from ${data.products_scanned ?? 0} products`);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Detector failed");
+    } finally {
+      setDetecting(false);
     }
   }
 
@@ -171,10 +216,27 @@ function CollectionsInner() {
             {lastScan ? `Last scan: ${new Date(lastScan).toLocaleString()}` : "No scans yet"}
           </p>
         </div>
-        <Button onClick={runScan} disabled={scanning}>
-          {scanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-          Scan store
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={voice}
+            onChange={(e) => saveVoice(e.target.value)}
+            disabled={savingVoice}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            title="Brand voice style — drives whether ICONIC or White Fox reference is used"
+          >
+            {VOICE_OPTIONS.map((v) => (
+              <option key={v.id} value={v.id}>{v.label}</option>
+            ))}
+          </select>
+          <Button variant="outline" onClick={runDetector} disabled={detecting}>
+            {detecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+            Detect colour/occasion/trend
+          </Button>
+          <Button onClick={runScan} disabled={scanning}>
+            {scanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Scan store
+          </Button>
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>

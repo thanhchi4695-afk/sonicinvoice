@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
     if (level === 5 && body.brand_id) {
       const { data } = await supabase
         .from("brand_intelligence")
-        .select("brand_name, brand_voice, value_proposition, hero_keywords, iconic_reference, competitor_reference_styletread")
+        .select("brand_name, brand_voice, value_proposition, hero_keywords, iconic_reference, whitefox_reference, competitor_reference_styletread")
         .eq("id", body.brand_id)
         .maybeSingle();
       brand = data;
@@ -287,7 +287,7 @@ Deno.serve(async (req) => {
       const prompt = buildPrompt({
         suggestion, level, isBrandPage, vertical, storeName, storeCity,
         keywords: (tieredKws ?? []) as any, brand, linkOptions, primaryKeyword,
-        previousIssues: lastIssues,
+        previousIssues: lastIssues, voice,
       });
       const ai = await callAI({
         model: "google/gemini-2.5-pro",
@@ -403,8 +403,9 @@ function buildPrompt(opts: {
   linkOptions: Array<{ handle: string; title: string; type: string }>;
   primaryKeyword: string;
   previousIssues: ValidationIssue[];
+  voice: VoiceStyle;
 }) {
-  const { suggestion, level, isBrandPage, vertical, storeName, storeCity, keywords, brand, linkOptions, primaryKeyword, previousIssues } = opts;
+  const { suggestion, level, isBrandPage, vertical, storeName, storeCity, keywords, brand, linkOptions, primaryKeyword, previousIssues, voice } = opts;
 
   const titleFormulas: Record<Level, string> = {
     2: "{Audience} {Category} | " + storeName,
@@ -414,9 +415,18 @@ function buildPrompt(opts: {
     6: "{Occasion}" + (storeCity ? " " + storeCity : "") + " | " + storeName,
   };
 
-  const iconicBlock = brand?.iconic_reference
-    ? "\nTHE ICONIC REFERENCE for " + brand.brand_name + " (match vocabulary, do not plagiarise):\n" +
-      JSON.stringify(brand.iconic_reference).slice(0, 1800) + "\n"
+  // Competitor reference router:
+  //   FOOTWEAR or professional/luxury voice -> ICONIC (marketplace breadth)
+  //   CLOTHING/SWIMWEAR + aspirational/warmth voice -> White Fox (single-brand DTC)
+  const useWhiteFox =
+    (vertical === "CLOTHING" || vertical === "SWIMWEAR") &&
+    (voice === "aspirational_youth" || voice === "local_warmth") &&
+    !!brand?.whitefox_reference;
+  const refLabel = useWhiteFox ? "WHITE FOX REFERENCE" : "THE ICONIC REFERENCE";
+  const refData = useWhiteFox ? brand?.whitefox_reference : brand?.iconic_reference;
+  const iconicBlock = refData
+    ? `\n${refLabel} for ${brand?.brand_name ?? "this brand"} (match vocabulary, do not plagiarise):\n` +
+      JSON.stringify(refData).slice(0, 1800) + "\n"
     : "";
 
   const previousBlock = previousIssues.length

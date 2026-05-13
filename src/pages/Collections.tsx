@@ -254,11 +254,13 @@ function CollectionsInner() {
           <TabsTrigger value="suggestions">Suggestions ({filtered.length})</TabsTrigger>
           <TabsTrigger value="active">Active</TabsTrigger>
           <TabsTrigger value="blogs">Blog drafts ({pendingBlogs.length})</TabsTrigger>
-          <TabsTrigger value="gaps">Competitor Gaps</TabsTrigger>
+          <TabsTrigger value="gaps">
+            Gaps{pendingGapsCount > 0 ? ` (${pendingGapsCount})` : ""}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="gaps">
-          <GapsTab />
+          <GapsTab onPendingCountChange={setPendingGapsCount} />
         </TabsContent>
 
         <TabsContent value="suggestions" className="space-y-4">

@@ -92,7 +92,7 @@ export default function Brands() {
   async function toggleKillSwitch() {
     const next = !killSwitch;
     setKillSwitch(next);
-    const { error } = await supabase.from("app_settings").update({ brand_intelligence_enabled: next }).neq("id", "00000000-0000-0000-0000-000000000000");
+    const { error } = await supabase.from("app_settings").update({ brand_intelligence_enabled: next }).eq("singleton", true);
     if (error) { toast.error(error.message); setKillSwitch(!next); return; }
     toast.success(`Brand intelligence ${next ? "enabled" : "paused"}`);
   }

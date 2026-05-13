@@ -173,10 +173,24 @@ export default function SeoEngine() {
                   const metaOk = metaLen >= 150 && metaLen <= 160;
                   return (
                     <tr key={s.id} className="border-t border-border/40 h-8">
-                      <td className="p-2 truncate max-w-[280px]">{s.suggested_title}</td>
+                      <td className="p-2 truncate max-w-[260px]">{s.suggested_title}</td>
+                      <td className="p-2 text-xs">{s.taxonomy_level ?? "—"}</td>
+                      <td className="p-2">
+                        {typeof s.completeness_score === "number" ? (
+                          <Badge
+                            variant={s.completeness_score >= 80 ? "secondary" : "outline"}
+                            className={
+                              s.completeness_score >= 80 ? "bg-emerald-500/15 text-emerald-500"
+                              : s.completeness_score >= 50 ? "bg-amber-500/15 text-amber-500"
+                              : "bg-destructive/15 text-destructive"
+                            }
+                          >
+                            {s.completeness_score}
+                          </Badge>
+                        ) : "—"}
+                      </td>
                       <td className="p-2 text-xs text-muted-foreground">{s.collection_type}</td>
                       <td className="p-2">{s.product_count}</td>
-                      <td className="p-2">{o?.layer ?? "—"}</td>
                       <td className="p-2">
                         {o?.seo_title ? (
                           <span className={titleLen > 60 ? "text-destructive" : ""}>

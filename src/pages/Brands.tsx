@@ -163,22 +163,32 @@ export default function Brands() {
       </div>
 
       {unseeded.length > 0 && (
-        <Card className="p-4 mb-6">
-          <h2 className="font-semibold mb-2">Pre-seed Splash brands</h2>
-          <div className="flex flex-wrap gap-2">
-            {unseeded.map((b) => (
-              <Button
-                key={b.name}
-                variant="outline"
-                size="sm"
-                disabled={!!crawlingId}
-                onClick={() => seedAndCrawl(b)}
-              >
-                {crawlingId === b.name ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
-                {b.name} <span className="text-muted-foreground ml-1">P{b.tier}</span>
-              </Button>
-            ))}
-          </div>
+        <Card className="p-4 mb-6 space-y-3">
+          {(["Splash", "Stomp"] as const).map((store) => {
+            const items = unseeded.filter((b) => b.store === store);
+            if (items.length === 0) return null;
+            return (
+              <div key={store}>
+                <h2 className="font-semibold mb-2 text-sm">Pre-seed {store} brands</h2>
+                <div className="flex flex-wrap gap-2">
+                  {items.map((b) => (
+                    <Button
+                      key={b.name}
+                      variant="outline"
+                      size="sm"
+                      disabled={!!crawlingId}
+                      onClick={() => seedAndCrawl(b)}
+                      title={`${b.vertical} · ${b.domain}`}
+                    >
+                      {crawlingId === b.name ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                      {b.name}
+                      <span className="text-muted-foreground ml-1 text-xs">{b.vertical[0]}{b.vertical.slice(1).toLowerCase()} · P{b.tier}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </Card>
       )}
 

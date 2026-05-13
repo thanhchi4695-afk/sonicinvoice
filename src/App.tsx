@@ -36,6 +36,7 @@ const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleS
 const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx"));
 const FeedHealthPanel = lazy(() => import("./components/FeedHealthPanel.tsx"));
 const Collections = lazy(() => import("./pages/Collections.tsx"));
+const Brands = lazy(() => import("./pages/Brands.tsx"));
 
 const queryClient = new QueryClient();
 

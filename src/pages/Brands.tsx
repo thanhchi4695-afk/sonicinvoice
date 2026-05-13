@@ -317,9 +317,14 @@ export default function Brands() {
                       {stale && <Badge variant="outline" className="ml-2">Needs re-crawl</Badge>}
                     </td>
                     <td className="p-3 text-right space-x-2 whitespace-nowrap">
-                      <Button size="sm" variant="ghost" disabled={crawlingId === r.id} onClick={() => crawl(r.brand_name, r.brand_domain, r.id)}>
+                      <Button size="sm" variant="ghost" disabled={crawlingId === r.id} onClick={() => crawl(r.brand_name, r.brand_domain, r.id)} title="Re-crawl brand">
                         {crawlingId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                       </Button>
+                      {r.industry_vertical === "FOOTWEAR" && (
+                        <Button size="sm" variant="ghost" disabled={iconicRefreshingId === r.id} onClick={() => refreshIconic(r.id, r.brand_name)} title="Refresh ICONIC reference">
+                          {iconicRefreshingId === r.id ? <Loader2 className="h-3 w-3 animate-spin text-amber-500" /> : <Zap className="h-3 w-3 text-amber-500" />}
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => setSelected(r)}>View</Button>
                     </td>
                   </tr>

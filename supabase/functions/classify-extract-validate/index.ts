@@ -926,7 +926,7 @@ function json(body: unknown, status = 200) {
 
 // ─────── Claude-native PDF extraction (Anthropic API direct) ───────
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
-const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
+const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 const RETURN_INVOICE_TOOL = {
   name: "return_invoice",

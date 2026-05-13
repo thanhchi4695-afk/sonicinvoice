@@ -46,8 +46,8 @@ export default function SeoEngine() {
     setLoading(true);
     const { data: s } = await supabase
       .from("collection_suggestions")
-      .select("id,suggested_title,suggested_handle,collection_type,product_count,status")
-      .order("created_at", { ascending: false })
+      .select("id,suggested_title,suggested_handle,collection_type,product_count,status,completeness_score,taxonomy_level")
+      .order("completeness_score", { ascending: true, nullsFirst: true })
       .limit(200);
     setSuggestions((s ?? []) as Suggestion[]);
     const { data: o } = await supabase

@@ -153,6 +153,10 @@ function CollectionsInner() {
       setDetecting(false);
     }
   }
+
+  async function generate(id: string) {
+    setGenerating(id);
+    try {
       const { data, error } = await supabase.functions.invoke("collection-content-generator", { body: { suggestion_id: id } });
       if (error) throw error;
       const r = data?.results?.[0];

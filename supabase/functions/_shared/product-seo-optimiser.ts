@@ -15,6 +15,21 @@ const ACCESSORY_VENDOR_HINTS = [
   "louenhide", "olga berg", "peta and jain", "peta & jain", "status anxiety",
 ];
 
+const JEWELLERY_VENDOR_HINTS = [
+  "amber sceats","by charlotte","mayol","arms of eve","emma pills","avant studio",
+  "noah the label","heaven mayhem","porter","lana wilkinson","midsummer star","olga de polga",
+];
+
+const JEWELLERY_TYPE_TOKENS = [
+  "earrings","earring","hoops","hoop","studs","stud","necklace","pendant","chain","choker",
+  "bracelet","bangle","cuff","ring","signet","anklet","charm",
+];
+
+const JEWELLERY_METAL_TOKENS = [
+  "gold-filled","gold filled","14k gold","18k gold","rose gold","sterling silver",
+  "vermeil","pearl","silver","gold",
+];
+
 export function slugify(s: string): string {
   return (s || "")
     .toLowerCase()
@@ -36,6 +51,29 @@ export function detectBagType(...sources: (string | null | undefined)[]): string
     if (new RegExp(`\\b${tok}\\b`).test(hay)) return tok;
   }
   return null;
+}
+
+export function detectJewelleryType(...sources: (string | null | undefined)[]): string | null {
+  const hay = sources.filter(Boolean).join(" ").toLowerCase();
+  for (const tok of JEWELLERY_TYPE_TOKENS) {
+    if (new RegExp(`\\b${tok}\\b`).test(hay)) return tok;
+  }
+  return null;
+}
+
+export function detectMetal(...sources: (string | null | undefined)[]): string | null {
+  const hay = sources.filter(Boolean).join(" ").toLowerCase();
+  for (const tok of JEWELLERY_METAL_TOKENS) {
+    if (hay.includes(tok)) return tok;
+  }
+  return null;
+}
+
+export function isJewelleryVendor(vendor: string | null | undefined, productType: string | null | undefined): boolean {
+  const v = (vendor || "").toLowerCase();
+  if (JEWELLERY_VENDOR_HINTS.some((h) => v.includes(h))) return true;
+  const t = (productType || "").toLowerCase();
+  return /jewellery|jewelry|earring|necklace|bracelet|ring|bangle|pendant|hoop|stud|chain|anklet|charm/.test(t);
 }
 
 export function isAccessoryVendor(vendor: string | null | undefined, productType: string | null | undefined): boolean {

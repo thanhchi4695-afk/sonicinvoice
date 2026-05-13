@@ -252,6 +252,8 @@ export default function SeoEngine() {
             </table>
           )}
         </Card>
+
+        <ProductSeoAuditPanel defaultCity={storeCity} defaultStoreName={storeName} />
       </div>
     </div>
   );

@@ -680,8 +680,11 @@ function buildPrompt(opts: {
 
   // Niche-keyword guard (Megantic Innovation 2): never use broad standalone keywords as primary
   const broadBlocklist = new Set(["bags","accessories","wallets","handbags","online shopping"]);
+  const jewelleryBroadBlocklist = new Set(["jewellery","jewelry","earrings","necklaces","bracelets","rings","gold","silver"]);
   const nicheGuard = vertical === "ACCESSORIES"
     ? `\nNICHE KEYWORD GUARD: never use any of these as the primary keyword on its own — ${[...broadBlocklist].join(", ")}. Always combine with brand + type, feature, or location signal (e.g. "louenhide crossbody bag", "rfid blocking wallet women", "bags darwin").\n`
+    : vertical === "JEWELLERY"
+    ? `\nNICHE KEYWORD GUARD: never use any of these as the primary keyword on its own — ${[...jewelleryBroadBlocklist].join(", ")}. Always combine with brand + type, metal, occasion, gifting, or location (e.g. "by charlotte lotus necklace", "18k gold vermeil hoop earrings", "bridesmaid gift jewellery australia", "jewellery double bay").\n`
     : "";
 
   const previousBlock = previousIssues.length

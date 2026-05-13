@@ -31,6 +31,8 @@ interface InboxItem {
   messageId?: string;
   attachmentId?: string;
   attachmentMime?: string;
+  connectionId?: string | null;
+  accountEmail?: string | null;
   parseJobId?: string;
   parsedVariantCount?: number;
   importing?: boolean;

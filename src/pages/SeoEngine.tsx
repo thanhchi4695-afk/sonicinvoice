@@ -199,6 +199,20 @@ export default function SeoEngine() {
                         )}
                       </td>
                       <td className="p-2">
+                        {o ? (
+                          <Badge
+                            variant={
+                              o.rules_status === "validated" ? "secondary"
+                              : o.rules_status === "insufficient" ? "destructive"
+                              : o.rules_status === "error" ? "destructive"
+                              : "outline"
+                            }
+                          >
+                            {o.rules_status}{typeof o.rules_validated_count === "number" ? ` · ${o.rules_validated_count}` : ""}
+                          </Badge>
+                        ) : "—"}
+                      </td>
+                      <td className="p-2 space-x-1">
                         <Button
                           size="sm"
                           variant="outline"
@@ -207,6 +221,11 @@ export default function SeoEngine() {
                         >
                           {running === s.id ? "Generating…" : o ? "Regenerate" : "Generate"}
                         </Button>
+                        {o && (
+                          <Button size="sm" variant="ghost" onClick={() => validateRules([s.id])}>
+                            Validate
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   );

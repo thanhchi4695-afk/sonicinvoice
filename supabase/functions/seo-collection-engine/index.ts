@@ -171,7 +171,8 @@ type VoiceStyle =
   | "local_warmth"
   | "luxury_refined"
   | "luxury_authority"   // David Jones
-  | "aussie_accessible"; // Louenhide / Megantic
+  | "aussie_accessible"  // Louenhide / Megantic
+  | "gwg_meaningful";    // Girls With Gems (jewellery)
 
 function stitchFaqHtml(faq: Array<{ q: string; a: string }>): string {
   return [

@@ -45,11 +45,16 @@ Deno.serve(async (req) => {
     const { data: userData, error: userErr } = await userClient.auth.getUser();
     if (userErr || !userData?.user) return json({ error: "Not authenticated" }, 401);
 
-    const { data: conns, error } = await admin
+    const body = await req.json().catch(() => ({}));
+    const onlyConnectionId = typeof body?.connection_id === "string" ? body.connection_id : null;
+
+    let q = admin
       .from("imap_connections")
       .select("id, user_id, email_address, imap_host, imap_port, imap_tls, imap_username, password_encrypted, password_iv")
       .eq("user_id", userData.user.id)
       .eq("is_active", true);
+    if (onlyConnectionId) q = q.eq("id", onlyConnectionId);
+    const { data: conns, error } = await q;
     if (error) throw error;
     if (!conns || conns.length === 0) return json({ error: "No IMAP connection" }, 404);
 

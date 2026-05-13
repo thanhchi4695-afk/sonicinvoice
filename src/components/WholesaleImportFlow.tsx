@@ -233,8 +233,13 @@ const WholesaleImportFlow = ({ onBack }: Props) => {
               setOrders(result.orders);
               const grouped = result.rawProducts.length;
               const rowCount = result.rawRowCount ?? firstRows.length;
-              setDetectionBanner({ kind: "nuorder", products: grouped, rows: rowCount });
-              toast.success(`NuOrder catalog detected — ${grouped} products grouped from ${rowCount} rows`);
+              const fmt: "item" | "order" = result.format === "xlsx_order_data" ? "order" : "item";
+              setDetectionBanner({ kind: "nuorder", products: grouped, rows: rowCount, format: fmt });
+              toast.success(
+                fmt === "order"
+                  ? `NuOrder Order detected — ${grouped} products with size quantities`
+                  : `NuOrder Product Data detected — ${grouped} products grouped from ${rowCount} rows`,
+              );
               import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "wholesale", productCount: grouped }));
               setScreen("orders");
               return;

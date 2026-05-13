@@ -1511,6 +1511,7 @@ export type Database = {
           seo_description: string | null
           seo_title: string | null
           shopify_collection_id: string | null
+          smart_collection_rules: Json | null
           status: string
           store_domain: string | null
           suggested_handle: string
@@ -1533,6 +1534,7 @@ export type Database = {
           seo_description?: string | null
           seo_title?: string | null
           shopify_collection_id?: string | null
+          smart_collection_rules?: Json | null
           status?: string
           store_domain?: string | null
           suggested_handle: string
@@ -1555,6 +1557,7 @@ export type Database = {
           seo_description?: string | null
           seo_title?: string | null
           shopify_collection_id?: string | null
+          smart_collection_rules?: Json | null
           status?: string
           store_domain?: string | null
           suggested_handle?: string

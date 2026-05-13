@@ -22,6 +22,7 @@ interface Output {
   meta_description: string | null;
   status: string;
   rules_status: string;
+  rules_validated_count?: number | null;
   validation_errors: any;
 }
 

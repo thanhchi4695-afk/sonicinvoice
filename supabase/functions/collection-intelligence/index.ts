@@ -321,17 +321,22 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const auth = req.headers.get("Authorization");
-    if (!auth) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
-    const { data: userData } = await userClient.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
+    const auth = req.headers.get("Authorization") ?? "";
     const body = await req.json().catch(() => ({}));
     const triggeredBy = (body.triggered_by ?? "manual") as string;
     const verticalOverride = (body.industry_vertical as string | undefined)?.toUpperCase();
+
+    // Internal callers (webhook, cron) authenticate with service-role key + explicit user_id.
+    let userId: string | undefined;
+    const serviceBearer = `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`;
+    if (auth === serviceBearer && typeof body.user_id === "string") {
+      userId = body.user_id;
+    } else if (auth) {
+      const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
+      const { data: userData } = await userClient.auth.getUser();
+      userId = userData.user?.id;
+    }
+    if (!userId) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: scanRow } = await admin

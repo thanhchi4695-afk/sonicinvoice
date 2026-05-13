@@ -201,6 +201,8 @@ interface EditState {
   availableSizes: string[];
   selectedColors: string[];    // user-picked subset to stock
   selectedSizes: string[];
+  /** Stock to allocate per variant, keyed `${colour}||${size}`. */
+  variantQuantities: Record<string, number>;
 }
 
 type BulkStatus = "pending" | "fetching" | "success" | "error";

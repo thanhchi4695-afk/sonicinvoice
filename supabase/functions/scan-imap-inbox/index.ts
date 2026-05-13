@@ -12,7 +12,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const MAX_MESSAGES_PER_SCAN = 250;
+const MAX_MESSAGES_PER_SCAN = 500;
 const SUBJECT_TERMS = ["invoice", "tax invoice", "purchase order", "packing slip", "receipt", "statement", "bill"];
 const INVOICE_FILE_RE = /\.(pdf|xlsx?|csv|jpe?g|png|heic|webp)$/i;
 

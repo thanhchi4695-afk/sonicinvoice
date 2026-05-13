@@ -463,6 +463,13 @@ Deno.serve(async (req) => {
         success: true,
         scan_id: scanId,
         vertical,
+        vertical_detection: {
+          detected: detection.vertical,
+          override: verticalOverride ?? null,
+          classified_products: detection.classified,
+          distribution: detection.distribution,
+          threshold: 0.4,
+        },
         products_scanned: products.length,
         dimensions_loaded: dimensions.length,
         brands_loaded: brands.length,

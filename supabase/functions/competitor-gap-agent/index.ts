@@ -259,6 +259,7 @@ async function runPipeline(userId: string, runId: string) {
     const existingHandles = new Set<string>(collections.map((c: any) => c.handle));
 
     await step(`Vertical=${vertical}, ${brands.length} brands, ${existingHandles.size} existing collections`);
+    await admin.from("gap_analysis_runs").update({ brands_checked: brands.length }).eq("id", runId);
 
     const refs = COMPETITOR_REFERENCES[vertical] || [];
     let storesChecked = 0;

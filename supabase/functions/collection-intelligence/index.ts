@@ -394,11 +394,19 @@ Deno.serve(async (req) => {
 
     try {
       const { accessToken, storeUrl, apiVersion } = await getValidShopifyToken(admin, userId);
-      const vertical = verticalOverride ?? detectVerticalFromStore(storeUrl);
 
-      // Load taxonomy dimensions for this vertical (or all if MULTI)
+      // Fetch products + collections first so we can run distribution-based vertical detection.
+      const [products, collections] = await Promise.all([
+        fetchAllProducts(storeUrl, accessToken, apiVersion),
+        fetchAllCollections(storeUrl, accessToken, apiVersion),
+      ]);
+
+      const detection = detectVerticalFromProducts(products);
+      const vertical = verticalOverride ?? detection.vertical;
+
+      // Load taxonomy dimensions for this vertical (or all signature verticals if MULTI)
       const verticalsToLoad = vertical === "MULTI"
-        ? ["FOOTWEAR", "SWIMWEAR", "CLOTHING", "ACCESSORIES", "LIFESTYLE"]
+        ? Object.keys(VERTICAL_SIGNATURES)
         : vertical === "UNKNOWN" ? [] : [vertical];
 
       const { data: taxRows } = verticalsToLoad.length > 0
@@ -423,11 +431,6 @@ Deno.serve(async (req) => {
         .eq("user_id", userId)
         .gte("crawl_confidence", 0.6);
       const brands = (brandRows ?? []) as BrandRow[];
-
-      const [products, collections] = await Promise.all([
-        fetchAllProducts(storeUrl, accessToken, apiVersion),
-        fetchAllCollections(storeUrl, accessToken, apiVersion),
-      ]);
 
       const suggestions = buildSuggestions(products, collections, vertical, dimensions, brands);
 

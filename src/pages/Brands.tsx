@@ -153,7 +153,25 @@ export default function Brands() {
       toast.error(`${name}: ${e instanceof Error ? e.message : "ICONIC refresh failed"}`);
     } finally {
       setIconicRefreshingId(null);
+  }
+
+  async function refreshWhitefox(id: string, name: string) {
+    setWhitefoxRefreshingId(id);
+    try {
+      const { data, error } = await supabase.functions.invoke("whitefox-reference-refresh", { body: { brand_id: id } });
+      if (error) throw error;
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      const d = data as { hasChanges?: boolean; changes?: string[]; pages_scraped?: number };
+      toast.success(`${name}: White Fox refreshed (${d.pages_scraped ?? 0} pages)`, {
+        description: (d.changes ?? []).slice(0, 3).join(" • ") || "No changes detected",
+      });
+      await load();
+    } catch (e) {
+      toast.error(`${name}: ${e instanceof Error ? e.message : "White Fox refresh failed"}`);
+    } finally {
+      setWhitefoxRefreshingId(null);
     }
+  }
   }
 
   async function addBrand() {

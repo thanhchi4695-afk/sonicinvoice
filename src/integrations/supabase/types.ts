@@ -1834,6 +1834,75 @@ export type Database = {
         }
         Relationships: []
       }
+      competitor_gaps: {
+        Row: {
+          brand: string | null
+          competitor_framing: string
+          competitor_name: string
+          competitor_url: string
+          created_at: string
+          expected_impact: string
+          gap_type: string
+          id: string
+          product_count_in_store: number | null
+          run_id: string | null
+          shopify_collection_id: string | null
+          smart_rule_column: string | null
+          smart_rule_condition: string | null
+          smart_rule_relation: string | null
+          status: string
+          suggested_description: string | null
+          suggested_handle: string
+          suggested_title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand?: string | null
+          competitor_framing: string
+          competitor_name: string
+          competitor_url: string
+          created_at?: string
+          expected_impact?: string
+          gap_type: string
+          id?: string
+          product_count_in_store?: number | null
+          run_id?: string | null
+          shopify_collection_id?: string | null
+          smart_rule_column?: string | null
+          smart_rule_condition?: string | null
+          smart_rule_relation?: string | null
+          status?: string
+          suggested_description?: string | null
+          suggested_handle: string
+          suggested_title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand?: string | null
+          competitor_framing?: string
+          competitor_name?: string
+          competitor_url?: string
+          created_at?: string
+          expected_impact?: string
+          gap_type?: string
+          id?: string
+          product_count_in_store?: number | null
+          run_id?: string | null
+          shopify_collection_id?: string | null
+          smart_rule_column?: string | null
+          smart_rule_condition?: string | null
+          smart_rule_relation?: string | null
+          status?: string
+          suggested_description?: string | null
+          suggested_handle?: string
+          suggested_title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       competitor_monitored_products: {
         Row: {
           created_at: string
@@ -2555,6 +2624,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      gap_analysis_runs: {
+        Row: {
+          competitor_stores_checked: number
+          completed_at: string | null
+          current_step: string | null
+          error_message: string | null
+          gaps_found: number
+          id: string
+          started_at: string
+          status: string
+          user_id: string
+          vertical: string | null
+        }
+        Insert: {
+          competitor_stores_checked?: number
+          completed_at?: string | null
+          current_step?: string | null
+          error_message?: string | null
+          gaps_found?: number
+          id?: string
+          started_at?: string
+          status?: string
+          user_id: string
+          vertical?: string | null
+        }
+        Update: {
+          competitor_stores_checked?: number
+          completed_at?: string | null
+          current_step?: string | null
+          error_message?: string | null
+          gaps_found?: number
+          id?: string
+          started_at?: string
+          status?: string
+          user_id?: string
+          vertical?: string | null
+        }
+        Relationships: []
       }
       gmail_connections: {
         Row: {

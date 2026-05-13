@@ -154,7 +154,13 @@ export interface ImportedLineItem {
   sourceUrl: string;
   colors?: string[];
   sizes?: string[];
+  /** Per-variant stock quantities, keyed `${colour}||${size}` (empty string if dimension absent). */
+  variantQuantities?: Record<string, number>;
 }
+
+/** Build the canonical key for variantQuantities lookups. */
+export const variantQtyKey = (colour: string, size: string): string =>
+  `${colour ?? ""}||${size ?? ""}`;
 
 export interface ExtractedProduct {
   name?: string;
@@ -195,6 +201,8 @@ interface EditState {
   availableSizes: string[];
   selectedColors: string[];    // user-picked subset to stock
   selectedSizes: string[];
+  /** Stock to allocate per variant, keyed `${colour}||${size}`. */
+  variantQuantities: Record<string, number>;
 }
 
 type BulkStatus = "pending" | "fetching" | "success" | "error";
@@ -390,6 +398,12 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     const priceStr =
       item.price !== undefined && Number.isFinite(item.price) ? String(item.price) : "0";
 
+    const qtyMap = item.variantQuantities ?? {};
+    const qtyFor = (c: string, s: string) => {
+      const n = qtyMap[variantQtyKey(c, s)];
+      return Number.isFinite(n) && (n as number) > 0 ? Math.floor(n as number) : 0;
+    };
+
     const options: { name: string }[] = [];
     if (colors.length) options.push({ name: "Colour" });
     if (sizes.length) options.push({ name: "Size" });
@@ -403,7 +417,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
               price: priceStr,
               sku: "",
               inventory_management: "shopify",
-              inventory_quantity: 0,
+              inventory_quantity: qtyFor(c, s),
             })),
           )
         : colors.length
@@ -412,7 +426,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
               price: priceStr,
               sku: "",
               inventory_management: "shopify",
-              inventory_quantity: 0,
+              inventory_quantity: qtyFor(c, ""),
             }))
           : sizes.length
             ? sizes.map((s) => ({
@@ -420,14 +434,14 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                 price: priceStr,
                 sku: "",
                 inventory_management: "shopify",
-                inventory_quantity: 0,
+                inventory_quantity: qtyFor("", s),
               }))
             : [
                 {
                   price: priceStr,
                   sku: "",
                   inventory_management: "shopify",
-                  inventory_quantity: 0,
+                  inventory_quantity: qtyFor("", ""),
                 },
               ];
 
@@ -500,6 +514,17 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
         variants = sizes.map((s) => ({ o1: s, o2: "" }));
       }
 
+      const qtyMap = item.variantQuantities ?? {};
+      const qtyForRow = (vRow: { o1: string; o2: string } | undefined): string => {
+        if (!vRow) return "";
+        let c = "", s = "";
+        if (colors.length && sizes.length) { c = vRow.o1; s = vRow.o2; }
+        else if (colors.length) { c = vRow.o1; }
+        else if (sizes.length) { s = vRow.o1; }
+        const n = qtyMap[variantQtyKey(c, s)];
+        return Number.isFinite(n) && (n as number) > 0 ? String(Math.floor(n as number)) : "0";
+      };
+
       const images = (item.imageUrls || []).filter(Boolean);
       const maxRows = Math.max(variants.length, images.length, 1);
 
@@ -524,7 +549,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
           "",                        // Variant SKU
           v ? "0" : "",              // Variant Grams
           v ? "shopify" : "",        // Inventory Tracker
-          v ? "0" : "",              // Inventory Qty
+          v ? qtyForRow(v) : "",     // Inventory Qty
           v ? "deny" : "",           // Inventory Policy
           v ? "manual" : "",         // Fulfillment Service
           v ? priceStr : "",         // Variant Price
@@ -750,6 +775,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
         availableSizes: product.sizes ?? [],
         selectedColors: product.colors ?? [],
         selectedSizes: product.sizes ?? [],
+        variantQuantities: {},
       });
       toast.success("Product details fetched — review and edit before adding");
     } catch (err) {
@@ -783,6 +809,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       sourceUrl: result.sourceUrl ?? url,
       colors: edit.selectedColors.length ? edit.selectedColors : undefined,
       sizes: edit.selectedSizes.length ? edit.selectedSizes : undefined,
+      variantQuantities: Object.keys(edit.variantQuantities).length ? edit.variantQuantities : undefined,
     };
   };
 
@@ -1193,6 +1220,85 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
               addPlaceholder="Add a size (e.g. M)"
               emptyHint="No sizes detected on the page — add any you'd like to stock."
             />
+
+            {/* Per-variant stock quantities */}
+            {(edit.selectedColors.length > 0 || edit.selectedSizes.length > 0) && (() => {
+              const colours = edit.selectedColors.length ? edit.selectedColors : [""];
+              const sizes = edit.selectedSizes.length ? edit.selectedSizes : [""];
+              const setQty = (c: string, s: string, raw: string) => {
+                const n = raw === "" ? 0 : Math.max(0, Math.floor(Number(raw) || 0));
+                const key = variantQtyKey(c, s);
+                setEdit((prev) => {
+                  const next = { ...prev.variantQuantities };
+                  if (n > 0) next[key] = n; else delete next[key];
+                  return { ...prev, variantQuantities: next };
+                });
+              };
+              const total = Object.values(edit.variantQuantities).reduce((a, b) => a + (Number(b) || 0), 0);
+              const fillAll = (n: number) => {
+                setEdit((prev) => {
+                  const next: Record<string, number> = {};
+                  for (const c of colours) for (const s of sizes) {
+                    if (n > 0) next[variantQtyKey(c, s)] = n;
+                  }
+                  return { ...prev, variantQuantities: next };
+                });
+              };
+              return (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">
+                      Stock per variant <span className="text-muted-foreground font-normal">(total {total})</span>
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => fillAll(1)} className="text-[11px] text-muted-foreground hover:text-foreground">Fill 1</button>
+                      <span className="text-[11px] text-muted-foreground">·</span>
+                      <button type="button" onClick={() => fillAll(0)} className="text-[11px] text-muted-foreground hover:text-foreground">Clear</button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto rounded-md border border-border">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/40">
+                        <tr>
+                          <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">
+                            {edit.selectedColors.length && edit.selectedSizes.length ? "Colour \\ Size" : edit.selectedColors.length ? "Colour" : "Size"}
+                          </th>
+                          {sizes.map((s) => (
+                            <th key={s || "_"} className="text-left px-2 py-1.5 font-medium">
+                              {s || (edit.selectedColors.length ? "Qty" : "—")}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {colours.map((c) => (
+                          <tr key={c || "_"} className="border-t border-border">
+                            <td className="px-2 py-1.5 font-medium">{c || (edit.selectedSizes.length ? "Qty" : "—")}</td>
+                            {sizes.map((s) => {
+                              const key = variantQtyKey(c, s);
+                              const val = edit.variantQuantities[key] ?? 0;
+                              return (
+                                <td key={s || "_"} className="px-1 py-1">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    inputMode="numeric"
+                                    value={val === 0 ? "" : String(val)}
+                                    onChange={(e) => setQty(c, s, e.target.value)}
+                                    placeholder="0"
+                                    className="h-7 text-xs w-16"
+                                  />
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Images */}
             <div className="space-y-2">

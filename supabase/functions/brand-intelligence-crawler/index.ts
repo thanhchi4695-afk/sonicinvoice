@@ -335,7 +335,7 @@ Deno.serve(async (req) => {
     // Step 4: AI synthesis
     let extracted: ExtractedIntelligence;
     try {
-      extracted = await aiExtract(body.brand_name, navTitles, Array.from(blogTitlesSet), toneSample);
+      extracted = await aiExtract(body.brand_name, vertical, navTitles, Array.from(blogTitlesSet), toneSample);
     } catch (e) {
       const err = `AI extraction failed: ${e instanceof Error ? e.message : String(e)}`;
       await supabase.from("brand_intelligence").update({
@@ -344,19 +344,38 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: err }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Coerce brand_tone to existing CHECK-constraint allow-list
+    const ALLOWED_TONES = new Set(["aspirational","edgy","functional","luxurious","inclusive","playful","unknown"]);
+    const TONE_FALLBACK: Record<string, string> = { technical: "functional", lifestyle: "aspirational", sustainable: "functional" };
+    const rawTone = (extracted.brand_tone || "unknown").toLowerCase();
+    const safeTone = ALLOWED_TONES.has(rawTone) ? rawTone : (TONE_FALLBACK[rawTone] || "unknown");
+
+    // Build blog_topic_distribution from titles if AI didn't provide it
+    let topicDist = extracted.blog_topic_distribution;
+    if (!topicDist || Object.keys(topicDist).length === 0) {
+      topicDist = (extracted.blog_topics_used ?? []).reduce<Record<string, number>>((acc, t) => {
+        acc[t] = (acc[t] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
     const confidence = scoreConfidence(extracted);
     await supabase.from("brand_intelligence").update({
       brand_domain: domain,
+      industry_vertical: vertical,
       collection_nav_urls: allCollectionUrls,
+      collection_nav_structure: extracted.collection_nav_structure || [],
       category_vocabulary: extracted.category_vocabulary || {},
       collection_structure_type: extracted.collection_structure_type || "unknown",
+      collection_structure_secondary: extracted.collection_structure_secondary || null,
       subcategory_list: extracted.subcategory_list || [],
       print_story_names: extracted.print_story_names || [],
       seo_primary_keyword: extracted.seo_primary_keyword || null,
       seo_secondary_keywords: extracted.seo_secondary_keywords || [],
-      brand_tone: extracted.brand_tone || "unknown",
+      brand_tone: safeTone,
       brand_tone_sample: extracted.brand_tone_sample || toneSample.slice(0, 500),
       blog_topics_used: extracted.blog_topics_used || [],
+      blog_topic_distribution: topicDist,
       blog_sample_titles: extracted.blog_sample_titles || Array.from(blogTitlesSet).slice(0, 5),
       crawl_confidence: confidence,
       crawl_status: "crawled",

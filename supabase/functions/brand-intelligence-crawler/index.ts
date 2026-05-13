@@ -19,9 +19,10 @@ const FETCH_DELAY_MS = 500;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface CrawlBody {
-  brand_id?: string;        // existing record to refresh
+  brand_id?: string;
   brand_name: string;
-  brand_domain?: string;    // optional, will resolve if missing
+  brand_domain?: string;
+  industry_vertical?: string; // FOOTWEAR | SWIMWEAR | CLOTHING | ACCESSORIES | LIFESTYLE | MULTI | UNKNOWN
 }
 
 interface FirecrawlScrapeResult {
@@ -110,6 +111,8 @@ function extractBlogUrls(links: string[], domain: string): string[] {
 interface ExtractedIntelligence {
   category_vocabulary: Record<string, string>;
   collection_structure_type: string;
+  collection_structure_secondary?: string;
+  collection_nav_structure: Array<{ label: string; children?: string[] }>;
   subcategory_list: string[];
   print_story_names: string[];
   seo_primary_keyword: string;
@@ -117,13 +120,28 @@ interface ExtractedIntelligence {
   brand_tone: string;
   brand_tone_sample: string;
   blog_topics_used: string[];
+  blog_topic_distribution?: Record<string, number>;
   blog_sample_titles: string[];
 }
 
-async function aiExtract(brandName: string, navTitles: string[], blogTitles: string[], toneSample: string): Promise<ExtractedIntelligence> {
-  const prompt = `You analyse fashion/swimwear brand websites for a retail intelligence system.
+const VERTICAL_CONTEXT: Record<string, string> = {
+  FOOTWEAR: "shoe categories (heels, sandals, boots, sneakers, loafers), heel height, toe shape, material, occasion, comfort technology, gender",
+  SWIMWEAR: "garment type (one piece, bikini top, bikini bottom), silhouette, cup size, function (tummy control, mastectomy, chlorine resistant), print stories, gender",
+  CLOTHING: "garment type (dress, top, pants), dress style (maxi, midi, mini), occasion, fit, fabric",
+  ACCESSORIES: "accessory type (tote, crossbody, clutch, jewellery), material, occasion, size, closure",
+  LIFESTYLE: "product type (candle, diffuser), scent family, size, occasion",
+  MULTI: "multiple product categories — analyse the actual nav to determine dominant ones",
+  UNKNOWN: "any retail category — infer from the nav titles",
+};
+
+const STRUCTURE_OPTIONS = '"silhouette" | "print_story" | "function" | "style_name" | "cup_size" | "technology" | "occasion" | "material" | "gender_age" | "mixed" | "unknown"';
+
+async function aiExtract(brandName: string, vertical: string, navTitles: string[], blogTitles: string[], toneSample: string): Promise<ExtractedIntelligence> {
+  const verticalContext = VERTICAL_CONTEXT[vertical] || VERTICAL_CONTEXT.UNKNOWN;
+  const prompt = `You analyse retail brand websites for a universal retail intelligence system.
 
 Brand: ${brandName}
+Industry vertical: ${vertical} — typical dimensions: ${verticalContext}
 
 Their navigation/collection page titles (extracted from their site):
 ${navTitles.map((t) => `- ${t}`).join("\n") || "(none extracted)"}
@@ -138,22 +156,27 @@ ${toneSample.slice(0, 1200)}
 
 Return STRICT JSON (no prose, no markdown fences) with this exact shape:
 {
-  "category_vocabulary": { "Their exact category name": "Generic equivalent (One Piece | Bikini Top | Bikini Bottom | Swimsuit | Cover Up | Accessory | Other)" },
-  "collection_structure_type": "silhouette" | "print_story" | "function" | "style_name" | "cup_size" | "mixed" | "unknown",
+  "category_vocabulary": { "Their exact category name": "Generic equivalent appropriate for ${vertical}" },
+  "collection_structure_type": ${STRUCTURE_OPTIONS},
+  "collection_structure_secondary": ${STRUCTURE_OPTIONS},
+  "collection_nav_structure": [{"label": "Top-level nav item", "children": ["sub-item 1", "sub-item 2"]}],
   "subcategory_list": ["..."],
   "print_story_names": ["..."],
-  "seo_primary_keyword": "e.g. ${brandName} swimwear Australia",
+  "seo_primary_keyword": "e.g. ${brandName} ${vertical.toLowerCase()} Australia",
   "seo_secondary_keywords": ["...", "..."],
-  "brand_tone": "aspirational" | "edgy" | "functional" | "luxurious" | "inclusive" | "playful" | "unknown",
-  "brand_tone_sample": "50-word excerpt of their voice",
-  "blog_topics_used": ["styling-guide" | "fit-guide" | "sustainability" | "care-guide" | "trend-report" | "brand-story" | "destination" | "other"],
+  "brand_tone": "aspirational" | "edgy" | "functional" | "luxurious" | "inclusive" | "playful" | "technical" | "lifestyle" | "sustainable" | "unknown",
+  "brand_tone_sample": "60-80 word excerpt of their voice",
+  "blog_topics_used": ["styling-guide" | "fit-guide" | "sizing-guide" | "sustainability" | "care-guide" | "trend-report" | "brand-story" | "destination" | "occasion-guide" | "technology-explainer" | "other"],
+  "blog_topic_distribution": {"sizing-guide": 2, "care-guide": 1},
   "blog_sample_titles": ["up to 5 of their actual titles"]
-}`;
+}
+
+Identify the PRIMARY structure type (the dominant axis the brand uses to organise products) and a SECONDARY if they clearly use two axes. Pick from the listed options exactly.`;
   const resp = await callAI({
     model: "google/gemini-2.5-pro",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.2,
-    max_tokens: 2000,
+    max_tokens: 2500,
   });
   let text = getContent(resp).trim();
   text = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
@@ -162,11 +185,11 @@ Return STRICT JSON (no prose, no markdown fences) with this exact shape:
 
 function scoreConfidence(x: ExtractedIntelligence): number {
   let s = 0;
-  if (x.category_vocabulary && Object.keys(x.category_vocabulary).length > 0) s += 0.3;
-  if (x.collection_structure_type && x.collection_structure_type !== "unknown") s += 0.2;
-  if (x.blog_topics_used?.length > 0) s += 0.2;
-  if (x.brand_tone_sample && x.brand_tone_sample.length > 30) s += 0.2;
-  if (x.print_story_names?.length > 0) s += 0.1;
+  if (x.category_vocabulary && Object.keys(x.category_vocabulary).length > 0) s += 0.25;
+  if (x.collection_structure_type && x.collection_structure_type !== "unknown") s += 0.20;
+  if (x.blog_topics_used?.length > 0) s += 0.20;
+  if (x.brand_tone_sample && x.brand_tone_sample.length > 30) s += 0.20;
+  if (x.print_story_names?.length > 0) s += 0.15;
   return Math.round(s * 100) / 100;
 }
 
@@ -194,15 +217,27 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Kill switch
+    const { data: settings } = await supabase
+      .from("app_settings")
+      .select("brand_intelligence_enabled")
+      .eq("singleton", true)
+      .maybeSingle();
+    if (settings && settings.brand_intelligence_enabled === false) {
+      return new Response(JSON.stringify({ error: "Brand Intelligence is disabled in app settings." }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = (await req.json()) as CrawlBody;
     if (!body.brand_name) {
       return new Response(JSON.stringify({ error: "brand_name required" }), { status: 400, headers: corsHeaders });
     }
+    const vertical = (body.industry_vertical || "UNKNOWN").toUpperCase();
 
-    // Upsert row in 'crawling' state
     const { data: existing } = await supabase
       .from("brand_intelligence")
-      .select("id, brand_domain")
+      .select("id, brand_domain, industry_vertical")
       .eq("user_id", user.id)
       .eq("brand_name", body.brand_name)
       .maybeSingle();
@@ -214,7 +249,7 @@ Deno.serve(async (req) => {
       domain = await resolveDomain(body.brand_name);
     }
     if (!domain) {
-      const errPayload = { user_id: user.id, brand_name: body.brand_name, crawl_status: "failed", crawl_error: "Could not resolve domain", last_crawled_at: new Date().toISOString() };
+      const errPayload = { user_id: user.id, brand_name: body.brand_name, industry_vertical: vertical, crawl_status: "failed", crawl_error: "Could not resolve domain", last_crawled_at: new Date().toISOString() };
       if (recordId) await supabase.from("brand_intelligence").update(errPayload).eq("id", recordId);
       else await supabase.from("brand_intelligence").insert(errPayload);
       return new Response(JSON.stringify({ error: "Could not resolve domain. Please provide brand_domain." }), {
@@ -226,6 +261,7 @@ Deno.serve(async (req) => {
       user_id: user.id,
       brand_name: body.brand_name,
       brand_domain: domain,
+      industry_vertical: vertical,
       crawl_status: "crawling",
       crawl_error: null,
     };
@@ -299,7 +335,7 @@ Deno.serve(async (req) => {
     // Step 4: AI synthesis
     let extracted: ExtractedIntelligence;
     try {
-      extracted = await aiExtract(body.brand_name, navTitles, Array.from(blogTitlesSet), toneSample);
+      extracted = await aiExtract(body.brand_name, vertical, navTitles, Array.from(blogTitlesSet), toneSample);
     } catch (e) {
       const err = `AI extraction failed: ${e instanceof Error ? e.message : String(e)}`;
       await supabase.from("brand_intelligence").update({
@@ -308,19 +344,38 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: err }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // Coerce brand_tone to existing CHECK-constraint allow-list
+    const ALLOWED_TONES = new Set(["aspirational","edgy","functional","luxurious","inclusive","playful","unknown"]);
+    const TONE_FALLBACK: Record<string, string> = { technical: "functional", lifestyle: "aspirational", sustainable: "functional" };
+    const rawTone = (extracted.brand_tone || "unknown").toLowerCase();
+    const safeTone = ALLOWED_TONES.has(rawTone) ? rawTone : (TONE_FALLBACK[rawTone] || "unknown");
+
+    // Build blog_topic_distribution from titles if AI didn't provide it
+    let topicDist = extracted.blog_topic_distribution;
+    if (!topicDist || Object.keys(topicDist).length === 0) {
+      topicDist = (extracted.blog_topics_used ?? []).reduce<Record<string, number>>((acc, t) => {
+        acc[t] = (acc[t] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
     const confidence = scoreConfidence(extracted);
     await supabase.from("brand_intelligence").update({
       brand_domain: domain,
+      industry_vertical: vertical,
       collection_nav_urls: allCollectionUrls,
+      collection_nav_structure: extracted.collection_nav_structure || [],
       category_vocabulary: extracted.category_vocabulary || {},
       collection_structure_type: extracted.collection_structure_type || "unknown",
+      collection_structure_secondary: extracted.collection_structure_secondary || null,
       subcategory_list: extracted.subcategory_list || [],
       print_story_names: extracted.print_story_names || [],
       seo_primary_keyword: extracted.seo_primary_keyword || null,
       seo_secondary_keywords: extracted.seo_secondary_keywords || [],
-      brand_tone: extracted.brand_tone || "unknown",
+      brand_tone: safeTone,
       brand_tone_sample: extracted.brand_tone_sample || toneSample.slice(0, 500),
       blog_topics_used: extracted.blog_topics_used || [],
+      blog_topic_distribution: topicDist,
       blog_sample_titles: extracted.blog_sample_titles || Array.from(blogTitlesSet).slice(0, 5),
       crawl_confidence: confidence,
       crawl_status: "crawled",

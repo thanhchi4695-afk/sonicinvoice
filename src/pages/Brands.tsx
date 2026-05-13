@@ -8,21 +8,38 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Loader2, RefreshCw, Plus, CheckCircle2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
-const PRIORITY_BRANDS: Array<{ name: string; domain: string; tier: 1 | 2 }> = [
-  { name: "Seafolly", domain: "seafolly.com", tier: 1 },
-  { name: "Bond Eye", domain: "bondeye.com.au", tier: 1 },
-  { name: "Sea Level", domain: "sealevelswim.com.au", tier: 1 },
-  { name: "Baku", domain: "baku.com.au", tier: 1 },
-  { name: "JETS", domain: "jetsswimwear.com.au", tier: 1 },
-  { name: "Sunseeker", domain: "sunseekerswimwear.com.au", tier: 1 },
-  { name: "Tigerlily", domain: "tigerlily.com.au", tier: 1 },
-  { name: "Rhythm", domain: "rhythmlivin.com", tier: 2 },
-  { name: "Jantzen", domain: "jantzen.com.au", tier: 2 },
-  { name: "OM Designs", domain: "omdesigns.com.au", tier: 2 },
-  { name: "Jaase", domain: "jaase.com", tier: 2 },
-  { name: "Le Specs", domain: "lespecs.com", tier: 2 },
-  { name: "Elcee the Label", domain: "elceethelabel.com.au", tier: 2 },
+type Vertical = "FOOTWEAR" | "SWIMWEAR" | "CLOTHING" | "ACCESSORIES" | "LIFESTYLE";
+
+const PRIORITY_BRANDS: Array<{ name: string; domain: string; tier: 1 | 2; vertical: Vertical; store: "Splash" | "Stomp" }> = [
+  // Splash Swimwear
+  { name: "Seafolly", domain: "seafolly.com", tier: 1, vertical: "SWIMWEAR", store: "Splash" },
+  { name: "Bond Eye", domain: "bondeye.com.au", tier: 1, vertical: "SWIMWEAR", store: "Splash" },
+  { name: "Sea Level", domain: "sealevelswim.com.au", tier: 1, vertical: "SWIMWEAR", store: "Splash" },
+  { name: "Baku", domain: "baku.com.au", tier: 1, vertical: "SWIMWEAR", store: "Splash" },
+  { name: "JETS", domain: "jetsswimwear.com.au", tier: 1, vertical: "SWIMWEAR", store: "Splash" },
+  { name: "Sunseeker", domain: "sunseekerswimwear.com.au", tier: 1, vertical: "SWIMWEAR", store: "Splash" },
+  { name: "Tigerlily", domain: "tigerlily.com.au", tier: 1, vertical: "SWIMWEAR", store: "Splash" },
+  { name: "Rhythm", domain: "rhythmlivin.com", tier: 2, vertical: "SWIMWEAR", store: "Splash" },
+  { name: "Jantzen", domain: "jantzen.com.au", tier: 2, vertical: "SWIMWEAR", store: "Splash" },
+  { name: "OM Designs", domain: "omdesigns.com.au", tier: 2, vertical: "SWIMWEAR", store: "Splash" },
+  { name: "Jaase", domain: "jaase.com", tier: 2, vertical: "CLOTHING", store: "Splash" },
+  { name: "Le Specs", domain: "lespecs.com", tier: 2, vertical: "ACCESSORIES", store: "Splash" },
+  { name: "Elcee the Label", domain: "elceethelabel.com.au", tier: 2, vertical: "CLOTHING", store: "Splash" },
+  // Stomp Shoes Darwin
+  { name: "Walnut Melbourne", domain: "walnutmelbourne.com", tier: 1, vertical: "FOOTWEAR", store: "Stomp" },
+  { name: "Django and Juliette", domain: "djangoandjuliette.com.au", tier: 1, vertical: "FOOTWEAR", store: "Stomp" },
+  { name: "Colorado", domain: "colorado.com.au", tier: 1, vertical: "FOOTWEAR", store: "Stomp" },
+  { name: "Mollini", domain: "mollini.com.au", tier: 1, vertical: "FOOTWEAR", store: "Stomp" },
+  { name: "Siren", domain: "sirenshoes.com.au", tier: 1, vertical: "FOOTWEAR", store: "Stomp" },
+  { name: "Top End", domain: "topendshoes.com.au", tier: 1, vertical: "FOOTWEAR", store: "Stomp" },
+  { name: "Olga Berg", domain: "olgaberg.com.au", tier: 2, vertical: "ACCESSORIES", store: "Stomp" },
+  { name: "Louenhide", domain: "louenhide.com", tier: 2, vertical: "ACCESSORIES", store: "Stomp" },
+  { name: "Peta and Jain", domain: "petaandjain.com", tier: 2, vertical: "ACCESSORIES", store: "Stomp" },
+  { name: "Nude Footwear", domain: "nudefootwear.com.au", tier: 2, vertical: "FOOTWEAR", store: "Stomp" },
+  { name: "Alias Mae", domain: "aliasmae.com.au", tier: 2, vertical: "FOOTWEAR", store: "Stomp" },
 ];
+
+const VERTICALS: Array<"ALL" | Vertical> = ["ALL", "FOOTWEAR", "SWIMWEAR", "CLOTHING", "ACCESSORIES", "LIFESTYLE"];
 
 interface BrandRow {
   id: string;
@@ -82,11 +99,11 @@ export default function Brands() {
     return data.id;
   }
 
-  async function crawl(name: string, domain: string | null, id?: string) {
+  async function crawl(name: string, domain: string | null, id?: string, vertical?: Vertical) {
     setCrawlingId(id ?? name);
     try {
       const { data, error } = await supabase.functions.invoke("brand-intelligence-crawler", {
-        body: { brand_id: id, brand_name: name, brand_domain: domain || undefined },
+        body: { brand_id: id, brand_name: name, brand_domain: domain || undefined, industry_vertical: vertical },
       });
       if (error) throw error;
       if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
@@ -99,9 +116,9 @@ export default function Brands() {
     }
   }
 
-  async function seedAndCrawl(b: { name: string; domain: string }) {
+  async function seedAndCrawl(b: { name: string; domain: string; vertical: Vertical }) {
     const id = await ensureSeedRow(b.name, b.domain);
-    if (id) await crawl(b.name, b.domain, id);
+    if (id) await crawl(b.name, b.domain, id, b.vertical);
   }
 
   async function addBrand() {
@@ -146,22 +163,32 @@ export default function Brands() {
       </div>
 
       {unseeded.length > 0 && (
-        <Card className="p-4 mb-6">
-          <h2 className="font-semibold mb-2">Pre-seed Splash brands</h2>
-          <div className="flex flex-wrap gap-2">
-            {unseeded.map((b) => (
-              <Button
-                key={b.name}
-                variant="outline"
-                size="sm"
-                disabled={!!crawlingId}
-                onClick={() => seedAndCrawl(b)}
-              >
-                {crawlingId === b.name ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
-                {b.name} <span className="text-muted-foreground ml-1">P{b.tier}</span>
-              </Button>
-            ))}
-          </div>
+        <Card className="p-4 mb-6 space-y-3">
+          {(["Splash", "Stomp"] as const).map((store) => {
+            const items = unseeded.filter((b) => b.store === store);
+            if (items.length === 0) return null;
+            return (
+              <div key={store}>
+                <h2 className="font-semibold mb-2 text-sm">Pre-seed {store} brands</h2>
+                <div className="flex flex-wrap gap-2">
+                  {items.map((b) => (
+                    <Button
+                      key={b.name}
+                      variant="outline"
+                      size="sm"
+                      disabled={!!crawlingId}
+                      onClick={() => seedAndCrawl(b)}
+                      title={`${b.vertical} · ${b.domain}`}
+                    >
+                      {crawlingId === b.name ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                      {b.name}
+                      <span className="text-muted-foreground ml-1 text-xs">{b.vertical[0]}{b.vertical.slice(1).toLowerCase()} · P{b.tier}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </Card>
       )}
 

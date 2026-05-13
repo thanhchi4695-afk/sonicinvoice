@@ -631,6 +631,7 @@ export type Database = {
       app_settings: {
         Row: {
           brand_context_injection_enabled: boolean
+          brand_intelligence_enabled: boolean
           brand_sync_last_run_at: string | null
           brand_sync_last_status: string | null
           brand_sync_schedule: string
@@ -644,6 +645,7 @@ export type Database = {
         }
         Insert: {
           brand_context_injection_enabled?: boolean
+          brand_intelligence_enabled?: boolean
           brand_sync_last_run_at?: string | null
           brand_sync_last_status?: string | null
           brand_sync_schedule?: string
@@ -657,6 +659,7 @@ export type Database = {
         }
         Update: {
           brand_context_injection_enabled?: boolean
+          brand_intelligence_enabled?: boolean
           brand_sync_last_run_at?: string | null
           brand_sync_last_status?: string | null
           brand_sync_schedule?: string
@@ -724,13 +727,16 @@ export type Database = {
       brand_intelligence: {
         Row: {
           blog_sample_titles: Json | null
+          blog_topic_distribution: Json | null
           blog_topics_used: Json | null
           brand_domain: string | null
           brand_name: string
           brand_tone: string | null
           brand_tone_sample: string | null
           category_vocabulary: Json | null
+          collection_nav_structure: Json | null
           collection_nav_urls: Json | null
+          collection_structure_secondary: string | null
           collection_structure_type: string | null
           competitor_urls: Json | null
           crawl_confidence: number | null
@@ -738,6 +744,7 @@ export type Database = {
           crawl_status: string
           created_at: string
           id: string
+          industry_vertical: string | null
           last_crawled_at: string | null
           manually_verified: boolean
           pages_fetched: number | null
@@ -751,13 +758,16 @@ export type Database = {
         }
         Insert: {
           blog_sample_titles?: Json | null
+          blog_topic_distribution?: Json | null
           blog_topics_used?: Json | null
           brand_domain?: string | null
           brand_name: string
           brand_tone?: string | null
           brand_tone_sample?: string | null
           category_vocabulary?: Json | null
+          collection_nav_structure?: Json | null
           collection_nav_urls?: Json | null
+          collection_structure_secondary?: string | null
           collection_structure_type?: string | null
           competitor_urls?: Json | null
           crawl_confidence?: number | null
@@ -765,6 +775,7 @@ export type Database = {
           crawl_status?: string
           created_at?: string
           id?: string
+          industry_vertical?: string | null
           last_crawled_at?: string | null
           manually_verified?: boolean
           pages_fetched?: number | null
@@ -778,13 +789,16 @@ export type Database = {
         }
         Update: {
           blog_sample_titles?: Json | null
+          blog_topic_distribution?: Json | null
           blog_topics_used?: Json | null
           brand_domain?: string | null
           brand_name?: string
           brand_tone?: string | null
           brand_tone_sample?: string | null
           category_vocabulary?: Json | null
+          collection_nav_structure?: Json | null
           collection_nav_urls?: Json | null
+          collection_structure_secondary?: string | null
           collection_structure_type?: string | null
           competitor_urls?: Json | null
           crawl_confidence?: number | null
@@ -792,6 +806,7 @@ export type Database = {
           crawl_status?: string
           created_at?: string
           id?: string
+          industry_vertical?: string | null
           last_crawled_at?: string | null
           manually_verified?: boolean
           pages_fetched?: number | null
@@ -2597,6 +2612,42 @@ export type Database = {
           training_pipeline_enabled?: boolean
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      industry_taxonomy: {
+        Row: {
+          created_at: string
+          dimension_name: string
+          dimension_values: Json
+          display_order: number
+          id: string
+          is_collection_trigger: boolean
+          min_products_to_trigger: number
+          updated_at: string
+          vertical: string
+        }
+        Insert: {
+          created_at?: string
+          dimension_name: string
+          dimension_values?: Json
+          display_order?: number
+          id?: string
+          is_collection_trigger?: boolean
+          min_products_to_trigger?: number
+          updated_at?: string
+          vertical: string
+        }
+        Update: {
+          created_at?: string
+          dimension_name?: string
+          dimension_values?: Json
+          display_order?: number
+          id?: string
+          is_collection_trigger?: boolean
+          min_products_to_trigger?: number
+          updated_at?: string
+          vertical?: string
         }
         Relationships: []
       }

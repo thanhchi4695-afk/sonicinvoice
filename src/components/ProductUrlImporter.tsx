@@ -792,6 +792,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
       sourceUrl: result.sourceUrl ?? url,
       colors: edit.selectedColors.length ? edit.selectedColors : undefined,
       sizes: edit.selectedSizes.length ? edit.selectedSizes : undefined,
+      variantQuantities: Object.keys(edit.variantQuantities).length ? edit.variantQuantities : undefined,
     };
   };
 

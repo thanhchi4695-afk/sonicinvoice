@@ -77,6 +77,7 @@ export default function Brands() {
   const [verticalFilter, setVerticalFilter] = useState<"ALL" | Vertical>("ALL");
   const [killSwitch, setKillSwitch] = useState<boolean>(true);
   const [iconicRefreshingId, setIconicRefreshingId] = useState<string | null>(null);
+  const [whitefoxRefreshingId, setWhitefoxRefreshingId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);

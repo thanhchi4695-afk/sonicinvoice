@@ -414,9 +414,18 @@ function buildPrompt(opts: {
     6: "{Occasion}" + (storeCity ? " " + storeCity : "") + " | " + storeName,
   };
 
-  const iconicBlock = brand?.iconic_reference
-    ? "\nTHE ICONIC REFERENCE for " + brand.brand_name + " (match vocabulary, do not plagiarise):\n" +
-      JSON.stringify(brand.iconic_reference).slice(0, 1800) + "\n"
+  // Competitor reference router:
+  //   FOOTWEAR or professional/luxury voice -> ICONIC (marketplace breadth)
+  //   CLOTHING/SWIMWEAR + aspirational/warmth voice -> White Fox (single-brand DTC)
+  const useWhiteFox =
+    (vertical === "CLOTHING" || vertical === "SWIMWEAR") &&
+    (voice === "aspirational_youth" || voice === "local_warmth") &&
+    !!brand?.whitefox_reference;
+  const refLabel = useWhiteFox ? "WHITE FOX REFERENCE" : "THE ICONIC REFERENCE";
+  const refData = useWhiteFox ? brand?.whitefox_reference : brand?.iconic_reference;
+  const iconicBlock = refData
+    ? `\n${refLabel} for ${brand?.brand_name ?? "this brand"} (match vocabulary, do not plagiarise):\n` +
+      JSON.stringify(refData).slice(0, 1800) + "\n"
     : "";
 
   const previousBlock = previousIssues.length

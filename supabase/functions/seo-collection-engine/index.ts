@@ -232,12 +232,21 @@ function normaliseMeta(meta: string, storeName: string, storeCity: string | null
   return m;
 }
 
-function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: VoiceStyle, primaryKeyword: string, storeName: string, storeCity: string | null): Record<string, string> {
+function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: VoiceStyle, primaryKeyword: string, storeName: string, storeCity: string | null, vertical?: string, handle?: string): Record<string, string> {
   const out = { ...parts };
   const usesWfFormula = voice === "aspirational_youth" || voice === "local_warmth";
   const usesLouenhideBrand = isBrandPage && voice === "aussie_accessible";
   const usesDavidJones = !isBrandPage && voice === "luxury_authority";
-  const slot = usesLouenhideBrand
+  const usesGwgBrand = vertical === "JEWELLERY" && isBrandPage && voice === "gwg_meaningful";
+  const usesGwgEdit  = vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryEditHandle(handle);
+  const usesGwgInter = vertical === "JEWELLERY" && voice === "gwg_meaningful" && isJewelleryIntersectionHandle(handle);
+  const slot = usesGwgBrand
+    ? "gwg_keyword_repetition"
+    : usesGwgEdit
+    ? "gwg_edit_snapshot"
+    : usesGwgInter
+    ? "gwg_intersection_styles"
+    : usesLouenhideBrand
     ? "lh_keyword_repetition"
     : usesDavidJones
     ? "dj_faq_prose"
@@ -246,7 +255,13 @@ function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: 
     : usesWfFormula
     ? "wf_utility"
     : "part4_styling";
-  const fillers = voice === "aussie_accessible"
+  const fillers = voice === "gwg_meaningful"
+    ? [
+        `Every piece in our ${primaryKeyword} edit is chosen by hand for the way it wears every day — layered, stacked, gifted, or worn solo.`,
+        `Visit ${storeName}${storeCity ? ` in ${storeCity}` : ""} for a personal styling session, or order online with free shipping over $199 and gift packaging at checkout.`,
+        `From dainty everyday pieces to statement designs that mark a milestone, the range covers gold, silver, vermeil, and pearl in styles you'll reach for season after season.`,
+      ]
+    : voice === "aussie_accessible"
     ? [
         `Whether you're ${storeCity ? `shopping in ${storeCity}` : "browsing online"} or grabbing a last-minute gift, our ${primaryKeyword} are built for real life — designed to carry everything you need without the fuss.`,
         `Pop into ${storeName}${storeCity ? ` in ${storeCity}` : ""} and our team will help you find the perfect fit, or order online and we'll have it on its way the same day.`,
@@ -264,7 +279,7 @@ function extendBody(parts: Record<string, string>, isBrandPage: boolean, voice: 
         `From everyday essentials to standout pieces, the collection is built around what real customers actually wear day to day.`,
       ];
   for (const filler of fillers) {
-    if (countWords(stitchDescription(out, isBrandPage, voice)) >= 200) break;
+    if (countWords(stitchDescription(out, isBrandPage, voice, vertical, handle)) >= 200) break;
     out[slot] = ((out[slot] ?? "") + " " + filler).trim();
   }
   return out;

@@ -166,14 +166,14 @@ Deno.serve(async (req) => {
           suggested_title: title,
           suggested_handle: handle,
           shopify_handle: handle,
-          collection_type: kind === "colour" ? "dimension" : (kind === "occasion" ? "niche" : "trend"),
+          collection_type: kind === "colour" ? "colour" : (kind === "occasion" ? "occasion" : "trend"),
           colour_filter: kind === "colour" ? value : null,
           occasion_filter: kind === "occasion" ? value : null,
           trend_signal: kind === "trend" ? value : null,
           product_count: info.count,
-          status: "suggested",
+          status: "pending",
           source: "seo-collection-detector",
-          metadata: { sample_product_ids: info.sample_ids, parent: parentSlug },
+          sample_product_ids: info.sample_ids,
         });
       }
     }

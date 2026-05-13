@@ -122,6 +122,56 @@ export function optimiseProductSeo(input: OptimiserInput): OptimisedSeo {
   const brand = (input.brand || "").trim();
   const styleName = (input.title || "").trim();
   const colour = (input.colour || "").trim();
+
+  // JEWELLERY path — formula: {Brand} {Style Name} {Metal} {Jewellery Type}
+  const isJewel = isJewelleryVendor(input.brand, input.productType);
+  if (isJewel) {
+    const jewelType = detectJewelleryType(input.title, input.productType, brand);
+    const metal = detectMetal(input.title, input.productType, input.bodyHtml);
+    if (!jewelType) flags.push("no_jewellery_type_detected");
+    if (!metal) flags.push("no_metal_detected");
+
+    const handleParts = [brand, styleName, metal, jewelType].filter(Boolean).map(slugify).filter(Boolean);
+    const handle = handleParts.join("-").replace(/-{2,}/g, "-").slice(0, 80) || slugify(styleName) || "product";
+
+    const titleHay = `${brand} ${styleName}`.toLowerCase();
+    const titleBits = [
+      brand,
+      styleName,
+      metal && !titleHay.includes(metal.toLowerCase()) && metal.replace(/-/g, " "),
+      jewelType && !new RegExp(`\\b${jewelType}\\b`, "i").test(titleHay) && jewelType,
+    ].filter(Boolean) as string[];
+    const seoTitle = clampTitle(titleBits.join(" ").replace(/\s+/g, " ").trim());
+
+    const store = (input.storeName || "").trim();
+    const city = (input.storeCity || "").trim();
+    const ship = (input.freeShippingThreshold || "").trim();
+    const piece = [brand, styleName].filter(Boolean).join(" ");
+    const benefit = metal && jewelType
+      ? `Demi-fine ${metal.replace(/-/g, " ")} ${jewelType} crafted for everyday wear`
+      : jewelType
+      ? `Demi-fine ${jewelType} crafted for everyday wear`
+      : "Demi-fine jewellery crafted for everyday wear";
+    const shopBit = store
+      ? ` Shop at ${store}${city ? `, ${city}` : ""}${ship ? ` — free shipping over $${ship}.` : "."}`
+      : "";
+    let meta = `${benefit}. ${piece}.${shopBit}`.replace(/\s+/g, " ").trim();
+    if (meta.length < 150) {
+      const pad = " Gift boxed and ready to ship Australia-wide.";
+      meta = (meta + pad).slice(0, 160);
+    }
+    meta = clampMeta(meta);
+    if (meta.length < 150 || meta.length > 160) flags.push(`meta_length_${meta.length}`);
+
+    let bodyHtml = (input.bodyHtml || "").trim();
+    const wc = bodyHtml.replace(/<[^>]+>/g, " ").trim().split(/\s+/).filter(Boolean).length;
+    if (wc < 200) {
+      if (bodyHtml) flags.push(`body_padded_from_${wc}_words`);
+      bodyHtml = (bodyHtml ? bodyHtml + "\n\n" : "") + generateJewelleryBody({ brand, styleName, metal, jewelType, store, city });
+    }
+    return { handle, seoTitle, metaDescription: meta, bodyHtml, bagType: null, flags };
+  }
+
   const bagType = input.bagType || detectBagType(input.title, input.productType, brand);
 
   if (!bagType) flags.push("no_bag_type_detected");

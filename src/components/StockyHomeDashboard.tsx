@@ -203,6 +203,9 @@ export default function StockyHomeDashboard({ onNavigate, onSwitchToClassic }: S
       {/* ── Margin Guardian / Condition Builder showcase ─── */}
       <ConditionBuilderShowcase />
 
+      {/* Collection scanner CTA */}
+      <ScanCollectionsCard />
+
       {/* Quick Actions */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {[

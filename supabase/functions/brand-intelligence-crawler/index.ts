@@ -203,16 +203,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Auth: need user_id
+    // Auth: user JWT, OR service-role bearer + body.user_id (for queue runner / cron)
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), { status: 401, headers: corsHeaders });
     }
-    const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData } = await supabaseUser.auth.getUser();
-    const user = userData?.user;
+    const rawBody = await req.json().catch(() => ({})) as CrawlBody & { user_id?: string };
+    const serviceBearer = `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`;
+    let user: { id: string } | null = null;
+    if (authHeader === serviceBearer && typeof rawBody.user_id === "string") {
+      user = { id: rawBody.user_id };
+    } else {
+      const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: userData } = await supabaseUser.auth.getUser();
+      user = userData?.user ?? null;
+    }
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);

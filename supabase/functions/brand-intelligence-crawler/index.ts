@@ -447,6 +447,7 @@ Deno.serve(async (req) => {
     const confidence = scoreConfidence(extracted);
     await supabase.from("brand_intelligence").update({
       competitor_reference_styletread: styletreadRef,
+      iconic_reference: iconicRef,
       brand_domain: domain,
       industry_vertical: vertical,
       collection_nav_urls: allCollectionUrls,

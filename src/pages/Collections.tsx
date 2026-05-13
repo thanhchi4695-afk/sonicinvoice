@@ -90,6 +90,7 @@ function typeBadgeColor(t: string) {
 
 function CollectionsInner() {
   const [tab, setTab] = useState("suggestions");
+  const [pendingGapsCount, setPendingGapsCount] = useState(0);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [filter, setFilter] = useState("all");

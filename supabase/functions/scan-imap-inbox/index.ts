@@ -78,8 +78,9 @@ Deno.serve(async (req) => {
       acc.emails_scanned += r.emails_scanned ?? 0;
       if (Array.isArray(r.invoices_found)) acc.invoices_found.push(...r.invoices_found);
       if (r.error) acc.errors.push({ email: r.email, error: r.error });
+      if (r.warning) acc.warnings.push({ email: r.email, warning: r.warning });
       return acc;
-    }, { emails_scanned: 0, invoices_found: [] as any[], errors: [] as any[], accounts: results.length });
+    }, { emails_scanned: 0, invoices_found: [] as any[], errors: [] as any[], warnings: [] as any[], accounts: results.length });
     return json(aggregate);
   } catch (err) {
     console.error("[scan-imap] error", err);
@@ -115,7 +116,12 @@ async function scanOne(admin: any, conn: Conn, supplierMap: Map<string, string>)
   let scanned = 0;
   let partialReason: string | null = null;
 
-  await withTimeout(client.connect(), CONNECT_TIMEOUT_MS, `IMAP connect timed out after ${CONNECT_TIMEOUT_MS / 1000}s`);
+  try {
+    await withTimeout(client.connect(), CONNECT_TIMEOUT_MS, `IMAP connect timed out after ${CONNECT_TIMEOUT_MS / 1000}s`);
+  } catch (err) {
+    try { await client.logout(); } catch { /* */ }
+    throw err;
+  }
   try {
     const lock = await client.getMailboxLock("INBOX");
     try {

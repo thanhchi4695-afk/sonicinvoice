@@ -73,10 +73,62 @@ const ACC_OCCASIONS: Record<string, string[]> = {
 };
 
 // Niche keyword blocklist (Louenhide/Megantic Innovation 2)
-const BROAD_BLOCKLIST = new Set(["bags","accessories","wallets","handbags","online shopping"]);
+const BROAD_BLOCKLIST = new Set(["bags","accessories","wallets","handbags","online shopping","jewellery","jewelry","earrings","necklaces","bracelets","rings"]);
 function isAccessoriesVertical(productType: string): boolean {
   const t = productType.toLowerCase();
   return /bag|wallet|clutch|backpack|tote|crossbody|purse|accessor/.test(t);
+}
+
+// JEWELLERY vocabulary — Girls With Gems model
+const JEWELLERY_BRANDS = [
+  "amber sceats","by charlotte","mayol","arms of eve","emma pills","avant studio",
+  "noah the label","heaven mayhem","porter","lana wilkinson","midsummer star","olga de polga",
+];
+const JEWELLERY_TYPES: Record<string, string[]> = {
+  earrings: ["earring","earrings","hoop","hoops","stud","studs","drop earring","huggie"],
+  necklaces: ["necklace","pendant","chain","choker","layering"],
+  bracelets: ["bracelet","bangle","cuff","tennis"],
+  rings: ["ring","signet","stacker","stacking ring","band"],
+  anklets: ["anklet"],
+  charms: ["charm"],
+  sets: ["jewellery set","jewelry set","matching set"],
+};
+const JEWELLERY_METALS: Record<string, string[]> = {
+  gold: ["gold filled","14k gold","18k gold"," gold "],
+  silver: ["sterling silver","silver","925"],
+  rose_gold: ["rose gold"],
+  vermeil: ["vermeil"],
+  pearl: ["pearl","freshwater pearl"],
+};
+const JEWELLERY_GEMSTONES: Record<string, string[]> = {
+  diamond: ["diamond"], moonstone: ["moonstone"], turquoise: ["turquoise"],
+  opal: ["opal"], topaz: ["topaz"], amethyst: ["amethyst"], cz: ["cubic zirconia"," cz "],
+};
+const GIFT_RECIPIENTS: Record<string, string[]> = {
+  her: ["for her","womens","women's"],
+  mum: ["for mum","mothers day","mother's day"],
+  bridesmaid: ["bridesmaid","bridal party"],
+  him: ["for him","mens","men's"],
+};
+const GIFT_OCCASIONS: Record<string, string[]> = {
+  birthday: ["birthday"],
+  christmas: ["christmas","xmas"],
+  valentines: ["valentine","valentines"],
+  mothers_day: ["mothers day","mother's day"],
+  anniversary: ["anniversary"],
+  graduation: ["graduation"],
+  bridal: ["bridal","wedding"],
+};
+const GIFT_SIGNALS = ["gift","gift box","giftable","gift-ready","gift wrap","gift packaging"];
+
+function isJewelleryVertical(productType: string, vendor: string, title: string): boolean {
+  const t = (productType || "").toLowerCase();
+  const v = (vendor || "").toLowerCase();
+  const ti = (title || "").toLowerCase();
+  if (JEWELLERY_BRANDS.some((b) => v.includes(b))) return true;
+  if (/jewellery|jewelry|earring|necklace|bracelet|ring|bangle|pendant|hoop|stud|chain|anklet|charm/.test(t)) return true;
+  if (/\b(earring|earrings|necklace|bracelet|bangle|pendant|hoop|stud|chain|anklet)\b/.test(ti)) return true;
+  return false;
 }
 
 // ---- Helpers ---------------------------------------------------------------

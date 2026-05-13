@@ -107,7 +107,13 @@ function stitchDescription(parts: any, isBrandPage: boolean, voice: VoiceStyle):
   ].join("\n");
 }
 
-type VoiceStyle = "aspirational_youth" | "professional_editorial" | "local_warmth" | "luxury_refined";
+type VoiceStyle =
+  | "aspirational_youth"
+  | "professional_editorial"
+  | "local_warmth"
+  | "luxury_refined"
+  | "luxury_authority"   // David Jones
+  | "aussie_accessible"; // Louenhide / Megantic
 
 function stitchFaqHtml(faq: Array<{ q: string; a: string }>): string {
   return [
@@ -227,7 +233,7 @@ Deno.serve(async (req) => {
     if (level === 5 && body.brand_id) {
       const { data } = await supabase
         .from("brand_intelligence")
-        .select("brand_name, brand_voice, value_proposition, hero_keywords, iconic_reference, whitefox_reference, competitor_reference_styletread")
+        .select("brand_name, brand_voice, value_proposition, hero_keywords, iconic_reference, whitefox_reference, davidjones_reference, louenhide_megantic_reference, competitor_reference_styletread")
         .eq("id", body.brand_id)
         .maybeSingle();
       brand = data;
@@ -415,18 +421,39 @@ function buildPrompt(opts: {
     6: "{Occasion}" + (storeCity ? " " + storeCity : "") + " | " + storeName,
   };
 
-  // Competitor reference router:
-  //   FOOTWEAR or professional/luxury voice -> ICONIC (marketplace breadth)
-  //   CLOTHING/SWIMWEAR + aspirational/warmth voice -> White Fox (single-brand DTC)
+  // Competitor reference router (in priority order):
+  //   ACCESSORIES + luxury_authority    -> David Jones (premium multi-brand)
+  //   ACCESSORIES + aussie_accessible   -> Louenhide / Megantic (3-innovation playbook)
+  //   CLOTHING/SWIMWEAR + aspirational  -> White Fox (single-brand DTC)
+  //   default                            -> THE ICONIC (marketplace breadth)
+  const useDavidJones =
+    vertical === "ACCESSORIES" && voice === "luxury_authority" && !!brand?.davidjones_reference;
+  const useLouenhide =
+    vertical === "ACCESSORIES" && voice === "aussie_accessible" && !!brand?.louenhide_megantic_reference;
   const useWhiteFox =
+    !useDavidJones && !useLouenhide &&
     (vertical === "CLOTHING" || vertical === "SWIMWEAR") &&
     (voice === "aspirational_youth" || voice === "local_warmth") &&
     !!brand?.whitefox_reference;
-  const refLabel = useWhiteFox ? "WHITE FOX REFERENCE" : "THE ICONIC REFERENCE";
-  const refData = useWhiteFox ? brand?.whitefox_reference : brand?.iconic_reference;
+  const refLabel =
+    useDavidJones ? "DAVID JONES REFERENCE (luxury 4-part formula)" :
+    useLouenhide  ? "LOUENHIDE / MEGANTIC REFERENCE (3-innovation playbook)" :
+    useWhiteFox   ? "WHITE FOX REFERENCE" :
+                    "THE ICONIC REFERENCE";
+  const refData =
+    useDavidJones ? brand?.davidjones_reference :
+    useLouenhide  ? brand?.louenhide_megantic_reference :
+    useWhiteFox   ? brand?.whitefox_reference :
+                    brand?.iconic_reference;
   const iconicBlock = refData
     ? `\n${refLabel} for ${brand?.brand_name ?? "this brand"} (match vocabulary, do not plagiarise):\n` +
       JSON.stringify(refData).slice(0, 1800) + "\n"
+    : "";
+
+  // Niche-keyword guard (Megantic Innovation 2): never use broad standalone keywords as primary
+  const broadBlocklist = new Set(["bags","accessories","wallets","handbags","online shopping"]);
+  const nicheGuard = vertical === "ACCESSORIES"
+    ? `\nNICHE KEYWORD GUARD: never use any of these as the primary keyword on its own — ${[...broadBlocklist].join(", ")}. Always combine with brand + type, feature, or location signal (e.g. "louenhide crossbody bag", "rfid blocking wallet women", "bags darwin").\n`
     : "";
 
   const previousBlock = previousIssues.length
@@ -480,7 +507,7 @@ ${kwList || "  (none)"}
 
 RELATED COLLECTIONS for internal links (pick 3-5 from this list):
 ${linkList || "  (none — link to the collection's own handle as last resort)"}
-${iconicBlock}${brand ? `\nBRAND VOICE: ${brand.brand_voice ?? ""}\nBRAND VALUE PROP: ${brand.value_proposition ?? ""}\n` : ""}${previousBlock}
+${iconicBlock}${nicheGuard}${brand ? `\nBRAND VOICE: ${brand.brand_voice ?? ""}\nBRAND VALUE PROP: ${brand.value_proposition ?? ""}\n` : ""}${previousBlock}
 
 OUTPUT JSON SCHEMA (strict):
 {

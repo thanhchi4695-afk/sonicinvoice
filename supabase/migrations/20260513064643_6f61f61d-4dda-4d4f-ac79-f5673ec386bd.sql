@@ -1,0 +1,3 @@
+ALTER TABLE public.collection_suggestions DROP CONSTRAINT IF EXISTS collection_suggestions_collection_type_check;
+ALTER TABLE public.collection_suggestions ADD CONSTRAINT collection_suggestions_collection_type_check
+  CHECK (collection_type = ANY (ARRAY['brand','brand_category','type','niche','print','archive','dimension','brand_print','colour','occasion','trend','sale','back_in_stock','bag_type','feature','static_filter']));

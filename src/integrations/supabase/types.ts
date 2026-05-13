@@ -744,10 +744,12 @@ export type Database = {
           crawl_error: string | null
           crawl_status: string
           created_at: string
+          davidjones_reference: Json | null
           iconic_reference: Json | null
           id: string
           industry_vertical: string | null
           last_crawled_at: string | null
+          louenhide_megantic_reference: Json | null
           manually_verified: boolean
           pages_fetched: number | null
           print_story_names: Json | null
@@ -778,10 +780,12 @@ export type Database = {
           crawl_error?: string | null
           crawl_status?: string
           created_at?: string
+          davidjones_reference?: Json | null
           iconic_reference?: Json | null
           id?: string
           industry_vertical?: string | null
           last_crawled_at?: string | null
+          louenhide_megantic_reference?: Json | null
           manually_verified?: boolean
           pages_fetched?: number | null
           print_story_names?: Json | null
@@ -812,10 +816,12 @@ export type Database = {
           crawl_error?: string | null
           crawl_status?: string
           created_at?: string
+          davidjones_reference?: Json | null
           iconic_reference?: Json | null
           id?: string
           industry_vertical?: string | null
           last_crawled_at?: string | null
+          louenhide_megantic_reference?: Json | null
           manually_verified?: boolean
           pages_fetched?: number | null
           print_story_names?: Json | null

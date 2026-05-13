@@ -51,6 +51,9 @@ const TYPE_FILTERS = [
   { id: "colour", label: "Colour" },
   { id: "occasion", label: "Occasion" },
   { id: "trend", label: "Trend" },
+  { id: "bag_type", label: "Bag type" },
+  { id: "feature", label: "Feature" },
+  { id: "static_filter", label: "Static filter ⚡" },
   { id: "sale", label: "Sale" },
   { id: "back_in_stock", label: "Back in Stock" },
 ];
@@ -60,6 +63,8 @@ const VOICE_OPTIONS = [
   { id: "local_warmth", label: "Local warmth (boutique)" },
   { id: "professional_editorial", label: "Professional editorial (ICONIC)" },
   { id: "luxury_refined", label: "Luxury refined" },
+  { id: "luxury_authority", label: "Luxury authority (David Jones)" },
+  { id: "aussie_accessible", label: "Aussie accessible (Louenhide / Megantic)" },
 ];
 
 function typeBadgeColor(t: string) {
@@ -73,6 +78,9 @@ function typeBadgeColor(t: string) {
     colour: "bg-violet-500/15 text-violet-300 border-violet-500/30",
     occasion: "bg-teal-500/15 text-teal-300 border-teal-500/30",
     trend: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+    bag_type: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+    feature: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
+    static_filter: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
     sale: "bg-red-500/15 text-red-300 border-red-500/30",
     back_in_stock: "bg-lime-500/15 text-lime-300 border-lime-500/30",
   };

@@ -38,6 +38,47 @@ const TRENDS: Record<string, string[]> = {
   westerncore: ["western","cowgirl"],
 };
 
+// ACCESSORIES vocabulary — Louenhide model
+const BAG_TYPES: Record<string, string[]> = {
+  crossbody: ["crossbody","cross body","cross-body"],
+  shoulder: ["shoulder bag","shoulder-bag"],
+  tote: ["tote"],
+  clutch: ["clutch"],
+  backpack: ["backpack"],
+  sling: ["sling","bum bag","belt bag","fanny"],
+  bucket: ["bucket bag"],
+  hobo: ["hobo"],
+  satchel: ["satchel"],
+  weekender: ["weekender","duffle"],
+  laptop_bag: ["laptop bag","laptop-friendly","laptop sleeve"],
+  cosmetic_bag: ["cosmetic bag","makeup bag","toiletry"],
+  beach_bag: ["beach bag","straw bag"],
+  wallet: ["wallet","cardholder","card holder","purse"],
+};
+
+const ACC_FEATURES: Record<string, string[]> = {
+  rfid: ["rfid","rfid blocking","rfid-blocking"],
+  vegan_leather: ["vegan leather","vegan-leather"],
+  multi_wear: ["multi-wear","multi wear","convertible"],
+  laptop_friendly: ["13-inch","13 inch","14-inch","15-inch","16-inch","laptop"],
+  waterproof: ["waterproof","water-resistant","water resistant"],
+};
+
+const ACC_OCCASIONS: Record<string, string[]> = {
+  work: ["work bag","office","corporate"],
+  uni: ["uni","university","student","campus"],
+  travel: ["travel","carry-on","carry on","weekender"],
+  evening: ["evening","cocktail","gala","formal"],
+  beach: ["beach","poolside","resort"],
+};
+
+// Niche keyword blocklist (Louenhide/Megantic Innovation 2)
+const BROAD_BLOCKLIST = new Set(["bags","accessories","wallets","handbags","online shopping"]);
+function isAccessoriesVertical(productType: string): boolean {
+  const t = productType.toLowerCase();
+  return /bag|wallet|clutch|backpack|tote|crossbody|purse|accessor/.test(t);
+}
+
 // ---- Helpers ---------------------------------------------------------------
 
 function slug(s: string): string {
@@ -137,6 +178,38 @@ Deno.serve(async (req) => {
       for (const c of detectIn(text, COLOURS)) bump(parent, `colour:${c}`, p.id);
       for (const o of detectMap(text, OCCASIONS)) bump(parent, `occasion:${o}`, p.id);
       for (const tr of detectMap(text, TRENDS)) bump(parent, `trend:${tr}`, p.id);
+
+      // ACCESSORIES — bag_type, feature, accessories occasion
+      if (isAccessoriesVertical(parent)) {
+        for (const bt of detectMap(text, BAG_TYPES)) bump(parent, `bag_type:${bt}`, p.id);
+        for (const f of detectMap(text, ACC_FEATURES)) bump(parent, `feature:${f}`, p.id);
+        for (const o of detectMap(text, ACC_OCCASIONS)) bump(parent, `acc_occasion:${o}`, p.id);
+      }
+    }
+
+    // STATIC FILTER COLLECTIONS (Megantic Innovation 1):
+    // colour × bag_type and feature × bag_type intersections — produces
+    // /collections/black-crossbody-bags, /collections/rfid-wallets etc.
+    const staticFilters: Record<string, Bucket & { kind: string; parent: string; left: string; right: string }> = {};
+    for (const p of rows) {
+      const parent = (p.product_type || "").trim();
+      if (!parent || !isAccessoriesVertical(parent)) continue;
+      const text = `${p.title ?? ""} ${p.description ?? ""}`;
+      const colours = detectIn(text, COLOURS);
+      const bagTypes = detectMap(text, BAG_TYPES);
+      const features = detectMap(text, ACC_FEATURES);
+      for (const c of colours) for (const bt of bagTypes) {
+        const key = `colour:${c}|bag_type:${bt}`;
+        staticFilters[key] ??= { count: 0, sample_ids: [], kind: "colour_x_bag", parent, left: c, right: bt };
+        staticFilters[key].count++;
+        if (staticFilters[key].sample_ids.length < 5) staticFilters[key].sample_ids.push(p.id);
+      }
+      for (const f of features) for (const bt of bagTypes) {
+        const key = `feature:${f}|bag_type:${bt}`;
+        staticFilters[key] ??= { count: 0, sample_ids: [], kind: "feature_x_bag", parent, left: f, right: bt };
+        staticFilters[key].count++;
+        if (staticFilters[key].sample_ids.length < 5) staticFilters[key].sample_ids.push(p.id);
+      }
     }
 
     // Sale + Back-in-stock detection from catalog cache restock_status
@@ -169,19 +242,27 @@ Deno.serve(async (req) => {
         const [kind, value] = child.split(":");
         const childSlug = slug(value);
         const handle = `${parentSlug}/${childSlug}`;
-        const title =
-          kind === "colour" ? `${value[0].toUpperCase()}${value.slice(1)} ${parent}` :
-          kind === "occasion" ? `${parent} for ${value.replace(/_/g, " ")}` :
-          /* trend */          `${value.replace(/_/g, " ")} ${parent}`;
+        const titleCase = (s: string) => s.replace(/_/g, " ").replace(/(^|\s)\S/g, (m) => m.toUpperCase());
+        let title: string;
+        let collection_type: string;
+        if (kind === "colour")        { title = `${titleCase(value)} ${parent}`;            collection_type = "colour"; }
+        else if (kind === "occasion") { title = `${parent} for ${titleCase(value)}`;        collection_type = "occasion"; }
+        else if (kind === "bag_type") { title = `${titleCase(value)} ${parent}`;            collection_type = "bag_type"; }
+        else if (kind === "feature")  { title = `${titleCase(value)} ${parent}`;            collection_type = "feature"; }
+        else if (kind === "acc_occasion"){ title = `${titleCase(value)} ${parent}`;          collection_type = "occasion"; }
+        else                          { title = `${titleCase(value)} ${parent}`;            collection_type = "trend"; }
+
+        // Niche-keyword guard (Megantic Innovation 2): block standalone broad keywords as title
+        if (BROAD_BLOCKLIST.has(title.toLowerCase().trim())) continue;
 
         suggestions.push({
           user_id: userId,
           suggested_title: title,
           suggested_handle: handle,
           shopify_handle: handle,
-          collection_type: kind === "colour" ? "colour" : (kind === "occasion" ? "occasion" : "trend"),
+          collection_type,
           colour_filter: kind === "colour" ? value : null,
-          occasion_filter: kind === "occasion" ? value : null,
+          occasion_filter: (kind === "occasion" || kind === "acc_occasion") ? value : null,
           trend_signal: kind === "trend" ? value : null,
           product_count: info.count,
           status: "pending",
@@ -189,6 +270,30 @@ Deno.serve(async (req) => {
           sample_product_ids: info.sample_ids,
         });
       }
+    }
+
+    // Static filter intersections (Megantic Innovation 1) — minimum 3 products
+    for (const [, info] of Object.entries(staticFilters)) {
+      if (info.count < Math.max(3, minProducts)) continue;
+      const titleCase = (s: string) => s.replace(/_/g, " ").replace(/(^|\s)\S/g, (m) => m.toUpperCase());
+      const handle = info.kind === "colour_x_bag"
+        ? `${slug(info.left)}-${slug(info.right)}-bags`
+        : `${slug(info.left)}-${slug(info.right)}-bags`;
+      const title = info.kind === "colour_x_bag"
+        ? `${titleCase(info.left)} ${titleCase(info.right)} Bags`
+        : `${titleCase(info.left)} ${titleCase(info.right)} Bags`;
+      suggestions.push({
+        user_id: userId,
+        suggested_title: title,
+        suggested_handle: handle,
+        shopify_handle: handle,
+        collection_type: "static_filter",
+        colour_filter: info.kind === "colour_x_bag" ? info.left : null,
+        product_count: info.count,
+        status: "pending",
+        source: "seo-collection-detector",
+        sample_product_ids: info.sample_ids,
+      });
     }
 
     for (const [parent, info] of Object.entries(sale)) {

@@ -1,53 +1,61 @@
-# White Fox SEO Architecture — Implementation Plan
+# David Jones + Louenhide/Megantic SEO Intelligence
 
-Extends the existing ICONIC reference system with White Fox's three signature techniques: nested Shopify handles, colour-dimension collections, and occasion/trend layers — plus voice-matched copy.
+Extend the Universal SEO Collection Engine with a new **ACCESSORIES** vertical and three Megantic-grade techniques (indexable filter collections, niche keyword tiers, product URL/H1/meta audit). Reuses existing tables — no new schemas required.
 
-## Phase A — Schema, voice & nested handle support
+## 1. Reference data (seeded into existing tables)
 
-**Migration:**
-- `collection_suggestions`: add `parent_collection_id uuid` (self-FK), `collection_type text` (`type | colour | occasion | trend | sale | restock | brand`), `colour_filter text`, `occasion_filter text`, `trend_signal text`.
-- `store_settings`: add `brand_voice_style text` default `local_warmth` (one of `aspirational_youth | professional_editorial | local_warmth | luxury_refined`).
-- `brand_intelligence`: add `whitefox_reference jsonb`.
-- `seo_keyword_tiers`: seed CLOTHING vertical (Tier 2–5 + TREND).
-- New table `nested_handle_map` (parent_slug, child_slug, vertical) — pre-seeded with the full White Fox / Sonic handle taxonomy from the spec.
+**`brand_intelligence`** — add two retailer references for the demo user (Stomp Shoes Darwin) and the global "shared" row:
 
-**Engine:**
-- Update `seo-collection-engine` to:
-  - emit `shopify_handle = parent-slug/child-slug` when `parent_collection_id` is set,
-  - select voice template by `brand_voice_style`,
-  - apply White Fox **6-part description formula** (`hook | sub-types | features | fit/body | cross-sell | utility`) for `aspirational_youth` and `local_warmth`,
-  - keep ICONIC 5-part formula for `professional_editorial`.
+- `david_jones_reference` — 4-part luxury formula, sub-collection link list, accessories taxonomy snippets
+- `louenhide_megantic_reference` — 3 innovations, niche-keyword tiers, product audit checklist, accessories FAQ template
 
-## Phase B — Colour & occasion detectors
+**`industry_taxonomy`** — insert vertical `ACCESSORIES` with dimensions:
+`bag_type`, `travel_type`, `occasion`, `size`, `material`, `feature`, `accessory_type`, `gender_use` (full Louenhide model).
 
-New edge function `seo-collection-detector`:
-- **Colour pass:** scan products in each parent type collection for the 32-colour vocabulary (Black, White, Navy, Cream, Beige, Tan, Floral, Animal, etc.); when ≥5 solid / ≥3 print → suggest a colour child collection nested under the parent.
-- **Occasion pass:** scan tags + titles + descriptions for the universal/CLOTHING/SWIMWEAR/FOOTWEAR occasion sets in the spec; ≥5 matches → suggest occasion collection.
-- **Trend pass:** scan against quarterly trend vocabulary; ≥3 matches → `collection_type='trend'` with auto-review-after-90-days flag.
-- **Sale-by-category:** if ≥3 products in a type have `compare_at_price > 0` → emit `/collections/sale/{type}`.
-- **Back in Stock:** ensure one per store; bind to `tag IN ('back-in-stock','restocked','back-soon')`.
+**`seo_keyword_library`** — pre-load Tiers 2-5 keywords for `ACCESSORIES` (brand+type, feature, local Darwin, attribute).
 
-Returns batch of `collection_suggestions` rows with the right `parent_collection_id`, `colour_filter`, `occasion_filter`, `trend_signal`.
+## 2. Engine changes
 
-## Phase C — White Fox brand-intel scraper
+**`supabase/functions/seo-collection-detector/index.ts`**
+- Add ACCESSORIES detection rules using new taxonomy + thresholds:
+  - bag_type ≥3, occasion ≥3, material ≥5, feature ≥2, accessory_type ≥3
+- Emit `static_filter_collection` suggestions for every colour/feature/size combination with ≥3 products (Megantic Innovation 1) instead of relying on Shopify dynamic filter URLs.
 
-Extend `brand-intelligence-crawler` with a Step 7D (CLOTHING-only) that scrapes `whitefoxboutique.com.au/collections/{slug}` via Firecrawl. Captures opening line voice sample, sub-type list, description structure, and trend vocabulary into `brand_intelligence.whitefox_reference`.
+**`supabase/functions/seo-collection-engine/index.ts`**
+- Add competitor router branch: when `vertical IN ('ACCESSORIES')` → choose `david_jones` (luxury voice) or `louenhide_megantic` (Aussie accessible voice) based on price band / `voice` selector.
+- New formula `david_jones_4_part`: authority opener → occasion+material loading → embedded FAQ prose → sub-collection link list.
+- New formula `louenhide_brand_page`: Brisbane founding → mission → brand+type keyword repetition (≥3) → collection link-out.
+- Niche-keyword guard: reject any primary keyword in the broad blocklist (`bags`, `accessories`, `wallets`, `handbags` standalone) — must combine with brand / type / locale.
 
-Add `whitefox-reference-refresh` edge function (mirror of `iconic-brand-refresh`) and a ⚡ button on CLOTHING brand rows in `/brands`.
+**New: `supabase/functions/product-seo-audit/index.ts`** (Megantic Innovation 3)
+- For each Shopify product in accessories vertical, score:
+  - Handle contains bag_type keyword? (else suggest `-{bag_type}` suffix)
+  - H1/title contains bag_type word?
+  - Meta description present and ≤160 chars in formula `{benefit}. {Brand} {Style} in {colour}. {Specs}. {Store + shipping}.`
+- Writes results to existing `collection_seo_outputs`-style row per product (or new `product_seo_audits` if needed — TBD: prefer reusing `agent_feedback` notes table to avoid migration).
 
-## Phase D — UI & competitor reference router
+## 3. UI
 
-- `/seo-engine`: add filters by `collection_type` (Type / Colour / Occasion / Trend / Sale / Restock) and a "Nested under" column showing parent.
-- `/seo-engine` row action: "Generate child collections" button (runs detector for one parent).
-- New "Voice" selector in store settings page.
-- Engine **decision router**: multi-brand store → ICONIC ref; single-brand DTC → White Fox ref; young fashion boutique → White Fox voice + ICONIC URL depth.
+**`src/pages/Collections.tsx`**
+- Add filter chip `static_filter` (Megantic) alongside existing chips.
+- Add voice option `luxury_authority` (David Jones) and `aussie_accessible` (Louenhide) to the Voice selector.
+- Show a "Megantic score" badge on each suggestion card (filter-indexable + niche keyword + product-audit pass).
 
-## One-tap action for Splash Swimwear
+**`src/pages/SeoEngine.tsx`**
+- New panel "Product SEO Audit" listing flagged products from the new edge function with one-click "apply suggested handle/title/meta" buttons.
 
-After Phases A–B deploy, add a "Generate White Fox-style swim collections" button on `/seo-engine` that creates the full nested set from the spec (bikinis, bikini-tops, bikini-bottoms, one-pieces, cover-ups, plus black/floral/navy/white colour children, plus resort-wear / tummy-control / back-in-stock / sale-by-type) for the active Splash store in one go.
+## 4. Demo seeding for Stomp Shoes Darwin
 
----
+Insert demo `collection_suggestions` covering:
+- Static filter: `louenhide-black-bags`, `olga-berg-gold-clutches`
+- Feature: `rfid-wallets-darwin`, `vegan-leather-bags-darwin`
+- Brand+type: `louenhide-crossbody-bags`, `peta-and-jain-tote-bags`
+- Occasion: `work-bags-darwin`, `evening-bags-darwin`
 
-**Technical notes:** completeness trigger already auto-recomputes on `collection_seo_outputs` / `collection_link_mesh` / `collection_blog_plans` writes — no change needed. Existing `seo-link-mesh-builder` will pick up new sibling links once colour/occasion children exist (siblings rule already covers same-parent grouping). All edge functions remain Lovable AI Gateway → `gemini-2.5-pro` → `gemini-2.5-flash` fallback.
+Generate `collection_seo_outputs` for the Louenhide brand page using the new `louenhide_brand_page` formula and 6-question FAQ template.
 
-Reply **continue** to start Phase A.
+## Out of scope (this round)
+- Actual publishing to Shopify (Testing-store token still expired).
+- Live crawl of David Jones / Louenhide — formulas baked from research above; can wire `whitefox-reference-refresh` pattern to a `dj-reference-refresh` later if desired.
+
+Approve to proceed and I'll seed references → update detector/engine → add audit function → wire UI.

@@ -1221,6 +1221,85 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
               emptyHint="No sizes detected on the page — add any you'd like to stock."
             />
 
+            {/* Per-variant stock quantities */}
+            {(edit.selectedColors.length > 0 || edit.selectedSizes.length > 0) && (() => {
+              const colours = edit.selectedColors.length ? edit.selectedColors : [""];
+              const sizes = edit.selectedSizes.length ? edit.selectedSizes : [""];
+              const setQty = (c: string, s: string, raw: string) => {
+                const n = raw === "" ? 0 : Math.max(0, Math.floor(Number(raw) || 0));
+                const key = variantQtyKey(c, s);
+                setEdit((prev) => {
+                  const next = { ...prev.variantQuantities };
+                  if (n > 0) next[key] = n; else delete next[key];
+                  return { ...prev, variantQuantities: next };
+                });
+              };
+              const total = Object.values(edit.variantQuantities).reduce((a, b) => a + (Number(b) || 0), 0);
+              const fillAll = (n: number) => {
+                setEdit((prev) => {
+                  const next: Record<string, number> = {};
+                  for (const c of colours) for (const s of sizes) {
+                    if (n > 0) next[variantQtyKey(c, s)] = n;
+                  }
+                  return { ...prev, variantQuantities: next };
+                });
+              };
+              return (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">
+                      Stock per variant <span className="text-muted-foreground font-normal">(total {total})</span>
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => fillAll(1)} className="text-[11px] text-muted-foreground hover:text-foreground">Fill 1</button>
+                      <span className="text-[11px] text-muted-foreground">·</span>
+                      <button type="button" onClick={() => fillAll(0)} className="text-[11px] text-muted-foreground hover:text-foreground">Clear</button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto rounded-md border border-border">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/40">
+                        <tr>
+                          <th className="text-left px-2 py-1.5 font-medium text-muted-foreground">
+                            {edit.selectedColors.length && edit.selectedSizes.length ? "Colour \\ Size" : edit.selectedColors.length ? "Colour" : "Size"}
+                          </th>
+                          {sizes.map((s) => (
+                            <th key={s || "_"} className="text-left px-2 py-1.5 font-medium">
+                              {s || (edit.selectedColors.length ? "Qty" : "—")}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {colours.map((c) => (
+                          <tr key={c || "_"} className="border-t border-border">
+                            <td className="px-2 py-1.5 font-medium">{c || (edit.selectedSizes.length ? "Qty" : "—")}</td>
+                            {sizes.map((s) => {
+                              const key = variantQtyKey(c, s);
+                              const val = edit.variantQuantities[key] ?? 0;
+                              return (
+                                <td key={s || "_"} className="px-1 py-1">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    inputMode="numeric"
+                                    value={val === 0 ? "" : String(val)}
+                                    onChange={(e) => setQty(c, s, e.target.value)}
+                                    placeholder="0"
+                                    className="h-7 text-xs w-16"
+                                  />
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Images */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">

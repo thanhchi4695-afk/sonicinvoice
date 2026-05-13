@@ -12,6 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import ConditionBuilderShowcase from "@/components/ConditionBuilderShowcase";
+import ScanCollectionsCard from "@/components/ScanCollectionsCard";
 
 /* ─── Types ─── */
 

@@ -149,6 +149,8 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [simFile, setSimFile] = useState<string | null>(null);
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
   const [filter, setFilter] = useState<"all" | "known" | "unknown" | "processed">("all");
+  const [accountFilter, setAccountFilter] = useState<string>("all");
+  const [collapsedAccounts, setCollapsedAccounts] = useState<Set<string>>(() => new Set());
   const [search, setSearch] = useState("");
   const [smartBulk, setSmartBulk] = useState<boolean>(() => {
     try { return localStorage.getItem("sonic_smart_bulk_enabled") === "1"; } catch { return false; }

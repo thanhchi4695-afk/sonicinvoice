@@ -35,6 +35,7 @@ import { lazy, Suspense } from "react";
 const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleShoppingHub.tsx"));
 const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx"));
 const FeedHealthPanel = lazy(() => import("./components/FeedHealthPanel.tsx"));
+const Collections = lazy(() => import("./pages/Collections.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,7 @@ const App = () => (
                   <Route path="/admin/training-pipeline" element={<RequireAuth><AdminTrainingPipeline /></RequireAuth>} />
                   <Route path="/rules" element={<Rules />} />
                   <Route path="/rules/setup" element={<RulesSetup />} />
+                  <Route path="/collections" element={<Suspense fallback={null}><Collections /></Suspense>} />
                   <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
                   <Route

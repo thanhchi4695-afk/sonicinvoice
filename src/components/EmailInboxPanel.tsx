@@ -31,6 +31,8 @@ interface InboxItem {
   messageId?: string;
   attachmentId?: string;
   attachmentMime?: string;
+  connectionId?: string | null;
+  accountEmail?: string | null;
   parseJobId?: string;
   parsedVariantCount?: number;
   importing?: boolean;
@@ -147,6 +149,8 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const [simFile, setSimFile] = useState<string | null>(null);
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
   const [filter, setFilter] = useState<"all" | "known" | "unknown" | "processed">("all");
+  const [accountFilter, setAccountFilter] = useState<string>("all");
+  const [collapsedAccounts, setCollapsedAccounts] = useState<Set<string>>(() => new Set());
   const [search, setSearch] = useState("");
   const [smartBulk, setSmartBulk] = useState<boolean>(() => {
     try { return localStorage.getItem("sonic_smart_bulk_enabled") === "1"; } catch { return false; }
@@ -188,9 +192,9 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
   const loadFoundInvoices = useCallback(async () => {
     const { data, error } = await supabase
       .from("gmail_found_invoices")
-      .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed, provider")
+      .select("id, message_id, from_email, subject, received_at, supplier_name, known_supplier, attachments, processed, provider, connection_id")
       .order("received_at", { ascending: false })
-      .limit(1000);
+      .limit(2000);
     if (error) return;
     const items: InboxItem[] = [];
     for (const row of data ?? []) {
@@ -217,6 +221,7 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
         messageId: row.message_id,
         attachmentId: first.attachment_id,
         attachmentMime: first.mime_type,
+        connectionId: (row as any).connection_id ?? null,
       });
     }
     setGmailItems(items);
@@ -720,11 +725,17 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     setSimFrom(""); setSimSubject(""); setSimFile(null); setShowSimulator(false);
   };
 
-  const items = [...gmailItems, ...simItems];
+  const connectionMap = new Map(connections.map(c => [c.id, c.email_address]));
+  const itemsRaw = [...gmailItems, ...simItems];
+  const items = itemsRaw.map(i => ({
+    ...i,
+    accountEmail: i.connectionId ? connectionMap.get(i.connectionId) ?? null : (i.source === "sim" ? "Simulator" : null),
+  }));
   const filteredItems = items.filter(i => {
     if (filter === "known" && !i.knownSupplier) return false;
     if (filter === "unknown" && i.knownSupplier) return false;
     if (filter === "processed" && i.status !== "done") return false;
+    if (accountFilter !== "all" && (i.accountEmail ?? "Unassigned") !== accountFilter) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       const hay = `${i.from ?? ""} ${i.subject ?? ""} ${i.supplierName ?? ""}`.toLowerCase();
@@ -733,6 +744,19 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
     return true;
   });
   const queuedCount = items.filter(i => i.status === "queued" || i.status === "ready").length;
+
+  // Group filtered items by account email for display
+  const groupedItems = (() => {
+    const groups = new Map<string, typeof filteredItems>();
+    for (const it of filteredItems) {
+      const key = it.accountEmail ?? "Unassigned";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(it);
+    }
+    return Array.from(groups.entries());
+  })();
+  const accountOptions = Array.from(new Set(items.map(i => i.accountEmail ?? "Unassigned")));
+
 
   return (
     <div className="min-h-screen pb-24 animate-fade-in">
@@ -1086,6 +1110,29 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
               />
             </div>
           )}
+          {items.length > 0 && accountOptions.length > 1 && (
+            <div className="flex items-center gap-1 mb-2 flex-wrap">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">Account:</span>
+              {(["all", ...accountOptions] as string[]).map(a => {
+                const active = accountFilter === a;
+                const count = a === "all" ? items.length : items.filter(i => (i.accountEmail ?? "Unassigned") === a).length;
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => setAccountFilter(a)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted text-muted-foreground border-border hover:bg-muted/70"
+                    }`}
+                  >
+                    {a === "all" ? "All accounts" : a} <span className="opacity-70">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {items.length === 0 ? (
             <div className="bg-card rounded-lg border border-border p-8 text-center">
               <div className="w-14 h-14 rounded-full bg-muted mx-auto flex items-center justify-center mb-3">
@@ -1101,78 +1148,107 @@ const EmailInboxPanel = ({ onBack, onProcessInvoice }: EmailInboxPanelProps) => 
               <p className="text-xs text-muted-foreground">No invoices match this filter.</p>
             </div>
           ) : (
-            <div className="bg-card rounded-lg border border-border overflow-hidden">
-              <div className="divide-y divide-border">
-                {filteredItems.map(item => (
-                  <div key={item.id} className="px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="text-sm font-medium truncate">{item.from}</p>
-                          <span className="text-[10px] text-muted-foreground shrink-0">{item.received}</span>
-                          {(item.source === "gmail" || item.source === "outlook" || item.source === "imap") && (
-                            <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${providerBadgeCls(item.source)}`}>
-                              {providerLabel(item.source).toUpperCase()}
-                            </span>
-                          )}
-                          {item.source === "sim" && demo && (
-                            <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning border border-warning/20 shrink-0">DEMO</span>
-                          )}
-                          {item.knownSupplier && (
-                            <span className="text-[9px] px-1 py-0.5 rounded bg-primary/15 text-primary border border-primary/20 shrink-0">KNOWN</span>
-                          )}
-                          {(() => {
-                            const c = item.confidence ?? computeConfidence(item);
-                            const tip =
-                              c === "high"
-                                ? "High confidence — sender domain matches a known supplier and the filename looks invoice-like. Auto Process will run this row."
-                                : c === "medium"
-                                ? `Medium confidence — sender ${item.fromEmail || "domain"} is recognised but the supplier couldn't be matched exactly. Skipped by Auto Process; click Process → to confirm manually. Add this domain in Supplier Profiles → Email Domains to promote it to High.`
-                                : `Low confidence — sender ${item.fromEmail || "domain"} isn't linked to any supplier yet. Skipped by Auto Process; click Process → to review manually, or add the domain in Supplier Profiles → Email Domains.`;
-                            return <span title={tip}>{confidenceBadge(c)}</span>;
-                          })()}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">{item.subject}</p>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-muted text-muted-foreground border border-border">
-                            {attachmentIcon(item.attachmentType)}
-                            <Paperclip className="w-2.5 h-2.5" />
-                            {item.attachmentName}
-                          </span>
-                          {statusBadge(item.status)}
-                        </div>
+            <div className="space-y-3">
+              {groupedItems.map(([accountKey, groupItems]) => {
+                const collapsed = collapsedAccounts.has(accountKey);
+                const queuedInGroup = groupItems.filter(i => i.status === "queued" || i.status === "ready").length;
+                return (
+                  <div key={accountKey} className="bg-card rounded-lg border border-border overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setCollapsedAccounts(prev => {
+                        const next = new Set(prev);
+                        if (next.has(accountKey)) next.delete(accountKey); else next.add(accountKey);
+                        return next;
+                      })}
+                      className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/40 border-b border-border hover:bg-muted/60 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-xs font-semibold truncate">{accountKey}</span>
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {groupItems.length} email{groupItems.length === 1 ? "" : "s"}
+                          {queuedInGroup > 0 && ` · ${queuedInGroup} queued`}
+                        </span>
                       </div>
-                      <div className="shrink-0">
-                        {(item.status === "queued" || item.status === "ready") && (
-                          <Button size="sm" variant="teal" className="h-7 text-xs" onClick={() => handleProcess(item)}>
-                            Process →
-                          </Button>
-                        )}
-                        {item.status === "done" && (
-                          item.imported ? (
-                            <span className="text-[10px] text-success font-medium">✓ Imported to Shopify</span>
-                          ) : item.parseJobId ? (
-                            <Button
-                              size="sm"
-                              variant="teal"
-                              className="h-7 text-xs"
-                              disabled={item.importing}
-                              onClick={() => handleImportToShopify(item)}
-                              title="Push parsed variants to your Shopify store"
-                            >
-                              {item.importing
-                                ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Importing…</>
-                                : <>Import to Shopify{item.parsedVariantCount ? ` (${item.parsedVariantCount})` : ""}</>}
-                            </Button>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">✓ Done</span>
-                          )
-                        )}
+                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} />
+                    </button>
+                    {!collapsed && (
+                      <div className="divide-y divide-border">
+                        {groupItems.map(item => (
+                          <div key={item.id} className="px-4 py-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-0.5">
+                                  <p className="text-sm font-medium truncate">{item.from}</p>
+                                  <span className="text-[10px] text-muted-foreground shrink-0">{item.received}</span>
+                                  {(item.source === "gmail" || item.source === "outlook" || item.source === "imap") && (
+                                    <span className={`text-[9px] px-1 py-0.5 rounded border shrink-0 ${providerBadgeCls(item.source)}`}>
+                                      {providerLabel(item.source).toUpperCase()}
+                                    </span>
+                                  )}
+                                  {item.source === "sim" && demo && (
+                                    <span className="text-[9px] px-1 py-0.5 rounded bg-warning/15 text-warning border border-warning/20 shrink-0">DEMO</span>
+                                  )}
+                                  {item.knownSupplier && (
+                                    <span className="text-[9px] px-1 py-0.5 rounded bg-primary/15 text-primary border border-primary/20 shrink-0">KNOWN</span>
+                                  )}
+                                  {(() => {
+                                    const c = item.confidence ?? computeConfidence(item);
+                                    const tip =
+                                      c === "high"
+                                        ? "High confidence — sender domain matches a known supplier and the filename looks invoice-like. Auto Process will run this row."
+                                        : c === "medium"
+                                        ? `Medium confidence — sender ${item.fromEmail || "domain"} is recognised but the supplier couldn't be matched exactly. Skipped by Auto Process; click Process → to confirm manually. Add this domain in Supplier Profiles → Email Domains to promote it to High.`
+                                        : `Low confidence — sender ${item.fromEmail || "domain"} isn't linked to any supplier yet. Skipped by Auto Process; click Process → to review manually, or add the domain in Supplier Profiles → Email Domains.`;
+                                    return <span title={tip}>{confidenceBadge(c)}</span>;
+                                  })()}
+                                </div>
+                                <p className="text-xs text-muted-foreground truncate">{item.subject}</p>
+                                <div className="flex items-center gap-2 mt-1.5">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-muted text-muted-foreground border border-border">
+                                    {attachmentIcon(item.attachmentType)}
+                                    <Paperclip className="w-2.5 h-2.5" />
+                                    {item.attachmentName}
+                                  </span>
+                                  {statusBadge(item.status)}
+                                </div>
+                              </div>
+                              <div className="shrink-0">
+                                {(item.status === "queued" || item.status === "ready") && (
+                                  <Button size="sm" variant="teal" className="h-7 text-xs" onClick={() => handleProcess(item)}>
+                                    Process →
+                                  </Button>
+                                )}
+                                {item.status === "done" && (
+                                  item.imported ? (
+                                    <span className="text-[10px] text-success font-medium">✓ Imported to Shopify</span>
+                                  ) : item.parseJobId ? (
+                                    <Button
+                                      size="sm"
+                                      variant="teal"
+                                      className="h-7 text-xs"
+                                      disabled={item.importing}
+                                      onClick={() => handleImportToShopify(item)}
+                                      title="Push parsed variants to your Shopify store"
+                                    >
+                                      {item.importing
+                                        ? <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Importing…</>
+                                        : <>Import to Shopify{item.parsedVariantCount ? ` (${item.parsedVariantCount})` : ""}</>}
+                                    </Button>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground">✓ Done</span>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           )}
         </div>

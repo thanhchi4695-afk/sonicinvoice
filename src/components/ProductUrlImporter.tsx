@@ -398,6 +398,12 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
     const priceStr =
       item.price !== undefined && Number.isFinite(item.price) ? String(item.price) : "0";
 
+    const qtyMap = item.variantQuantities ?? {};
+    const qtyFor = (c: string, s: string) => {
+      const n = qtyMap[variantQtyKey(c, s)];
+      return Number.isFinite(n) && (n as number) > 0 ? Math.floor(n as number) : 0;
+    };
+
     const options: { name: string }[] = [];
     if (colors.length) options.push({ name: "Colour" });
     if (sizes.length) options.push({ name: "Size" });
@@ -411,7 +417,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
               price: priceStr,
               sku: "",
               inventory_management: "shopify",
-              inventory_quantity: 0,
+              inventory_quantity: qtyFor(c, s),
             })),
           )
         : colors.length
@@ -420,7 +426,7 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
               price: priceStr,
               sku: "",
               inventory_management: "shopify",
-              inventory_quantity: 0,
+              inventory_quantity: qtyFor(c, ""),
             }))
           : sizes.length
             ? sizes.map((s) => ({
@@ -428,14 +434,14 @@ export default function ProductUrlImporter({ onAddToInvoice, className }: Props)
                 price: priceStr,
                 sku: "",
                 inventory_management: "shopify",
-                inventory_quantity: 0,
+                inventory_quantity: qtyFor("", s),
               }))
             : [
                 {
                   price: priceStr,
                   sku: "",
                   inventory_management: "shopify",
-                  inventory_quantity: 0,
+                  inventory_quantity: qtyFor("", ""),
                 },
               ];
 

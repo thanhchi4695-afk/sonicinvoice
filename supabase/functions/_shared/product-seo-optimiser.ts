@@ -238,3 +238,20 @@ function generateBody(o: {
     `<p>Shop the ${piece}${storePhrase} online or in-store, with fast Australia-wide shipping and easy returns.</p>`,
   ].join("\n");
 }
+
+function generateJewelleryBody(o: {
+  brand: string; styleName: string; metal: string | null;
+  jewelType: string | null; store: string; city: string;
+}): string {
+  const piece = [o.brand, o.styleName].filter(Boolean).join(" ") || "This piece";
+  const jt = o.jewelType || "jewellery";
+  const metalPhrase = o.metal ? ` in ${o.metal.replace(/-/g, " ")}` : "";
+  const cityPhrase = o.city ? ` in ${o.city}` : "";
+  const storePhrase = o.store ? ` ${o.store}${cityPhrase}` : "";
+  return [
+    `<p>The ${piece} is a demi-fine ${jt}${metalPhrase} designed to be worn every day. ${o.brand ? `${o.brand} crafts each piece` : "It is crafted"} with considered detail and hard-wearing materials so the ${jt} keeps its finish through real life — showers, school runs, weekends away.</p>`,
+    `<p>Wear it solo as a quiet everyday piece, or stack and layer it with other ${jt} for a more considered look. The proportions sit comfortably for all-day wear and pair back to denim, tailoring and evening dressing equally well.</p>`,
+    `<p>Care is straightforward — store separately in the gift pouch, keep away from perfume and chlorine, and wipe with a soft cloth after wear. With everyday care the ${o.metal ? o.metal.replace(/-/g, " ") : "finish"} keeps its shine for years.</p>`,
+    `<p>Shop the ${piece}${storePhrase} online or in-store, with gift packaging at checkout, fast Australia-wide shipping, and easy returns.</p>`,
+  ].join("\n");
+}

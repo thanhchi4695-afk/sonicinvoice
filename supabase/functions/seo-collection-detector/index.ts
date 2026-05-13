@@ -188,9 +188,9 @@ Deno.serve(async (req) => {
         shopify_handle: `sale/${parentSlug}`,
         collection_type: "sale",
         product_count: info.count,
-        status: "suggested",
+        status: "pending",
         source: "seo-collection-detector",
-        metadata: { sample_product_ids: info.sample_ids },
+        sample_product_ids: info.sample_ids,
       });
     }
 
@@ -204,9 +204,9 @@ Deno.serve(async (req) => {
         shopify_handle: `back-in-stock/${parentSlug}`,
         collection_type: "back_in_stock",
         product_count: info.count,
-        status: "suggested",
+        status: "pending",
         source: "seo-collection-detector",
-        metadata: { sample_product_ids: info.sample_ids },
+        sample_product_ids: info.sample_ids,
       });
     }
 

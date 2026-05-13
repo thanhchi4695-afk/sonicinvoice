@@ -206,6 +206,7 @@ Deno.serve(async (req) => {
             published_count: published.length,
             failed_count: failed.length,
             shopify_product_ids: published.map((p) => p.shopify_id).filter(Boolean),
+            seo_optimised: seoApplied,
             published_at: new Date().toISOString(),
           },
         },
@@ -218,6 +219,7 @@ Deno.serve(async (req) => {
       failed,
       skipped: 0,
       shopify_product_ids: published.map((p) => p.shopify_id).filter(Boolean),
+      seo_optimised: seoApplied,
     });
   } catch (err) {
     console.error("[publishing-agent] error", err);

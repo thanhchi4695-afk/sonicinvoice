@@ -45,6 +45,7 @@ interface BrandRow {
   id: string;
   brand_name: string;
   brand_domain: string | null;
+  industry_vertical: string | null;
   collection_structure_type: string | null;
   brand_tone: string | null;
   brand_tone_sample: string | null;

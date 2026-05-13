@@ -403,8 +403,9 @@ function buildPrompt(opts: {
   linkOptions: Array<{ handle: string; title: string; type: string }>;
   primaryKeyword: string;
   previousIssues: ValidationIssue[];
+  voice: VoiceStyle;
 }) {
-  const { suggestion, level, isBrandPage, vertical, storeName, storeCity, keywords, brand, linkOptions, primaryKeyword, previousIssues } = opts;
+  const { suggestion, level, isBrandPage, vertical, storeName, storeCity, keywords, brand, linkOptions, primaryKeyword, previousIssues, voice } = opts;
 
   const titleFormulas: Record<Level, string> = {
     2: "{Audience} {Category} | " + storeName,

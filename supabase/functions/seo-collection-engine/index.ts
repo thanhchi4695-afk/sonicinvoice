@@ -30,6 +30,7 @@ interface RunBody {
   store_name?: string;
   store_city?: string;
   brand_id?: string;
+  voice?: VoiceStyle;
 }
 
 function inferTaxonomyLevel(s: any): { level: Level; isBrandPage: boolean } {
@@ -209,7 +210,7 @@ Deno.serve(async (req) => {
       .select("brand_voice_style")
       .eq("user_id", suggestion.user_id)
       .maybeSingle();
-    const voice: VoiceStyle = (conn?.brand_voice_style as VoiceStyle) || "local_warmth";
+    const voice: VoiceStyle = (body.voice as VoiceStyle) || (conn?.brand_voice_style as VoiceStyle) || "local_warmth";
 
     // Persist taxonomy_level for the row
     if (suggestion.taxonomy_level !== level) {
@@ -228,15 +229,22 @@ Deno.serve(async (req) => {
       .order("tier", { ascending: true })
       .limit(40);
 
-    // Brand intelligence + ICONIC reference
+    // Brand intelligence + competitor reference (load whenever brand_id is supplied)
     let brand: any = null;
-    if (level === 5 && body.brand_id) {
+    if (body.brand_id) {
       const { data } = await supabase
         .from("brand_intelligence")
-        .select("brand_name, brand_voice, value_proposition, hero_keywords, iconic_reference, whitefox_reference, davidjones_reference, louenhide_megantic_reference, competitor_reference_styletread")
+        .select("brand_name, brand_tone, brand_tone_sample, seo_primary_keyword, seo_secondary_keywords, iconic_reference, whitefox_reference, davidjones_reference, louenhide_megantic_reference, competitor_reference_styletread")
         .eq("id", body.brand_id)
         .maybeSingle();
-      brand = data;
+      if (data) {
+        brand = {
+          ...data,
+          brand_voice: data.brand_tone,
+          value_proposition: data.brand_tone_sample,
+          hero_keywords: data.seo_secondary_keywords,
+        };
+      }
     }
 
     // Link mesh — pre-built sibling/parent/child set; otherwise fall back to siblings
@@ -296,12 +304,13 @@ Deno.serve(async (req) => {
         previousIssues: lastIssues, voice,
       });
       const ai = await callAI({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: prompt.system },
           { role: "user", content: prompt.user },
         ],
         temperature: 0.4,
+        timeoutMs: 120_000,
       });
       const raw = getContent(ai);
       parsed = safeParseJson(raw);

@@ -18,7 +18,60 @@ interface GeneratedPayload {
   blogs: Array<{ blog_type: "sizing" | "care" | "features" | "faq"; title: string; content_html: string }>;
 }
 
-function buildPrompt(s: Record<string, unknown>, related: string[]): string {
+interface BrandProfile {
+  brand_name: string;
+  brand_domain: string | null;
+  category_vocabulary: Record<string, string> | null;
+  collection_structure_type: string | null;
+  print_story_names: string[] | null;
+  seo_primary_keyword: string | null;
+  seo_secondary_keywords: string[] | null;
+  brand_tone: string | null;
+  brand_tone_sample: string | null;
+  blog_topics_used: string[] | null;
+  blog_sample_titles: string[] | null;
+  crawl_confidence: number | null;
+  manually_verified: boolean;
+}
+
+function detectBrand(s: Record<string, unknown>, brands: BrandProfile[]): BrandProfile | null {
+  if (brands.length === 0) return null;
+  const haystack = [
+    String(s.suggested_title ?? ""),
+    String((s.rule_set as { vendor?: string } | null)?.vendor ?? ""),
+    ...((s.sample_titles as string[] | undefined) ?? []),
+  ].join(" ").toLowerCase();
+  // Prefer longer brand names first to avoid "Sea" matching before "Sea Level"
+  const sorted = [...brands].sort((a, b) => b.brand_name.length - a.brand_name.length);
+  for (const b of sorted) {
+    if (haystack.includes(b.brand_name.toLowerCase())) return b;
+  }
+  return null;
+}
+
+function brandBlock(b: BrandProfile | null): string {
+  if (!b) return "";
+  const vocab = b.category_vocabulary && Object.keys(b.category_vocabulary).length > 0
+    ? Object.entries(b.category_vocabulary).map(([their, generic]) => `  "${their}" (generic: ${generic})`).join("\n")
+    : "  (none extracted)";
+  return `
+BRAND INTELLIGENCE FOR ${b.brand_name}${b.manually_verified ? " (verified)" : ""}:
+- Their category vocabulary (use these EXACT names instead of generic terms):
+${vocab}
+- Their collection structure: ${b.collection_structure_type ?? "unknown"}
+- Their brand tone: ${b.brand_tone ?? "unknown"}
+- Sample of their voice: "${(b.brand_tone_sample ?? "").slice(0, 400)}"
+- Their print/story names: ${(b.print_story_names ?? []).slice(0, 6).join(", ") || "(none)"}
+- Primary SEO keyword: ${b.seo_primary_keyword ?? "(none)"}
+- Secondary SEO keywords: ${(b.seo_secondary_keywords ?? []).slice(0, 6).join(", ") || "(none)"}
+- Their blog topic types: ${(b.blog_topics_used ?? []).join(", ") || "(none)"}
+- Sample titles from their blog: ${(b.blog_sample_titles ?? []).slice(0, 5).join(" | ") || "(none)"}
+
+INSTRUCTION: Mirror ${b.brand_name}'s own voice and vocabulary, adapted for Splash Swimwear Darwin. Use their exact category names. Reference their brand story and values in the opening paragraph. Use their SEO keywords naturally. Blog titles should follow their own blog structure.
+`;
+}
+
+function buildPrompt(s: Record<string, unknown>, related: string[], brand: BrandProfile | null): string {
   return `COLLECTION CONTEXT:
 Type: ${s.collection_type}
 Name: ${s.suggested_title}
@@ -26,7 +79,7 @@ Products in collection: ${s.product_count}
 Sample product titles: ${(s.sample_titles as string[] ?? []).slice(0, 5).join(" | ")}
 Related existing collections on this store: ${related.slice(0, 8).join(", ") || "none"}
 Store: Splash Swimwear — Darwin, NT, Australia
-
+${brandBlock(brand)}
 OUTPUT JSON ONLY (no prose, no markdown fences) with this exact shape:
 {
   "seo_title": "string max 60 chars in form '<Collection> | Splash Swimwear Darwin'",
@@ -41,12 +94,15 @@ OUTPUT JSON ONLY (no prose, no markdown fences) with this exact shape:
 Australian English. No exaggerated claims. No fake material claims.`;
 }
 
-async function generate(s: Record<string, unknown>, related: string[]): Promise<GeneratedPayload> {
+async function generate(s: Record<string, unknown>, related: string[], brand: BrandProfile | null): Promise<GeneratedPayload> {
+  const systemMsg = brand
+    ? `You are a senior SEO copywriter for Splash Swimwear in Darwin, NT. You write content that mirrors each brand's own voice — for ${brand.brand_name}, channel a ${brand.brand_tone ?? "brand-appropriate"} tone. You output strict JSON only.`
+    : "You are a senior SEO copywriter for Splash Swimwear in Darwin, NT. You output strict JSON only.";
   const data = await callAI({
     model: "google/gemini-2.5-pro",
     messages: [
-      { role: "system", content: "You are a senior SEO copywriter for Splash Swimwear in Darwin, NT. You output strict JSON only." },
-      { role: "user", content: buildPrompt(s, related) },
+      { role: "system", content: systemMsg },
+      { role: "user", content: buildPrompt(s, related, brand) },
     ],
     temperature: 0.4,
     max_tokens: 4000,
@@ -88,6 +144,14 @@ Deno.serve(async (req) => {
       .limit(20);
     const relatedTitles = (related ?? []).map((r: any) => r.suggested_title);
 
+    // Load brand intelligence profiles for this user (only ones with reasonable confidence)
+    const { data: brandRows } = await admin
+      .from("brand_intelligence")
+      .select("brand_name, brand_domain, category_vocabulary, collection_structure_type, print_story_names, seo_primary_keyword, seo_secondary_keywords, brand_tone, brand_tone_sample, blog_topics_used, blog_sample_titles, crawl_confidence, manually_verified")
+      .eq("user_id", userId)
+      .gte("crawl_confidence", 0.6);
+    const brands = (brandRows ?? []) as BrandProfile[];
+
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       try {
@@ -105,7 +169,8 @@ Deno.serve(async (req) => {
         }
 
         await admin.from("collection_suggestions").update({ status: "content_generating" }).eq("id", id);
-        const out = await generate(s as any, relatedTitles);
+        const matchedBrand = detectBrand(s as Record<string, unknown>, brands);
+        const out = await generate(s as any, relatedTitles, matchedBrand);
 
         await admin.from("collection_suggestions").update({
           seo_title: out.seo_title,

@@ -79,6 +79,63 @@ Deno.serve(async (req) => {
       .gte("started_at", since)
       .limit(1);
 
+    // Back-in-stock detection: parse incoming variants and compare to last-known qty.
+    try {
+      const payload = JSON.parse(rawBody);
+      const incoming: Array<{ id?: number | string; inventory_quantity?: number; title?: string; sku?: string }> =
+        Array.isArray(payload?.variants) ? payload.variants : [];
+      const productTitle: string = payload?.title ?? "";
+      const productHandle: string = payload?.handle ?? "";
+      const productImage: string | null = payload?.image?.src ?? payload?.images?.[0]?.src ?? null;
+
+      if (incoming.length > 0) {
+        const ids = incoming.map((v) => String(v?.id ?? "")).filter(Boolean);
+        const { data: existing } = await admin
+          .from("variants")
+          .select("shopify_variant_id, quantity, sku")
+          .eq("user_id", conn.user_id)
+          .in("shopify_variant_id", ids);
+        const prevMap = new Map<string, number>(
+          (existing ?? []).map((r: { shopify_variant_id: string; quantity: number }) => [r.shopify_variant_id, r.quantity ?? 0]),
+        );
+
+        for (const v of incoming) {
+          const vid = String(v?.id ?? "");
+          if (!vid) continue;
+          const newQty = Number(v?.inventory_quantity ?? 0);
+          const oldQty = prevMap.get(vid);
+          if (oldQty === 0 && newQty > 0) {
+            const klaviyoUrl = `${SUPABASE_URL}/functions/v1/klaviyo-trigger`;
+            fetch(klaviyoUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              },
+              body: JSON.stringify({
+                user_id: conn.user_id,
+                event_name: "Sonic: Back In Stock",
+                profile: { external_id: `shop:${shopDomain}` },
+                unique_id: `bis:${vid}:${Date.now()}`,
+                properties: {
+                  shop_domain: shopDomain,
+                  product_title: productTitle,
+                  product_handle: productHandle,
+                  product_image: productImage,
+                  variant_id: vid,
+                  variant_title: v?.title ?? null,
+                  variant_sku: v?.sku ?? null,
+                  inventory_quantity: newQty,
+                },
+              }),
+            }).catch((e) => console.error("klaviyo-trigger BIS failed:", e));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("BIS detection skipped:", e);
+    }
+
     if (recent && recent.length > 0) {
       return new Response(JSON.stringify({ ok: true, debounced: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

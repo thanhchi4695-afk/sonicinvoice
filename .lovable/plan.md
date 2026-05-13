@@ -88,7 +88,13 @@ Same order you approved for David Jones rounds — taxonomy → keyword library 
 - **Product title audit** in `_shared/product-seo-optimiser.ts` — `isJewelleryVendor`, `detectJewelleryType`, `detectMetal` helpers + a JEWELLERY branch in `optimiseProductSeo` enforcing `{Brand} {Style Name} {Metal} {Jewellery Type}`, raising `no_jewellery_type_detected` / `no_metal_detected` audit flags, and writing a 4-paragraph jewellery body when copy is missing.
 - Both edge functions redeployed (`seo-collection-detector`, `publishing-agent`).
 
-## Round 3 — partial (smoke-tested, pre-seed deferred)
+## Round 3 — partial (validated end-to-end on connected store)
 
-- Smoke test against connected `testing-d9eimunn` store (337 SWIMWEAR/CLOTHING products) confirms detector returns 6 colour collections and zero JEWELLERY/gifting suggestions — Round 1+2 add branches without regressing existing verticals.
-- Splash Swimwear Darwin (`b8dcf887-…`) is connected but `products` table is empty for that user — pre-seed deferred until catalogue syncs. Re-run `seo-collection-detector` with that user_id once Shopify products land.
+- Initial smoke test against `testing-d9eimunn` returned only colour collections — investigation found two real bugs:
+  1. Detector skipped any product with empty `product_type` (`if (!parent) continue`) — masking 11 real jewellery items in the testing store.
+  2. The Round 2 niche-keyword blocklist was killing canonical jewellery type pages (necklaces/earrings/bracelets/rings) — those titles are *intentionally* the broad word for a type collection.
+- **Fixes shipped & redeployed:**
+  - Added `inferJewelleryParent(title)` — when `product_type` is empty, infer Necklaces/Earrings/Bracelets/Rings/Anklets/Charms from title (with false-positive guard for "ring front" swimwear).
+  - Niche-keyword guard now skipped for `kind === jewellery_type | metal | gemstone`.
+- **Validation:** detector against `testing-d9eimunn` now correctly emits a `jewellery_type` necklaces collection for the 3 untyped necklace products, alongside SWIMWEAR/CLOTHING colour and occasion collections — proves Round 1+2 fire end-to-end in production.
+- Splash Swimwear Darwin (`b8dcf887-…`) full pre-seed still deferred until their Shopify catalogue syncs into `products`.

@@ -71,3 +71,14 @@ Demo/data work, not engine work. Requires Splash's `user_id` or for the store to
 ## Confirm before I start
 
 Same order you approved for David Jones rounds — taxonomy → keyword library → schemas — applied to JEWELLERY. Reply "go" and I'll ship Round 1.
+
+---
+
+## Round 1 status: SHIPPED ✅
+
+- `industry_taxonomy` JEWELLERY vertical seeded (11 dimensions: jewellery_type, earring/necklace/bracelet/ring style, metal, gemstone, style, occasion, theme, giftability) via migration + insert.
+- `seo_keyword_library` and `industry_taxonomy` CHECK constraints widened to allow `JEWELLERY` and new keyword buckets (gifting, metal, gemstone, style, theme).
+- `seo-collection-engine`: added `gwg_meaningful` voice + three new schemas (`gwg_brand_page`, `gwg_edits`, `gwg_intersection`) wired into `stitchDescription`, `extendBody`, `formulaSchema`. Niche-keyword guard extended to JEWELLERY. Edge function deployed.
+- Edit URL persistence rule already lives in the Louenhide/Megantic shipped logic — applies to GWG Edits without further changes.
+
+Round 2 (keyword library + gifting engine + product title audit) and Round 3 (Splash pre-seed) remain queued per the approved plan.

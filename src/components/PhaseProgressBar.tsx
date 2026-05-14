@@ -22,8 +22,8 @@ export interface Phase {
 // rather than silently dumping the user back on Capture.
 export const PHASES: (Phase & { implemented: boolean })[] = [
   { id: "capture",  num: 1, label: "Capture",       shortLabel: "Capture",  icon: FileText,   description: "Upload invoice / scan goods", target: { type: "flow", id: "invoice" }, implemented: true  },
-  { id: "review",   num: 2, label: "Review & Sync", shortLabel: "Review",   icon: Search,     description: "Verify lines & sync to catalog", target: { type: "flow", id: "invoice" }, implemented: true  },
-  { id: "catalog",  num: 3, label: "Enrich",        shortLabel: "Enrich",   icon: Package,    description: "AI-generated names, images, SEO descriptions & pricing", target: { type: "flow", id: "invoice" }, implemented: true  },
+  { id: "review",   num: 2, label: "Review & Sync", shortLabel: "Review",   icon: Search,     description: "Verify lines & sync to catalog", target: { type: "flow", id: "reconciliation" }, implemented: true  },
+  { id: "catalog",  num: 3, label: "Enrich",        shortLabel: "Enrich",   icon: Package,    description: "AI-generated names, images, SEO descriptions & pricing", target: { type: "flow", id: "product_descriptions" }, implemented: true  },
   { id: "price",    num: 4, label: "Price",         shortLabel: "Price",    icon: DollarSign, description: "RRP, margins, markdowns", target: { type: "flow", id: "price_adjust" }, implemented: true  },
   { id: "publish",  num: 5, label: "Publish",       shortLabel: "Publish",  icon: Upload,     description: "Push to Shopify or export CSV — available after review", target: { type: "flow", id: "invoice" }, implemented: true  },
   { id: "analyse",  num: 6, label: "Analyse",       shortLabel: "Analyse",  icon: BarChart3,  description: "Reports, restock, performance", target: { type: "tab", id: "analytics" }, implemented: true  },

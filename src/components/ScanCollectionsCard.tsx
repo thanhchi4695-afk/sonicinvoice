@@ -98,6 +98,9 @@ export default function ScanCollectionsCard() {
               {pendingCount > 0 && (
                 <Badge variant="secondary" className="text-[10px] h-5">{pendingCount} pending</Badge>
               )}
+              {geoReadyCount > 0 && (
+                <Badge className="text-[10px] h-5 bg-violet-500/15 text-violet-300 border border-violet-500/30">{geoReadyCount} GEO ready</Badge>
+              )}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               {loading ? "Loading…" : lastScan

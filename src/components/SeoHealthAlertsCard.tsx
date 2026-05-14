@@ -77,14 +77,16 @@ export default function SeoHealthAlertsCard() {
               </div>
             </div>
           </div>
-          <Button size="sm" variant="ghost" onClick={runScan} disabled={scanning} className="text-xs">
-            {scanning ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Activity className="h-3 w-3 mr-1" />}
-            Run scan
-          </Button>
-          <Button size="sm" variant="ghost" onClick={runQuarterlyRefresh} disabled={refreshing} className="text-xs" title="Re-generate all collections — runs automatically every 3 months">
-            {refreshing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-            Quarterly refresh
-          </Button>
+          <div className="flex items-center gap-1 shrink-0">
+            <Button size="sm" variant="ghost" onClick={runScan} disabled={scanning} className="text-xs">
+              {scanning ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Activity className="h-3 w-3 mr-1" />}
+              Run scan
+            </Button>
+            <Button size="sm" variant="ghost" onClick={runQuarterlyRefresh} disabled={refreshing} className="text-xs" title="Re-generate all collections — runs automatically every 3 months">
+              {refreshing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+              Quarterly
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2">

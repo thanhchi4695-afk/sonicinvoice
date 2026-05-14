@@ -38,6 +38,7 @@ const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleS
 const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx"));
 const FeedHealthPanel = lazy(() => import("./components/FeedHealthPanel.tsx"));
 const Collections = lazy(() => import("./pages/Collections.tsx"));
+const SonicRank = lazy(() => import("./pages/SonicRank.tsx"));
 const Brands = lazy(() => import("./pages/Brands.tsx"));
 const SeoEngine = lazy(() => import("./pages/SeoEngine.tsx"));
 const SeoKeywords = lazy(() => import("./pages/SeoKeywords.tsx"));
@@ -89,6 +90,7 @@ const App = () => (
                   <Route path="/rules" element={<Rules />} />
                   <Route path="/rules/setup" element={<RulesSetup />} />
                   <Route path="/collections" element={<Suspense fallback={null}><Collections /></Suspense>} />
+                  <Route path="/rank" element={<Suspense fallback={null}><SonicRank /></Suspense>} />
                   <Route path="/brands" element={<Suspense fallback={null}><Brands /></Suspense>} />
                   <Route path="/seo-engine" element={<RequireAuth><Suspense fallback={null}><SeoEngine /></Suspense></RequireAuth>} />
                   <Route path="/seo-keywords" element={<RequireAuth><Suspense fallback={null}><SeoKeywords /></Suspense></RequireAuth>} />

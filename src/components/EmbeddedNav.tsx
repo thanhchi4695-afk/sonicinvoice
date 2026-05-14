@@ -132,7 +132,8 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
       <p className="text-[9px] text-muted-foreground">Built for AU fashion boutiques</p>
     </div>
   </>
-);
+  );
+};
 
 const EmbeddedNav = (props: EmbeddedNavProps) => {
   const { open, onClose } = props;

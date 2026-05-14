@@ -32,6 +32,7 @@ import RulesSetup from "./pages/RulesSetup.tsx";
 import SonicKnowledge from "./pages/SonicKnowledge.tsx";
 import DriveWatcher from "./pages/DriveWatcher.tsx";
 import ClaudeConnector from "./pages/ClaudeConnector.tsx";
+import ClaudeActivity from "./pages/ClaudeActivity.tsx";
 import { lazy, Suspense } from "react";
 const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleShoppingHub.tsx"));
 const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx"));

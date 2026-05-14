@@ -3704,6 +3704,50 @@ export type Database = {
         }
         Relationships: []
       }
+      mcp_tool_calls: {
+        Row: {
+          arguments: Json | null
+          called_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          status: string
+          token_id: string | null
+          tool_name: string
+          user_id: string
+        }
+        Insert: {
+          arguments?: Json | null
+          called_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          token_id?: string | null
+          tool_name: string
+          user_id: string
+        }
+        Update: {
+          arguments?: Json | null
+          called_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          token_id?: string | null
+          tool_name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_tool_calls_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "sonic_mcp_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       misclassification_alerts: {
         Row: {
           alerted_at: string
@@ -7099,7 +7143,15 @@ export type Database = {
         Returns: undefined
       }
       verify_extension_token: { Args: { _token_hash: string }; Returns: string }
-      verify_sonic_mcp_token: { Args: { _token_hash: string }; Returns: string }
+      verify_sonic_mcp_token: {
+        Args: { _token_hash: string }
+        Returns: {
+          access_token: string
+          store_url: string
+          token_id: string
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "buyer" | "warehouse" | "viewer"

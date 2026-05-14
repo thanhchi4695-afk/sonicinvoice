@@ -179,6 +179,19 @@ const Landing = () => {
           </div>
         </section>
 
+        <div className="mb-20 flex justify-center">
+          <div className="relative w-full max-w-[480px] overflow-hidden rounded-2xl border border-border bg-card shadow-lg aspect-square">
+            <iframe
+              src="/marketing/sonic_rank_arch.html"
+              title="Sonic Rank AI architecture"
+              className="absolute inset-0 w-full h-full"
+              loading="lazy"
+              frameBorder={0}
+              allow="autoplay"
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left mb-20">
           <Feature title="Invoice → Shopify" body="Upload PDF, Excel or CSV. We extract every product, map to Shopify fields, and produce a ready-to-import file." />
           <Feature title="Stocky replacement" body="Purchase orders, demand forecasting, dead stock detection, stocktakes, and AI reorder intelligence." />

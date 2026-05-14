@@ -16,6 +16,7 @@ const Landing = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [checking, setChecking] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (isShopifyEmbedded()) {

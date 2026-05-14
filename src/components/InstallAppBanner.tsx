@@ -66,27 +66,8 @@ export default function InstallAppBanner() {
           </>
         ) : (
           <>
-            <Sparkle className="h-5 w-5 shrink-0 text-purple-400" />
-            <p className="text-sm flex-1 leading-tight">
-              Power up your store with AI shortcuts.
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 px-2 gap-1 border-purple-500/40 text-purple-300 hover:bg-purple-500/10"
-              onClick={() => navigate("/settings/claude-connector")}
-            >
-              <Sparkle className="h-3.5 w-3.5" />
-              <span className="text-xs">Claude</span>
-            </Button>
-            <Button
-              size="sm"
-              className="h-8 px-2 gap-1"
-              onClick={openAskSonic}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span className="text-xs">Ask Sonic</span>
-            </Button>
+            {/* iOS / no-install path: nothing extra here — Claude & Ask Sonic
+                are now their own dedicated floating buttons. */}
           </>
         )}
         <button onClick={dismiss} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label="Dismiss">

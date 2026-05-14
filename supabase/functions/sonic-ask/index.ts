@@ -318,10 +318,16 @@ Deno.serve(async (req) => {
       (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim()
     );
 
-    const liveContext = await fetchContext(user.id).catch((e) => {
-      console.warn("[sonic-ask] context fetch failed:", e);
-      return "## LIVE STORE CONTEXT\n(unavailable this turn)";
-    });
+    const [liveContext, expertKnowledge] = await Promise.all([
+      fetchContext(user.id).catch((e) => {
+        console.warn("[sonic-ask] context fetch failed:", e);
+        return "## LIVE STORE CONTEXT\n(unavailable this turn)";
+      }),
+      fetchSkills(user.id).catch((e) => {
+        console.warn("[sonic-ask] skills fetch failed:", e);
+        return EXPERT_KNOWLEDGE;
+      }),
+    ]);
 
     const systemPrompt = `You are Sonic AI — an embedded expert assistant inside Sonic Invoices, a Shopify stock-intake and SEO automation tool for Australian independent retailers (boutique fashion, swimwear, footwear).
 
@@ -334,7 +340,7 @@ You answer the store owner's questions using the live data and expert knowledge 
 
 ${liveContext}
 
-${EXPERT_KNOWLEDGE}
+${expertKnowledge}
 
 Tone: confident, retail-savvy, no fluff. Default to short answers (2-5 sentences) unless the user asks for detail. Use markdown sparingly (lists, bold) when it helps scanability.`;
 

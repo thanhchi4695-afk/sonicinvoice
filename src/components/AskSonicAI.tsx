@@ -142,6 +142,9 @@ export default function AskSonicAI() {
               <div className="text-sm font-semibold leading-tight">Ask Sonic AI</div>
               <div className="text-[11px] text-muted-foreground">Knows your store, brands & inventory</div>
             </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-purple-400" onClick={() => window.dispatchEvent(new CustomEvent("sonic:open-claude"))} aria-label="Switch to Claude" title="Switch to Claude Custom App">
+              <Sparkle className="w-4 h-4" />
+            </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)} aria-label="Close">
               <X className="w-4 h-4" />
             </Button>

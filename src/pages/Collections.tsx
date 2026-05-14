@@ -136,10 +136,15 @@ function CollectionsInner() {
     else toast.success("Brand voice updated");
   }
 
+  const [sortBySeo, setSortBySeo] = useState(false);
+
   const filtered = useMemo(() => {
-    if (filter === "all") return suggestions.filter((s) => s.status !== "rejected");
-    return suggestions.filter((s) => s.collection_type === filter && s.status !== "rejected");
-  }, [suggestions, filter]);
+    const base = (filter === "all"
+      ? suggestions.filter((s) => s.status !== "rejected")
+      : suggestions.filter((s) => s.collection_type === filter && s.status !== "rejected"));
+    if (!sortBySeo) return base;
+    return [...base].sort((a, b) => (a.completeness_score ?? 0) - (b.completeness_score ?? 0));
+  }, [suggestions, filter, sortBySeo]);
 
   async function runScan() {
     setScanning(true);

@@ -41,6 +41,12 @@ export default function AskSonicAI() {
     if (open) inputRef.current?.focus();
   }, [open]);
 
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener("sonic:open-ask", onOpen);
+    return () => window.removeEventListener("sonic:open-ask", onOpen);
+  }, []);
+
   async function send(text: string) {
     const msg = text.trim();
     if (!msg || loading) return;

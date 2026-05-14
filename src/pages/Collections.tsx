@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Loader2, Sparkles, Trash2, CheckCircle2, RefreshCw } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import GapsTab from "@/components/GapsTab";
+import { ClaudeEmptyState } from "@/components/ClaudeConnectPrompts";
 
 type Suggestion = {
   id: string;

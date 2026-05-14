@@ -2310,7 +2310,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
         const reader = new FileReader();
         reader.onload = async (ev) => {
           try {
-            const XLSX = await import("xlsx");
+            const XLSX = await import("@e965/xlsx");
             const wb = XLSX.read(ev.target?.result, { type: "array" });
             const ws = wb.Sheets[wb.SheetNames[0]];
             const data = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: "" });

@@ -9,7 +9,7 @@
  * Description field carries real marketing copy and is used directly.
  */
 
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import type { WholesaleOrder, WholesaleLineItem } from "./wholesale-mapper";
 
 // ── Types ───────────────────────────────────────────────────────────────────

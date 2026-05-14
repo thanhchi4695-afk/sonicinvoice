@@ -294,6 +294,11 @@ function CollectionsInner() {
               {filtered.map((s) => {
                 const isExpanded = expanded === s.id;
                 const e = edits[s.id] ?? {};
+                const score = s.completeness_score ?? 0;
+                const kind = actionKind(score);
+                const gaps = gapCount(s.completeness_breakdown);
+                const parts = breakdownParts(s.completeness_breakdown);
+                const isGenerating = generating === s.id;
                 return (
                   <Card key={s.id} className="overflow-hidden">
                     <CardHeader className="pb-3">
@@ -305,6 +310,27 @@ function CollectionsInner() {
                       <Progress value={s.confidence_score * 100} className="h-1" />
                     </CardHeader>
                     <CardContent className="space-y-3">
+                      {/* SEO score row — Placement 1 */}
+                      <div className="flex items-center justify-between gap-3 -mt-1">
+                        <SeoScoreBadge score={score} breakdown={s.completeness_breakdown} />
+                        {kind === "generate" && (
+                          <Button size="sm" variant="secondary" onClick={() => generate(s.id)} disabled={isGenerating}>
+                            {isGenerating ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Sparkles className="mr-2 h-3 w-3" />}
+                            Generate SEO
+                          </Button>
+                        )}
+                        {kind === "fix" && (
+                          <Button size="sm" variant="outline" onClick={() => setExpanded(isExpanded ? null : s.id)}>
+                            <Wrench className="mr-2 h-3 w-3" />
+                            Fix {gaps} gap{gaps === 1 ? "" : "s"}
+                          </Button>
+                        )}
+                        {kind === "complete" && (
+                          <span className="text-xs text-emerald-300 inline-flex items-center gap-1">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Complete
+                          </span>
+                        )}
+                      </div>
                       {s.sample_images.length > 0 && (
                         <div className="flex gap-1 overflow-hidden">
                           {s.sample_images.slice(0, 3).map((src, i) => (
@@ -316,11 +342,39 @@ function CollectionsInner() {
                         <div className="text-xs text-destructive">{s.error_message}</div>
                       )}
                       {isExpanded && (
-                        <div className="space-y-2 pt-2 border-t">
-                          {s.status === "content_ready" || s.description_html ? (
+                        <div className="space-y-3 pt-2 border-t">
+                          {/* Placement 2 — SEO completeness panel */}
+                          <div className="rounded-md border bg-muted/30 p-3">
+                            <div className="flex items-baseline justify-between mb-2">
+                              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">SEO completeness</span>
+                              <span className="text-sm font-mono-data tabular-nums"><span className="text-base font-semibold">{score}</span><span className="text-muted-foreground"> / 100</span></span>
+                            </div>
+                            <Progress value={score} className="h-1.5 mb-3" />
+                            <div className="space-y-1">
+                              {parts.map((p) => {
+                                const ok = p.earned >= p.max;
+                                return (
+                                  <div key={p.key} className="flex items-center justify-between text-xs py-1 border-b border-border/40 last:border-0">
+                                    <span className={ok ? "text-foreground" : "text-muted-foreground"}>{p.label}</span>
+                                    <span className={`font-mono-data tabular-nums ${ok ? "text-emerald-300" : "text-red-300"}`}>{p.earned} / {p.max}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {kind !== "complete" && (
+                              <Button size="sm" className="w-full mt-3" onClick={() => generate(s.id)} disabled={isGenerating}>
+                                {isGenerating ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-2 h-3.5 w-3.5" />}
+                                {score === 0 ? "Generate SEO content" : "Generate all missing"}
+                              </Button>
+                            )}
+                          </div>
+                          {(s.status === "content_ready" || s.description_html) && (
                             <>
                               <div>
-                                <label className="text-xs font-medium">SEO Title</label>
+                                <label className="text-xs font-medium flex items-center justify-between">
+                                  <span>SEO Title</span>
+                                  {!s.seo_title && <span className="text-[10px] text-red-300">Missing</span>}
+                                </label>
                                 <Input
                                   defaultValue={s.seo_title ?? ""}
                                   onChange={(ev) => setEdit(s.id, "seo_title", ev.target.value)}
@@ -328,7 +382,10 @@ function CollectionsInner() {
                                 />
                               </div>
                               <div>
-                                <label className="text-xs font-medium">Meta Description</label>
+                                <label className="text-xs font-medium flex items-center justify-between">
+                                  <span>Meta Description</span>
+                                  {!s.seo_description && <span className="text-[10px] text-red-300">Missing</span>}
+                                </label>
                                 <Textarea
                                   defaultValue={s.seo_description ?? ""}
                                   onChange={(ev) => setEdit(s.id, "seo_description", ev.target.value)}
@@ -337,7 +394,10 @@ function CollectionsInner() {
                                 />
                               </div>
                               <div>
-                                <label className="text-xs font-medium">Description HTML</label>
+                                <label className="text-xs font-medium flex items-center justify-between">
+                                  <span>Description HTML</span>
+                                  {!s.description_html && <span className="text-[10px] text-red-300">Missing</span>}
+                                </label>
                                 <Textarea
                                   defaultValue={s.description_html ?? ""}
                                   onChange={(ev) => setEdit(s.id, "description_html", ev.target.value)}
@@ -345,11 +405,6 @@ function CollectionsInner() {
                                 />
                               </div>
                             </>
-                          ) : (
-                            <Button size="sm" variant="secondary" onClick={() => generate(s.id)} disabled={generating === s.id} className="w-full">
-                              {generating === s.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                              Generate SEO content
-                            </Button>
                           )}
                           <div className="text-xs">
                             <div className="font-medium mb-1">Smart rule</div>

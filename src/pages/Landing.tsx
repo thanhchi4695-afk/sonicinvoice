@@ -68,28 +68,6 @@ const Landing = () => {
         description="Turn supplier invoices into Shopify products in minutes. AI app for fashion retailers — bulk discounts, Google Shopping feed, SEO, Xero/MYOB sync."
         path="/"
       />
-      <div className="w-full bg-background border-b border-border">
-        <div className="max-w-6xl mx-auto px-0 sm:px-6 pt-0 sm:pt-6">
-          <div className="relative w-screen sm:w-full left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 overflow-hidden sm:rounded-xl sm:border sm:border-border bg-card shadow-sm h-[100svh] sm:h-auto sm:aspect-video">
-            <iframe
-              src="/marketing/sonic_white.html"
-              title="Sonic Invoices intro"
-              className="absolute inset-0 w-full h-full"
-              loading="lazy"
-              frameBorder={0}
-              allow="autoplay"
-            />
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              className="absolute bottom-3 right-3 sm:hidden bg-black/60 text-white rounded-full p-2 backdrop-blur-sm"
-              aria-label="Expand video"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
 
       {expanded && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -203,6 +181,28 @@ const Landing = () => {
             your suppliers brand by brand. Explore our open <Link to="/brand-guide" className="text-primary underline">AU brand directory</Link>.
           </p>
         </section>
+      <div className="w-full bg-background mb-20">
+        <div className="max-w-6xl mx-auto px-0 sm:px-6">
+          <div className="relative w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm aspect-video">
+            <iframe
+              src="/marketing/sonic_white.html"
+              title="Sonic Invoices intro"
+              className="absolute inset-0 w-full h-full"
+              loading="lazy"
+              frameBorder={0}
+              allow="autoplay"
+            />
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="absolute bottom-3 right-3 sm:hidden bg-black/60 text-white rounded-full p-2 backdrop-blur-sm"
+              aria-label="Expand video"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
       </main>
 
       <footer className="border-t border-border">

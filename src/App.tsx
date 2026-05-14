@@ -95,6 +95,7 @@ const App = () => (
                   <Route path="/seo-link-mesh" element={<RequireAuth><Suspense fallback={null}><SeoLinkMesh /></Suspense></RequireAuth>} />
                   <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
+                  <Route path="/settings/claude-connector" element={<RequireAuth><ClaudeConnector /></RequireAuth>} />
                   <Route
                     path="/google-shopping"
                     element={

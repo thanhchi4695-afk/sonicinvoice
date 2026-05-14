@@ -1,21 +1,18 @@
 // ══════════════════════════════════════════════════════════
-// Sonic Invoices — MCP Server (day-1 MVP)
+// Sonic Invoices — MCP Server (day-1 MVP, user-scoped)
 //
-// Lets Claude.ai (or any MCP client) connect to a user's
-// Sonic Invoices account via a per-user bearer token.
+// Auth:  Authorization: Bearer <raw_token>
+//        token_hash = SHA-256(raw_token), validated via
+//        verify_sonic_mcp_token RPC (returns user_id +
+//        Shopify connection info in one round-trip).
 //
-// Tools (read-only for v1):
-//   - get_store_context   → Shopify store, voice, brand list
-//   - get_collections     → Suggested collections + SEO score
-//   - get_gap_results     → Latest competitor-gap results
+// Tools (read-only v1):
+//   - get_store_context  → Shopify store + brand list
+//   - get_collections    → Suggested collections + score
+//   - get_gap_results    → Latest competitor-gap cards
 //
-// Auth model:
-//   Authorization: Bearer <raw_token>
-//   token_hash = SHA-256(raw_token), stored in sonic_mcp_tokens.
-//
-// IMPORTANT: this function deploys with verify_jwt = false
-// (Claude.ai cannot send a Supabase JWT). We validate the
-// bearer token IN CODE via verify_sonic_mcp_token RPC.
+// Every tool call is logged to mcp_tool_calls.
+// Deploys with verify_jwt = false (Claude can't send a JWT).
 // ══════════════════════════════════════════════════════════
 import { Hono } from "npm:hono@4";
 import { McpServer, StreamableHttpTransport } from "npm:mcp-lite@^0.10.0";
@@ -31,10 +28,16 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Service-role client used only for verify/touch RPCs and server-scoped reads.
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
+
+interface AuthCtx {
+  userId: string;
+  tokenId: string | null;
+  storeUrl: string | null;
+  accessToken: string | null;
+}
 
 async function sha256Hex(s: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -43,7 +46,7 @@ async function sha256Hex(s: string): Promise<string> {
     .join("");
 }
 
-async function resolveUserId(req: Request): Promise<string | null> {
+async function resolveAuth(req: Request): Promise<AuthCtx | null> {
   const auth = req.headers.get("authorization") || "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
   if (!m) return null;
@@ -51,10 +54,63 @@ async function resolveUserId(req: Request): Promise<string | null> {
   const { data, error } = await admin.rpc("verify_sonic_mcp_token", {
     _token_hash: hash,
   });
-  if (error || !data) return null;
+  if (error || !data || (Array.isArray(data) && data.length === 0)) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.user_id) return null;
   // fire-and-forget last_used_at bump
   admin.rpc("touch_sonic_mcp_token", { _token_hash: hash }).then(() => {});
-  return data as string;
+  return {
+    userId: row.user_id as string,
+    tokenId: (row.token_id as string) ?? null,
+    storeUrl: (row.store_url as string) ?? null,
+    accessToken: (row.access_token as string) ?? null,
+  };
+}
+
+async function logCall(
+  auth: AuthCtx,
+  tool: string,
+  args: unknown,
+  startedAt: number,
+  status: "success" | "error",
+  errorMessage?: string,
+) {
+  try {
+    await admin.from("mcp_tool_calls").insert({
+      user_id: auth.userId,
+      token_id: auth.tokenId,
+      tool_name: tool,
+      arguments: (args ?? {}) as Record<string, unknown>,
+      status,
+      duration_ms: Date.now() - startedAt,
+      error_message: errorMessage ?? null,
+    });
+  } catch (_e) { /* best-effort */ }
+}
+
+// Helper to wrap a tool handler with auth + logging.
+function tool<TArgs extends Record<string, unknown>>(
+  name: string,
+  fn: (args: TArgs, auth: AuthCtx) => Promise<unknown>,
+) {
+  return async (args: TArgs, ctx: any) => {
+    const auth = ctx?.extra?.auth as AuthCtx | undefined;
+    if (!auth) {
+      return { content: [{ type: "text", text: "Unauthorized" }] };
+    }
+    const t0 = Date.now();
+    try {
+      const result = await fn(args, auth);
+      logCall(auth, name, args, t0, "success");
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      logCall(auth, name, args, t0, "error", msg);
+      return { content: [{ type: "text", text: `Error: ${msg}` }] };
+    }
+  };
 }
 
 // ── MCP server + tools ──────────────────────────────────────
@@ -66,41 +122,38 @@ const mcp = new McpServer({
 mcp.tool({
   name: "get_store_context",
   description:
-    "Returns the connected Shopify store, brand voice style, and a list of known brands for the current Sonic Invoices user.",
+    "Returns the connected Shopify store (URL, shop name, voice style, default product status) and a list of brands the user has products from.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  handler: async (_args, ctx) => {
-    const userId = (ctx as any)?.extra?.userId as string | undefined;
-    if (!userId) return { content: [{ type: "text", text: "Unauthorized" }] };
+  handler: tool<Record<string, never>>("get_store_context", async (_args, auth) => {
+    // Shopify connection (already in auth context, but re-fetch full row for richer fields)
+    const { data: shop } = await admin
+      .from("shopify_connections")
+      .select("store_url, shop_name, brand_voice_style, product_status")
+      .eq("user_id", auth.userId)
+      .maybeSingle();
 
-    const [{ data: shop }, { data: brands }] = await Promise.all([
-      admin
-        .from("shopify_connections")
-        .select("store_url, shop_name, brand_voice_style, product_status")
-        .eq("user_id", userId)
-        .maybeSingle(),
-      admin
-        .from("brand_profiles")
-        .select("brand_name")
-        .eq("user_id", userId)
-        .limit(50),
-    ]);
+    // Brands this user has actually seen, derived from competitor_gaps (user-scoped).
+    const { data: brandRows } = await admin
+      .from("competitor_gaps")
+      .select("brand")
+      .eq("user_id", auth.userId)
+      .not("brand", "is", null)
+      .limit(500);
+    const brands = Array.from(
+      new Set((brandRows ?? []).map((r: any) => r.brand).filter(Boolean)),
+    ).slice(0, 50);
 
     return {
-      content: [{
-        type: "text",
-        text: JSON.stringify({
-          shopify: shop ?? null,
-          brands: (brands ?? []).map((b: any) => b.brand_name),
-        }, null, 2),
-      }],
+      shopify: shop ?? null,
+      brands,
     };
-  },
+  }),
 });
 
 mcp.tool({
   name: "get_collections",
   description:
-    "Lists the user's Sonic-suggested Shopify collections with their SEO completeness score. Optionally filter by status (pending|approved|published) or minimum completeness.",
+    "Lists Sonic-suggested Shopify collections for the user with SEO completeness score. Filter by status (pending|approved|published) or min completeness.",
   inputSchema: {
     type: "object",
     properties: {
@@ -110,87 +163,78 @@ mcp.tool({
     },
     additionalProperties: false,
   },
-  handler: async (args: any, ctx) => {
-    const userId = (ctx as any)?.extra?.userId as string | undefined;
-    if (!userId) return { content: [{ type: "text", text: "Unauthorized" }] };
+  handler: tool<{ status?: string; min_completeness?: number; limit?: number }>(
+    "get_collections",
+    async (args, auth) => {
+      let q = admin
+        .from("collection_suggestions")
+        .select(
+          "id, suggested_title, shopify_handle, status, product_count, completeness_score, completeness_breakdown, collection_type",
+        )
+        .eq("user_id", auth.userId)
+        .order("completeness_score", { ascending: true })
+        .limit(Math.min(Number(args?.limit) || 25, 100));
 
-    let q = admin
-      .from("collection_suggestions")
-      .select(
-        "id, suggested_title, shopify_handle, status, product_count, completeness_score, completeness_breakdown, collection_type",
-      )
-      .eq("user_id", userId)
-      .order("completeness_score", { ascending: true })
-      .limit(Math.min(Number(args?.limit) || 25, 100));
+      if (args?.status) q = q.eq("status", args.status);
+      if (typeof args?.min_completeness === "number") {
+        q = q.gte("completeness_score", args.min_completeness);
+      }
 
-    if (args?.status) q = q.eq("status", args.status);
-    if (typeof args?.min_completeness === "number") {
-      q = q.gte("completeness_score", args.min_completeness);
-    }
-
-    const { data, error } = await q;
-    if (error) {
-      return { content: [{ type: "text", text: `Error: ${error.message}` }] };
-    }
-    return {
-      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-    };
-  },
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  ),
 });
 
 mcp.tool({
   name: "get_gap_results",
   description:
-    "Returns the most recent competitor gap-analysis cards (collections this store is missing vs competitors).",
+    "Returns the most recent competitor gap-analysis cards (collections / brands this store is missing vs competitors).",
   inputSchema: {
     type: "object",
     properties: {
       limit: { type: "number", minimum: 1, maximum: 50, default: 10 },
+      gap_type: { type: "string", description: "Filter by gap_type (e.g. collection, brand)" },
     },
     additionalProperties: false,
   },
-  handler: async (args: any, ctx) => {
-    const userId = (ctx as any)?.extra?.userId as string | undefined;
-    if (!userId) return { content: [{ type: "text", text: "Unauthorized" }] };
+  handler: tool<{ limit?: number; gap_type?: string }>(
+    "get_gap_results",
+    async (args, auth) => {
+      let q = admin
+        .from("competitor_gaps")
+        .select(
+          "id, competitor_name, competitor_url, gap_type, brand, product_count_in_store, suggested_handle, suggested_title, suggested_description, expected_impact, status, created_at",
+        )
+        .eq("user_id", auth.userId)
+        .order("created_at", { ascending: false })
+        .limit(Math.min(Number(args?.limit) || 10, 50));
 
-    const { data, error } = await admin
-      .from("collection_suggestions")
-      .select(
-        "id, suggested_title, suggested_handle, collection_type, product_count, confidence_score, sample_titles, status, created_at",
-      )
-      .eq("user_id", userId)
-      .eq("status", "pending")
-      .order("confidence_score", { ascending: false })
-      .limit(Math.min(Number(args?.limit) || 10, 50));
+      if (args?.gap_type) q = q.eq("gap_type", args.gap_type);
 
-    if (error) {
-      return { content: [{ type: "text", text: `Error: ${error.message}` }] };
-    }
-    return {
-      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-    };
-  },
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+  ),
 });
 
 // ── HTTP transport ─────────────────────────────────────────
 const transport = new StreamableHttpTransport();
 const app = new Hono();
 
-app.options("*", (c) => {
-  return new Response("ok", { headers: corsHeaders });
-});
+app.options("*", () => new Response("ok", { headers: corsHeaders }));
 
 app.all("*", async (c) => {
-  const userId = await resolveUserId(c.req.raw);
-  if (!userId) {
+  const auth = await resolveAuth(c.req.raw);
+  if (!auth) {
     return new Response(
       JSON.stringify({ error: "Unauthorized — missing or invalid bearer token" }),
       { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
-  // Pass userId through to tool handlers via the transport's extra context.
-  const res = await transport.handleRequest(c.req.raw, mcp, { userId });
-  // Merge CORS headers into the streamed response.
+  const res = await transport.handleRequest(c.req.raw, mcp, { auth });
   const headers = new Headers(res.headers);
   for (const [k, v] of Object.entries(corsHeaders)) headers.set(k, v);
   return new Response(res.body, { status: res.status, headers });

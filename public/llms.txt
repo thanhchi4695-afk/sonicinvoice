@@ -1,0 +1,19 @@
+# Sonic Invoices
+
+> AI-powered Shopify back-office for independent fashion and lifestyle retailers. Turns supplier invoices into Shopify products in minutes; handles bulk discounts, Google Shopping feeds, SEO, and Xero/MYOB accounting sync.
+
+Sonic Invoices is a Chrome-friendly web app and embedded Shopify app built for boutique retailers managing 10–500+ brands. It replaces Stocky, automates pricing and markdown ladders, generates SEO collections, and keeps inventory in sync across Shopify, Lightspeed, Xero and MYOB.
+
+## Pages
+
+- [Home](/): Product overview, pricing, and feature highlights.
+- [Case study](/case-study): How an Australian boutique automated its back-office with Sonic Invoices.
+- [Brand guide](/brand-guide): Visual identity, voice, and product positioning.
+- [Support](/support): Help articles, contact details, and feature requests.
+- [Login](/login): Sign in or create a Sonic Invoices account.
+- [Privacy](/privacy): Privacy policy and data handling practices.
+
+## Optional
+
+- [Reset password](/reset-password): Account recovery.
+- [Unsubscribe](/unsubscribe): Email preferences.

@@ -68,8 +68,10 @@ const Landing = () => {
         path="/"
       />
       <div className="w-full bg-background border-b border-border">
-        <div className="max-w-6xl mx-auto px-6 pt-6">
-          <div className="relative w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm" style={{ aspectRatio: "16 / 9" }}>
+        <div className="max-w-6xl mx-auto px-0 sm:px-6 pt-0 sm:pt-6">
+          <div
+            className="relative w-full overflow-hidden sm:rounded-xl sm:border sm:border-border bg-card shadow-sm aspect-[3/4] sm:aspect-video"
+          >
             <iframe
               src="/marketing/sonic_white.html"
               title="Sonic Invoices intro"

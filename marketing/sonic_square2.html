@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Sonic Invoices</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#111;overflow:hidden;font-family:'Inter',system-ui,sans-serif}
+#wrap{
+  width:min(100vw,100vh);height:min(100vw,100vh);
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:#f9fafb;overflow:hidden;
+}
+canvas{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+/* top-left brand mark — tiny, always present */
+#brand{position:absolute;top:3.5%;left:4%;z-index:9;display:flex;align-items:center;gap:1.8%;opacity:.55}
+#brand svg{width:5.5%;height:5.5%;min-width:18px;min-height:18px}
+#brand span{font-size:2.6%;font-weight:700;color:#0f172a;letter-spacing:-.02em;white-space:nowrap}
+/* step label — top right, colour coded */
+#steplbl{position:absolute;top:3.5%;right:4%;z-index:9;font-size:2.2%;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;transition:color .4s}
+/* progress strip */
+#prog{position:absolute;top:0;left:0;right:0;height:3px;z-index:20;background:rgba(0,0,0,.06)}
+#pf{height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#8b5cf6,#10b981);transition:none}
+/* dots */
+#dots{position:absolute;bottom:3%;left:50%;transform:translateX(-50%);z-index:9;display:flex;gap:1.4%;align-items:center}
+.dot{width:1.4%;aspect-ratio:1;min-width:5px;border-radius:50%;background:rgba(0,0,0,.13);transition:all .3s;cursor:pointer}
+.dot.on{background:#6366f1;width:3.8%;border-radius:.8%;min-width:14px}
+.dot.done{background:rgba(99,102,241,.4)}
+/* play */
+#play{
+  position:absolute;bottom:10%;left:50%;transform:translateX(-50%);
+  z-index:20;background:rgba(255,255,255,.96);border:1px solid rgba(0,0,0,.1);
+  border-radius:30px;padding:2% 8%;font-size:3%;font-weight:700;
+  color:#334155;cursor:pointer;font-family:inherit;white-space:nowrap;
+  box-shadow:0 4px 20px rgba(0,0,0,.13);display:flex;align-items:center;gap:1.8%;
+}
+#play.h{opacity:0;pointer-events:none}
+#play:active{transform:translateX(-50%) scale(.97)}
+</style>
+</head>
+<body>
+<div id="wrap">
+<canvas id="c"></canvas>
+<div id="brand">
+  <svg viewBox="0 0 36 36" fill="none">
+    <circle cx="18" cy="18" r="16" fill="#6366f1" opacity=".12" stroke="#6366f1" stroke-width="1.1"/>
+    <circle cx="18" cy="18" r="10" fill="#6366f1"/>
+    <circle cx="15" cy="18" r="5" fill="#f9fafb"/>
+    <circle cx="19.5" cy="18" r="3.2" fill="#6366f1"/>
+  </svg>
+  <span>Sonic Invoices</span>
+</div>
+<div id="steplbl"></div>
+<div id="prog"><div id="pf"></div></div>
+<div id="dots"></div>
+<button id="play" onclick="togglePlay()">▶ &nbsp;Play</button>
+</div>
+
+<script>
+/* ─── CANVAS ─────────────────────────────── */
+const wrap=document.getElementById('wrap')
+const cv=document.getElementById('c')
+const ctx=cv.getContext('2d')
+let Q=0,DPR=1   // Q = side of square
+
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2)
+  Q=wrap.offsetWidth
+  cv.width=Q*DPR; cv.height=Q*DPR
+  cv.style.width=Q+'px'; cv.style.height=Q+'px'
+  ctx.scale(DPR,DPR)
+}
+
+/* ─── MATH ─────────────────────────────── */
+const cl=(v,a,b)=>Math.max(a,Math.min(b,v))
+const lr=(a,b,t)=>a+(b-a)*t
+const E={
+  o3: t=>1-Math.pow(1-t,3),
+  el: t=>{const c=2*Math.PI/3;return t===0?0:t===1?1:Math.pow(2,-10*t)*Math.sin((t*10-.75)*c)+1},
+  io: t=>t<.5?4*t*t*t:(1-Math.pow(-2*t+2,3)/2),
+  o2: t=>1-(1-t)*(1-t),
+  bk: t=>(2.618)*t*t*t-1.618*t*t,
+}
+function ease(t,fn=E.o3){return fn(cl(t,0,1))}
+const q=f=>Q*f   // fraction of square side
+const π=Math.PI
+
+/* ─── COLOURS ─────────────────────────── */
+const C={
+  bg:'#f9fafb',
+  I:'#6366f1', Iv:'#8b5cf6',   // indigo / violet
+  G:'#10b981', Gt:'#14b8a6',   // green / teal
+  A:'#f59e0b', Ao:'#f97316',   // amber / orange
+  P:'#ec4899', Pr:'#ef4444',   // pink / red
+  B:'#3b82f6', Bs:'#0ea5e9',   // blue / sky
+  K:'#0f172a', M:'#94a3b8',    // ink / muted
+  Bo:'#e2e8f0',                 // border
+}
+
+/* ─── PRIMITIVES ──────────────────────── */
+function arc(x,y,r,fill,stroke,sw=1.5){
+  ctx.beginPath();ctx.arc(x,y,r,0,2*π)
+  if(fill){ctx.fillStyle=fill;ctx.fill()}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke()}
+}
+function rrect(x,y,w,h,r,fill,stroke,sw=1.2){
+  ctx.beginPath();ctx.roundRect(x,y,w,h,r)
+  if(fill){ctx.fillStyle=fill;ctx.fill()}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke()}
+}
+function ring(x,y,r,col,a,sw=1.5){
+  ctx.save();ctx.globalAlpha=a;ctx.beginPath();ctx.arc(x,y,r,0,2*π)
+  ctx.strokeStyle=col;ctx.lineWidth=sw;ctx.stroke();ctx.restore()
+}
+function line(x1,y1,x2,y2,col,sw,dash=[]){
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=sw;ctx.lineCap='round'
+  ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2)
+  ctx.stroke();ctx.setLineDash([]);ctx.restore()
+}
+function arrow(x1,y1,x2,y2,col,sw,pg=1){
+  const dx=x2-x1,dy=y2-y1,ex=x1+dx*pg,ey=y1+dy*pg
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=sw;ctx.lineCap='round'
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(ex,ey);ctx.stroke()
+  if(pg>.78){
+    const a=Math.atan2(dy,dx),hs=q(.02)
+    ctx.beginPath()
+    ctx.moveTo(ex-Math.cos(a-π/6)*hs,ey-Math.sin(a-π/6)*hs)
+    ctx.lineTo(ex,ey)
+    ctx.lineTo(ex-Math.cos(a+π/6)*hs,ey-Math.sin(a+π/6)*hs)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+function num(x,y,s,sz,col,wt='700',a=1){
+  ctx.save();ctx.globalAlpha=a
+  ctx.font=`${wt} ${sz}px 'Inter',system-ui,sans-serif`
+  ctx.fillStyle=col;ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.fillText(s,x,y);ctx.restore()
+}
+function chip(x,y,s,sz,col,a=1){
+  ctx.save();ctx.globalAlpha=a
+  ctx.font=`600 ${sz}px 'Inter',system-ui,sans-serif`
+  const w=ctx.measureText(s).width,px=sz*.65,ph=sz*1.55
+  rrect(x-w/2-px,y-ph/2,w+px*2,ph,ph/2,col+'1a',col+'55',.9)
+  ctx.fillStyle=col;ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.fillText(s,x,y);ctx.restore()
+}
+
+/* ─── SONIC LOGO ──────────────────────── */
+function sonic(x,y,r,a=1,col=C.I){
+  ctx.save();ctx.globalAlpha=a
+  arc(x,y,r,col)
+  ctx.globalCompositeOperation='destination-out'
+  arc(x-r*.17,y,r*.27,C.K)
+  ctx.globalCompositeOperation='source-over'
+  arc(x+r*.1,y,r*.2,col)
+  ctx.restore()
+}
+function sonicRings(x,y,r,t2,col=C.I,a=1){
+  ;[0,.32,.64].forEach(off=>{
+    const rp=((t2*.8+off)%1)
+    ring(x,y,r+q(.09)*rp,col,(1-rp)*.18*a,2)
+  })
+}
+
+/* ─── DOCUMENT ────────────────────────── */
+function doc(x,y,w,h,a=1,fill='#fff',stroke=C.Bo){
+  ctx.save();ctx.globalAlpha=a
+  const fold=w*.2,r=w*.07
+  ctx.beginPath()
+  ctx.moveTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y)
+  ctx.lineTo(x+w-fold,y);ctx.lineTo(x+w,y+fold)
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h)
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r)
+  ctx.closePath();ctx.fillStyle=fill;ctx.fill()
+  ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke()
+  ctx.beginPath();ctx.moveTo(x+w-fold,y);ctx.lineTo(x+w-fold,y+fold);ctx.lineTo(x+w,y+fold)
+  ctx.lineWidth=1;ctx.stroke()
+  ;[.3,.46,.62].forEach(f=>rrect(x+w*.12,y+h*f,w*.7,h*.055,1,stroke+'33'))
+  ctx.restore()
+}
+
+/* ─── ENVELOPE ────────────────────────── */
+function env(x,y,w,h,a=1,col=C.A){
+  ctx.save();ctx.globalAlpha=a
+  rrect(x,y,w,h,w*.07,col+'1a',col,1.5)
+  ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.lineCap='round';ctx.lineJoin='round'
+  ctx.beginPath();ctx.moveTo(x,y+h*.08);ctx.lineTo(x+w/2,y+h*.58);ctx.lineTo(x+w,y+h*.08)
+  ctx.stroke()
+  ctx.restore()
+}
+
+/* ─── HEXAGON (AI) ───────────────────── */
+function hex(x,y,r,rot,a=1,col=C.I){
+  ctx.save();ctx.globalAlpha=a;ctx.translate(x,y);ctx.rotate(rot)
+  ctx.beginPath()
+  for(let i=0;i<6;i++){const ag=i*π/3-π/6;i===0?ctx.moveTo(Math.cos(ag)*r,Math.sin(ag)*r):ctx.lineTo(Math.cos(ag)*r,Math.sin(ag)*r)}
+  ctx.closePath();ctx.fillStyle=col+'18';ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke()
+  // inner spark
+  const sr=r*.38
+  ctx.beginPath()
+  for(let i=0;i<8;i++){const ag=i*π/4,rr=i%2===0?sr:sr*.38;i===0?ctx.moveTo(Math.cos(ag)*rr,Math.sin(ag)*rr):ctx.lineTo(Math.cos(ag)*rr,Math.sin(ag)*rr)}
+  ctx.closePath();ctx.fillStyle=col;ctx.fill()
+  ctx.restore()
+}
+
+/* ─── CYLINDER (DB) ──────────────────── */
+function cyl(x,y,w,h,col,a=1){
+  ctx.save();ctx.globalAlpha=a
+  const ry=h*.2
+  rrect(x-w/2,y-h/2,w,h,0,col+'18',col,.9)
+  ctx.beginPath();ctx.ellipse(x,y-h/2,w/2,ry,0,0,2*π)
+  ctx.fillStyle=col+'28';ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=.9;ctx.stroke()
+  ctx.beginPath();ctx.ellipse(x,y+h/2,w/2,ry,0,0,π)
+  ctx.strokeStyle=col;ctx.lineWidth=.9;ctx.stroke()
+  ctx.restore()
+}
+
+/* ─── DIAMOND ────────────────────────── */
+function diamond(x,y,w,h,col,a=1){
+  ctx.save();ctx.globalAlpha=a
+  ctx.beginPath()
+  ctx.moveTo(x,y-h/2);ctx.lineTo(x+w/2,y);ctx.lineTo(x,y+h/2);ctx.lineTo(x-w/2,y)
+  ctx.closePath();ctx.fillStyle=col+'1c';ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke()
+  ctx.restore()
+}
+
+/* ─── BAG ────────────────────────────── */
+function bag(x,y,w,h,col,a=1){
+  ctx.save();ctx.globalAlpha=a
+  rrect(x-w/2,y,w,h,w*.1,col+'1a',col,2)
+  ctx.beginPath();ctx.arc(x,y,w*.35,π,0)
+  ctx.strokeStyle=col;ctx.lineWidth=w*.1;ctx.lineCap='round';ctx.stroke()
+  ctx.restore()
+}
+
+/* ─── STAR BURST ─────────────────────── */
+function burst(x,y,r,n,col,a=1,rot=0){
+  ctx.save();ctx.globalAlpha=a;ctx.translate(x,y);ctx.rotate(rot)
+  ctx.beginPath()
+  for(let i=0;i<n*2;i++){
+    const ag=i*π/n,rr=i%2===0?r:r*.42
+    i===0?ctx.moveTo(Math.cos(ag)*rr,Math.sin(ag)*rr):ctx.lineTo(Math.cos(ag)*rr,Math.sin(ag)*rr)
+  }
+  ctx.closePath();ctx.fillStyle=col;ctx.fill();ctx.restore()
+}
+
+/* ─── EYE ────────────────────────────── */
+function eye(x,y,w,openFrac,col,a=1){
+  const h=w*.42
+  ctx.save();ctx.globalAlpha=a
+  // white of eye
+  ctx.beginPath();ctx.ellipse(x,y,w/2,h/2*openFrac,0,0,2*π)
+  ctx.fillStyle='#fff';ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke()
+  // pupil
+  if(openFrac>.35){
+    arc(x,y,w*.15,col)
+    arc(x+w*.06,y-w*.04,w*.05,'#fff')
+  }
+  ctx.restore()
+}
+
+/* ─── ROCKET ─────────────────────────── */
+function rocket(x,y,sz,a=1){
+  ctx.save();ctx.globalAlpha=a;ctx.translate(x,y)
+  // body
+  ctx.beginPath();ctx.ellipse(0,0,sz*.28,sz*.52,0,0,2*π);ctx.fillStyle=C.I;ctx.fill()
+  // nose
+  ctx.beginPath();ctx.moveTo(0,-sz*.52);ctx.lineTo(-sz*.2,0);ctx.lineTo(sz*.2,0);ctx.closePath()
+  ctx.fillStyle=C.Iv;ctx.fill()
+  // fins
+  ;[[-1],[1]].forEach(([s])=>{
+    ctx.beginPath();ctx.moveTo(s*sz*.2,sz*.22);ctx.lineTo(s*sz*.44,sz*.52);ctx.lineTo(s*sz*.2,sz*.42);ctx.closePath()
+    ctx.fillStyle=C.Iv;ctx.fill()
+  })
+  // flame
+  arc(0,sz*.62,sz*.17,C.A+'cc')
+  arc(0,sz*.72,sz*.09,C.Ao+'99')
+  ctx.restore()
+}
+
+/* ─── CHECKMARK ──────────────────────── */
+function check(x,y,sz,col,a=1){
+  ctx.save();ctx.globalAlpha=a;ctx.strokeStyle=col;ctx.lineWidth=sz*.22;ctx.lineCap='round';ctx.lineJoin='round'
+  ctx.beginPath();ctx.moveTo(x-sz*.38,y);ctx.lineTo(x-sz*.08,y+sz*.32);ctx.lineTo(x+sz*.42,y-sz*.35)
+  ctx.stroke();ctx.restore()
+}
+
+/* ─── X MARK ─────────────────────────── */
+function xmark(x,y,sz,col,a=1){
+  ctx.save();ctx.globalAlpha=a;ctx.strokeStyle=col;ctx.lineWidth=sz*.2;ctx.lineCap='round'
+  ctx.beginPath();ctx.moveTo(x-sz*.35,y-sz*.35);ctx.lineTo(x+sz*.35,y+sz*.35);ctx.stroke()
+  ctx.beginPath();ctx.moveTo(x+sz*.35,y-sz*.35);ctx.lineTo(x-sz*.35,y+sz*.35);ctx.stroke()
+  ctx.restore()
+}
+
+/* ─── ORBIT ──────────────────────────── */
+function orbit(x,y,r,count,t2,col,a=1){
+  ctx.save();ctx.globalAlpha=a
+  ring(x,y,r,col,.12,1)
+  for(let i=0;i<count;i++){
+    const ag=t2*2.2+i*2*π/count
+    arc(x+Math.cos(ag)*r,y+Math.sin(ag)*r*.7,r*.1,col)
+  }
+  ctx.restore()
+}
+
+/* ─── FLOW PARTICLE ──────────────────── */
+function fp(x1,y1,x2,y2,t2,col,r=q(.014)){
+  const ft=t2%1,x=lr(x1,x2,ft),y=lr(y1,y2,ft)
+  const fa=ft<.14?ft/.14:ft>.82?(1-ft)/.18:1
+  ctx.save();ctx.globalAlpha=fa*.88;arc(x,y,r,col)
+  for(let i=1;i<=3;i++){
+    const bt=Math.max(0,ft-i*.05)
+    ctx.globalAlpha=fa*(4-i)*.09
+    arc(lr(x1,x2,bt),lr(y1,y2,bt),r*(4-i)/4,col)
+  }
+  ctx.restore()
+}
+
+/* ─── PARTICLES ──────────────────────── */
+let pts=[]
+function pt(x,y,col,vx,vy,life=.75){pts.push({x,y,vx,vy,r:q(.009),col,l:life,ml:life,t:0})}
+function tickPts(dt){
+  pts=pts.filter(p=>{
+    p.t+=dt;p.x+=p.vx*dt*60;p.y+=p.vy*dt*60;p.vy+=.14*dt*60
+    const a=ease(1-p.t/p.ml)
+    ctx.save();ctx.globalAlpha=a*.7;arc(p.x,p.y,p.r*a,p.col);ctx.restore()
+    return p.t<p.ml
+  })
+}
+
+/* ─── BG GRID ────────────────────────── */
+function bg(){
+  ctx.fillStyle=C.bg;ctx.fillRect(0,0,Q,Q)
+  ctx.save()
+  const gs=q(.055)
+  for(let gx=gs/2;gx<Q;gx+=gs)
+    for(let gy=gs/2;gy<Q;gy+=gs)
+      arc(gx,gy,q(.0018),'rgba(99,102,241,.07)')
+  ctx.restore()
+}
+
+/* ═══════════════════════════════════════
+   GLOBAL TIME
+═══════════════════════════════════════ */
+let T=0          // global elapsed seconds
+let playing=false,lastTs=null
+const DUR=15     // seconds per act
+const N=8
+let gT=0,aT=0,aI=0
+
+/* ═══════════════════════════════════════
+   ACT 0 — TRIGGER
+   Three sources (doc / envelope / hand-cursor) float from
+   edges, trail comet-tails, converge into the Sonic hub.
+   Big "3" counts the inputs.
+═══════════════════════════════════════ */
+function a0(p){
+  const cx=q(.5),cy=q(.5)
+
+  // Sonic hub grows
+  const hr=q(.11)*ease(p*.72,E.el)
+  sonicRings(cx,cy,hr,T,C.I,ease(p*.72))
+  sonic(cx,cy,hr,ease(p*.72))
+
+  // 3 source symbols
+  const src=[
+    // [draw, colour, start-angle, start-frac]
+    {fn:(x,y,s,a)=>doc(x-s/2,y-s*.62,s,s*.78,a,C.Iv+'18',C.Iv), c:C.Iv, ang:-π*.7},
+    {fn:(x,y,s,a)=>env(x-s/2,y-s*.36,s,s*.58,a,C.A),             c:C.A,  ang:π/2},
+    {fn:(x,y,s,a)=>{
+      // cursor arrow symbol
+      ctx.save();ctx.globalAlpha=a;ctx.fillStyle=C.Gt;ctx.strokeStyle=C.Gt;ctx.lineWidth=s*.06
+      ctx.beginPath();ctx.moveTo(x,y-s*.45);ctx.lineTo(x,y+s*.3);ctx.lineTo(x+s*.18,y+s*.05);ctx.lineTo(x+s*.35,y+s*.45);ctx.lineTo(x+s*.45,y+s*.35);ctx.lineTo(x+s*.28,y-.01);ctx.lineTo(x+s*.45,y-.12);ctx.closePath()
+      ctx.fill();ctx.stroke();ctx.restore()
+    }, c:C.Gt, ang:π*1.72},
+  ]
+
+  src.forEach((s,i)=>{
+    const del=i*.17
+    const sp=cl((p-del-.06)/(1-del),0,1)
+    const ep=ease(sp,E.io)
+    const R0=q(.42),R1=q(.16)
+    const R=lr(R0,R1,ep)
+    const wobble=Math.sin(T*1.6+i)*q(.014)*(1-ep)
+    const sx=cx+Math.cos(s.ang)*(R+wobble)
+    const sy=cy+Math.sin(s.ang)*(R+wobble)*.88
+    const sz=q(.1)*(1-ep*.28)
+    const a=ease(sp)
+
+    // comet trail
+    if(ep>.04&&ep<.88){
+      for(let d=1;d<=5;d++){
+        const tr=lr(R0,R1,Math.max(0,ep-d*.055))
+        const tx=cx+Math.cos(s.ang)*tr,ty=cy+Math.sin(s.ang)*tr*.88
+        ctx.save();ctx.globalAlpha=a*(6-d)*.06;arc(tx,ty,sz*.15,s.c);ctx.restore()
+      }
+    }
+
+    s.fn(sx,sy,sz,a)
+
+    // dashed connection when near hub
+    if(ep>.8){
+      const lp=ease((ep-.8)/.2)
+      ctx.save();ctx.globalAlpha=lp*.22;ctx.setLineDash([q(.01),q(.007)])
+      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(cx+Math.cos(s.ang)*hr,cy+Math.sin(s.ang)*hr)
+      ctx.strokeStyle=s.c;ctx.lineWidth=1.5;ctx.stroke();ctx.setLineDash([]);ctx.restore()
+    }
+
+    // flowing particle
+    if(ep>.08&&ep<.86) fp(cx+Math.cos(s.ang)*R0,cy+Math.sin(s.ang)*R0*.88,cx+Math.cos(s.ang)*hr,cy+Math.sin(s.ang)*hr,T*1.4+i*.7,s.c)
+  })
+
+  // "3" counter
+  if(p>.75){
+    const np=ease((p-.75)/.25,E.el)
+    num(cx,q(.14),'3',q(.082)*np,C.I,'900',np)
+    chip(cx,q(.2),'entry points',q(.022),C.M,np*.8)
+  }
+}
+
+/* ═══════════════════════════════════════
+   ACT 1 — PARSE & CLASSIFY
+   Single doc flies in → eaten by spinning hex →
+   9 coloured signal dots explode outward like fireworks.
+═══════════════════════════════════════ */
+function a1(p){
+  const cx=q(.5),cy=q(.47)
+
+  // Doc flies in and shrinks into hex
+  if(p<.38){
+    const dp=ease(p/.35,E.io)
+    const s=q(.12)*(1-dp*.85)
+    doc(lr(q(.1),cx-s/2,dp),lr(q(.18),cy-s*.62,dp),s,s*.78,1-p*2.4)
+  }
+
+  // AI hex spins up
+  const hr=q(.14)*ease(cl(p-.04,.0,1)/.5,E.el)
+  if(hr>0){
+    hex(cx,cy,hr,T*1.2,ease(cl(p-.04,0,1)/.5),C.I)
+    // glow rings while processing
+    ;[q(.2),q(.27)].forEach((r,i)=>{
+      ring(cx,cy,r*(hr/q(.14)),C.I,.1+Math.sin(T*3+i)*.04,1.5)
+    })
+  }
+
+  // Signal dots burst out — each a different colour
+  const tags=[
+    {c:C.G, ang:  π*.05, lbl:'brand'},
+    {c:C.Iv,ang:  π*.4,  lbl:'type'},
+    {c:C.A, ang:  π*.75, lbl:'colour'},
+    {c:C.P, ang:  π,     lbl:'print'},
+    {c:C.B, ang:  π*1.25,lbl:'feature'},
+    {c:C.Gt,ang:  π*1.6, lbl:'season'},
+    {c:C.Bs,ang: -π*.25, lbl:'price'},
+    {c:C.Ao,ang: -π*.55, lbl:'size'},
+    {c:C.Pr,ang: -π*.85, lbl:'occasion'},
+  ]
+  tags.forEach((tg,i)=>{
+    const del=i*.07
+    const tp=cl((p-.2-del)/.72,0,1)
+    const ep=ease(tp,E.el)
+    const R=q(.4)*ep
+    const tx=cx+Math.cos(tg.ang)*R,ty=cy+Math.sin(tg.ang)*R
+    const sz=q(.038)*ep,a=ease(tp)
+
+    // glowing dot
+    arc(tx,ty,sz,tg.c+'22')
+    arc(tx,ty,sz,null,tg.c,sz*.18)
+    arc(tx,ty,sz*.45,tg.c)
+
+    // label when settled
+    if(ep>.55) chip(tx,ty+sz*1.5,tg.lbl,q(.019),tg.c,ease((ep-.55)/.45)*.9)
+
+    // particle trail during flight
+    if(ep>.04&&ep<.84) fp(cx,cy,tx,ty,T*2+i*.4,tg.c,q(.01))
+  })
+
+  // "9 signals" stat
+  if(p>.82){
+    const np=ease((p-.82)/.18,E.el)
+    num(cx,q(.9),'9',q(.075)*np,C.I,'900',np)
+    chip(cx,q(.94),'signals extracted',q(.022),C.M,np*.8)
+  }
+}
+
+/* ═══════════════════════════════════════
+   ACT 2 — CATALOGUE UPDATE
+   Dots stream into 3 glowing cylinders.
+   Cylinders pulse as they fill. Lock icon = patterns saved.
+═══════════════════════════════════════ */
+function a2(p){
+  const cx=q(.5),cy=q(.22)
+
+  // Tiny hex fades out at top
+  if(p<.28){
+    const f=1-ease(p/.25)
+    hex(cx,cy,q(.065)*f,T*.8,f,C.I)
+  }
+
+  // 3 cylinders grow in
+  const dbs=[
+    {c:C.Iv, x:.2,  y:.52, lbl:'brand_patterns'},
+    {c:C.A,  x:.5,  y:.57, lbl:'tag_index'},
+    {c:C.G,  x:.8,  y:.52, lbl:'collection_analysis'},
+  ]
+  dbs.forEach((db,i)=>{
+    const del=i*.14
+    const dp=ease(cl((p-.08-del)/.58,0,1),E.el)
+    const a=ease(cl((p-del-.08)/.52,0,1))
+    const dx=q(db.x),dy=q(db.y)
+    const dw=q(.18)*dp,dh=q(.2)*dp
+
+    cyl(dx,dy,dw,dh,db.c,a)
+
+    // fill level animation
+    if(dp>.5&&a>.5){
+      const fill=ease((dp-.5)/.5)*dh*.6
+      ctx.save();ctx.globalAlpha=a*.35
+      rrect(dx-dw/2+1,dy-dh/2+dh*.12,dw-2,fill,2,db.c)
+      ctx.restore()
+    }
+
+    // pulsing write ring at top
+    const wr=(T*2+i*.8)%1
+    if(dp>.4) ring(dx,dy-dh*.5+2,dw*.48,db.c,wr<.5?wr*.5:.5*(1-wr*2+1),1.2)
+
+    // label
+    if(dp>.62) chip(dx,dy+dh*.72+q(.03),db.lbl,q(.018),db.c,ease((dp-.62)/.38)*.85)
+
+    // arrow from hex
+    if(dp>.2) arrow(cx,cy+q(.04),dx,dy-dh*.52,db.c,1.2,ease((dp-.2)/.8))
+
+    // streaming particles
+    if(p>.15&&a>.15){
+      const t2=((T*1.8+i*.4)%1)
+      fp(cx,cy+q(.04),dx,dy-dh*.52,t2,db.c,q(.011))
+    }
+  })
+
+  // Lock icon — patterns memorised
+  if(p>.75){
+    const lp=ease((p-.75)/.25,E.el)
+    const lx=cx,ly=q(.87),lw=q(.055),lh=q(.05)
+    ctx.save();ctx.globalAlpha=lp
+    rrect(lx-lw/2,ly,lw,lh,lw*.18,C.G+'1a',C.G,2)
+    ctx.beginPath();ctx.arc(lx,ly,lw*.42,π,0)
+    ctx.strokeStyle=C.G;ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke()
+    arc(lx,ly+lh*.45,lw*.14,C.G)
+    ctx.restore()
+    chip(cx,q(.93),'patterns memorised',q(.021),C.G,lp*.85)
+  }
+}
+
+/* ═══════════════════════════════════════
+   ACT 3 — COLLECTION INTELLIGENCE
+   Centre product card radiates arrows to 3 diamond questions.
+   Each diamond flips to YES → star bursts → collection badge.
+   Visually: 1 object → 3 outcomes.
+═══════════════════════════════════════ */
+function a3(p){
+  const cx=q(.5),cy=q(.36)
+
+  // Central product card with mini sonic
+  const cp=ease(p*.55,E.el)
+  ctx.save();ctx.globalAlpha=cp
+  rrect(cx-q(.09),cy-q(.07),q(.18),q(.14),q(.016),C.Iv+'18',C.Iv,1.5)
+  sonic(cx,cy,q(.028),1,C.Iv)
+  ctx.restore()
+  if(cp>.5) chip(cx,cy+q(.07),'product',q(.019),C.Iv,ease((cp-.5)/.5)*.7)
+
+  // 3 diamonds
+  const ds=[
+    {q:'?', c:C.A,  lbl:'exists?',   tx:.14, ty:.6,  ans:'✓', ac:C.G},
+    {q:'?', c:C.Ao, lbl:'new niche?',tx:.5,  ty:.64, ans:'✓', ac:C.G},
+    {q:'?', c:C.P,  lbl:'story?',    tx:.86, ty:.6,  ans:'✓', ac:C.G},
+  ]
+  ds.forEach((d,i)=>{
+    const del=i*.15
+    const dp=ease(cl((p-.18-del)/.55,0,1),E.el)
+    const a=ease(cl((p-del-.18)/.5,0,1))
+    const dx=q(d.tx),dy=q(d.ty)
+    const dw=q(.24)*dp,dh=q(.2)*dp
+
+    diamond(dx,dy,dw,dh,d.c,a)
+
+    // question mark or answer
+    const flipP=cl((p-.65-i*.08)/.2,0,1)
+    if(dp>.5){
+      if(flipP<.5){
+        num(dx,dy,d.q,q(.055)*dp,d.c,'700',a*.75)
+      } else {
+        // flip to YES check
+        const fa=ease((flipP-.5)/.5,E.el)
+        ctx.save();ctx.globalAlpha=a*fa
+        ctx.strokeStyle=d.ac;ctx.lineWidth=q(.012);ctx.lineCap='round';ctx.lineJoin='round'
+        ctx.beginPath()
+        ctx.moveTo(dx-dw*.22,dy);ctx.lineTo(dx-dw*.04,dy+dh*.22);ctx.lineTo(dx+dw*.26,dy-dh*.28)
+        ctx.stroke();ctx.restore()
+      }
+    }
+
+    if(dp>.65) chip(dx,dy+dh*.6+q(.01),d.lbl,q(.019),d.c,ease((dp-.65)/.35)*.8)
+
+    // arrow from product
+    if(dp>.2) arrow(cx,cy+q(.075),dx,dy-dh*.52,d.c,1.2,ease((dp-.2)/.8))
+    if(p>.22) fp(cx,cy+q(.075),dx,dy-dh*.52,(T*1.6+i*.5)%1,d.c,q(.011))
+
+    // Collection badge after YES
+    if(p>.72){
+      const colls=['Seafolly','Bikini Tops','Floral']
+      const bap=ease(cl((p-.72-i*.08)/.22,0,1),E.el)
+      if(bap>.05){
+        burst(dx,dy+dh*.62+q(.05),q(.04)*bap,7,d.ac,bap*.7,T*.5+i)
+        if(bap>.35) chip(dx,dy+dh*.62+q(.11),colls[i],q(.02),d.ac,ease((bap-.35)/.65))
+
+        // particle celebration
+        if(bap>.6&&Math.random()<.1) pt(dx,dy+dh*.6,d.ac,(Math.random()-.5)*3,-(Math.random()*3+1))
+      }
+    }
+  })
+
+  // "1 → 3" display
+  if(p>.85){
+    const np=ease((p-.85)/.15,E.el)
+    chip(cx,q(.12),'1 product  →  3 collections',q(.023),C.I,np)
+  }
+}
+
+/* ═══════════════════════════════════════
+   ACT 4 — AI CONTENT ENGINE
+   Central nucleus with 3 orbiting electron rings.
+   6 content nodes orbit at different speeds, connected by
+   fine dotted lines. Competitor reference dots glow at top.
+═══════════════════════════════════════ */
+function a4(p){
+  const cx=q(.5),cy=q(.47)
+
+  // Nucleus
+  const nr=q(.1)*ease(p*.6,E.el)
+  if(nr>2){
+    ;[q(.16),q(.24),q(.33)].forEach((r,i)=>{
+      const rp=r*ease(p*.6,E.el)/r
+      orbit(cx,cy,r*ease(p*.6,E.el),i+1,T*(1.1-i*.22),[C.I,C.Iv,C.Bs][i],ease(p*.6)*.7)
+    })
+    arc(cx,cy,nr,C.I+'1a')
+    sonic(cx,cy,nr,ease(p*.6))
+  }
+
+  // 6 content output nodes
+  const nodes=[
+    {sym:'T',  lbl:'SEO title',   c:C.Bs, ang:-π*.65},
+    {sym:'M',  lbl:'meta 160',    c:C.B,  ang:-π*.2},
+    {sym:'≡',  lbl:'description', c:C.Iv, ang: π*.2},
+    {sym:'⚙',  lbl:'smart rules', c:C.A,  ang: π*.65},
+    {sym:'?',  lbl:'FAQ',         c:C.P,  ang: π*1.1},
+    {sym:'↗',  lbl:'link mesh',   c:C.G,  ang:-π*1.1},
+  ]
+
+  nodes.forEach((nd,i)=>{
+    const del=i*.09
+    const np=ease(cl((p-.2-del)/.68,0,1),E.el)
+    const a=ease(cl((p-del-.2)/.62,0,1))
+    const R=q(.4)*np
+    const nx=cx+Math.cos(nd.ang)*R,ny=cy+Math.sin(nd.ang)*R
+    const ns=q(.042)*np
+
+    // dotted spoke
+    if(np>.1){
+      ctx.save();ctx.globalAlpha=np*.18;ctx.setLineDash([q(.008),q(.006)])
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(nx,ny)
+      ctx.strokeStyle=nd.c;ctx.lineWidth=1;ctx.stroke();ctx.setLineDash([]);ctx.restore()
+    }
+
+    // node circle
+    arc(nx,ny,ns,nd.c+'1a')
+    arc(nx,ny,ns,null,nd.c,ns*.14)
+    // symbol
+    if(np>.35){
+      ctx.save();ctx.globalAlpha=a
+      ctx.font=`700 ${q(.03)*np}px 'Inter',system-ui,sans-serif`
+      ctx.fillStyle=nd.c;ctx.textAlign='center';ctx.textBaseline='middle'
+      ctx.fillText(nd.sym,nx,ny);ctx.restore()
+    }
+    if(np>.6) chip(nx,ny+ns*1.6,nd.lbl,q(.018),nd.c,ease((np-.6)/.4)*.85)
+
+    // streaming particle
+    if(np>.12) fp(cx,cy,nx,ny,(T*1.3+i*.22)%1,nd.c,q(.009))
+  })
+
+  // Competitor reference dots — 6 tiny circles at top
+  if(p>.55){
+    const rp=ease((p-.55)/.45,E.o2)
+    const cols=[C.B,C.P,C.A,C.Iv,C.Gt,C.G]
+    cols.forEach((c,i)=>{
+      const dp=ease(cl(rp*4-i*.18,0,1),E.el)
+      const gx=q(.22+i*.11),gy=q(.09)
+      arc(gx,gy,q(.018)*dp,c+'2a',c,dp*1.8)
+      // connection line to nucleus
+      if(dp>.6){
+        ctx.save();ctx.globalAlpha=dp*.12;ctx.setLineDash([q(.007),q(.007)])
+        ctx.beginPath();ctx.moveTo(gx,gy+q(.018));ctx.lineTo(cx,cy-nr)
+        ctx.strokeStyle=c;ctx.lineWidth=.8;ctx.stroke();ctx.setLineDash([]);ctx.restore()
+      }
+    })
+    chip(cx,q(.07),'6 competitors studied',q(.02),C.M,rp*.85)
+  }
+}
+
+/* ═══════════════════════════════════════
+   ACT 5 — OUTPUT FORK
+   Sonic hub → two diverging paths →
+   LEFT: shopping bag (Shopify) fills with product cards
+   RIGHT: document stack (Blog + FAQ) grows with lines
+═══════════════════════════════════════ */
+function a5(p){
+  const cx=q(.5),ty=q(.18)
+
+  // Small sonic hub at top
+  const hr=q(.07)
+  sonic(cx,ty,hr,ease(p*.4,E.el))
+  sonicRings(cx,ty,hr,T,C.I,ease(p*.4))
+
+  // Fork arrows
+  if(p>.12){
+    const fp2=ease((p-.12)/.35,E.o3)
+    const lx=q(.22),ly=q(.55),rx=q(.78),ry=q(.53)
+    arrow(cx,ty+hr,lx,ly,C.G,2,fp2)
+    arrow(cx,ty+hr,rx,ry,C.B,2,fp2)
+    // particles on both paths
+    fp(cx,ty+hr,lx,ly,(T*1.8)%1,C.G)
+    fp(cx,ty+hr,rx,ry,(T*1.8+.5)%1,C.B)
+  }
+
+  // LEFT — Shopify bag
+  if(p>.32){
+    const lp=ease((p-.32)/.45,E.el)
+    const bx=q(.22),by=q(.57)
+    bag(bx,by,q(.3)*lp,q(.26)*lp,C.G,lp)
+
+    // product cards fly into bag
+    if(lp>.45){
+      ;[0,.12,.24].forEach((del2,i)=>{
+        const cp=ease(cl((lp-.45-del2)/(1-.45-del2),0,1),E.io)
+        const cardy=by-q(.15)-i*q(.06)
+        const cardx=bx+lr(-q(.04),0,cp)
+        const ca=1-ease(cl((cp-.82)/.18,0,1))
+        const cw=q(.12)*(1-cp*.5),ch=q(.065)*(1-cp*.5)
+        rrect(cardx-cw/2,cardy-ch/2,cw,ch,q(.01),[C.G,C.Bs,C.G][i]+'22',[C.G,C.Bs,C.G][i],1.2)
+        rrect(cardx-cw*.32,cardy-ch*.12,cw*.65,ch*.18,1,[C.G,C.Bs,C.G][i]+'66')
+      })
+    }
+    // smart rules / SEO chips
+    if(lp>.62){
+      ;['smart rules','SEO ✓','links ✓'].forEach((t2,i)=>{
+        const ca=ease(cl((lp-.62-i*.1)/(1-.62),0,1))
+        chip(bx,by+q(.16+i*.065),t2,q(.019),C.G,ca*.85)
+      })
+    }
+  }
+
+  // RIGHT — Document stack
+  if(p>.35){
+    const rp=ease((p-.35)/.45,E.el)
+    const dx=q(.78),dy=q(.54)
+    // stacked docs
+    ;[q(.05),q(.025),0].forEach((off,i)=>{
+      doc(dx-q(.1)+off,dy+off,q(.2),q(.26),rp*(1-i*.15),C.B+'18',C.B)
+    })
+    if(rp>.5){
+      ;['sizing','care tips','FAQ ×5'].forEach((t2,i)=>{
+        const ca=ease(cl((rp-.5-i*.1)/(1-.5),0,1))
+        chip(dx,dy+q(.29+i*.065),t2,q(.019),C.B,ca*.85)
+      })
+    }
+  }
+
+  // "2 outputs" badge
+  if(p>.8){
+    const np=ease((p-.8)/.2,E.el)
+    num(cx,q(.9),'2',q(.072)*np,C.I,'900',np)
+    chip(cx,q(.94),'outputs per invoice',q(.022),C.M,np*.8)
+  }
+}
+
+/* ═══════════════════════════════════════
+   ACT 6 — HUMAN REVIEW
+   Large eye blinks open. Three buttons (✓ ✏ ✕) float up.
+   The ✓ button pulses — user taps it — ripple wave.
+   Check marks cascade across screen.
+═══════════════════════════════════════ */
+function a6(p){
+  const cx=q(.5),cy=q(.38)
+
+  // Eye opens
+  const openF=ease(p*.65,E.o3)
+  eye(cx,cy,q(.38),openF,C.M,ease(p*.5))
+
+  // Lid covers during opening
+  if(p<.5){
+    const lid=1-ease(p/.42,E.o3)
+    ctx.save();ctx.globalAlpha=lid*.95
+    ctx.fillStyle=C.bg
+    const ey=cy-q(.38*.42/2)*openF
+    ctx.fillRect(cx-q(.26),ey,q(.52),q(.14)*lid)
+    ctx.restore()
+  }
+
+  // 3 action buttons float up
+  const btns=[
+    {s:'✓',c:C.G, x:.22,y:.64},
+    {s:'✏',c:C.A, x:.5, y:.64},
+    {s:'✕',c:C.Pr,x:.78,y:.64},
+  ]
+  if(p>.24){
+    btns.forEach((b,i)=>{
+      const del=i*.13
+      const bp=ease(cl((p-.24-del)/.45,0,1),E.el)
+      const a=ease(cl((p-del-.24)/.4,0,1))
+      const bx=q(b.x),by=q(b.y),bs=q(.1)*bp
+
+      arc(bx,by,bs,b.c+'1a',b.c,bs*.14)
+      if(bp>.35){
+        ctx.save();ctx.globalAlpha=a
+        ctx.font=`700 ${q(.04)*bp}px 'Inter',system-ui,sans-serif`
+        ctx.fillStyle=b.c;ctx.textAlign='center';ctx.textBaseline='middle'
+        ctx.fillText(b.s,bx,by);ctx.restore()
+      }
+      // approve button pulses
+      if(i===0&&bp>.6){
+        const pp=(Math.sin(T*3.5)*.5+.5)*bp
+        ring(bx,by,bs+q(.014)*pp,b.c,pp*.28,2)
+      }
+    })
+  }
+
+  // Approve tap — ripple + cascade checks
+  if(p>.58){
+    const ap=ease((p-.58)/.42,E.o3)
+    // ripple from ✓ button
+    ;[0,.18,.36].forEach(off=>{
+      const rp=cl(ap-off,0,1)
+      ring(q(.22),q(.64),q(.1)+q(.12)*rp,C.G,(1-rp)*.4,2)
+    })
+
+    // check marks cascade across
+    ;[.18,.38,.58,.72,.86].forEach((fx,i)=>{
+      const del=i*.1
+      const cpa=ease(cl((ap-del*.8)/(1-del*.8),0,1),E.el)
+      check(q(fx),q(.82),q(.038),C.G,cpa)
+    })
+
+    // SEO score
+    if(p>.82){
+      const sp=ease((p-.82)/.18,E.el)
+      chip(cx,q(.92),'SEO score: 94 / 100',q(.023),C.G,sp)
+    }
+  }
+}
+
+/* ═══════════════════════════════════════
+   ACT 7 — PUBLISH
+   Rocket launches from bottom. Three URL slugs land at
+   target positions. Rising bar chart, #1 bar crowned with star.
+   Confetti celebration.
+═══════════════════════════════════════ */
+function a7(p){
+  const cx=q(.5)
+
+  // Rocket launches
+  const lp=ease(p*.75,E.o3)
+  const ry=lr(q(.85),q(.08),lp)
+  rocket(cx,ry,q(.085),ease(p*.6,E.el))
+
+  // flame exhaust particles
+  if(p>.04&&Math.random()<.38){
+    pt(cx+(Math.random()-.5)*q(.04),ry+q(.08),Math.random()>.5?C.A:C.Ao,(Math.random()-.5)*1.2,q(.08)/Q*4,.4)
+  }
+
+  // Launch flash
+  if(p<.1){
+    ctx.save();ctx.globalAlpha=(1-ease(p/.1))*.25;ctx.fillStyle=C.A;ctx.fillRect(0,0,Q,Q);ctx.restore()
+  }
+
+  // URL slugs materialise at 3 positions
+  const urls=[
+    {lbl:'/swimwear-darwin',c:C.G, x:.15,y:.5},
+    {lbl:'/bikini-tops',    c:C.B, x:.5, y:.54},
+    {lbl:'/floral-swimwear',c:C.P, x:.85,y:.5},
+  ]
+  urls.forEach((u,i)=>{
+    const del=i*.15
+    const up=ease(cl((p-.18-del)/.55,0,1),E.el)
+    const a=ease(cl((p-del-.18)/.5,0,1))
+    const ux=q(u.x),uy=q(u.y)
+
+    if(up>.08){
+      ctx.save();ctx.globalAlpha=a
+      const w=q(.28),h=q(.055)
+      rrect(ux-w/2,uy-h/2,w,h,h/2,u.c+'18',u.c,.9)
+      ctx.font=`600 ${q(.018)*up}px 'Inter',system-ui,monospace`
+      ctx.fillStyle=u.c;ctx.textAlign='center';ctx.textBaseline='middle'
+      ctx.fillText(u.lbl,ux,uy);ctx.restore()
+    }
+
+    // arrow from rocket trail
+    if(up>.28) arrow(cx,ry,ux,uy-q(.03),u.c,1,ease((up-.28)/.72))
+
+    // #1 star badge on /swimwear-darwin
+    if(i===0&&up>.68){
+      const gp=ease((up-.68)/.32,E.el)
+      burst(ux,uy-q(.055),q(.024)*gp,5,C.A,gp*.9,T*.4)
+      chip(ux,uy-q(.05),'#1',q(.02),C.A,gp)
+    }
+  })
+
+  // Bar chart rises
+  if(p>.5){
+    const bp=ease((p-.5)/.5,E.o3)
+    const bBase=q(.92),maxH=q(.28)
+    const bars=[.28,.5,.36,.68,.42,.74,.48]
+    const bW=q(.048),bGap=q(.012),total=bars.length*(bW+bGap)
+    const sx=cx-total/2
+
+    bars.forEach((bh,i)=>{
+      const del=i*.07
+      const ibp=ease(cl((bp-del)/(1-del),0,1),E.el)
+      const barH=maxH*bh*ibp
+      const isWinner=(i===3)
+      rrect(sx+i*(bW+bGap),bBase-barH,bW,barH,3,isWinner?C.I:C.M+'55')
+      if(isWinner&&ibp>.7){
+        burst(sx+i*(bW+bGap)+bW/2,bBase-barH-q(.035),q(.022)*ease((ibp-.7)/.3,E.el),5,C.A,ease((ibp-.7)/.3),T*.4)
+      }
+    })
+
+    // baseline
+    ctx.save();ctx.globalAlpha=ease(bp)*.2
+    line(sx-q(.02),bBase,sx+total+q(.02),bBase,C.Bo,1.5)
+    ctx.restore()
+
+    // #1 big number
+    if(p>.78){
+      const np=ease((p-.78)/.22,E.el)
+      num(cx,q(.7),'#1',q(.1)*np,C.I,'900',np*.85)
+    }
+  }
+
+  // Confetti
+  if(p>.72&&Math.random()<.28){
+    const cols=[C.G,C.I,C.A,C.P,C.Gt,C.Iv]
+    pt(q(.2)+Math.random()*q(.6),q(.85),cols[Math.floor(Math.random()*cols.length)],(Math.random()-.5)*3,-(Math.random()*4+2))
+  }
+}
+
+/* ═══════════════════════════════════════
+   ENGINE
+═══════════════════════════════════════ */
+const FNS=[a0,a1,a2,a3,a4,a5,a6,a7]
+const LBLS=['Trigger','Parse','Catalogue','Intelligence','Content Engine','Output','Review','Publish']
+const LCOLS=[C.G,C.I,C.Iv,C.A,C.I,C.B,C.M,C.G]
+
+// build dots
+const dotsEl=document.getElementById('dots')
+for(let i=0;i<N;i++){
+  const d=document.createElement('div')
+  d.className='dot';d.id='d'+i;d.onclick=()=>goTo(i)
+  dotsEl.appendChild(d)
+}
+
+function uiSync(){
+  for(let i=0;i<N;i++){
+    document.getElementById('d'+i).className='dot'+(i===aI?' on':i<aI?' done':'')
+  }
+  const sl=document.getElementById('steplbl')
+  sl.textContent=LBLS[aI];sl.style.color=LCOLS[aI]
+}
+
+function render(ts){
+  if(!lastTs) lastTs=ts
+  const dt=Math.min((ts-lastTs)/1000,.05);lastTs=ts
+  if(playing){
+    T+=dt
+    const raw=T/(DUR*N)
+    gT=cl(raw,0,1)
+    const na=Math.min(Math.floor(raw*N),N-1)
+    if(na!==aI){aI=na;uiSync()}
+    aT=cl((raw*N)%1,0,1)
+    document.getElementById('pf').style.width=(gT*100)+'%'
+    if(gT>=1){
+      playing=false
+      document.getElementById('play').textContent='↺ Replay'
+      document.getElementById('play').classList.remove('h')
+    }
+  }
+  ctx.clearRect(0,0,Q,Q);bg();tickPts(dt)
+  const F=.055
+  if(aT<F&&aI>0){
+    ctx.save();ctx.globalAlpha=ease(1-aT/F);FNS[aI-1](1);ctx.restore()
+    ctx.save();ctx.globalAlpha=ease(aT/F);FNS[aI](0);ctx.restore()
+  } else FNS[aI](aT)
+  requestAnimationFrame(render)
+}
+
+function goTo(i){aI=i;aT=0;T=i*DUR;uiSync()}
+
+function togglePlay(){
+  const btn=document.getElementById('play')
+  if(playing){playing=false;btn.textContent='▶ Play'}
+  else{
+    if(T>=DUR*N-.5) T=0
+    playing=true;btn.textContent='❙❙ Pause'
+    btn.classList.add('h');lastTs=null
+  }
+}
+
+window.addEventListener('load',()=>{resize();uiSync();bg();FNS[0](0);requestAnimationFrame(render)})
+window.addEventListener('resize',()=>{resize();ctx.clearRect(0,0,Q,Q);bg()})
+</script>
+</body>
+</html>

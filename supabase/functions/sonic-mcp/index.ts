@@ -1,18 +1,14 @@
 // ══════════════════════════════════════════════════════════
 // Sonic Invoices — MCP Server (day-1 MVP, user-scoped)
 //
-// Auth:  Authorization: Bearer <raw_token>
-//        token_hash = SHA-256(raw_token), validated via
-//        verify_sonic_mcp_token RPC (returns user_id +
-//        Shopify connection info in one round-trip).
-//
-// Tools (read-only v1):
-//   - get_store_context  → Shopify store + brand list
-//   - get_collections    → Suggested collections + score
-//   - get_gap_results    → Latest competitor-gap cards
-//
-// Every tool call is logged to mcp_tool_calls.
-// Deploys with verify_jwt = false (Claude can't send a JWT).
+// Auth:    Authorization: Bearer <raw_token>
+//          token_hash = SHA-256(raw_token), validated via
+//          verify_sonic_mcp_token RPC.
+// Scope:   user_id (no stores table in v1)
+// Rate:    20 tool calls per user per minute (in-memory)
+// Tools:   get_store_context, get_collections, get_gap_results
+// Logs:    every call → mcp_tool_calls
+// Config:  verify_jwt = false  (Claude.ai cannot send Supabase JWTs)
 // ══════════════════════════════════════════════════════════
 import { Hono } from "npm:hono@4";
 import { McpServer, StreamableHttpTransport } from "npm:mcp-lite@^0.10.0";
@@ -21,7 +17,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, mcp-session-id",
+    "authorization, x-client-info, apikey, content-type, mcp-session-id, accept",
   "Access-Control-Expose-Headers": "mcp-session-id",
 };
 
@@ -37,6 +33,20 @@ interface AuthCtx {
   tokenId: string | null;
   storeUrl: string | null;
   accessToken: string | null;
+}
+
+// ── Rate limiter: 20 calls / user / minute ──────────────────
+const callCounts = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = callCounts.get(userId);
+  if (!entry || now > entry.resetAt) {
+    callCounts.set(userId, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (entry.count >= 20) return false;
+  entry.count++;
+  return true;
 }
 
 async function sha256Hex(s: string): Promise<string> {
@@ -57,7 +67,6 @@ async function resolveAuth(req: Request): Promise<AuthCtx | null> {
   if (error || !data || (Array.isArray(data) && data.length === 0)) return null;
   const row = Array.isArray(data) ? data[0] : data;
   if (!row?.user_id) return null;
-  // fire-and-forget last_used_at bump
   admin.rpc("touch_sonic_mcp_token", { _token_hash: hash }).then(() => {});
   return {
     userId: row.user_id as string,
@@ -93,23 +102,18 @@ function getAuth(ctx: any): AuthCtx | null {
   return extra?.auth ?? null;
 }
 
-// Helper to wrap a handler body with auth check + logging.
 function wrap<TArgs>(
   name: string,
   fn: (args: TArgs, auth: AuthCtx) => Promise<unknown>,
 ) {
   return async (args: TArgs, ctx: any) => {
     const auth = getAuth(ctx);
-    if (!auth) {
-      return { content: [{ type: "text", text: "Unauthorized" }] };
-    }
+    if (!auth) return { content: [{ type: "text", text: "Unauthorized" }] };
     const t0 = Date.now();
     try {
       const result = await fn(args, auth);
       logCall(auth, name, args, t0, "success");
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       logCall(auth, name, args, t0, "error", msg);
@@ -119,24 +123,19 @@ function wrap<TArgs>(
 }
 
 // ── MCP server + tools ──────────────────────────────────────
-const mcp = new McpServer({
-  name: "sonic-invoices",
-  version: "0.1.0",
-});
+const mcp = new McpServer({ name: "sonic-invoices", version: "1.0.0" });
 
 mcp.tool("get_store_context", {
   description:
-    "Returns the connected Shopify store (URL, shop name, voice style, default product status) and a list of brands the user has products from.",
+    "Returns an overview of this Sonic Invoices store: connected Shopify domain, brand voice, default product status, and the brands seen in competitor analysis. Always call this first before any other tool.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
   handler: wrap<Record<string, never>>("get_store_context", async (_args, auth) => {
-    // Shopify connection (already in auth context, but re-fetch full row for richer fields)
     const { data: shop } = await admin
       .from("shopify_connections")
       .select("store_url, shop_name, brand_voice_style, product_status")
       .eq("user_id", auth.userId)
       .maybeSingle();
 
-    // Brands this user has actually seen, derived from competitor_gaps (user-scoped).
     const { data: brandRows } = await admin
       .from("competitor_gaps")
       .select("brand")
@@ -147,16 +146,13 @@ mcp.tool("get_store_context", {
       new Set((brandRows ?? []).map((r: any) => r.brand).filter(Boolean)),
     ).slice(0, 50);
 
-    return {
-      shopify: shop ?? null,
-      brands,
-    };
+    return { shopify: shop ?? null, brands };
   }),
 });
 
 mcp.tool("get_collections", {
   description:
-    "Lists Sonic-suggested Shopify collections for the user with SEO completeness score. Filter by status (pending|approved|published) or min completeness.",
+    "Returns Sonic-suggested Shopify collections for this store with SEO completeness scores (0-100). Filter by status (pending|approved|published) or by min_completeness. A score below 70 means missing content.",
   inputSchema: {
     type: "object",
     properties: {
@@ -177,22 +173,20 @@ mcp.tool("get_collections", {
         .eq("user_id", auth.userId)
         .order("completeness_score", { ascending: true })
         .limit(Math.min(Number(args?.limit) || 25, 100));
-
       if (args?.status) q = q.eq("status", args.status);
       if (typeof args?.min_completeness === "number") {
         q = q.gte("completeness_score", args.min_completeness);
       }
-
       const { data, error } = await q;
       if (error) throw new Error(error.message);
-      return data ?? [];
+      return { count: (data ?? []).length, collections: data ?? [] };
     },
   ),
 });
 
 mcp.tool("get_gap_results", {
   description:
-    "Returns the most recent competitor gap-analysis cards (collections / brands this store is missing vs competitors).",
+    "Returns the latest competitor gap-analysis results — collections or brands competitors carry that this store is missing. Each gap includes the competitor URL, suggested handle/title, expected impact and current status.",
   inputSchema: {
     type: "object",
     properties: {
@@ -212,12 +206,10 @@ mcp.tool("get_gap_results", {
         .eq("user_id", auth.userId)
         .order("created_at", { ascending: false })
         .limit(Math.min(Number(args?.limit) || 10, 50));
-
       if (args?.gap_type) q = q.eq("gap_type", args.gap_type);
-
       const { data, error } = await q;
       if (error) throw new Error(error.message);
-      return data ?? [];
+      return { count: (data ?? []).length, gaps: data ?? [] };
     },
   ),
 });
@@ -235,6 +227,12 @@ app.all("*", async (c) => {
     return new Response(
       JSON.stringify({ error: "Unauthorized — missing or invalid bearer token" }),
       { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+  if (!checkRateLimit(auth.userId)) {
+    return new Response(
+      JSON.stringify({ error: "Rate limit exceeded. Max 20 tool calls per minute." }),
+      { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
   const authHeader = c.req.raw.headers.get("authorization") || "";

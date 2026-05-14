@@ -17,6 +17,8 @@ import {
 } from "../_shared/seo-validators.ts";
 import { getValidShopifyToken } from "../_shared/shopify-token.ts";
 import { generateGeoBlock } from "../_shared/geo-blocks.ts";
+import { generateAndPersistBlogs } from "../_shared/blog-templates.ts";
+import { persistSmartRules } from "../_shared/smart-rules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -77,6 +79,14 @@ function safeParseJson(raw: string): any {
   const m = cleaned.match(/\{[\s\S]*\}/);
   if (m) { try { return JSON.parse(m[0]); } catch {/**/} }
   return null;
+}
+
+function deriveStoreName(storeUrl: string): string {
+  const u = (storeUrl || "").toLowerCase();
+  if (u.includes("splash")) return "Splash Swimwear Darwin";
+  if (u.includes("stomp")) return "Stomp Shoes Darwin";
+  const host = u.replace(/^https?:\/\//, "").split("/")[0].split(".")[0];
+  return host.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Our Store";
 }
 
 // Detect a JEWELLERY-vertical Edit / gifting collection from its handle
@@ -380,17 +390,20 @@ Deno.serve(async (req) => {
     if (sErr || !suggestion) return json({ error: "suggestion not found" }, 404);
 
     const { level, isBrandPage } = inferTaxonomyLevel(suggestion);
-    const vertical = (body.vertical || "FOOTWEAR").toUpperCase();
-    const storeName = body.store_name || "Our Store";
+    const vertical = (body.vertical || (suggestion as any).vertical || "FOOTWEAR").toUpperCase();
     const storeCity = body.store_city || null;
 
-    // Load brand voice style from this user's shopify connection (default local_warmth)
+    // Load brand voice style + store_url so we can derive store_name when
+    // callers (re-routed from collection-content-generator) only pass suggestion_id.
     const { data: conn } = await supabase
       .from("shopify_connections")
-      .select("brand_voice_style")
+      .select("brand_voice_style, store_url")
       .eq("user_id", suggestion.user_id)
       .maybeSingle();
     const voice: VoiceStyle = (body.voice as VoiceStyle) || (conn?.brand_voice_style as VoiceStyle) || "local_warmth";
+    const storeName = body.store_name
+      || (conn?.store_url ? deriveStoreName(conn.store_url) : null)
+      || "Our Store";
 
     // Persist taxonomy_level for the row
     if (suggestion.taxonomy_level !== level) {
@@ -586,6 +599,39 @@ Deno.serve(async (req) => {
       }, { onConflict: "suggestion_id" });
     if (upErr) return json({ error: upErr.message }, 500);
 
+    // ── Smart collection rules (ported from collection-content-generator) ──
+    // Mirror parsed.smart_rules_json onto collection_suggestions so
+    // collection-publish (reads s.rule_set) and legacy UI (reads
+    // s.smart_collection_rules) both have the rules.
+    let smartRulesResult: any = { persisted: false };
+    try {
+      smartRulesResult = await persistSmartRules(supabase, suggestion.id, parsed.smart_rules_json);
+    } catch (e) {
+      console.warn("persistSmartRules failed (non-fatal)", e);
+      smartRulesResult = { persisted: false, error: e instanceof Error ? e.message : String(e) };
+    }
+
+    // ── Blog drafts (ported from collection-content-generator) ──
+    // Generate fully-rendered blog HTML based on BLOG_TEMPLATE per collection_type
+    // and write to collection_blogs (consumed by Collections page).
+    let blogResult: any = { generated: 0 };
+    try {
+      blogResult = await generateAndPersistBlogs({
+        supabase,
+        suggestionId: suggestion.id,
+        userId: suggestion.user_id,
+        collectionType: (suggestion as any).collection_type,
+        collectionTitle: (suggestion as any).suggested_title,
+        sampleTitles: Array.isArray((suggestion as any).sample_titles) ? (suggestion as any).sample_titles : [],
+        storeName,
+        brandName: brand?.brand_name ?? null,
+        brandTone: brand?.brand_tone ?? null,
+      });
+    } catch (e) {
+      console.warn("generateAndPersistBlogs failed (non-fatal)", e);
+      blogResult = { generated: 0, error: e instanceof Error ? e.message : String(e) };
+    }
+
     // Persist blog plans (still useful)
     if (Array.isArray(parsed.blog_plans) && parsed.blog_plans.length > 0) {
       const rows = parsed.blog_plans.slice(0, 6).map((b: any, idx: number) => ({
@@ -684,6 +730,8 @@ Deno.serve(async (req) => {
       validation_errors: lastIssues,
       shopify_push: push,
       geo: geoResult,
+      smart_rules: smartRulesResult,
+      blogs: blogResult,
     });
   } catch (e) {
     console.error("seo-collection-engine error", e);

@@ -1,3 +1,10 @@
+// DEPRECATED: replaced by seo-collection-engine (canonical SEO content engine).
+// All UI callers (GapsTab, Collections, SonicRank) re-routed 2026-05-14.
+// BLOG_TEMPLATE ported to _shared/blog-templates.ts.
+// smart_collection_rules ported to _shared/smart-rules.ts.
+// Safe to delete after 2026-06-15 (4-week soak window) once production confirms
+// no Shopify regressions on Splash + Stomp first weekly health scan.
+//
 // Universal collection content generator v2.
 // - Uses brand_intelligence to mirror brand voice + vocabulary.
 // - Selects blog templates based on collection_type (universal across verticals).

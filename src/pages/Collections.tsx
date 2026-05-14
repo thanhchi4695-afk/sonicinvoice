@@ -177,11 +177,11 @@ function CollectionsInner() {
   async function generate(id: string) {
     setGenerating(id);
     try {
-      const { data, error } = await supabase.functions.invoke("collection-content-generator", { body: { suggestion_id: id } });
+      // Re-routed from collection-content-generator to seo-collection-engine (canonical).
+      const { data, error } = await supabase.functions.invoke("seo-collection-engine", { body: { suggestion_id: id } });
       if (error) throw error;
-      const r = data?.results?.[0];
-      if (r?.ok) toast.success("Content generated");
-      else toast.error(r?.error ?? "Generation failed");
+      if ((data as any)?.ok) toast.success("Content generated");
+      else toast.error((data as any)?.error ?? "Generation failed");
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Generation failed");

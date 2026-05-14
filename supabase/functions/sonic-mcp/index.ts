@@ -224,6 +224,7 @@ mcp.tool("get_gap_results", {
 
 // ── HTTP transport ─────────────────────────────────────────
 const transport = new StreamableHttpTransport();
+const handleMcp = transport.bind(mcp);
 const app = new Hono();
 
 app.options("*", () => new Response("ok", { headers: corsHeaders }));
@@ -236,7 +237,11 @@ app.all("*", async (c) => {
       { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
-  const res = await transport.handleRequest(c.req.raw, mcp, { auth });
+  const authHeader = c.req.raw.headers.get("authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  const res = await handleMcp(c.req.raw, {
+    authInfo: { token, scopes: [], extra: { auth } },
+  });
   const headers = new Headers(res.headers);
   for (const [k, v] of Object.entries(corsHeaders)) headers.set(k, v);
   return new Response(res.body, { status: res.status, headers });

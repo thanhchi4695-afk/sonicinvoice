@@ -120,13 +120,18 @@ export function CaseStudyPage() {
       "description",
       "Real results from a boutique fashion retailer using Sonic Invoices: AI parsing, brand intelligence flywheel, one-click Shopify import."
     );
+    const url = `${window.location.origin}/case-study`;
     let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!canonical) {
       canonical = document.createElement("link");
       canonical.rel = "canonical";
       document.head.appendChild(canonical);
     }
-    canonical.href = `${window.location.origin}/case-study`;
+    canonical.href = url;
+    setProperty("og:title", "Case Study: 95% Faster Invoice → Shopify");
+    setProperty("og:description", "How a boutique retailer cut invoice-to-Shopify time by 95% with Sonic Invoices.");
+    setProperty("og:url", url);
+    setProperty("og:type", "article");
   }, []);
 
   const jsonLd = {

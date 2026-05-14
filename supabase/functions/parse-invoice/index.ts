@@ -545,26 +545,37 @@ async function stage1Gemini(fileBase64: string, mimeType: string, supplierName: 
     },
   ];
 
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages,
-      tools,
-      tool_choice: { type: "function", function: { name: "return_invoice_rows" } },
-    }),
-  });
+  // Retry transient gateway errors (502/503/504) with backoff, fallback to pro on final attempt
+  const ATTEMPTS: Array<{ model: string; backoffMs: number }> = [
+    { model: "google/gemini-2.5-flash", backoffMs: 0 },
+    { model: "google/gemini-2.5-flash", backoffMs: 3000 },
+    { model: "google/gemini-2.5-pro", backoffMs: 8000 },
+  ];
 
-  if (!resp.ok) {
+  let resp!: Response;
+  let lastErrText = "";
+  for (let i = 0; i < ATTEMPTS.length; i++) {
+    const { model, backoffMs } = ATTEMPTS[i];
+    if (backoffMs > 0) await new Promise((r) => setTimeout(r, backoffMs));
+    resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model, messages, tools, tool_choice: { type: "function", function: { name: "return_invoice_rows" } } }),
+    });
+    if (resp.ok) break;
     if (resp.status === 429) throw new Error("AI rate limit exceeded (Gemini). Please retry shortly.");
     if (resp.status === 402) throw new Error("AI credits exhausted. Add credits in Settings → Workspace → Usage.");
-    const t = await resp.text();
-    throw new Error(`Gemini stage failed: ${resp.status} ${t.slice(0, 300)}`);
+    const isTransient = resp.status === 502 || resp.status === 503 || resp.status === 504;
+    lastErrText = (await resp.text()).slice(0, 300);
+    console.log(`[parse-invoice] gemini attempt ${i + 1}/${ATTEMPTS.length} (${model}) → ${resp.status}: ${lastErrText}`);
+    if (!isTransient || i === ATTEMPTS.length - 1) {
+      throw new Error(`Gemini stage failed: ${resp.status} ${lastErrText}`);
+    }
   }
+
   const json = await resp.json();
   const toolCall = json?.choices?.[0]?.message?.tool_calls?.[0];
   if (!toolCall) throw new Error("Gemini returned no tool call");

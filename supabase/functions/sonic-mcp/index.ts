@@ -157,12 +157,14 @@ mcp.tool("get_collections", {
     type: "object",
     properties: {
       status: { type: "string", enum: ["pending", "approved", "published"] },
-      min_completeness: { type: "number", minimum: 0, maximum: 100 },
+      min_completeness: { type: "number", minimum: 0, maximum: 100, description: "Only return collections with completeness_score >= this value" },
+      max_completeness: { type: "number", minimum: 0, maximum: 100, description: "Only return collections with completeness_score < this value (use 70 to find underperformers)" },
+      max_seo_score: { type: "number", minimum: 0, maximum: 100, description: "Alias for max_completeness" },
       limit: { type: "number", minimum: 1, maximum: 100, default: 25 },
     },
     additionalProperties: false,
   },
-  handler: wrap<{ status?: string; min_completeness?: number; limit?: number }>(
+  handler: wrap<{ status?: string; min_completeness?: number; max_completeness?: number; max_seo_score?: number; limit?: number }>(
     "get_collections",
     async (args, auth) => {
       let q = admin
@@ -176,6 +178,10 @@ mcp.tool("get_collections", {
       if (args?.status) q = q.eq("status", args.status);
       if (typeof args?.min_completeness === "number") {
         q = q.gte("completeness_score", args.min_completeness);
+      }
+      const maxC = args?.max_completeness ?? args?.max_seo_score;
+      if (typeof maxC === "number") {
+        q = q.lt("completeness_score", maxC);
       }
       const { data, error } = await q;
       if (error) throw new Error(error.message);

@@ -37,6 +37,7 @@ const Login = () => {
     >
       <AuthScreen onAuth={() => navigate("/dashboard", { replace: true })} />
     </Suspense>
+    </>
   );
 };
 

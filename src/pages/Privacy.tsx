@@ -1,7 +1,13 @@
 import { Link } from "react-router-dom";
+import RouteSeo from "@/components/RouteSeo";
 
 const Privacy = () => (
   <div className="min-h-screen bg-background text-foreground">
+    <RouteSeo
+      title="Privacy Policy · Sonic Invoices"
+      description="How Sonic Invoices collects, stores and uses Gmail invoice data, Shopify product data and account information. Updated April 2026."
+      path="/privacy"
+    />
     <div className="max-w-2xl mx-auto px-6 py-16 text-sm leading-relaxed">
       <h1 className="text-3xl font-bold mb-2">Privacy Policy</h1>
       <p className="text-muted-foreground mb-10">Sonic Invoice — Last updated April 2026</p>

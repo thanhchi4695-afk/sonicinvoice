@@ -67,6 +67,20 @@ const Landing = () => {
         description="Turn supplier invoices into Shopify products in minutes. AI app for fashion retailers — bulk discounts, Google Shopping feed, SEO, Xero/MYOB sync."
         path="/"
       />
+      <div className="w-full bg-background border-b border-border">
+        <div className="max-w-6xl mx-auto px-6 pt-6">
+          <div className="relative w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm" style={{ aspectRatio: "16 / 9" }}>
+            <iframe
+              src="/marketing/sonic_white.html"
+              title="Sonic Invoices intro"
+              className="absolute inset-0 w-full h-full"
+              loading="eager"
+              frameBorder={0}
+              allow="autoplay"
+            />
+          </div>
+        </div>
+      </div>
       <header className="flex items-center justify-between max-w-6xl mx-auto px-6 py-5">
         <div className="flex items-center gap-2">
           <span className="text-lg font-bold font-display">Sonic Invoice</span>

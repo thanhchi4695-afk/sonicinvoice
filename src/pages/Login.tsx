@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import RouteSeo from "@/components/RouteSeo";
 
 const AuthScreen = lazy(() => import("@/components/AuthScreen"));
 
@@ -20,7 +21,14 @@ const Login = () => {
   }, [navigate]);
 
   return (
-    <Suspense
+    <>
+      <RouteSeo
+        title="Sign in or create an account · Sonic Invoices"
+        description="Sign in to Sonic Invoices to manage Shopify products, bulk discounts, Google Shopping feeds, and supplier invoice imports."
+        path="/login"
+        noindex
+      />
+      <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-background">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />

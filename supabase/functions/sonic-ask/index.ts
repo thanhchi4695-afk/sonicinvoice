@@ -23,39 +23,206 @@ const MAX_TOKENS = 1024;
 const MAX_HISTORY = 20;
 
 const EXPERT_KNOWLEDGE = `
-## TAGGING RULES
-Australian fashion uses a 7-layer tag formula:
-1. Brand: lowercase-hyphenated (seafolly, kulani-kinis, bond-eye)
-2. Type: bikini-top, bikini-bottom, one-piece, rash-guard, coverup, boardshort, dress, top, bottom
-3. Colour: primary colour lowercase (black, teal, coral, floral, stripe)
-4. Material/feature: underwire, dd-cup, upf-50, chlorine-resistant, tummy-control
-5. Season: spring-26, summer-26, winter-26
-6. Occasion: beach, resort, sport, bridal, festival
-7. Arriving: arriving-jan-2026 format
+══════════════════════════════════════
+SKILL 1 — 7-LAYER TAGGING SYSTEM
+══════════════════════════════════════
+Every product gets all applicable layers. Apply in order.
 
-## SEO COLLECTION FORMULA
-6-level URL hierarchy. 5-part description:
-1. Keyword-loaded opener (brand + type + location)
+LAYER 1 — GENDER (exactly one):
+- Womens → women's swimwear, clothing, accessories (capital W)
+- mens → men's products. Vendors: Rhythm Mens, Funky Trunks, Skwosh, Budgy Smuggler, Green Rock, Rusty, Dukies, Suen Noaj
+- kids → children's products. Type/vendor contains: Girls, Boys, Kids, 00-7, 8-16
+
+LAYER 2 — DEPARTMENT (1-2 that apply):
+- Swimwear + womens swim → women's swimwear (one pieces, bikinis, tankinis, rashies, boardshorts womens)
+- clothing + womens clothing → women's clothing (dresses, tops, pants, kaftans, jumpsuits)
+- accessories → hats, sunnies, jewellery, bags, towels, goggles, gifts
+- mens swim → men's swimwear
+- kids → all children's
+
+LAYER 3 — PRODUCT TYPE (exact casing — case matters):
+Women's Swimwear: One Pieces | Bikini Tops | bikini bottoms (lowercase) | Bikini Set | tankini tops | rashies & sunsuits | swimdress (use BOTH One Pieces + swimdress) | boardshorts | Boyleg | Blouson
+Women's Clothing: Dresses | tops + womens top (both) | kaftans & cover ups + cover ups (both) | Sarongs + sarong (both) | playsuits & jumpsuits | pants | skirts
+Men's: boardshorts + mens boardies (both) | mens swim | mens clothing
+Kids: Girls swimwear + girls 00-7 OR girls 8-16 | boys swim + boys 00-7 OR boys 8-16
+Accessories: hats | Sunnies + sunglasses (both) | BAGS + handbags (both) | towels | goggles
+Jewellery: JEWELLERY (all caps) + earrings OR necklace OR bracelet OR ring — NO Womens or accessories tags
+
+LAYER 4 — BRAND TAGS (exact casing):
+Seafolly → Seafolly ★ | Seafolly Girls → Seafolly Girls ★ | Baku → Baku ★ | Jantzen → jantzen | Sunseeker → Sunseeker ★ | Sea Level → sea level | Kulani Kinis → Kulani Kinis ★ | Bond Eye → bond eye | Artesands → artesands | Monte & Lou → Monte & Lou ★ | Rhythm Womens → rhythm women | Rhythm Mens → rhythm | Funkita → Funkita ★ | Funky Trunks → funky trunks | Reef → Thongs/ Shoes | Jets → Jets ★ | Tigerlily → Tigerlily ★ | Salty Ink Kids → salty ink | Salty Ink Ladies → Ladies Salty Ink ★ | Zoggs → zoggs | Speedo → speedo | Hammamas → hammamas | Walnut Melbourne → walnut melbourne
+Rule: if vendor not in table, use lowercase version of vendor name
+
+LAYER 5 — ARRIVAL MONTH (from invoice date, not today):
+Format: 3-letter month + 2-digit year. NO space. Examples: Jan26, Feb26, Mar26, Apr26, May26, Jun26, Jul26, Aug26, Sept26 (4 letters — NEVER Sep26), Oct26, Nov26, Dec26
+CRITICAL: September = Sept (4 letters). Most common tagging mistake.
+
+LAYER 6 — PRICE STATUS (conditional):
+- Compare-at price blank or 0 → ADD full_price (underscore, lowercase)
+- Compare-at price > current price (on sale) → OMIT full_price entirely
+
+LAYER 7 — SPECIAL PROPERTIES:
+- chlorine resistant / Xtralife → chlorine resist (lowercase). EXCEPTION: Funkita only → Chlorine Resistant (capital C and R)
+- underwire / balconette → underwire
+- plus size / extended sizing / sizes 18-26 → plus size
+- tummy control / shaping / powermesh → tummy control. Miracle Suit always gets tummy control.
+- D/E, E/F, F/G, G/H, DD cup or above → d-g
+- mastectomy / prosthesis pocket → mastectomy
+- UPF / sun protection → Sun Protection (capital S and P)
+- new arrival → new + new arrivals + new swim (swimwear) OR new clothing + new womens (clothing) OR new mens (mens)
+- period-proof → Period Swimwear (capital P and S)
+- multifit / A-DD → A-DD
+
+BRAND-SPECIFIC OVERRIDES:
+- Artesands: every product → plus size (automatic, even if not stated)
+- Jantzen (on invoice as "Skye Group Pty. Ltd") → vendor must be "Jantzen" not "Skye Group"
+- Reef: type = shoes/thongs → brand tag = Thongs/ Shoes (slash + space). Never swimwear.
+- Seafolly Girls: must use Seafolly Girls vendor and brand tag — NOT Seafolly
+- Rhythm: Rhythm Womens ≠ Rhythm Mens (different vendor, different tag)
+- Sea Level: style code ending in S = swimdress → One Pieces + swimdress both
+- Funkita ONLY: chlorine resistant = Chlorine Resistant (capital)
+
+COMPLETE TAG FORMULAS:
+Women's swimwear: Womens, Swimwear, womens swim, [TYPE], [BRAND], [MONTH], [full_price if applicable], [new tags if new], [special tags]
+Women's clothing: Womens, clothing, womens clothing, [TYPE], [BRAND], [MONTH], [full_price], [new tags if new]
+Men's boardshorts: mens, mens swim, boardshorts, mens boardies, [BRAND], [MONTH], [full_price]
+Girls swimwear: kids, Swimwear, Girls swimwear, [girls 00-7 OR girls 8-16], [BRAND], [MONTH], [full_price]
+Jewellery: JEWELLERY, [earrings OR necklace etc.], [BRAND], [MONTH], [full_price]
+
+══════════════════════════════════════
+SKILL 2 — INVOICE PROCESSING RULES
+══════════════════════════════════════
+INVOICE TYPES:
+A = standard table | B = pack notation (1x8, 2x10 → one row per size) | C = size matrix (each non-zero cell = one row) | D = free-form PDF (style number = anchor) | E = image/scan (OCR first)
+
+7 REQUIRED FIELDS per row: Product name | Style number/SKU | Colour | Size | Quantity | Cost ex GST | RRP incl GST
+
+STOCK CLASSIFICATION (every line):
+REFILL = barcode or style already in catalog → update inventory only
+NEW COLOUR = same style, new colourway → add as new variant
+NEW PRODUCT = style not found → create from scratch with full tagging
+Matching priority: barcode → style number → style name + vendor fuzzy match
+
+PRICING when RRP not on invoice:
+One pieces, bikini sets: cost ex GST × 2.3-2.5
+Bikini tops/bottoms: × 2.2-2.4
+Rashies/sunsuits: × 2.0-2.2
+Women's clothing: × 2.0-2.2
+Men's swimwear: × 2.0-2.3
+Kids swimwear: × 2.2-2.4
+Accessories/hats/footwear: × 2.0
+Rounding: nearest $0.95 or $5.00. Example: $42 × 2.3 = $96.60 → $99.95
+
+GST RULE: Shopify Cost per item = ex GST. Shopify Price = RRP incl GST. Never same number in both.
+Minimum margin: 50% on all categories.
+Margin formula: (RRP incl GST − Cost incl GST) ÷ RRP incl GST × 100. Cost incl GST = cost ex GST × 1.1
+
+BRAND INVOICE QUIRKS:
+- Jantzen: invoice says "Skye Group Pty. Ltd" — always map to vendor "Jantzen"
+- Seafolly: 6-digit numeric style numbers. Sizes AU 6-20. DD/E cup → d-g tag.
+- Baku: style = letters+digits, sometimes colour code suffix. Fuller-bust → d-g + underwire.
+- Ambra: scanned PDF, handwritten qty. Size matrix uses PAIRS (8/10 col = both 8 AND 10). Codes: BLAC=Black, ROBE=Rose Beige, NAVY=Navy, NUDE=Nude, WHIT=White.
+- Sea Level: invoice numbers start N000. Style ending S = swimdress.
+- Artesands: ALL products → plus size tag.
+- Sunseeker: chlorine-resistant range common.
+
+PACK NOTATION: 1x8, 2x10, 1x12 = size 8 qty 1, size 10 qty 2, size 12 qty 1 (one row per size)
+SIZE CONVERSION: US women's + 4 = AU (US6=AU10). EUR − 30 = AU (EUR40=AU10).
+
+══════════════════════════════════════
+SKILL 3 — SEO FORMULAS
+══════════════════════════════════════
+PRODUCT SEO TITLE: [Brand] [Style Name] [Product Type] - [Colour]
+Rules: max 65 chars. Brand first or second word. Append | Australia if under 52 chars.
+Good: "Seafolly Beach Bound DD Bandeau One Piece - Dark Chocolate" (58)
+
+META DESCRIPTION: [What it is] + [Key feature] + [Delivery CTA]
+Rules: 120-155 chars. Unique per product. End with benefit/soft CTA.
+Good: "Shop the Beach Bound DD Bandeau One Piece by Seafolly at Splash Swimwear. Dark Chocolate. Free delivery Australia-wide on orders over $150." (139)
+
+COLLECTION DESCRIPTION (5 parts):
+1. Keyword-loaded opener: location + brand + type in first sentence
 2. Materials and features paragraph
 3. Brand names mentioned explicitly
-4. FAQ section (4-6 questions targeting People Also Ask)
-5. Internal links to sibling collections
-Meta description: 150-160 chars, location + brand + type formula.
-SEO title: 30-60 chars. Body must include opening, features, styling, local, cta blocks.
+4. FAQ section: 4-6 questions targeting Google People Also Ask
+5. Internal links to 3-5 sibling collections
+Length: 200-350 words.
 
-## DARWIN RETAIL CONTEXT
-Two seasons: wet (Nov-Apr), dry (May-Oct). Key events: Darwin Cup (Aug),
-Dry Season fashion peak (Jun-Sep), Christmas (Dec), EOFY (Jun), Back to school (Jan-Feb).
-Major AU swimwear brands: Seafolly, Kulani Kinis, Baku, Bond Eye, Jantzen, Sea Level.
-Reference competitors: THE ICONIC, Mathers, David Jones.
+SEO SCORE (0-100): Title=15, Meta 150-160=20, Body 200+ words=25, FAQ 4+=20, Links 3+=10, Products=10. <70 needs attention. >90 complete.
 
-## PRICING KNOWLEDGE
-AU swimwear retail markup: 2.2-2.5x wholesale. Bikini tops $120-$220 RRP.
-One pieces $180-$280. Footwear 2.0-2.3x. Dresses 2.3-2.8x.
+COLLECTION URL HIERARCHY:
+L1 /collections/[brand] | L2 /collections/[brand]-[type] | L3 /collections/[colour]-[type] | L4 /collections/[feature]-[type] | L5 /collections/[occasion]-[type]
 
-## THREE-PATTERN AI DOCTRINE (internal)
-Classify every AI feature as LLM_CALL (one-shot), AUTOMATION_FLOW (cron/rule, no LLM hot path),
-or AI_AGENT (tool-using loop). Never use an Agent for what an automation can do.
+DESCRIPTION TEMPLATES:
+One piece: "Shop the [style] by [brand] at [store]. [colour]. Free delivery Australia-wide on orders over $150."
+Bikini top: "The [style] bikini top by [brand]. Available in [colour]. Shop at [store] — free AU delivery over $150."
+Bikini bottom: "The [style] bikini bottom by [brand]. In [colour]. Mix & match at [store] — free AU delivery over $150."
+Clothing: "The [style] by [brand]. Shop women's fashion at [store]. Free delivery Australia-wide on orders over $150."
+
+AUSTRALIAN SEO RULES:
+- AU English: colour not color, swimwear not swimsuit, free delivery not free shipping
+- Geo-modifier: "Darwin", "Darwin NT", "Australia" in titles/descriptions
+- AI search: answer-format FAQ to rank in ChatGPT, Perplexity, Google AI Mode
+
+══════════════════════════════════════
+SKILL 4 — DARWIN RETAIL CALENDAR
+══════════════════════════════════════
+Two seasons, not four:
+- Wet: Nov-Apr (humid, cyclone risk, lighter swimwear/resort)
+- Dry: May-Oct (peak tourist season, best retail months)
+
+KEY EVENTS:
+Jan: Back to school — kids/school swimwear push
+Mar-Apr: End of wet season clearance — markdown summer stock
+May: Dry season starts — resort wear, travel
+Jun: EOFY sales. Dry season peak begins.
+Jul-Aug: PEAK retail. Tourist influx. Darwin Cup (Aug) — racing fashion, hats, formal wear
+Sept: Cup hangover. Spring collections arriving.
+Oct: Pre-Christmas stock arriving. Swimwear for gifting.
+Nov-Dec: Christmas. Wet season starts. Summer swimwear peak.
+Dec 26: Boxing Day clearance.
+
+DARWIN CUP (Aug): biggest single retail event. Fascinators, hats, dresses, formal wear. Stock up Jun-Jul. Hats/sunnies are impulse buys.
+
+COMPETITOR REFERENCES: THE ICONIC (swimwear), Mathers (footwear), David Jones (premium), White Fox (clothing/occasion).
+
+WHOLESALE INVOICING CALENDAR:
+Jan-Feb: spring/summer pre-orders arrive (Seafolly, Baku)
+Mar-Apr: JOOR/NuOrder bulk for mid-year delivery
+Jun-Jul: spring/summer arrives — major invoice processing
+Aug-Sept: new launches at trade shows, forward orders
+Oct-Nov: Christmas/summer arrives
+
+══════════════════════════════════════
+SKILL 5 — PRICING & MARGIN BENCHMARKS
+══════════════════════════════════════
+SWIMWEAR RRP (AU incl GST):
+Bikini tops: $120-$220 (budget $89-$119, premium $220-$299)
+Bikini bottoms: $90-$160
+Bikini sets: $180-$320
+One pieces: $180-$280 (Jets premium $229-$329)
+Rashies/sunsuits: $79-$149
+Kids: $49-$89
+
+FOOTWEAR RRP: Sandals/thongs $80-$160 | Sneakers $120-$220 | Boots $180-$380 | Dress $150-$280
+CLOTHING RRP: Dresses $89-$199 (maxi $149-$249) | Tops $59-$129 | Kaftans $79-$169
+
+MARKUP:
+One pieces, bikini sets: 2.3-2.5× (56-60% margin)
+Bikini tops/bottoms: 2.2-2.4× (55-58%)
+Clothing: 2.0-2.2× (50-55%)
+Footwear: 2.0-2.3× (50-57%)
+Accessories: 2.0× (50%)
+Minimum: 50% across all categories
+
+PRICE SANITY CHECKS:
+- One piece under $100 → likely wholesale not RRP (esp. Jets, Seafolly premium)
+- Cost = RRP → GST error (cost should be ex GST, price incl GST)
+- Margin <40% → flag (wrong cost, RRP, or markup)
+
+══════════════════════════════════════
+INTERNAL DOCTRINE
+══════════════════════════════════════
+Three-pattern AI: classify every feature as LLM_CALL (one-shot), AUTOMATION_FLOW (cron/rule, no LLM hot path), or AI_AGENT (tool-using loop). Never use an Agent for what an automation can do.
 `.trim();
 
 interface ChatMessage { role: "user" | "assistant"; content: string }

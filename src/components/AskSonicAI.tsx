@@ -1,7 +1,7 @@
 // AskSonicAI — floating expert chat panel (Claude-powered Q&A about the user's store).
 // Separate from SonicChat (which is an action-routing intent classifier).
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Send, X, Loader2 } from "lucide-react";
+import { Sparkles, Send, X, Loader2, Sparkle } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -142,6 +142,9 @@ export default function AskSonicAI() {
               <div className="text-sm font-semibold leading-tight">Ask Sonic AI</div>
               <div className="text-[11px] text-muted-foreground">Knows your store, brands & inventory</div>
             </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-purple-400" onClick={() => window.dispatchEvent(new CustomEvent("sonic:open-claude"))} aria-label="Switch to Claude" title="Switch to Claude Custom App">
+              <Sparkle className="w-4 h-4" />
+            </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)} aria-label="Close">
               <X className="w-4 h-4" />
             </Button>
@@ -165,6 +168,18 @@ export default function AskSonicAI() {
                     </button>
                   ))}
                 </div>
+
+                {/* Claude switch CTA */}
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent("sonic:open-claude"))}
+                  className="flex items-center gap-2 w-full text-left text-xs px-3 py-2.5 rounded-lg border border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 transition-colors"
+                >
+                  <Sparkle className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <div>
+                    <span className="font-medium text-foreground">Need deeper store insights?</span>
+                    <span className="block text-muted-foreground">Open Claude Custom App for store-level analysis</span>
+                  </div>
+                </button>
               </div>
             )}
 

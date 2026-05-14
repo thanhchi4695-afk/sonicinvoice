@@ -33,6 +33,7 @@ export default function ScanCollectionsCard() {
   const navigate = useNavigate();
   const [lastScan, setLastScan] = useState<LastScan | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [geoReadyCount, setGeoReadyCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
 
@@ -41,7 +42,7 @@ export default function ScanCollectionsCard() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const [scanRes, sugRes] = await Promise.all([
+      const [scanRes, sugRes, geoRes] = await Promise.all([
         supabase.from("collection_scans")
           .select("id, triggered_by, products_scanned, suggestions_created, archive_candidates, completed_at, started_at")
           .eq("user_id", user.id)
@@ -52,9 +53,14 @@ export default function ScanCollectionsCard() {
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id)
           .eq("status", "pending"),
+        supabase.from("collection_suggestions")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("geo_ready", true),
       ]);
       setLastScan((scanRes.data as unknown as LastScan | null) ?? null);
       setPendingCount(sugRes.count ?? 0);
+      setGeoReadyCount(geoRes.count ?? 0);
     } finally {
       setLoading(false);
     }
@@ -91,6 +97,9 @@ export default function ScanCollectionsCard() {
               <h3 className="text-sm font-semibold text-foreground">Scan for new collections</h3>
               {pendingCount > 0 && (
                 <Badge variant="secondary" className="text-[10px] h-5">{pendingCount} pending</Badge>
+              )}
+              {geoReadyCount > 0 && (
+                <Badge className="text-[10px] h-5 bg-violet-500/15 text-violet-300 border border-violet-500/30">{geoReadyCount} GEO ready</Badge>
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">

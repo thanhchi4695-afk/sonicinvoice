@@ -4,13 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Wrench, ArrowLeft, RefreshCw, Search } from "lucide-react";
+import { Loader2, Sparkles, Wrench, ArrowLeft, RefreshCw, Search, Bot } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import RequireAuth from "@/components/RequireAuth";
 import { SeoScoreBadge } from "@/components/SeoScoreBadge";
 import { actionKind, gapCount, ringClasses } from "@/lib/seo-score";
 import { cn } from "@/lib/utils";
+import CollectionGeoDialog from "@/components/CollectionGeoDialog";
 
 interface Row {
   id: string;
@@ -21,6 +22,8 @@ interface Row {
   collection_type: string;
   completeness_score: number | null;
   completeness_breakdown: unknown;
+  geo_ready: boolean | null;
+  geo_status: "draft" | "approved" | "published" | null;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -53,17 +56,22 @@ function SonicRankInner() {
   const [generating, setGenerating] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [query, setQuery] = useState("");
+  const [geoDialogId, setGeoDialogId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
     const { data, error } = await supabase
       .from("collection_suggestions")
-      .select("id, suggested_title, shopify_handle, status, product_count, collection_type, completeness_score, completeness_breakdown")
+      .select("id, suggested_title, shopify_handle, status, product_count, collection_type, completeness_score, completeness_breakdown, geo_ready, collection_geo_blocks(status)")
       .neq("status", "rejected")
       .order("completeness_score", { ascending: true })
       .limit(500);
     if (error) toast.error(error.message);
-    setRows((data ?? []) as Row[]);
+    const mapped = (data ?? []).map((r: any) => ({
+      ...r,
+      geo_status: r.collection_geo_blocks?.[0]?.status ?? null,
+    })) as Row[];
+    setRows(mapped);
     setLoading(false);
   }
 
@@ -190,24 +198,38 @@ function SonicRankInner() {
                     </div>
                   </div>
                   <SeoScoreBadge score={score} breakdown={r.completeness_breakdown} size="sm" showHint={false} />
-                  <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <Badge className={`${status.cls} border`}>{status.label}</Badge>
+                    {r.geo_ready && (
+                      <Badge className="bg-violet-500/15 text-violet-300 border border-violet-500/30 text-[10px]">
+                        <Bot className="w-2.5 h-2.5 mr-0.5" /> GEO ready
+                      </Badge>
+                    )}
+                    {!r.geo_ready && r.geo_status === "draft" && (
+                      <Badge className="bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px]">GEO pending</Badge>
+                    )}
+                    {!r.geo_ready && r.geo_status === "approved" && (
+                      <Badge className="bg-sky-500/15 text-sky-300 border border-sky-500/30 text-[10px]">GEO approved</Badge>
+                    )}
                   </div>
-                  <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {kind === "generate" && (
-                      <Button size="sm" variant="secondary" onClick={() => generate(r.id)} disabled={isGenerating} className="w-full md:w-auto">
+                      <Button size="sm" variant="secondary" onClick={() => generate(r.id)} disabled={isGenerating} className="flex-1 md:flex-none">
                         {isGenerating ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Sparkles className="mr-2 h-3 w-3" />}
                         Generate SEO
                       </Button>
                     )}
                     {kind === "fix" && (
-                      <Button size="sm" variant="outline" onClick={() => navigate("/collections")} className="w-full md:w-auto">
-                        <Wrench className="mr-2 h-3 w-3" /> Fix {gaps} gap{gaps === 1 ? "" : "s"}
+                      <Button size="sm" variant="outline" onClick={() => navigate("/collections")} className="flex-1 md:flex-none">
+                        <Wrench className="mr-2 h-3 w-3" /> Fix {gaps}
                       </Button>
                     )}
-                    {kind === "complete" && (
+                    {kind === "complete" && !r.geo_status && (
                       <span className="text-xs text-muted-foreground">Complete</span>
                     )}
+                    <Button size="sm" variant="ghost" onClick={() => setGeoDialogId(r.id)} title="Open GEO panel">
+                      <Bot className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
               );
@@ -215,6 +237,13 @@ function SonicRankInner() {
           </CardContent>
         </Card>
       )}
+
+      <CollectionGeoDialog
+        suggestionId={geoDialogId}
+        open={!!geoDialogId}
+        onClose={() => setGeoDialogId(null)}
+        onChanged={load}
+      />
     </div>
   );
 }

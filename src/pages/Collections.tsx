@@ -274,12 +274,17 @@ function CollectionsInner() {
         </TabsContent>
 
         <TabsContent value="suggestions" className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {TYPE_FILTERS.map((f) => (
-              <Button key={f.id} size="sm" variant={filter === f.id ? "default" : "outline"} onClick={() => setFilter(f.id)}>
-                {f.label}
-              </Button>
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              {TYPE_FILTERS.map((f) => (
+                <Button key={f.id} size="sm" variant={filter === f.id ? "default" : "outline"} onClick={() => setFilter(f.id)}>
+                  {f.label}
+                </Button>
+              ))}
+            </div>
+            <Button size="sm" variant={sortBySeo ? "default" : "outline"} onClick={() => setSortBySeo((v) => !v)}>
+              {sortBySeo ? "✓ Sorted by SEO score" : "Sort by SEO score"}
+            </Button>
           </div>
 
           {loading ? (

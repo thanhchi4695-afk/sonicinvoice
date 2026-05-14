@@ -1491,6 +1491,59 @@ export type Database = {
           },
         ]
       }
+      collection_geo_blocks: {
+        Row: {
+          best_for_summary: string | null
+          care_instructions: Json | null
+          collection_suggestion_id: string
+          comparison_snippet: Json | null
+          created_at: string
+          id: string
+          refreshed_at: string
+          scenario_questions: Json
+          status: string
+          updated_at: string
+          user_id: string
+          validation_errors: Json | null
+        }
+        Insert: {
+          best_for_summary?: string | null
+          care_instructions?: Json | null
+          collection_suggestion_id: string
+          comparison_snippet?: Json | null
+          created_at?: string
+          id?: string
+          refreshed_at?: string
+          scenario_questions?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+          validation_errors?: Json | null
+        }
+        Update: {
+          best_for_summary?: string | null
+          care_instructions?: Json | null
+          collection_suggestion_id?: string
+          comparison_snippet?: Json | null
+          created_at?: string
+          id?: string
+          refreshed_at?: string
+          scenario_questions?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+          validation_errors?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_geo_blocks_collection_suggestion_id_fkey"
+            columns: ["collection_suggestion_id"]
+            isOneToOne: true
+            referencedRelation: "collection_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_link_mesh: {
         Row: {
           anchor_text: string
@@ -1736,6 +1789,7 @@ export type Database = {
           created_at: string
           description_html: string | null
           error_message: string | null
+          geo_ready: boolean
           id: string
           occasion_filter: string | null
           parent_collection_id: string | null
@@ -1769,6 +1823,7 @@ export type Database = {
           created_at?: string
           description_html?: string | null
           error_message?: string | null
+          geo_ready?: boolean
           id?: string
           occasion_filter?: string | null
           parent_collection_id?: string | null
@@ -1802,6 +1857,7 @@ export type Database = {
           created_at?: string
           description_html?: string | null
           error_message?: string | null
+          geo_ready?: boolean
           id?: string
           occasion_filter?: string | null
           parent_collection_id?: string | null

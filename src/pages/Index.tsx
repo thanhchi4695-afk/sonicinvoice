@@ -686,6 +686,8 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           <div className="px-4 pb-6">
             <SeoHealthWidget />
           </div>
+        </>
+      )}
       {activeTab === "ai_agents" && (
         <Suspense fallback={suspenseFallback}>
           <AIAgentsLanding

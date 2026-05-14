@@ -440,25 +440,52 @@ async function fetchImap(admin: any, found: any, att: any) {
   const uid = Number(uidStr);
   if (!Number.isFinite(uid) || !part) throw new Error("invalid imap attachment_id");
 
-  const client = new ImapFlow({
-    host: conn.imap_host, port: conn.imap_port, secure: !!conn.imap_tls,
-    auth: { user: conn.imap_username, pass: password }, logger: false, socketTimeout: 30000,
-  });
-  await client.connect();
-  try {
-    const lock = await client.getMailboxLock("INBOX");
+  // Retry with backoff for flaky IMAP servers (VentraIP drops sockets mid-fetch)
+  const MAX_ATTEMPTS = 3;
+  const BACKOFF_MS = [2000, 8000, 30000];
+  let lastErr: unknown = null;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const client = new ImapFlow({
+      host: conn.imap_host,
+      port: conn.imap_port,
+      secure: !!conn.imap_tls,
+      auth: { user: conn.imap_username, pass: password },
+      logger: false,
+      socketTimeout: 60000, // bumped from 30s — VentraIP is slow
+    });
+
     try {
-      const dl = await client.download(uid, part, { uid: true });
-      if (!dl?.content) throw new Error("imap download empty");
-      const chunks: Uint8Array[] = [];
-      for await (const c of dl.content as AsyncIterable<Uint8Array>) chunks.push(c);
-      const total = chunks.reduce((s, c) => s + c.byteLength, 0);
-      const out = new Uint8Array(total);
-      let off = 0;
-      for (const c of chunks) { out.set(c, off); off += c.byteLength; }
-      return { bytes: out, emailAccount: conn.email_address ?? null };
-    } finally { lock.release(); }
-  } finally { try { await client.logout(); } catch { /* */ } }
+      await client.connect();
+      try {
+        const lock = await client.getMailboxLock("INBOX");
+        try {
+          const dl = await client.download(uid, part, { uid: true });
+          if (!dl?.content) throw new Error("imap download empty");
+          const chunks: Uint8Array[] = [];
+          for await (const c of dl.content as AsyncIterable<Uint8Array>) chunks.push(c);
+          const total = chunks.reduce((s, c) => s + c.byteLength, 0);
+          // Skip oversize attachments (>10MB) — VentraIP can't stream them reliably
+          if (total > 10 * 1024 * 1024) {
+            throw new Error(`attachment too large (${(total / 1024 / 1024).toFixed(1)}MB) — skip`);
+          }
+          const out = new Uint8Array(total);
+          let off = 0;
+          for (const c of chunks) { out.set(c, off); off += c.byteLength; }
+          return { bytes: out, emailAccount: conn.email_address ?? null };
+        } finally { lock.release(); }
+      } finally { try { await client.logout(); } catch { /* */ } }
+    } catch (err) {
+      lastErr = err;
+      const msg = String((err as Error)?.message ?? err);
+      const retriable = /Unexpected close|ECONNRESET|ETIMEDOUT|socket|timed? ?out|Failed to established/i.test(msg);
+      const isLast = attempt === MAX_ATTEMPTS - 1;
+      console.log(`[fetchImap] attempt ${attempt + 1}/${MAX_ATTEMPTS} failed (${conn.imap_host}): ${msg}${retriable && !isLast ? ` — retrying in ${BACKOFF_MS[attempt]}ms` : ""}`);
+      if (!retriable || isLast) throw err;
+      await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt]));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 // ─────────────────────────── AI call ───────────────────────────

@@ -4,13 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, Wrench, ArrowLeft, RefreshCw, Search } from "lucide-react";
+import { Loader2, Sparkles, Wrench, ArrowLeft, RefreshCw, Search, Bot } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import RequireAuth from "@/components/RequireAuth";
 import { SeoScoreBadge } from "@/components/SeoScoreBadge";
 import { actionKind, gapCount, ringClasses } from "@/lib/seo-score";
 import { cn } from "@/lib/utils";
+import CollectionGeoDialog from "@/components/CollectionGeoDialog";
 
 interface Row {
   id: string;
@@ -21,6 +22,8 @@ interface Row {
   collection_type: string;
   completeness_score: number | null;
   completeness_breakdown: unknown;
+  geo_ready: boolean | null;
+  geo_status: "draft" | "approved" | "published" | null;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {

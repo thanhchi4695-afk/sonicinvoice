@@ -97,6 +97,7 @@ const groups: BottomGroup[] = [
       { id: "ai_agents", label: "AI Agents", icon: Bot, type: "tab" },
       { id: "margin_guardian", label: "Margin Guardian", icon: Shield, type: "route", href: "/rules" },
       { id: "howto", label: "How To", icon: BookOpen, type: "tab" },
+      { id: "claude_connector", label: "Claude Custom App", icon: Sparkle, type: "route", href: "/settings/claude-connector" },
       { id: "billing", label: "Billing", icon: CreditCard, type: "tab" },
     ],
   },

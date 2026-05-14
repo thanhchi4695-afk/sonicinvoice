@@ -56,18 +56,29 @@ async function sha256Hex(s: string): Promise<string> {
     .join("");
 }
 
+async function extractToken(req: Request): Promise<string | null> {
+  const authHeader = req.headers.get("authorization") || "";
+  const m = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (m) return m[1].trim();
+
+  const url = new URL(req.url);
+  const queryToken = url.searchParams.get("token");
+  if (queryToken) return queryToken.trim();
+
+  return null;
+}
+
 async function resolveAuth(req: Request): Promise<AuthCtx | null> {
-  const auth = req.headers.get("authorization") || "";
-  const m = auth.match(/^Bearer\s+(.+)$/i);
-  if (!m) return null;
-  const hash = await sha256Hex(m[1].trim());
+  const rawToken = await extractToken(req);
+  if (!rawToken) return null;
+  const hash = await sha256Hex(rawToken);
   const { data, error } = await admin.rpc("verify_sonic_mcp_token", {
     _token_hash: hash,
   });
   if (error || !data || (Array.isArray(data) && data.length === 0)) return null;
   const row = Array.isArray(data) ? data[0] : data;
   if (!row?.user_id) return null;
-  admin.rpc("touch_sonic_mcp_token", { _token_hash: hash }).then(() => {});
+  admin.rpc("touch_sonic_mcp_token", { _token_hash: hash }).catch(() => {});
   return {
     userId: row.user_id as string,
     tokenId: (row.token_id as string) ?? null,
@@ -247,10 +258,9 @@ app.all("*", async (c) => {
       { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
-  const authHeader = c.req.raw.headers.get("authorization") || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "");
+  const rawToken = await extractToken(c.req.raw);
   const res = await handleMcp(c.req.raw, {
-    authInfo: { token, scopes: [], extra: { auth } },
+    authInfo: { token: rawToken ?? "", scopes: [], extra: { auth } },
   });
   const headers = new Headers(res.headers);
   for (const [k, v] of Object.entries(corsHeaders)) headers.set(k, v);

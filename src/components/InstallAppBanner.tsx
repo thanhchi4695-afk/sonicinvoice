@@ -48,14 +48,16 @@ export default function InstallAppBanner() {
   return (
     <div className="fixed bottom-20 inset-x-0 z-50 flex justify-center px-3 pb-2 pointer-events-none">
       <div className="pointer-events-auto w-full max-w-md rounded-xl border bg-card shadow-lg p-3 flex items-center gap-2">
-        {deferredPrompt ? (
-          <>
-            <Download className="h-5 w-5 shrink-0 text-primary" />
-            <p className="text-sm flex-1">Install Sonic Invoices for quick access.</p>
-            <Button size="sm" onClick={install}>Install</Button>
-          </>
-        ) : (
-          <>
+        <Download className="h-5 w-5 shrink-0 text-primary" />
+        <p className="text-sm flex-1">Install Sonic Invoices for quick access.</p>
+        <Button size="sm" onClick={install}>Install</Button>
+        <button onClick={dismiss} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label="Dismiss">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
             {/* iOS / no-install path: nothing extra here — Claude & Ask Sonic
                 are now their own dedicated floating buttons. */}
           </>

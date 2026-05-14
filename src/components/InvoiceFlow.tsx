@@ -1099,7 +1099,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   useEffect(() => {
     if (!showCompletionSummary || askClaudeShownRef.current) return;
     askClaudeShownRef.current = true;
-    const tagged = enrichLines.length || total || 0;
+    const tagged = enrichLines.length || 0;
     if (tagged === 0) return;
     toast(`Ask Claude about these results — ${tagged} ${tagged === 1 ? "product" : "products"} tagged`, {
       duration: 8000,

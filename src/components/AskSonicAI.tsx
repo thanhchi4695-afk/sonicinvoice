@@ -80,7 +80,7 @@ export default function AskSonicAI() {
         <button
           onClick={() => setOpen(true)}
           className={cn(
-            "fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full",
+            "fixed right-4 bottom-24 lg:right-6 lg:bottom-6 z-[60] flex items-center gap-2 rounded-full",
             "bg-primary text-primary-foreground px-4 py-3 shadow-lg",
             "hover:scale-105 transition-transform"
           )}
@@ -93,7 +93,7 @@ export default function AskSonicAI() {
 
       {/* Panel */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-40 w-[380px] h-[560px] flex flex-col rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
+        <div className="fixed inset-x-2 bottom-20 top-16 lg:inset-auto lg:bottom-6 lg:right-6 lg:top-auto lg:w-[380px] lg:h-[560px] z-[60] flex flex-col rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
           {/* Header */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-primary/5">
             <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">

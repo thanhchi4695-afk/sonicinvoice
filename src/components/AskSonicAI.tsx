@@ -126,7 +126,6 @@ export default function AskSonicAI() {
             <div className="absolute -bottom-1.5 right-6 lg:right-8 w-3 h-3 bg-card border-r border-b border-border rotate-45" />
           </div>
         )}
-      )}
 
       {/* Panel */}
       {open && (

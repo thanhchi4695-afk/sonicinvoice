@@ -154,7 +154,8 @@ export default function GapsTab({ onPendingCountChange }: GapsTabProps) {
         .single();
       if (sErr) throw sErr;
 
-      await supabase.functions.invoke("collection-content-generator", { body: { suggestion_id: sugg.id } });
+      // Re-routed from collection-content-generator to seo-collection-engine (canonical).
+      await supabase.functions.invoke("seo-collection-engine", { body: { suggestion_id: sugg.id } });
       const { data: pub, error: pErr } = await supabase.functions.invoke("collection-publish", { body: { suggestion_id: sugg.id } });
       if (pErr) throw pErr;
 

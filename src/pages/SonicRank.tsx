@@ -198,24 +198,38 @@ function SonicRankInner() {
                     </div>
                   </div>
                   <SeoScoreBadge score={score} breakdown={r.completeness_breakdown} size="sm" showHint={false} />
-                  <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <Badge className={`${status.cls} border`}>{status.label}</Badge>
+                    {r.geo_ready && (
+                      <Badge className="bg-violet-500/15 text-violet-300 border border-violet-500/30 text-[10px]">
+                        <Bot className="w-2.5 h-2.5 mr-0.5" /> GEO ready
+                      </Badge>
+                    )}
+                    {!r.geo_ready && r.geo_status === "draft" && (
+                      <Badge className="bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px]">GEO pending</Badge>
+                    )}
+                    {!r.geo_ready && r.geo_status === "approved" && (
+                      <Badge className="bg-sky-500/15 text-sky-300 border border-sky-500/30 text-[10px]">GEO approved</Badge>
+                    )}
                   </div>
-                  <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     {kind === "generate" && (
-                      <Button size="sm" variant="secondary" onClick={() => generate(r.id)} disabled={isGenerating} className="w-full md:w-auto">
+                      <Button size="sm" variant="secondary" onClick={() => generate(r.id)} disabled={isGenerating} className="flex-1 md:flex-none">
                         {isGenerating ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Sparkles className="mr-2 h-3 w-3" />}
                         Generate SEO
                       </Button>
                     )}
                     {kind === "fix" && (
-                      <Button size="sm" variant="outline" onClick={() => navigate("/collections")} className="w-full md:w-auto">
-                        <Wrench className="mr-2 h-3 w-3" /> Fix {gaps} gap{gaps === 1 ? "" : "s"}
+                      <Button size="sm" variant="outline" onClick={() => navigate("/collections")} className="flex-1 md:flex-none">
+                        <Wrench className="mr-2 h-3 w-3" /> Fix {gaps}
                       </Button>
                     )}
-                    {kind === "complete" && (
+                    {kind === "complete" && !r.geo_status && (
                       <span className="text-xs text-muted-foreground">Complete</span>
                     )}
+                    <Button size="sm" variant="ghost" onClick={() => setGeoDialogId(r.id)} title="Open GEO panel">
+                      <Bot className="h-3 w-3" />
+                    </Button>
                   </div>
                 </div>
               );
@@ -223,6 +237,13 @@ function SonicRankInner() {
           </CardContent>
         </Card>
       )}
+
+      <CollectionGeoDialog
+        suggestionId={geoDialogId}
+        open={!!geoDialogId}
+        onClose={() => setGeoDialogId(null)}
+        onChanged={load}
+      />
     </div>
   );
 }

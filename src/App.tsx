@@ -10,6 +10,7 @@ import InstallAppBanner from "@/components/InstallAppBanner";
 import StockyAnnouncementBar from "@/components/StockyAnnouncementBar";
 import BarcodeProvider from "@/components/BarcodeProvider";
 import SonicChat from "@/components/SonicChat";
+import AskSonicAI from "@/components/AskSonicAI";
 import { ConfirmDialogProvider } from "@/hooks/use-confirm-dialog";
 import { PromptDialogProvider } from "@/hooks/use-prompt-dialog";
 import Index from "./pages/Index.tsx";

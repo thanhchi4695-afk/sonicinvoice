@@ -17,6 +17,8 @@ import {
 } from "../_shared/seo-validators.ts";
 import { getValidShopifyToken } from "../_shared/shopify-token.ts";
 import { generateGeoBlock } from "../_shared/geo-blocks.ts";
+import { generateAndPersistBlogs } from "../_shared/blog-templates.ts";
+import { persistSmartRules } from "../_shared/smart-rules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -586,6 +588,39 @@ Deno.serve(async (req) => {
       }, { onConflict: "suggestion_id" });
     if (upErr) return json({ error: upErr.message }, 500);
 
+    // ── Smart collection rules (ported from collection-content-generator) ──
+    // Mirror parsed.smart_rules_json onto collection_suggestions so
+    // collection-publish (reads s.rule_set) and legacy UI (reads
+    // s.smart_collection_rules) both have the rules.
+    let smartRulesResult: any = { persisted: false };
+    try {
+      smartRulesResult = await persistSmartRules(supabase, suggestion.id, parsed.smart_rules_json);
+    } catch (e) {
+      console.warn("persistSmartRules failed (non-fatal)", e);
+      smartRulesResult = { persisted: false, error: e instanceof Error ? e.message : String(e) };
+    }
+
+    // ── Blog drafts (ported from collection-content-generator) ──
+    // Generate fully-rendered blog HTML based on BLOG_TEMPLATE per collection_type
+    // and write to collection_blogs (consumed by Collections page).
+    let blogResult: any = { generated: 0 };
+    try {
+      blogResult = await generateAndPersistBlogs({
+        supabase,
+        suggestionId: suggestion.id,
+        userId: suggestion.user_id,
+        collectionType: (suggestion as any).collection_type,
+        collectionTitle: (suggestion as any).suggested_title,
+        sampleTitles: Array.isArray((suggestion as any).sample_titles) ? (suggestion as any).sample_titles : [],
+        storeName,
+        brandName: brand?.brand_name ?? null,
+        brandTone: brand?.brand_tone ?? null,
+      });
+    } catch (e) {
+      console.warn("generateAndPersistBlogs failed (non-fatal)", e);
+      blogResult = { generated: 0, error: e instanceof Error ? e.message : String(e) };
+    }
+
     // Persist blog plans (still useful)
     if (Array.isArray(parsed.blog_plans) && parsed.blog_plans.length > 0) {
       const rows = parsed.blog_plans.slice(0, 6).map((b: any, idx: number) => ({
@@ -684,6 +719,8 @@ Deno.serve(async (req) => {
       validation_errors: lastIssues,
       shopify_push: push,
       geo: geoResult,
+      smart_rules: smartRulesResult,
+      blogs: blogResult,
     });
   } catch (e) {
     console.error("seo-collection-engine error", e);

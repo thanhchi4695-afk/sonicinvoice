@@ -665,6 +665,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     <>
       {(activeTab === "home" || activeTab === "start") && (
         <>
+          <ClaudeConnectBanner />
           <InputSelector
             onSelect={(kind) => {
               if (kind === "pdf" || kind === "excel") setActiveFlow("invoice");

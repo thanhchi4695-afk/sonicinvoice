@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, ChevronRight, Loader2, Activity } from "lucide-react";
+import { ShieldAlert, ChevronRight, Loader2, Activity, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ export default function SeoHealthAlertsCard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [counts, setCounts] = useState<Counts>({ high: 0, medium: 0, low: 0, total: 0, lastScan: null });
 
   const load = async () => {
@@ -41,6 +43,17 @@ export default function SeoHealthAlertsCard() {
     } finally { setScanning(false); }
   };
 
+  const runQuarterlyRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const { error } = await supabase.functions.invoke("seo-quarterly-refresh", { body: { source: "manual" } });
+      if (error) throw error;
+      toast.success("Quarterly refresh started — collections will re-generate in the background");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Quarterly refresh failed");
+    } finally { setRefreshing(false); }
+  };
+
   if (loading) {
     return (
       <Card><CardContent className="py-6 flex items-center justify-center text-muted-foreground text-sm">
@@ -67,6 +80,10 @@ export default function SeoHealthAlertsCard() {
           <Button size="sm" variant="ghost" onClick={runScan} disabled={scanning} className="text-xs">
             {scanning ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Activity className="h-3 w-3 mr-1" />}
             Run scan
+          </Button>
+          <Button size="sm" variant="ghost" onClick={runQuarterlyRefresh} disabled={refreshing} className="text-xs" title="Re-generate all collections — runs automatically every 3 months">
+            {refreshing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+            Quarterly refresh
           </Button>
         </div>
 

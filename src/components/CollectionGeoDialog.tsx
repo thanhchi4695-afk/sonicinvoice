@@ -84,7 +84,7 @@ export default function CollectionGeoDialog({ suggestionId, open, onClose, onCha
     if (!block) return;
     const { error } = await supabase
       .from("collection_geo_blocks")
-      .update(patch)
+      .update(patch as any)
       .eq("id", block.id);
     if (error) toast.error(error.message);
     else { setBlock({ ...block, ...patch } as GeoBlock); }

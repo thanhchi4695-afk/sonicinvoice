@@ -841,6 +841,7 @@ let rafId
 window.addEventListener('load',()=>{
   resize();updateDots();clearBG();FNS[0](0)
   showPanel(0)
+  playing=true;document.getElementById('playbtn').classList.add('hidden')
   requestAnimationFrame(render)
 })
 window.addEventListener('resize',()=>{resize();ctx.clearRect(0,0,W,H);clearBG()})

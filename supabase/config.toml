@@ -69,4 +69,7 @@ verify_jwt = false
 [functions.silent-training-dispatcher]
 verify_jwt = false
 
+[functions.sonic-mcp]
+verify_jwt = false
+
 

@@ -1015,7 +1015,7 @@ function togglePlay(){
   }
 }
 
-window.addEventListener('load',()=>{resize();uiSync();bg();FNS[0](0);requestAnimationFrame(render)})
+window.addEventListener('load',()=>{resize();uiSync();bg();FNS[0](0);playing=true;document.getElementById('play').classList.add('h');requestAnimationFrame(render)})
 window.addEventListener('resize',()=>{resize();ctx.clearRect(0,0,Q,Q);bg()})
 </script>
 </body>

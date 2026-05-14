@@ -12,6 +12,7 @@ import { Wrench } from "lucide-react";
 // ── Eagerly loaded (critical path) ──
 import HomeWizard from "@/components/HomeWizard";
 import PhaseFlowHome from "@/components/PhaseFlowHome";
+import { ClaudeConnectBanner } from "@/components/ClaudeConnectPrompts";
 import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
 import StockyLayout from "@/components/StockyLayout";

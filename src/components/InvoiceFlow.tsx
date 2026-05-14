@@ -1095,6 +1095,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
   const [showSpeedTips, setShowSpeedTips] = useState(false);
   const [processingCancelled, setProcessingCancelled] = useState(false);
   const [showCompletionSummary, setShowCompletionSummary] = useState(false);
+  const askClaudeShownRef = useRef(false);
+  useEffect(() => {
+    if (!showCompletionSummary || askClaudeShownRef.current) return;
+    askClaudeShownRef.current = true;
+    const tagged = enrichLines.length || total || 0;
+    if (tagged === 0) return;
+    toast(`Ask Claude about these results — ${tagged} ${tagged === 1 ? "product" : "products"} tagged`, {
+      duration: 8000,
+      position: "bottom-right",
+      action: {
+        label: "Ask Claude",
+        onClick: () => window.open("https://claude.ai", "_blank", "noopener,noreferrer"),
+      },
+    });
+  }, [showCompletionSummary]);
   const [filterReviewOnly, setFilterReviewOnly] = useState(false);
   const [confidenceFilter, setConfidenceFilter] = useState<"all" | "high" | "medium" | "low">("all");
 

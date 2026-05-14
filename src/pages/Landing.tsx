@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { isShopifyEmbedded } from "@/lib/shopify-embedded";
+import RouteSeo from "@/components/RouteSeo";
 
 /**
  * Public marketing landing page.
@@ -61,6 +62,11 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <RouteSeo
+        title="Sonic Invoices — Invoice to Shopify in Minutes"
+        description="Turn supplier invoices into Shopify products in minutes. AI app for fashion retailers — bulk discounts, Google Shopping feed, SEO, Xero/MYOB sync."
+        path="/"
+      />
       <header className="flex items-center justify-between max-w-6xl mx-auto px-6 py-5">
         <div className="flex items-center gap-2">
           <span className="text-lg font-bold font-display">Sonic Invoice</span>

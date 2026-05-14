@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { BackButton } from "@/components/BackButton";
+import RouteSeo from "@/components/RouteSeo";
 
 const supportSchema = z.object({
   email: z.string().trim().email("Please enter a valid email").max(255),
@@ -218,6 +219,11 @@ const Support = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <RouteSeo
+        title="Support & Help · Sonic Invoices"
+        description="Get help with Sonic Invoices: invoice parsing, Shopify imports, billing, integrations, and bug reports. Contact our support team."
+        path="/support"
+      />
       <div className="max-w-xl mx-auto px-6 py-12">
         <div className="mb-6">
           <BackButton to="/dashboard" />

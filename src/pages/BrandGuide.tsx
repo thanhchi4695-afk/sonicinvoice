@@ -25,6 +25,16 @@ const setMeta = (name: string, content: string) => {
   el.setAttribute("content", content);
 };
 
+const setProperty = (property: string, content: string) => {
+  let el = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null;
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute("property", property);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", content);
+};
+
 export default function BrandGuide() {
   const [rows, setRows] = useState<BrandRow[]>([]);
   const [q, setQ] = useState("");
@@ -36,13 +46,18 @@ export default function BrandGuide() {
       "description",
       "Open directory of Australian fashion brand invoice formats: SKU patterns, size schemas, and AI parsing accuracy from real retailer data."
     );
+    const url = `${window.location.origin}/brand-guide`;
     let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!canonical) {
       canonical = document.createElement("link");
       canonical.rel = "canonical";
       document.head.appendChild(canonical);
     }
-    canonical.href = `${window.location.origin}/brand-guide`;
+    canonical.href = url;
+    setProperty("og:title", "AU Fashion Brand Invoice Parsing Guide");
+    setProperty("og:description", "Australian fashion brand invoice formats, SKU patterns and parsing accuracy.");
+    setProperty("og:url", url);
+    setProperty("og:type", "website");
   }, []);
 
   useEffect(() => {

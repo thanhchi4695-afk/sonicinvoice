@@ -113,6 +113,20 @@ const Landing = () => {
         <span className="inline-block text-xs uppercase tracking-widest text-primary border border-primary/30 rounded-full px-3 py-1 mb-5">
           Stock Intake Automation
         </span>
+
+        <div className="mb-8 flex justify-center">
+          <div className="relative w-full max-w-[480px] overflow-hidden rounded-2xl border border-border bg-card shadow-lg aspect-square">
+            <iframe
+              src="/marketing/sonic_square2.html"
+              title="Sonic Invoices square demo"
+              className="absolute inset-0 w-full h-full"
+              loading="lazy"
+              frameBorder={0}
+              allow="autoplay"
+            />
+          </div>
+        </div>
+
         <h1 className="text-4xl sm:text-5xl font-bold font-display mb-4 leading-tight">
           The stock intake layer your Shopify store is missing
         </h1>

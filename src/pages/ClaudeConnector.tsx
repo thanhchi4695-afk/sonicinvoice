@@ -166,7 +166,7 @@ const ClaudeConnector = () => {
     return rawToken.slice(0, 8) + "•".repeat(24);
   }, [rawToken]);
 
-  const bearerPrefill = rawToken ? `Bearer ${rawToken}` : "Bearer <your-token>";
+  const fullConnectorUrl = rawToken ? `${FUNCTION_URL}?token=${encodeURIComponent(rawToken)}` : "";
 
   return (
     <div className="container max-w-3xl py-8 space-y-6">
@@ -244,13 +244,13 @@ const ClaudeConnector = () => {
               <div className="flex gap-2">
                 <Input
                   readOnly
-                  value={rawToken ? `https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/sonic-mcp?token=${rawToken}` : "Generate a token to see the URL"}
+                  value={fullConnectorUrl || "Generate a token to see the URL"}
                   className="font-mono text-xs"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => rawToken && copy(`https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/sonic-mcp?token=${rawToken}`, "URL copied")}
+                  onClick={() => fullConnectorUrl && copy(fullConnectorUrl, "URL copied")}
                   disabled={!rawToken}
                 >
                   <Copy className="h-4 w-4" />

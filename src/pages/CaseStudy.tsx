@@ -26,9 +26,6 @@ const setProperty = (property: string, content: string) => {
   }
   el.setAttribute("content", content);
 };
-  }
-  el.setAttribute("content", content);
-};
 
 interface Props {
   source?: string;

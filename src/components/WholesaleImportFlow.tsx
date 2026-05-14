@@ -20,7 +20,7 @@ import {
 } from "@/lib/wholesale-parsers";
 import { toast } from "sonner";
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import {
   ArrowLeft, Check, Loader2, RefreshCw, Download,
   Upload, Search, ChevronRight, Link2, Unplug,

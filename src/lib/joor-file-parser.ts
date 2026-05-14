@@ -6,7 +6,7 @@
  *   3. PDF Order Confirmation — visual format parsed with regex from text content
  */
 
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import JSZip from "jszip";
 import type { WholesaleOrder, WholesaleLineItem } from "./wholesale-mapper";
 import { deriveArrivalMonth } from "./wholesale-mapper";

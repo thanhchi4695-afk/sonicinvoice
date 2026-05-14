@@ -168,6 +168,18 @@ export default function AskSonicAI() {
                     </button>
                   ))}
                 </div>
+
+                {/* Claude switch CTA */}
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent("sonic:open-claude"))}
+                  className="flex items-center gap-2 w-full text-left text-xs px-3 py-2.5 rounded-lg border border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 transition-colors"
+                >
+                  <Sparkle className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <div>
+                    <span className="font-medium text-foreground">Need deeper store insights?</span>
+                    <span className="block text-muted-foreground">Open Claude Custom App for store-level analysis</span>
+                  </div>
+                </button>
               </div>
             )}
 

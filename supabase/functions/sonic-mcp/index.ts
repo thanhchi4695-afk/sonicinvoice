@@ -154,8 +154,7 @@ mcp.tool("get_store_context", {
   }),
 });
 
-mcp.tool({
-  name: "get_collections",
+mcp.tool("get_collections", {
   description:
     "Lists Sonic-suggested Shopify collections for the user with SEO completeness score. Filter by status (pending|approved|published) or min completeness.",
   inputSchema: {
@@ -167,7 +166,7 @@ mcp.tool({
     },
     additionalProperties: false,
   },
-  handler: tool<{ status?: string; min_completeness?: number; limit?: number }>(
+  handler: wrap<{ status?: string; min_completeness?: number; limit?: number }>(
     "get_collections",
     async (args, auth) => {
       let q = admin
@@ -191,8 +190,7 @@ mcp.tool({
   ),
 });
 
-mcp.tool({
-  name: "get_gap_results",
+mcp.tool("get_gap_results", {
   description:
     "Returns the most recent competitor gap-analysis cards (collections / brands this store is missing vs competitors).",
   inputSchema: {
@@ -203,7 +201,7 @@ mcp.tool({
     },
     additionalProperties: false,
   },
-  handler: tool<{ limit?: number; gap_type?: string }>(
+  handler: wrap<{ limit?: number; gap_type?: string }>(
     "get_gap_results",
     async (args, auth) => {
       let q = admin

@@ -13,6 +13,7 @@ import { Wrench } from "lucide-react";
 import HomeWizard from "@/components/HomeWizard";
 import PhaseFlowHome from "@/components/PhaseFlowHome";
 import { ClaudeConnectBanner } from "@/components/ClaudeConnectPrompts";
+import SeoHealthWidget from "@/components/SeoHealthWidget";
 import BottomTabBar from "@/components/BottomTabBar";
 import EmbeddedNav from "@/components/EmbeddedNav";
 import StockyLayout from "@/components/StockyLayout";

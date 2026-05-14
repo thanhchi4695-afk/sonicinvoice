@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Sparkles, ExternalLink, X, CheckCircle2, Search } from "lucide-react";
 import { toast } from "sonner";
+import { ClaudeEmptyState } from "@/components/ClaudeConnectPrompts";
 
 type Gap = {
   id: string;
@@ -208,23 +209,23 @@ export default function GapsTab({ onPendingCountChange }: GapsTabProps) {
 
   if (!run && gaps.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-16 flex flex-col items-center text-center gap-4">
-          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Search className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <div className="text-base font-semibold">No gap analysis yet</div>
-            <div className="text-sm text-muted-foreground mt-1 max-w-md">
-              Run a competitor gap analysis to compare your store against the leading retailers in your vertical and surface SEO collection opportunities.
-            </div>
-          </div>
-          <Button onClick={startRun} disabled={starting}>
+      <div className="space-y-4">
+        <ClaudeEmptyState
+          heading="No gaps found yet"
+          subheading="Run a competitor gap analysis, or ask Claude to surface SEO collection opportunities your competitors carry."
+          prompts={[
+            "What competitor collections am I missing?",
+            "Which brands do my competitors stock that I don't?",
+            "Find me 5 high-impact SEO gaps to fix this week",
+          ]}
+        />
+        <div className="flex justify-center">
+          <Button onClick={startRun} disabled={starting} variant="outline">
             {starting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting…</>
-              : <><Sparkles className="mr-2 h-4 w-4" /> Run Competitor Gap Analysis</>}
+              : <><Sparkles className="mr-2 h-4 w-4" /> Or run automated gap analysis</>}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 

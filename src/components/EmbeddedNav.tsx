@@ -57,7 +57,11 @@ const navSections = [
   },
 ];
 
-const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedNavProps) => (
+const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedNavProps) => {
+  const claudeBadge = (() => {
+    try { return localStorage.getItem("claude_connector_visited") !== "true"; } catch { return false; }
+  })();
+  return (
   <>
     <div className="px-4 py-4 flex items-center justify-between">
       <div>
@@ -80,6 +84,7 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
             {section.items.map((item) => {
               const Icon = item.icon;
               const isActive = item.type === "tab" && activeTab === item.id;
+              const showClaudeDot = item.id === "account" && claudeBadge;
               return (
                 <button
                   key={item.id}
@@ -98,6 +103,12 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
                 >
                   <Icon className="w-4 h-4 shrink-0" />
                   <span className="truncate">{item.label}</span>
+                  {showClaudeDot && (
+                    <span
+                      aria-label="New: Claude connector"
+                      className="ml-auto h-2 w-2 rounded-full bg-purple-500 shadow-[0_0_6px_rgba(168,85,247,0.7)]"
+                    />
+                  )}
                 </button>
               );
             })}
@@ -121,7 +132,8 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
       <p className="text-[9px] text-muted-foreground">Built for AU fashion boutiques</p>
     </div>
   </>
-);
+  );
+};
 
 const EmbeddedNav = (props: EmbeddedNavProps) => {
   const { open, onClose } = props;

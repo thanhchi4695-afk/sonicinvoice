@@ -88,6 +88,7 @@ const ClaudeConnector = () => {
 
   useEffect(() => {
     load();
+    try { localStorage.setItem("claude_connector_visited", "true"); } catch {}
   }, []);
 
   const generate = async () => {

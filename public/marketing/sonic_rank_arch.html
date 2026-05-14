@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Sonic Rank · AI Architecture</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#0d0d0d;overflow:hidden;font-family:'Inter',system-ui,sans-serif}
+
+#wrap{
+  width:min(100vw,100vh);
+  height:min(100vw,100vh);
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  background:#f8fafc;
+  overflow:hidden;
+}
+canvas{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+
+/* brand — top left */
+#brand{
+  position:absolute;top:3.5%;left:4.5%;z-index:9;
+  display:flex;align-items:center;gap:2%;opacity:.6;
+}
+#brand svg{width:5.5%;height:5.5%;min-width:18px}
+#brand-name{font-size:2.5%;font-weight:800;color:#0f172a;letter-spacing:-.03em;white-space:nowrap}
+
+/* pattern badge — top right */
+#badge{
+  position:absolute;top:3.5%;right:4.5%;z-index:9;
+  padding:.5% 2.2%;border-radius:20px;
+  font-size:2%;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  transition:background .4s,color .4s;white-space:nowrap;
+}
+
+/* act label — below badge */
+#actlbl{
+  position:absolute;top:9%;right:4.5%;z-index:9;
+  font-size:1.8%;color:#94a3b8;font-weight:500;
+  text-align:right;transition:color .4s;
+}
+
+/* progress */
+#prog{position:absolute;top:0;left:0;right:0;height:3px;z-index:20;background:rgba(0,0,0,.06)}
+#pf{height:100%;width:0%;transition:none}
+
+/* dots */
+#dots{
+  position:absolute;bottom:3%;left:50%;transform:translateX(-50%);
+  z-index:9;display:flex;gap:1.5%;align-items:center;
+}
+.dot{width:1.4%;aspect-ratio:1;min-width:5px;border-radius:50%;background:rgba(0,0,0,.12);transition:all .3s;cursor:pointer}
+.dot.on{width:4%;border-radius:.8%;min-width:14px}
+.dot.done{opacity:.55}
+
+/* play button */
+#play{
+  position:absolute;bottom:10%;left:50%;transform:translateX(-50%);
+  z-index:20;background:rgba(255,255,255,.96);
+  border:1px solid rgba(0,0,0,.1);border-radius:30px;
+  padding:2% 8%;font-size:3%;font-weight:700;
+  color:#334155;cursor:pointer;font-family:inherit;
+  box-shadow:0 4px 20px rgba(0,0,0,.13);
+  display:flex;align-items:center;gap:2%;
+  white-space:nowrap;transition:all .2s;
+}
+#play.h{opacity:0;pointer-events:none}
+#play:active{transform:translateX(-50%) scale(.97)}
+</style>
+</head>
+<body>
+<div id="wrap">
+<canvas id="c"></canvas>
+
+<div id="brand">
+  <svg viewBox="0 0 36 36" fill="none">
+    <circle cx="18" cy="18" r="16" fill="#6366f1" opacity=".12" stroke="#6366f1" stroke-width="1.1"/>
+    <circle cx="18" cy="18" r="10" fill="#6366f1"/>
+    <circle cx="15" cy="18" r="5" fill="#f8fafc"/>
+    <circle cx="19.5" cy="18" r="3.2" fill="#6366f1"/>
+  </svg>
+  <span id="brand-name">Sonic Rank</span>
+</div>
+
+<div id="badge"></div>
+<div id="actlbl"></div>
+<div id="prog"><div id="pf"></div></div>
+<div id="dots"></div>
+<button id="play" onclick="togglePlay()">▶ &nbsp;Play</button>
+</div>
+
+<script>
+/* ══ SETUP ══════════════════════════════ */
+const wrap=document.getElementById('wrap')
+const cv=document.getElementById('c')
+const ctx=cv.getContext('2d')
+let Q=0,DPR=1
+
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2)
+  Q=wrap.offsetWidth
+  cv.width=Q*DPR;cv.height=Q*DPR
+  cv.style.width=Q+'px';cv.style.height=Q+'px'
+  ctx.scale(DPR,DPR)
+}
+
+/* ══ MATH ════════════════════════════════ */
+const cl=(v,a,b)=>Math.max(a,Math.min(b,v))
+const lr=(a,b,t)=>a+(b-a)*t
+const π=Math.PI
+const E={
+  o3:t=>1-Math.pow(1-t,3),
+  el:t=>{const c=2*π/3;return t===0?0:t===1?1:Math.pow(2,-10*t)*Math.sin((t*10-.75)*c)+1},
+  io:t=>t<.5?4*t*t*t:(1-Math.pow(-2*t+2,3)/2),
+  o2:t=>1-(1-t)*(1-t),
+  back:t=>(2.618)*t*t*t-1.618*t*t,
+}
+const ease=(t,fn=E.o3)=>fn(cl(t,0,1))
+const q=f=>Q*f
+
+/* ══ PALETTE ════════════════════════════ */
+// Three pattern colours matching the HTML
+const BLUE='#3b82f6',   BLUE_L='#dbeafe'   // LLM call
+const GREEN='#10b981',  GREEN_L='#d1fae5'  // Automation
+const AMBER='#f59e0b',  AMBER_L='#fef3c7'  // AI Agent
+// supporting
+const INDIGO='#6366f1', VIOLET='#8b5cf6'
+const TEAL='#14b8a6',   PINK='#ec4899'
+const INK='#0f172a',    MUTED='#94a3b8'
+const BG='#f8fafc',     BORDER='#e2e8f0'
+
+/* ══ DRAW PRIMITIVES ═════════════════════ */
+function arc(x,y,r,fill,stroke,sw=1.5){
+  ctx.beginPath();ctx.arc(x,y,r,0,2*π)
+  if(fill){ctx.fillStyle=fill;ctx.fill()}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke()}
+}
+function ring(x,y,r,col,a,sw=1.5){
+  ctx.save();ctx.globalAlpha=a
+  ctx.beginPath();ctx.arc(x,y,r,0,2*π)
+  ctx.strokeStyle=col;ctx.lineWidth=sw;ctx.stroke()
+  ctx.restore()
+}
+function rr(x,y,w,h,r,fill,stroke,sw=1.2){
+  ctx.beginPath();ctx.roundRect(x,y,w,h,r)
+  if(fill){ctx.fillStyle=fill;ctx.fill()}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke()}
+}
+function ln(x1,y1,x2,y2,col,sw,dash=[]){
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=sw;ctx.lineCap='round'
+  ctx.setLineDash(dash)
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke()
+  ctx.setLineDash([]);ctx.restore()
+}
+function arw(x1,y1,x2,y2,col,sw,pg=1){
+  const dx=x2-x1,dy=y2-y1,ex=x1+dx*pg,ey=y1+dy*pg
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=sw;ctx.lineCap='round'
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(ex,ey);ctx.stroke()
+  if(pg>.76){
+    const a=Math.atan2(dy,dx),hs=q(.018)
+    ctx.beginPath()
+    ctx.moveTo(ex-Math.cos(a-π/6)*hs,ey-Math.sin(a-π/6)*hs)
+    ctx.lineTo(ex,ey)
+    ctx.lineTo(ex-Math.cos(a+π/6)*hs,ey-Math.sin(a+π/6)*hs)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+function txt(x,y,s,sz,col,wt='600',align='center',base='middle',a=1){
+  ctx.save();ctx.globalAlpha=a
+  ctx.font=`${wt} ${sz}px 'Inter',system-ui,sans-serif`
+  ctx.fillStyle=col;ctx.textAlign=align;ctx.textBaseline=base
+  ctx.fillText(s,x,y);ctx.restore()
+}
+function chip(x,y,s,sz,col,a=1){
+  ctx.save();ctx.globalAlpha=a
+  ctx.font=`600 ${sz}px 'Inter',system-ui,sans-serif`
+  const w=ctx.measureText(s).width,px=sz*.6,ph=sz*1.6
+  rr(x-w/2-px,y-ph/2,w+px*2,ph,ph/2,col+'1a',col+'55',.9)
+  ctx.fillStyle=col;ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.fillText(s,x,y);ctx.restore()
+}
+
+/* ══ SONIC LOGO ═════════════════════════ */
+function sonic(x,y,r,a=1,col=INDIGO){
+  ctx.save();ctx.globalAlpha=a
+  arc(x,y,r,col)
+  ctx.globalCompositeOperation='destination-out'
+  arc(x-r*.17,y,r*.27,INK)
+  ctx.globalCompositeOperation='source-over'
+  arc(x+r*.1,y,r*.2,col)
+  ctx.restore()
+}
+function sonicPulse(x,y,r,T2,col,a=1){
+  ;[0,.33,.66].forEach(off=>{
+    const rp=((T2*.7+off)%1)
+    ring(x,y,r+q(.08)*rp,col,(1-rp)*.18*a,1.5)
+  })
+}
+
+/* ══ DOCUMENT ════════════════════════════ */
+function doc(x,y,w,h,a=1,fill='#fff',stroke=BORDER){
+  ctx.save();ctx.globalAlpha=a
+  const fold=w*.2,r=w*.07
+  ctx.beginPath()
+  ctx.moveTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y)
+  ctx.lineTo(x+w-fold,y);ctx.lineTo(x+w,y+fold)
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h)
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r)
+  ctx.closePath();ctx.fillStyle=fill;ctx.fill()
+  ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke()
+  ctx.beginPath();ctx.moveTo(x+w-fold,y);ctx.lineTo(x+w-fold,y+fold);ctx.lineTo(x+w,y+fold)
+  ctx.lineWidth=1;ctx.stroke()
+  ;[.28,.44,.6].forEach(f=>rr(x+w*.12,y+h*f,w*.72,h*.055,1,stroke+'33'))
+  ctx.restore()
+}
+
+/* ══ HEXAGON ═════════════════════════════ */
+function hex(x,y,r,rot,a=1,col=INDIGO){
+  ctx.save();ctx.globalAlpha=a;ctx.translate(x,y);ctx.rotate(rot)
+  ctx.beginPath()
+  for(let i=0;i<6;i++){const ag=i*π/3-π/6;i===0?ctx.moveTo(Math.cos(ag)*r,Math.sin(ag)*r):ctx.lineTo(Math.cos(ag)*r,Math.sin(ag)*r)}
+  ctx.closePath();ctx.fillStyle=col+'18';ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke()
+  const sr=r*.36
+  ctx.beginPath()
+  for(let i=0;i<8;i++){const ag=i*π/4,rr2=i%2===0?sr:sr*.38;i===0?ctx.moveTo(Math.cos(ag)*rr2,Math.sin(ag)*rr2):ctx.lineTo(Math.cos(ag)*rr2,Math.sin(ag)*rr2)}
+  ctx.closePath();ctx.fillStyle=col;ctx.fill()
+  ctx.restore()
+}
+
+/* ══ LIGHTNING BOLT (LLM) ═══════════════ */
+function bolt(x,y,sz,col,a=1){
+  ctx.save();ctx.globalAlpha=a;ctx.fillStyle=col;ctx.strokeStyle=col;ctx.lineWidth=sz*.06
+  ctx.beginPath()
+  ctx.moveTo(x+sz*.12,y-sz*.5)
+  ctx.lineTo(x-sz*.1,y+sz*.08)
+  ctx.lineTo(x+sz*.06,y+sz*.08)
+  ctx.lineTo(x-sz*.12,y+sz*.5)
+  ctx.lineTo(x+sz*.1,y-sz*.08)
+  ctx.lineTo(x-sz*.06,y-sz*.08)
+  ctx.closePath();ctx.fill()
+  ctx.restore()
+}
+
+/* ══ GEAR (AUTOMATION) ══════════════════ */
+function gear(x,y,r,rot,a=1,col=GREEN){
+  const teeth=8,toothH=r*.32
+  ctx.save();ctx.globalAlpha=a;ctx.translate(x,y);ctx.rotate(rot)
+  ctx.fillStyle=col+'22';ctx.strokeStyle=col;ctx.lineWidth=1.5
+  ctx.beginPath()
+  for(let i=0;i<teeth;i++){
+    const a1=i*2*π/teeth-π/teeth*.5
+    const a2=a1+π/teeth*.5
+    const a3=a2+π/teeth*.5
+    const a4=a3+π/teeth*.5
+    if(i===0) ctx.moveTo(Math.cos(a1)*r,Math.sin(a1)*r)
+    else ctx.lineTo(Math.cos(a1)*r,Math.sin(a1)*r)
+    ctx.lineTo(Math.cos(a1)*(r+toothH),Math.sin(a1)*(r+toothH))
+    ctx.lineTo(Math.cos(a2)*(r+toothH),Math.sin(a2)*(r+toothH))
+    ctx.lineTo(Math.cos(a2)*r,Math.sin(a2)*r)
+    ctx.lineTo(Math.cos(a3)*r,Math.sin(a3)*r)
+  }
+  ctx.closePath();ctx.fill();ctx.stroke()
+  arc(0,0,r*.45,BG,col,1.5)
+  ctx.restore()
+}
+
+/* ══ ORBIT DOTS (AI AGENT) ══════════════ */
+function orbitAgent(x,y,r,n,T2,col,a=1){
+  ctx.save();ctx.globalAlpha=a
+  ring(x,y,r,col,.15,1)
+  for(let i=0;i<n;i++){
+    const ag=T2*2+i*2*π/n
+    const ex=x+Math.cos(ag)*r,ey=y+Math.sin(ag)*r*.72
+    arc(ex,ey,r*.14,col)
+    // trail
+    for(let d=1;d<=3;d++){
+      const ta=T2*2+i*2*π/n-d*.15
+      ctx.save();ctx.globalAlpha=a*(4-d)*.08
+      arc(x+Math.cos(ta)*r,y+Math.sin(ta)*r*.72,r*.1,col)
+      ctx.restore()
+    }
+  }
+  ctx.restore()
+}
+
+/* ══ FLOW PARTICLE ══════════════════════ */
+function fp(x1,y1,x2,y2,T2,col,r=q(.013)){
+  const t=T2%1,x=lr(x1,x2,t),y=lr(y1,y2,t)
+  const fa=t<.12?t/.12:t>.84?(1-t)/.16:1
+  ctx.save();ctx.globalAlpha=fa*.85;arc(x,y,r,col)
+  for(let i=1;i<=4;i++){
+    const bt=Math.max(0,t-i*.04)
+    ctx.globalAlpha=fa*(5-i)*.08
+    arc(lr(x1,x2,bt),lr(y1,y2,bt),r*(5-i)/5,col)
+  }
+  ctx.restore()
+}
+
+/* ══ PARTICLES ══════════════════════════ */
+let pts=[]
+function pt(x,y,col,vx,vy,life=.75){pts.push({x,y,vx,vy,r:q(.009),col,l:life,ml:life,t:0})}
+function tickPts(dt){
+  pts=pts.filter(p=>{
+    p.t+=dt;p.x+=p.vx*dt*60;p.y+=p.vy*dt*60;p.vy+=.14*dt*60
+    const a=ease(1-p.t/p.ml)
+    ctx.save();ctx.globalAlpha=a*.7;arc(p.x,p.y,p.r*a,p.col);ctx.restore()
+    return p.t<p.ml
+  })
+}
+
+/* ══ BACKGROUND ═════════════════════════ */
+function bg(){
+  ctx.fillStyle=BG;ctx.fillRect(0,0,Q,Q)
+  ctx.save()
+  const gs=q(.052)
+  for(let gx=gs/2;gx<Q;gx+=gs)
+    for(let gy=gs/2;gy<Q;gy+=gs)
+      arc(gx,gy,q(.002),'rgba(99,102,241,.06)')
+  ctx.restore()
+}
+
+/* ══ STATE ═════════════════════════════ */
+let T=0,playing=false,lastTs=null
+const DUR=15,N=8
+let gT=0,aT=0,aI=0
+
+/* ══════════════════════════════════════════════════════
+   ACT 0 — OVERVIEW: 3 PATTERNS
+   Three symbols rise: bolt (LLM), gear (Auto), orbit (Agent)
+   Each pulses with its colour, then shows its label.
+   They form a triangle — the architecture at a glance.
+══════════════════════════════════════════════════════ */
+function a0(p){
+  const cx=q(.5),cy=q(.48)
+
+  // Sonic logo centre
+  const sr=q(.07)*ease(p*.5,E.el)
+  sonicPulse(cx,cy,sr,T,INDIGO,ease(p*.5))
+  sonic(cx,cy,sr,ease(p*.5))
+
+  const patterns=[
+    {sym:'bolt',  col:BLUE,  lbl:'LLM call',       sublbl:'One shot · fast · cheap',   ang:-π*.5,   R:.34},
+    {sym:'gear',  col:GREEN, lbl:'Automation',      sublbl:'Scheduled · silent · free', ang:π*.17,   R:.36},
+    {sym:'orbit', col:AMBER, lbl:'AI Agent',        sublbl:'Autonomous · tool-calling', ang:-π*1.17, R:.36},
+  ]
+
+  patterns.forEach((pat,i)=>{
+    const del=i*.18
+    const pp=ease(cl((p-del-.05)/(1-del),0,1),E.el)
+    const a=ease(cl((p-del-.05)/(1-del),0,1))
+    const R=q(pat.R)*pp
+    const px=cx+Math.cos(pat.ang)*R*ease(pp,E.back)
+    const py=cy+Math.sin(pat.ang)*R*.85
+
+    // glow circle behind
+    arc(px,py,q(.1)*pp,pat.col+'18')
+    arc(px,py,q(.1)*pp,null,pat.col,pp*2)
+
+    // pulsing rings
+    if(pp>.5){
+      ;[0,.4,.8].forEach(off=>{
+        const rp=((p*1.4+off+i*.22)%1)*pp
+        ring(px,py,q(.1)*pp+q(.06)*rp,pat.col,(1-rp)*.2,1)
+      })
+    }
+
+    // symbol
+    if(pat.sym==='bolt')  bolt(px,py,q(.06)*pp,pat.col,a)
+    if(pat.sym==='gear')  gear(px,py,q(.055)*pp,T*.6,a,pat.col)
+    if(pat.sym==='orbit') orbitAgent(px,py,q(.06)*pp,2,T,pat.col,a)
+
+    // dashed line to hub
+    if(pp>.45){
+      const lp=ease((pp-.45)/.55)
+      ctx.save();ctx.globalAlpha=lp*.22;ctx.setLineDash([q(.009),q(.007)])
+      ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(cx,cy)
+      ctx.strokeStyle=pat.col;ctx.lineWidth=1.2;ctx.stroke();ctx.setLineDash([]);ctx.restore()
+    }
+
+    // labels
+    if(pp>.62){
+      const la=ease((pp-.62)/.38)
+      // label below
+      const labY=py+(pat.ang<0?-1:1)*q(.1)*pp
+      chip(px,labY,pat.lbl,q(.022),pat.col,la)
+      if(pp>.82) chip(px,labY+q(.052),pat.sublbl,q(.017),MUTED,ease((pp-.82)/.18)*.8)
+    }
+
+    // connecting flow particles
+    if(pp>.3) fp(cx,cy,px,py,(T*1.5+i*.4)%1,pat.col)
+  })
+
+  // Title
+  if(p>.8){
+    const np=ease((p-.8)/.2,E.el)
+    chip(cx,q(.1),'3 AI patterns · 1 product',q(.023),INDIGO,np)
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   ACT 1 — LLM CALL: SEO CONTENT GENERATOR
+   Lightning bolt fires → document appears →
+   5 content items stream out like a typewriter.
+   Input → Prompt → Output flow boxes animate left to right.
+══════════════════════════════════════════════════════ */
+function a1(p){
+  const cx=q(.5),cy=q(.42)
+
+  // Lightning bolt fires from top
+  const bp=ease(p*.5,E.el)
+  bolt(cx,q(.2),q(.1)*bp,BLUE,bp)
+  if(bp>.6){
+    ;[0,.3,.6].forEach(off=>{
+      const rp=((p*2+off)%1)
+      ring(cx,q(.2),q(.04)+q(.08)*rp,BLUE,(1-rp)*.3*bp,1.5)
+    })
+  }
+
+  // 4-step flow: Store context → Collection data → 5-part formula → SEO pack
+  const steps=[
+    {lbl:'Store context',    sub:'vertical · voice · brands',  col:BLUE+'33'},
+    {lbl:'Collection data',  sub:'handle · tags · products',   col:BLUE+'33'},
+    {lbl:'5-part formula',   sub:'keyword · brands · FAQ · links', col:BLUE+'55'},
+    {lbl:'SEO pack ✓',       sub:'title · meta · 200+ words',  col:BLUE_L},
+  ]
+  const boxW=q(.18),boxH=q(.1),startX=q(.08),stepY=q(.46)
+  const arrW=q(.04)
+
+  steps.forEach((st,i)=>{
+    const del=i*.14
+    const sp=ease(cl((p-.2-del)/.6,0,1),E.el)
+    const a=ease(cl((p-del-.2)/.55,0,1))
+    const bx=startX+i*(boxW+arrW+q(.015))
+
+    rr(bx,stepY-boxH/2,boxW,boxH,q(.012),st.col,BLUE,1.2*sp)
+    if(sp>.4){
+      txt(bx+boxW/2,stepY-boxH*.18,st.lbl,q(.018),BLUE,'600','center','middle',ease((sp-.4)/.6)*a)
+      txt(bx+boxW/2,stepY+boxH*.22,st.sub,q(.013),MUTED,'400','center','middle',ease((sp-.4)/.6)*a*.8)
+    }
+
+    // arrow to next
+    if(i<steps.length-1&&sp>.6){
+      const ap=ease((sp-.6)/.4)
+      arw(bx+boxW,stepY,bx+boxW+arrW+q(.015),stepY,BLUE,1.5,ap)
+      // particle
+      fp(bx+boxW,stepY,bx+boxW+arrW+q(.015),stepY,(T*3+i*.3)%1,BLUE,q(.009))
+    }
+  })
+
+  // Output items cascade below
+  const outputs=['SEO title','Meta 160 chars','Description 200+ words','FAQ × 4–6','Internal links × 3–5']
+  if(p>.55){
+    outputs.forEach((out,i)=>{
+      const del=i*.09
+      const op=ease(cl((p-.55-del)/.42,0,1),E.el)
+      const oy=q(.62+i*.068)
+      ctx.save();ctx.globalAlpha=op
+      const ww=q(.72)
+      rr(cx-ww/2,oy-q(.022),ww,q(.044),q(.008),BLUE+'12',BLUE,op*.8)
+      // typewriter fill
+      rr(cx-ww/2,oy-q(.022),ww*op,q(.044),q(.008),BLUE+'20')
+      // check
+      ctx.strokeStyle=BLUE;ctx.lineWidth=q(.008);ctx.lineCap='round';ctx.lineJoin='round'
+      ctx.beginPath()
+      ctx.moveTo(cx-ww/2+q(.012),oy);ctx.lineTo(cx-ww/2+q(.022),oy+q(.01));ctx.lineTo(cx-ww/2+q(.038),oy-q(.012))
+      ctx.stroke()
+      txt(cx+q(.01),oy,out,q(.018),BLUE,'600','center','middle',op)
+      ctx.restore()
+    })
+  }
+
+  // "1 API call" label
+  if(p>.88){
+    const np=ease((p-.88)/.12,E.el)
+    chip(cx,q(.92),'1 API call · runs in parallel',q(.021),BLUE,np)
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   ACT 2 — AUTOMATION: NIGHTLY SCAN
+   Moon appears (night). Scanning line sweeps store.
+   New products glow. SEO job queue fills up.
+   Flow: scan → diff → detect → queue.
+══════════════════════════════════════════════════════ */
+function a2(p){
+  const cx=q(.5),cy=q(.44)
+
+  // Moon symbol
+  if(p<.55){
+    const mp=ease(p/.5,E.el)*(1-ease(cl((p-.45)/.1,0,1)))
+    ctx.save();ctx.globalAlpha=mp
+    // full circle
+    arc(q(.16),q(.18),q(.07)*mp,AMBER_L,AMBER,mp*2)
+    // bite out
+    ctx.globalCompositeOperation='destination-out'
+    arc(q(.16)+q(.04)*mp,q(.18)-q(.02)*mp,q(.055)*mp,INK)
+    ctx.globalCompositeOperation='source-over'
+    ctx.restore()
+    // stars around moon
+    if(mp>.5){
+      const sa=ease((mp-.5)/.5)
+      ;[[.28,.1],[.32,.22],[.08,.24],[.2,.32]].forEach(([sx,sy])=>{
+        arc(q(sx),q(sy),q(.006)*sa,AMBER,null)
+      })
+    }
+  }
+
+  // Shopify store grid — product cards
+  const cols=5,rows=4
+  const gW=q(.12),gH=q(.08),gGap=q(.014)
+  const gridX=cx-((gW+gGap)*cols-gGap)/2
+  const gridY=q(.24)
+
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const del=(r*cols+c)*.03
+      const gp=ease(cl(p*.8-del,0,1),E.o2)
+      const x=gridX+c*(gW+gGap),y=gridY+r*(gH+gGap)
+      rr(x,y,gW,gH,q(.008),BORDER,BORDER,1)
+      // product mini-card interior
+      if(gp>.3){
+        rr(x+gW*.1,y+gH*.15,gW*.8,gH*.25,1,GREEN+'22')
+        rr(x+gW*.1,y+gH*.52,gW*.55,gH*.2,1,MUTED+'33')
+      }
+    }
+  }
+
+  // Scanning line sweeps across grid
+  if(p>.18){
+    const sp=ease((p-.18)/.45,E.io)
+    const scanY=gridY+sp*(rows*(gH+gGap))
+    ctx.save();ctx.globalAlpha=.7
+    const grd=ctx.createLinearGradient(gridX,scanY,gridX+cols*(gW+gGap),scanY)
+    grd.addColorStop(0,'rgba(16,185,129,0)')
+    grd.addColorStop(.5,'rgba(16,185,129,.35)')
+    grd.addColorStop(1,'rgba(16,185,129,0)')
+    ctx.fillStyle=grd
+    ctx.fillRect(gridX,scanY-q(.015),cols*(gW+gGap),q(.03))
+    ctx.restore()
+  }
+
+  // "New products" glow on some cards
+  if(p>.45){
+    const np=ease((p-.45)/.3,E.el)
+    ;[[0,2],[2,3],[4,1],[1,0]].forEach(([c,r],i)=>{
+      const del=i*.08
+      const ga=ease(cl((np-del)/(1-del),0,1),E.el)
+      const x=gridX+c*(gW+gGap),y=gridY+r*(gH+gGap)
+      ctx.save();ctx.globalAlpha=ga
+      rr(x,y,gW,gH,q(.008),GREEN+'28',GREEN,1.5)
+      // new badge
+      arc(x+gW-q(.012),y+q(.012),q(.012),GREEN)
+      ctx.restore()
+    })
+  }
+
+  // Queue fills up bottom
+  if(p>.6){
+    const qp=ease((p-.6)/.4,E.o3)
+    const qY=q(.78)
+    chip(cx,qY-q(.04),'SEO job queue',q(.02),GREEN,qp)
+    const jobs=['Seafolly collection','Bikini Tops page','Floral edit','Brand page']
+    jobs.forEach((j,i)=>{
+      const ja=ease(cl((qp-i*.15)/(1-i*.15),0,1),E.el)
+      const jy=qY+q(.02)+i*q(.052)
+      rr(cx-q(.32),jy,q(.64)*ja,q(.04),q(.008),GREEN+'1a',GREEN,.8)
+      txt(cx,jy+q(.02),j,q(.018),GREEN,'600','center','middle',ja)
+    })
+  }
+
+  // Cost = zero chip
+  if(p>.85){
+    chip(cx,q(.94),'near-zero cost when quiet',q(.021),MUTED,ease((p-.85)/.15))
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   ACT 3 — AUTOMATION: SEASONAL + LINK MESH
+   Left: Calendar flips season → collection refreshes (green)
+   Right: New collection node → links radiate to siblings
+══════════════════════════════════════════════════════ */
+function a3(p){
+  const cx=q(.5)
+
+  // ── LEFT: Seasonal refresher ──
+  const lx=q(.26),ly=q(.45)
+
+  // Calendar icon
+  if(p<.7){
+    const cp=ease(p*.65,E.el)
+    ctx.save();ctx.globalAlpha=cp
+    rr(lx-q(.12),q(.12),q(.24),q(.22),q(.012),GREEN+'18',GREEN,1.5)
+    // header
+    rr(lx-q(.12),q(.12),q(.24),q(.06),q(.012)+'00',GREEN)
+    rr(lx-q(.12),q(.12),q(.24),q(.06),q(.012),GREEN,null,0)
+    txt(lx,q(.165),'▸ Season turns',q(.018),BG,'700','center','middle',cp)
+    // calendar grid
+    ;[0,1,2,3,4,5].forEach(i=>{
+      const cy2=q(.2)+Math.floor(i/3)*q(.05),cx2=lx-q(.06)+(i%3)*q(.06)
+      arc(cx2,cy2,q(.014),i<2?GREEN+'44':AMBER,null)
+    })
+    ctx.restore()
+  }
+
+  // Season flip animation
+  if(p>.2){
+    const fp2=ease((p-.2)/.35,E.io)
+    const seasons=['Summer Edit','Wet Season','Christmas','Darwin Cup']
+    const si=Math.floor(fp2*seasons.length)
+    chip(lx,ly,seasons[Math.min(si,seasons.length-1)],q(.024),GREEN,ease((fp2%(1/seasons.length))*seasons.length))
+  }
+
+  // Flow: Calendar → Season → Update → Regen
+  if(p>.42){
+    const fboxes=['Calendar','Season?','Update rules','Regen desc']
+    const fY=q(.6)
+    const fw=q(.14),fa=ease((p-.42)/.45,E.o3)
+    fboxes.forEach((fb,i)=>{
+      const delay=i*.12
+      const fa2=ease(cl((fa-delay)/(1-delay),0,1))
+      const fx=q(.04)+i*(fw+q(.01))
+      rr(fx,fY,fw,q(.065),q(.008),i===1?AMBER_L:GREEN+'18',i===1?AMBER:GREEN,.8)
+      txt(fx+fw/2,fY+q(.032),fb,q(.014),i===1?AMBER:GREEN,'600','center','middle',fa2)
+      if(i<3&&fa2>.5) arw(fx+fw,fY+q(.032),fx+fw+q(.01),fY+q(.032),MUTED,1,ease((fa2-.5)/.5))
+    })
+  }
+
+  // Divider
+  ctx.save();ctx.globalAlpha=ease(p*.5)*.18
+  ln(q(.5),q(.08),q(.5),q(.92),BORDER,1)
+  ctx.restore()
+
+  // ── RIGHT: Link mesh rebuilder ──
+  const rx=q(.74),ry=q(.44)
+
+  if(p>.08){
+    const lp=ease((p-.08)*.7,E.el)
+
+    // New collection node in centre
+    arc(rx,ry,q(.065)*lp,GREEN+'22',GREEN,lp*2)
+    if(lp>.4){
+      txt(rx,ry,'new',q(.02),GREEN,'700','center','middle',ease((lp-.4)/.6)*lp)
+      txt(rx,ry+q(.03),'collection',q(.015),GREEN,'400','center','middle',ease((lp-.4)/.6)*lp*.7)
+    }
+
+    // Sibling nodes radiate out
+    const siblings=[
+      {ang:-π*.5,  lbl:'Seafolly'},
+      {ang:π*.08,  lbl:'One Pieces'},
+      {ang:π*.65,  lbl:'Black SW'},
+      {ang:-π*.92, lbl:'Bikini Tops'},
+      {ang:π*1.35, lbl:'Floral'},
+    ]
+    siblings.forEach((sib,i)=>{
+      const del=i*.1
+      const sp=ease(cl((lp-.3-del)/.6,0,1),E.el)
+      const sa=ease(cl((lp-del-.3)/.55,0,1))
+      const sr2=q(.24)*sp
+      const sx=rx+Math.cos(sib.ang)*sr2
+      const sy=ry+Math.sin(sib.ang)*sr2*.78
+
+      if(sp>.1){
+        ln(rx,ry,sx,sy,GREEN,1.2*sp,[q(.008),q(.006)])
+        arc(sx,sy,q(.05)*sp,GREEN+'18',GREEN,sp*1.5)
+        if(sp>.5) txt(sx,sy,sib.lbl,q(.015),GREEN,'600','center','middle',ease((sp-.5)/.5)*sa)
+
+        // particle on link
+        fp(rx,ry,sx,sy,(T*2+i*.3)%1,GREEN,q(.009))
+      }
+    })
+  }
+
+  // "No LLM" badge
+  if(p>.82){
+    chip(rx,q(.84),'no LLM · rule-based',q(.021),GREEN,ease((p-.82)/.18))
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   ACT 4 — AI AGENT: BRAND INTELLIGENCE CRAWLER
+   Agent orbit node → web_search → brand site appears →
+   web_fetch × 3 pages → data saves to DB cylinder.
+   Steps 1–6 cascade with tool labels.
+══════════════════════════════════════════════════════ */
+function a4(p){
+  const cx=q(.5),cy=q(.36)
+
+  // Agent hub
+  const hr=q(.075)*ease(p*.5,E.el)
+  orbitAgent(cx,cy,hr*1.4,3,T,AMBER,ease(p*.5))
+  arc(cx,cy,hr,AMBER+'22',AMBER,hr*.18)
+  hex(cx,cy,hr*.7,T*.8,ease(p*.5),AMBER)
+
+  // Steps cascade as action cards
+  const steps=[
+    {n:'1',lbl:'Confirm domain',  tool:'web_search',   col:AMBER,  tx:.16,ty:.25},
+    {n:'2',lbl:'Crawl nav',       tool:'web_fetch',    col:AMBER,  tx:.82,ty:.25},
+    {n:'3',lbl:'Founding story',  tool:'web_fetch',    col:AMBER,  tx:.14,ty:.52},
+    {n:'4',lbl:'Check competitors',tool:'web_search',  col:BLUE,   tx:.84,ty:.52},
+    {n:'5',lbl:'Extract voice',   tool:'web_fetch',    col:AMBER,  tx:.18,ty:.76},
+    {n:'6',lbl:'Save intelligence',tool:'supabase',    col:GREEN,  tx:.82,ty:.76},
+  ]
+
+  steps.forEach((st,i)=>{
+    const del=i*.12
+    const sp=ease(cl((p-.15-del)/.68,0,1),E.el)
+    const a=ease(cl((p-del-.15)/.62,0,1))
+    const sx=q(st.tx),sy=q(st.ty)
+    const sw=q(.22),sh=q(.11)
+
+    ctx.save();ctx.globalAlpha=a*sp
+    rr(sx-sw/2,sy-sh/2,sw,sh,q(.012),st.col+'18',st.col,1.2)
+    ctx.restore()
+
+    if(sp>.3){
+      txt(sx,sy-sh*.15,st.n+' · '+st.lbl,q(.017),st.col,'600','center','middle',ease((sp-.3)/.7)*a)
+      txt(sx,sy+sh*.22,st.tool,q(.014),MUTED,'400','center','middle',ease((sp-.3)/.7)*a*.8)
+    }
+
+    // arrow from hub
+    if(sp>.2) arw(cx,cy,sx,sy-sh*.55,st.col,1,ease((sp-.2)/.8))
+
+    // particle from hub
+    fp(cx,cy,sx,sy-sh*.55,(T*1.4+i*.28)%1,st.col)
+  })
+
+  // "Handles surprises" note
+  if(p>.82){
+    const np=ease((p-.82)/.18,E.el)
+    chip(cx,q(.92),'handles surprises · loops until done',q(.021),AMBER,np)
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   ACT 5 — AI AGENT: STORE SEO AUDIT
+   Shopify store grid → agent scans → gaps glow red →
+   ranked list fills → approval buttons → push to Shopify.
+   Big "20 gaps found" counter.
+══════════════════════════════════════════════════════ */
+function a5(p){
+  const cx=q(.5),cy=q(.4)
+
+  // Agent orbit
+  const ar=q(.07)*ease(p*.4,E.el)
+  orbitAgent(cx,cy,ar*1.5,3,T,AMBER,ease(p*.4)*.7)
+  arc(cx,cy,ar,AMBER+'22',AMBER,ar*.15)
+
+  // Collection bars — some green (exist) some red (gaps)
+  const bars=[
+    {h:.6,ok:true},{h:.4,ok:false},{h:.75,ok:true},{h:.3,ok:false},
+    {h:.55,ok:true},{h:.2,ok:false},{h:.65,ok:true},{h:.35,ok:false},
+    {h:.5,ok:true},{h:.45,ok:false},
+  ]
+  const bW=q(.052),bGap=q(.01),total=bars.length*(bW+bGap)
+  const bBase=q(.72),maxH=q(.38)
+  const startX=cx-total/2
+
+  bars.forEach((b,i)=>{
+    const del=i*.07
+    const bp=ease(cl(p*.85-del,0,1),E.el)
+    const bh=maxH*b.h*bp
+    const col=b.ok?GREEN:AMBER_L
+    const strokeCol=b.ok?GREEN:AMBER
+    rr(startX+i*(bW+bGap),bBase-bh,bW,bh,3,col,strokeCol,.8)
+
+    // Scan flash on non-ok bars
+    if(!b.ok&&p>.35){
+      const gp=ease(cl((p-.35-i*.05)/(1-i*.05),0,1),E.el)
+      arc(startX+i*(bW+bGap)+bW/2,bBase-bh-q(.03),q(.022)*gp,AMBER,null)
+    }
+  })
+
+  // Baseline
+  ctx.save();ctx.globalAlpha=ease(p*.6)*.2
+  ln(startX-q(.02),bBase,startX+total+q(.02),bBase,BORDER,1.5)
+  ctx.restore()
+
+  // Gap list cascades on right
+  if(p>.5){
+    const gaps=['Walnut Melbourne Boots','Black Swimwear','Comfort Heels','Tummy Control','Bridal Edit']
+    gaps.forEach((g,i)=>{
+      const del=i*.09
+      const ga=ease(cl((p-.5-del)/.48,0,1),E.el)
+      const gy=q(.26+i*.078)
+      rr(q(.64),gy-q(.024),q(.32),q(.048),q(.008),AMBER+'18',AMBER,.9*ga)
+      txt(q(.8),gy,g,q(.016),AMBER,'600','center','middle',ga)
+    })
+    chip(q(.8),q(.26-q(.04)/Q),'gaps found',q(.019),AMBER,ease((p-.5)/.5))
+  }
+
+  // "20" counter
+  if(p>.72){
+    const np=ease((p-.72)/.28,E.el)
+    const numStr=Math.round(ease(cl((p-.72)/.2,0,1))*20).toString()
+    txt(q(.78),q(.18),numStr,q(.072)*np,AMBER,'900','center','middle',np)
+  }
+
+  // Approval buttons
+  if(p>.8){
+    const ap=ease((p-.8)/.2,E.el)
+    ;['✓ Approve','✕ Dismiss'].forEach((lbl,i)=>{
+      const bx=cx+(i===0?-q(.18):q(.18))
+      arc(bx,q(.88),q(.06)*ap,[GREEN,AMBER_L][i],[GREEN,AMBER][i],ap*2)
+      txt(bx,q(.88),lbl,q(.018),[GREEN,AMBER][i],'700','center','middle',ap)
+    })
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   ACT 6 — AI AGENT: COMPETITOR GAP
+   Split screen: YOUR store bars vs THEIR bars.
+   Gap highlighted. Arrow "one click" → fills the gap.
+   THE ICONIC reference → your store.
+══════════════════════════════════════════════════════ */
+function a6(p){
+  const cx=q(.5)
+
+  // Divider
+  ctx.save();ctx.globalAlpha=ease(p*.5)*.15
+  ln(cx,q(.08),cx,q(.88),BORDER,1.5)
+  ctx.restore()
+
+  // YOUR store — left bars
+  const yourBars=[.5,.35,.7,.25,.6,.4]
+  const theirBars=[.5,.7,.7,.65,.6,.85]  // competitor has more
+  const bW=q(.06),bGap=q(.008)
+  const bBase=q(.82),maxH=q(.55)
+
+  // YOUR bars
+  const lStart=q(.08)
+  yourBars.forEach((bh,i)=>{
+    const del=i*.08
+    const bp=ease(cl(p*.75-del,0,1),E.el)
+    rr(lStart+i*(bW+bGap),bBase-maxH*bh*bp,bW,maxH*bh*bp,3,BLUE+'44',BLUE,.8)
+  })
+  chip(q(.26),q(.12),'your store',q(.022),BLUE,ease(p*.6))
+
+  // THEIR bars (competitor)
+  const rStart=q(.54)
+  theirBars.forEach((bh,i)=>{
+    const del=i*.08
+    const bp=ease(cl(p*.75-del,0,1),E.el)
+    const isGap=(bh>yourBars[i]+.15)
+    const col=isGap?AMBER:BLUE
+    rr(rStart+i*(bW+bGap),bBase-maxH*bh*bp,bW,maxH*bh*bp,3,col+(isGap?'33':'44'),col,.8)
+    // gap indicator arrow
+    if(isGap&&p>.4){
+      const gp=ease(cl((p-.4-i*.06)/(1-.4-i*.06),0,1),E.el)
+      arc(rStart+i*(bW+bGap)+bW/2,bBase-maxH*bh*bp-q(.04),q(.02)*gp,AMBER,null)
+    }
+  })
+  chip(q(.74),q(.12),'THE ICONIC',q(.022),AMBER,ease(p*.6))
+
+  // "They have it — you don't" label
+  if(p>.42){
+    const lp=ease((p-.42)/.35,E.o3)
+    chip(cx,q(.88),'they have it — you don\'t',q(.022),AMBER,lp)
+  }
+
+  // One-click arrow bridging the gap
+  if(p>.62){
+    const op=ease((p-.62)/.38,E.el)
+    // arrow from your bar 1 gap to filled
+    arw(q(.64),q(.52),q(.24),q(.52),GREEN,2,op)
+    fp(q(.64),q(.52),q(.24),q(.52),(T*2)%1,GREEN)
+
+    if(op>.6){
+      const fp2=ease((op-.6)/.4,E.el)
+      chip(cx,q(.74),'one click → live',q(.024),GREEN,fp2)
+    }
+  }
+
+  // Baseline
+  ctx.save();ctx.globalAlpha=.2
+  ln(q(.06),bBase,q(.94),bBase,BORDER,1.5)
+  ctx.restore()
+}
+
+/* ══════════════════════════════════════════════════════
+   ACT 7 — FULL STACK SUMMARY
+   Three columns (LLM / Auto / Agent) each with their
+   feature list flowing in. Then all three converge into
+   a Shopify bag + Google #1 bar. Celebration.
+══════════════════════════════════════════════════════ */
+function a7(p){
+  const cx=q(.5)
+
+  const cols=[
+    {col:BLUE,  sym:'bolt',  lbl:'LLM calls',    x:.18,
+     items:['Description gen','Meta description','FAQ generation','Brand page copy','Blog topic planner','Title audit']},
+    {col:GREEN, sym:'gear',  lbl:'Automations',  x:.5,
+     items:['Nightly scan','New product detect','Seasonal refresh','Link mesh rebuild','SEO score update','Restock tag']},
+    {col:AMBER, sym:'orbit', lbl:'AI Agents',    x:.82,
+     items:['Brand intelligence','Store SEO audit','Competitor gaps','New store onboard','Full SEO rebuild']},
+  ]
+
+  cols.forEach((col,ci)=>{
+    const del=ci*.18
+    const cp=ease(cl((p-.06-del)/.72,0,1),E.el)
+    const a=ease(cl((p-del-.06)/.66,0,1))
+    const cx2=q(col.x)
+
+    // Column symbol at top
+    const sy=q(.12)
+    arc(cx2,sy,q(.065)*cp,col.col+'18',col.col,cp*2)
+    if(col.sym==='bolt')  bolt(cx2,sy,q(.045)*cp,col.col,a)
+    if(col.sym==='gear')  gear(cx2,sy,q(.04)*cp,T*.5,a,col.col)
+    if(col.sym==='orbit') orbitAgent(cx2,sy,q(.04)*cp,2,T,col.col,a)
+    if(cp>.5) chip(cx2,sy+q(.09),'lbl',q(.021),col.col,0)  // skip text on sym
+    chip(cx2,q(.23),col.lbl,q(.022),col.col,ease(cl(cp*.8,0,1)))
+
+    // Feature items cascade
+    col.items.forEach((item,i)=>{
+      const idel=i*.07
+      const ia=ease(cl((cp-.3-idel)/(1-.3-idel),0,1),E.el)
+      const iy=q(.3+i*.095)
+      rr(cx2-q(.16),iy-q(.025),q(.32)*ia,q(.05),q(.007),col.col+'18',col.col,ia*.7)
+      txt(cx2,iy,item,q(.016),col.col,'500','center','middle',ia)
+    })
+  })
+
+  // Convergence — all paths meet centre bottom
+  if(p>.72){
+    const cp2=ease((p-.72)/.28,E.el)
+    const destX=cx,destY=q(.92)
+
+    cols.forEach((col,ci)=>{
+      const cx2=q(col.x)
+      arw(cx2,q(.8),destX,destY-q(.04),col.col,1.5,cp2)
+      fp(cx2,q(.8),destX,destY-q(.04),(T*2+ci*.33)%1,col.col)
+    })
+
+    // Destination: Shopify bag
+    if(cp2>.5){
+      const bp2=ease((cp2-.5)/.5,E.el)
+      arc(destX,destY,q(.055)*bp2,GREEN+'22',GREEN,bp2*2)
+      txt(destX,destY,'Shopify',q(.02),GREEN,'700','center','middle',bp2)
+      txt(destX,destY+q(.04),'live',q(.016),GREEN,'400','center','middle',bp2*.8)
+    }
+  }
+
+  // Celebration
+  if(p>.85&&Math.random()<.2){
+    const cols2=[BLUE,GREEN,AMBER,INDIGO,PINK]
+    pt(q(.2)+Math.random()*q(.6),q(.88),cols2[Math.floor(Math.random()*cols2.length)],(Math.random()-.5)*3,-(Math.random()*4+2))
+  }
+}
+
+/* ══ ACTS CONFIG ══════════════════════════ */
+const ACTS=[
+  {fn:a0, lbl:'3 AI patterns',        badge:'Overview',       bcol:INDIGO, bfg:'#fff',  pg:'linear-gradient(90deg,#6366f1,#8b5cf6)'},
+  {fn:a1, lbl:'SEO content generator',badge:'LLM call',       bcol:BLUE,   bfg:'#fff',  pg:'linear-gradient(90deg,#3b82f6,#0ea5e9)'},
+  {fn:a2, lbl:'Nightly scan',          badge:'Automation',     bcol:GREEN,  bfg:'#fff',  pg:'linear-gradient(90deg,#10b981,#14b8a6)'},
+  {fn:a3, lbl:'Seasonal + link mesh',  badge:'Automation',     bcol:GREEN,  bfg:'#fff',  pg:'linear-gradient(90deg,#10b981,#14b8a6)'},
+  {fn:a4, lbl:'Brand intelligence',    badge:'AI Agent',       bcol:AMBER,  bfg:INK,     pg:'linear-gradient(90deg,#f59e0b,#f97316)'},
+  {fn:a5, lbl:'Store SEO audit',       badge:'AI Agent',       bcol:AMBER,  bfg:INK,     pg:'linear-gradient(90deg,#f59e0b,#f97316)'},
+  {fn:a6, lbl:'Competitor gap finder', badge:'AI Agent',       bcol:AMBER,  bfg:INK,     pg:'linear-gradient(90deg,#f59e0b,#f97316)'},
+  {fn:a7, lbl:'Full AI stack',         badge:'Sonic Rank',     bcol:INDIGO, bfg:'#fff',  pg:'linear-gradient(90deg,#6366f1,#10b981)'},
+]
+
+/* ══ DOTS ════════════════════════════════ */
+const dotsEl=document.getElementById('dots')
+for(let i=0;i<N;i++){
+  const d=document.createElement('div')
+  d.className='dot';d.id='d'+i;d.onclick=()=>goTo(i)
+  dotsEl.appendChild(d)
+}
+
+function uiSync(){
+  const act=ACTS[aI]
+  for(let i=0;i<N;i++){
+    const d=document.getElementById('d'+i)
+    d.className='dot'+(i===aI?' on':i<aI?' done':'')
+    d.style.background=i===aI?act.bcol:i<aI?act.bcol+'66':'rgba(0,0,0,.12)'
+  }
+  const badge=document.getElementById('badge')
+  badge.textContent=act.badge
+  badge.style.background=act.bcol+'22'
+  badge.style.color=act.bcol
+  badge.style.border=`1px solid ${act.bcol}44`
+  document.getElementById('actlbl').textContent=act.lbl
+  document.getElementById('actlbl').style.color=act.bcol
+  document.getElementById('pf').style.background=act.pg
+}
+
+/* ══ ENGINE ═════════════════════════════ */
+function render(ts){
+  if(!lastTs)lastTs=ts
+  const dt=Math.min((ts-lastTs)/1000,.05);lastTs=ts
+  if(playing){
+    T+=dt
+    const raw=T/(DUR*N)
+    gT=cl(raw,0,1)
+    const na=Math.min(Math.floor(raw*N),N-1)
+    if(na!==aI){aI=na;uiSync()}
+    aT=cl((raw*N)%1,0,1)
+    document.getElementById('pf').style.width=(gT*100)+'%'
+    if(gT>=1){playing=false;document.getElementById('play').textContent='↺ Replay';document.getElementById('play').classList.remove('h')}
+  }
+  ctx.clearRect(0,0,Q,Q);bg();tickPts(dt)
+  const F=.055
+  if(aT<F&&aI>0){
+    ctx.save();ctx.globalAlpha=ease(1-aT/F);ACTS[aI-1].fn(1);ctx.restore()
+    ctx.save();ctx.globalAlpha=ease(aT/F);ACTS[aI].fn(0);ctx.restore()
+  } else ACTS[aI].fn(aT)
+  requestAnimationFrame(render)
+}
+
+function goTo(i){aI=i;aT=0;T=i*DUR;uiSync()}
+
+function togglePlay(){
+  const btn=document.getElementById('play')
+  if(playing){playing=false;btn.textContent='▶ Play'}
+  else{if(T>=DUR*N-.5)T=0;playing=true;btn.textContent='❙❙ Pause';btn.classList.add('h');lastTs=null}
+}
+
+window.addEventListener('load',()=>{resize();uiSync();bg();ACTS[0].fn(0);requestAnimationFrame(render)})
+window.addEventListener('resize',()=>{resize();ctx.clearRect(0,0,Q,Q);bg()})
+</script>
+</body>
+</html>

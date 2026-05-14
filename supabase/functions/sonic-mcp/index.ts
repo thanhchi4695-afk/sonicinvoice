@@ -198,10 +198,13 @@ mcp.tool("get_gap_results", {
     properties: {
       limit: { type: "number", minimum: 1, maximum: 50, default: 10 },
       gap_type: { type: "string", description: "Filter by gap_type (e.g. collection, brand)" },
+      status: { type: "string", description: "Filter by status (e.g. pending, created, dismissed)" },
+      expected_impact: { type: "string", enum: ["high", "medium", "low"], description: "Filter by expected impact" },
+      impact: { type: "string", enum: ["high", "medium", "low"], description: "Alias for expected_impact" },
     },
     additionalProperties: false,
   },
-  handler: wrap<{ limit?: number; gap_type?: string }>(
+  handler: wrap<{ limit?: number; gap_type?: string; status?: string; expected_impact?: string; impact?: string }>(
     "get_gap_results",
     async (args, auth) => {
       let q = admin
@@ -213,6 +216,9 @@ mcp.tool("get_gap_results", {
         .order("created_at", { ascending: false })
         .limit(Math.min(Number(args?.limit) || 10, 50));
       if (args?.gap_type) q = q.eq("gap_type", args.gap_type);
+      if (args?.status) q = q.eq("status", args.status);
+      const impact = args?.expected_impact ?? args?.impact;
+      if (impact) q = q.eq("expected_impact", impact);
       const { data, error } = await q;
       if (error) throw new Error(error.message);
       return { count: (data ?? []).length, gaps: data ?? [] };

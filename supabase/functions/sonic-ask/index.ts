@@ -259,6 +259,29 @@ Lowest-scoring collections (focus areas):
 ${colSummary}`;
 }
 
+// Loads the user's active claude_skills from the DB and concatenates them
+// into a single knowledge block. Falls back to the hardcoded EXPERT_KNOWLEDGE
+// if no active skills exist (so the chat still works on a fresh install).
+async function fetchSkills(userId: string): Promise<string> {
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data, error } = await admin
+    .from("claude_skills")
+    .select("skill_name, content")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("skill_name", { ascending: true });
+  if (error) {
+    console.warn("[sonic-ask] skills fetch failed:", error.message);
+    return EXPERT_KNOWLEDGE;
+  }
+  const rows = (data ?? []) as { skill_name: string; content: string }[];
+  if (rows.length === 0) return EXPERT_KNOWLEDGE;
+  const sep = "═".repeat(40);
+  return rows
+    .map(s => `${sep}\nSKILL — ${s.skill_name.toUpperCase()}\n${sep}\n${s.content}`)
+    .join("\n\n");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405, headers: corsHeaders });
@@ -295,10 +318,16 @@ Deno.serve(async (req) => {
       (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim()
     );
 
-    const liveContext = await fetchContext(user.id).catch((e) => {
-      console.warn("[sonic-ask] context fetch failed:", e);
-      return "## LIVE STORE CONTEXT\n(unavailable this turn)";
-    });
+    const [liveContext, expertKnowledge] = await Promise.all([
+      fetchContext(user.id).catch((e) => {
+        console.warn("[sonic-ask] context fetch failed:", e);
+        return "## LIVE STORE CONTEXT\n(unavailable this turn)";
+      }),
+      fetchSkills(user.id).catch((e) => {
+        console.warn("[sonic-ask] skills fetch failed:", e);
+        return EXPERT_KNOWLEDGE;
+      }),
+    ]);
 
     const systemPrompt = `You are Sonic AI — an embedded expert assistant inside Sonic Invoices, a Shopify stock-intake and SEO automation tool for Australian independent retailers (boutique fashion, swimwear, footwear).
 
@@ -311,7 +340,7 @@ You answer the store owner's questions using the live data and expert knowledge 
 
 ${liveContext}
 
-${EXPERT_KNOWLEDGE}
+${expertKnowledge}
 
 Tone: confident, retail-savvy, no fluff. Default to short answers (2-5 sentences) unless the user asks for detail. Use markdown sparingly (lists, bold) when it helps scanability.`;
 

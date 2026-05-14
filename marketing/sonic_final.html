@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sonic Invoices</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#0a0a0a;overflow:hidden;font-family:'Inter',system-ui,sans-serif}
+#wrap{
+  width:100vw;height:56.25vw;max-height:100vh;max-width:177.78vh;
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:#f8fafc;overflow:hidden;
+}
+canvas{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+
+/* info panel — right side */
+#panel{
+  position:absolute;right:0;top:0;bottom:0;width:28%;z-index:5;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:0 2.5% 0 2%;
+  pointer-events:none;
+}
+.panel-inner{
+  background:rgba(255,255,255,0.94);
+  border:1px solid rgba(226,232,240,0.9);
+  border-radius:1.2vw;
+  padding:1.6vh 1.6vw;
+  backdrop-filter:blur(12px);
+  box-shadow:0 4px 24px rgba(0,0,0,0.07);
+  transform:translateX(30px);
+  opacity:0;
+  transition:opacity 0.5s ease, transform 0.5s ease;
+}
+.panel-inner.show{opacity:1;transform:translateX(0)}
+.panel-act{font-size:.65vw;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#94a3b8;margin-bottom:.7vh}
+.panel-title{font-size:1.25vw;font-weight:800;color:#0f172a;letter-spacing:-.03em;line-height:1.15;margin-bottom:1vh}
+.panel-title span{display:inline-block}
+.panel-items{display:flex;flex-direction:column;gap:.55vh}
+.panel-item{
+  display:flex;align-items:flex-start;gap:.55vw;
+  opacity:0;transform:translateX(10px);
+  transition:opacity .35s ease, transform .35s ease;
+  font-size:.78vw;line-height:1.45;color:#475569;
+}
+.panel-item.show{opacity:1;transform:translateX(0)}
+.panel-dot{width:.55vw;height:.55vw;border-radius:50%;flex-shrink:0;margin-top:.45vh}
+.panel-num{
+  font-size:1.8vw;font-weight:900;letter-spacing:-.05em;
+  margin-top:.8vh;margin-bottom:.2vh;
+}
+.panel-divider{height:1px;background:#f1f5f9;margin:.8vh 0}
+
+/* wordmark */
+#wm{position:absolute;top:2.5%;left:2.5%;z-index:8;display:flex;align-items:center;gap:.55vw;opacity:.7}
+#wm svg{width:1.8vw;height:1.8vw}
+#wm span{font-size:.85vw;font-weight:700;color:#0f172a;letter-spacing:-.01em}
+
+/* progress + controls */
+#prog{position:absolute;bottom:0;left:0;right:0;height:2px;background:rgba(0,0,0,.06);z-index:20}
+#pf{height:100%;width:0%;background:#6366f1;transition:none}
+#ctrls{position:absolute;bottom:1.5%;left:50%;transform:translateX(-50%);z-index:20;display:flex;align-items:center;gap:.8vw;opacity:0;transition:opacity .25s}
+#wrap:hover #ctrls{opacity:1}
+.cb{background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.1);border-radius:20px;padding:.5vh 1.2vw;font-size:.78vw;font-weight:600;color:#334155;cursor:pointer;transition:all .18s;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.cb:hover{background:#fff;box-shadow:0 3px 14px rgba(0,0,0,.15)}
+.cb.play{background:#6366f1;color:#fff;border-color:#6366f1;box-shadow:0 4px 14px rgba(99,102,241,.4)}
+#acts{display:flex;gap:.35vw;align-items:center}
+.adot{width:.45vw;height:.45vw;border-radius:50%;background:rgba(0,0,0,.15);transition:all .3s;cursor:pointer}
+.adot.on{background:#6366f1;width:1.1vw;border-radius:.25vw}
+.adot.done{background:rgba(99,102,241,.4)}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c"></canvas>
+
+  <div id="wm">
+    <svg viewBox="0 0 40 40" fill="none">
+      <circle cx="20" cy="20" r="18" fill="#6366f1" opacity=".15" stroke="#6366f1" stroke-width="1"/>
+      <circle cx="20" cy="20" r="11" fill="#6366f1"/>
+      <circle cx="16" cy="20" r="5.5" fill="#f8fafc"/>
+      <circle cx="21" cy="20" r="3.5" fill="#6366f1"/>
+    </svg>
+    <span>Sonic Invoices</span>
+  </div>
+
+  <div id="panel"><div class="panel-inner" id="panelInner">
+    <div class="panel-act" id="pAct"></div>
+    <div class="panel-title" id="pTitle"></div>
+    <div class="panel-divider"></div>
+    <div class="panel-items" id="pItems"></div>
+    <div class="panel-num" id="pNum" style="display:none"></div>
+  </div></div>
+
+  <div id="prog"><div id="pf"></div></div>
+  <div id="ctrls">
+    <button class="cb" onclick="nav(-1)">←</button>
+    <button class="cb play" id="playBtn" onclick="togglePlay()">▶ Play</button>
+    <div id="acts"></div>
+    <button class="cb" onclick="nav(1)">→</button>
+  </div>
+</div>
+
+<script>
+/* ─── CANVAS ─────────────────────────────── */
+const wrap=document.getElementById('wrap')
+const cv=document.getElementById('c')
+const ctx=cv.getContext('2d')
+let W=0,H=0,DPR=1
+
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2)
+  W=wrap.offsetWidth;H=wrap.offsetHeight
+  cv.width=W*DPR;cv.height=H*DPR
+  cv.style.width=W+'px';cv.style.height=H+'px'
+  ctx.scale(DPR,DPR)
+}
+
+/* ─── EASING ─────────────────────────────── */
+const E={
+  o3:t=>1-Math.pow(1-t,3),
+  i3:t=>t*t*t,
+  io:t=>t<.5?4*t*t*t:(1-Math.pow(-2*t+2,3)/2),
+  el:t=>{const c=2*Math.PI/3;return t===0?0:t===1?1:Math.pow(2,-10*t)*Math.sin((t*10-.75)*c)+1},
+  bk:t=>{const c=1.70158+1;return c*t*t*t-(c-1)*t*t},
+}
+function lerp(a,b,t){return a+(b-a)*t}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function ease(t,fn=E.o3){return fn(clamp(t,0,1))}
+function cx(f){return W*f}
+function cy(f){return H*f}
+function cs(f){return Math.min(W,H)*f}
+
+/* ─── COLOURS ────────────────────────────── */
+const C={
+  bg:'#f8fafc',ink:'#0f172a',muted:'#94a3b8',border:'#e2e8f0',
+  indigo:'#6366f1',violet:'#8b5cf6',green:'#10b981',
+  amber:'#f59e0b',red:'#ef4444',teal:'#14b8a6',
+  pink:'#ec4899',blue:'#3b82f6',sky:'#0ea5e9',
+  greenL:'#f0fdf4',redL:'#fef2f2',indigoL:'#eef2ff',
+}
+
+/* ─── STATE ──────────────────────────────── */
+let t=0,playing=false,lastTs=null,rafId=null
+const ACT_DUR=11
+const ACTS=10
+let globalT=0,actT=0,actIdx=0
+
+/* ─── PRIMITIVES ─────────────────────────── */
+function rr(x,y,w,h,r,fill,stroke,sw=1){
+  ctx.beginPath();ctx.roundRect(x,y,w,h,r)
+  if(fill){ctx.fillStyle=fill;ctx.fill()}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke()}
+}
+function circ(x,y,r,fill,stroke,sw=1.5){
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2)
+  if(fill){ctx.fillStyle=fill;ctx.fill()}
+  if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=sw;ctx.stroke()}
+}
+function ring(x,y,r,color,alpha,sw=2){
+  ctx.save();ctx.globalAlpha=alpha
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2)
+  ctx.strokeStyle=color;ctx.lineWidth=sw;ctx.stroke()
+  ctx.restore()
+}
+function txt(x,y,s,size,color,weight='600',align='center',baseline='middle'){
+  ctx.save()
+  ctx.font=`${weight} ${size}px 'Inter',system-ui,sans-serif`
+  ctx.fillStyle=color;ctx.textAlign=align;ctx.textBaseline=baseline
+  ctx.fillText(s,x,y);ctx.restore()
+}
+function label(x,y,s,size,color,bg,alpha=1){
+  ctx.save();ctx.globalAlpha=alpha
+  ctx.font=`600 ${size}px 'Inter',system-ui,sans-serif`
+  const m=ctx.measureText(s).width
+  const pad=size*.55,ph=size*1.5
+  rr(x-m/2-pad,y-ph/2,m+pad*2,ph,ph/2,bg,color+'44',1)
+  ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle'
+  ctx.fillText(s,x,y);ctx.restore()
+}
+
+/* ─── PARTICLES ──────────────────────────── */
+let parts=[]
+function spawn(x,y,col,vx,vy,life=.9,r=cs(.006)){
+  parts.push({x,y,vx,vy,r,col,life,ml:life,t:0})
+}
+function tickParts(dt){
+  parts=parts.filter(p=>{
+    p.t+=dt;p.x+=p.vx*dt*60;p.y+=p.vy*dt*60;p.vy+=.25*dt*60
+    const a=ease(1-p.t/p.ml)
+    ctx.save();ctx.globalAlpha=a*.75
+    circ(p.x,p.y,p.r*a,p.col);ctx.restore()
+    return p.t<p.ml
+  })
+}
+
+/* ─── SONIC LOGO ─────────────────────────── */
+function sonic(x,y,r,alpha=1,col=C.indigo){
+  ctx.save();ctx.globalAlpha=alpha
+  ring(x,y,r,col,.12,r*.11);ring(x,y,r*.66,col,.2,r*.08)
+  ctx.beginPath();ctx.arc(x,y,r*.5,0,Math.PI*2)
+  ctx.fillStyle=col;ctx.fill()
+  ctx.globalCompositeOperation='destination-out'
+  ctx.beginPath();ctx.arc(x-r*.17,y,r*.27,0,Math.PI*2);ctx.fill()
+  ctx.globalCompositeOperation='source-over'
+  ctx.beginPath();ctx.arc(x+r*.1,y,r*.21,0,Math.PI*2)
+  ctx.fillStyle=col;ctx.fill()
+  ctx.restore()
+}
+
+/* ─── DOCUMENT ───────────────────────────── */
+function doc(x,y,w,h,r,alpha=1,fill=C.bg,stroke=C.border){
+  ctx.save();ctx.globalAlpha=alpha
+  const fold=w*.2
+  ctx.beginPath()
+  ctx.moveTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y)
+  ctx.lineTo(x+w-fold,y);ctx.lineTo(x+w,y+fold)
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h)
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r)
+  ctx.closePath();ctx.fillStyle=fill;ctx.fill()
+  ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(x+w-fold,y);ctx.lineTo(x+w-fold,y+fold);ctx.lineTo(x+w,y+fold)
+  ctx.lineWidth=1;ctx.stroke();ctx.restore()
+}
+
+/* ─── CLOCK ──────────────────────────────── */
+function clock(x,y,r,ha,ma,alpha=1,col=C.ink){
+  ctx.save();ctx.globalAlpha=alpha
+  circ(x,y,r,null,col,r*.08)
+  ;[{a:ha,l:.5,lw:r*.12},{a:ma,l:.74,lw:r*.08}].forEach(h=>{
+    ctx.beginPath();ctx.moveTo(x,y)
+    ctx.lineTo(x+Math.cos(h.a)*r*h.l,y+Math.sin(h.a)*r*h.l)
+    ctx.strokeStyle=col;ctx.lineWidth=h.lw;ctx.lineCap='round';ctx.stroke()
+  })
+  circ(x,y,r*.1,col);ctx.restore()
+}
+
+/* ─── ICON DRAWER ────────────────────────── */
+function icon(x,y,size,col,alpha,shape){
+  ctx.save();ctx.globalAlpha=alpha;ctx.strokeStyle=col
+  ctx.lineWidth=size*.09;ctx.lineCap='round';ctx.lineJoin='round'
+  ctx.translate(x,y);ctx.scale(size/24,size/24);ctx.translate(-12,-12)
+  ctx.beginPath()
+  const sh={
+    mail:()=>{ctx.roundRect(2,4,20,16,2);ctx.moveTo(2,7);ctx.lineTo(12,13);ctx.lineTo(22,7)},
+    file:()=>{ctx.moveTo(6,2);ctx.lineTo(14,2);ctx.lineTo(18,6);ctx.lineTo(18,22);ctx.lineTo(6,22);ctx.closePath();ctx.moveTo(14,2);ctx.lineTo(14,7);ctx.lineTo(18,7)},
+    cart:()=>{ctx.moveTo(1,1);ctx.lineTo(5,1);ctx.lineTo(8,14);ctx.lineTo(19,14);ctx.lineTo(21,5);ctx.lineTo(6,5);ctx.moveTo(9,19);ctx.arc(9,19,1.5,0,Math.PI*2);ctx.moveTo(18,19);ctx.arc(18,19,1.5,0,Math.PI*2)},
+    link:()=>{ctx.moveTo(10,13);ctx.bezierCurveTo(12,15,16,15,18,13);ctx.moveTo(14,11);ctx.bezierCurveTo(12,9,8,9,6,11);ctx.moveTo(15,9);ctx.lineTo(20,4);ctx.moveTo(9,15);ctx.lineTo(4,20)},
+    tag:()=>{ctx.moveTo(3,3);ctx.lineTo(10,3);ctx.lineTo(21,14);ctx.lineTo(14,21);ctx.lineTo(3,10);ctx.closePath()},
+    check:()=>{ctx.moveTo(20,6);ctx.lineTo(9,17);ctx.lineTo(4,12)},
+    shopify:()=>{ctx.moveTo(16,3);ctx.bezierCurveTo(14,2,12,2,10,3);ctx.lineTo(8,19);ctx.lineTo(17,21);ctx.lineTo(21,5);ctx.bezierCurveTo(19,4,16,3,16,3);ctx.moveTo(8,8);ctx.lineTo(4,10);ctx.lineTo(4,19);ctx.lineTo(8,21)},
+    search:()=>{ctx.arc(11,11,7,0,Math.PI*2);ctx.moveTo(16,16);ctx.lineTo(21,21)},
+    clock:()=>{ctx.arc(12,12,9,0,Math.PI*2);ctx.moveTo(12,7);ctx.lineTo(12,12);ctx.lineTo(16,14)},
+    brain:()=>{ctx.moveTo(12,5);ctx.bezierCurveTo(8,5,6,8,6,11);ctx.bezierCurveTo(4,11,2,13,2,15);ctx.bezierCurveTo(2,17,4,19,7,19);ctx.lineTo(17,19);ctx.bezierCurveTo(20,19,22,17,22,15);ctx.bezierCurveTo(22,13,20,11,18,11);ctx.bezierCurveTo(18,8,16,5,12,5);ctx.moveTo(12,5);ctx.lineTo(12,19)},
+    refresh:()=>{ctx.arc(12,12,8,-.3,Math.PI*1.7);ctx.moveTo(20,8);ctx.lineTo(21,12);ctx.lineTo(17,13)},
+    trending:()=>{ctx.moveTo(2,20);ctx.lineTo(8,12);ctx.lineTo(14,16);ctx.lineTo(22,5);ctx.moveTo(16,5);ctx.lineTo(22,5);ctx.lineTo(22,11)},
+    star:()=>{for(let j=0;j<5;j++){const a=-Math.PI/2+j*Math.PI*2/5;const a2=a+Math.PI/5;ctx.moveTo(12+Math.cos(a)*9,12+Math.sin(a)*9);ctx.lineTo(12+Math.cos(a2)*4,12+Math.sin(a2)*4)}},
+    photo:()=>{ctx.roundRect(2,4,20,16,2);ctx.arc(12,12,4,0,Math.PI*2);ctx.moveTo(16,4);ctx.lineTo(18,4)},
+    mail2:()=>{ctx.roundRect(2,4,20,16,2);ctx.moveTo(2,7);ctx.lineTo(12,13);ctx.lineTo(22,7);ctx.moveTo(12,13);ctx.lineTo(12,20)},
+    keyboard:()=>{ctx.roundRect(2,6,20,14,2);ctx.moveTo(6,11);ctx.lineTo(6,11);ctx.rect(5,10,2,2);ctx.rect(9,10,2,2);ctx.rect(13,10,2,2);ctx.rect(17,10,2,2);ctx.rect(7,14,10,2)},
+    alert:()=>{ctx.moveTo(12,2);ctx.lineTo(22,20);ctx.lineTo(2,20);ctx.closePath();ctx.moveTo(12,9);ctx.lineTo(12,13);ctx.moveTo(12,17);ctx.arc(12,17,.5,0,Math.PI*2)},
+  }
+  if(sh[shape])sh[shape]()
+  ctx.stroke();ctx.restore()
+}
+
+/* ─── PANEL SYSTEM ───────────────────────── */
+const panelData=[
+  // Act 0 — PROBLEM
+  {
+    act:'The problem',title:'Manual entry is killing your day',
+    col:C.red,
+    items:['Wholesale invoices arrive daily from 40+ brands','Every product re-typed by hand into Shopify','40+ line items per invoice · sizing per variant','Products go live days after stock arrives','Errors in SKUs, prices and descriptions'],
+    num:{val:'2 hrs',sub:'per delivery, every week',col:C.red},
+  },
+  // Act 1 — SONIC ARRIVES
+  {
+    act:'Introducing Sonic Invoices',title:'One AI hub. Every invoice format.',
+    col:C.indigo,
+    items:['Gmail / IMAP — OAuth email, auto-detects attachments','JOOR — Excel XLSX, AU size normalisation, images','NuOrder — Format A long + Format B wide orders','Paste URL — AI scrapes any supplier catalogue','Universal parser — learns any new format automatically'],
+    num:{val:'5',sub:'import sources covered',col:C.indigo},
+  },
+  // Act 2 — AI PARSE + TAGS
+  {
+    act:'Pillar 2 · Automate',title:'AI reads, tags and enriches every product',
+    col:C.violet,
+    items:['7-layer auto-tagging: brand · type · colour · material · season · occasion · arriving-mmm-yyyy','Brand context AI — 3 confidence tiers, 85% gate','Silent training pipeline — learns from email history','Image enrichment — fetches photos from brand sites','Description AI — SEO-ready copy from brand voice'],
+    num:{val:'187',sub:'brands learned',col:C.violet},
+  },
+  // Act 3 — SHOPIFY PUSH
+  {
+    act:'Pillar 2 · Automate',title:'Products live in Shopify instantly',
+    col:C.green,
+    items:['Smart collection rules auto-created per brand + type','Restock detection — tags known products "restocked"','Back In Stock collection updates automatically','Dual-store inventory sync across 2 Shopify stores','Klaviyo triggers fire on Back In Stock + seasonal edits'],
+    num:{val:'15 min',sub:'invoice to Shopify live',col:C.green},
+  },
+  // Act 4 — SEO COLLECTIONS
+  {
+    act:'Pillar 3 · Sonic Rank · SEO engine',title:'90+ SEO collections. Generated automatically.',
+    col:C.sky,
+    items:['6-level URL hierarchy — /collections/parent/child','Colour collections: black swimwear · floral · tan shoes','Mathers intersections: comfort × heels · tummy control','Static filter pages — 90+ indexed (Louenhide technique)','GWG Edits: Bridal · Summer · Gifting · Workwear'],
+    num:{val:'90+',sub:'SEO collections created',col:C.sky},
+  },
+  // Act 5 — CONTENT GENERATION
+  {
+    act:'Pillar 3 · Sonic Rank · Content',title:'Every collection gets expert SEO content',
+    col:C.indigo,
+    items:['5-part description formula — keyword-loaded opener, materials, brands, FAQ, links','Brand page builder — founding story + seasonal products','FAQ generator — 4–6 questions, captures People Also Ask','Internal link mesh — every collection links to siblings','Meta description formula — Mathers pattern, 150–160 chars'],
+    num:{val:'6',sub:'retailer references studied',col:C.indigo},
+  },
+  // Act 6 — AI AGENTS
+  {
+    act:'Pillar 3 · AI Agents',title:'Three agents scouting 24/7',
+    col:C.violet,
+    items:['Brand intelligence agent — crawls brand sites, extracts founding story, voice, category vocab','SEO audit agent — scans all collections, detects gaps, ranks by traffic impact','Competitor gap agent — crawls THE ICONIC, Mathers, David Jones · "they have this — you don\'t"','One click → collection created, SEO content generated, live in Shopify'],
+    num:{val:'3',sub:'AI agents always working',col:C.violet},
+  },
+  // Act 7 — AUTOMATIONS
+  {
+    act:'Silent automations · background engine',title:'The machine that never stops',
+    col:C.teal,
+    items:['Nightly product scan — queues SEO jobs on new content only','Seasonal edit refresher — Darwin wet/dry + AU retail calendar','Link mesh rebuilder — updates all siblings when new collection added','SEO score updater — 100-point completeness, red/amber/green badges','Dual-store sync + Klaviyo email trigger on collection update'],
+    num:{val:'6',sub:'silent automations running',col:C.teal},
+  },
+  // Act 8 — SEO RANK
+  {
+    act:'The result · Google ranking',title:'From zero visibility to #1',
+    col:C.amber,
+    items:['THE ICONIC URL taxonomy depth — 6 levels','White Fox nested /parent/child Shopify handles','David Jones brand page luxury formula','Louenhide static filter collections — 90+ indexed pages','Girls With Gems gifting engine + occasion Edits'],
+    num:{val:'#1',sub:'swimwear darwin · organic Google',col:C.amber},
+  },
+  // Act 9 — TRANSFORM
+  {
+    act:'The transformation',title:'Same invoice. 87% less time.',
+    col:C.green,
+    items:['Invoice received → products live in 15 minutes','AI learns your brands with every invoice','SEO collections grow automatically over time','Google finds your store — you focus on selling','Built for Splash Swimwear · Stomp Shoes · Pinkhill'],
+    num:{val:'87%',sub:'time saved every delivery',col:C.green},
+  },
+]
+
+let panelVisible=false
+function showPanel(idx){
+  const d=panelData[idx]
+  const pi=document.getElementById('panelInner')
+  document.getElementById('pAct').textContent=d.act
+  document.getElementById('pTitle').textContent=d.title
+  document.getElementById('pTitle').style.color=d.col
+  const pItems=document.getElementById('pItems')
+  pItems.innerHTML=''
+  d.items.forEach((item,i)=>{
+    const div=document.createElement('div')
+    div.className='panel-item'
+    div.innerHTML=`<div class="panel-dot" style="background:${d.col}"></div><span>${item}</span>`
+    div.style.transitionDelay=`${.12+i*.09}s`
+    pItems.appendChild(div)
+  })
+  const pNum=document.getElementById('pNum')
+  if(d.num){
+    pNum.style.display='block'
+    pNum.style.color=d.col
+    pNum.innerHTML=`${d.num.val}<span style="font-size:.75vw;font-weight:500;color:#94a3b8;margin-left:.4vw">${d.num.sub}</span>`
+  } else {pNum.style.display='none'}
+
+  // trigger animation
+  setTimeout(()=>{
+    pi.classList.add('show')
+    pItems.querySelectorAll('.panel-item').forEach(el=>setTimeout(()=>el.classList.add('show'),10))
+  },80)
+}
+
+function hidePanel(){
+  const pi=document.getElementById('panelInner')
+  pi.classList.remove('show')
+  document.querySelectorAll('.panel-item').forEach(el=>el.classList.remove('show'))
+}
+
+/* ─── BACKGROUND ─────────────────────────── */
+function clearBG(){
+  ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H)
+  ctx.save()
+  const gs=cs(.038)
+  for(let gx=gs*.5;gx<W*.72;gx+=gs)
+    for(let gy=gs*.5;gy<H;gy+=gs)
+      circ(gx,gy,cs(.0018),'rgba(99,102,241,0.1)')
+  ctx.restore()
+}
+
+/* ─── ACTS ───────────────────────────────── */
+
+/* ACT 0 — PROBLEM */
+function act0(p){
+  const dW=cs(.055),dH=cs(.068)
+  const pos=[{x:.18,y:.32},{x:.38,y:.26},{x:.55,y:.38},{x:.25,y:.56},{x:.48,y:.62},{x:.12,y:.65}]
+  pos.forEach((ps,i)=>{
+    const dp=ease(clamp((p-i*.12)/(1-i*.12),0,1),E.o3)
+    const y=lerp(cy(-.12),cy(ps.y),dp)
+    const a=ease(clamp((p-i*.12)/(1-i*.12),0,1))
+    const x_=cx(ps.x)
+    doc(x_-dW/2,y-dH/2,dW,dH,cs(.008),a)
+    if(a>.3){
+      ctx.save();ctx.globalAlpha=a*.45
+      ;[.28,.44,.6].forEach(ly=>rr(x_-dW*.33,y-dH/2+dH*ly,dW*.66,cs(.003),1,C.border))
+      ctx.restore()
+    }
+  })
+  // manual typing hand icon centre
+  if(p>.25){
+    const tp=ease((p-.25)/.4,E.o3)
+    const hx=cx(.4),hy=cy(.48)
+    icon(hx,hy,cs(.06),C.muted,tp*.6,'keyboard')
+    // repeated entries — blink
+    if(p>.4){
+      const bp=(Math.sin(t*6)*.5+.5)*ease((p-.4)/.3)
+      txt(hx+cs(.04),hy-cs(.06),'SKU-229-XS',cs(.013),C.muted+'99','400')
+      txt(hx+cs(.04),hy,'SKU-229-S',cs(.013),C.muted+'66','400')
+    }
+  }
+  // red X on docs
+  if(p>.5){
+    const xp=ease((p-.5)/.5,E.o3)
+    ;[{x:.18,y:.32},{x:.55,y:.38},{x:.12,y:.65}].forEach((ps,i)=>{
+      const a=ease(clamp((xp-i*.18)/(1-i*.18),0,1))
+      const x_=cx(ps.x),y_=cy(ps.y),s=cs(.016)*a
+      ctx.save();ctx.globalAlpha=a;ctx.strokeStyle=C.red;ctx.lineWidth=cs(.005);ctx.lineCap='round'
+      ctx.beginPath();ctx.moveTo(x_-s,y_-s);ctx.lineTo(x_+s,y_+s);ctx.stroke()
+      ctx.beginPath();ctx.moveTo(x_+s,y_-s);ctx.lineTo(x_-s,y_+s);ctx.stroke()
+      ctx.restore()
+    })
+  }
+  // clock
+  if(p>.3){
+    const cp=ease((p-.3)/.7,E.o3)
+    const cr=cs(.07)*cp
+    const hx=cx(.38),hy=cy(.44)
+    clock(hx,hy,cr,-Math.PI/2,-Math.PI/2+Math.PI*.33,cp*.8,C.muted)
+  }
+}
+
+/* ACT 1 — SONIC ARRIVES */
+function act1(p){
+  const hx=cx(.38),hy=cy(.5)
+  const hr=cs(.09)*ease(p*.85,E.el)
+  sonic(hx,hy,hr,ease(p*.85,E.el))
+  ;[0,.35,.7].forEach(off=>{
+    const rp=((p+off)%1)
+    ring(hx,hy,hr+cs(.09)*rp,C.indigo,(1-rp)*.22,1.5)
+  })
+  const srcs=[
+    {icon:'mail',lbl:'Gmail',angle:-Math.PI*.72,col:C.amber},
+    {icon:'file',lbl:'JOOR',angle:-Math.PI*.24,col:C.violet},
+    {icon:'cart',lbl:'NuOrder',angle:Math.PI*.24,col:C.blue},
+    {icon:'link',lbl:'URL',angle:Math.PI*.72,col:C.green},
+  ]
+  srcs.forEach((s,i)=>{
+    const del=i*.17
+    const sp=clamp((p-del-.08)/(1-del),0,1)
+    const ep=ease(sp,E.io)
+    const r=lerp(cs(.38),cs(.16)*ease(p*.85,E.el),ep)
+    const sx=hx+Math.cos(s.angle)*r
+    const sy=hy+Math.sin(s.angle)*r*.82
+    const sz=cs(.044)
+    const a=ease(sp)
+    circ(sx,sy,sz,s.col+'1a')
+    circ(sx,sy,sz,null,s.col,sz*.09)
+    icon(sx,sy,sz*1.08,s.col,a,s.icon)
+    if(ep>.6){
+      const la=ease((ep-.6)/.4)
+      label(sx,sy+sz*1.5,s.lbl,cs(.012),s.col,s.col+'22',la)
+    }
+    if(ep>.05&&ep<.88){
+      for(let d=0;d<3;d++){
+        const tr=lerp(cs(.38),cs(.16)*ease(p*.85,E.el),Math.max(0,ep-d*.07))
+        const tx_=hx+Math.cos(s.angle)*tr
+        const ty_=hy+Math.sin(s.angle)*tr*.82
+        circ(tx_,ty_,sz*.18,s.col+'55')
+      }
+    }
+    if(ep>.82){
+      const lp=ease((ep-.82)/.18)
+      ctx.save();ctx.globalAlpha=lp*.28
+      ctx.beginPath();ctx.moveTo(sx,sy)
+      ctx.lineTo(hx+Math.cos(s.angle)*hr,hy+Math.sin(s.angle)*hr*.82)
+      ctx.strokeStyle=s.col;ctx.lineWidth=1.5;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([])
+      ctx.restore()
+    }
+  })
+}
+
+/* ACT 2 — AI PARSE + TAGS */
+function act2(p){
+  const hx=cx(.38),hy=cy(.5)
+  const hr=cs(.09)
+  sonic(hx,hy,hr)
+  ;[0,.38,.72].forEach(off=>{
+    const rp=((p*1.4+off)%1)
+    ring(hx,hy,hr+cs(.055)*rp,C.violet,(1-rp)*.28,1.5)
+  })
+  const dW=cs(.065),dH=cs(.08)
+  if(p<.38){
+    const dp=ease(p/.35,E.io)
+    const dx=lerp(cx(.08),hx-dW/2,dp)
+    const dy=lerp(cy(.38),hy-dH/2,dp)
+    doc(dx,dy,dW,dH,cs(.009),1-p*2.2)
+    // label on doc
+    if(p<.22){
+      txt(dx+dW*.5,dy+dH*.35,'JOOR invoice',cs(.011),C.muted,'400')
+      txt(dx+dW*.5,dy+dH*.6,'40 products',cs(.01),C.muted+'88','400')
+    }
+  }
+  // brain icon processing
+  if(p>.15&&p<.55){
+    const bp=ease((p-.15)/.3,E.o3)*(1-ease((p-.45)/.1,E.o3))
+    icon(hx,hy,cs(.048),C.violet,bp,'brain')
+  }
+  const tags=[
+    {lbl:'seafolly',col:C.amber,tx:.06,ty:.18},
+    {lbl:'bikini-tops',col:C.violet,tx:.65,ty:.16},
+    {lbl:'teal',col:C.teal,tx:.06,ty:.44},
+    {lbl:'size-12',col:C.blue,tx:.68,ty:.42},
+    {lbl:'dd-cup',col:C.pink,tx:.08,ty:.7},
+    {lbl:'upf-50',col:C.green,tx:.64,ty:.68},
+    {lbl:'jun-2026',col:C.indigo,tx:.36,ty:.82},
+    {lbl:'bond-eye',col:C.amber,tx:.3,ty:.1},
+    {lbl:'restocked',col:C.green,tx:.56,ty:.84},
+    {lbl:'one-piece',col:C.pink,tx:.05,ty:.58},
+    {lbl:'underwire',col:C.violet,tx:.7,ty:.56},
+    {lbl:'chlorine-resistant',col:C.teal,tx:.3,ty:.9},
+  ]
+  tags.forEach((tg,i)=>{
+    const del=i*.055
+    const tp=clamp((p-.18-del)/.62,0,1)
+    const ep=ease(tp,E.el)
+    const x_=lerp(hx,cx(tg.tx),ep)
+    const y_=lerp(hy,cy(tg.ty),ep)
+    const sz=cs(.024)*ep
+    const a=ease(tp)
+    label(x_,y_,tg.lbl,sz*.85,tg.col,tg.col+'22',a)
+  })
+}
+
+/* ACT 3 — SHOPIFY PUSH */
+function act3(p){
+  const hx=cx(.38),hy=cy(.5)
+  sonic(hx,hy,cs(.09))
+  const bx=cx(.72),by=cy(.5),br=cs(.072)
+  const bp=ease(p*.48,E.o3)
+  ctx.save();ctx.globalAlpha=bp
+  rr(bx-br*.78,by-br*.48,br*1.56,br*1.45,br*.14,C.greenL,C.green,2)
+  ctx.beginPath();ctx.arc(bx,by-br*.48,br*.33,Math.PI,0)
+  ctx.strokeStyle=C.green;ctx.lineWidth=br*.11;ctx.lineCap='round';ctx.stroke()
+  // Shopify icon
+  if(p>.2) icon(bx,by+br*.2,cs(.032),C.green,ease((p-.2)/.4),'shopify')
+  ctx.restore()
+  const cards=[
+    {del:0,sx:.05,sy:.25,col:C.amber},
+    {del:.1,sx:.08,sy:.48,col:C.violet},
+    {del:.18,sx:.04,sy:.7,col:C.blue},
+    {del:.28,sx:.12,sy:.2,col:C.pink},
+    {del:.38,sx:.07,sy:.6,col:C.teal},
+    {del:.48,sx:.1,sy:.38,col:C.green},
+  ]
+  cards.forEach((cd,i)=>{
+    const tp=clamp((p-cd.del)/.52,0,1)
+    const ep=ease(tp,E.io)
+    const ap=clamp((tp-.82)/.18,0,1)
+    const sx=lerp(cx(cd.sx),bx,ep),sy=lerp(cy(cd.sy),by,ep)
+    const a=(1-ap)*ease(tp)
+    const cw=cs(.045),ch=cs(.033)
+    ctx.save();ctx.globalAlpha=a
+    rr(sx-cw/2,sy-ch/2,cw,ch,cs(.005),cd.col+'2a',cd.col,1.5)
+    ctx.save();ctx.globalAlpha=.55
+    rr(sx-cw*.3,sy-ch*.12,cw*.62,cs(.0035),1,cd.col+'88')
+    rr(sx-cw*.3,sy+ch*.22,cw*.4,cs(.0028),1,cd.col+'55')
+    ctx.restore();ctx.restore()
+    if(ap>.08) icon(sx,sy,cs(.02),C.green,ease(ap,E.el),'check')
+  })
+  // "15 min" label
+  if(p>.6){
+    const np=ease((p-.6)/.4,E.el)
+    txt(bx,by+br*1.55,'15 min',cs(.038)*np,C.green,'900')
+    txt(bx,by+br*2.08,'invoice → live',cs(.014)*np,C.muted,'500')
+  }
+}
+
+/* ACT 4 — SEO COLLECTIONS */
+function act4(p){
+  const hx=cx(.38),hy=cy(.5)
+  sonic(hx,hy,cs(.08))
+  // URL hierarchy visualisation — expanding tree
+  const treeX=cx(.15),treeY=cy(.2)
+  const levels=[
+    {lbl:'/swimwear',col:C.sky,y:0},
+    {lbl:'/bikini-tops',col:C.blue,y:1},
+    {lbl:'/one-pieces',col:C.indigo,y:2},
+    {lbl:'/black-swimwear',col:C.pink,y:3},
+    {lbl:'/tummy-control',col:C.teal,y:4},
+    {lbl:'/seafolly-one-pieces',col:C.violet,y:5},
+  ]
+  levels.forEach((lv,i)=>{
+    const del=i*.1
+    const lp=ease(clamp((p-.05-del)/.55,0,1),E.o3)
+    const x_=treeX+i*cx(.04)*lp
+    const y_=treeY+i*cy(.12)
+    const a=ease(clamp((p-del-.05)/.5,0,1))
+    // connector
+    if(i>0){
+      ctx.save();ctx.globalAlpha=a*.35
+      ctx.beginPath();ctx.moveTo(x_-cx(.04)*lp,y_-cy(.12))
+      ctx.lineTo(x_,y_)
+      ctx.strokeStyle=lv.col;ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([])
+      ctx.restore()
+    }
+    label(x_+cx(.08),y_,lv.lbl,cs(.013),lv.col,lv.col+'18',a)
+  })
+  // colour collections grid
+  const cols2=['black','white','navy','floral','teal','coral']
+  const gcols=[C.ink,C.muted,C.blue,C.pink,C.teal,C.red]
+  if(p>.3){
+    const gp=ease((p-.3)/.5,E.o3)
+    const startX=cx(.55),startY=cy(.25)
+    cols2.forEach((cl,i)=>{
+      const del=i*.09
+      const a=ease(clamp((gp-del)/(1-del),0,1))
+      const gx_=startX+(i%3)*cx(.1)
+      const gy_=startY+Math.floor(i/3)*cy(.14)
+      const sz=cs(.028)*a
+      circ(gx_,gy_,sz,gcols[i]+'33',gcols[i],sz*.12)
+      txt(gx_,gy_+sz*1.5,cl,cs(.01),C.muted,'500','center','middle')
+    })
+  }
+  // "90+" badge
+  if(p>.72){
+    const np=ease((p-.72)/.28,E.el)
+    txt(cx(.38),cy(.82),'90+',cs(.08)*np,C.sky,'900')
+    txt(cx(.38),cy(.9),'SEO collections',cs(.015)*np,C.muted,'500')
+  }
+}
+
+/* ACT 5 — CONTENT GENERATION */
+function act5(p){
+  const hx=cx(.38),hy=cy(.5)
+  sonic(hx,hy,cs(.08))
+  // description formula visual
+  const parts=[
+    {lbl:'Keyword opener',col:C.indigo,icon:'search'},
+    {lbl:'Materials + brands',col:C.violet,icon:'tag'},
+    {lbl:'FAQ — People Also Ask',col:C.blue,icon:'brain'},
+    {lbl:'Internal link mesh',col:C.teal,icon:'link'},
+    {lbl:'Meta description',col:C.pink,icon:'search'},
+  ]
+  const px=cx(.55),py=cy(.18)
+  parts.forEach((pt,i)=>{
+    const del=i*.12
+    const pp=ease(clamp((p-.08-del)/.55,0,1),E.el)
+    const a=ease(clamp((p-del-.08)/.5,0,1))
+    const y_=py+i*cy(.15)
+    const w=cx(.26)*pp
+    rr(px,y_-cy(.03),w,cy(.06),cs(.006),pt.col+'18',pt.col,1,)
+    icon(px+cx(.016),y_,cs(.022),pt.col,a*pp,pt.icon)
+    txt(px+cx(.042),y_,pt.lbl,cs(.012),pt.col,'600','left')
+  })
+  // retailer dots
+  const rets=[C.blue,C.pink,C.amber,C.violet,C.teal,C.green]
+  rets.forEach((rc,i)=>{
+    const rp=ease(clamp(p*3.5-i*.2,0,1),E.el)
+    circ(cx(.1+i*.055),cy(.18),cs(.016)*rp,rc+'33',rc,1.5*rp)
+  })
+  if(p>.65){
+    const np=ease((p-.65)/.35,E.el)
+    txt(hx,cy(.82),'6 retailers studied',cs(.02)*np,C.indigo,'700')
+  }
+}
+
+/* ACT 6 — AI AGENTS */
+function act6(p){
+  const hx=cx(.38),hy=cy(.5)
+  const hr=cs(.09)
+  sonic(hx,hy,hr)
+  const nets=[
+    {x:.08,y:.18},{x:.62,y:.14},{x:.08,y:.72},{x:.65,y:.72},
+    {x:.22,y:.88},{x:.6,y:.88},{x:.04,y:.46},{x:.7,y:.46},
+  ]
+  ctx.save();ctx.globalAlpha=ease(p*.5)*.2
+  nets.forEach((n,i)=>{
+    circ(cx(n.x),cy(n.y),cs(.016),null,C.muted,1)
+    nets.forEach((m,j)=>{
+      if(j<=i)return
+      const d=Math.hypot(cx(n.x)-cx(m.x),cy(n.y)-cy(m.y))
+      if(d<cs(.38)){
+        ctx.beginPath();ctx.moveTo(cx(n.x),cy(n.y));ctx.lineTo(cx(m.x),cy(m.y))
+        ctx.strokeStyle=C.border;ctx.lineWidth=.8;ctx.stroke()
+      }
+    })
+  })
+  ctx.restore()
+  const agDefs=[
+    {col:C.violet,oR:cs(.17),oS:1.2,ph:0,tn:0,lbl:'Brand\nIntel'},
+    {col:C.sky,oR:cs(.21),oS:.9,ph:Math.PI*.66,tn:3,lbl:'SEO\nAudit'},
+    {col:C.amber,oR:cs(.19),oS:1.1,ph:Math.PI*1.33,tn:6,lbl:'Gap\nAgent'},
+  ]
+  agDefs.forEach((ag,i)=>{
+    const ss=.3+i*.14,sd=.26,rs=ss+sd,rd=.18
+    const sp=clamp((p-ss)/sd,0,1),rp=clamp((p-rs)/rd,0,1)
+    let ax,ay
+    if(p<ss){
+      const ang=ag.ph+t*ag.oS*Math.PI*2*.38
+      ax=hx+Math.cos(ang)*ag.oR;ay=hy+Math.sin(ang)*ag.oR*.7
+    } else if(rp<1){
+      const tgt=nets[ag.tn]
+      const tx_=cx(tgt.x),ty_=cy(tgt.y)
+      if(sp<1){
+        const ep=ease(sp,E.io)
+        const mx=(hx+tx_)/2+(i-.5)*cs(.08),my=(hy+ty_)/2-cs(.08)
+        ax=lerp(lerp(hx,mx,ep),lerp(mx,tx_,ep),ep)
+        ay=lerp(lerp(hy,my,ep),lerp(my,ty_,ep),ep)
+      } else {
+        const ep=ease(rp,E.o3)
+        ax=lerp(cx(nets[ag.tn].x),hx,ep);ay=lerp(cy(nets[ag.tn].y),hy,ep)
+      }
+    } else {ax=hx;ay=hy}
+    const pulse=1+Math.sin(t*4+i)*.08
+    circ(ax,ay,cs(.024)*pulse,ag.col,null)
+    circ(ax,ay,cs(.012),C.bg,null)
+    // label near agent when orbiting
+    if(p<ss*.8){
+      const la=ease(clamp(p*4,0,1))*.6
+      const ang=ag.ph+t*ag.oS*Math.PI*2*.38
+      const lx=hx+Math.cos(ang)*(ag.oR+cs(.04))
+      const ly=hy+Math.sin(ang)*(ag.oR+cs(.04))*.7
+      ag.lbl.split('\n').forEach((line,li)=>
+        txt(lx,ly+li*cs(.018),line,cs(.012),ag.col,'600','center','middle')
+      )
+    }
+    if(sp>.82&&rp===0){
+      const gp=ease((sp-.82)/.18,E.el)
+      ring(cx(nets[ag.tn].x),cy(nets[ag.tn].y),cs(.038)*gp,ag.col,(1-gp*.5),2)
+    }
+  })
+  // competitor logos
+  if(p>.55){
+    const cp=ease((p-.55)/.35,E.o3)
+    const retNames=['THE ICONIC','Mathers','David Jones','GWG']
+    retNames.forEach((rn,i)=>{
+      const a=ease(clamp((cp-i*.15)/(1-i*.15),0,1))
+      const rx=cx(.55+i*.1)
+      txt(rx,cy(.9),rn,cs(.011),C.muted,'500','center')
+    })
+  }
+}
+
+/* ACT 7 — AUTOMATIONS */
+function act7(p){
+  const hx=cx(.38),hy=cy(.5)
+  sonic(hx,hy,cs(.08))
+  const autoItems=[
+    {icon:'clock',lbl:'Nightly scan',col:C.green,x:.12,y:.2},
+    {icon:'refresh',lbl:'Seasonal refresh',col:C.amber,x:.55,y:.16},
+    {icon:'link',lbl:'Link mesh rebuild',col:C.indigo,x:.12,y:.48},
+    {icon:'trending',lbl:'SEO score update',col:C.violet,x:.55,y:.44},
+    {icon:'shopify',lbl:'Dual-store sync',col:C.pink,x:.12,y:.76},
+    {icon:'mail2',lbl:'Klaviyo trigger',col:C.teal,x:.55,y:.72},
+  ]
+  autoItems.forEach((a,i)=>{
+    const del=i*.1
+    const ap=ease(clamp((p-del-.05)/.55,0,1),E.el)
+    const a2=ease(clamp((p-del-.05)/.5,0,1))
+    const ax=cx(a.x),ay=cy(a.y)
+    const sz=cs(.038)*ap
+    circ(ax,ay,sz,a.col+'22',a.col,sz*.1)
+    icon(ax,ay,sz*1.1,a.col,a2,a.icon)
+    txt(ax,ay+sz*1.55,a.lbl,cs(.012),a.col,'600')
+    // orbit ring animation
+    const orb=((p*1.2+i*.22)%1)
+    if(ap>.5) ring(ax,ay,sz+cs(.03)*orb,a.col,(1-orb)*.2,1)
+  })
+  // centre "always on"
+  if(p>.5){
+    const np=ease((p-.5)/.5,E.o3)
+    txt(hx,hy,Math.floor(24*p)+'h/day',cs(.04)*np,C.indigo,'900')
+    txt(hx,hy+cs(.06),'always running',cs(.014)*np,C.muted,'500')
+  }
+}
+
+/* ACT 8 — SEO RANK */
+function act8(p){
+  const barBase=cy(.82),barMaxH=cy(.55)
+  const barW=cx(.048),barGap=cx(.007)
+  const bars=[
+    {w:.35,col:C.blue},{w:.52,col:C.pink},{w:.4,col:C.amber},
+    {w:.6,col:C.violet},{w:.45,col:C.teal},{w:.68,col:C.green},
+    {w:.48,col:C.blue},{w:.55,col:C.pink},{w:.42,col:C.violet},
+  ]
+  const total=bars.length*(barW+barGap)
+  const sx=cx(.5)-total/2
+  bars.forEach((bd,i)=>{
+    const del=i*.07
+    const bp=ease(clamp((p-.12-del)/.65,0,1),E.el)
+    const bh=barMaxH*bd.w*bp
+    rr(sx+i*(barW+barGap),barBase-bh,barW,bh,4,bd.col+'44',null)
+    rr(sx+i*(barW+barGap),barBase-bh,barW,barW*.18,4,bd.col,null)
+  })
+  ctx.save();ctx.globalAlpha=ease(p)*.25
+  ctx.beginPath();ctx.moveTo(sx-cx(.02),barBase);ctx.lineTo(sx+total+cx(.02),barBase)
+  ctx.strokeStyle=C.border;ctx.lineWidth=1.5;ctx.stroke()
+  ctx.restore()
+  // winner bar
+  if(p>.5){
+    const wp=ease((p-.5)/.5,E.el)
+    const wi=4,wx=sx+wi*(barW+barGap)
+    const wh=barMaxH*1.18*wp
+    rr(wx,barBase-wh,barW,wh,4,C.indigo,null)
+    rr(wx,barBase-wh,barW,barW*.18,4,C.violet,null)
+    // star
+    if(p>.7){
+      const sp=ease((p-.7)/.3,E.el)
+      const starX=wx+barW/2,starY=barBase-wh-cs(.038)
+      ctx.save();ctx.globalAlpha=sp
+      ctx.beginPath()
+      for(let j=0;j<10;j++){
+        const ang=-Math.PI/2+j*Math.PI/5
+        const r=j%2===0?cs(.022):cs(.01)
+        j===0?ctx.moveTo(starX+Math.cos(ang)*r,starY+Math.sin(ang)*r)
+             :ctx.lineTo(starX+Math.cos(ang)*r,starY+Math.sin(ang)*r)
+      }
+      ctx.closePath();ctx.fillStyle=C.amber;ctx.fill();ctx.restore()
+    }
+    if(p>.75){
+      const np=ease((p-.75)/.25,E.el)
+      txt(wx+barW/2,cy(.14),'#1',cs(.09)*np,C.indigo,'900')
+      txt(wx+barW/2,cy(.26),'swimwear darwin',cs(.014)*np,C.muted,'500')
+    }
+  }
+  // retailer badges
+  const rets=[C.blue,C.pink,C.amber,C.violet,C.teal,C.green]
+  rets.forEach((rc,i)=>{
+    const rp=ease(clamp(p*4-i*.2,0,1),E.el)
+    circ(cx(.16+i*.12),cy(.09),cs(.014)*rp,rc+'33',rc,1.5*rp)
+  })
+}
+
+/* ACT 9 — TRANSFORM */
+function act9(p){
+  const bigCR=lerp(cs(.16),cs(.055),ease(p,E.io))
+  const bigCX=lerp(cx(.28),cx(.32),ease(p))
+  const bigCY=cy(.46)
+  clock(bigCX,bigCY,bigCR,-Math.PI/2,-Math.PI/2+Math.PI*.33,1-ease(p)*.55,C.muted)
+  if(p<.55){
+    const a=ease(1-p*1.7)
+    txt(bigCX+bigCR*1.15,bigCY,'2 hrs',cs(.032),C.red,'700')
+  }
+  const smCR=lerp(cs(.035),cs(.12),ease(p,E.el))
+  const smCX=lerp(cx(.7),cx(.62),ease(p))
+  const smCY=cy(.46)
+  clock(smCX,smCY,smCR,-Math.PI/2,-Math.PI/2+Math.PI*.08,ease(p),C.green)
+  if(p>.22){
+    const a=ease((p-.22)/.78)
+    txt(smCX+smCR*1.2,smCY,'15 min',cs(.028),C.green,'700')
+  }
+  if(p>.14){
+    const ap=ease((p-.14)/.46,E.o3)
+    ctx.save();ctx.globalAlpha=ap
+    ctx.beginPath();ctx.moveTo(bigCX+bigCR,bigCY);ctx.lineTo(smCX-smCR,smCY)
+    ctx.strokeStyle=C.green;ctx.lineWidth=cs(.007)*ap;ctx.lineCap='round'
+    ctx.setLineDash([cs(.013),cs(.009)]);ctx.stroke();ctx.setLineDash([])
+    ctx.restore()
+  }
+  if(p>.42){
+    const np=ease((p-.42)/.58,E.el)
+    const hx=cx(.5)
+    ctx.save();ctx.globalAlpha=np*.12
+    txt(hx,cy(.78),'87%',cs(.18),C.indigo,'900')
+    ctx.restore()
+    txt(hx,cy(.78),'87%',cs(.13)*np,C.indigo,'900')
+    txt(hx,cy(.86),'time saved',cs(.018)*np,C.muted,'500')
+  }
+  if(p>.68){
+    const fp=ease((p-.68)/.32,E.o3)
+    sonic(cx(.5),cy(.22),cs(.065)*fp,fp)
+    ;[0,.32,.64].forEach(off=>{
+      const rp=((fp+off)%1)
+      ring(cx(.5),cy(.22),cs(.065)*fp+cs(.11)*rp,C.indigo,(1-rp)*.32*fp,2)
+    })
+    // website
+    const wa=ease(clamp((p-.82)/.18,0,1))
+    label(cx(.5),cy(.32),'sonicinvoices.com',cs(.015),C.indigo,C.indigo+'18',wa)
+  }
+  if(p>.55){
+    const cp=ease((p-.55)/.45)
+    if(Math.random()<cp*.35){
+      const cols=[C.green,C.indigo,C.amber,C.teal,C.violet]
+      spawn(cx(.5)+(Math.random()-.5)*cx(.5),cy(.82),
+        cols[Math.floor(Math.random()*cols.length)],
+        (Math.random()-.5)*2.5,-(Math.random()*3.5+1.5),.8+Math.random()*.4)
+    }
+  }
+}
+
+/* ─── DRAW FNS ───────────────────────────── */
+const FNS=[act0,act1,act2,act3,act4,act5,act6,act7,act8,act9]
+
+/* ─── ACT DOTS ───────────────────────────── */
+const actsEl=document.getElementById('acts')
+for(let i=0;i<ACTS;i++){
+  const d=document.createElement('div')
+  d.className='adot';d.id='dot'+i
+  d.onclick=()=>goTo(i)
+  actsEl.appendChild(d)
+}
+function updateDots(){
+  for(let i=0;i<ACTS;i++){
+    const d=document.getElementById('dot'+i)
+    d.className='adot'+(i===actIdx?' on':i<actIdx?' done':'')
+  }
+}
+
+/* ─── RENDER LOOP ────────────────────────── */
+function render(ts){
+  if(!lastTs)lastTs=ts
+  const dt=Math.min((ts-lastTs)/1000,.05);lastTs=ts
+  if(playing){
+    t+=dt
+    const raw=t/(ACT_DUR*ACTS)
+    globalT=clamp(raw,0,1)
+    const newAct=Math.min(Math.floor(raw*ACTS),ACTS-1)
+    if(newAct!==actIdx){
+      hidePanel()
+      actIdx=newAct
+      setTimeout(()=>showPanel(actIdx),420)
+    }
+    actT=clamp((raw*ACTS)%1,0,1)
+    document.getElementById('pf').style.width=(globalT*100)+'%'
+    updateDots()
+    if(globalT>=1){playing=false;document.getElementById('playBtn').textContent='↺ Replay';t=0}
+  }
+  ctx.clearRect(0,0,W,H);clearBG();tickParts(dt)
+  const FADE=.06
+  if(actT<FADE&&actIdx>0){
+    ctx.save();ctx.globalAlpha=ease(1-actT/FADE)
+    FNS[actIdx-1](1);ctx.restore()
+    ctx.save();ctx.globalAlpha=ease(actT/FADE)
+    FNS[actIdx](0);ctx.restore()
+  } else FNS[actIdx](actT)
+  rafId=requestAnimationFrame(render)
+}
+
+/* ─── NAV ────────────────────────────────── */
+function goTo(idx){
+  hidePanel()
+  actIdx=idx
+  actT=0
+  t=idx*ACT_DUR
+  updateDots()
+  setTimeout(()=>showPanel(actIdx),400)
+}
+function nav(d){
+  const n=actIdx+d
+  if(n>=0&&n<ACTS)goTo(n)
+}
+function togglePlay(){
+  if(playing){
+    playing=false
+    document.getElementById('playBtn').textContent='▶ Play'
+  } else {
+    if(t>=ACT_DUR*ACTS-.5)t=0
+    playing=true
+    document.getElementById('playBtn').textContent='❙❙ Pause'
+    lastTs=null
+  }
+}
+
+/* ─── INIT ───────────────────────────────── */
+window.addEventListener('load',()=>{
+  resize();updateDots()
+  clearBG();FNS[0](0)
+  showPanel(0)
+  requestAnimationFrame(render)
+})
+window.addEventListener('resize',()=>{resize();ctx.clearRect(0,0,W,H);clearBG()})
+</script>
+</body>
+</html>

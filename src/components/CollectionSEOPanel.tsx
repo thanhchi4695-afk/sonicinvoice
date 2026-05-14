@@ -214,7 +214,7 @@ export default function CollectionSEOPanel({ onBack }: { onBack: () => void }) {
       setProgress({ done: i, total: collections.length });
 
       try {
-        const { data, error } = await supabase.functions.invoke("collection-seo", {
+        const { data, error } = await supabase.functions.invoke("seo-collection-engine", {
           body: {
             collections: batch.map(c => ({
               title: c.title,

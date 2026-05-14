@@ -327,7 +327,7 @@ const CollectionSEOExport = ({ onBack }: Props) => {
     setAiLoadingId(row.shopify_id);
     setAiSuggestions(null);
     try {
-      const { data, error } = await supabase.functions.invoke("collection-seo", {
+      const { data, error } = await supabase.functions.invoke("seo-collection-engine", {
         body: {
           collections: [{ title: row.title, handle: row.handle, body_html: row.body_html }],
           mode: "seo_only",

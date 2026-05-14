@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { publishNotification } from "@/lib/notifications";
 
 import {
   Check, X, AlertTriangle, ChevronDown, ChevronRight, RotateCcw,
@@ -331,8 +332,20 @@ export default function PostParseReviewScreen({
       const failed = ((data as any)?.failed ?? []).length;
       if (failed > 0) {
         toast.warning(`${published} published · ${failed} failed`);
+        publishNotification({
+          severity: "warning",
+          title: "Shopify publish completed with errors",
+          message: `${published} products published, ${failed} failed.`,
+          link: "processing_history",
+        });
       } else {
         toast.success(`${published} products published to Shopify`);
+        publishNotification({
+          severity: "success",
+          title: "Products published to Shopify",
+          message: `${published} ${published === 1 ? "product" : "products"} published successfully.`,
+          link: "processing_history",
+        });
       }
       window.dispatchEvent(new CustomEvent("sonic:navigate-flow", { detail: "account" }));
     } catch (e) {

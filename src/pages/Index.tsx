@@ -707,6 +707,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               className="w-full h-full"
               controls
               autoPlay
+              loop
               playsInline
             />
           </div>

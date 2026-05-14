@@ -56,17 +56,22 @@ function SonicRankInner() {
   const [generating, setGenerating] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [query, setQuery] = useState("");
+  const [geoDialogId, setGeoDialogId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
     const { data, error } = await supabase
       .from("collection_suggestions")
-      .select("id, suggested_title, shopify_handle, status, product_count, collection_type, completeness_score, completeness_breakdown")
+      .select("id, suggested_title, shopify_handle, status, product_count, collection_type, completeness_score, completeness_breakdown, geo_ready, collection_geo_blocks(status)")
       .neq("status", "rejected")
       .order("completeness_score", { ascending: true })
       .limit(500);
     if (error) toast.error(error.message);
-    setRows((data ?? []) as Row[]);
+    const mapped = (data ?? []).map((r: any) => ({
+      ...r,
+      geo_status: r.collection_geo_blocks?.[0]?.status ?? null,
+    })) as Row[];
+    setRows(mapped);
     setLoading(false);
   }
 

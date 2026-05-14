@@ -276,7 +276,15 @@ function CollectionsInner() {
           {loading ? (
             <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : filtered.length === 0 ? (
-            <Card><CardContent className="py-10 text-center text-muted-foreground">No suggestions. Click "Scan store" to detect collection opportunities.</CardContent></Card>
+            <ClaudeEmptyState
+              heading="No collections scored yet"
+              subheading="Scan your store to detect collection opportunities, or ask Claude which of your collections need SEO work."
+              prompts={[
+                "Which collections have the lowest SEO scores?",
+                "Show me collections missing meta descriptions",
+                "What new collections should I create this month?",
+              ]}
+            />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {filtered.map((s) => {

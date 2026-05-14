@@ -683,8 +683,9 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             onStartLookbookImport={() => setActiveFlow("lookbook_import")}
             onStartScanMode={() => setActiveFlow("scan_mode")}
           />
-        </>
-      )}
+          <div className="px-4 pb-6">
+            <SeoHealthWidget />
+          </div>
       {activeTab === "ai_agents" && (
         <Suspense fallback={suspenseFallback}>
           <AIAgentsLanding

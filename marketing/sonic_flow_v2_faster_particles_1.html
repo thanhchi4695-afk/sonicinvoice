@@ -1,0 +1,276 @@
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+#stage{
+  width:100%;
+  background:linear-gradient(160deg,#f8f9ff 0%,#f0f4ff 40%,#f5fff8 100%);
+  border-radius:16px;
+  padding:40px 32px 48px;
+  overflow:hidden;
+  position:relative;
+  min-height:520px;
+}
+.logo-row{text-align:center;margin-bottom:36px}
+.logo-mark{display:inline-flex;align-items:center;gap:8px}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.logo-text{font-size:17px;font-weight:600;color:#1a1a2e;letter-spacing:-0.3px}
+.logo-sub{font-size:12px;color:#6b7280;margin-top:2px}
+.flow-wrap{display:flex;align-items:center;gap:0;justify-content:center}
+.sources-col{display:flex;flex-direction:column;gap:10px;width:130px;flex-shrink:0}
+.source-card{
+  background:white;border:0.5px solid #e5e7eb;border-radius:12px;
+  padding:10px 12px;display:flex;align-items:center;gap:8px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06);
+}
+.src-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.src-label{font-size:11px;font-weight:500;color:#374151;line-height:1.3}
+.src-sub{font-size:10px;color:#9ca3af;margin-top:1px}
+.connector-zone{flex:1;position:relative;height:260px;min-width:80px;max-width:100px}
+svg.conn{width:100%;height:100%;overflow:visible;position:absolute;top:0;left:0}
+.hub-col{display:flex;flex-direction:column;align-items:center;gap:6px;width:120px;flex-shrink:0}
+.hub-ring{
+  width:96px;height:96px;border-radius:50%;
+  background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#06b6d4 100%);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 0 8px rgba(99,102,241,0.08),0 4px 20px rgba(99,102,241,0.25);
+  position:relative;
+}
+.hub-inner{width:72px;height:72px;border-radius:50%;background:white;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.hub-logo-icon{width:24px;height:24px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.hub-name{font-size:9px;font-weight:600;color:#6366f1;letter-spacing:0.3px}
+.hub-label{font-size:11px;font-weight:500;color:#374151;text-align:center;line-height:1.3}
+.hub-badge{font-size:9px;background:#eef2ff;color:#6366f1;border-radius:20px;padding:2px 8px;font-weight:500}
+.connector-zone-r{flex:1;position:relative;height:320px;min-width:80px;max-width:100px}
+svg.conn-r{width:100%;height:100%;overflow:visible;position:absolute;top:0;left:0}
+.outputs-col{display:flex;flex-direction:column;gap:10px;width:138px;flex-shrink:0}
+.output-card{
+  background:white;border:0.5px solid #e5e7eb;border-radius:12px;
+  padding:10px 12px;display:flex;align-items:center;gap:8px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06);opacity:0;
+}
+.out-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.out-label{font-size:11px;font-weight:500;color:#374151;line-height:1.3}
+.out-sub{font-size:10px;color:#9ca3af;margin-top:1px}
+.stats-row{display:flex;gap:16px;justify-content:center;margin-top:32px}
+.stat{text-align:center;background:white;border:0.5px solid #e5e7eb;border-radius:12px;padding:12px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+.stat-num{font-size:22px;font-weight:600;color:#1a1a2e;letter-spacing:-0.5px}
+.stat-label{font-size:11px;color:#6b7280;margin-top:2px}
+.pulse-ring{position:absolute;inset:-8px;border-radius:50%;border:1.5px solid rgba(99,102,241,0.3);animation:pulse-out 2.5s ease-out infinite}
+.pulse-ring2{animation-delay:1.25s}
+@keyframes pulse-out{0%{transform:scale(1);opacity:0.6}100%{transform:scale(1.4);opacity:0}}
+@keyframes card-in{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes float-src{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.source-card{animation:float-src 3.5s ease-in-out infinite}
+.source-card:nth-child(2){animation-delay:0.8s}
+.source-card:nth-child(3){animation-delay:1.6s}
+.source-card:nth-child(4){animation-delay:2.4s}
+</style>
+
+<div id="stage">
+  <div class="logo-row">
+    <div class="logo-mark">
+      <div class="logo-icon">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="white"><path d="M10 2C5.6 2 2 5.6 2 10s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 3c.8 0 1.5.3 2 .8L5.8 12c-.5-.5-.8-1.2-.8-2 0-1.7 1.3-5 5-5zm0 10c-.8 0-1.5-.3-2-.8l6.2-6.2c.5.5.8 1.2.8 2 0 1.7-1.3 5-5 5z"/></svg>
+      </div>
+      <div>
+        <div class="logo-text">Sonic Invoices</div>
+        <div class="logo-sub">Import · Automate · Rank</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-wrap">
+    <div class="sources-col">
+      <div class="source-card">
+        <div class="src-icon" style="background:#fef3c7"><i class="ti ti-mail" style="color:#d97706;font-size:15px" aria-hidden="true"></i></div>
+        <div><div class="src-label">Gmail</div><div class="src-sub">Email invoices</div></div>
+      </div>
+      <div class="source-card">
+        <div class="src-icon" style="background:#ede9fe"><i class="ti ti-file-text" style="color:#7c3aed;font-size:15px" aria-hidden="true"></i></div>
+        <div><div class="src-label">JOOR</div><div class="src-sub">Catalog files</div></div>
+      </div>
+      <div class="source-card">
+        <div class="src-icon" style="background:#dbeafe"><i class="ti ti-shopping-cart" style="color:#2563eb;font-size:15px" aria-hidden="true"></i></div>
+        <div><div class="src-label">NuOrder</div><div class="src-sub">Order data</div></div>
+      </div>
+      <div class="source-card">
+        <div class="src-icon" style="background:#dcfce7"><i class="ti ti-pencil" style="color:#16a34a;font-size:15px" aria-hidden="true"></i></div>
+        <div><div class="src-label">Manual</div><div class="src-sub">Paste or type</div></div>
+      </div>
+    </div>
+
+    <div class="connector-zone">
+      <svg class="conn" id="svg-left" viewBox="0 0 100 260" preserveAspectRatio="none">
+        <path id="p1" d="M0,32 C50,32 50,130 100,130" fill="none" stroke="#c7d2fe" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <path id="p2" d="M0,97 C50,97 50,130 100,130" fill="none" stroke="#ddd6fe" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <path id="p3" d="M0,162 C50,162 50,130 100,130" fill="none" stroke="#bfdbfe" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <path id="p4" d="M0,227 C50,227 50,130 100,130" fill="none" stroke="#bbf7d0" stroke-width="1.5" stroke-dasharray="4,3"/>
+      </svg>
+    </div>
+
+    <div class="hub-col">
+      <div class="hub-ring">
+        <div class="pulse-ring"></div>
+        <div class="pulse-ring pulse-ring2"></div>
+        <div class="hub-inner">
+          <div class="hub-logo-icon">
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="white"><path d="M10 2C5.6 2 2 5.6 2 10s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 3c.8 0 1.5.3 2 .8L5.8 12c-.5-.5-.8-1.2-.8-2 0-1.7 1.3-5 5-5zm0 10c-.8 0-1.5-.3-2-.8l6.2-6.2c.5.5.8 1.2.8 2 0 1.7-1.3 5-5 5z"/></svg>
+          </div>
+          <div class="hub-name">SONIC AI</div>
+        </div>
+      </div>
+      <div class="hub-label" style="margin-top:8px">AI processes<br>every invoice</div>
+      <div class="hub-badge">15 min avg</div>
+    </div>
+
+    <div class="connector-zone-r">
+      <svg class="conn-r" id="svg-right" viewBox="0 0 100 320" preserveAspectRatio="none">
+        <path id="r1" d="M0,160 C50,160 50,32 100,32" fill="none" stroke="#bbf7d0" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <path id="r2" d="M0,160 C50,160 50,96 100,96" fill="none" stroke="#fde68a" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <path id="r3" d="M0,160 C50,160 50,160 100,160" fill="none" stroke="#ddd6fe" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <path id="r4" d="M0,160 C50,160 50,224 100,224" fill="none" stroke="#bfdbfe" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <path id="r5" d="M0,160 C50,160 50,288 100,288" fill="none" stroke="#fbcfe8" stroke-width="1.5" stroke-dasharray="4,3"/>
+      </svg>
+    </div>
+
+    <div class="outputs-col">
+      <div class="output-card" id="o1">
+        <div class="out-icon" style="background:#f0fdf4"><i class="ti ti-brand-shopify" style="color:#16a34a;font-size:15px" aria-hidden="true"></i></div>
+        <div><div class="out-label">Products live</div><div class="out-sub">Shopify ready</div></div>
+      </div>
+      <div class="output-card" id="o2">
+        <div class="out-icon" style="background:#fef3c7"><i class="ti ti-tag" style="color:#d97706;font-size:15px" aria-hidden="true"></i></div>
+        <div><div class="out-label">Auto-tagged</div><div class="out-sub">Brand · colour · size</div></div>
+      </div>
+      <div class="output-card" id="o3">
+        <div class="out-icon" style="background:#ede9fe"><i class="ti ti-search" style="color:#7c3aed;font-size:15px" aria-hidden="true"></i></div>
+        <div><div class="out-label">SEO collections</div><div class="out-sub">Google rank</div></div>
+      </div>
+      <div class="output-card" id="o4">
+        <div class="out-icon" style="background:#dbeafe"><i class="ti ti-sparkles" style="color:#2563eb;font-size:15px" aria-hidden="true"></i></div>
+        <div><div class="out-label">Descriptions</div><div class="out-sub">AI-written</div></div>
+      </div>
+      <div class="output-card" id="o5">
+        <div class="out-icon" style="background:#fce7f3"><i class="ti ti-chart-line" style="color:#db2777;font-size:15px" aria-hidden="true"></i></div>
+        <div><div class="out-label">Rank #1</div><div class="out-sub">Competitor gaps fixed</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat"><div class="stat-num" id="s1">0</div><div class="stat-label">Brands learned</div></div>
+    <div class="stat"><div class="stat-num" id="s2">0 min</div><div class="stat-label">vs 2hr manual</div></div>
+    <div class="stat"><div class="stat-num" id="s3">0</div><div class="stat-label">SEO collections</div></div>
+    <div class="stat"><div class="stat-num" id="s4">0%</div><div class="stat-label">Time saved</div></div>
+  </div>
+</div>
+
+<script>
+function getPathPoint(pathEl, t) {
+  const len = pathEl.getTotalLength()
+  return pathEl.getPointAtLength(t * len)
+}
+
+function animateParticle(svgEl, pathEl, fillColor, trailColor, delay, duration) {
+  const trail = []
+  const TRAIL_LEN = 5
+  for(let i = 0; i < TRAIL_LEN; i++) {
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle')
+    c.setAttribute('r', (3.5 - i * 0.5).toString())
+    c.setAttribute('fill', i === 0 ? fillColor : trailColor)
+    c.setAttribute('opacity', (0.9 - i * 0.15).toString())
+    svgEl.appendChild(c)
+    trail.push(c)
+  }
+
+  let start = null
+  function step(ts) {
+    if(!start) start = ts + delay * 1000
+    if(ts < start) { requestAnimationFrame(step); return }
+    const elapsed = ts - start
+    const t = Math.min(elapsed / (duration * 1000), 1)
+    const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t
+
+    trail.forEach((c, i) => {
+      const tOffset = Math.max(0, ease - i * 0.04)
+      const pt = getPathPoint(pathEl, tOffset)
+      c.setAttribute('cx', pt.x)
+      c.setAttribute('cy', pt.y)
+      const alpha = t < 0.08 ? t * 11 : t > 0.88 ? (1 - t) * 8 : (0.9 - i * 0.15)
+      c.setAttribute('opacity', Math.max(0, alpha).toString())
+    })
+
+    if(t < 1) {
+      requestAnimationFrame(step)
+    } else {
+      trail.forEach(c => c.remove())
+    }
+  }
+  requestAnimationFrame(step)
+}
+
+function loopPath(svgEl, pathEl, fillColor, trailColor, interval, dur) {
+  function fire() {
+    animateParticle(svgEl, pathEl, fillColor, trailColor, 0, dur)
+    const jitter = interval * (0.7 + Math.random() * 0.6)
+    setTimeout(fire, jitter)
+  }
+  setTimeout(fire, Math.random() * interval)
+}
+
+function countUp(el, target, suffix, duration) {
+  let start = null
+  function step(ts) {
+    if(!start) start = ts
+    const progress = Math.min((ts - start) / duration, 1)
+    const eased = 1 - Math.pow(1 - progress, 3)
+    el.textContent = Math.round(eased * target) + suffix
+    if(progress < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+
+window.addEventListener('load', () => {
+  const svgL = document.getElementById('svg-left')
+  const svgR = document.getElementById('svg-right')
+
+  const leftPaths = [
+    {id:'p1', fill:'#f59e0b', trail:'#fde68a'},
+    {id:'p2', fill:'#8b5cf6', trail:'#ddd6fe'},
+    {id:'p3', fill:'#3b82f6', trail:'#bfdbfe'},
+    {id:'p4', fill:'#10b981', trail:'#bbf7d0'},
+  ]
+  const rightPaths = [
+    {id:'r1', fill:'#22c55e', trail:'#bbf7d0'},
+    {id:'r2', fill:'#f59e0b', trail:'#fde68a'},
+    {id:'r3', fill:'#8b5cf6', trail:'#ddd6fe'},
+    {id:'r4', fill:'#3b82f6', trail:'#bfdbfe'},
+    {id:'r5', fill:'#ec4899', trail:'#fbcfe8'},
+  ]
+
+  leftPaths.forEach((p, i) => {
+    const el = document.getElementById(p.id)
+    loopPath(svgL, el, p.fill, p.trail, 900, 0.75)
+  })
+
+  rightPaths.forEach((p, i) => {
+    const el = document.getElementById(p.id)
+    setTimeout(() => loopPath(svgR, el, p.fill, p.trail, 850, 0.7), 400 + i * 80)
+  })
+
+  ;['o1','o2','o3','o4','o5'].forEach((id, i) => {
+    setTimeout(() => {
+      const el = document.getElementById(id)
+      el.style.animation = 'card-in 0.45s ease forwards'
+    }, 600 + i * 250)
+  })
+
+  setTimeout(() => {
+    countUp(document.getElementById('s1'), 187, '', 1600)
+    countUp(document.getElementById('s2'), 15, ' min', 1600)
+    countUp(document.getElementById('s3'), 90, '', 1600)
+    countUp(document.getElementById('s4'), 87, '%', 1600)
+  }, 900)
+})
+</script>

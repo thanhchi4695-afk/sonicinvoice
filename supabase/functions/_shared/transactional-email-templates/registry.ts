@@ -10,7 +10,9 @@ export interface TemplateEntry {
 }
 
 import { template as supportRequest } from './support-request.tsx'
+import { template as seoHealthSummary } from './seo-health-summary.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'support-request': supportRequest,
+  'seo-health-summary': seoHealthSummary,
 }

@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import ConditionBuilderShowcase from "@/components/ConditionBuilderShowcase";
 import ScanCollectionsCard from "@/components/ScanCollectionsCard";
+import SeoHealthAlertsCard from "@/components/SeoHealthAlertsCard";
 
 /* ─── Types ─── */
 
@@ -203,8 +204,11 @@ export default function StockyHomeDashboard({ onNavigate, onSwitchToClassic }: S
       {/* ── Margin Guardian / Condition Builder showcase ─── */}
       <ConditionBuilderShowcase />
 
-      {/* Collection scanner CTA */}
-      <ScanCollectionsCard />
+      {/* Collection scanner CTA + SEO health */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <ScanCollectionsCard />
+        <SeoHealthAlertsCard />
+      </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">

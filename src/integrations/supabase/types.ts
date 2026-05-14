@@ -1682,6 +1682,50 @@ export type Database = {
           },
         ]
       }
+      collection_seo_snapshots: {
+        Row: {
+          captured_at: string
+          id: string
+          shopify_collection_id: string | null
+          snapshot_body_html: string | null
+          snapshot_completeness_score: number | null
+          snapshot_meta_description: string | null
+          snapshot_title: string | null
+          suggestion_id: string
+          user_id: string
+        }
+        Insert: {
+          captured_at?: string
+          id?: string
+          shopify_collection_id?: string | null
+          snapshot_body_html?: string | null
+          snapshot_completeness_score?: number | null
+          snapshot_meta_description?: string | null
+          snapshot_title?: string | null
+          suggestion_id: string
+          user_id: string
+        }
+        Update: {
+          captured_at?: string
+          id?: string
+          shopify_collection_id?: string | null
+          snapshot_body_html?: string | null
+          snapshot_completeness_score?: number | null
+          snapshot_meta_description?: string | null
+          snapshot_title?: string | null
+          suggestion_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_seo_snapshots_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: true
+            referencedRelation: "collection_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_suggestions: {
         Row: {
           collection_type: string
@@ -5143,6 +5187,59 @@ export type Database = {
         }
         Relationships: []
       }
+      seo_health_alerts: {
+        Row: {
+          alert_type: Database["public"]["Enums"]["seo_alert_type"]
+          collection_handle: string | null
+          collection_title: string | null
+          detail: Json | null
+          detected_at: string
+          id: string
+          resolved_at: string | null
+          scan_run_id: string | null
+          severity: Database["public"]["Enums"]["seo_alert_severity"]
+          shopify_collection_id: string | null
+          suggestion_id: string | null
+          user_id: string
+        }
+        Insert: {
+          alert_type: Database["public"]["Enums"]["seo_alert_type"]
+          collection_handle?: string | null
+          collection_title?: string | null
+          detail?: Json | null
+          detected_at?: string
+          id?: string
+          resolved_at?: string | null
+          scan_run_id?: string | null
+          severity: Database["public"]["Enums"]["seo_alert_severity"]
+          shopify_collection_id?: string | null
+          suggestion_id?: string | null
+          user_id: string
+        }
+        Update: {
+          alert_type?: Database["public"]["Enums"]["seo_alert_type"]
+          collection_handle?: string | null
+          collection_title?: string | null
+          detail?: Json | null
+          detected_at?: string
+          id?: string
+          resolved_at?: string | null
+          scan_run_id?: string | null
+          severity?: Database["public"]["Enums"]["seo_alert_severity"]
+          shopify_collection_id?: string | null
+          suggestion_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_health_alerts_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "collection_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seo_keyword_library: {
         Row: {
           bucket: string
@@ -7158,6 +7255,12 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "buyer" | "warehouse" | "viewer"
+      seo_alert_severity: "low" | "medium" | "high"
+      seo_alert_type:
+        | "thin_collection"
+        | "content_drift"
+        | "no_internal_links"
+        | "completeness_drop"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -7286,6 +7389,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "buyer", "warehouse", "viewer"],
+      seo_alert_severity: ["low", "medium", "high"],
+      seo_alert_type: [
+        "thin_collection",
+        "content_drift",
+        "no_internal_links",
+        "completeness_drop",
+      ],
     },
   },
 } as const

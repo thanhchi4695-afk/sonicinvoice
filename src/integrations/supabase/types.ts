@@ -1259,6 +1259,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          is_active: boolean
           is_global: boolean
           skill_name: string
           task_types: string[]
@@ -1269,6 +1270,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          is_active?: boolean
           is_global?: boolean
           skill_name: string
           task_types?: string[]
@@ -1279,6 +1281,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          is_active?: boolean
           is_global?: boolean
           skill_name?: string
           task_types?: string[]

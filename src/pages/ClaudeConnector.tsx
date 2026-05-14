@@ -166,7 +166,7 @@ const ClaudeConnector = () => {
     return rawToken.slice(0, 8) + "•".repeat(24);
   }, [rawToken]);
 
-  const bearerPrefill = rawToken ? `Bearer ${rawToken}` : "Bearer <your-token>";
+  const fullConnectorUrl = rawToken ? `${FUNCTION_URL}?token=${encodeURIComponent(rawToken)}` : "";
 
   return (
     <div className="container max-w-3xl py-8 space-y-6">
@@ -244,13 +244,13 @@ const ClaudeConnector = () => {
               <div className="flex gap-2">
                 <Input
                   readOnly
-                  value={rawToken ? `https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/sonic-mcp?token=${rawToken}` : "Generate a token to see the URL"}
+                  value={fullConnectorUrl || "Generate a token to see the URL"}
                   className="font-mono text-xs"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => rawToken && copy(`https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/sonic-mcp?token=${rawToken}`, "URL copied")}
+                  onClick={() => fullConnectorUrl && copy(fullConnectorUrl, "URL copied")}
                   disabled={!rawToken}
                 >
                   <Copy className="h-4 w-4" />
@@ -325,21 +325,21 @@ const ClaudeConnector = () => {
             <Step
               n={2}
               title="Open Claude.ai"
-              body="Go to Settings → Connectors → Add custom connector"
+              body="Go to Settings → Integrations → Add Custom Integration"
             />
             <Step n={3} title="Fill in the form">
               <div className="mt-2 grid gap-2">
                 <KV label="Name" value="Sonic Invoices" onCopy={() => copy("Sonic Invoices", "Copied")} />
-                <KV label="URL" value={FUNCTION_URL} onCopy={() => copy(FUNCTION_URL, "URL copied")} />
-                <div className="text-xs text-muted-foreground mt-1">Under "Custom Headers":</div>
-                <KV label="Header name" value="Authorization" onCopy={() => copy("Authorization", "Copied")} />
                 <KV
-                  label="Value"
-                  value={bearerPrefill}
+                  label="URL"
+                  value={fullConnectorUrl || `${FUNCTION_URL}?token=YOUR_TOKEN`}
                   mono
-                  onCopy={() => rawToken && copy(bearerPrefill, "Bearer value copied")}
-                  disabled={!rawToken}
+                  onCopy={() => copy(fullConnectorUrl || `${FUNCTION_URL}?token=YOUR_TOKEN`, "URL copied")}
                 />
+                <div className="text-xs text-muted-foreground mt-1">Leave OAuth fields empty.</div>
+                <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
+                  ℹ Claude.ai does not currently support custom Authorization headers for connectors. The token is passed securely as a URL parameter instead. Your token is specific to your store and can be revoked at any time.
+                </div>
               </div>
             </Step>
             <Step n={4} title="Start a conversation with Claude">

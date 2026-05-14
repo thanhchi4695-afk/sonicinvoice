@@ -78,7 +78,7 @@ async function resolveAuth(req: Request): Promise<AuthCtx | null> {
   if (error || !data || (Array.isArray(data) && data.length === 0)) return null;
   const row = Array.isArray(data) ? data[0] : data;
   if (!row?.user_id) return null;
-  admin.rpc("touch_sonic_mcp_token", { _token_hash: hash }).catch(() => {});
+  admin.rpc("touch_sonic_mcp_token", { _token_hash: hash }).then(() => {});
   return {
     userId: row.user_id as string,
     tokenId: (row.token_id as string) ?? null,

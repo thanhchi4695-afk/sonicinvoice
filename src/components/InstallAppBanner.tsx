@@ -58,15 +58,4 @@ export default function InstallAppBanner() {
     </div>
   );
 }
-            {/* iOS / no-install path: nothing extra here — Claude & Ask Sonic
-                are now their own dedicated floating buttons. */}
-          </>
-        )}
-        <button onClick={dismiss} className="shrink-0 text-muted-foreground hover:text-foreground" aria-label="Dismiss">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
 

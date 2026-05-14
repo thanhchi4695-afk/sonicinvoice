@@ -26,11 +26,6 @@ export default function InstallAppBanner() {
     };
     window.addEventListener("beforeinstallprompt", handler);
 
-    // iOS (or any device without beforeinstallprompt) — show Claude / Ask Sonic shortcuts
-    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isStandalone = (window.navigator as any).standalone === true;
-    if (isIos && !isStandalone) setShowShortcuts(true);
-
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, [dismissed]);
 
@@ -38,7 +33,6 @@ export default function InstallAppBanner() {
     localStorage.setItem(DISMISSED_KEY, "1");
     setDismissed(true);
     setDeferredPrompt(null);
-    setShowShortcuts(false);
   };
 
   const install = async () => {
@@ -49,11 +43,7 @@ export default function InstallAppBanner() {
     setDeferredPrompt(null);
   };
 
-  const openAskSonic = () => {
-    window.dispatchEvent(new CustomEvent("sonic:open-ask"));
-  };
-
-  if (dismissed || (!deferredPrompt && !showShortcuts)) return null;
+  if (dismissed || !deferredPrompt) return null;
 
   return (
     <div className="fixed bottom-20 inset-x-0 z-50 flex justify-center px-3 pb-2 pointer-events-none">

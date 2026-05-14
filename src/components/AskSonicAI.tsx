@@ -1,7 +1,7 @@
 // AskSonicAI — floating expert chat panel (Claude-powered Q&A about the user's store).
 // Separate from SonicChat (which is an action-routing intent classifier).
 import { useEffect, useRef, useState } from "react";
-import { Sparkle, Send, X, Loader2, Sparkles } from "lucide-react";
+import { Sparkles, Send, X, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";

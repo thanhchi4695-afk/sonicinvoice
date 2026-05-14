@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { X, Download, Sparkle, Sparkles } from "lucide-react";
+import { X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -11,9 +10,7 @@ interface BeforeInstallPromptEvent extends Event {
 const DISMISSED_KEY = "sonic-install-dismissed";
 
 export default function InstallAppBanner() {
-  const navigate = useNavigate();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showShortcuts, setShowShortcuts] = useState(false);
   const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISSED_KEY) === "1");
 
   useEffect(() => {

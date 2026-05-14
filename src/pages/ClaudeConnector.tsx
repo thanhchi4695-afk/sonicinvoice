@@ -238,16 +238,30 @@ const ClaudeConnector = () => {
             <CardTitle>Your connection</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Connector URL with embedded token */}
             <div className="space-y-2">
-              <Label>Your connection URL</Label>
+              <Label>Your connector URL (includes token)</Label>
               <div className="flex gap-2">
-                <Input readOnly value={FUNCTION_URL} className="font-mono text-xs" />
-                <Button variant="outline" size="icon" onClick={() => copy(FUNCTION_URL, "URL copied")}>
+                <Input
+                  readOnly
+                  value={rawToken ? `https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/sonic-mcp?token=${rawToken}` : "Generate a token to see the URL"}
+                  className="font-mono text-xs"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => rawToken && copy(`https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/sonic-mcp?token=${rawToken}`, "URL copied")}
+                  disabled={!rawToken}
+                >
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <ShieldAlert className="h-3.5 w-3.5" /> Keep this URL private. Anyone with it can read your store data.
+              </p>
             </div>
 
+            {/* Bearer token (fallback / legacy) */}
             <div className="space-y-2">
               <Label>Your bearer token</Label>
               <div className="flex gap-2">
@@ -274,9 +288,6 @@ const ClaudeConnector = () => {
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <ShieldAlert className="h-3.5 w-3.5" /> Keep this private. Anyone with this token can read your store data.
-              </p>
 
               {rawToken && (
                 <div className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm">

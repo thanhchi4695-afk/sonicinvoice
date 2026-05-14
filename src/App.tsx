@@ -32,6 +32,7 @@ import RulesSetup from "./pages/RulesSetup.tsx";
 import SonicKnowledge from "./pages/SonicKnowledge.tsx";
 import DriveWatcher from "./pages/DriveWatcher.tsx";
 import ClaudeConnector from "./pages/ClaudeConnector.tsx";
+import ClaudeActivity from "./pages/ClaudeActivity.tsx";
 import { lazy, Suspense } from "react";
 const GoogleShoppingHub = lazy(() => import("./components/GoogleShopping/GoogleShoppingHub.tsx"));
 const PricingIntelligence = lazy(() => import("./pages/PricingIntelligence.tsx"));
@@ -96,6 +97,7 @@ const App = () => (
                   <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
                   <Route path="/settings/claude-connector" element={<RequireAuth><ClaudeConnector /></RequireAuth>} />
+                  <Route path="/settings/claude-activity" element={<RequireAuth><ClaudeActivity /></RequireAuth>} />
                   <Route
                     path="/google-shopping"
                     element={

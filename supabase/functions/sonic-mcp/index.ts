@@ -157,12 +157,14 @@ mcp.tool("get_collections", {
     type: "object",
     properties: {
       status: { type: "string", enum: ["pending", "approved", "published"] },
-      min_completeness: { type: "number", minimum: 0, maximum: 100 },
+      min_completeness: { type: "number", minimum: 0, maximum: 100, description: "Only return collections with completeness_score >= this value" },
+      max_completeness: { type: "number", minimum: 0, maximum: 100, description: "Only return collections with completeness_score < this value (use 70 to find underperformers)" },
+      max_seo_score: { type: "number", minimum: 0, maximum: 100, description: "Alias for max_completeness" },
       limit: { type: "number", minimum: 1, maximum: 100, default: 25 },
     },
     additionalProperties: false,
   },
-  handler: wrap<{ status?: string; min_completeness?: number; limit?: number }>(
+  handler: wrap<{ status?: string; min_completeness?: number; max_completeness?: number; max_seo_score?: number; limit?: number }>(
     "get_collections",
     async (args, auth) => {
       let q = admin
@@ -176,6 +178,10 @@ mcp.tool("get_collections", {
       if (args?.status) q = q.eq("status", args.status);
       if (typeof args?.min_completeness === "number") {
         q = q.gte("completeness_score", args.min_completeness);
+      }
+      const maxC = args?.max_completeness ?? args?.max_seo_score;
+      if (typeof maxC === "number") {
+        q = q.lt("completeness_score", maxC);
       }
       const { data, error } = await q;
       if (error) throw new Error(error.message);
@@ -192,10 +198,13 @@ mcp.tool("get_gap_results", {
     properties: {
       limit: { type: "number", minimum: 1, maximum: 50, default: 10 },
       gap_type: { type: "string", description: "Filter by gap_type (e.g. collection, brand)" },
+      status: { type: "string", description: "Filter by status (e.g. pending, created, dismissed)" },
+      expected_impact: { type: "string", enum: ["high", "medium", "low"], description: "Filter by expected impact" },
+      impact: { type: "string", enum: ["high", "medium", "low"], description: "Alias for expected_impact" },
     },
     additionalProperties: false,
   },
-  handler: wrap<{ limit?: number; gap_type?: string }>(
+  handler: wrap<{ limit?: number; gap_type?: string; status?: string; expected_impact?: string; impact?: string }>(
     "get_gap_results",
     async (args, auth) => {
       let q = admin
@@ -207,6 +216,9 @@ mcp.tool("get_gap_results", {
         .order("created_at", { ascending: false })
         .limit(Math.min(Number(args?.limit) || 10, 50));
       if (args?.gap_type) q = q.eq("gap_type", args.gap_type);
+      if (args?.status) q = q.eq("status", args.status);
+      const impact = args?.expected_impact ?? args?.impact;
+      if (impact) q = q.eq("expected_impact", impact);
       const { data, error } = await q;
       if (error) throw new Error(error.message);
       return { count: (data ?? []).length, gaps: data ?? [] };

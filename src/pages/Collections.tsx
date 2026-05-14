@@ -30,6 +30,8 @@ type Suggestion = {
   shopify_collection_id: string | null;
   error_message: string | null;
   created_at: string;
+  completeness_score: number | null;
+  completeness_breakdown: unknown;
 };
 
 type Blog = {

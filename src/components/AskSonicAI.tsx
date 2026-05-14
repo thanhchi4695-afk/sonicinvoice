@@ -92,40 +92,43 @@ export default function AskSonicAI() {
     <>
       {/* Floating trigger */}
       {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className={cn(
-            "fixed right-4 bottom-24 lg:right-6 lg:bottom-6 z-[60] flex items-center gap-2 rounded-full",
-            "bg-primary text-primary-foreground px-4 py-3 shadow-lg",
-            "hover:scale-105 transition-transform"
-          )}
-          aria-label="Ask Sonic AI"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span className="text-sm font-semibold">Ask Sonic AI</span>
-        </button>
+        <>
+          <button
+            onClick={() => setOpen(true)}
+            className={cn(
+              "fixed right-4 bottom-24 lg:right-6 lg:bottom-6 z-[60] flex items-center gap-2 rounded-full",
+              "bg-primary text-primary-foreground px-4 py-3 shadow-lg",
+              "hover:scale-105 transition-transform"
+            )}
+            aria-label="Ask Sonic AI"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span className="text-sm font-semibold">Ask Sonic AI</span>
+          </button>
 
-        {/* First-time tooltip */}
-        {!tooltipDismissed && !open && (
-          <div className="fixed right-4 bottom-[8.5rem] lg:right-6 lg:bottom-20 z-[61] w-56">
-            <div className="rounded-xl border border-border bg-card shadow-xl p-3 space-y-2">
-              <p className="text-xs text-foreground leading-relaxed">
-                Tap to open your AI assistant. Ask about your store, SEO, inventory, or pricing anytime.
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-muted-foreground">You can toggle it here</span>
-                <button
-                  onClick={dismissTooltip}
-                  className="text-[10px] font-semibold text-primary hover:underline"
-                >
-                  Got it
-                </button>
+          {/* First-time tooltip */}
+          {!tooltipDismissed && (
+            <div className="fixed right-4 bottom-[8.5rem] lg:right-6 lg:bottom-20 z-[61] w-56">
+              <div className="rounded-xl border border-border bg-card shadow-xl p-3 space-y-2">
+                <p className="text-xs text-foreground leading-relaxed">
+                  Tap to open your AI assistant. Ask about your store, SEO, inventory, or pricing anytime.
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground">You can toggle it here</span>
+                  <button
+                    onClick={dismissTooltip}
+                    className="text-[10px] font-semibold text-primary hover:underline"
+                  >
+                    Got it
+                  </button>
+                </div>
               </div>
+              {/* little triangle pointer */}
+              <div className="absolute -bottom-1.5 right-6 lg:right-8 w-3 h-3 bg-card border-r border-b border-border rotate-45" />
             </div>
-            {/* little triangle pointer */}
-            <div className="absolute -bottom-1.5 right-6 lg:right-8 w-3 h-3 bg-card border-r border-b border-border rotate-45" />
-          </div>
-        )}
+          )}
+        </>
+      )}
 
       {/* Panel */}
       {open && (

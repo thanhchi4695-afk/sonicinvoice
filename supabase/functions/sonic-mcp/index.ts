@@ -237,6 +237,59 @@ mcp.tool("get_gap_results", {
   ),
 });
 
+mcp.tool("get_brands", {
+  description:
+    "Returns brands configured in this Sonic Invoices store, ordered by activity (most recent invoices first). Each brand includes its domain, industry, crawl status, and invoice-parse count — use to answer questions like 'which brands do I stock?' or 'how many invoices have I parsed for Seafolly?'.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      limit: { type: "number", minimum: 1, maximum: 100, default: 30, description: "Max brands to return. Default 30." },
+      search: { type: "string", description: "Case-insensitive substring match against brand_name." },
+    },
+    additionalProperties: false,
+  },
+  handler: wrap<{ limit?: number; search?: string }>("get_brands", async (args, auth) => {
+    const limit = Math.min(Number(args?.limit) || 30, 100);
+
+    let q = admin
+      .from("brand_intelligence")
+      .select("brand_name, brand_domain, industry_vertical, crawl_status, crawl_confidence, manually_verified, last_crawled_at, updated_at")
+      .eq("user_id", auth.userId)
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+    if (args?.search) q = q.ilike("brand_name", `%${args.search}%`);
+    const { data: brands, error } = await q;
+    if (error) throw new Error(error.message);
+
+    // Enrich with invoice-parse counts from brand_stats
+    const names = (brands ?? []).map((b: any) => b.brand_name).filter(Boolean);
+    let statsByName = new Map<string, { invoices: number; accuracy: number | null; last_seen: string | null }>();
+    if (names.length > 0) {
+      const { data: stats } = await admin
+        .from("brand_stats")
+        .select("brand_name, total_invoices_parsed, avg_accuracy, last_seen_at")
+        .eq("user_id", auth.userId)
+        .in("brand_name", names);
+      for (const s of stats ?? []) {
+        statsByName.set((s as any).brand_name, {
+          invoices: (s as any).total_invoices_parsed ?? 0,
+          accuracy: (s as any).avg_accuracy ?? null,
+          last_seen: (s as any).last_seen_at ?? null,
+        });
+      }
+    }
+
+    const enriched = (brands ?? []).map((b: any) => ({
+      ...b,
+      invoices_parsed: statsByName.get(b.brand_name)?.invoices ?? 0,
+      avg_accuracy: statsByName.get(b.brand_name)?.accuracy ?? null,
+      last_invoice_at: statsByName.get(b.brand_name)?.last_seen ?? null,
+    }));
+
+    return { count: enriched.length, brands: enriched };
+  }),
+});
+
 // ── HTTP transport ─────────────────────────────────────────
 const transport = new StreamableHttpTransport();
 const handleMcp = transport.bind(mcp);

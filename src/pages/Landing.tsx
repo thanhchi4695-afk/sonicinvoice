@@ -74,7 +74,7 @@ const Landing = () => {
               src="/marketing/sonic_white.html"
               title="Sonic Invoices intro"
               className="absolute inset-0 w-full h-full"
-              loading="eager"
+              loading="lazy"
               frameBorder={0}
               allow="autoplay"
             />

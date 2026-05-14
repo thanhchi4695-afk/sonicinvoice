@@ -137,6 +137,7 @@ const App = () => (
                 <InstallAppBanner />
                 <EmbeddedAuthHealthCheck />
                 <SonicChat />
+                <AskSonicAI />
               </BrowserRouter>
             </PromptDialogProvider>
           </ConfirmDialogProvider>

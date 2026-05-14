@@ -16,6 +16,7 @@ import {
   BANNED_PHRASES,
 } from "../_shared/seo-validators.ts";
 import { getValidShopifyToken } from "../_shared/shopify-token.ts";
+import { generateGeoBlock } from "../_shared/geo-blocks.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -606,12 +607,83 @@ Deno.serve(async (req) => {
       suggestion.shopify_collection_id ?? null,
     );
 
+    // ── GEO answer-block generation (additive — never overwrites approved) ──
+    let geoResult: any = { generated: false };
+    try {
+      const { data: existingGeo } = await supabase
+        .from("collection_geo_blocks")
+        .select("id, status")
+        .eq("collection_suggestion_id", suggestion.id)
+        .maybeSingle();
+
+      if (existingGeo && existingGeo.status !== "draft") {
+        geoResult = { generated: false, reason: `existing GEO block is ${existingGeo.status} — preserved` };
+      } else {
+        // Build brand list from sample_titles vendors + brand_intelligence rows
+        const sampleTitles: string[] = Array.isArray((suggestion as any).sample_titles)
+          ? (suggestion as any).sample_titles
+          : [];
+        const distinctBrandNames: string[] = Array.from(
+          new Set(
+            (Array.isArray((suggestion as any).sample_brands) ? (suggestion as any).sample_brands : [])
+              .map((b: any) => String(b || "").trim())
+              .filter(Boolean),
+          ),
+        ).slice(0, 6) as string[];
+        let brandRows: Array<{ name: string; tone?: string | null; differentiator?: string | null }> = [];
+        if (distinctBrandNames.length >= 2) {
+          const { data: bi } = await supabase
+            .from("brand_intelligence")
+            .select("brand_name, brand_tone, brand_tone_sample")
+            .in("brand_name", distinctBrandNames);
+          const map = new Map((bi ?? []).map((r: any) => [String(r.brand_name).toLowerCase(), r]));
+          brandRows = distinctBrandNames.map((n) => {
+            const row: any = map.get(n.toLowerCase());
+            return { name: n, tone: row?.brand_tone ?? null, differentiator: row?.brand_tone_sample ?? null };
+          });
+        }
+
+        const geo = await generateGeoBlock({
+          vertical,
+          primary_keyword: primaryKeyword,
+          collection_title: suggestion.suggested_title,
+          store_name: storeName,
+          store_city: storeCity,
+          sample_titles: sampleTitles,
+          brands: brandRows,
+        });
+
+        await supabase.from("collection_geo_blocks").upsert({
+          collection_suggestion_id: suggestion.id,
+          user_id: suggestion.user_id,
+          scenario_questions: geo.scenario_questions,
+          comparison_snippet: geo.comparison_snippet,
+          care_instructions: geo.care_instructions,
+          best_for_summary: geo.best_for_summary,
+          status: "draft",
+          validation_errors: geo.validation_errors.length ? geo.validation_errors : null,
+          refreshed_at: new Date().toISOString(),
+        }, { onConflict: "collection_suggestion_id" });
+
+        geoResult = {
+          generated: true,
+          validation_errors: geo.validation_errors,
+          has_comparison: !!geo.comparison_snippet,
+          has_care: !!geo.care_instructions,
+        };
+      }
+    } catch (geoErr) {
+      console.warn("GEO block generation failed (non-fatal)", geoErr);
+      geoResult = { generated: false, error: geoErr instanceof Error ? geoErr.message : String(geoErr) };
+    }
+
     return json({
       ok: true,
       level,
       is_brand_page: isBrandPage,
       validation_errors: lastIssues,
       shopify_push: push,
+      geo: geoResult,
     });
   } catch (e) {
     console.error("seo-collection-engine error", e);

@@ -70,7 +70,7 @@ const Landing = () => {
       />
       <div className="w-full bg-background border-b border-border">
         <div className="max-w-6xl mx-auto px-0 sm:px-6 pt-0 sm:pt-6">
-          <div className="relative w-full overflow-hidden sm:rounded-xl sm:border sm:border-border bg-card shadow-sm aspect-[3/4] sm:aspect-video">
+          <div className="relative w-screen sm:w-full left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 overflow-hidden sm:rounded-xl sm:border sm:border-border bg-card shadow-sm h-[100svh] sm:h-auto sm:aspect-video">
             <iframe
               src="/marketing/sonic_white.html"
               title="Sonic Invoices intro"

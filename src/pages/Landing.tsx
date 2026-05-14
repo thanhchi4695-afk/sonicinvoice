@@ -142,13 +142,26 @@ const Landing = () => {
           Sonic Invoices turns supplier invoices into Shopify-ready products in minutes — not hours.
           The first Stock Intake Automation tool built for Australian independent retail.
         </p>
-        <div className="flex items-center justify-center gap-3 mb-16">
+        <div className="flex items-center justify-center gap-3 mb-10">
           <Link to="/login?signup=1">
             <Button variant="teal" size="lg">See how it works</Button>
           </Link>
           <Link to="/case-study">
             <Button variant="outline" size="lg">Read the case study</Button>
           </Link>
+        </div>
+
+        <div className="mb-16 flex justify-center">
+          <div className="relative w-full max-w-[320px] overflow-hidden rounded-3xl border border-border bg-card shadow-lg aspect-[9/16]">
+            <iframe
+              src="/marketing/sonic_mobile.html"
+              title="Sonic Invoices mobile demo"
+              className="absolute inset-0 w-full h-full"
+              loading="lazy"
+              frameBorder={0}
+              allow="autoplay"
+            />
+          </div>
         </div>
 
         <section className="mb-20 text-left">

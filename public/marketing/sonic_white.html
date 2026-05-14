@@ -818,6 +818,9 @@ window.addEventListener('load',()=>{
   resizeCv(); build(); buildFlowSVGs(); drawMesh()
   document.getElementById('s0').classList.add('active')
   updateUI(); triggerScene(0)
+  playing=true
+  document.getElementById('playBtn').textContent='❙❙ Pause'
+  startTimer()
 })
 window.addEventListener('resize',resizeCv)
 </script>

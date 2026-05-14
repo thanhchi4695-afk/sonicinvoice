@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Maximize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { isShopifyEmbedded } from "@/lib/shopify-embedded";
@@ -16,6 +16,7 @@ const Landing = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [checking, setChecking] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (isShopifyEmbedded()) {
@@ -69,9 +70,41 @@ const Landing = () => {
       />
       <div className="w-full bg-background border-b border-border">
         <div className="max-w-6xl mx-auto px-0 sm:px-6 pt-0 sm:pt-6">
-          <div
-            className="relative w-full overflow-hidden sm:rounded-xl sm:border sm:border-border bg-card shadow-sm aspect-[3/4] sm:aspect-video"
-          >
+          <div className="relative w-full overflow-hidden sm:rounded-xl sm:border sm:border-border bg-card shadow-sm aspect-[3/4] sm:aspect-video">
+            <iframe
+              src="/marketing/sonic_white.html"
+              title="Sonic Invoices intro"
+              className="absolute inset-0 w-full h-full"
+              loading="lazy"
+              frameBorder={0}
+              allow="autoplay"
+            />
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="absolute bottom-3 right-3 sm:hidden bg-black/60 text-white rounded-full p-2 backdrop-blur-sm"
+              aria-label="Expand video"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 bg-black/80">
+            <span className="text-sm text-white font-medium">Sonic Invoices</span>
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="text-white rounded-full p-2 hover:bg-white/10"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex-1 relative">
             <iframe
               src="/marketing/sonic_white.html"
               title="Sonic Invoices intro"
@@ -82,7 +115,7 @@ const Landing = () => {
             />
           </div>
         </div>
-      </div>
+      )}
       <header className="flex items-center justify-between max-w-6xl mx-auto px-6 py-5">
         <div className="flex items-center gap-2">
           <span className="text-lg font-bold font-display">Sonic Invoice</span>

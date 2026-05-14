@@ -323,6 +323,20 @@ const AccountScreen = () => {
               </Suspense>
             </SectionErrorBoundary>
           </Section>
+          <Section title="✨ Claude AI">
+            <a
+              href="/settings/claude-connector"
+              className="flex items-center justify-between rounded-md border bg-card p-3 hover:bg-muted/40 transition-colors"
+            >
+              <div>
+                <div className="text-sm font-medium">Connect Claude AI</div>
+                <div className="text-xs text-muted-foreground">
+                  Use natural language to query your store from Claude.ai
+                </div>
+              </div>
+              <span className="text-xs text-muted-foreground">Open →</span>
+            </a>
+          </Section>
         </TabsContent>
 
         {/* ─── AI & DATA ─────────────────────────────────────── */}

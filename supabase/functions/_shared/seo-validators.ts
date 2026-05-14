@@ -202,6 +202,91 @@ export function validateSeoOutputV2(out: SeoOutputV2, ctx: ValidationContextV2):
   return issues;
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// GEO answer-block validators (used by collection_geo_blocks generator).
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface GeoScenarioQA { question: string; answer: string }
+export interface GeoComparison { question: string; answer: string; brand_a: string; brand_b: string }
+export interface GeoCareStep { step: string; instruction: string }
+
+export function validateGeoScenarioAnswer(
+  qa: GeoScenarioQA,
+  index: number,
+  issues: ValidationIssue[],
+) {
+  const q = (qa?.question || "").trim();
+  const a = (qa?.answer || "").trim();
+  if (!q.endsWith("?")) {
+    issues.push({ field: `geo.scenario[${index}].question`, message: "Question must end with ?" });
+  }
+  const wc = a ? a.split(/\s+/).length : 0;
+  if (wc < 40 || wc > 80) {
+    issues.push({ field: `geo.scenario[${index}].answer`, message: `Answer ${wc} words (need 40–80)` });
+  }
+  validateBannedPhrases(a, issues, `geo.scenario[${index}].answer`);
+}
+
+export function validateGeoComparisonSnippet(
+  snip: GeoComparison | null | undefined,
+  issues: ValidationIssue[],
+) {
+  if (!snip) return; // optional
+  const a = (snip.answer || "").trim();
+  const wc = a ? a.split(/\s+/).length : 0;
+  if (wc > 60) {
+    issues.push({ field: "geo.comparison.answer", message: `Answer ${wc} words (max 60)` });
+  }
+  const brandA = (snip.brand_a || "").trim();
+  const brandB = (snip.brand_b || "").trim();
+  if (!brandA || !brandB) {
+    issues.push({ field: "geo.comparison", message: "Both brand_a and brand_b required" });
+    return;
+  }
+  const lower = a.toLowerCase();
+  if (!lower.includes(brandA.toLowerCase()) || !lower.includes(brandB.toLowerCase())) {
+    issues.push({ field: "geo.comparison.answer", message: "Answer must reference both brand names" });
+  }
+  validateBannedPhrases(a, issues, "geo.comparison.answer");
+}
+
+export function validateGeoCareStep(
+  step: GeoCareStep,
+  index: number,
+  issues: ValidationIssue[],
+) {
+  const inst = (step?.instruction || "").trim();
+  const wc = inst ? inst.split(/\s+/).length : 0;
+  if (wc === 0) {
+    issues.push({ field: `geo.care[${index}].instruction`, message: "Empty instruction" });
+  } else if (wc > 20) {
+    issues.push({ field: `geo.care[${index}].instruction`, message: `Step ${wc} words (max 20)` });
+  }
+  if (!(step?.step || "").trim()) {
+    issues.push({ field: `geo.care[${index}].step`, message: "Empty step label" });
+  }
+}
+
+export function validateGeoBestFor(
+  text: string | null | undefined,
+  city: string | null | undefined,
+  issues: ValidationIssue[],
+) {
+  const t = (text || "").trim();
+  if (!t) {
+    issues.push({ field: "geo.best_for_summary", message: "Empty summary" });
+    return;
+  }
+  const wc = t.split(/\s+/).length;
+  if (wc > 25) {
+    issues.push({ field: "geo.best_for_summary", message: `Summary ${wc} words (max 25)` });
+  }
+  if (city && !new RegExp(`\\b${city}\\b`, "i").test(t)) {
+    issues.push({ field: "geo.best_for_summary", message: `Missing store city: ${city}` });
+  }
+  validateBannedPhrases(t, issues, "geo.best_for_summary");
+}
+
 // Legacy V1 used by seo-blog-writer; keep for compatibility.
 export interface SeoOutput {
   seo_title: string;

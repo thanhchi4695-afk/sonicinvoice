@@ -297,10 +297,28 @@ const PriceAdjustmentPanel = ({ onBack, products: externalProducts }: Props) => 
     const succeeded = adjusted.length - errors.length;
     if (errors.length === 0) {
       toast.success(`✅ ${succeeded} prices updated and saved`);
+      publishNotification({
+        severity: "success",
+        title: "Price adjustments applied",
+        message: `${succeeded} ${succeeded === 1 ? "price" : "prices"} updated and saved.`,
+        link: "price_adjust",
+      });
     } else if (succeeded > 0) {
       toast.warning(`${succeeded} saved · ${errors.length} failed`);
+      publishNotification({
+        severity: "warning",
+        title: "Price adjustments completed with errors",
+        message: `${succeeded} saved, ${errors.length} failed.`,
+        link: "price_adjust",
+      });
     } else {
       toast.error(`Failed to save ${errors.length} prices`);
+      publishNotification({
+        severity: "urgent",
+        title: "Price adjustments failed",
+        message: `${errors.length} ${errors.length === 1 ? "price" : "prices"} could not be saved.`,
+        link: "price_adjust",
+      });
     }
   }, [adjusted]);
 

@@ -19,6 +19,7 @@ import { getValidShopifyToken } from "../_shared/shopify-token.ts";
 import { generateGeoBlock } from "../_shared/geo-blocks.ts";
 import { generateAndPersistBlogs } from "../_shared/blog-templates.ts";
 import { persistSmartRules } from "../_shared/smart-rules.ts";
+import { bulkStatelessSeo, singleStatelessSeo } from "../_shared/stateless-seo.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -364,7 +365,34 @@ async function pushFaqMetafield(
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    const body = (await req.json()) as RunBody;
+    const rawBody: any = await req.json();
+
+    // ── Stateless entrypoints (re-routed from legacy collection-seo /
+    // collection-seo-agent). These callers pass raw Shopify collection data
+    // and don't have a collection_suggestions row.
+    if (rawBody?.mode === "seo_only" || (Array.isArray(rawBody?.collections) && !rawBody?.suggestion_id)) {
+      const out = await bulkStatelessSeo(rawBody);
+      return json(out, 200);
+    }
+    if (rawBody?.collection_title && !rawBody?.suggestion_id) {
+      // Resolve user_id from Authorization if not provided
+      let userId: string | undefined = rawBody.user_id;
+      const auth = req.headers.get("Authorization");
+      if (!userId && auth) {
+        const sb = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_ANON_KEY")!,
+          { global: { headers: { Authorization: auth } } },
+        );
+        const { data } = await sb.auth.getUser();
+        userId = data.user?.id;
+      }
+      if (!userId) return json({ error: "unauthorized" }, 401);
+      const out = await singleStatelessSeo({ ...rawBody, user_id: userId });
+      return json(out, 200);
+    }
+
+    const body = rawBody as RunBody;
     if (!body?.suggestion_id) return json({ error: "suggestion_id required" }, 400);
 
     const supabase = createClient(

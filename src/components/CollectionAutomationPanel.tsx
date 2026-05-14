@@ -152,7 +152,7 @@ export function CollectionAutomationPanel() {
       return result;
     }
     if (row.approval_type === "update_seo") {
-      const { error } = await supabase.functions.invoke("collection-seo-agent", {
+      const { error } = await supabase.functions.invoke("seo-collection-engine", {
         body: {
           collection_handle: row.collection_handle,
           collection_title: row.collection_title,

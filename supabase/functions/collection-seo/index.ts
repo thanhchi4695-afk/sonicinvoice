@@ -1,7 +1,6 @@
-// DEPRECATED (PARTIAL): stateless bulk SEO duplicate of seo-collection-engine.
-// Still invoked by CollectionSEOExport and CollectionSEOPanel which pass raw
-// Shopify collection objects (no suggestion_id). Hard retirement deferred
-// until a stateless engine entrypoint is added in a follow-up pass.
+// DEPRECATED (FULL): all callers re-routed to seo-collection-engine's
+// stateless bulk entrypoint (mode: "seo_only" or { collections: [...] }
+// without suggestion_id). Safe to delete after 2026-06-15.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { callAI, getContent, AIGatewayError } from "../_shared/ai-gateway.ts";
 

@@ -17,6 +17,19 @@ const setMeta = (name: string, content: string) => {
   el.setAttribute("content", content);
 };
 
+const setProperty = (property: string, content: string) => {
+  let el = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null;
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute("property", property);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", content);
+};
+  }
+  el.setAttribute("content", content);
+};
+
 interface Props {
   source?: string;
   compact?: boolean;

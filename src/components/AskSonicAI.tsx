@@ -77,7 +77,16 @@ export default function AskSonicAI() {
     }
   }
 
+  const [tooltipDismissed, setTooltipDismissed] = useState(() => {
+    try { return localStorage.getItem("sonic-ask-tooltip-dismissed") === "true"; } catch { return false; }
+  });
+
   if (!authed) return null;
+
+  const dismissTooltip = () => {
+    try { localStorage.setItem("sonic-ask-tooltip-dismissed", "true"); } catch {}
+    setTooltipDismissed(true);
+  };
 
   return (
     <>

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Sparkles, ExternalLink, X, CheckCircle2, Search } from "lucide-react";
 import { toast } from "sonner";
+import { ClaudeEmptyState } from "@/components/ClaudeConnectPrompts";
 
 type Gap = {
   id: string;

@@ -88,13 +88,18 @@ async function logCall(
   } catch (_e) { /* best-effort */ }
 }
 
-// Helper to wrap a tool handler with auth + logging.
-function tool<TArgs extends Record<string, unknown>>(
+function getAuth(ctx: any): AuthCtx | null {
+  const extra = ctx?.authInfo?.extra as { auth?: AuthCtx } | undefined;
+  return extra?.auth ?? null;
+}
+
+// Helper to wrap a handler body with auth check + logging.
+function wrap<TArgs>(
   name: string,
   fn: (args: TArgs, auth: AuthCtx) => Promise<unknown>,
 ) {
   return async (args: TArgs, ctx: any) => {
-    const auth = ctx?.extra?.auth as AuthCtx | undefined;
+    const auth = getAuth(ctx);
     if (!auth) {
       return { content: [{ type: "text", text: "Unauthorized" }] };
     }
@@ -119,12 +124,11 @@ const mcp = new McpServer({
   version: "0.1.0",
 });
 
-mcp.tool({
-  name: "get_store_context",
+mcp.tool("get_store_context", {
   description:
     "Returns the connected Shopify store (URL, shop name, voice style, default product status) and a list of brands the user has products from.",
   inputSchema: { type: "object", properties: {}, additionalProperties: false },
-  handler: tool<Record<string, never>>("get_store_context", async (_args, auth) => {
+  handler: wrap<Record<string, never>>("get_store_context", async (_args, auth) => {
     // Shopify connection (already in auth context, but re-fetch full row for richer fields)
     const { data: shop } = await admin
       .from("shopify_connections")

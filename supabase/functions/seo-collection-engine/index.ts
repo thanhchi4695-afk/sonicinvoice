@@ -81,6 +81,14 @@ function safeParseJson(raw: string): any {
   return null;
 }
 
+function deriveStoreName(storeUrl: string): string {
+  const u = (storeUrl || "").toLowerCase();
+  if (u.includes("splash")) return "Splash Swimwear Darwin";
+  if (u.includes("stomp")) return "Stomp Shoes Darwin";
+  const host = u.replace(/^https?:\/\//, "").split("/")[0].split(".")[0];
+  return host.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Our Store";
+}
+
 // Detect a JEWELLERY-vertical Edit / gifting collection from its handle
 function isJewelleryEditHandle(handle: string | undefined | null): boolean {
   const h = (handle || "").toLowerCase();
@@ -382,17 +390,20 @@ Deno.serve(async (req) => {
     if (sErr || !suggestion) return json({ error: "suggestion not found" }, 404);
 
     const { level, isBrandPage } = inferTaxonomyLevel(suggestion);
-    const vertical = (body.vertical || "FOOTWEAR").toUpperCase();
-    const storeName = body.store_name || "Our Store";
+    const vertical = (body.vertical || (suggestion as any).vertical || "FOOTWEAR").toUpperCase();
     const storeCity = body.store_city || null;
 
-    // Load brand voice style from this user's shopify connection (default local_warmth)
+    // Load brand voice style + store_url so we can derive store_name when
+    // callers (re-routed from collection-content-generator) only pass suggestion_id.
     const { data: conn } = await supabase
       .from("shopify_connections")
-      .select("brand_voice_style")
+      .select("brand_voice_style, store_url")
       .eq("user_id", suggestion.user_id)
       .maybeSingle();
     const voice: VoiceStyle = (body.voice as VoiceStyle) || (conn?.brand_voice_style as VoiceStyle) || "local_warmth";
+    const storeName = body.store_name
+      || (conn?.store_url ? deriveStoreName(conn.store_url) : null)
+      || "Our Store";
 
     // Persist taxonomy_level for the row
     if (suggestion.taxonomy_level !== level) {

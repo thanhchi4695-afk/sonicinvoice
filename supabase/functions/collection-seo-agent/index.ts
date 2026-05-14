@@ -1,8 +1,6 @@
-// DEPRECATED (PARTIAL): overlaps with seo-collection-engine but still invoked
-// by CollectionAutomationPanel via the approval queue, which passes
-// {collection_handle, collection_title} (no suggestion_id) — the engine requires
-// a suggestion row. Hard retirement deferred until a stateless engine entrypoint
-// is added in a follow-up consolidation pass.
+// DEPRECATED (FULL): re-routed to seo-collection-engine's stateless single
+// entrypoint ({ collection_title, collection_handle, ... } without
+// suggestion_id). Safe to delete after 2026-06-15.
 //
 // Collection SEO Auto-Generation agent.
 // Generates body_html + meta tags for a single collection and pushes to Shopify.

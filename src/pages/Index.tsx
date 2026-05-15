@@ -29,6 +29,8 @@ const HomeScreen = lazy(() => import("@/components/HomeScreen"));
 
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──
+// Note: every panel reachable via `activeFlow` lives in src/router/flow-registry.tsx
+// — only top-level tab/landing screens are imported directly here.
 const BillingScreen = lazy(() => import("@/components/BillingScreen"));
 const InvoicesTab = lazy(() => import("@/components/InvoicesTab"));
 const AuthScreen = lazy(() => import("@/components/AuthScreen"));
@@ -36,165 +38,26 @@ const OnboardingFlow = lazy(() => import("@/components/OnboardingFlow"));
 const HistoryScreen = lazy(() => import("@/components/HistoryScreen"));
 const ToolsScreen = lazy(() => import("@/components/ToolsScreen"));
 const AccountScreen = lazy(() => import("@/components/AccountScreen"));
-const InvoiceFlow = lazy(() => import("@/components/InvoiceFlow"));
-const BulkSaleFlow = lazy(() => import("@/components/BulkSaleFlow"));
-const RestockAnalytics = lazy(() => import("@/components/RestockAnalytics"));
-const PriceAdjustmentPanel = lazy(() => import("@/components/PriceAdjustmentPanel"));
-const PriceLookup = lazy(() => import("@/components/PriceLookup"));
-const LightspeedGuide = lazy(() => import("@/components/LightspeedGuide"));
 const AnalyticsPanel = lazy(() => import("@/components/AnalyticsPanel"));
 const QuickCapture = lazy(() => import("@/components/QuickCapture"));
-const ScanMode = lazy(() => import("@/components/ScanMode"));
-const OrderFormFlow = lazy(() => import("@/components/OrderFormFlow"));
-const PurchaseOrderPanel = lazy(() => import("@/components/PurchaseOrderPanel"));
-const OutboundPurchaseOrders = lazy(() => import("@/components/OutboundPurchaseOrders"));
-const RestockSuggestionsPanel = lazy(() => import("@/components/RestockSuggestionsPanel"));
-const PricingAssistantPanel = lazy(() => import("@/components/PricingAssistantPanel"));
-const SeasonManager = lazy(() => import("@/components/SeasonManager"));
-const ReorderPanel = lazy(() => import("@/components/ReorderPanel"));
-const SupplierPanel = lazy(() => import("@/components/SupplierPanel"));
 const HelpCentre = lazy(() => import("@/components/HelpCentre"));
 const HowToCatalog = lazy(() => import("@/components/HowToCatalog"));
 const HowToTabs = lazy(() => import("@/components/HowToTabs"));
 const AgentGuide = lazy(() => import("@/components/AgentGuide"));
-const AuditLogPanel = lazy(() => import("@/components/AuditLogPanel"));
-const CatalogMemoryPanel = lazy(() => import("@/components/CatalogMemoryPanel"));
-const EmailInboxPanel = lazy(() => import("@/components/EmailInboxPanel"));
-const CollabSEOFlow = lazy(() => import("@/components/CollabSEOFlow"));
 const AdsGuideTabs = lazy(() => import("@/components/AdsGuideTabs"));
-const LightspeedConverter = lazy(() => import("@/components/LightspeedConverter"));
-const GoogleAdsSetupWizard = lazy(() => import("@/components/GoogleAdsSetupWizard"));
-const MetaAdsSetupWizard = lazy(() => import("@/components/MetaAdsSetupWizard"));
-const PerformanceDashboard = lazy(() => import("@/components/PerformanceDashboard"));
-const AIFeedOptimisation = lazy(() => import("@/components/AIFeedOptimisation"));
-const FeedHealthPanel = lazy(() => import("@/components/FeedHealthPanel"));
-const ProductCollectionDecomposer = lazy(() => import("@/components/ProductCollectionDecomposer"));
-const GoogleColourFlow = lazy(() => import("@/components/GoogleColourFlow"));
-const GoogleAdsFlow = lazy(() => import("@/components/GoogleAdsFlow"));
-const StyleGroupingFlow = lazy(() => import("@/components/StyleGroupingFlow"));
-const CompetitorIntelFlow = lazy(() => import("@/components/CompetitorIntelFlow"));
-const CollectionSEOFlow = lazy(() => import("@/components/CollectionSEOFlow"));
-const CollectionSEOExport = lazy(() => import("@/components/CollectionSEOExport"));
-const GeoAgenticFlow = lazy(() => import("@/components/GeoAgenticFlow"));
-const OrganicSEOFlow = lazy(() => import("@/components/OrganicSEOFlow"));
-const MarginProtectionPanel = lazy(() => import("@/components/MarginProtectionPanel"));
-const MarkdownLadderPanel = lazy(() => import("@/components/MarkdownLadderPanel"));
-const StockMonitorPanel = lazy(() => import("@/components/StockMonitorPanel"));
-const SocialMediaPanel = lazy(() => import("@/components/SocialMediaPanel"));
-const InventoryPlanningPanel = lazy(() => import("@/components/InventoryPlanningPanel"));
-const PackingSlipFlow = lazy(() => import("@/components/PackingSlipFlow"));
-const JoorFlow = lazy(() => import("@/components/JoorFlow"));
-const WholesaleImportFlow = lazy(() => import("@/components/WholesaleImportFlow"));
-const LookbookImportFlow = lazy(() => import("@/components/LookbookImportFlow"));
-const AccountingIntegration = lazy(() => import("@/components/AccountingIntegration"));
-const ProfitLossPanel = lazy(() => import("@/components/ProfitLossPanel"));
-const StockyHub = lazy(() => import("@/components/StockyHub"));
-const StockyMigration = lazy(() => import("@/components/StockyMigration"));
-const InventoryDashboard = lazy(() => import("@/components/InventoryDashboard"));
-const ProductHealthPanel = lazy(() => import("@/components/ProductHealthPanel"));
-const ShopifyOrderSync = lazy(() => import("@/components/ShopifyOrderSync"));
-const ImageOptimisePanel = lazy(() => import("@/components/ImageOptimisePanel"));
-const StockCheckFlow = lazy(() => import("@/components/StockCheckFlow"));
-const PipelineRunner = lazy(() => import("@/components/PipelineRunner"));
-const PipelineChooser = lazy(() => import("@/components/PipelineChooser"));
-const StockyOnboarding = lazy(() => import("@/components/StockyOnboarding"));
-const SupplierProfileBuilder = lazy(() => import("@/components/SupplierProfileBuilder"));
-const SupplierIntelligencePanel = lazy(() => import("@/components/SupplierIntelligencePanel"));
-const TeachInvoiceTutorial = lazy(() => import("@/components/TeachInvoiceTutorial"));
-const ProcessingHistoryPanel = lazy(() => import("@/components/ProcessingHistoryPanel"));
-const StocktakeModule = lazy(() => import("@/components/StocktakeModule"));
-const TransferOrderPanel = lazy(() => import("@/components/TransferOrderPanel"));
-const ReportsHub = lazy(() => import("@/components/ReportsHub"));
-const StockAdjustmentPanel = lazy(() => import("@/components/StockAdjustmentPanel"));
-const InventoryView = lazy(() => import("@/components/InventoryView"));
-const ShopifyCSVSEO = lazy(() => import("@/components/ShopifyCSVSEO"));
-const StockyHomeDashboard = lazy(() => import("@/components/StockyHomeDashboard"));
 const AIAgentsLanding = lazy(() => import("@/components/AIAgentsLanding"));
-const InvoiceDetailScreen = lazy(() => import("@/components/InvoiceDetailScreen"));
-const PriceMatchPanel = lazy(() => import("@/components/PriceMatchPanel"));
-const ProductDescriptionPanel = lazy(() => import("@/components/ProductDescriptionPanel"));
-const StockReconciliationPanel = lazy(() => import("@/components/StockReconciliationPanel").then(m => ({ default: m.StockReconciliationPanel })));
-const ImageSEOFlow = lazy(() => import("@/components/ImageSEOFlow"));
-// ── Flow keys registry — single source of truth for all activeFlow values ──
-// Add a new flow by adding its key here; TypeScript will enforce usage everywhere.
-const FLOW_KEYS = {
-  invoice: true,
-  sale: true,
-  restock: true,
-  price_adjust: true,
-  price_lookup: true,
-  price_match: true,
-  product_descriptions: true,
-  order_form: true,
-  seasons: true,
-  reorder: true,
-  suppliers: true,
-  audit_log: true,
-  purchase_orders: true,
-  catalog_memory: true,
-  email_inbox: true,
-  collab_seo: true,
-  google_ads_setup: true,
-  meta_ads_setup: true,
-  lightspeed_convert: true,
-  scan_mode: true,
-  performance: true,
-  feed_optimise: true,
-  feed_health: true,
-  google_colour: true,
-  google_ads: true,
-  style_grouping: true,
-  competitor_intel: true,
-  collection_seo: true,
-  collection_decomposer: true,
-  collection_seo_export: true,
-  geo_agentic: true,
-  organic_seo: true,
-  margin_protection: true,
-  markdown_ladder: true,
-  stock_monitor: true,
-  social_media: true,
-  inventory_planning: true,
-  packing_slip: true,
-  joor: true,
-  wholesale_import: true,
-  lookbook_import: true,
-  accounting: true,
-  profit_loss: true,
-  stocky_hub: true,
-  stocky_migration: true,
-  stocky_onboarding: true,
-  inventory_dashboard: true,
-  inventory_view: true,
-  product_health: true,
-  order_sync: true,
-  image_optimise: true,
-  stock_check: true,
-  stocktake_module: true,
-  transfer_orders: true,
-  reports_hub: true,
-  pipeline: true,
-  pipeline_chooser: true,
-  supplier_profile_builder: true,
-  supplier_intelligence: true,
-  processing_history: true,
-  stock_adjustment: true,
-  quick_receive: true,
-  csv_seo: true,
-  stocky_dashboard: true,
-  stock_reconciliation: true,
-  teach_invoice_tutorial: true,
-  restock_suggestions: true,
-  pricing_assistant: true,
-  image_seo: true,
-  invoice_detail: true,
-} as const;
 
-export type ActiveFlow = keyof typeof FLOW_KEYS;
+// ── Flow registry (single source of truth for activeFlow values + render dispatch) ──
+import {
+  FLOW_REGISTRY,
+  isFlowKey,
+  renderFlow,
+  type FlowKey,
+  type FlowContext,
+} from "@/router/flow-registry";
 
-// Runtime type guard — single source of truth for "is this a known flow?"
-export const isFlowKey = (k: unknown): k is ActiveFlow =>
-  typeof k === "string" && Object.prototype.hasOwnProperty.call(FLOW_KEYS, k);
+// Backwards-compatible alias — older imports may still expect ActiveFlow.
+export type ActiveFlow = FlowKey;
 
 export interface FlowParams {
   patternId?: string;
@@ -208,10 +71,10 @@ const consumeFlowParams = (): FlowParams | undefined => {
   delete (window as unknown as { __sonicFlowParams?: FlowParams }).__sonicFlowParams;
   return p;
 };
-// Exposed for flows that prefer reading via window helper.
 if (typeof window !== "undefined") {
   (window as unknown as { __sonicConsumeFlowParams: () => FlowParams | undefined }).__sonicConsumeFlowParams = consumeFlowParams;
 }
+
 
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";

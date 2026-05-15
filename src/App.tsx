@@ -45,6 +45,7 @@ const SeoEngine = lazy(() => import("./pages/SeoEngine.tsx"));
 const SeoKeywords = lazy(() => import("./pages/SeoKeywords.tsx"));
 const SeoBlogPlans = lazy(() => import("./pages/SeoBlogPlans.tsx"));
 const SeoLinkMesh = lazy(() => import("./pages/SeoLinkMesh.tsx"));
+const AutoIngest = lazy(() => import("./pages/AutoIngest.tsx"));
 
 const queryClient = new QueryClient();
 

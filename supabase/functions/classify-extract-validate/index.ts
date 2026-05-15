@@ -1141,7 +1141,8 @@ RUBRIC — check every criterion:
 
 5. NO_TESTER_ROWS: No rows where SKU starts with TEST or RRP = 0.
 
-6. COST_VALIDATES: sum(cost_ex_gst × qty) must equal invoice subtotal ±$1.00.
+6. COST_VALIDATES: sum(cost_ex_gst × qty) must equal invoice subtotal within ±0.5% or ±$1.00, whichever is greater.
+   For a $300 invoice that's ±$1.50; for a $30,000 invoice that's ±$150.
    If subtotal unknown, mark as "unverified" not fail.
 
 7. RRP_ABOVE_COST: For every product, check: rrp_incl_gst > (cost_ex_gst × 1.1).

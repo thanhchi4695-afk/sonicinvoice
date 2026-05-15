@@ -99,6 +99,7 @@ const App = () => (
                   <Route path="/seo-blog-plans" element={<RequireAuth><Suspense fallback={null}><SeoBlogPlans /></Suspense></RequireAuth>} />
                   <Route path="/seo-link-mesh" element={<RequireAuth><Suspense fallback={null}><SeoLinkMesh /></Suspense></RequireAuth>} />
                   <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />
+                  <Route path="/auto-ingest" element={<RequireAuth><Suspense fallback={null}><AutoIngest /></Suspense></RequireAuth>} />
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
                   <Route path="/settings/claude-connector" element={<RequireAuth><ClaudeConnector /></RequireAuth>} />
                   <Route path="/settings/claude-activity" element={<RequireAuth><ClaudeActivity /></RequireAuth>} />

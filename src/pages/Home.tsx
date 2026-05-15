@@ -40,6 +40,8 @@ export default function Home() {
       />
       <Navigation />
       <HeroSection />
+      <ConnectionMapHero />
+      <CompleteFlowSection />
       <StatBarSection />
       <LogoTrustBar />
       <HowItWorksSection />

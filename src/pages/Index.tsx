@@ -192,11 +192,20 @@ const FLOW_KEYS = {
 
 export type ActiveFlow = keyof typeof FLOW_KEYS;
 
+// Runtime type guard — single source of truth for "is this a known flow?"
+export const isFlowKey = (k: unknown): k is ActiveFlow =>
+  typeof k === "string" && Object.prototype.hasOwnProperty.call(FLOW_KEYS, k);
+
+export interface FlowParams {
+  patternId?: string;
+  [key: string]: unknown;
+}
+
 // Consume one-shot flow params stashed on window by the navigate-flow event.
 // Reading clears the value so a later flow can't pick up stale data.
-const consumeFlowParams = (): any => {
-  const p = (window as any).__sonicFlowParams;
-  delete (window as any).__sonicFlowParams;
+const consumeFlowParams = (): FlowParams | undefined => {
+  const p = (window as unknown as { __sonicFlowParams?: FlowParams }).__sonicFlowParams;
+  delete (window as unknown as { __sonicFlowParams?: FlowParams }).__sonicFlowParams;
   return p;
 };
 // Exposed for flows that prefer reading via window helper.

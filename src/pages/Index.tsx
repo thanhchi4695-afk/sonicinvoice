@@ -485,7 +485,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             <h1 className="text-2xl sm:text-3xl font-bold font-display mb-2">Claude Integration</h1>
             <p className="text-sm text-muted-foreground max-w-2xl">
               See how Sonic Invoice uses Claude Sonnet 4.5 with supplier-specific skills to extract,
-              classify and validate every invoice — with automatic Gemini fallback for resilience.
+              classify and validate every invoice — with automatic Azure Document Intelligence fallback for resilience.
             </p>
           </header>
           <div className="aspect-video w-full overflow-hidden rounded-lg border border-border bg-black">
@@ -509,8 +509,8 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             <div className="rounded-lg border border-border bg-card p-4">
               <h2 className="text-sm font-semibold mb-1">Resilient fallback</h2>
               <p className="text-xs text-muted-foreground">
-                If Claude is unreachable, the AI Gateway automatically retries on Gemini 2.5 Flash
-                so processing never stalls.
+                If Claude is unreachable, the pipeline automatically falls back to Azure Document
+                Intelligence so processing never stalls.
               </p>
             </div>
           </div>

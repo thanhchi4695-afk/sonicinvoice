@@ -15,6 +15,59 @@ const corsHeaders = {
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void } | undefined;
 
+/** Fetch with exponential backoff on 429/529/5xx. Surfaces TimeoutError immediately. */
+async function fetchWithBackoff(
+  url: string,
+  init: RequestInit,
+  maxAttempts = 3,
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if (res.status === 429 || res.status === 529 || (res.status >= 500 && res.status < 600)) {
+        if (attempt < maxAttempts) {
+          const waitMs = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+          console.warn(`[anthropic] ${res.status} on attempt ${attempt} — retrying in ${waitMs}ms`);
+          await new Promise((r) => setTimeout(r, waitMs));
+          continue;
+        }
+      }
+      return res;
+    } catch (err) {
+      lastErr = err;
+      if (err instanceof Error && err.name === "TimeoutError") throw err;
+      if (attempt < maxAttempts) {
+        const waitMs = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+        console.warn(`[anthropic] fetch threw on attempt ${attempt} — retrying in ${waitMs}ms`, err);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+    }
+  }
+  throw lastErr ?? new Error("fetchWithBackoff exhausted attempts");
+}
+
+/** Normalise an Azure-extracted product row into the internal shape used by
+ *  the validator, UI, and Shopify CSV. */
+function normaliseAzureProduct(p: Record<string, unknown>): Record<string, unknown> {
+  const cost = Number(p.unit_cost ?? p.cost ?? 0) || 0;
+  const rrp = p.rrp != null && p.rrp !== "" ? Number(p.rrp) : null;
+  const qty = Number(p.qty ?? p.quantity ?? 0) || 0;
+  const name = String(p.product_title ?? p.name ?? "").trim();
+  const sku = String(p.style_code ?? p.sku ?? "").trim();
+  const colour = String(p.colour ?? p.color ?? "").trim();
+  const size = String(p.size ?? "").trim();
+  const category = String(p.category ?? "").trim();
+  return {
+    ...p,
+    name, product_name: name, product_title: name,
+    sku, style_code: sku, colour, size, qty, quantity: qty,
+    cost, unit_cost: cost, rrp: rrp ?? null, compare_at_price: rrp ?? null,
+    tags: category ? [category] : (Array.isArray(p.tags) ? p.tags : []),
+  };
+}
+
 interface Classification {
   supplier_name: string | null;
   document_type: string;
@@ -41,11 +94,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   console.log("[startup] ANTHROPIC_API_KEY present:", !!Deno.env.get("ANTHROPIC_API_KEY"));
-  try {
-    console.log("[startup] Deno.env keys available:", Object.keys(Deno.env.toObject()).join(", "));
-  } catch (e) {
-    console.log("[startup] Deno.env.toObject() failed:", e instanceof Error ? e.message : String(e));
-  }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -78,7 +126,7 @@ Deno.serve(async (req) => {
         const { data } = await userClient.auth.getUser();
         callerId = data?.user?.id ?? null;
       } catch { /* anonymous */ }
-      if (callerId && jobRow.user_id && callerId !== jobRow.user_id) {
+      if (!callerId || (jobRow.user_id && callerId !== jobRow.user_id)) {
         return json({ job: null }, 200);
       }
       return json({ job: jobRow }, 200);
@@ -217,7 +265,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
   // ─────── STAGE 1 — orientation ───────
   let classification: Classification | null = null;
   let usedSavedProfile = false;
-  const SAVED_PROFILE_MIN_CONFIDENCE = 20; // lowered from 70 — raise to 70 once 7+ invoices/supplier
+  const SAVED_PROFILE_MIN_CONFIDENCE = 50; // bumped from 20 — still reuses early profiles but blocks the worst guesses
 
   // First try: saved profile by supplier hint OR filename token match.
   // We track WHICH signal matched so we can later detect filename-driven
@@ -559,36 +607,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
         // Bond Eye–style flat lists give us RRP directly, so we surface it as both
         // `rrp` and `compare_at_price` so the Shopify CSV gets a Compare At Price
         // without needing Phase 3 price research.
-        const azProducts = azProductsRaw.map((p: Record<string, unknown>) => {
-          const cost = Number(p.unit_cost ?? p.cost ?? 0) || 0;
-          const rrp = p.rrp != null && p.rrp !== "" ? Number(p.rrp) : null;
-          const qty = Number(p.qty ?? p.quantity ?? 0) || 0;
-          // Azure flat-list output uses product_title/style_code; the rest of the
-          // pipeline (validator, UI, Shopify CSV) expects name/sku. Surface both.
-          const name = String(p.product_title ?? p.name ?? "").trim();
-          const sku = String(p.style_code ?? p.sku ?? "").trim();
-          const colour = String(p.colour ?? p.color ?? "").trim();
-          const size = String(p.size ?? "").trim();
-          const category = String(p.category ?? "").trim();
-          return {
-            ...p,
-            name,
-            product_name: name,
-            product_title: name,
-            sku,
-            style_code: sku,
-            colour,
-            size,
-            qty,
-            quantity: qty,
-            cost,
-            unit_cost: cost,
-            rrp: rrp ?? null,
-            compare_at_price: rrp ?? null,
-            // Carry section header (e.g. "Recycled", "Eco") as a tag candidate.
-            tags: category ? [category] : (Array.isArray(p.tags) ? p.tags : []),
-          };
-        });
+        const azProducts = azProductsRaw.map(normaliseAzureProduct);
         if (azProducts.length > 0) {
           console.log(`[classify-extract-validate] Azure layout returned ${azProducts.length} line items in ${azJson.azure_ms}ms (format=${azJson.format ?? "unknown"})`);
           extraction = {
@@ -692,22 +711,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
           if (az.ok) {
             const azJson = await az.json();
             const azProductsRaw = Array.isArray(azJson?.products) ? azJson.products : [];
-            const azProducts = azProductsRaw.map((p: Record<string, unknown>) => {
-              const cost = Number(p.unit_cost ?? p.cost ?? 0) || 0;
-              const rrp = p.rrp != null && p.rrp !== "" ? Number(p.rrp) : null;
-              const qty = Number(p.qty ?? p.quantity ?? 0) || 0;
-              const name = String(p.product_title ?? p.name ?? "").trim();
-              const sku = String(p.style_code ?? p.sku ?? "").trim();
-              const colour = String(p.colour ?? p.color ?? "").trim();
-              const size = String(p.size ?? "").trim();
-              const category = String(p.category ?? "").trim();
-              return {
-                ...p, name, product_name: name, product_title: name,
-                sku, style_code: sku, colour, size, qty, quantity: qty,
-                cost, unit_cost: cost, rrp: rrp ?? null, compare_at_price: rrp ?? null,
-                tags: category ? [category] : (Array.isArray(p.tags) ? p.tags : []),
-              };
-            });
+            const azProducts = azProductsRaw.map(normaliseAzureProduct);
             if (azProducts.length > 0) {
               extraction = {
                 products: azProducts,
@@ -995,17 +999,21 @@ async function runClaudePdfDirect(opts: {
     ? `IMPORTANT — RE-EXTRACTION FEEDBACK FROM GRADER:\n${opts.reextractReason}\nFix these specific issues this time.`
     : "";
 
-  // Build system as content blocks. The cache breakpoint lives on the last
-  // tool (see RETURN_INVOICE_TOOL above), which caches tools + system together
-  // as one prefix. Individual system blocks are too small (<1,024 tokens) to
-  // be cache breakpoints on their own, so we don't put cache_control here.
+  // Build system as content blocks. The brand profile is supplier-static and
+  // cached so repeat invoices from the same supplier benefit from cache_read.
   const systemBlocks: Array<Record<string, unknown>> = [
     { type: "text", text: masterPrompt },
   ];
   if (brandProfileBlock) {
-    systemBlocks.push({ type: "text", text: brandProfileBlock });
+    // Cache the brand profile — it's identical across every invoice from this supplier.
+    systemBlocks.push({
+      type: "text",
+      text: brandProfileBlock,
+      cache_control: { type: "ephemeral" },
+    });
   }
   if (reextractBlock) {
+    // Per-attempt grader feedback — never cached.
     systemBlocks.push({ type: "text", text: reextractBlock });
   }
 
@@ -1029,29 +1037,38 @@ async function runClaudePdfDirect(opts: {
   };
   const batches = chunkForClaude([docBlockWithCache], 20);
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-beta": "prompt-caching-2024-07-31",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 8000,
-      system: systemBlocks,
-      tools: [RETURN_INVOICE_TOOL],
-      tool_choice: { type: "tool", name: "return_invoice" },
-      messages: [{
-        role: "user",
-        content: [
-          ...batches[0],
-          { type: "text", text: userPrompt },
-        ],
-      }],
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithBackoff(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "prompt-caching-2024-07-31",
+        "content-type": "application/json",
+      },
+      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 8000,
+        system: systemBlocks,
+        tools: [RETURN_INVOICE_TOOL],
+        tool_choice: { type: "tool", name: "return_invoice" },
+        messages: [{
+          role: "user",
+          content: [
+            ...batches[0],
+            { type: "text", text: userPrompt },
+          ],
+        }],
+      }),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      throw new Error("Anthropic API timeout after 60s — invoice may be too complex or Anthropic is slow");
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     const errText = await response.text();
@@ -1124,7 +1141,8 @@ RUBRIC — check every criterion:
 
 5. NO_TESTER_ROWS: No rows where SKU starts with TEST or RRP = 0.
 
-6. COST_VALIDATES: sum(cost_ex_gst × qty) must equal invoice subtotal ±$1.00.
+6. COST_VALIDATES: sum(cost_ex_gst × qty) must equal invoice subtotal within ±0.5% or ±$1.00, whichever is greater.
+   For a $300 invoice that's ±$1.50; for a $30,000 invoice that's ±$150.
    If subtotal unknown, mark as "unverified" not fail.
 
 7. RRP_ABOVE_COST: For every product, check: rrp_incl_gst > (cost_ex_gst × 1.1).
@@ -1243,20 +1261,32 @@ async function runSonicGrader(opts: {
     console.log(`[grader] appended ${correctionContext.length} chars of supplier corrections to rubric`);
   }
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: SONIC_GRADER_MODEL,
-      max_tokens: 1500,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithBackoff(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify({
+        model: SONIC_GRADER_MODEL,
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      return {
+        passed: false, score: 0, criteria: {}, failures: ["grader timeout after 60s"],
+        reextract_needed: false, reextract_reason: "", error: "timeout",
+      };
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     const errText = await response.text();

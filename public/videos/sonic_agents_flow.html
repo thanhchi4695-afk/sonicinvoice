@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — AI Agents</title>
+<style>
+:root {
+  --bg: #f6f7fb;
+  --text: #111;
+  --muted: #6b7280;
+  --card: #fff;
+  --border: #e5e7eb;
+  --purple: #9D50DD;
+  --green: #00CA72;
+  --orange: #FDAB3D;
+  --blue: #0086C0;
+  --red: #E54D4D;
+  --lime: #a3e635;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+#stage {
+  width: 800px;
+  height: 800px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.15);
+}
+.headline { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.act {
+  position: absolute;
+  inset: 0;
+  padding: 48px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.act.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.spring-in {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  animation: springIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes springIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
+.stagger-8 { animation-delay: 840ms; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pill-purple { background: rgba(157,80,221,0.12); color: var(--purple); }
+.pill-green { background: rgba(0,202,114,0.12); color: var(--green); }
+.pill-orange { background: rgba(253,171,61,0.12); color: var(--orange); }
+.pill-blue { background: rgba(0,134,192,0.12); color: var(--blue); }
+.pill-red { background: rgba(229,77,77,0.12); color: var(--red); }
+.pill-grey { background: rgba(107,114,128,0.12); color: var(--muted); }
+.pill-lime { background: rgba(163,230,53,0.12); color: #65a30d; }
+
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.board-row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 8px 0 0 8px;
+}
+.row-purple::before { background: var(--purple); }
+.row-green::before { background: var(--green); }
+.row-orange::before { background: var(--orange); }
+.row-blue::before { background: var(--blue); }
+
+#progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--border);
+}
+#progress-fill {
+  height: 100%;
+  background: var(--purple);
+  width: 0%;
+  transition: width 0.3s linear;
+}
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#play-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+#play-btn:hover { border-color: var(--purple); color: var(--purple); }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--purple); transform: scale(1.3); }
+
+.agent-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin: 2px;
+}
+.step-wait { background: #f3f4f6; color: var(--muted); }
+.step-run { background: rgba(253,171,61,0.15); color: var(--orange); animation: pulseStep 1.5s ease-in-out infinite; }
+.step-done { background: rgba(0,202,114,0.15); color: var(--green); }
+@keyframes pulseStep {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.gap-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.gap-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.gap-impact { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 100px; }
+.impact-high { background: rgba(253,171,61,0.12); color: var(--orange); }
+.impact-med { background: rgba(0,134,192,0.12); color: var(--blue); }
+.gap-btn {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(157,80,221,0.12);
+  color: var(--purple);
+  border: none;
+  cursor: pointer;
+}
+
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 100px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.bar {
+  flex: 1;
+  border-radius: 4px 4px 0 0;
+  min-width: 24px;
+  animation: barGrow 1s ease-out forwards;
+  transform-origin: bottom;
+  transform: scaleY(0);
+}
+@keyframes barGrow {
+  to { transform: scaleY(1); }
+}
+
+.timeline-node {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+.timeline-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+.timeline-line {
+  position: absolute;
+  left: 4px;
+  top: 20px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- ACT 1: Intro -->
+<div class="act active" data-act="0">
+  <div class="spring-in stagger-1 mono" style="color:var(--muted);margin-bottom:16px;">Act 1 — The Agents</div>
+  <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:24px;">Three agents. Always running.</div>
+  <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+    <div class="board-row row-purple spring-in stagger-3">
+      <div style="width:32px;height:32px;background:rgba(157,80,221,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">🔮</div>
+      <div style="flex:1;margin-left:8px;">
+        <div style="font-size:14px;font-weight:700;color:var(--text);">Brand Intelligence Agent</div>
+        <div style="font-size:12px;color:var(--muted);">Crawling supplier sites</div>
+      </div>
+      <span class="pill pill-grey">Idle</span>
+    </div>
+    <div class="board-row row-blue spring-in stagger-4">
+      <div style="width:32px;height:32px;background:rgba(0,134,192,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">🔍</div>
+      <div style="flex:1;margin-left:8px;">
+        <div style="font-size:14px;font-weight:700;color:var(--text);">Store SEO Audit Agent</div>
+        <div style="font-size:12px;color:var(--muted);">Scanning 90 collections</div>
+      </div>
+      <span class="pill pill-grey">Idle</span>
+    </div>
+    <div class="board-row row-orange spring-in stagger-5">
+      <div style="width:32px;height:32px;background:rgba(253,171,61,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">🕵️</div>
+      <div style="flex:1;margin-left:8px;">
+        <div style="font-size:14px;font-weight:700;color:var(--text);">Competitor Gap Finder</div>
+        <div style="font-size:12px;color:var(--muted);">Crawling THE ICONIC</div>
+      </div>
+      <span class="pill pill-grey">Idle</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:24px;text-align:center;">
+    <div style="font-size:14px;color:var(--muted);">🕐 2:00 AM — Running while you sleep</div>
+  </div>
+</div>
+
+<!-- ACT 2: Brand Intelligence -->
+<div class="act" data-act="1">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 2 — Brand Intelligence</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Learning every brand</div>
+  <div class="agent-card spring-in stagger-3">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <div style="width:36px;height:36px;background:rgba(157,80,221,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;">🔮</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text);">Brand Intelligence Agent</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+      <span class="step-pill step-done">✓ Confirm domain</span>
+      <span class="step-pill step-done">✓ Crawl nav</span>
+      <span class="step-pill step-run">Founding story...</span>
+      <span class="step-pill step-wait">Check competitors</span>
+      <span class="step-pill step-wait">Extract voice</span>
+      <span class="step-pill step-wait">Save to DB</span>
+    </div>
+    <div class="spring-in stagger-4" style="margin-top:12px;background:#f9fafb;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text);font-family:monospace;">
+      Extracted: "Founded 1975, Bondi Beach. Known for: mix-and-match..."
+    </div>
+  </div>
+</div>
+
+<!-- ACT 3: SEO Audit -->
+<div class="act" data-act="2">
+  <div class="spring-in stagger-1 mono" style="color:var(--blue);margin-bottom:16px;">Act 3 — SEO Audit</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Scoring every collection</div>
+  <div class="agent-card spring-in stagger-3">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <div style="width:36px;height:36px;background:rgba(0,134,192,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;">🔍</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text);">Store SEO Audit Agent</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">
+      <span class="step-pill step-done">✓ Scan collections</span>
+      <span class="step-pill step-done">✓ Score 0-100</span>
+      <span class="step-pill step-run">Detect gaps...</span>
+      <span class="step-pill step-wait">20 suggestions</span>
+    </div>
+    <div class="bar-chart">
+      <div class="bar" style="height:10%;background:var(--red);animation-delay:0s"></div>
+      <div class="bar" style="height:30%;background:var(--orange);animation-delay:0.1s"></div>
+      <div class="bar" style="height:40%;background:var(--orange);animation-delay:0.2s"></div>
+      <div class="bar" style="height:45%;background:var(--orange);animation-delay:0.3s"></div>
+      <div class="bar" style="height:87%;background:var(--green);animation-delay:0.4s"></div>
+      <div class="bar" style="height:92%;background:var(--green);animation-delay:0.5s"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--muted);">
+      <span>0</span><span>30</span><span>40</span><span>45</span><span>87</span><span>92</span>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 4: Competitor Gap -->
+<div class="act" data-act="3">
+  <div class="spring-in stagger-1 mono" style="color:var(--orange);margin-bottom:16px;">Act 4 — Gap Finder</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Crawling competitors</div>
+  <div class="agent-card spring-in stagger-3">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <div style="width:36px;height:36px;background:rgba(253,171,61,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;">🕵️</div>
+      <div style="font-size:15px;font-weight:700;color:var(--text);">Competitor Gap Finder</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px;">
+      <span class="step-pill step-done">✓ THE ICONIC ref</span>
+      <span class="step-pill step-done">✓ Fetch nav</span>
+      <span class="step-pill step-run">Compare depth...</span>
+    </div>
+    <div style="display:flex;gap:16px;">
+      <div style="flex:1;background:#f9fafb;border:1px solid var(--border);border-radius:8px;padding:10px;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">THE ICONIC</div>
+        <div style="font-size:11px;color:var(--text);line-height:1.6;">
+          /womens-swimwear<br>
+          /womens-one-pieces<br>
+          /womens-bikini-tops<br>
+          /womens-modest-swimwear
+        </div>
+      </div>
+      <div style="flex:1;background:#f9fafb;border:1px solid var(--border);border-radius:8px;padding:10px;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Your Store</div>
+        <div style="font-size:11px;color:var(--text);line-height:1.6;">
+          /womens-swimwear ✓<br>
+          /womens-one-pieces ✓<br>
+          /womens-bikini-tops ✓<br>
+          <span style="color:var(--orange);font-weight:700;">/womens-modest-swimwear ✗</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 5: Gaps Found -->
+<div class="act" data-act="4">
+  <div class="spring-in stagger-1 mono" style="color:var(--orange);margin-bottom:16px;">Act 5 — Gaps Found</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Opportunities identified</div>
+  <div class="gap-card spring-in stagger-3">
+    <span class="gap-name">/womens-modest-swimwear</span>
+    <span class="gap-impact impact-high">HIGH — Swimwear Galore #3</span>
+    <button class="gap-btn">+ Create</button>
+  </div>
+  <div class="gap-card spring-in stagger-4">
+    <span class="gap-name">/maternity-swimwear</span>
+    <span class="gap-impact impact-high">HIGH — THE ICONIC #1</span>
+    <button class="gap-btn">+ Create</button>
+  </div>
+  <div class="gap-card spring-in stagger-5">
+    <span class="gap-name">/teen-girls-swimwear</span>
+    <span class="gap-impact impact-med">MEDIUM — Multiple</span>
+    <button class="gap-btn">+ Create</button>
+  </div>
+</div>
+
+<!-- ACT 6: One Click -->
+<div class="act" data-act="5">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 6 — One Click</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Gap → Collection in seconds</div>
+  <div class="spring-in stagger-3" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+      <span class="pill pill-orange">Gap</span>
+      <span style="font-size:14px;color:var(--text);font-weight:600;">/womens-modest-swimwear</span>
+    </div>
+    <div style="text-align:center;margin:8px 0;"><span style="color:var(--purple);font-size:20px;">↓</span></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+      <span class="pill pill-purple">Creating...</span>
+      <span style="font-size:14px;color:var(--text);">AI writing content</span>
+    </div>
+    <div style="text-align:center;margin:8px 0;"><span style="color:var(--purple);font-size:20px;">↓</span></div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="pill pill-green">✓ Live</span>
+      <span style="font-size:14px;color:var(--text);font-weight:600;">/womens-modest-swimwear</span>
+      <span style="font-size:12px;color:var(--muted);margin-left:auto;">SEO: 0/100 → needs content</span>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 7: All Complete -->
+<div class="act" data-act="6">
+  <div class="spring-in stagger-1 mono" style="color:var(--green);margin-bottom:16px;">Act 7 — Complete</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">All agents finished</div>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <div class="board-row row-purple spring-in stagger-3">
+      <div style="width:28px;height:28px;background:rgba(157,80,221,0.12);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">✓</div>
+      <div style="flex:1;margin-left:8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);">Brand Intelligence</div>
+        <div style="font-size:11px;color:var(--muted);">6 brands · 3 new stories · 94% confidence</div>
+      </div>
+      <span class="pill pill-green">Done ✓</span>
+    </div>
+    <div class="board-row row-blue spring-in stagger-4">
+      <div style="width:28px;height:28px;background:rgba(0,134,192,0.12);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">✓</div>
+      <div style="flex:1;margin-left:8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);">SEO Audit</div>
+        <div style="font-size:11px;color:var(--muted);">6 scored · 3 need attention · 20 suggestions</div>
+      </div>
+      <span class="pill pill-green">Done ✓</span>
+    </div>
+    <div class="board-row row-orange spring-in stagger-5">
+      <div style="width:28px;height:28px;background:rgba(253,171,61,0.12);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">✓</div>
+      <div style="flex:1;margin-left:8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);">Gap Finder</div>
+        <div style="font-size:11px;color:var(--muted);">47 URLs · 11 gaps · 3 high priority</div>
+      </div>
+      <span class="pill pill-green">Done ✓</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:20px;text-align:center;font-size:13px;color:var(--muted);">
+    Total runtime: <span style="color:var(--text);font-weight:700;">4 min 12 sec</span> — You were asleep.
+  </div>
+</div>
+
+<!-- ACT 8: Compound Effect -->
+<div class="act" data-act="7">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 8 — Compound</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:20px;text-align:center;">Every night, Sonic knows more</div>
+  <div class="spring-in stagger-3" style="display:flex;gap:16px;justify-content:center;margin-bottom:24px;">
+    <div style="text-align:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;width:120px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Brands</div>
+      <div style="font-size:24px;font-weight:800;color:var(--purple);font-family:Georgia,serif;">87</div>
+      <div style="font-size:10px;color:var(--muted);">+47 this month</div>
+    </div>
+    <div style="text-align:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;width:120px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Collections</div>
+      <div style="font-size:24px;font-weight:800;color:var(--blue);font-family:Georgia,serif;">41</div>
+      <div style="font-size:10px;color:var(--muted);">+35 this month</div>
+    </div>
+    <div style="text-align:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;width:120px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Google</div>
+      <div style="font-size:24px;font-weight:800;color:var(--green);font-family:Georgia,serif;">↑↑↑</div>
+      <div style="font-size:10px;color:var(--muted);">Ranking up</div>
+    </div>
+  </div>
+  <div class="spring-in stagger-4" style="text-align:center;font-size:14px;color:var(--muted);">
+    Autonomous · Compounding · Always learning
+  </div>
+  <div class="spring-in stagger-5" style="margin-top:32px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;">
+    <div style="width:32px;height:32px;background:var(--purple);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;">⚡</div>
+    <div style="font-size:18px;font-weight:800;color:var(--text);">Sonic Invoices</div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="progress-wrap"><div id="progress-fill"></div></div>
+<div id="controls">
+  <button id="play-btn" onclick="togglePlay()">⏸</button>
+  <div id="dots"></div>
+</div>
+</div>
+
+<script>
+const ACT_DURATION = 15000;
+const TOTAL_ACTS = 8;
+let currentAct = 0;
+let isPlaying = true;
+let timer = null;
+let progressTimer = null;
+let progressStart = 0;
+
+const dotsContainer = document.getElementById('dots');
+for (let i = 0; i < TOTAL_ACTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goToAct(i);
+  dotsContainer.appendChild(d);
+}
+
+function showAct(index) {
+  document.querySelectorAll('.act').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  document.querySelectorAll('.dot').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  currentAct = index;
+  updateProgress(0);
+}
+function updateProgress(pct) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+function nextAct() {
+  if (currentAct < TOTAL_ACTS - 1) goToAct(currentAct + 1);
+  else goToAct(0);
+}
+function goToAct(index) {
+  showAct(index);
+  if (isPlaying) startTimer();
+}
+function startTimer() {
+  clearInterval(timer);
+  clearInterval(progressTimer);
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    updateProgress(Math.min((elapsed / ACT_DURATION) * 100, 100));
+  }, 50);
+  timer = setTimeout(nextAct, ACT_DURATION);
+}
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) startTimer();
+  else { clearTimeout(timer); clearInterval(progressTimer); }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') goToAct(Math.min(currentAct + 1, TOTAL_ACTS - 1));
+  if (e.key === 'ArrowLeft') goToAct(Math.max(currentAct - 1, 0));
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+startTimer();
+</script>
+</body>
+</html>

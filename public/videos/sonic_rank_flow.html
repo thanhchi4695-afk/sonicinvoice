@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Sonic Rank</title>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --lime: #a3e635;
+  --purple: #9D50DD;
+  --green: #00CA72;
+  --orange: #FDAB3D;
+  --blue: #0086C0;
+  --red: #E54D4D;
+  --gold: #fbbf24;
+  --text: #f5f5f5;
+  --muted: #737373;
+  --card: #141414;
+  --border: #262626;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+#stage {
+  width: 800px;
+  height: 800px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.8);
+}
+.headline { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.act {
+  position: absolute;
+  inset: 0;
+  padding: 48px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.act.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.spring-in {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  animation: springIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes springIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
+.stagger-8 { animation-delay: 840ms; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pill-purple { background: rgba(157,80,221,0.15); color: var(--purple); }
+.pill-green { background: rgba(0,202,114,0.15); color: var(--green); }
+.pill-orange { background: rgba(253,171,61,0.15); color: var(--orange); }
+.pill-blue { background: rgba(0,134,192,0.15); color: var(--blue); }
+.pill-lime { background: rgba(163,230,53,0.15); color: var(--lime); }
+.pill-red { background: rgba(229,77,77,0.15); color: var(--red); }
+.pill-gold { background: rgba(251,191,36,0.15); color: var(--gold); }
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+.pill-purple .pill-dot { background: var(--purple); }
+.pill-green .pill-dot { background: var(--green); }
+.pill-orange .pill-dot { background: var(--orange); }
+.pill-blue .pill-dot { background: var(--blue); }
+.pill-lime .pill-dot { background: var(--lime); }
+.pill-red .pill-dot { background: var(--red); }
+.pill-gold .pill-dot { background: var(--gold); }
+
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.board-row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 8px 0 0 8px;
+}
+.row-purple::before { background: var(--purple); }
+.row-green::before { background: var(--green); }
+.row-orange::before { background: var(--orange); }
+.row-blue::before { background: var(--blue); }
+.row-lime::before { background: var(--lime); }
+.row-red::before { background: var(--red); }
+.row-gold::before { background: var(--gold); }
+
+#progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--border);
+}
+#progress-fill {
+  height: 100%;
+  background: var(--lime);
+  width: 0%;
+  transition: width 0.3s linear;
+}
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#play-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+#play-btn:hover { border-color: var(--lime); color: var(--lime); }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--lime); transform: scale(1.3); }
+
+.score-ring {
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  margin: 0 auto;
+}
+.score-ring::after {
+  content: '';
+  position: absolute;
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  background: var(--bg);
+}
+.score-val {
+  position: relative;
+  z-index: 2;
+  font-size: 36px;
+  font-weight: 800;
+  font-family: Georgia, serif;
+}
+
+.serp-result {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+.serp-url { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.serp-title { font-size: 14px; font-weight: 600; color: var(--blue); margin-bottom: 3px; }
+.serp-desc { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.tree-level { display: flex; flex-direction: column; }
+.tree-connector {
+  width: 2px;
+  background: var(--border);
+  margin-left: 12px;
+}
+
+.task-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.task-status {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.task-done { background: rgba(0,202,114,0.15); color: var(--green); }
+.task-run { background: rgba(163,230,53,0.15); color: var(--lime); animation: taskPulse 1.5s ease-in-out infinite; }
+@keyframes taskPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.content-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 8px;
+}
+.content-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.content-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+
+.logo-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-icon {
+  width: 40px; height: 40px;
+  background: var(--lime);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.logo-text {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.03em;
+}
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- ACT 1: Empty Collections -->
+<div class="act active" data-act="0">
+  <div class="spring-in stagger-1 mono" style="color:var(--red);margin-bottom:16px;">Act 1 — The Problem</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:20px;">Empty collections = invisible</div>
+  <div class="spring-in stagger-3" style="font-size:13px;color:var(--muted);margin-bottom:16px;">Search: "seafolly swimwear darwin"</div>
+  <div class="serp-result spring-in stagger-3" style="opacity:0.6;">
+    <div class="serp-url">seafolly.com › swimwear</div>
+    <div class="serp-title">Seafolly Swimwear — Official Store</div>
+    <div class="serp-desc">Shop the latest Seafolly swimwear collection. Free delivery Australia-wide.</div>
+  </div>
+  <div class="serp-result spring-in stagger-4" style="opacity:0.6;">
+    <div class="serp-url">theiconic.com.au › womens-swimwear</div>
+    <div class="serp-title">Seafolly Swimwear — THE ICONIC</div>
+    <div class="serp-desc">Discover Seafolly at THE ICONIC. Afterpay available.</div>
+  </div>
+  <div class="serp-result spring-in stagger-5" style="opacity:0.6;">
+    <div class="serp-url">swimweargalore.com.au › brands › seafolly</div>
+    <div class="serp-title">Seafolly — Swimwear Galore</div>
+    <div class="serp-desc">Seafolly swimwear for every body. Shop online.</div>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:16px;text-align:center;">
+    <span class="pill pill-red"><span class="pill-dot"></span>Your store not found</span>
+  </div>
+  <div class="spring-in stagger-7 board-row row-red" style="margin-top:16px;">
+    <div style="flex:1;font-size:13px;color:var(--text);">/collections/seafolly — SEO Score: 0/100</div>
+    <span class="pill pill-red"><span class="pill-dot"></span>Invisible</span>
+  </div>
+</div>
+
+<!-- ACT 2: Score System -->
+<div class="act" data-act="1">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 2 — Score System</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:20px;text-align:center;">0 — 100 points</div>
+  <div class="spring-in stagger-3" style="text-align:center;margin-bottom:24px;">
+    <div class="score-ring" style="background: conic-gradient(var(--red) 0% 10%, var(--border) 10% 100%);">
+      <div class="score-val" style="color:var(--red);">10</div>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--muted);">/collections/seafolly</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:480px;margin:0 auto;">
+    <div class="board-row row-red spring-in stagger-4" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">SEO Title</div>
+      <span class="pill pill-red" style="margin-left:auto;font-size:10px;">✗ 0/15</span>
+    </div>
+    <div class="board-row row-red spring-in stagger-4" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">Meta Description</div>
+      <span class="pill pill-red" style="margin-left:auto;font-size:10px;">✗ 0/20</span>
+    </div>
+    <div class="board-row row-red spring-in stagger-5" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">Description</div>
+      <span class="pill pill-red" style="margin-left:auto;font-size:10px;">✗ 0/25</span>
+    </div>
+    <div class="board-row row-red spring-in stagger-5" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">FAQ Section</div>
+      <span class="pill pill-red" style="margin-left:auto;font-size:10px;">✗ 0/20</span>
+    </div>
+    <div class="board-row row-red spring-in stagger-6" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">Internal Links</div>
+      <span class="pill pill-red" style="margin-left:auto;font-size:10px;">✗ 0/10</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-6" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">Products Present</div>
+      <span class="pill pill-green" style="margin-left:auto;font-size:10px;">✓ 10/10</span>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 3: AI Generation -->
+<div class="act" data-act="2">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 3 — AI Generation</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Generate all missing content</div>
+  <div class="spring-in stagger-3" style="text-align:center;margin-bottom:20px;">
+    <button style="padding:10px 24px;background:var(--lime);color:#000;border:none;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;">Generate All Missing →</button>
+  </div>
+  <div class="task-queue spring-in stagger-4">
+    <div class="task-item">
+      <div class="task-status task-done">✓</div>
+      <div style="flex:1;font-size:13px;color:var(--text);">Writing SEO title...</div>
+      <span class="pill pill-green" style="font-size:10px;">Done</span>
+    </div>
+    <div class="task-item">
+      <div class="task-status task-done">✓</div>
+      <div style="flex:1;font-size:13px;color:var(--text);">Writing meta description...</div>
+      <span class="pill pill-green" style="font-size:10px;">Done</span>
+    </div>
+    <div class="task-item">
+      <div class="task-status task-done">✓</div>
+      <div style="flex:1;font-size:13px;color:var(--text);">Writing 250-word description...</div>
+      <span class="pill pill-green" style="font-size:10px;">Done</span>
+    </div>
+    <div class="task-item">
+      <div class="task-status task-done">✓</div>
+      <div style="flex:1;font-size:13px;color:var(--text);">Generating 5 FAQ questions...</div>
+      <span class="pill pill-green" style="font-size:10px;">Done</span>
+    </div>
+    <div class="task-item">
+      <div class="task-status task-done">✓</div>
+      <div style="flex:1;font-size:13px;color:var(--text);">Building internal link mesh...</div>
+      <span class="pill pill-green" style="font-size:10px;">Done</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-5" style="margin-top:16px;text-align:center;font-size:12px;color:var(--muted);">
+    Total: <span style="color:var(--lime);font-weight:700;">23 seconds</span>
+  </div>
+</div>
+
+<!-- ACT 4: Content Preview -->
+<div class="act" data-act="3">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 4 — Content Preview</div>
+  <div class="spring-in stagger-2 headline" style="font-size:24px;color:var(--text);margin-bottom:16px;">Google-ready content</div>
+  <div class="content-card spring-in stagger-3">
+    <div class="content-label">SEO Title — 59 characters</div>
+    <div class="content-text" style="color:var(--lime);">Seafolly Swimwear Darwin | Bikinis, One Pieces & Cover-Ups | Splash Swimwear</div>
+  </div>
+  <div class="content-card spring-in stagger-4">
+    <div class="content-label">Meta Description — 134 characters <span style="color:var(--green);">✓</span></div>
+    <div class="content-text">Shop Seafolly swimwear in Darwin at Splash. New Spring 2026 arrivals — bikinis, one pieces & mix-and-match sets. Free delivery over $150.</div>
+  </div>
+  <div class="content-card spring-in stagger-5">
+    <div class="content-label">Description — 250+ words</div>
+    <div class="content-text">Splash Swimwear is Darwin's home of Seafolly — stocking the full Spring 2026 range including the iconic Riviera One Piece, Beach Bound Bandeau, and mix-and-match bikini separates...</div>
+  </div>
+  <div class="content-card spring-in stagger-6">
+    <div class="content-label">FAQ + Internal Links</div>
+    <div class="content-text">Q: What Seafolly styles are available in Darwin?<br>→ <span style="color:var(--blue);">/collections/seafolly-bikini-tops</span><br>→ <span style="color:var(--blue);">/collections/seafolly-one-pieces</span></div>
+  </div>
+</div>
+
+<!-- ACT 5: Score Transform -->
+<div class="act" data-act="4">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 5 — Score Transform</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:20px;text-align:center;">0 → 100</div>
+  <div class="spring-in stagger-3" style="text-align:center;margin-bottom:24px;">
+    <div class="score-ring" style="background: conic-gradient(var(--lime) 0% 100%, var(--border) 100% 100%);animation: scoreFill 2s ease-out forwards;">
+      <div class="score-val" style="color:var(--lime);">100</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:480px;margin:0 auto;">
+    <div class="board-row row-green spring-in stagger-4" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">SEO Title</div>
+      <span class="pill pill-green" style="margin-left:auto;font-size:10px;">✓ 15/15</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-4" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">Meta Description</div>
+      <span class="pill pill-green" style="margin-left:auto;font-size:10px;">✓ 20/20</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-5" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">Description</div>
+      <span class="pill pill-green" style="margin-left:auto;font-size:10px;">✓ 25/25</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-5" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">FAQ Section</div>
+      <span class="pill pill-green" style="margin-left:auto;font-size:10px;">✓ 20/20</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-6" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">Internal Links</div>
+      <span class="pill pill-green" style="margin-left:auto;font-size:10px;">✓ 10/10</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-6" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);">Products Present</div>
+      <span class="pill pill-green" style="margin-left:auto;font-size:10px;">✓ 10/10</span>
+    </div>
+  </div>
+  <style>
+    @keyframes scoreFill {
+      from { background: conic-gradient(var(--lime) 0% 0%, var(--border) 0% 100%); }
+      to { background: conic-gradient(var(--lime) 0% 100%, var(--border) 100% 100%); }
+    }
+  </style>
+</div>
+
+<!-- ACT 6: URL Hierarchy -->
+<div class="act" data-act="5">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 6 — Hierarchy</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">90+ collections. One tree.</div>
+  <div style="max-width:520px;margin:0 auto;">
+    <div class="tree-node spring-in stagger-3" style="border-color:var(--purple);">
+      <span style="color:var(--purple);font-weight:700;">L1</span> /collections/seafolly (brand)
+    </div>
+    <div class="tree-connector" style="height:12px;"></div>
+    <div style="display:flex;gap:8px;margin-left:24px;">
+      <div class="tree-node spring-in stagger-4" style="border-color:var(--blue);">
+        <span style="color:var(--blue);font-weight:700;">L2</span> /seafolly-bikini-tops
+      </div>
+      <div class="tree-node spring-in stagger-5" style="border-color:var(--blue);">
+        <span style="color:var(--blue);font-weight:700;">L2</span> /seafolly-one-pieces
+      </div>
+    </div>
+    <div class="tree-connector" style="height:12px;margin-left:36px;"></div>
+    <div style="display:flex;gap:8px;margin-left:48px;">
+      <div class="tree-node spring-in stagger-6" style="border-color:var(--orange);">
+        <span style="color:var(--orange);font-weight:700;">L3</span> /black-swimwear
+      </div>
+      <div class="tree-node spring-in stagger-7" style="border-color:var(--orange);">
+        <span style="color:var(--orange);font-weight:700;">L3</span> /teal-swimwear
+      </div>
+    </div>
+    <div class="tree-connector" style="height:12px;margin-left:60px;"></div>
+    <div style="display:flex;gap:8px;margin-left:72px;">
+      <div class="tree-node spring-in stagger-6" style="border-color:var(--green);">
+        <span style="color:var(--green);font-weight:700;">L4</span> /tummy-control
+      </div>
+      <div class="tree-node spring-in stagger-7" style="border-color:var(--green);">
+        <span style="color:var(--green);font-weight:700;">L4</span> /d-cup-swimwear
+      </div>
+    </div>
+  </div>
+  <div class="spring-in stagger-8" style="margin-top:16px;text-align:center;font-size:12px;color:var(--muted);">
+    90 collections. One intelligent hierarchy.
+  </div>
+</div>
+
+<!-- ACT 7: Google Ranking -->
+<div class="act" data-act="6">
+  <div class="spring-in stagger-1 mono" style="color:var(--gold);margin-bottom:16px;">Act 7 — Google Ranking</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:16px;text-align:center;">From #8 to #1</div>
+  <div class="spring-in stagger-3" style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:16px;">Search: "seafolly swimwear darwin"</div>
+  <div style="max-width:520px;margin:0 auto;">
+    <div class="serp-result spring-in stagger-3" style="opacity:0.5;">
+      <div class="serp-url">seafolly.com › swimwear</div>
+      <div class="serp-title">Seafolly Swimwear — Official Store</div>
+      <div class="serp-desc">Shop the latest Seafolly swimwear collection.</div>
+      <div style="position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:var(--muted);">#2</div>
+    </div>
+    <div class="serp-result spring-in stagger-4" style="border-color:var(--lime);position:relative;">
+      <div class="serp-url">yoursplashstore.com.au › collections › seafolly</div>
+      <div class="serp-title" style="color:var(--lime);">Seafolly Swimwear Darwin | Splash Swimwear</div>
+      <div class="serp-desc">Shop Seafolly swimwear in Darwin. New Spring 2026 arrivals. Free delivery over $150.</div>
+      <div style="position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:14px;font-weight:800;color:var(--gold);">👑 #1</div>
+    </div>
+    <div class="serp-result spring-in stagger-5" style="opacity:0.5;">
+      <div class="serp-url">theiconic.com.au › womens-swimwear</div>
+      <div class="serp-title">Seafolly — THE ICONIC</div>
+      <div class="serp-desc">Discover Seafolly at THE ICONIC.</div>
+      <div style="position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:var(--muted);">#3</div>
+    </div>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:16px;text-align:center;">
+    <span class="pill pill-gold"><span class="pill-dot"></span>Position gained in 48 hours</span>
+  </div>
+</div>
+
+<!-- ACT 8: Dashboard -->
+<div class="act" data-act="7">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 8 — Dashboard</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:20px;text-align:center;">Sonic Rank Board</div>
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:560px;margin:0 auto;">
+    <div class="board-row row-green spring-in stagger-3" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/seafolly</div>
+      <div style="font-size:13px;font-weight:800;color:var(--green);font-family:Georgia,serif;margin-right:12px;">100</div>
+      <span class="pill pill-gold" style="font-size:10px;">👑 #1</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-4" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/seafolly-bikini-tops</div>
+      <div style="font-size:13px;font-weight:800;color:var(--green);font-family:Georgia,serif;margin-right:12px;">92</div>
+      <span class="pill pill-gold" style="font-size:10px;">👑 #1</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-5" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/seafolly-one-pieces</div>
+      <div style="font-size:13px;font-weight:800;color:var(--green);font-family:Georgia,serif;margin-right:12px;">91</div>
+      <span class="pill pill-gold" style="font-size:10px;">👑 #2</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-6" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/black-swimwear</div>
+      <div style="font-size:13px;font-weight:800;color:var(--green);font-family:Georgia,serif;margin-right:12px;">88</div>
+      <span class="pill pill-gold" style="font-size:10px;">👑 #3</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-7" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/tummy-control</div>
+      <div style="font-size:13px;font-weight:800;color:var(--green);font-family:Georgia,serif;margin-right:12px;">95</div>
+      <span class="pill pill-gold" style="font-size:10px;">👑 #1</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-8" style="margin-top:24px;text-align:center;">
+    <div style="font-size:14px;color:var(--muted);">Average: <span style="color:var(--lime);font-weight:800;font-size:24px;font-family:Georgia,serif;">92</span>/100</div>
+    <div style="margin-top:16px;display:flex;align-items:center;justify-content:center;gap:10px;">
+      <div style="width:32px;height:32px;background:var(--lime);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">⚡</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text);">Sonic Invoices</div>
+    </div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="progress-wrap"><div id="progress-fill"></div></div>
+<div id="controls">
+  <button id="play-btn" onclick="togglePlay()">⏸</button>
+  <div id="dots"></div>
+</div>
+</div>
+
+<script>
+const ACT_DURATION = 15000;
+const TOTAL_ACTS = 8;
+let currentAct = 0;
+let isPlaying = true;
+let timer = null;
+let progressTimer = null;
+let progressStart = 0;
+
+const dotsContainer = document.getElementById('dots');
+for (let i = 0; i < TOTAL_ACTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goToAct(i);
+  dotsContainer.appendChild(d);
+}
+
+function showAct(index) {
+  document.querySelectorAll('.act').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  document.querySelectorAll('.dot').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  currentAct = index;
+  updateProgress(0);
+}
+function updateProgress(pct) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+function nextAct() {
+  if (currentAct < TOTAL_ACTS - 1) goToAct(currentAct + 1);
+  else goToAct(0);
+}
+function goToAct(index) {
+  showAct(index);
+  if (isPlaying) startTimer();
+}
+function startTimer() {
+  clearInterval(timer);
+  clearInterval(progressTimer);
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    updateProgress(Math.min((elapsed / ACT_DURATION) * 100, 100));
+  }, 50);
+  timer = setTimeout(nextAct, ACT_DURATION);
+}
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) startTimer();
+  else { clearTimeout(timer); clearInterval(progressTimer); }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') goToAct(Math.min(currentAct + 1, TOTAL_ACTS - 1));
+  if (e.key === 'ArrowLeft') goToAct(Math.max(currentAct - 1, 0));
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+startTimer();
+</script>
+</body>
+</html>

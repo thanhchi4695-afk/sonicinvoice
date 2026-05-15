@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — The Import Flow</title>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --lime: #a3e635;
+  --purple: #9D50DD;
+  --green: #00CA72;
+  --orange: #FDAB3D;
+  --blue: #0086C0;
+  --red: #E54D4D;
+  --text: #f5f5f5;
+  --muted: #737373;
+  --card: #141414;
+  --border: #262626;
+  --grey: #525252;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+#stage {
+  width: 800px;
+  height: 800px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.8);
+}
+.headline { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.act {
+  position: absolute;
+  inset: 0;
+  padding: 48px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.act.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.spring-in {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  animation: springIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes springIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
+.stagger-8 { animation-delay: 840ms; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pill-purple { background: rgba(157,80,221,0.15); color: var(--purple); }
+.pill-green { background: rgba(0,202,114,0.15); color: var(--green); }
+.pill-orange { background: rgba(253,171,61,0.15); color: var(--orange); }
+.pill-blue { background: rgba(0,134,192,0.15); color: var(--blue); }
+.pill-lime { background: rgba(163,230,53,0.15); color: var(--lime); }
+.pill-red { background: rgba(229,77,77,0.15); color: var(--red); }
+.pill-grey { background: rgba(82,82,82,0.15); color: var(--grey); }
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+.pill-purple .pill-dot { background: var(--purple); }
+.pill-green .pill-dot { background: var(--green); }
+.pill-orange .pill-dot { background: var(--orange); }
+.pill-blue .pill-dot { background: var(--blue); }
+.pill-lime .pill-dot { background: var(--lime); }
+.pill-red .pill-dot { background: var(--red); }
+
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.board-row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 8px 0 0 8px;
+}
+.row-purple::before { background: var(--purple); }
+.row-green::before { background: var(--green); }
+.row-orange::before { background: var(--orange); }
+.row-blue::before { background: var(--blue); }
+.row-lime::before { background: var(--lime); }
+.row-red::before { background: var(--red); }
+.row-grey::before { background: var(--grey); }
+
+#progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--border);
+}
+#progress-fill {
+  height: 100%;
+  background: var(--lime);
+  width: 0%;
+  transition: width 0.3s linear;
+}
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#play-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+#play-btn:hover { border-color: var(--lime); color: var(--lime); }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--lime); transform: scale(1.3); }
+
+/* Specific to Import Flow */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+.data-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.data-table td {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+.typing-cursor::after {
+  content: '|';
+  animation: blink 1s step-end infinite;
+  color: var(--lime);
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.timer-box {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-family: monospace;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.pdf-drop {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.pdf-icon {
+  width: 44px; height: 44px;
+  background: rgba(253,171,61,0.15);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+
+.scan-beam {
+  position: absolute;
+  left: 0; right: 0;
+  height: 3px;
+  background: var(--lime);
+  box-shadow: 0 0 20px var(--lime);
+  opacity: 0.7;
+  animation: scanDown 2s ease-in-out infinite;
+}
+@keyframes scanDown {
+  0% { top: 0; opacity: 0; }
+  10% { opacity: 0.7; }
+  90% { opacity: 0.7; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1.5px solid;
+  margin: 3px;
+  animation: chipPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  opacity: 0;
+  transform: scale(0.5);
+}
+@keyframes chipPop {
+  to { opacity: 1; transform: scale(1); }
+}
+
+.brand-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.shopify-pop {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--green);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  position: relative;
+  margin: 0 auto;
+}
+.shopify-pop::after {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  border: 2px solid var(--green);
+  opacity: 0;
+  animation: popRing 2s ease-out infinite;
+}
+@keyframes popRing {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.split-screen {
+  display: flex;
+  gap: 16px;
+  margin-top: 32px;
+}
+.split-half {
+  flex: 1;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+}
+.split-sad {
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.split-happy {
+  background: rgba(163,230,53,0.08);
+  border: 1px solid rgba(163,230,53,0.3);
+}
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- ACT 1: THE PAIN -->
+<div class="act active" data-act="0">
+  <div class="spring-in stagger-1 mono" style="color:var(--red);margin-bottom:16px;">Act 1 — The Pain</div>
+  <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:24px;">Manual data entry</div>
+  <div class="timer-box spring-in stagger-3">0:00</div>
+  <table class="data-table spring-in stagger-3">
+    <tr><th>Product</th><th>SKU</th><th>Price</th></tr>
+    <tr><td class="typing-cursor">Seafolly Riviera One Piece</td><td class="typing-cursor">SEA-RP-TL-12</td><td class="typing-cursor">$129.00</td></tr>
+    <tr style="opacity:0.4"><td>Kulani Kinis Malibu Top</td><td>KK-MT-CR-10</td><td>$89.00</td></tr>
+    <tr style="opacity:0.2"><td>Bond-Eye Sahara Dress</td><td>BE-SD-BK-S</td><td>$145.00</td></tr>
+  </table>
+  <div class="spring-in stagger-4" style="margin-top:20px;">
+    <div class="board-row row-red">
+      <div style="flex:1;font-size:13px;color:var(--text);">Manual entry: 2 hrs estimated</div>
+      <span class="pill pill-red"><span class="pill-dot"></span>Slow</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-5 headline" style="font-size:48px;color:var(--grey);text-align:center;margin-top:32px;letter-spacing:0.2em;">BORING</div>
+</div>
+
+<!-- ACT 2: INVOICE ARRIVES -->
+<div class="act" data-act="1">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 2 — Invoice Arrives</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:24px;">Monday morning. 83 products.</div>
+  <div class="spring-in stagger-3 pdf-drop">
+    <div class="pdf-icon">📄</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">Kulani Kinis — Spring 2026</div>
+      <div style="font-size:12px;color:var(--muted);">40 products</div>
+    </div>
+    <span class="pill pill-orange"><span class="pill-dot"></span>New</span>
+  </div>
+  <div class="spring-in stagger-4 pdf-drop">
+    <div class="pdf-icon" style="background:rgba(0,134,192,0.15);">📄</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">Seafolly — Summer 2026</div>
+      <div style="font-size:12px;color:var(--muted);">28 products</div>
+    </div>
+    <span class="pill pill-blue"><span class="pill-dot"></span>New</span>
+  </div>
+  <div class="spring-in stagger-5 pdf-drop">
+    <div class="pdf-icon" style="background:rgba(157,80,221,0.15);">📄</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">Walnut Melbourne — Autumn 2026</div>
+      <div style="font-size:12px;color:var(--muted);">15 products</div>
+    </div>
+    <span class="pill pill-purple"><span class="pill-dot"></span>New</span>
+  </div>
+  <div class="spring-in stagger-6 timer-box" style="position:static;margin-top:20px;text-align:center;">Timer: 2:30 estimated</div>
+</div>
+
+<!-- ACT 3: AI PARSING -->
+<div class="act" data-act="2">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 3 — AI Parsing</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:24px;">Scanning begins</div>
+  <div style="position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;height:280px;overflow:hidden;">
+    <div class="scan-beam"></div>
+    <div style="position:relative;z-index:2;display:flex;flex-direction:column;gap:8px;">
+      <div class="board-row row-orange spring-in stagger-3">
+        <div style="font-size:13px;color:var(--text);flex:1;">Seafolly Riviera One Piece — Teal — $129.00</div>
+        <span class="pill pill-orange"><span class="pill-dot"></span>Parsing</span>
+      </div>
+      <div class="board-row row-orange spring-in stagger-4">
+        <div style="font-size:13px;color:var(--text);flex:1;">Kulani Kinis Malibu Top — Coral — $89.00</div>
+        <span class="pill pill-orange"><span class="pill-dot"></span>Parsing</span>
+      </div>
+      <div class="board-row row-orange spring-in stagger-5">
+        <div style="font-size:13px;color:var(--text);flex:1;">Bond-Eye Sahara Dress — Black — $145.00</div>
+        <span class="pill pill-orange"><span class="pill-dot"></span>Parsing</span>
+      </div>
+    </div>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;">
+    <div style="font-size:14px;color:var(--text);font-weight:700;">Progress: <span style="color:var(--lime);">100%</span></div>
+    <div style="font-size:12px;color:var(--muted);">Duration: 12 seconds</div>
+  </div>
+</div>
+
+<!-- ACT 4: PRODUCTS EXTRACTED -->
+<div class="act" data-act="3">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 4 — Extracted</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:16px;">40 products. 18 seconds.</div>
+  <div style="display:flex;flex-direction:column;gap:6px;max-height:420px;overflow:hidden;">
+    <div class="board-row row-green spring-in stagger-2" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">Seafolly Riviera One Piece</div>
+      <div style="font-size:11px;color:var(--muted);">Teal · D-G · $129</div>
+      <span class="pill pill-green" style="margin-left:8px"><span class="pill-dot"></span>✓</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-3" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">Kulani Kinis Malibu Top</div>
+      <div style="font-size:11px;color:var(--muted);">Coral · Underwire · $89</div>
+      <span class="pill pill-green" style="margin-left:8px"><span class="pill-dot"></span>✓</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-4" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">Bond-Eye Sahara Dress</div>
+      <div style="font-size:11px;color:var(--muted);">Black · Tummy Control · $145</div>
+      <span class="pill pill-green" style="margin-left:8px"><span class="pill-dot"></span>✓</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-5" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">Seafolly Beach Bound Bandeau</div>
+      <div style="font-size:11px;color:var(--muted);">Chocolate · DD/E · $89</div>
+      <span class="pill pill-green" style="margin-left:8px"><span class="pill-dot"></span>✓</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-6" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">Kulani Kinis Soft Knot Halter</div>
+      <div style="font-size:11px;color:var(--muted);">Emerald · B-C · $79</div>
+      <span class="pill pill-green" style="margin-left:8px"><span class="pill-dot"></span>✓</span>
+    </div>
+    <div class="board-row row-orange spring-in stagger-7" style="margin-bottom:0;padding:10px 12px;opacity:0.6;">
+      <div style="font-size:12px;color:var(--text);flex:1;">+ 35 more products extracted</div>
+      <span class="pill pill-orange" style="margin-left:8px"><span class="pill-dot"></span>...</span>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 5: 7-LAYER TAGGING -->
+<div class="act" data-act="4">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 5 — 7-Layer Tagging</div>
+  <div class="spring-in stagger-2 headline" style="font-size:24px;color:var(--text);margin-bottom:16px;">Soft Knot Halter Bikini Top — Emerald Aura</div>
+  <div class="spring-in stagger-3" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;">
+    <div style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:4px;">Kulani Kinis · Soft Knot Halter · Emerald Aura</div>
+    <div style="font-size:12px;color:var(--muted);">AU 8-14 · $79 ex GST</div>
+  </div>
+  <div style="text-align:center;padding:16px;">
+    <span class="tag-chip" style="border-color:var(--purple);color:var(--purple);animation-delay:0ms">★ kulani-kinis</span>
+    <span class="tag-chip" style="border-color:var(--blue);color:var(--blue);animation-delay:150ms">bikini-top</span>
+    <span class="tag-chip" style="border-color:var(--green);color:var(--green);animation-delay:300ms">emerald</span>
+    <span class="tag-chip" style="border-color:var(--orange);color:var(--orange);animation-delay:450ms">underwire</span>
+    <span class="tag-chip" style="border-color:var(--orange);color:var(--orange);animation-delay:600ms">spring-26</span>
+    <span class="tag-chip" style="border-color:var(--purple);color:var(--purple);animation-delay:750ms">beach</span>
+    <span class="tag-chip" style="border-color:var(--lime);color:var(--lime);animation-delay:900ms">arriving-jun-2026</span>
+  </div>
+  <div class="spring-in stagger-7" style="text-align:center;margin-top:16px;font-size:12px;color:var(--muted);">7 layers. Automatic. Every product.</div>
+</div>
+
+<!-- ACT 6: BRAND INTELLIGENCE -->
+<div class="act" data-act="5">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 6 — Brand Intelligence</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:20px;">Kulani Kinis — learned from 40 invoices</div>
+  <div class="brand-panel spring-in stagger-3">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <div style="width:48px;height:48px;background:rgba(157,80,221,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;">🧠</div>
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);">Brand Intelligence</div>
+        <div style="font-size:12px;color:var(--muted);">Confidence: 94%</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Founding</div>
+        <div style="font-size:13px;color:var(--text);">Hawaii-born, bold prints, sustainable fabrics</div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Spring 26 Trend</div>
+        <div style="font-size:13px;color:var(--text);">Soft knot details, emerald aura, recycled nylon</div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Size Guide</div>
+        <div style="font-size:13px;color:var(--text);">AU 6-16 · Runs small · Size up for D+</div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Price Range</div>
+        <div style="font-size:13px;color:var(--text);">$69-$129 · Premium positioning</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 7: SHOPIFY PUSH -->
+<div class="act" data-act="6">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 7 — Shopify Push</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:24px;text-align:center;">Products fly to Shopify</div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:40px;margin-top:24px;">
+    <div class="spring-in stagger-3">
+      <div style="width:80px;height:80px;background:var(--card);border:1px solid var(--border);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;">⚡</div>
+      <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--muted);">Sonic</div>
+    </div>
+    <div class="spring-in stagger-4" style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+      <div style="width:100px;height:3px;background:var(--border);position:relative;overflow:hidden;border-radius:2px;">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:100%;background:var(--lime);animation:stream 1s linear infinite;"></div>
+      </div>
+      <div class="mono" style="color:var(--lime);font-size:10px;">SYNCING</div>
+    </div>
+    <div class="spring-in stagger-5">
+      <div class="shopify-pop">🛒</div>
+      <div style="text-align:center;margin-top:8px;font-size:12px;color:var(--muted);">Shopify</div>
+    </div>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:32px;">
+    <div class="board-row row-green">
+      <div style="width:28px;height:28px;background:rgba(0,202,114,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">✓</div>
+      <div style="flex:1;margin-left:10px;">
+        <div style="font-size:14px;font-weight:600;color:var(--text);">40 products live in Shopify</div>
+        <div style="font-size:12px;color:var(--muted);">Smart collections updated · Tags indexed</div>
+      </div>
+      <span class="pill pill-green"><span class="pill-dot"></span>Live</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-7" style="margin-top:16px;text-align:center;">
+    <div style="font-size:14px;color:var(--muted);">Total time: <span style="color:var(--lime);font-weight:700;">14 min 22 sec</span></div>
+    <div style="font-size:12px;color:var(--grey);text-decoration:line-through;margin-top:4px;">Manual: 2 hours estimated</div>
+  </div>
+  <style>@keyframes stream { from { transform:translateX(-100%); } to { transform:translateX(100%); } }</style>
+</div>
+
+<!-- ACT 8: THE RESULT -->
+<div class="act" data-act="7">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+    <div class="spring-in stagger-1 headline" style="font-size:48px;color:var(--text);margin-bottom:24px;line-height:1.1;">87% faster</div>
+    <div class="split-screen spring-in stagger-2" style="width:100%;max-width:600px;">
+      <div class="split-half split-sad">
+        <div style="font-size:14px;color:var(--grey);margin-bottom:8px;">Before</div>
+        <div style="font-size:32px;font-weight:800;color:var(--grey);font-family:Georgia,serif;">2 hrs</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">Manual entry</div>
+        <div style="font-size:12px;color:var(--red);margin-top:4px;">Errors possible</div>
+      </div>
+      <div class="split-half split-happy">
+        <div style="font-size:14px;color:var(--lime);margin-bottom:8px;">After</div>
+        <div style="font-size:32px;font-weight:800;color:var(--lime);font-family:Georgia,serif;">14 min</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">AI-tagged</div>
+        <div style="font-size:12px;color:var(--green);margin-top:4px;">Zero errors</div>
+      </div>
+    </div>
+    <div class="spring-in stagger-3" style="margin-top:40px;display:flex;gap:12px;">
+      <span class="pill pill-lime"><span class="pill-dot"></span>Import</span>
+      <span class="pill pill-purple"><span class="pill-dot"></span>Automate</span>
+      <span class="pill pill-green"><span class="pill-dot"></span>Rank</span>
+    </div>
+    <div class="spring-in stagger-4" style="margin-top:24px;display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;background:var(--lime);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">⚡</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text);">Sonic Invoices</div>
+    </div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="progress-wrap"><div id="progress-fill"></div></div>
+<div id="controls">
+  <button id="play-btn" onclick="togglePlay()">⏸</button>
+  <div id="dots"></div>
+</div>
+</div>
+
+<script>
+const ACT_DURATION = 15000;
+const TOTAL_ACTS = 8;
+let currentAct = 0;
+let isPlaying = true;
+let timer = null;
+let progressTimer = null;
+let progressStart = 0;
+
+const dotsContainer = document.getElementById('dots');
+for (let i = 0; i < TOTAL_ACTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goToAct(i);
+  dotsContainer.appendChild(d);
+}
+
+function showAct(index) {
+  document.querySelectorAll('.act').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  document.querySelectorAll('.dot').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  currentAct = index;
+  updateProgress(0);
+}
+function updateProgress(pct) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+function nextAct() {
+  if (currentAct < TOTAL_ACTS - 1) goToAct(currentAct + 1);
+  else goToAct(0);
+}
+function goToAct(index) {
+  showAct(index);
+  if (isPlaying) startTimer();
+}
+function startTimer() {
+  clearInterval(timer);
+  clearInterval(progressTimer);
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    updateProgress(Math.min((elapsed / ACT_DURATION) * 100, 100));
+  }, 50);
+  timer = setTimeout(nextAct, ACT_DURATION);
+}
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) startTimer();
+  else { clearTimeout(timer); clearInterval(progressTimer); }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') goToAct(Math.min(currentAct + 1, TOTAL_ACTS - 1));
+  if (e.key === 'ArrowLeft') goToAct(Math.max(currentAct - 1, 0));
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+startTimer();
+</script>
+</body>
+</html>

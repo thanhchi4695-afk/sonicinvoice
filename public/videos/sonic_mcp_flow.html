@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — MCP Connector</title>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --lime: #a3e635;
+  --purple: #9D50DD;
+  --green: #00CA72;
+  --orange: #FDAB3D;
+  --blue: #0086C0;
+  --red: #E54D4D;
+  --text: #f5f5f5;
+  --muted: #737373;
+  --card: #141414;
+  --border: #262626;
+  --terminal: #0d1117;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+#stage {
+  width: 800px;
+  height: 800px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.8);
+}
+.headline { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.act {
+  position: absolute;
+  inset: 0;
+  padding: 48px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.act.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.spring-in {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  animation: springIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes springIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
+.stagger-8 { animation-delay: 840ms; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pill-purple { background: rgba(157,80,221,0.15); color: var(--purple); }
+.pill-green { background: rgba(0,202,114,0.15); color: var(--green); }
+.pill-orange { background: rgba(253,171,61,0.15); color: var(--orange); }
+.pill-blue { background: rgba(0,134,192,0.15); color: var(--blue); }
+.pill-lime { background: rgba(163,230,53,0.15); color: var(--lime); }
+.pill-red { background: rgba(229,77,77,0.15); color: var(--red); }
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+#progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--border);
+}
+#progress-fill {
+  height: 100%;
+  background: var(--purple);
+  width: 0%;
+  transition: width 0.3s linear;
+}
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#play-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+#play-btn:hover { border-color: var(--purple); color: var(--purple); }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--purple); transform: scale(1.3); }
+
+/* Chat UI */
+.chat-bubble {
+  max-width: 420px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.chat-user {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-bottom-right-radius: 4px;
+  margin-left: auto;
+}
+.chat-ai {
+  background: rgba(157,80,221,0.08);
+  border: 1px solid rgba(157,80,221,0.2);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+.chat-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+/* Terminal */
+.terminal {
+  background: var(--terminal);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.term-prompt { color: var(--lime); }
+.term-cmd { color: var(--text); }
+.term-out { color: var(--muted); }
+.term-highlight { color: var(--purple); }
+
+/* Browser tabs */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  margin-bottom: 8px;
+}
+.tab {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  background: transparent;
+}
+.tab.active {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Architecture diagram */
+.arch-node {
+  width: 100px;
+  height: 100px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 2px solid var(--purple);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  position: relative;
+}
+.arch-center {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 3px solid var(--purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  text-align: center;
+}
+.arch-line {
+  position: absolute;
+  height: 2px;
+  background: var(--border);
+}
+
+/* Connector card */
+.connector-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+.connector-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- ACT 1: Old Way -->
+<div class="act active" data-act="0">
+  <div class="spring-in stagger-1 mono" style="color:var(--red);margin-bottom:16px;">Act 1 — The Old Way</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:20px;">Every answer in a different tab</div>
+  <div class="spring-in stagger-3 tab-bar">
+    <div class="tab active">Shopify Admin</div>
+    <div class="tab">Search Console</div>
+    <div class="tab">Spreadsheet</div>
+    <div class="tab">Email</div>
+  </div>
+  <div class="spring-in stagger-4" style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div style="width:140px;height:90px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Collections</div>
+      <div style="width:80%;height:6px;background:var(--border);border-radius:3px;margin-bottom:4px;"></div>
+      <div style="width:60%;height:6px;background:var(--border);border-radius:3px;"></div>
+    </div>
+    <div style="width:140px;height:90px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Rankings</div>
+      <div style="width:70%;height:6px;background:var(--border);border-radius:3px;margin-bottom:4px;"></div>
+      <div style="width:50%;height:6px;background:var(--border);border-radius:3px;"></div>
+    </div>
+    <div style="width:140px;height:90px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">SEO Tracking</div>
+      <div style="width:90%;height:6px;background:var(--border);border-radius:3px;margin-bottom:4px;"></div>
+      <div style="width:40%;height:6px;background:var(--border);border-radius:3px;"></div>
+    </div>
+    <div style="width:140px;height:90px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Supplier Invoice</div>
+      <div style="width:60%;height:6px;background:var(--border);border-radius:3px;margin-bottom:4px;"></div>
+      <div style="width:80%;height:6px;background:var(--border);border-radius:3px;"></div>
+    </div>
+  </div>
+  <div class="spring-in stagger-5" style="margin-top:24px;text-align:center;font-size:18px;">😵‍💫</div>
+</div>
+
+<!-- ACT 2: The Connector -->
+<div class="act" data-act="1">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 2 — The Connector</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:20px;">One URL. Your entire store.</div>
+  <div class="spring-in stagger-3" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
+    <div style="font-size:14px;color:var(--muted);margin-bottom:8px;">Settings → Integrations</div>
+    <div style="font-family:monospace;font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;word-break:break-all;">
+      https://xuaakgdkkrrsqxafffyj.supabase.co/functions/v1/sonic-mcp?token=<span style="color:var(--muted);">••••••••</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-4 connector-card" style="margin-top:16px;border-color:var(--purple);">
+    <div class="connector-icon" style="background:rgba(157,80,221,0.15);color:var(--purple);">🔌</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:700;color:var(--text);">Sonic Invoices MCP</div>
+      <div style="font-size:12px;color:var(--muted);">3 tools available</div>
+    </div>
+    <span class="pill pill-green"><span class="pill-dot"></span>Connected</span>
+  </div>
+  <div class="spring-in stagger-5" style="margin-top:16px;text-align:center;font-size:13px;color:var(--muted);">
+    Connected to Claude.ai in <span style="color:var(--purple);font-weight:700;">4 seconds</span>
+  </div>
+</div>
+
+<!-- ACT 3: First Question -->
+<div class="act" data-act="2">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 3 — First Question</div>
+  <div class="spring-in stagger-2 headline" style="font-size:24px;color:var(--text);margin-bottom:16px;">"What does my store look like?"</div>
+  <div style="max-width:480px;margin:0 auto;">
+    <div class="chat-bubble chat-user spring-in stagger-3">
+      <div class="chat-label" style="text-align:right;">You</div>
+      What does my store look like right now?
+    </div>
+    <div class="chat-bubble chat-ai spring-in stagger-4">
+      <div class="chat-label" style="color:var(--purple);">Claude + Sonic MCP</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">🔌 Used Sonic Invoices</div>
+      Your store <b>testing-d9eimunn.myshopify.com</b> has 6 collections. Three are at 0/100 SEO score:<br><br>
+      • Mini Dresses (15 products)<br>
+      • White Swimwear (10 products)<br>
+      • Quiet Luxury Sets (5 products)<br><br>
+      Three have partial content. Shall I fix the gaps?
+    </div>
+  </div>
+</div>
+
+<!-- ACT 4: SEO Gaps -->
+<div class="act" data-act="3">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 4 — SEO Gaps</div>
+  <div class="spring-in stagger-2 headline" style="font-size:24px;color:var(--text);margin-bottom:16px;">"Which need urgent attention?"</div>
+  <div style="max-width:480px;margin:0 auto;">
+    <div class="chat-bubble chat-user spring-in stagger-3">
+      <div class="chat-label" style="text-align:right;">You</div>
+      Which collections need the most urgent SEO attention?
+    </div>
+    <div class="chat-bubble chat-ai spring-in stagger-in stagger-4">
+      <div class="chat-label" style="color:var(--purple);">Claude + Sonic MCP</div>
+      <div style="margin-bottom:8px;">🔴 <b>/mini-dresses</b> — 0/100 — "No content at all"</div>
+      <div style="margin-bottom:8px;">🔴 <b>/white-swimwear</b> — 0/100 — "No content at all"</div>
+      <div style="margin-bottom:8px;">🟡 <b>/y2k-tops</b> — 30/100 — "Missing meta, FAQ, links"</div>
+      <div style="margin-bottom:8px;">🟡 <b>/black-dresses</b> — 40/100 — "Missing body copy"</div>
+      <div style="margin-top:8px;font-size:12px;color:var(--muted);">I'd start with <b>Black Dresses</b> — 12 products, best ROI per word.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 5: Tagging Question -->
+<div class="act" data-act="4">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 5 — Tagging</div>
+  <div class="spring-in stagger-2 headline" style="font-size:24px;color:var(--text);margin-bottom:16px;">"What tags for this invoice?"</div>
+  <div style="max-width:480px;margin:0 auto;">
+    <div class="chat-bubble chat-user spring-in stagger-3">
+      <div class="chat-label" style="text-align:right;">You</div>
+      A Seafolly invoice arrived with 12 new DD cup bikini tops in teal, arriving this month. What tags?
+    </div>
+    <div class="chat-bubble chat-ai spring-in stagger-4">
+      <div class="chat-label" style="color:var(--purple);">Claude + Sonic MCP</div>
+      <div style="font-family:monospace;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:6px;line-height:1.8;">
+        Womens · Swimwear · womens swim · Bikini Tops · Seafolly · teal · d-g · underwire · summer-26 · beach · arriving-jun-2026 · full_price · new · new arrivals · new swim
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--lime);">✓ Claude knows the tagging rules because Sonic injected them</div>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 6: Darwin Intelligence -->
+<div class="act" data-act="5">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 6 — Darwin Intelligence</div>
+  <div class="spring-in stagger-2 headline" style="font-size:24px;color:var(--text);margin-bottom:16px;">"It's June in Darwin. What now?"</div>
+  <div style="max-width:480px;margin:0 auto;">
+    <div class="chat-bubble chat-user spring-in stagger-3">
+      <div class="chat-label" style="text-align:right;">You</div>
+      It's June in Darwin. What should I focus on?
+    </div>
+    <div class="chat-bubble chat-ai spring-in stagger-4">
+      <div class="chat-label" style="color:var(--purple);">Claude + Sonic MCP</div>
+      June is critical for Darwin retail — three things happening:<br><br>
+      <b>1. EOFY sales</b> (June 30) — clear winter stock now<br>
+      <b>2. Dry season started</b> — tourists arriving, best months ahead<br>
+      <b>3. Darwin Cup</b> is 8 weeks away (August) — order fascinators, race fashion, hats NOW<br><br>
+      Recommend: run 15% EOFY clearance this week, then switch to dry season new arrivals next week.
+    </div>
+  </div>
+</div>
+
+<!-- ACT 7: Kimi CLI -->
+<div class="act" data-act="6">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 7 — Kimi CLI</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;text-align:center;">One MCP server. Any AI.</div>
+  <div class="terminal spring-in stagger-3" style="max-width:520px;margin:0 auto;">
+    <div><span class="term-prompt">$</span> <span class="term-cmd">kimi mcp add --transport http sonic-invoices</span> <span class="term-highlight">[URL]</span></div>
+    <div class="term-out">> Connected: sonic-invoices (3 tools)</div>
+    <div style="margin-top:12px;"><span class="term-prompt">$</span> <span class="term-cmd">kimi chat</span></div>
+    <div style="margin-top:8px;"><span class="term-prompt">></span> <span class="term-cmd">You: Show me my SEO gaps</span></div>
+    <div class="term-out">> Sonic Invoices: [tool call: get_collections]</div>
+    <div class="term-out">> 3 collections at 0/100:</div>
+    <div class="term-out">>   - mini-dresses</div>
+    <div class="term-out">>   - white-swimwear</div>
+    <div class="term-out">>   - quiet-luxury-sets</div>
+  </div>
+  <div class="spring-in stagger-4" style="margin-top:16px;text-align:center;">
+    <span class="pill pill-lime"><span class="pill-dot"></span>One MCP server. Claude. Kimi. Any AI.</span>
+  </div>
+</div>
+
+<!-- ACT 8: Architecture -->
+<div class="act" data-act="7">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 8 — Architecture</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:24px;text-align:center;">Your store. Any AI.</div>
+  <div style="position:relative;width:400px;height:300px;margin:0 auto;">
+    <!-- Center -->
+    <div class="arch-center spring-in stagger-3" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);">
+      <div style="font-size:24px;">🔌</div>
+      <div style="font-size:10px;">Sonic MCP</div>
+    </div>
+    <!-- Claude -->
+    <div class="arch-node spring-in stagger-4" style="position:absolute;top:0;left:50%;transform:translateX(-50%);border-color:var(--purple);">
+      <div style="font-size:20px;">🤖</div>
+      <div style="font-size:9px;">Claude</div>
+    </div>
+    <!-- Kimi -->
+    <div class="arch-node spring-in stagger-5" style="position:absolute;top:50%;right:0;transform:translateY(-50%);border-color:var(--blue);">
+      <div style="font-size:20px;">💻</div>
+      <div style="font-size:9px;">Kimi</div>
+    </div>
+    <!-- Supabase -->
+    <div class="arch-node spring-in stagger-6" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);border-color:var(--green);">
+      <div style="font-size:20px;">🗄</div>
+      <div style="font-size:9px;">Supabase</div>
+    </div>
+    <!-- Shopify -->
+    <div class="arch-node spring-in stagger-7" style="position:absolute;top:50%;left:0;transform:translateY(-50%);border-color:var(--lime);">
+      <div style="font-size:20px;">🛒</div>
+      <div style="font-size:9px;">Shopify</div>
+    </div>
+    <!-- Connection lines (CSS borders) -->
+    <div style="position:absolute;top:50px;left:50%;width:2px;height:70px;background:var(--border);transform:translateX(-1px);"></div>
+    <div style="position:absolute;bottom:50px;left:50%;width:2px;height:70px;background:var(--border);transform:translateX(-1px);"></div>
+    <div style="position:absolute;top:50%;left:50px;width:70px;height:2px;background:var(--border);transform:translateY(-1px);"></div>
+    <div style="position:absolute;top:50%;right:50px;width:70px;height:2px;background:var(--border);transform:translateY(-1px);"></div>
+  </div>
+  <div class="spring-in stagger-8" style="margin-top:24px;text-align:center;font-size:14px;color:var(--muted);">
+    Real data. Natural language. Any AI.
+  </div>
+  <div class="spring-in stagger-8" style="margin-top:16px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;">
+    <div style="width:32px;height:32px;background:var(--lime);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">⚡</div>
+    <div style="font-size:18px;font-weight:800;color:var(--text);">Sonic Invoices</div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="progress-wrap"><div id="progress-fill"></div></div>
+<div id="controls">
+  <button id="play-btn" onclick="togglePlay()">⏸</button>
+  <div id="dots"></div>
+</div>
+</div>
+
+<script>
+const ACT_DURATION = 15000;
+const TOTAL_ACTS = 8;
+let currentAct = 0;
+let isPlaying = true;
+let timer = null;
+let progressTimer = null;
+let progressStart = 0;
+
+const dotsContainer = document.getElementById('dots');
+for (let i = 0; i < TOTAL_ACTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goToAct(i);
+  dotsContainer.appendChild(d);
+}
+
+function showAct(index) {
+  document.querySelectorAll('.act').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  document.querySelectorAll('.dot').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  currentAct = index;
+  updateProgress(0);
+}
+function updateProgress(pct) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+function nextAct() {
+  if (currentAct < TOTAL_ACTS - 1) goToAct(currentAct + 1);
+  else goToAct(0);
+}
+function goToAct(index) {
+  showAct(index);
+  if (isPlaying) startTimer();
+}
+function startTimer() {
+  clearInterval(timer);
+  clearInterval(progressTimer);
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    updateProgress(Math.min((elapsed / ACT_DURATION) * 100, 100));
+  }, 50);
+  timer = setTimeout(nextAct, ACT_DURATION);
+}
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) startTimer();
+  else { clearTimeout(timer); clearInterval(progressTimer); }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') goToAct(Math.min(currentAct + 1, TOTAL_ACTS - 1));
+  if (e.key === 'ArrowLeft') goToAct(Math.max(currentAct - 1, 0));
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+startTimer();
+</script>
+</body>
+</html>

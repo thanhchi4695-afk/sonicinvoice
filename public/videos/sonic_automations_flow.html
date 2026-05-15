@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Silent Automations</title>
+<style>
+:root {
+  --bg: #f6f7fb;
+  --text: #111;
+  --muted: #6b7280;
+  --card: #fff;
+  --border: #e5e7eb;
+  --purple: #9D50DD;
+  --green: #00CA72;
+  --orange: #FDAB3D;
+  --blue: #0086C0;
+  --teal: #14b8a6;
+  --red: #E54D4D;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+#stage {
+  width: 800px;
+  height: 800px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.15);
+}
+.headline { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.act {
+  position: absolute;
+  inset: 0;
+  padding: 48px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.act.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.spring-in {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  animation: springIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes springIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
+.stagger-8 { animation-delay: 840ms; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pill-purple { background: rgba(157,80,221,0.12); color: var(--purple); }
+.pill-green { background: rgba(0,202,114,0.12); color: var(--green); }
+.pill-orange { background: rgba(253,171,61,0.12); color: var(--orange); }
+.pill-blue { background: rgba(0,134,192,0.12); color: var(--blue); }
+.pill-teal { background: rgba(20,184,166,0.12); color: var(--teal); }
+.pill-grey { background: rgba(107,114,128,0.12); color: var(--muted); }
+
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+#progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--border);
+}
+#progress-fill {
+  height: 100%;
+  background: var(--green);
+  width: 0%;
+  transition: width 0.3s linear;
+}
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#play-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+#play-btn:hover { border-color: var(--green); color: var(--green); }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--green); transform: scale(1.3); }
+
+.bento-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  position: relative;
+  overflow: hidden;
+}
+.bento-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.bento-green::before { background: var(--green); }
+.bento-blue::before { background: var(--blue); }
+.bento-orange::before { background: var(--orange); }
+.bento-purple::before { background: var(--purple); }
+.bento-teal::before { background: var(--teal); }
+.bento-grey::before { background: var(--muted); }
+
+.bento-icon {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+.bento-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.bento-desc { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+.status-pulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.status-pulse::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+.calendar-event {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+.event-month { font-size: 11px; font-weight: 700; color: var(--text); width: 60px; }
+.event-desc { font-size: 12px; color: var(--muted); flex: 1; }
+
+.node-web {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 16px;
+}
+.node {
+  padding: 6px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text);
+}
+.node-new {
+  border-color: var(--green);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.morning-report {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.report-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.report-line:last-child { border-bottom: none; }
+.report-check { color: var(--green); font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- ACT 1: 2AM -->
+<div class="act active" data-act="0">
+  <div class="spring-in stagger-1 mono" style="color:var(--muted);margin-bottom:16px;">Act 1 — 2:00 AM</div>
+  <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:24px;text-align:center;">While you sleep</div>
+  <div class="spring-in stagger-3" style="text-align:center;font-size:64px;margin-bottom:16px;">😴</div>
+  <div class="spring-in stagger-4" style="text-align:center;font-size:14px;color:var(--muted);margin-bottom:32px;">
+    Store owner asleep. Sonic Invoices running.
+  </div>
+  <div class="spring-in stagger-5" style="text-align:center;">
+    <span class="status-pulse">6 automations active</span>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:32px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;">
+    <div style="width:32px;height:32px;background:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;">⚡</div>
+    <div style="font-size:18px;font-weight:800;color:var(--text);">Sonic Invoices</div>
+  </div>
+</div>
+
+<!-- ACT 2: 6 Cards -->
+<div class="act" data-act="1">
+  <div class="spring-in stagger-1 mono" style="color:var(--green);margin-bottom:16px;">Act 2 — All 6 Running</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Silent automations</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+    <div class="bento-card bento-green spring-in stagger-3">
+      <div class="bento-icon" style="background:rgba(0,202,114,0.12);">🌙</div>
+      <div class="bento-title">Nightly Scan</div>
+      <div class="bento-desc">02:00 every night</div>
+      <span class="pill pill-green" style="margin-top:8px;">Running</span>
+    </div>
+    <div class="bento-card bento-blue spring-in stagger-4">
+      <div class="bento-icon" style="background:rgba(0,134,192,0.12);">📅</div>
+      <div class="bento-title">Seasonal Refresh</div>
+      <div class="bento-desc">Darwin calendar-aware</div>
+      <span class="pill pill-blue" style="margin-top:8px;">Scheduled</span>
+    </div>
+    <div class="bento-card bento-grey spring-in stagger-5">
+      <div class="bento-icon" style="background:rgba(107,114,128,0.12);">🔗</div>
+      <div class="bento-title">Link Mesh</div>
+      <div class="bento-desc">On collection.create</div>
+      <span class="pill pill-grey" style="margin-top:8px;">Idle</span>
+    </div>
+    <div class="bento-card bento-orange spring-in stagger-4">
+      <div class="bento-icon" style="background:rgba(253,171,61,0.12);">📊</div>
+      <div class="bento-title">SEO Updater</div>
+      <div class="bento-desc">Every 6 hours</div>
+      <span class="pill pill-orange" style="margin-top:8px;">Running</span>
+    </div>
+    <div class="bento-card bento-grey spring-in stagger-5">
+      <div class="bento-icon" style="background:rgba(107,114,128,0.12);">🔄</div>
+      <div class="bento-title">Dual-Store Sync</div>
+      <div class="bento-desc">Webhook-first</div>
+      <span class="pill pill-grey" style="margin-top:8px;">Idle</span>
+    </div>
+    <div class="bento-card bento-purple spring-in stagger-6">
+      <div class="bento-icon" style="background:rgba(157,80,221,0.12);">📧</div>
+      <div class="bento-title">Klaviyo Trigger</div>
+      <div class="bento-desc">On collection update</div>
+      <span class="pill pill-purple" style="margin-top:8px;">Scheduled</span>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 3: Nightly Scan -->
+<div class="act" data-act="2">
+  <div class="spring-in stagger-1 mono" style="color:var(--green);margin-bottom:16px;">Act 3 — Nightly Scan</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">4 tasks completed</div>
+  <div class="bento-card bento-green spring-in stagger-3" style="max-width:520px;margin:0 auto;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <div class="bento-icon" style="background:rgba(0,202,114,0.12);">🌙</div>
+      <div class="bento-title">Nightly Product Scan</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="board-row" style="margin-bottom:0;padding:10px 12px;">
+        <div style="font-size:12px;color:var(--text);flex:1;">Missing tags check</div>
+        <span class="pill pill-green" style="font-size:10px;">3 found → fixed</span>
+      </div>
+      <div class="board-row" style="margin-bottom:0;padding:10px 12px;">
+        <div style="font-size:12px;color:var(--text);flex:1;">Orphaned products</div>
+        <span class="pill pill-green" style="font-size:10px;">0 found</span>
+      </div>
+      <div class="board-row" style="margin-bottom:0;padding:10px 12px;">
+        <div style="font-size:12px;color:var(--text);flex:1;">Arrival month tags</div>
+        <span class="pill pill-green" style="font-size:10px;">Jan26 → archived</span>
+      </div>
+      <div class="board-row" style="margin-bottom:0;padding:10px 12px;">
+        <div style="font-size:12px;color:var(--text);flex:1;">Brand confidence scores</div>
+        <span class="pill pill-green" style="font-size:10px;">2 updated</span>
+      </div>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--muted);">
+      4 tasks · 0 errors · <span style="color:var(--green);font-weight:700;">3 min 42 sec</span>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 4: Darwin Calendar -->
+<div class="act" data-act="3">
+  <div class="spring-in stagger-1 mono" style="color:var(--blue);margin-bottom:16px;">Act 4 — Darwin Calendar</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Seasonal awareness</div>
+  <div style="display:flex;flex-direction:column;gap:8px;max-width:520px;margin:0 auto;">
+    <div class="calendar-event spring-in stagger-3">
+      <div class="event-month">June</div>
+      <div class="event-desc">EOFY sales — "Clearance collections promoted"</div>
+      <span class="pill pill-green" style="font-size:10px;">Active</span>
+    </div>
+    <div class="calendar-event spring-in stagger-4">
+      <div class="event-month">August</div>
+      <div class="event-desc">Darwin Cup — "Race fashion · Fascinators · Hats"</div>
+      <span class="pill pill-blue" style="font-size:10px;">Prep</span>
+    </div>
+    <div class="calendar-event spring-in stagger-5">
+      <div class="event-month">November</div>
+      <div class="event-desc">Wet season starts — "Resort collections to front"</div>
+      <span class="pill pill-grey" style="font-size:10px;">Scheduled</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:16px;text-align:center;font-size:12px;color:var(--muted);">
+    Seasonal awareness: automatic. Darwin-specific: always.
+  </div>
+</div>
+
+<!-- ACT 5: Link Mesh -->
+<div class="act" data-act="4">
+  <div class="spring-in stagger-1 mono" style="color:var(--teal);margin-bottom:16px;">Act 5 — Link Mesh</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Auto-woven connections</div>
+  <div class="bento-card bento-teal spring-in stagger-3" style="max-width:520px;margin:0 auto;">
+    <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px;">New collection: /teal-swimwear</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Links built automatically:</div>
+    <div class="node-web">
+      <div class="node">/swimwear</div>
+      <div class="node">→</div>
+      <div class="node node-new">/teal-swimwear</div>
+      <div class="node">←</div>
+      <div class="node">/seafolly</div>
+      <div class="node">←</div>
+      <div class="node">/beach-swimwear</div>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--muted);">
+      3 new paths. Google can now discover <span style="color:var(--teal);font-weight:700;">/teal-swimwear</span>.
+    </div>
+  </div>
+</div>
+
+<!-- ACT 6: SEO Score Updater -->
+<div class="act" data-act="5">
+  <div class="spring-in stagger-1 mono" style="color:var(--orange);margin-bottom:16px;">Act 6 — SEO Updater</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Scores refreshed every 6 hours</div>
+  <div style="display:flex;flex-direction:column;gap:8px;max-width:480px;margin:0 auto;">
+    <div class="board-row spring-in stagger-3" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/black-dresses</div>
+      <div style="font-size:14px;font-weight:800;color:var(--orange);font-family:Georgia,serif;margin-right:8px;">0 → 40</div>
+      <span class="pill pill-orange" style="font-size:10px;">Description added</span>
+    </div>
+    <div class="board-row spring-in stagger-4" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/festival-dresses</div>
+      <div style="font-size:14px;font-weight:800;color:var(--blue);font-family:Georgia,serif;margin-right:8px;">40 → 65</div>
+      <span class="pill pill-blue" style="font-size:10px;">FAQ added</span>
+    </div>
+    <div class="board-row spring-in stagger-5" style="margin-bottom:0;padding:10px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/y2k-tops</div>
+      <div style="font-size:14px;font-weight:800;color:var(--green);font-family:Georgia,serif;margin-right:8px;">30 → 72</div>
+      <span class="pill pill-green" style="font-size:10px;">All content present</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:16px;text-align:center;">
+    <span class="pill pill-green">Collections >70 get "Optimised" badge</span>
+  </div>
+</div>
+
+<!-- ACT 7: Dual Sync -->
+<div class="act" data-act="6">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 7 — Dual Sync</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Two stores. One truth.</div>
+  <div style="display:flex;gap:16px;max-width:520px;margin:0 auto;">
+    <div class="bento-card spring-in stagger-3" style="flex:1;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Store A</div>
+      <div style="font-size:13px;color:var(--text);margin-bottom:4px;">Seafolly Beach Bound</div>
+      <div style="font-size:12px;color:var(--muted);">Price: $189</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;">
+      <div style="font-size:20px;color:var(--green);animation:bounce 1s ease-in-out infinite;">⇄</div>
+    </div>
+    <div class="bento-card spring-in stagger-4" style="flex:1;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;">Store B</div>
+      <div style="font-size:13px;color:var(--text);margin-bottom:4px;">Seafolly Beach Bound</div>
+      <div style="font-size:12px;color:var(--green);font-weight:700;">Synced ✓ $189</div>
+    </div>
+  </div>
+  <div class="spring-in stagger-5" style="margin-top:16px;text-align:center;font-size:12px;color:var(--muted);">
+    Synced in <span style="color:var(--green);font-weight:700;">4 seconds</span> · Klaviyo segment triggered
+  </div>
+  <style>@keyframes bounce { 0%,100% { transform:translateX(0); } 50% { transform:translateX(4px); } }</style>
+</div>
+
+<!-- ACT 8: Morning Report -->
+<div class="act" data-act="7">
+  <div class="spring-in stagger-1 mono" style="color:var(--green);margin-bottom:16px;">Act 8 — Morning Report</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:20px;text-align:center;">What happened overnight</div>
+  <div class="morning-report spring-in stagger-3" style="max-width:480px;margin:0 auto;">
+    <div class="report-line">
+      <span class="report-check">✓</span>
+      <span style="flex:1;color:var(--text);">147 products scanned</span>
+    </div>
+    <div class="report-line">
+      <span class="report-check">✓</span>
+      <span style="flex:1;color:var(--text);">3 missing tags fixed</span>
+    </div>
+    <div class="report-line">
+      <span class="report-check">✓</span>
+      <span style="flex:1;color:var(--text);">2 brand profiles updated</span>
+    </div>
+    <div class="report-line">
+      <span class="report-check">✓</span>
+      <span style="flex:1;color:var(--text);">4 SEO scores improved</span>
+    </div>
+    <div class="report-line">
+      <span class="report-check">✓</span>
+      <span style="flex:1;color:var(--text);">1 Darwin Cup collection promoted</span>
+    </div>
+    <div class="report-line">
+      <span class="report-check">✓</span>
+      <span style="flex:1;color:var(--text);">6 new internal links built</span>
+    </div>
+    <div class="report-line">
+      <span class="report-check">✓</span>
+      <span style="flex:1;color:var(--text);font-weight:700;">0 errors</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-4" style="margin-top:24px;text-align:center;font-size:14px;color:var(--muted);">
+    While you slept. Zero effort. Every night.
+  </div>
+  <div class="spring-in stagger-5" style="margin-top:16px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;">
+    <div style="width:32px;height:32px;background:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;">⚡</div>
+    <div style="font-size:18px;font-weight:800;color:var(--text);">Sonic Invoices</div>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:6px;text-align:center;font-size:12px;color:var(--muted);">
+    Silent · Automatic · Compounding
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="progress-wrap"><div id="progress-fill"></div></div>
+<div id="controls">
+  <button id="play-btn" onclick="togglePlay()">⏸</button>
+  <div id="dots"></div>
+</div>
+</div>
+
+<script>
+const ACT_DURATION = 15000;
+const TOTAL_ACTS = 8;
+let currentAct = 0;
+let isPlaying = true;
+let timer = null;
+let progressTimer = null;
+let progressStart = 0;
+
+const dotsContainer = document.getElementById('dots');
+for (let i = 0; i < TOTAL_ACTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goToAct(i);
+  dotsContainer.appendChild(d);
+}
+
+function showAct(index) {
+  document.querySelectorAll('.act').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  document.querySelectorAll('.dot').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  currentAct = index;
+  updateProgress(0);
+}
+function updateProgress(pct) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+function nextAct() {
+  if (currentAct < TOTAL_ACTS - 1) goToAct(currentAct + 1);
+  else goToAct(0);
+}
+function goToAct(index) {
+  showAct(index);
+  if (isPlaying) startTimer();
+}
+function startTimer() {
+  clearInterval(timer);
+  clearInterval(progressTimer);
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    updateProgress(Math.min((elapsed / ACT_DURATION) * 100, 100));
+  }, 50);
+  timer = setTimeout(nextAct, ACT_DURATION);
+}
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) startTimer();
+  else { clearTimeout(timer); clearInterval(progressTimer); }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') goToAct(Math.min(currentAct + 1, TOTAL_ACTS - 1));
+  if (e.key === 'ArrowLeft') goToAct(Math.max(currentAct - 1, 0));
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+startTimer();
+</script>
+</body>
+</html>

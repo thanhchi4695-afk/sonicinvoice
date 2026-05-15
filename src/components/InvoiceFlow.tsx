@@ -237,6 +237,12 @@ const quickInserts = [
   { label: "+ Abbreviation", text: "Replace '[ABBREVIATION]' with '[FULL WORD]' in all product names." },
 ];
 
+/** Safely format a number to fixed decimals — returns "—" for null/undefined/NaN. */
+export function safeFixed(n: number | null | undefined, decimals = 2): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  return n.toFixed(decimals);
+}
+
 // ── localStorage helpers ───────────────────────────────────
 const HISTORY_KEY = 'custom_instructions_history';
 const TEMPLATES_KEY = 'invoice_templates';

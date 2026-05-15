@@ -49,13 +49,13 @@ export default function HeroSection() {
 
           <div className="flex flex-wrap items-center justify-center gap-3 mt-10">
             <a
-              href="#pricing"
+              href="/signup"
               className="bg-lime text-[#0a0a0a] px-6 py-3 rounded-full font-medium text-sm hover:brightness-110 transition-all duration-300"
             >
               Upload your first invoice
             </a>
             <a
-              href="#how-it-works"
+              href="/demo"
               className="border border-white/[0.14] text-[#fafafa] px-6 py-3 rounded-full font-medium text-sm hover:bg-white/[0.06] transition-all duration-300"
             >
               Watch demo

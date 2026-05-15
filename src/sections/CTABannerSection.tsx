@@ -34,7 +34,7 @@ export default function CTABannerSection() {
           Built for Australian fashion retail. Knows Seafolly, Kulani Kinis, Baku, Walnut Melbourne, and 184 more.
         </p>
         <a
-          href="#pricing"
+          href="/signup"
           className="inline-block bg-lime text-[#0a0a0a] px-8 py-4 rounded-full font-medium text-base mt-8 hover:brightness-110 transition-all duration-300"
         >
           Get started free

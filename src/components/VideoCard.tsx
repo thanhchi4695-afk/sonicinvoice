@@ -14,6 +14,7 @@ export default function VideoCard({ src, title, caption, onOpen }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [scale, setScale] = useState(0.4);
   const [loaded, setLoaded] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     function recalc() {
@@ -64,6 +65,7 @@ export default function VideoCard({ src, title, caption, onOpen }: Props) {
             title={title}
             width={STAGE}
             height={STAGE}
+            onLoad={() => setTimeout(() => setReady(true), 300)}
             style={{
               border: "none",
               width: STAGE,
@@ -75,6 +77,20 @@ export default function VideoCard({ src, title, caption, onOpen }: Props) {
             }}
             tabIndex={-1}
           />
+        )}
+        {!ready && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#0a0a0a]"
+          >
+            <div className="relative h-8 w-8">
+              <div className="absolute inset-0 rounded-full border-2 border-[#262626]" />
+              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-lime animate-spin" />
+            </div>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-[#525252]">
+              Loading
+            </span>
+          </div>
         )}
       </div>
       <div className="p-4 border-t border-[#262626]">

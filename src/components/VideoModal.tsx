@@ -12,6 +12,11 @@ const STAGE = 800;
 export default function VideoModal({ src, title, onClose }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setReady(false);
+  }, [src]);
 
   useEffect(() => {
     if (!src) return;
@@ -77,6 +82,7 @@ export default function VideoModal({ src, title, onClose }: Props) {
             width={STAGE}
             height={STAGE}
             allow="autoplay"
+            onLoad={() => setTimeout(() => setReady(true), 300)}
             style={{
               border: "none",
               borderRadius: 12,
@@ -85,6 +91,20 @@ export default function VideoModal({ src, title, onClose }: Props) {
             }}
           />
         </div>
+        {!ready && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl bg-[#0a0a0a]"
+          >
+            <div className="relative h-10 w-10">
+              <div className="absolute inset-0 rounded-full border-2 border-[#262626]" />
+              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-lime animate-spin" />
+            </div>
+            <span className="font-mono text-[11px] uppercase tracking-wider text-[#737373]">
+              Loading animation
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -999,17 +999,21 @@ async function runClaudePdfDirect(opts: {
     ? `IMPORTANT — RE-EXTRACTION FEEDBACK FROM GRADER:\n${opts.reextractReason}\nFix these specific issues this time.`
     : "";
 
-  // Build system as content blocks. The cache breakpoint lives on the last
-  // tool (see RETURN_INVOICE_TOOL above), which caches tools + system together
-  // as one prefix. Individual system blocks are too small (<1,024 tokens) to
-  // be cache breakpoints on their own, so we don't put cache_control here.
+  // Build system as content blocks. The brand profile is supplier-static and
+  // cached so repeat invoices from the same supplier benefit from cache_read.
   const systemBlocks: Array<Record<string, unknown>> = [
     { type: "text", text: masterPrompt },
   ];
   if (brandProfileBlock) {
-    systemBlocks.push({ type: "text", text: brandProfileBlock });
+    // Cache the brand profile — it's identical across every invoice from this supplier.
+    systemBlocks.push({
+      type: "text",
+      text: brandProfileBlock,
+      cache_control: { type: "ephemeral" },
+    });
   }
   if (reextractBlock) {
+    // Per-attempt grader feedback — never cached.
     systemBlocks.push({ type: "text", text: reextractBlock });
   }
 

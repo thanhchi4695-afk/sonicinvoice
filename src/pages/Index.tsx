@@ -260,11 +260,18 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           : detail && typeof detail === "object" && typeof detail.id === "string"
             ? detail.id
             : null;
-      if (flowId && (FLOW_KEYS as Record<string, boolean>)[flowId]) {
-        if (detail && typeof detail === "object" && detail.params) {
-          (window as any).__sonicFlowParams = detail.params;
+      if (flowId && isFlowKey(flowId)) {
+        const params: FlowParams | undefined =
+          detail && typeof detail === "object" && detail.params ? detail.params : undefined;
+        if (params) {
+          (window as unknown as { __sonicFlowParams?: FlowParams }).__sonicFlowParams = params;
         }
-        setActiveFlow(flowId as ActiveFlow);
+        // Special-case: invoice_detail is patternId-driven. Stash it in state
+        // so the dedicated screen renders instead of "No invoice selected".
+        if (flowId === "invoice_detail" && typeof params?.patternId === "string") {
+          setHistoryPatternId(params.patternId);
+        }
+        setActiveFlow(flowId);
       }
     };
     const onNavTab = (e: Event) => {

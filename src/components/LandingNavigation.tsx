@@ -33,16 +33,14 @@ export default function Navigation() {
 
         <div className="hidden md:flex items-center gap-4">
           <a
-            href="#"
+            href="/login"
             className="text-sm text-[#a3a3a3] hover:text-[#fafafa] transition-colors duration-300"
           >
             Sign in
           </a>
           <a
-            href="#pricing"
-            className="text-sm font-medium bg-lime text-[#0a0a0a] px-5 py-2 rounded-full hover:brightness-110 transition-all duration-300"
-          >
-            Get started
+            href="/signup"
+            className="text-sm font-medium bg-lime text-[#0a0a0a] px-5 py-2 rounded-full hover:brightness-110 transition-all duration-300">Get started
           </a>
         </div>
 
@@ -68,12 +66,10 @@ export default function Navigation() {
             </a>
           ))}
           <div className="pt-4 border-t border-white/[0.06] flex flex-col gap-3">
-            <a href="#" className="text-sm text-[#a3a3a3]">Sign in</a>
+            <a href="/login" className="text-sm text-[#a3a3a3]">Sign in</a>
             <a
-              href="#pricing"
-              className="text-sm font-medium bg-lime text-[#0a0a0a] px-5 py-2.5 rounded-full text-center"
-            >
-              Get started
+              href="/signup"
+              className="text-sm font-medium bg-lime text-[#0a0a0a] px-5 py-2.5 rounded-full text-center">Get started
             </a>
           </div>
         </div>

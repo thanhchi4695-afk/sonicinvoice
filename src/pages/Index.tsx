@@ -578,7 +578,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   if (!isEmbedded && activeFlow && !isDesktop) {
     return (
       <div className="min-h-screen pb-24">
-        {renderFlow()}
+        {renderActiveFlow()}
         <BottomTabBar activeTab={activeTab} onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }} />
       </div>
     );
@@ -742,7 +742,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               }}
             />
           ) : null}
-          {activeFlow ? renderFlow() : mainContent}
+          {activeFlow ? renderActiveFlow() : mainContent}
         </div>
         {/* Mobile bottom tabs for embedded mode — conditional render to avoid duplicate DOM */}
         {!isDesktop && (
@@ -794,7 +794,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               />
             ) : null}
             <QuickActionsBar onAction={handleStartFlow} />
-            {activeFlow ? renderFlow() : mainContent}
+            {activeFlow ? renderActiveFlow() : mainContent}
           </StockyLayout>
         </div>
       )}
@@ -831,7 +831,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             />
           ) : null}
           <QuickActionsBar onAction={handleStartFlow} />
-          {activeFlow ? renderFlow() : mainContent}
+          {activeFlow ? renderActiveFlow() : mainContent}
           <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Tablet-only quick "Tools" pill — bottom bar gets crowded on tablet,

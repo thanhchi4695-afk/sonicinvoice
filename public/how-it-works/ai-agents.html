@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — AI Agents</title>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --lime: #a3e635;
+  --purple: #9D50DD;
+  --green: #00CA72;
+  --orange: #FDAB3D;
+  --blue: #0086C0;
+  --red: #E54D4D;
+  --text: #f5f5f5;
+  --muted: #737373;
+  --card: #141414;
+  --border: #262626;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+#stage {
+  width: 800px;
+  height: 800px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.8);
+}
+.headline { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.act {
+  position: absolute;
+  inset: 0;
+  padding: 48px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.act.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.spring-in {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  animation: springIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes springIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
+.stagger-8 { animation-delay: 840ms; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pill-purple { background: rgba(157,80,221,0.15); color: var(--purple); }
+.pill-green { background: rgba(0,202,114,0.15); color: var(--green); }
+.pill-orange { background: rgba(253,171,61,0.15); color: var(--orange); }
+.pill-blue { background: rgba(0,134,192,0.15); color: var(--blue); }
+.pill-lime { background: rgba(163,230,53,0.15); color: var(--lime); }
+.pill-red { background: rgba(229,77,77,0.15); color: var(--red); }
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+.pill-purple .pill-dot { background: var(--purple); }
+.pill-green .pill-dot { background: var(--green); }
+.pill-orange .pill-dot { background: var(--orange); }
+.pill-blue .pill-dot { background: var(--blue); }
+.pill-lime .pill-dot { background: var(--lime); }
+.pill-red .pill-dot { background: var(--red); }
+
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.board-row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 8px 0 0 8px;
+}
+.row-purple::before { background: var(--purple); }
+.row-green::before { background: var(--green); }
+.row-orange::before { background: var(--orange); }
+.row-blue::before { background: var(--blue); }
+.row-lime::before { background: var(--lime); }
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 24px;
+}
+.bento-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.bento-card-wide { grid-column: span 2; }
+.bento-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.bento-value { font-size: 28px; font-weight: 800; color: var(--text); font-family: Georgia, serif; }
+.bento-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+#progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--border);
+}
+#progress-fill {
+  height: 100%;
+  background: var(--lime);
+  width: 0%;
+  transition: width 0.3s linear;
+}
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#play-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+#play-btn:hover { border-color: var(--lime); color: var(--lime); }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--lime); transform: scale(1.3); }
+
+/* Agent cards */
+.agent-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  position: relative;
+  overflow: hidden;
+}
+.agent-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.agent-purple::before { background: var(--purple); }
+.agent-orange::before { background: var(--orange); }
+.agent-blue::before { background: var(--blue); }
+
+.agent-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  margin-bottom: 16px;
+}
+.agent-purple .agent-icon { background: rgba(157,80,221,0.15); }
+.agent-orange .agent-icon { background: rgba(253,171,61,0.15); }
+.agent-blue .agent-icon { background: rgba(0,134,192,0.15); }
+
+.agent-name { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.agent-desc { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+
+/* Chat bubbles */
+.chat-bubble {
+  max-width: 380px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.chat-user {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-bottom-right-radius: 4px;
+  margin-left: auto;
+}
+.chat-ai {
+  background: rgba(163,230,53,0.08);
+  border: 1px solid rgba(163,230,53,0.2);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+.chat-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+/* Connector cards */
+.connector-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+.connector-logo {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  background: var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.connector-info { flex: 1; }
+.connector-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.connector-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* MCP server graphic */
+.mcp-hub {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 2px solid var(--lime);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  position: relative;
+  margin: 0 auto;
+}
+.mcp-orbital {
+  position: absolute;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  animation: orbit 4s linear infinite;
+}
+@keyframes orbit {
+  from { transform: rotate(0deg) translateX(60px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(60px) rotate(-360deg); }
+}
+
+/* Crawl animation */
+.crawl-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: monospace;
+  border-bottom: 1px solid var(--border);
+}
+.crawl-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: crawlPulse 1s ease-in-out infinite;
+}
+@keyframes crawlPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.logo-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-icon {
+  width: 40px; height: 40px;
+  background: var(--lime);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.logo-text {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.03em;
+}
+</style>
+</head>
+<body>
+
+<div id="stage">
+
+  <!-- ACT 1: Title -->
+  <div class="act active" data-act="0">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+      <div class="spring-in stagger-1 logo-lockup" style="justify-content:center;margin-bottom:24px;">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">Sonic Invoices</div>
+      </div>
+      <div class="spring-in stagger-2 headline" style="font-size:52px;color:var(--text);margin-bottom:16px;line-height:1.1;">
+        Three AI<br>Agents
+      </div>
+      <div class="spring-in stagger-3" style="font-size:18px;color:var(--muted);max-width:480px;line-height:1.5;">
+        Autonomous intelligence working 24/7 for your store
+      </div>
+      <div class="spring-in stagger-4" style="margin-top:40px;display:flex;gap:12px;">
+        <span class="pill pill-purple"><span class="pill-dot"></span>Brand Intel</span>
+        <span class="pill pill-orange"><span class="pill-dot"></span>SEO Audit</span>
+        <span class="pill pill-blue"><span class="pill-dot"></span>Gap Finder</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 2: Brand Intelligence Agent -->
+  <div class="act" data-act="1">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">01 — Brand Intelligence Agent</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:24px;">
+      Crawls supplier websites.<br>Extracts brand DNA.
+    </div>
+    <div style="display:flex;gap:24px;margin-top:8px;">
+      <div style="flex:1;">
+        <div class="agent-card agent-purple spring-in stagger-3">
+          <div class="agent-icon">🔮</div>
+          <div class="agent-name">Brand Intelligence Agent</div>
+          <div class="agent-desc">Crawls supplier sites, extracts founding story, voice, seasonal trends, saves to brand library.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <span class="pill pill-purple"><span class="pill-dot"></span>Story</span>
+            <span class="pill pill-purple"><span class="pill-dot"></span>Voice</span>
+            <span class="pill pill-purple"><span class="pill-dot"></span>Trends</span>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <div class="spring-in stagger-4" style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">Live Crawl Log</div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:220px;overflow:hidden;">
+          <div class="crawl-line"><div class="crawl-dot"></div>GET seafolly.com.au/about</div>
+          <div class="crawl-line"><div class="crawl-dot"></div>Extracted: "Founded 1975, Sydney"</div>
+          <div class="crawl-line"><div class="crawl-dot"></div>GET seafolly.com.au/sustainability</div>
+          <div class="crawl-line"><div class="crawl-dot"></div>Extracted: "ECONYL® commitment"</div>
+          <div class="crawl-line"><div class="crawl-dot"></div>GET kulani-kinis.com/lookbook</div>
+          <div class="crawl-line"><div class="crawl-dot"></div>Extracted: "Hawaii-born, bold prints"</div>
+          <div class="crawl-line"><div class="crawl-dot"></div>GET bond-eye.com/collections</div>
+          <div class="crawl-line"><div class="crawl-dot"></div>Extracted: "Minimalist, seamless"</div>
+        </div>
+      </div>
+    </div>
+    <div class="spring-in stagger-5" style="margin-top:20px;">
+      <div class="board-row row-purple">
+        <div style="width:28px;height:28px;background:rgba(157,80,221,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">📚</div>
+        <div style="flex:1;margin-left:10px;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">Brand Library Updated</div>
+          <div style="font-size:12px;color:var(--muted);">12 brands • 47 stories • 23 voice profiles</div>
+        </div>
+        <span class="pill pill-green"><span class="pill-dot"></span>Synced</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 3: Store SEO Audit Agent -->
+  <div class="act" data-act="2">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">02 — Store SEO Audit Agent</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:24px;">
+      Scans every collection.<br>Scores 0-100.
+    </div>
+    <div style="display:flex;gap:24px;margin-top:8px;">
+      <div style="flex:1;">
+        <div class="agent-card agent-orange spring-in stagger-3">
+          <div class="agent-icon">🔍</div>
+          <div class="agent-name">Store SEO Audit Agent</div>
+          <div class="agent-desc">Scans all collections, scores 0-100, detects gaps, generates 20 collection suggestions automatically.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <span class="pill pill-orange"><span class="pill-dot"></span>Scan</span>
+            <span class="pill pill-orange"><span class="pill-dot"></span>Score</span>
+            <span class="pill pill-orange"><span class="pill-dot"></span>Suggest</span>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <div class="spring-in stagger-4" style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">Collection Scores</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div class="board-row row-green" style="margin-bottom:0;padding:10px 12px;">
+            <div style="font-size:12px;color:var(--text);flex:1;">Bikini Tops</div>
+            <div style="font-size:14px;font-weight:800;color:var(--green);font-family:Georgia,serif;">96</div>
+          </div>
+          <div class="board-row row-green" style="margin-bottom:0;padding:10px 12px;">
+            <div style="font-size:12px;color:var(--text);flex:1;">One-Piece Swimsuits</div>
+            <div style="font-size:14px;font-weight:800;color:var(--green);font-family:Georgia,serif;">94</div>
+          </div>
+          <div class="board-row row-purple" style="margin-bottom:0;padding:10px 12px;">
+            <div style="font-size:12px;color:var(--text);flex:1;">Resort Wear</div>
+            <div style="font-size:14px;font-weight:800;color:var(--purple);font-family:Georgia,serif;">78</div>
+          </div>
+          <div class="board-row row-orange" style="margin-bottom:0;padding:10px 12px;">
+            <div style="font-size:12px;color:var(--text);flex:1;">Race Fashion</div>
+            <div style="font-size:14px;font-weight:800;color:var(--orange);font-family:Georgia,serif;">62</div>
+          </div>
+          <div class="board-row row-orange" style="margin-bottom:0;padding:10px 12px;">
+            <div style="font-size:12px;color:var(--text);flex:1;">Bridal Swim</div>
+            <div style="font-size:14px;font-weight:800;color:var(--orange);font-family:Georgia,serif;">54</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="spring-in stagger-5" style="margin-top:20px;">
+      <div class="board-row row-orange">
+        <div style="width:28px;height:28px;background:rgba(253,171,61,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">💡</div>
+        <div style="flex:1;margin-left:10px;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">20 Suggestions Generated</div>
+          <div style="font-size:12px;color:var(--muted);">Missing: "Honeymoon Swimwear", "Mother-Daughter Sets", "Post-Surgery Swim"</div>
+        </div>
+        <span class="pill pill-lime"><span class="pill-dot"></span>Ready</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 4: Competitor Gap Finder -->
+  <div class="act" data-act="3">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">03 — Competitor Gap Finder</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:24px;">
+      Crawls THE ICONIC & Mathers.<br>Finds what they rank for.
+    </div>
+    <div style="display:flex;gap:24px;margin-top:8px;">
+      <div style="flex:1;">
+        <div class="agent-card agent-blue spring-in stagger-3">
+          <div class="agent-icon">🕵️</div>
+          <div class="agent-name">Competitor Gap Finder</div>
+          <div class="agent-desc">Crawls THE ICONIC and Mathers, finds collections they rank for that you don't have, presents one-click creation.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <span class="pill pill-blue"><span class="pill-dot"></span>Crawl</span>
+            <span class="pill pill-blue"><span class="pill-dot"></span>Compare</span>
+            <span class="pill pill-blue"><span class="pill-dot"></span>Create</span>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <div class="spring-in stagger-4" style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">Gap Report</div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:12px;color:var(--text);">Sustainable Swimwear</span>
+            <span style="font-size:11px;color:var(--red);font-weight:700;">THE ICONIC #2</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:12px;color:var(--text);">Plus Size Resort</span>
+            <span style="font-size:11px;color:var(--red);font-weight:700;">Mathers #4</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:12px;color:var(--text);">Darwin Cup Fashion</span>
+            <span style="font-size:11px;color:var(--red);font-weight:700;">Swimwear Galore #3</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;">
+            <span style="font-size:12px;color:var(--text);">Recycled Fabric Swim</span>
+            <span style="font-size:11px;color:var(--green);font-weight:700;">You #1 🎉</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="spring-in stagger-5" style="margin-top:20px;text-align:center;">
+      <span class="pill pill-blue"><span class="pill-dot"></span>3 gaps found • 1-click creation enabled</span>
+    </div>
+  </div>
+
+  <!-- ACT 5: Claude MCP Connector -->
+  <div class="act" data-act="4">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">04 — Claude MCP Connector</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:16px;text-align:center;">
+      Ask Claude about your<br>live Shopify data
+    </div>
+    <div style="display:flex;justify-content:center;margin-top:24px;">
+      <div style="width:100%;max-width:480px;">
+        <div class="chat-bubble chat-user spring-in stagger-3">
+          <div class="chat-label" style="text-align:right;color:var(--muted);">Store Owner</div>
+          Which collections need SEO content this week?
+        </div>
+        <div class="chat-bubble chat-ai spring-in stagger-4">
+          <div class="chat-label" style="color:var(--lime);">Claude + Sonic MCP</div>
+          4 collections need attention:<br><br>
+          • <b>Race Fashion</b> — Score 62. Needs 200+ words and 2 more internal links.<br>
+          • <b>Bridal Swim</b> — Score 54. Missing FAQ section entirely.<br>
+          • <b>Resort Wear</b> — Score 78. Meta description too short (112 chars).<br>
+          • <b>Honeymoon Sets</b> — New gap found. No collection exists yet.<br><br>
+          Shall I generate all four?
+        </div>
+        <div class="chat-bubble chat-user spring-in stagger-5">
+          <div class="chat-label" style="text-align:right;color:var(--muted);">Store Owner</div>
+          Yes, generate and schedule for 6 AM tomorrow.
+        </div>
+        <div class="chat-bubble chat-ai spring-in stagger-6">
+          <div class="chat-label" style="color:var(--lime);">Claude + Sonic MCP</div>
+          ✅ Scheduled. 4 collections will go live at 6:00 AM Darwin time. SEO scores projected: 92-97.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 6: Kimi CLI -->
+  <div class="act" data-act="5">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">05 — Kimi CLI</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:16px;text-align:center;">
+      One MCP server.<br>Any AI.
+    </div>
+    <div style="display:flex;justify-content:center;margin-top:32px;">
+      <div style="position:relative;width:200px;height:200px;">
+        <div class="mcp-hub spring-in stagger-3">
+          <span style="font-size:32px;">🔌</span>
+        </div>
+        <div class="mcp-orbital spring-in stagger-4" style="animation-delay:0s;top:50%;left:50%;margin-top:-18px;margin-left:-18px;">🤖</div>
+        <div class="mcp-orbital spring-in stagger-4" style="animation-delay:1.33s;top:50%;left:50%;margin-top:-18px;margin-left:-18px;">🧠</div>
+        <div class="mcp-orbital spring-in stagger-4" style="animation-delay:2.66s;top:50%;left:50%;margin-top:-18px;margin-left:-18px;">💬</div>
+      </div>
+    </div>
+    <div class="spring-in stagger-5" style="margin-top:32px;">
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <div class="connector-card" style="max-width:200px;">
+          <div class="connector-logo" style="background:rgba(157,80,221,0.15);color:var(--purple);">C</div>
+          <div class="connector-info">
+            <div class="connector-title">Claude Desktop</div>
+            <div class="connector-desc">Natural language queries</div>
+          </div>
+        </div>
+        <div class="connector-card" style="max-width:200px;">
+          <div class="connector-logo" style="background:rgba(0,134,192,0.15);color:var(--blue);">K</div>
+          <div class="connector-info">
+            <div class="connector-title">Kimi Code CLI</div>
+            <div class="connector-desc">Terminal AI access</div>
+          </div>
+        </div>
+        <div class="connector-card" style="max-width:200px;">
+          <div class="connector-logo" style="background:rgba(163,230,53,0.15);color:var(--lime);">S</div>
+          <div class="connector-info">
+            <div class="connector-title">AskSonicAI</div>
+            <div class="connector-desc">In-app chat panel</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="spring-in stagger-6" style="margin-top:20px;text-align:center;">
+      <span class="pill pill-lime"><span class="pill-dot"></span>One MCP server connects them all</span>
+    </div>
+  </div>
+
+  <!-- ACT 7: AskSonicAI -->
+  <div class="act" data-act="6">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">06 — AskSonicAI</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:16px;text-align:center;">
+      In-app expert on AU<br>swimwear retail
+    </div>
+    <div style="display:flex;justify-content:center;margin-top:24px;">
+      <div style="width:100%;max-width:480px;">
+        <div class="chat-bubble chat-user spring-in stagger-3">
+          <div class="chat-label" style="text-align:right;color:var(--muted);">Retailer</div>
+          Should I markdown Riviera One Piece before EOFY?
+        </div>
+        <div class="chat-bubble chat-ai spring-in stagger-4">
+          <div class="chat-label" style="color:var(--lime);">AskSonicAI</div>
+          Based on your data:<br><br>
+          • Margin: 50% — safe to discount 20%<br>
+          • Stock: 47 units, 32 days cover<br>
+          • Velocity: 1.2/day (slowing)<br>
+          • Darwin calendar: EOFY sale starts June 1<br><br>
+          <b>Recommendation:</b> Markdown 15% on June 1. You'll clear 28 units and protect margin. I've added it to your Markdown Ladder.
+        </div>
+        <div class="chat-bubble chat-user spring-in stagger-5">
+          <div class="chat-label" style="text-align:right;color:var(--muted);">Retailer</div>
+          What's the D-G cup tagging rule again?
+        </div>
+        <div class="chat-bubble chat-ai spring-in stagger-6">
+          <div class="chat-label" style="color:var(--lime);">AskSonicAI</div>
+          AU swimwear rule: D-G cup = <code style="background:var(--bg);padding:2px 4px;border-radius:4px;">feature:d-g</code> + <code style="background:var(--bg);padding:2px 4px;border-radius:4px;">type:bikini-top</code> or <code style="background:var(--bg);padding:2px 4px;border-radius:4px;">type:one-piece</code>. Always pair with <code style="background:var(--bg);padding:2px 4px;border-radius:4px;">feature:underwire</code> if applicable.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 8: CTA -->
+  <div class="act" data-act="7">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+      <div class="spring-in stagger-1 headline" style="font-size:48px;color:var(--text);margin-bottom:16px;line-height:1.1;">
+        Your team of<br>AI agents
+      </div>
+      <div class="spring-in stagger-2" style="font-size:16px;color:var(--muted);max-width:460px;line-height:1.6;margin-bottom:40px;">
+        Three agents working 24/7. Connected to Claude, Kimi, and your in-app chat. One MCP server. Any AI.
+      </div>
+      <div class="spring-in stagger-3" style="display:flex;gap:16px;margin-bottom:40px;">
+        <div class="agent-card agent-purple" style="width:200px;">
+          <div class="agent-icon">🔮</div>
+          <div class="agent-name">Brand Intel</div>
+          <div class="agent-desc">Crawls & learns brands</div>
+        </div>
+        <div class="agent-card agent-orange" style="width:200px;">
+          <div class="agent-icon">🔍</div>
+          <div class="agent-name">SEO Audit</div>
+          <div class="agent-desc">Scores & suggests</div>
+        </div>
+        <div class="agent-card agent-blue" style="width:200px;">
+          <div class="agent-icon">🕵️</div>
+          <div class="agent-name">Gap Finder</div>
+          <div class="agent-desc">Beats competitors</div>
+        </div>
+      </div>
+      <div class="spring-in stagger-4 logo-lockup" style="justify-content:center;">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">Sonic Invoices</div>
+      </div>
+      <div class="spring-in stagger-5 mono" style="margin-top:16px;color:var(--muted);">sonicinvoices.com</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div id="progress-wrap"><div id="progress-fill"></div></div>
+  <div id="controls">
+    <button id="play-btn" onclick="togglePlay()">⏸</button>
+    <div id="dots"></div>
+  </div>
+</div>
+
+<script>
+const ACT_DURATION = 15000;
+const TOTAL_ACTS = 8;
+let currentAct = 0;
+let isPlaying = true;
+let timer = null;
+let progressTimer = null;
+let progressStart = 0;
+
+const dotsContainer = document.getElementById('dots');
+for (let i = 0; i < TOTAL_ACTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goToAct(i);
+  dotsContainer.appendChild(d);
+}
+
+function showAct(index) {
+  document.querySelectorAll('.act').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  document.querySelectorAll('.dot').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  currentAct = index;
+  updateProgress(0);
+}
+function updateProgress(pct) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+function nextAct() {
+  if (currentAct < TOTAL_ACTS - 1) goToAct(currentAct + 1);
+  else goToAct(0);
+}
+function goToAct(index) {
+  showAct(index);
+  if (isPlaying) startTimer();
+}
+function startTimer() {
+  clearInterval(timer);
+  clearInterval(progressTimer);
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    updateProgress(Math.min((elapsed / ACT_DURATION) * 100, 100));
+  }, 50);
+  timer = setTimeout(nextAct, ACT_DURATION);
+}
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) startTimer();
+  else { clearTimeout(timer); clearInterval(progressTimer); }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') goToAct(Math.min(currentAct + 1, TOTAL_ACTS - 1));
+  if (e.key === 'ArrowLeft') goToAct(Math.max(currentAct - 1, 0));
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+startTimer();
+</script>
+</body>
+</html>

@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — The Rank System</title>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --lime: #a3e635;
+  --purple: #9D50DD;
+  --green: #00CA72;
+  --orange: #FDAB3D;
+  --blue: #0086C0;
+  --red: #E54D4D;
+  --text: #f5f5f5;
+  --muted: #737373;
+  --card: #141414;
+  --border: #262626;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+#stage {
+  width: 800px;
+  height: 800px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.8);
+}
+.headline { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.act {
+  position: absolute;
+  inset: 0;
+  padding: 48px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.act.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.spring-in {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  animation: springIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes springIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
+.stagger-8 { animation-delay: 840ms; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pill-purple { background: rgba(157,80,221,0.15); color: var(--purple); }
+.pill-green { background: rgba(0,202,114,0.15); color: var(--green); }
+.pill-orange { background: rgba(253,171,61,0.15); color: var(--orange); }
+.pill-blue { background: rgba(0,134,192,0.15); color: var(--blue); }
+.pill-lime { background: rgba(163,230,53,0.15); color: var(--lime); }
+.pill-red { background: rgba(229,77,77,0.15); color: var(--red); }
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+.pill-purple .pill-dot { background: var(--purple); }
+.pill-green .pill-dot { background: var(--green); }
+.pill-orange .pill-dot { background: var(--orange); }
+.pill-blue .pill-dot { background: var(--blue); }
+.pill-lime .pill-dot { background: var(--lime); }
+.pill-red .pill-dot { background: var(--red); }
+
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.board-row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 8px 0 0 8px;
+}
+.row-purple::before { background: var(--purple); }
+.row-green::before { background: var(--green); }
+.row-orange::before { background: var(--orange); }
+.row-blue::before { background: var(--blue); }
+.row-lime::before { background: var(--lime); }
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 24px;
+}
+.bento-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.bento-card-wide { grid-column: span 2; }
+.bento-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.bento-value { font-size: 28px; font-weight: 800; color: var(--text); font-family: Georgia, serif; }
+.bento-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+#progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--border);
+}
+#progress-fill {
+  height: 100%;
+  background: var(--lime);
+  width: 0%;
+  transition: width 0.3s linear;
+}
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#play-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+#play-btn:hover { border-color: var(--lime); color: var(--lime); }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--lime); transform: scale(1.3); }
+
+/* SERP / Ranking */
+.serp-result {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.serp-url { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.serp-title { font-size: 14px; font-weight: 600; color: var(--blue); margin-bottom: 2px; }
+.serp-desc { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.serp-rank {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.rank-up { background: rgba(0,202,114,0.15); color: var(--green); }
+.rank-new { background: rgba(163,230,53,0.15); color: var(--lime); }
+
+.competitor-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+.competitor-favicon {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+.competitor-name { font-size: 13px; font-weight: 700; color: var(--text); flex: 1; }
+.competitor-collections { font-size: 11px; color: var(--muted); }
+
+.gap-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.gap-name { font-size: 12px; font-weight: 600; color: var(--text); }
+.gap-action {
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(163,230,53,0.15);
+  color: var(--lime);
+  border: none;
+  cursor: pointer;
+}
+
+.content-blocks {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+.content-block {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.content-block-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.content-block-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+
+.logo-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-icon {
+  width: 40px; height: 40px;
+  background: var(--lime);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.logo-text {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.03em;
+}
+
+.race-track {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 24px;
+}
+.racer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.racer-bar-wrap {
+  flex: 1;
+  height: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+.racer-bar {
+  height: 100%;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+  animation: raceGrow 1.5s ease-out forwards;
+}
+.racer-you .racer-bar { background: var(--lime); width: 0%; animation-name: raceYou; }
+.racer-them1 .racer-bar { background: var(--orange); animation-name: raceThem1; }
+.racer-them2 .racer-bar { background: var(--blue); animation-name: raceThem2; }
+.racer-them3 .racer-bar { background: var(--purple); animation-name: raceThem3; }
+
+@keyframes raceYou { from { width: 0; } to { width: 92%; } }
+@keyframes raceThem1 { from { width: 0; } to { width: 78%; } }
+@keyframes raceThem2 { from { width: 0; } to { width: 65%; } }
+@keyframes raceThem3 { from { width: 0; } to { width: 54%; } }
+
+.racer-label {
+  width: 80px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: right;
+}
+</style>
+</head>
+<body>
+
+<div id="stage">
+
+  <!-- ACT 1: Title -->
+  <div class="act active" data-act="0">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+      <div class="spring-in stagger-1 logo-lockup" style="justify-content:center;margin-bottom:24px;">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">Sonic Invoices</div>
+      </div>
+      <div class="spring-in stagger-2 headline" style="font-size:56px;color:var(--text);margin-bottom:16px;line-height:1.1;">
+        The Rank<br>System
+      </div>
+      <div class="spring-in stagger-3" style="font-size:18px;color:var(--muted);max-width:480px;line-height:1.5;">
+        90+ SEO collections. Competitor gap intelligence. AI-generated content that outranks.
+      </div>
+      <div class="spring-in stagger-4" style="margin-top:40px;display:flex;gap:12px;">
+        <span class="pill pill-purple"><span class="pill-dot"></span>Collections</span>
+        <span class="pill pill-orange"><span class="pill-dot"></span>Gaps</span>
+        <span class="pill pill-green"><span class="pill-dot"></span>Rank</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 2: 90+ Collections Built -->
+  <div class="act" data-act="1">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">01 — Collections Built</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:24px;">
+      90+ SEO collections<br>created automatically
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;">
+      <div class="gap-card spring-in stagger-2">
+        <span class="gap-name">Bikini Tops</span>
+        <span class="pill pill-green" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Live</span>
+      </div>
+      <div class="gap-card spring-in stagger-3">
+        <span class="gap-name">One-Piece Swimsuits</span>
+        <span class="pill pill-green" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Live</span>
+      </div>
+      <div class="gap-card spring-in stagger-4">
+        <span class="gap-name">D-G Cup Swimwear</span>
+        <span class="pill pill-green" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Live</span>
+      </div>
+      <div class="gap-card spring-in stagger-3">
+        <span class="gap-name">UPF 50+ Protection</span>
+        <span class="pill pill-green" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Live</span>
+      </div>
+      <div class="gap-card spring-in stagger-4">
+        <span class="gap-name">Resort Wear</span>
+        <span class="pill pill-green" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Live</span>
+      </div>
+      <div class="gap-card spring-in stagger-5">
+        <span class="gap-name">Tummy Control</span>
+        <span class="pill pill-green" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Live</span>
+      </div>
+      <div class="gap-card spring-in stagger-4">
+        <span class="gap-name">Race Fashion</span>
+        <span class="pill pill-green" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Live</span>
+      </div>
+      <div class="gap-card spring-in stagger-5">
+        <span class="gap-name">Bridal Swimwear</span>
+        <span class="pill pill-green" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Live</span>
+      </div>
+      <div class="gap-card spring-in stagger-6" style="opacity:0.6;">
+        <span class="gap-name">+ 82 more...</span>
+        <span class="pill pill-lime" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Auto</span>
+      </div>
+    </div>
+    <div class="spring-in stagger-7" style="margin-top:24px;">
+      <div class="board-row row-lime">
+        <div style="width:28px;height:28px;background:rgba(163,230,53,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">🤖</div>
+        <div style="flex:1;margin-left:10px;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">Collection Builder Agent</div>
+          <div style="font-size:12px;color:var(--muted);">Generated 94 collections from 7-layer tags</div>
+        </div>
+        <span class="pill pill-lime"><span class="pill-dot"></span>Active</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 3: Competitor Gap Agent -->
+  <div class="act" data-act="2">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">02 — Competitor Gap Agent</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:24px;">
+      Crawling THE ICONIC<br>and Mathers in real-time
+    </div>
+    <div style="display:flex;gap:16px;margin-top:8px;">
+      <div style="flex:1;">
+        <div class="spring-in stagger-3" style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">Competitors Monitored</div>
+        <div class="competitor-row spring-in stagger-3">
+          <div class="competitor-favicon">TI</div>
+          <div class="competitor-name">THE ICONIC</div>
+          <div class="competitor-collections">847 collections</div>
+        </div>
+        <div class="competitor-row spring-in stagger-4">
+          <div class="competitor-favicon">M</div>
+          <div class="competitor-name">Mathers</div>
+          <div class="competitor-collections">312 collections</div>
+        </div>
+        <div class="competitor-row spring-in stagger-5">
+          <div class="competitor-favicon">SG</div>
+          <div class="competitor-name">Swimwear Galore</div>
+          <div class="competitor-collections">156 collections</div>
+        </div>
+        <div class="competitor-row spring-in stagger-6">
+          <div class="competitor-favicon">DJ</div>
+          <div class="competitor-name">David Jones</div>
+          <div class="competitor-collections">423 collections</div>
+        </div>
+      </div>
+      <div style="flex:1;">
+        <div class="spring-in stagger-4" style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">Gaps Found</div>
+        <div class="gap-card spring-in stagger-4" style="border-color:var(--orange);">
+          <span class="gap-name">Sustainable Swimwear</span>
+          <span class="pill pill-orange" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Missing</span>
+        </div>
+        <div class="gap-card spring-in stagger-5" style="border-color:var(--orange);">
+          <span class="gap-name">Plus Size Resort Wear</span>
+          <span class="pill pill-orange" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Missing</span>
+        </div>
+        <div class="gap-card spring-in stagger-6" style="border-color:var(--orange);">
+          <span class="gap-name">Darwin Cup Fashion</span>
+          <span class="pill pill-orange" style="padding:2px 8px;font-size:10px;"><span class="pill-dot"></span>Missing</span>
+        </div>
+        <div class="gap-card spring-in stagger-7" style="border-color:var(--lime);">
+          <span class="gap-name">Recycled Fabric Swim</span>
+          <button class="gap-action">Create →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 4: Gap Analysis -->
+  <div class="act" data-act="3">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">03 — Gap Analysis</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:24px;">
+      One-click collection<br>creation from gaps
+    </div>
+    <div style="max-width:520px;margin:0 auto;">
+      <div class="board-row row-orange spring-in stagger-3">
+        <div style="width:28px;height:28px;background:rgba(253,171,61,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">🔍</div>
+        <div style="flex:1;margin-left:10px;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">Gap: "Sustainable Swimwear"</div>
+          <div style="font-size:12px;color:var(--muted);">THE ICONIC ranks #3 • 2,400 searches/mo</div>
+        </div>
+        <span class="pill pill-orange"><span class="pill-dot"></span>Opportunity</span>
+      </div>
+      <div style="text-align:center;margin:8px 0;" class="spring-in stagger-4"><span style="color:var(--lime);font-size:18px;">↓</span></div>
+      <div class="board-row row-purple spring-in stagger-5">
+        <div style="width:28px;height:28px;background:rgba(157,80,221,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">🤖</div>
+        <div style="flex:1;margin-left:10px;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">AI Generates Collection</div>
+          <div style="font-size:12px;color:var(--muted);">Title • Meta • Description • FAQ • Links</div>
+        </div>
+        <span class="pill pill-purple"><span class="pill-dot"></span>Writing</span>
+      </div>
+      <div style="text-align:center;margin:8px 0;" class="spring-in stagger-6"><span style="color:var(--lime);font-size:18px;">↓</span></div>
+      <div class="board-row row-green spring-in stagger-7">
+        <div style="width:28px;height:28px;background:rgba(0,202,114,0.15);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">✓</div>
+        <div style="flex:1;margin-left:10px;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">Collection Live</div>
+          <div style="font-size:12px;color:var(--muted);">SEO Score: 96/100 • 18 products matched</div>
+        </div>
+        <span class="pill pill-green"><span class="pill-dot"></span>Published</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 5: AI Content Generation -->
+  <div class="act" data-act="4">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">04 — AI Content Engine</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:16px;">
+      200-350 word descriptions<br>that beat every competitor
+    </div>
+    <div class="spring-in stagger-3" style="font-size:12px;color:var(--muted);margin-bottom:20px;">
+      THE ICONIC: 100-150 words • Mathers: 100-150 words • Swimwear Galore: 180-220 words • Sonic: 200-350 words
+    </div>
+    <div class="content-blocks">
+      <div class="content-block spring-in stagger-3">
+        <div class="content-block-label">SEO Title</div>
+        <div class="content-block-text">Sustainable Swimwear Australia — Recycled Fabrics, Ethical Brands | Free Shipping</div>
+      </div>
+      <div class="content-block spring-in stagger-4">
+        <div class="content-block-label">Meta Description</div>
+        <div class="content-block-text">Shop sustainable swimwear made from recycled ocean plastics. Ethical Australian brands. UPF 50+ protection. Free shipping over $100.</div>
+      </div>
+      <div class="content-block spring-in stagger-5">
+        <div class="content-block-label">Collection Description</div>
+        <div class="content-block-text">Our curated sustainable swimwear collection features pieces crafted from ECONYL® regenerated nylon and recycled polyester. Each design balances environmental responsibility with...</div>
+      </div>
+      <div class="content-block spring-in stagger-6">
+        <div class="content-block-label">FAQ</div>
+        <div class="content-block-text">Q: What makes swimwear sustainable?<br>A: Recycled fabrics, ethical manufacturing, and longevity...</div>
+      </div>
+    </div>
+    <div class="spring-in stagger-7" style="margin-top:16px;display:flex;gap:6px;flex-wrap:wrap;">
+      <span class="pill pill-blue"><span class="pill-dot"></span>3 internal links</span>
+      <span class="pill pill-purple"><span class="pill-dot"></span>4 FAQ questions</span>
+      <span class="pill pill-green"><span class="pill-dot"></span>312 words</span>
+      <span class="pill pill-lime"><span class="pill-dot"></span>Keyword rich</span>
+    </div>
+  </div>
+
+  <!-- ACT 6: SEO Score Breakdown -->
+  <div class="act" data-act="5">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">05 — SEO Score System</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:24px;text-align:center;">
+      Every collection scored<br>0 — 100
+    </div>
+    <div style="display:flex;gap:24px;justify-content:center;align-items:flex-start;margin-top:8px;">
+      <div class="spring-in stagger-3" style="text-align:center;">
+        <div style="width:100px;height:100px;border-radius:50%;background:conic-gradient(var(--green) 0% 94%, var(--border) 94% 100%);display:flex;align-items:center;justify-content:center;position:relative;margin:0 auto;">
+          <div style="position:absolute;width:80px;height:80px;border-radius:50%;background:var(--bg);"></div>
+          <div style="position:relative;z-index:2;font-size:28px;font-weight:800;color:var(--green);font-family:Georgia,serif;">94</div>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted);">Sonic Collection</div>
+      </div>
+      <div class="spring-in stagger-4" style="text-align:center;">
+        <div style="width:100px;height:100px;border-radius:50%;background:conic-gradient(var(--orange) 0% 62%, var(--border) 62% 100%);display:flex;align-items:center;justify-content:center;position:relative;margin:0 auto;">
+          <div style="position:absolute;width:80px;height:80px;border-radius:50%;background:var(--bg);"></div>
+          <div style="position:relative;z-index:2;font-size:28px;font-weight:800;color:var(--orange);font-family:Georgia,serif;">62</div>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted);">THE ICONIC</div>
+      </div>
+      <div class="spring-in stagger-5" style="text-align:center;">
+        <div style="width:100px;height:100px;border-radius:50%;background:conic-gradient(var(--blue) 0% 58%, var(--border) 58% 100%);display:flex;align-items:center;justify-content:center;position:relative;margin:0 auto;">
+          <div style="position:absolute;width:80px;height:80px;border-radius:50%;background:var(--bg);"></div>
+          <div style="position:relative;z-index:2;font-size:28px;font-weight:800;color:var(--blue);font-family:Georgia,serif;">58</div>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted);">Mathers</div>
+      </div>
+    </div>
+    <div class="spring-in stagger-6" style="margin-top:32px;">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:480px;margin:0 auto;">
+        <div class="board-row row-green" style="margin-bottom:0;"><div style="font-size:12px;color:var(--text);">Title</div><span class="pill pill-green" style="margin-left:auto"><span class="pill-dot"></span>15</span></div>
+        <div class="board-row row-green" style="margin-bottom:0;"><div style="font-size:12px;color:var(--text);">Meta</div><span class="pill pill-green" style="margin-left:auto"><span class="pill-dot"></span>20</span></div>
+        <div class="board-row row-green" style="margin-bottom:0;"><div style="font-size:12px;color:var(--text);">Description</div><span class="pill pill-green" style="margin-left:auto"><span class="pill-dot"></span>25</span></div>
+        <div class="board-row row-purple" style="margin-bottom:0;"><div style="font-size:12px;color:var(--text);">FAQ</div><span class="pill pill-purple" style="margin-left:auto"><span class="pill-dot"></span>20</span></div>
+        <div class="board-row row-blue" style="margin-bottom:0;"><div style="font-size:12px;color:var(--text);">Links</div><span class="pill pill-blue" style="margin-left:auto"><span class="pill-dot"></span>10</span></div>
+        <div class="board-row row-lime" style="margin-bottom:0;"><div style="font-size:12px;color:var(--text);">Products</div><span class="pill pill-lime" style="margin-left:auto"><span class="pill-dot"></span>10</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 7: Google Ranking -->
+  <div class="act" data-act="6">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">06 — Google Ranking</div>
+    <div class="spring-in stagger-2 headline" style="font-size:32px;color:var(--text);margin-bottom:16px;">
+      Climbing the SERP<br>past competitors
+    </div>
+    <div class="spring-in stagger-3" style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+      Search: "sustainable swimwear australia"
+    </div>
+    <div style="max-width:560px;margin:0 auto;">
+      <div class="serp-result spring-in stagger-3">
+        <div class="serp-url">www.theiconic.com.au › sustainable-swimwear</div>
+        <div class="serp-title">Sustainable Swimwear — Shop Eco-Friendly Brands</div>
+        <div class="serp-desc">Discover sustainable swimwear from top Australian brands. Free delivery over $75.</div>
+        <div class="serp-rank rank-up">#2 ↑</div>
+      </div>
+      <div class="serp-result spring-in stagger-4" style="border-color:var(--lime);">
+        <div class="serp-url">www.yourstore.com.au › collections › sustainable-swimwear</div>
+        <div class="serp-title" style="color:var(--lime);">Sustainable Swimwear Australia — Recycled & Ethical | Free Ship</div>
+        <div class="serp-desc">Shop the best sustainable swimwear in Australia. ECONYL® recycled nylon, UPF 50+, ethical manufacturing. 200+ 5-star reviews. Free shipping over $100.</div>
+        <div class="serp-rank rank-new">#3 🆕</div>
+      </div>
+      <div class="serp-result spring-in stagger-5">
+        <div class="serp-url">www.mathers.com.au › swimwear › sustainable</div>
+        <div class="serp-title">Sustainable Swimwear — Mathers Footwear & Swim</div>
+        <div class="serp-desc">Browse our range of sustainable swimwear options. Limited styles available.</div>
+        <div class="serp-rank rank-up">#5 ↓</div>
+      </div>
+      <div class="serp-result spring-in stagger-6" style="opacity:0.6;">
+        <div class="serp-url">www.swimweargalore.com.au › eco-swimwear</div>
+        <div class="serp-title">Eco Swimwear — Swimwear Galore</div>
+        <div class="serp-desc">Eco-friendly swimwear for the conscious swimmer. Shop online today.</div>
+        <div class="serp-rank rank-up">#6</div>
+      </div>
+    </div>
+    <div class="spring-in stagger-7" style="margin-top:16px;text-align:center;">
+      <span class="pill pill-lime"><span class="pill-dot"></span>Position gained in 14 days</span>
+    </div>
+  </div>
+
+  <!-- ACT 8: CTA -->
+  <div class="act" data-act="7">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+      <div class="spring-in stagger-1 headline" style="font-size:48px;color:var(--text);margin-bottom:16px;line-height:1.1;">
+        Outrank your<br>competitors
+      </div>
+      <div class="spring-in stagger-2" style="font-size:16px;color:var(--muted);max-width:460px;line-height:1.6;margin-bottom:32px;">
+        90+ collections. Competitor gap intelligence. AI content that beats THE ICONIC and Mathers on word count, depth, and SEO structure.
+      </div>
+      <div class="spring-in stagger-3" style="display:flex;gap:16px;align-items:center;margin-bottom:40px;">
+        <div style="text-align:center;">
+          <div style="font-size:36px;font-weight:800;color:var(--lime);font-family:Georgia,serif;">94</div>
+          <div style="font-size:11px;color:var(--muted);">Avg SEO Score</div>
+        </div>
+        <div style="width:1px;height:40px;background:var(--border);"></div>
+        <div style="text-align:center;">
+          <div style="font-size:36px;font-weight:800;color:var(--lime);font-family:Georgia,serif;">90+</div>
+          <div style="font-size:11px;color:var(--muted);">Collections</div>
+        </div>
+        <div style="width:1px;height:40px;background:var(--border);"></div>
+        <div style="text-align:center;">
+          <div style="font-size:36px;font-weight:800;color:var(--lime);font-family:Georgia,serif;">#3</div>
+          <div style="font-size:11px;color:var(--muted);">Google Rank</div>
+        </div>
+      </div>
+      <div class="spring-in stagger-4 logo-lockup" style="justify-content:center;">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">Sonic Invoices</div>
+      </div>
+      <div class="spring-in stagger-5 mono" style="margin-top:16px;color:var(--muted);">sonicinvoices.com</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div id="progress-wrap"><div id="progress-fill"></div></div>
+  <div id="controls">
+    <button id="play-btn" onclick="togglePlay()">⏸</button>
+    <div id="dots"></div>
+  </div>
+</div>
+
+<script>
+const ACT_DURATION = 15000;
+const TOTAL_ACTS = 8;
+let currentAct = 0;
+let isPlaying = true;
+let timer = null;
+let progressTimer = null;
+let progressStart = 0;
+
+const dotsContainer = document.getElementById('dots');
+for (let i = 0; i < TOTAL_ACTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goToAct(i);
+  dotsContainer.appendChild(d);
+}
+
+function showAct(index) {
+  document.querySelectorAll('.act').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  document.querySelectorAll('.dot').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  currentAct = index;
+  updateProgress(0);
+}
+function updateProgress(pct) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+function nextAct() {
+  if (currentAct < TOTAL_ACTS - 1) goToAct(currentAct + 1);
+  else goToAct(0);
+}
+function goToAct(index) {
+  showAct(index);
+  if (isPlaying) startTimer();
+}
+function startTimer() {
+  clearInterval(timer);
+  clearInterval(progressTimer);
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    updateProgress(Math.min((elapsed / ACT_DURATION) * 100, 100));
+  }, 50);
+  timer = setTimeout(nextAct, ACT_DURATION);
+}
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) startTimer();
+  else { clearTimeout(timer); clearInterval(progressTimer); }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') goToAct(Math.min(currentAct + 1, TOTAL_ACTS - 1));
+  if (e.key === 'ArrowLeft') goToAct(Math.max(currentAct - 1, 0));
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+startTimer();
+</script>
+</body>
+</html>

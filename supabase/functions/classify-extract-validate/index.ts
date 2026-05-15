@@ -1261,20 +1261,32 @@ async function runSonicGrader(opts: {
     console.log(`[grader] appended ${correctionContext.length} chars of supplier corrections to rubric`);
   }
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: SONIC_GRADER_MODEL,
-      max_tokens: 1500,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithBackoff(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify({
+        model: SONIC_GRADER_MODEL,
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      return {
+        passed: false, score: 0, criteria: {}, failures: ["grader timeout after 60s"],
+        reextract_needed: false, reextract_reason: "", error: "timeout",
+      };
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     const errText = await response.text();

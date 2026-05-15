@@ -10,12 +10,10 @@ import { cn } from "@/lib/utils";
 import { Wrench } from "lucide-react";
 
 // ── Eagerly loaded (critical path) ──
-import HomeWizard from "@/components/HomeWizard";
 import PhaseFlowHome from "@/components/PhaseFlowHome";
 import { ClaudeConnectBanner } from "@/components/ClaudeConnectPrompts";
 import SeoHealthWidget from "@/components/SeoHealthWidget";
 import BottomTabBar from "@/components/BottomTabBar";
-import EmbeddedNav from "@/components/EmbeddedNav";
 import StockyLayout from "@/components/StockyLayout";
 import QuickActionsBar from "@/components/QuickActionsBar";
 import KeyboardShortcutsModal from "@/components/KeyboardShortcutsModal";
@@ -24,8 +22,6 @@ import PhaseProgressBar from "@/components/PhaseProgressBar";
 import MobileKeyboardHint from "@/components/MobileKeyboardHint";
 import InputSelector from "@/components/InputSelector";
 const FlywheelDashboard = lazy(() => import("@/components/FlywheelDashboard"));
-// HomeScreen kept available (now lazy) — accessible from Tools as "Classic dashboard".
-const HomeScreen = lazy(() => import("@/components/HomeScreen"));
 
 
 // ── Lazy-loaded (code-split) — improves LCP & reduces main-thread work (INP) ──

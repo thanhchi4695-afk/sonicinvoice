@@ -556,151 +556,22 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   }
 
 
-  const renderFlow = () => {
-    let flowEl: React.ReactNode = null;
-    switch (activeFlow) {
-      case "invoice": flowEl = <InvoiceFlow onBack={() => setActiveFlow(null)} onNavigate={(f) => safeSetFlow(f)} />; break;
-      case "sale": flowEl = <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />; break;
-      case "restock": flowEl = <RestockAnalytics onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
-      case "price_adjust": flowEl = <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
-      case "price_lookup": flowEl = <PriceLookup onBack={() => setActiveFlow(null)} />; break;
-      case "order_form": flowEl = <OrderFormFlow onBack={() => setActiveFlow(null)} />; break;
-      case "seasons": flowEl = <SeasonManager onBack={() => setActiveFlow(null)} />; break;
-      case "reorder": flowEl = <ReorderPanel onBack={() => setActiveFlow(null)} onViewOrders={() => setActiveFlow("order_form")} />; break;
-      case "suppliers": flowEl = <SupplierPanel onBack={() => setActiveFlow(null)} onStartInvoice={() => setActiveFlow("invoice")} />; break;
-      case "audit_log": flowEl = <AuditLogPanel onBack={() => setActiveFlow(null)} />; break;
-      case "purchase_orders": flowEl = <OutboundPurchaseOrders onBack={() => setActiveFlow(null)} />; break;
-      case "restock_suggestions": flowEl = <RestockSuggestionsPanel onBack={() => setActiveFlow(null)} onOpenPO={() => setActiveFlow("purchase_orders")} />; break;
-      case "pricing_assistant": flowEl = <PricingAssistantPanel onBack={() => setActiveFlow(null)} />; break;
-      case "quick_receive": flowEl = <PurchaseOrderPanel onBack={() => setActiveFlow(null)} />; break;
-      case "catalog_memory": flowEl = <CatalogMemoryPanel onBack={() => setActiveFlow(null)} />; break;
-      case "email_inbox": flowEl = <EmailInboxPanel onBack={() => setActiveFlow(null)} onProcessInvoice={() => setActiveFlow("invoice")} />; break;
-      case "collab_seo": flowEl = <CollabSEOFlow onBack={() => setActiveFlow(null)} />; break;
-      case "google_ads_setup": flowEl = <GoogleAdsSetupWizard onBack={() => setActiveFlow(null)} />; break;
-      case "meta_ads_setup": flowEl = <MetaAdsSetupWizard onBack={() => setActiveFlow(null)} />; break;
-      case "lightspeed_convert": flowEl = <LightspeedConverter onBack={() => setActiveFlow(null)} />; break;
-      case "scan_mode": flowEl = <ScanMode onBack={() => setActiveFlow(null)} />; break;
-      case "performance": flowEl = <PerformanceDashboard onBack={() => setActiveFlow(null)} />; break;
-      case "feed_optimise": flowEl = <AIFeedOptimisation onBack={() => setActiveFlow(null)} />; break;
-      case "feed_health": flowEl = <FeedHealthPanel onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
-      case "google_colour": flowEl = <GoogleColourFlow onBack={() => setActiveFlow(null)} />; break;
-      case "google_ads": flowEl = <GoogleAdsFlow onBack={() => setActiveFlow(null)} />; break;
-      case "style_grouping": flowEl = <StyleGroupingFlow onBack={() => setActiveFlow(null)} />; break;
-      case "competitor_intel": flowEl = <CompetitorIntelFlow onBack={() => setActiveFlow(null)} />; break;
-      case "collection_seo": flowEl = <CollectionSEOFlow onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
-      case "collection_decomposer": flowEl = <ProductCollectionDecomposer onBack={() => setActiveFlow(null)} onOpenCollectionSEO={() => handleStartFlow("collection_seo")} />; break;
-      case "collection_seo_export": flowEl = <CollectionSEOExport onBack={() => setActiveFlow(null)} />; break;
-      case "geo_agentic": flowEl = <GeoAgenticFlow onBack={() => setActiveFlow(null)} />; break;
-      case "organic_seo": flowEl = <OrganicSEOFlow onBack={() => setActiveFlow(null)} />; break;
-      case "margin_protection": flowEl = <MarginProtectionPanel onBack={() => setActiveFlow(null)} />; break;
-      case "markdown_ladder": flowEl = <MarkdownLadderPanel onBack={() => setActiveFlow(null)} />; break;
-      case "stock_monitor": flowEl = <StockMonitorPanel onBack={() => setActiveFlow(null)} />; break;
-      case "social_media": flowEl = <SocialMediaPanel onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
-      case "inventory_planning": flowEl = <InventoryPlanningPanel onBack={() => setActiveFlow(null)} />; break;
-      case "packing_slip": flowEl = <PackingSlipFlow onBack={() => setActiveFlow(null)} />; break;
-      case "joor": flowEl = <JoorFlow onBack={() => setActiveFlow(null)} />; break;
-      case "wholesale_import": flowEl = <WholesaleImportFlow onBack={() => setActiveFlow(null)} />; break;
-      case "lookbook_import": flowEl = <LookbookImportFlow onBack={() => setActiveFlow(null)} />; break;
-      case "image_seo": flowEl = <ImageSEOFlow onBack={() => setActiveFlow(null)} />; break;
-      case "accounting": flowEl = <AccountingIntegration onBack={() => setActiveFlow(null)} />; break;
-      case "profit_loss": flowEl = <ProfitLossPanel onBack={() => setActiveFlow(null)} />; break;
-      case "stocky_hub": flowEl = <StockyHub onBack={() => setActiveFlow(null)} onNavigate={(t) => {
-        const map: Record<string, ActiveFlow> = { purchase_orders: "purchase_orders", suppliers: "suppliers", stock_monitor: "stock_monitor", reorder: "reorder", margin_protection: "margin_protection", markdown_ladder: "markdown_ladder", restock_analytics: "restock", stocky_migration: "stocky_migration", inventory_dashboard: "inventory_dashboard", product_health: "product_health", order_sync: "order_sync", stock_adjustment: "stock_adjustment" };
-        const target = map[t] ?? (t as string);
-        if (isFlowKey(target)) {
-          setActiveFlow(target);
-        }
-      }} />; break;
-      case "stocky_migration": flowEl = <StockyMigration onBack={() => setActiveFlow("stocky_hub")} onComplete={() => setActiveFlow("stocky_hub")} />; break;
-      case "stocky_onboarding": flowEl = <StockyOnboarding onBack={() => setActiveFlow(null)} onComplete={() => { setActiveFlow(null); localStorage.setItem("stocky_onboarding_done", "true"); }} onStartPipeline={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); localStorage.setItem("stocky_onboarding_done", "true"); }} onStartFlow={(f) => { safeSetFlow(f); localStorage.setItem("stocky_onboarding_done", "true"); }} />; break;
-      case "inventory_dashboard": flowEl = <InventoryDashboard onBack={() => setActiveFlow("stocky_hub")} />; break;
-      case "product_health": flowEl = <ProductHealthPanel onBack={() => setActiveFlow("stocky_hub")} />; break;
-      case "order_sync": flowEl = <ShopifyOrderSync onBack={() => setActiveFlow("stocky_hub")} />; break;
-      case "image_optimise": flowEl = <ImageOptimisePanel onBack={() => setActiveFlow(null)} />; break;
-      case "stock_check": flowEl = <StockCheckFlow lineItems={[]} onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
-      case "stocktake_module": flowEl = <StocktakeModule onBack={() => setActiveFlow(null)} />; break;
-      case "transfer_orders": flowEl = <TransferOrderPanel onBack={() => setActiveFlow(null)} />; break;
-      case "reports_hub": flowEl = <ReportsHub onBack={() => setActiveFlow(null)} />; break;
-      case "supplier_profile_builder": flowEl = <SupplierProfileBuilder onBack={() => setActiveFlow(null)} onViewLearnedRules={() => setActiveFlow("supplier_intelligence")} />; break;
-      case "stock_adjustment": flowEl = <StockAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
-      case "inventory_view": flowEl = <InventoryView onBack={() => setActiveFlow(null)} />; break;
-      case "csv_seo": flowEl = <ShopifyCSVSEO onBack={() => setActiveFlow(null)} />; break;
-      case "price_match": flowEl = <PriceMatchPanel lineItems={[]} onBack={() => setActiveFlow(null)} />; break;
-      case "product_descriptions": flowEl = <ProductDescriptionPanel lineItems={[]} onBack={() => setActiveFlow(null)} />; break;
-      case "stocky_dashboard": flowEl = <StockyHomeDashboard onNavigate={(f) => safeSetFlow(f)} onSwitchToClassic={() => { setUseStockyDashboard(false); localStorage.setItem("stocky_dashboard_mode", "false"); setActiveFlow(null); }} />; break;
-      case "pipeline": flowEl = activePipelineId ? <PipelineRunner pipelineId={activePipelineId} onRenderFlow={(flowKey, onComplete) => {
-        const flowMap: Record<string, React.ReactNode> = {
-          invoice: <InvoiceFlow onBack={onComplete} />,
-          stock_check: <StockCheckFlow lineItems={[]} onBack={onComplete} />,
-          image_optimise: <ImageOptimisePanel onBack={onComplete} />,
-          feed_health: <FeedHealthPanel onBack={onComplete} />,
-          collection_seo: <CollectionSEOFlow onBack={onComplete} />,
-          style_grouping: <StyleGroupingFlow onBack={onComplete} />,
-          social_media: <SocialMediaPanel onBack={onComplete} />,
-          accounting: <AccountingIntegration onBack={onComplete} />,
-          feed_optimise: <AIFeedOptimisation onBack={onComplete} />,
-          organic_seo: <OrganicSEOFlow onBack={onComplete} />,
-          geo_agentic: <GeoAgenticFlow onBack={onComplete} />,
-          collab_seo: <CollabSEOFlow onBack={onComplete} />,
-          google_colour: <GoogleColourFlow onBack={onComplete} />,
-          google_ads: <GoogleAdsFlow onBack={onComplete} />,
-          google_ads_setup: <GoogleAdsSetupWizard onBack={onComplete} />,
-          meta_ads_setup: <MetaAdsSetupWizard onBack={onComplete} />,
-          performance: <PerformanceDashboard onBack={onComplete} />,
-          restock: <RestockAnalytics onBack={onComplete} />,
-          markdown_ladder: <MarkdownLadderPanel onBack={onComplete} />,
-          margin_protection: <MarginProtectionPanel onBack={onComplete} />,
-          reorder: <ReorderPanel onBack={onComplete} onViewOrders={() => {}} />,
-          purchase_orders: <PurchaseOrderPanel onBack={onComplete} />,
-          profit_loss: <ProfitLossPanel onBack={onComplete} />,
-        };
-        return flowMap[flowKey] || <div className="p-6 text-center text-sm text-muted-foreground">Flow "{flowKey}" — <button className="text-primary underline" onClick={onComplete}>Mark complete →</button></div>;
-      }} onExit={() => { setActiveFlow(null); setActivePipelineId(null); }} /> : (
-        <div className="p-6 text-center text-sm text-muted-foreground">
-          No pipeline selected.{" "}
-          <button className="text-primary underline" onClick={() => setActiveFlow("pipeline_chooser")}>
-            Choose a pipeline →
-          </button>
-        </div>
-      ); break;
-      case "pipeline_chooser": flowEl = <PipelineChooser onSelect={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }} onBack={() => setActiveFlow(null)} />; break;
-      case "supplier_intelligence": flowEl = <SupplierIntelligencePanel onBack={() => setActiveFlow(null)} onOpenInvoiceFlow={() => setActiveFlow("invoice")} />; break;
-      case "teach_invoice_tutorial": flowEl = <TeachInvoiceTutorial
-        onBack={() => setActiveFlow(null)}
-        onStartInvoice={() => setActiveFlow("invoice")}
-        onOpenSupplierIntelligence={() => setActiveFlow("supplier_intelligence")}
-        onOpenCatalogMemory={() => setActiveFlow("catalog_memory")}
-      />; break;
-      case "processing_history": flowEl = <ProcessingHistoryPanel onBack={() => { setActiveFlow(null); setHistoryPatternId(null); }} onOpenInvoiceFlow={() => setActiveFlow("invoice")} initialPatternId={historyPatternId ?? undefined} />; break;
-      case "invoice_detail":
-        flowEl = historyPatternId ? (
-          <InvoiceDetailScreen
-            patternId={historyPatternId}
-            onBack={() => { setActiveFlow(null); setHistoryPatternId(null); }}
-            onResume={() => setActiveFlow("invoice")}
-            onOpenHistory={(id) => { setHistoryPatternId(id); setActiveFlow("processing_history"); }}
-          />
-        ) : (
-          <div className="p-6 text-center text-sm text-muted-foreground">No invoice selected.</div>
-        );
-        break;
-      case "stock_reconciliation":
-        flowEl = reconciliationResult ? (
-          <StockReconciliationPanel
-            reconciliationResult={reconciliationResult}
-            onBack={() => { setReconciliationResult(null); setActiveFlow("invoice"); }}
-            onExport={(sets) => { setReconciliationResult(null); handleReconciliationExport(sets); }}
-          />
-        ) : (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            No reconciliation in progress. <button className="text-primary underline" onClick={() => setActiveFlow("invoice")}>Start an invoice →</button>
-          </div>
-        );
-        break;
-      default: return null;
-    }
-    return <Suspense fallback={suspenseFallback}>{flowEl}</Suspense>;
+  // Single dispatch — flow definitions live in src/router/flow-registry.tsx
+  const flowCtx: FlowContext = {
+    setActiveFlow,
+    setActiveTab,
+    setActivePipelineId,
+    setUseStockyDashboard,
+    setReconciliationResult,
+    setHistoryPatternId,
+    handleStartFlow,
+    handleReconciliationExport,
+    safeSetFlow,
+    activePipelineId,
+    historyPatternId,
+    reconciliationResult,
   };
+  const renderActiveFlow = () => renderFlow(activeFlow, flowCtx);
 
   // In standalone mobile mode, flows replace the entire screen (no sidebar)
   // On desktop, flows render inside StockyLayout (sidebar stays visible)

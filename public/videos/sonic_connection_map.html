@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Connection Map</title>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --lime: #a3e635;
+  --purple: #9D50DD;
+  --green: #00CA72;
+  --orange: #FDAB3D;
+  --blue: #0086C0;
+  --teal: #14b8a6;
+  --gold: #fbbf24;
+  --text: #f5f5f5;
+  --muted: #737373;
+  --card: #141414;
+  --border: #262626;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+#stage {
+  width: 800px;
+  height: 800px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.8);
+}
+.headline { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.act {
+  position: absolute;
+  inset: 0;
+  padding: 48px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.act.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.spring-in {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  animation: springIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes springIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
+.stagger-8 { animation-delay: 840ms; }
+
+#progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--border);
+}
+#progress-fill {
+  height: 100%;
+  background: var(--purple);
+  width: 0%;
+  transition: width 0.3s linear;
+}
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#play-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+#play-btn:hover { border-color: var(--purple); color: var(--purple); }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--purple); transform: scale(1.3); }
+
+#canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 800px;
+  height: 800px;
+}
+
+.node-label {
+  position: absolute;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  pointer-events: none;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+}
+</style>
+</head>
+<body>
+<div id="stage">
+<canvas id="canvas" width="800" height="800"></canvas>
+
+<!-- ACT 1: Title overlay -->
+<div class="act active" data-act="0" style="background:transparent;pointer-events:none;">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;pointer-events:auto;">
+    <div class="spring-in stagger-1 headline" style="font-size:48px;color:var(--text);margin-bottom:16px;line-height:1.1;">
+      The Connection<br>Map
+    </div>
+    <div class="spring-in stagger-2" style="font-size:16px;color:var(--muted);max-width:400px;line-height:1.5;">
+      How every Sonic Invoices feature connects to every other
+    </div>
+    <div class="spring-in stagger-3" style="margin-top:32px;display:flex;gap:12px;">
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:700;background:rgba(253,171,61,0.15);color:var(--orange);">Invoice</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:700;background:rgba(157,80,221,0.15);color:var(--purple);">AI</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;font-size:11px;font-weight:700;background:rgba(163,230,53,0.15);color:var(--lime);">Rank</span>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 2: Nodes appear (handled by canvas) -->
+<div class="act" data-act="1" style="background:transparent;pointer-events:none;"></div>
+
+<!-- ACT 3: Connections draw (handled by canvas) -->
+<div class="act" data-act="2" style="background:transparent;pointer-events:none;"></div>
+
+<!-- ACT 4: Flow through (handled by canvas) -->
+<div class="act" data-act="3" style="background:transparent;pointer-events:none;"></div>
+
+<!-- Controls -->
+<div id="progress-wrap"><div id="progress-fill"></div></div>
+<div id="controls">
+  <button id="play-btn" onclick="togglePlay()">⏸</button>
+  <div id="dots"></div>
+</div>
+</div>
+
+<script>
+const ACT_DURATION = 15000;
+const TOTAL_ACTS = 4;
+let currentAct = 0;
+let isPlaying = true;
+let timer = null;
+let progressTimer = null;
+let progressStart = 0;
+let animFrame = null;
+
+const dotsContainer = document.getElementById('dots');
+for (let i = 0; i < TOTAL_ACTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goToAct(i);
+  dotsContainer.appendChild(d);
+}
+
+function showAct(index) {
+  document.querySelectorAll('.act').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  document.querySelectorAll('.dot').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  currentAct = index;
+  updateProgress(0);
+}
+function updateProgress(pct) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+function nextAct() {
+  if (currentAct < TOTAL_ACTS - 1) goToAct(currentAct + 1);
+  else goToAct(0);
+}
+function goToAct(index) {
+  showAct(index);
+  if (isPlaying) startTimer();
+}
+function startTimer() {
+  clearInterval(timer);
+  clearInterval(progressTimer);
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    updateProgress(Math.min((elapsed / ACT_DURATION) * 100, 100));
+  }, 50);
+  timer = setTimeout(nextAct, ACT_DURATION);
+}
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) startTimer();
+  else { clearTimeout(timer); clearInterval(progressTimer); }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') goToAct(Math.min(currentAct + 1, TOTAL_ACTS - 1));
+  if (e.key === 'ArrowLeft') goToAct(Math.max(currentAct - 1, 0));
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+
+// Canvas animation
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+const nodes = [
+  { id: 'invoice', label: '📄 INVOICE', x: 400, y: 80, color: '#FDAB3D', r: 45 },
+  { id: 'parse', label: '🤖 AI PARSE', x: 620, y: 200, color: '#9D50DD', r: 45 },
+  { id: 'tag', label: '🏷 7-LAYER', x: 680, y: 400, color: '#0086C0', r: 45 },
+  { id: 'shopify', label: '🛍 SHOPIFY', x: 620, y: 600, color: '#00CA72', r: 45 },
+  { id: 'collections', label: '📂 SEO COLL', x: 400, y: 720, color: '#14b8a6', r: 45 },
+  { id: 'score', label: '📊 SEO SCORE', x: 180, y: 600, color: '#a3e635', r: 45 },
+  { id: 'google', label: '👑 GOOGLE', x: 120, y: 400, color: '#fbbf24', r: 45 },
+  { id: 'claude', label: '🤖 CLAUDE/KIMI', x: 180, y: 200, color: '#9D50DD', r: 50 },
+  { id: 'center', label: '⚡', x: 400, y: 400, color: '#a3e635', r: 35 },
+];
+
+const connections = [
+  { from: 0, to: 1, color: '#FDAB3D', particles: [] },
+  { from: 1, to: 2, color: '#9D50DD', particles: [] },
+  { from: 2, to: 3, color: '#0086C0', particles: [] },
+  { from: 3, to: 4, color: '#00CA72', particles: [] },
+  { from: 4, to: 5, color: '#14b8a6', particles: [] },
+  { from: 5, to: 6, color: '#a3e635', particles: [] },
+  { from: 6, to: 7, color: '#fbbf24', particles: [], dotted: true },
+  { from: 7, to: 0, color: '#9D50DD', particles: [] },
+];
+
+let nodeAppearances = new Array(nodes.length).fill(0);
+let connectionDraws = new Array(connections.length).fill(0);
+let flowParticle = null;
+let flowProgress = 0;
+let allActive = false;
+let time = 0;
+
+function drawNode(node, opacity, scale) {
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.translate(node.x, node.y);
+  ctx.scale(scale, scale);
+
+  // Glow
+  const grad = ctx.createRadialGradient(0, 0, node.r * 0.5, 0, 0, node.r * 2);
+  grad.addColorStop(0, node.color + '40');
+  grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, node.r * 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hexagon shape
+  ctx.fillStyle = '#141414';
+  ctx.strokeStyle = node.color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i - Math.PI / 6;
+    const px = Math.cos(angle) * node.r;
+    const py = Math.sin(angle) * node.r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Label
+  ctx.fillStyle = '#f5f5f5';
+  ctx.font = 'bold 11px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const lines = node.label.split(' ');
+  if (lines.length > 1) {
+    ctx.fillText(lines[0], 0, -6);
+    ctx.fillText(lines.slice(1).join(' '), 0, 8);
+  } else {
+    ctx.fillText(node.label, 0, 0);
+  }
+
+  ctx.restore();
+}
+
+function drawConnection(conn, progress) {
+  const n1 = nodes[conn.from];
+  const n2 = nodes[conn.to];
+  const dx = n2.x - n1.x;
+  const dy = n2.y - n1.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const nx = dx / dist;
+  const ny = dy / dist;
+
+  const startX = n1.x + nx * n1.r;
+  const startY = n1.y + ny * n1.r;
+  const endX = n1.x + nx * (n1.r + (dist - n1.r - n2.r) * progress);
+  const endY = n1.y + ny * (n1.r + (dist - n1.r - n2.r) * progress);
+
+  ctx.strokeStyle = conn.color + '60';
+  ctx.lineWidth = 2;
+  if (conn.dotted) {
+    ctx.setLineDash([6, 6]);
+  } else {
+    ctx.setLineDash([]);
+  }
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw particles on completed connections
+  if (progress >= 1) {
+    conn.particles.forEach(p => {
+      ctx.fillStyle = conn.color;
+      ctx.globalAlpha = p.alpha;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  }
+}
+
+function updateParticles() {
+  connections.forEach(conn => {
+    if (connectionDraws[connections.indexOf(conn)] < 1) return;
+    const n1 = nodes[conn.from];
+    const n2 = nodes[conn.to];
+    const dx = n2.x - n1.x;
+    const dy = n2.y - n1.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    // Spawn new particle
+    if (Math.random() < 0.03) {
+      conn.particles.push({
+        x: n1.x + nx * n1.r,
+        y: n1.y + ny * n1.r,
+        progress: 0,
+        speed: 0.005 + Math.random() * 0.005,
+        alpha: 1
+      });
+    }
+
+    // Update particles
+    conn.particles = conn.particles.filter(p => {
+      p.progress += p.speed;
+      p.x = n1.x + nx * (n1.r + (dist - n1.r - n2.r) * p.progress);
+      p.y = n1.y + ny * (n1.r + (dist - n1.r - n2.r) * p.progress);
+      p.alpha = 1 - Math.abs(p.progress - 0.5) * 2;
+      return p.progress < 1;
+    });
+  });
+}
+
+function drawCenterPulse() {
+  const node = nodes[8];
+  const pulse = Math.sin(time * 0.003) * 0.3 + 0.7;
+
+  ctx.save();
+  ctx.translate(node.x, node.y);
+
+  // Outer ring
+  ctx.strokeStyle = '#a3e635' + Math.floor(pulse * 255).toString(16).padStart(2, '0');
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, node.r + 10 + pulse * 15, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Center glow
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, node.r * 3);
+  grad.addColorStop(0, '#a3e63530');
+  grad.addColorStop(1, 'transparent');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, node.r * 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawFlowParticle() {
+  if (!flowParticle || currentAct !== 3) return;
+
+  const conn = connections[flowParticle.connIndex];
+  const n1 = nodes[conn.from];
+  const n2 = nodes[conn.to];
+  const dx = n2.x - n1.x;
+  const dy = n2.y - n1.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const nx = dx / dist;
+  const ny = dy / dist;
+
+  const x = n1.x + nx * (n1.r + (dist - n1.r - n2.r) * flowParticle.progress);
+  const y = n1.y + ny * (n1.r + (dist - n1.r - n2.r) * flowParticle.progress);
+
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = conn.color;
+  ctx.shadowBlur = 20;
+  ctx.beginPath();
+  ctx.arc(x, y, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function animate() {
+  time += 16;
+  ctx.clearRect(0, 0, 800, 800);
+
+  // Background grid
+  ctx.strokeStyle = '#262626';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 800; i += 40) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i, 800);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, i);
+    ctx.lineTo(800, i);
+    ctx.stroke();
+  }
+
+  // Draw connections based on act
+  if (currentAct >= 1) {
+    connections.forEach((conn, i) => {
+      let targetProgress = 0;
+      if (currentAct === 1) targetProgress = 0;
+      else if (currentAct === 2) targetProgress = Math.min(1, connectionDraws[i] + 0.02);
+      else targetProgress = 1;
+      connectionDraws[i] = targetProgress;
+      drawConnection(conn, connectionDraws[i]);
+    });
+  }
+
+  // Draw nodes based on act
+  if (currentAct >= 1) {
+    nodes.forEach((node, i) => {
+      let targetAppear = 0;
+      if (currentAct === 1) {
+        targetAppear = Math.min(1, nodeAppearances[i] + 0.03);
+      } else {
+        targetAppear = 1;
+      }
+      nodeAppearances[i] = targetAppear;
+      const scale = 0.5 + nodeAppearances[i] * 0.5;
+      drawNode(node, nodeAppearances[i], scale);
+    });
+  }
+
+  // Center pulse when all nodes visible
+  if (currentAct >= 2 && nodeAppearances.every(n => n >= 1)) {
+    drawCenterPulse();
+  }
+
+  // Update and draw particles
+  if (currentAct >= 2) {
+    updateParticles();
+  }
+
+  // Flow particle for act 3
+  if (currentAct === 3) {
+    if (!flowParticle) {
+      flowParticle = { connIndex: 0, progress: 0 };
+    }
+    flowParticle.progress += 0.008;
+    if (flowParticle.progress >= 1) {
+      flowParticle.connIndex = (flowParticle.connIndex + 1) % 7;
+      flowParticle.progress = 0;
+    }
+    drawFlowParticle();
+  } else {
+    flowParticle = null;
+  }
+
+  // All-active radiating particles for act 3
+  if (currentAct === 3) {
+    // Radiate from center to all nodes
+    nodes.forEach((node, i) => {
+      if (i === 8) return;
+      const dx = node.x - 400;
+      const dy = node.y - 400;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const nx = dx / dist;
+      const ny = dy / dist;
+      const p = (time * 0.002 + i * 0.3) % 1;
+      const x = 400 + nx * dist * p;
+      const y = 400 + ny * dist * p;
+      ctx.fillStyle = '#9D50DD';
+      ctx.globalAlpha = 1 - Math.abs(p - 0.5) * 2;
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  animFrame = requestAnimationFrame(animate);
+}
+
+animate();
+startTimer();
+</script>
+</body>
+</html>

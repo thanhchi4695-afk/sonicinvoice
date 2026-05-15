@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — The Import Engine</title>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --lime: #a3e635;
+  --purple: #9D50DD;
+  --green: #00CA72;
+  --orange: #FDAB3D;
+  --blue: #0086C0;
+  --text: #f5f5f5;
+  --muted: #737373;
+  --card: #141414;
+  --border: #262626;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+#stage {
+  width: 800px;
+  height: 800px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.8);
+}
+
+/* Typography */
+.headline { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.label { font-size: 12px; font-weight: 600; color: var(--muted); }
+
+/* Acts */
+.act {
+  position: absolute;
+  inset: 0;
+  padding: 48px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.act.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+/* Spring entrance */
+.spring-in {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  animation: springIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes springIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Stagger children */
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
+.stagger-8 { animation-delay: 840ms; }
+
+/* Monday.com board rows */
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.board-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 8px 0 0 8px;
+}
+.row-purple::before { background: var(--purple); }
+.row-green::before { background: var(--green); }
+.row-orange::before { background: var(--orange); }
+.row-blue::before { background: var(--blue); }
+.row-lime::before { background: var(--lime); }
+
+.row-icon {
+  width: 32px; height: 32px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.row-content { flex: 1; }
+.row-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.row-sub { font-size: 12px; color: var(--muted); }
+
+/* Status pills */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.pill-purple { background: rgba(157,80,221,0.15); color: var(--purple); }
+.pill-green { background: rgba(0,202,114,0.15); color: var(--green); }
+.pill-orange { background: rgba(253,171,61,0.15); color: var(--orange); }
+.pill-blue { background: rgba(0,134,192,0.15); color: var(--blue); }
+.pill-lime { background: rgba(163,230,53,0.15); color: var(--lime); }
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+.pill-purple .pill-dot { background: var(--purple); }
+.pill-green .pill-dot { background: var(--green); }
+.pill-orange .pill-dot { background: var(--orange); }
+.pill-blue .pill-dot { background: var(--blue); }
+.pill-lime .pill-dot { background: var(--lime); }
+
+/* Bento cards */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 24px;
+}
+.bento-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.bento-card-wide { grid-column: span 2; }
+.bento-card-tall { grid-row: span 2; }
+.bento-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.bento-value { font-size: 28px; font-weight: 800; color: var(--text); font-family: Georgia, serif; }
+.bento-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* Progress bar */
+#progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--border);
+}
+#progress-fill {
+  height: 100%;
+  background: var(--lime);
+  width: 0%;
+  transition: width 0.3s linear;
+}
+
+/* Controls */
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#play-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+#play-btn:hover { border-color: var(--lime); color: var(--lime); }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--lime); transform: scale(1.3); }
+
+/* Specific visual elements */
+.email-float {
+  position: absolute;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+.tag-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.tag {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.tag-brand { border-color: var(--purple); color: var(--purple); }
+.tag-type { border-color: var(--blue); color: var(--blue); }
+.tag-colour { border-color: var(--orange); color: var(--orange); }
+.tag-feature { border-color: var(--green); color: var(--green); }
+.tag-season { border-color: var(--lime); color: var(--lime); }
+
+.scan-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: var(--lime);
+  box-shadow: 0 0 20px var(--lime);
+  opacity: 0.6;
+  animation: scan 2s ease-in-out infinite;
+}
+@keyframes scan {
+  0% { top: 0; opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.shopify-pulse {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  background: var(--green);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  position: relative;
+}
+.shopify-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid var(--green);
+  opacity: 0;
+  animation: pulseRing 2s ease-out infinite;
+}
+@keyframes pulseRing {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+.time-comparison {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 32px;
+  justify-content: center;
+}
+.time-box {
+  text-align: center;
+  padding: 24px 32px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+.time-box.old { border-color: var(--orange); }
+.time-box.new { border-color: var(--lime); background: rgba(163,230,53,0.05); }
+.time-num { font-size: 48px; font-weight: 800; font-family: Georgia, serif; }
+.time-box.old .time-num { color: var(--orange); }
+.time-box.new .time-num { color: var(--lime); }
+.time-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.time-arrow {
+  font-size: 32px;
+  color: var(--lime);
+  animation: bounceArrow 1s ease-in-out infinite;
+}
+@keyframes bounceArrow {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(8px); }
+}
+
+/* Logo lockup */
+.logo-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.logo-icon {
+  width: 40px; height: 40px;
+  background: var(--lime);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.logo-text {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.03em;
+}
+
+/* Particles */
+.particle {
+  position: absolute;
+  width: 4px; height: 4px;
+  background: var(--lime);
+  border-radius: 50%;
+  opacity: 0.3;
+  animation: float 6s ease-in-out infinite;
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  33% { transform: translateY(-20px) translateX(10px); }
+  66% { transform: translateY(10px) translateX(-10px); }
+}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <!-- Decorative particles -->
+  <div class="particle" style="top:10%;left:15%;animation-delay:0s"></div>
+  <div class="particle" style="top:30%;left:80%;animation-delay:1s"></div>
+  <div class="particle" style="top:70%;left:20%;animation-delay:2s"></div>
+  <div class="particle" style="top:85%;left:70%;animation-delay:3s"></div>
+
+  <!-- ACT 1: Title -->
+  <div class="act active" data-act="0">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+      <div class="spring-in stagger-1 logo-lockup" style="justify-content:center;margin-bottom:24px;">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">Sonic Invoices</div>
+      </div>
+      <div class="spring-in stagger-2 headline" style="font-size:56px;color:var(--text);margin-bottom:16px;line-height:1.1;">
+        The Import<br>Engine
+      </div>
+      <div class="spring-in stagger-3" style="font-size:18px;color:var(--muted);max-width:480px;line-height:1.5;">
+        AI-powered invoice parsing for Australian boutique retailers
+      </div>
+      <div class="spring-in stagger-4" style="margin-top:40px;display:flex;gap:12px;">
+        <span class="pill pill-lime"><span class="pill-dot"></span>Import</span>
+        <span class="pill pill-purple"><span class="pill-dot"></span>Parse</span>
+        <span class="pill pill-green"><span class="pill-dot"></span>Push</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 2: Invoice Arrives -->
+  <div class="act" data-act="1">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">01 — Invoice Arrives</div>
+    <div class="spring-in stagger-2 headline" style="font-size:36px;color:var(--text);margin-bottom:32px;">
+      Supplier invoice lands<br>in your inbox
+    </div>
+    <div style="position:relative;height:320px;">
+      <div class="email-float spring-in stagger-3" style="top:0;left:0;width:320px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div style="width:32px;height:32px;background:var(--purple);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;">📎</div>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">Seafolly_Invoice_June.pdf</div>
+            <div style="font-size:12px;color:var(--muted);">2.4 MB • 47 products</div>
+          </div>
+        </div>
+        <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;">
+          <div style="width:100%;height:100%;background:var(--purple);animation:loadBar 1.5s ease-out forwards;"></div>
+        </div>
+      </div>
+      <div class="email-float spring-in stagger-4" style="top:40px;left:200px;width:280px;opacity:0.7;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;">📎</div>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">BondEye_PackingSlip.pdf</div>
+            <div style="font-size:12px;color:var(--muted);">1.1 MB • 23 products</div>
+          </div>
+        </div>
+      </div>
+      <div class="email-float spring-in stagger-5" style="top:120px;left:80px;width:300px;opacity:0.5;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;background:var(--orange);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;">📎</div>
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);">KulaniKinis_Order.xlsx</div>
+            <div style="font-size:12px;color:var(--muted);">856 KB • 31 products</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <style>@keyframes loadBar { from { width:0; } to { width:100%; } }</style>
+    <div class="spring-in stagger-6" style="margin-top:24px;">
+      <div class="board-row row-purple">
+        <div class="row-icon" style="background:rgba(157,80,221,0.15);">🤖</div>
+        <div class="row-content">
+          <div class="row-title">AI Detection Active</div>
+          <div class="row-sub">Monitoring inbox for supplier attachments</div>
+        </div>
+        <span class="pill pill-purple"><span class="pill-dot"></span>Scanning</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 3: AI Parsing -->
+  <div class="act" data-act="2">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">02 — AI Parsing</div>
+    <div class="spring-in stagger-2 headline" style="font-size:36px;color:var(--text);margin-bottom:24px;">
+      Every product extracted<br>in seconds
+    </div>
+    <div style="position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;overflow:hidden;height:360px;">
+      <div class="scan-line"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;position:relative;z-index:2;">
+        <div class="board-row row-blue spring-in stagger-2" style="margin-bottom:6px;">
+          <div class="row-icon" style="background:rgba(0,134,192,0.15);">1</div>
+          <div class="row-content">
+            <div class="row-title">Seafolly • Riviera One Piece • Teal • $129.00</div>
+            <div class="row-sub">SKU: SEA-RP-TL-12 • D-G Cup • UPF 50</div>
+          </div>
+          <span class="pill pill-green"><span class="pill-dot"></span>Extracted</span>
+        </div>
+        <div class="board-row row-blue spring-in stagger-3" style="margin-bottom:6px;">
+          <div class="row-icon" style="background:rgba(0,134,192,0.15);">2</div>
+          <div class="row-content">
+            <div class="row-title">Kulani Kinis • Malibu Bikini Top • Coral • $89.00</div>
+            <div class="row-sub">SKU: KK-MT-CR-10 • Underwire • Recycled</div>
+          </div>
+          <span class="pill pill-green"><span class="pill-dot"></span>Extracted</span>
+        </div>
+        <div class="board-row row-blue spring-in stagger-4" style="margin-bottom:6px;">
+          <div class="row-icon" style="background:rgba(0,134,192,0.15);">3</div>
+          <div class="row-content">
+            <div class="row-title">Bond-Eye • Sahara Dress • Black • $145.00</div>
+            <div class="row-sub">SKU: BE-SD-BK-S • Tummy Control • Resort</div>
+          </div>
+          <span class="pill pill-green"><span class="pill-dot"></span>Extracted</span>
+        </div>
+        <div class="board-row row-orange spring-in stagger-5" style="margin-bottom:6px;opacity:0.6;">
+          <div class="row-icon" style="background:rgba(253,171,61,0.15);">...</div>
+          <div class="row-content">
+            <div class="row-title">+ 44 more products parsed</div>
+          </div>
+          <span class="pill pill-orange"><span class="pill-dot"></span>Processing</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 4: 7-Layer Tagging -->
+  <div class="act" data-act="3">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">03 — 7-Layer Tagging</div>
+    <div class="spring-in stagger-2 headline" style="font-size:36px;color:var(--text);margin-bottom:24px;">
+      Automatic taxonomy<br>applied to every SKU
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:16px;">
+      <div class="spring-in stagger-2" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:200px;">
+        <div class="bento-label">Brand</div>
+        <div class="tag-cluster">
+          <span class="tag tag-brand">seafolly</span>
+          <span class="tag tag-brand">kulani-kinis</span>
+          <span class="tag tag-brand">bond-eye</span>
+        </div>
+      </div>
+      <div class="spring-in stagger-3" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:200px;">
+        <div class="bento-label">Type</div>
+        <div class="tag-cluster">
+          <span class="tag tag-type">bikini-top</span>
+          <span class="tag tag-type">one-piece</span>
+          <span class="tag tag-type">dress</span>
+        </div>
+      </div>
+      <div class="spring-in stagger-4" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:200px;">
+        <div class="bento-label">Colour</div>
+        <div class="tag-cluster">
+          <span class="tag tag-colour">teal</span>
+          <span class="tag tag-colour">coral</span>
+          <span class="tag tag-colour">black</span>
+        </div>
+      </div>
+      <div class="spring-in stagger-5" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:200px;">
+        <div class="bento-label">Feature</div>
+        <div class="tag-cluster">
+          <span class="tag tag-feature">underwire</span>
+          <span class="tag tag-feature">d-g</span>
+          <span class="tag tag-feature">upf-50</span>
+        </div>
+      </div>
+      <div class="spring-in stagger-6" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:200px;">
+        <div class="bento-label">Season</div>
+        <div class="tag-cluster">
+          <span class="tag tag-season">spring-26</span>
+          <span class="tag tag-season">summer-26</span>
+        </div>
+      </div>
+      <div class="spring-in stagger-7" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:200px;">
+        <div class="bento-label">Occasion</div>
+        <div class="tag-cluster">
+          <span class="tag tag-season">beach</span>
+          <span class="tag tag-season">resort</span>
+          <span class="tag tag-season">bridal</span>
+        </div>
+      </div>
+      <div class="spring-in stagger-8" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:200px;border-color:var(--lime);">
+        <div class="bento-label" style="color:var(--lime);">Arriving</div>
+        <div class="tag-cluster">
+          <span class="tag" style="border-color:var(--lime);color:var(--lime);">arriving-jun-2026</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 5: Product Cards -->
+  <div class="act" data-act="4">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">04 — Product Assembly</div>
+    <div class="spring-in stagger-2 headline" style="font-size:36px;color:var(--text);margin-bottom:32px;">
+      Rich product cards<br>built automatically
+    </div>
+    <div class="bento-grid">
+      <div class="bento-card bento-card-wide spring-in stagger-2">
+        <div class="bento-label">Product Title</div>
+        <div style="font-size:16px;color:var(--text);font-weight:600;line-height:1.4;margin-top:8px;">
+          Seafolly Riviera One Piece Swimsuit — Teal D-G Cup Underwire UPF 50+
+        </div>
+        <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;">
+          <span class="pill pill-purple"><span class="pill-dot"></span>seafolly</span>
+          <span class="pill pill-blue"><span class="pill-dot"></span>one-piece</span>
+          <span class="pill pill-orange"><span class="pill-dot"></span>teal</span>
+          <span class="pill pill-green"><span class="pill-dot"></span>d-g</span>
+          <span class="pill pill-lime"><span class="pill-dot"></span>upf-50</span>
+        </div>
+      </div>
+      <div class="bento-card spring-in stagger-3">
+        <div class="bento-label">Price</div>
+        <div class="bento-value" style="color:var(--lime);">$129.00</div>
+        <div class="bento-sub">Wholesale: $64.50</div>
+      </div>
+      <div class="bento-card spring-in stagger-4">
+        <div class="bento-label">Margin</div>
+        <div class="bento-value" style="color:var(--green);">50%</div>
+        <div class="bento-sub">Protected by auto-pricing</div>
+      </div>
+      <div class="bento-card spring-in stagger-5">
+        <div class="bento-label">Inventory</div>
+        <div class="bento-value">47</div>
+        <div class="bento-sub">Units incoming June</div>
+      </div>
+      <div class="bento-card spring-in stagger-6">
+        <div class="bento-label">SEO Score</div>
+        <div class="bento-value" style="color:var(--purple);">94</div>
+        <div class="bento-sub">/ 100 — Excellent</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 6: Push to Shopify -->
+  <div class="act" data-act="5">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">05 — Live Push</div>
+    <div class="spring-in stagger-2 headline" style="font-size:36px;color:var(--text);margin-bottom:40px;text-align:center;">
+      Products go live<br>in Shopify
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:40px;margin-top:40px;">
+      <div class="spring-in stagger-3" style="text-align:center;">
+        <div style="width:80px;height:80px;background:var(--card);border:1px solid var(--border);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:32px;">
+          ⚡
+        </div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);">Sonic Invoices</div>
+        <div style="font-size:12px;color:var(--muted);">47 products ready</div>
+      </div>
+      <div class="spring-in stagger-4" style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+        <div style="width:120px;height:2px;background:var(--border);position:relative;overflow:hidden;">
+          <div style="position:absolute;left:0;top:0;bottom:0;width:100%;background:var(--lime);animation:stream 1.2s linear infinite;"></div>
+        </div>
+        <div class="mono" style="color:var(--lime);font-size:11px;">SYNCING</div>
+        <style>@keyframes stream { from { transform:translateX(-100%); } to { transform:translateX(100%); } }</style>
+      </div>
+      <div class="spring-in stagger-5" style="text-align:center;">
+        <div class="shopify-pulse" style="margin:0 auto 12px;">
+          🛒
+        </div>
+        <div style="font-size:14px;font-weight:600;color:var(--text);">Shopify</div>
+        <div style="font-size:12px;color:var(--muted);">Live store</div>
+      </div>
+    </div>
+    <div class="spring-in stagger-6" style="margin-top:48px;">
+      <div class="board-row row-green">
+        <div class="row-icon" style="background:rgba(0,202,114,0.15);">✓</div>
+        <div class="row-content">
+          <div class="row-title">Sync Complete</div>
+          <div class="row-sub">47 products • 12 collections updated • SEO scores generated</div>
+        </div>
+        <span class="pill pill-green"><span class="pill-dot"></span>Live</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 7: Time Comparison -->
+  <div class="act" data-act="6">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:24px;">06 — The Difference</div>
+    <div class="spring-in stagger-2 headline" style="font-size:36px;color:var(--text);margin-bottom:16px;text-align:center;">
+      What took hours<br>now takes minutes
+    </div>
+    <div class="time-comparison">
+      <div class="time-box old spring-in stagger-3">
+        <div class="time-num">2 hrs</div>
+        <div class="time-label">Manual entry</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--orange);">Copy • Paste • Format • Tag • Upload</div>
+      </div>
+      <div class="time-arrow spring-in stagger-4">→</div>
+      <div class="time-box new spring-in stagger-5">
+        <div class="time-num">15 min</div>
+        <div class="time-label">Sonic Invoices</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--lime);">Parse • Tag • Optimise • Push • Rank</div>
+      </div>
+    </div>
+    <div class="spring-in stagger-6" style="margin-top:40px;text-align:center;">
+      <div style="display:inline-flex;gap:24px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 32px;">
+        <div>
+          <div style="font-size:24px;font-weight:800;color:var(--lime);font-family:Georgia,serif;">8×</div>
+          <div style="font-size:11px;color:var(--muted);">Faster</div>
+        </div>
+        <div style="width:1px;height:32px;background:var(--border);"></div>
+        <div>
+          <div style="font-size:24px;font-weight:800;color:var(--lime);font-family:Georgia,serif;">0</div>
+          <div style="font-size:11px;color:var(--muted);">Errors</div>
+        </div>
+        <div style="width:1px;height:32px;background:var(--border);"></div>
+        <div>
+          <div style="font-size:24px;font-weight:800;color:var(--lime);font-family:Georgia,serif;">100%</div>
+          <div style="font-size:11px;color:var(--muted);">Tagged</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACT 8: CTA -->
+  <div class="act" data-act="7">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+      <div class="spring-in stagger-1 logo-lockup" style="justify-content:center;margin-bottom:32px;">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">Sonic Invoices</div>
+      </div>
+      <div class="spring-in stagger-2 headline" style="font-size:48px;color:var(--text);margin-bottom:16px;">
+        Turn invoices into<br>revenue — instantly
+      </div>
+      <div class="spring-in stagger-3" style="font-size:16px;color:var(--muted);max-width:440px;line-height:1.6;margin-bottom:40px;">
+        AI parsing. 7-layer tagging. Automatic Shopify sync. Built for Australian boutique retailers.
+      </div>
+      <div class="spring-in stagger-4" style="display:flex;gap:12px;">
+        <span class="pill pill-lime"><span class="pill-dot"></span>Import</span>
+        <span class="pill pill-purple"><span class="pill-dot"></span>Automate</span>
+        <span class="pill pill-green"><span class="pill-dot"></span>Rank</span>
+      </div>
+      <div class="spring-in stagger-5 mono" style="margin-top:48px;color:var(--muted);">
+        sonicinvoices.com
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress & Controls -->
+  <div id="progress-wrap"><div id="progress-fill"></div></div>
+  <div id="controls">
+    <button id="play-btn" onclick="togglePlay()">⏸</button>
+    <div id="dots"></div>
+  </div>
+</div>
+
+<script>
+const ACT_DURATION = 15000; // 15 seconds per act
+const TOTAL_ACTS = 8;
+let currentAct = 0;
+let isPlaying = true;
+let timer = null;
+let progressTimer = null;
+let progressStart = 0;
+
+const dotsContainer = document.getElementById('dots');
+for (let i = 0; i < TOTAL_ACTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goToAct(i);
+  dotsContainer.appendChild(d);
+}
+
+function showAct(index) {
+  document.querySelectorAll('.act').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  document.querySelectorAll('.dot').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  currentAct = index;
+  updateProgress(0);
+}
+
+function updateProgress(pct) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+function nextAct() {
+  if (currentAct < TOTAL_ACTS - 1) {
+    goToAct(currentAct + 1);
+  } else {
+    goToAct(0); // loop
+  }
+}
+
+function goToAct(index) {
+  showAct(index);
+  if (isPlaying) startTimer();
+}
+
+function startTimer() {
+  clearInterval(timer);
+  clearInterval(progressTimer);
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    const pct = Math.min((elapsed / ACT_DURATION) * 100, 100);
+    updateProgress(pct);
+  }, 50);
+  timer = setTimeout(nextAct, ACT_DURATION);
+}
+
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) {
+    startTimer();
+  } else {
+    clearTimeout(timer);
+    clearInterval(progressTimer);
+  }
+}
+
+// Keyboard nav
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') goToAct(Math.min(currentAct + 1, TOTAL_ACTS - 1));
+  if (e.key === 'ArrowLeft') goToAct(Math.max(currentAct - 1, 0));
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+
+// Init
+startTimer();
+</script>
+</body>
+</html>

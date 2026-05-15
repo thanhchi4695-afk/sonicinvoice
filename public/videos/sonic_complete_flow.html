@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Complete Flow</title>
+<style>
+:root {
+  --bg: #0a0a0a;
+  --lime: #a3e635;
+  --purple: #9D50DD;
+  --green: #00CA72;
+  --orange: #FDAB3D;
+  --blue: #0086C0;
+  --teal: #14b8a6;
+  --pink: #ec4899;
+  --red: #E54D4D;
+  --text: #f5f5f5;
+  --muted: #737373;
+  --card: #141414;
+  --border: #262626;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+#stage {
+  width: 800px;
+  height: 800px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.8);
+}
+.headline { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', Monaco, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.act {
+  position: absolute;
+  inset: 0;
+  padding: 48px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  flex-direction: column;
+}
+.act.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.spring-in {
+  opacity: 0;
+  transform: translateY(40px) scale(0.96);
+  animation: springIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes springIn {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 120ms; }
+.stagger-3 { animation-delay: 240ms; }
+.stagger-4 { animation-delay: 360ms; }
+.stagger-5 { animation-delay: 480ms; }
+.stagger-6 { animation-delay: 600ms; }
+.stagger-7 { animation-delay: 720ms; }
+.stagger-8 { animation-delay: 840ms; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pill-purple { background: rgba(157,80,221,0.15); color: var(--purple); }
+.pill-green { background: rgba(0,202,114,0.15); color: var(--green); }
+.pill-orange { background: rgba(253,171,61,0.15); color: var(--orange); }
+.pill-blue { background: rgba(0,134,192,0.15); color: var(--blue); }
+.pill-lime { background: rgba(163,230,53,0.15); color: var(--lime); }
+.pill-teal { background: rgba(20,184,166,0.15); color: var(--teal); }
+.pill-pink { background: rgba(236,72,153,0.15); color: var(--pink); }
+.pill-red { background: rgba(229,77,77,0.15); color: var(--red); }
+.pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.board-row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 8px 0 0 8px;
+}
+.row-purple::before { background: var(--purple); }
+.row-green::before { background: var(--green); }
+.row-orange::before { background: var(--orange); }
+.row-blue::before { background: var(--blue); }
+.row-lime::before { background: var(--lime); }
+.row-teal::before { background: var(--teal); }
+.row-pink::before { background: var(--pink); }
+.row-red::before { background: var(--red); }
+
+#progress-wrap {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--border);
+}
+#progress-fill {
+  height: 100%;
+  background: var(--lime);
+  width: 0%;
+  transition: width 0.3s linear;
+}
+#controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  z-index: 100;
+}
+#play-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+#play-btn:hover { border-color: var(--lime); color: var(--lime); }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.dot.active { background: var(--lime); transform: scale(1.3); }
+
+.flow-arrow {
+  text-align: center;
+  font-size: 20px;
+  color: var(--lime);
+  margin: 4px 0;
+  animation: bounceDown 1s ease-in-out infinite;
+}
+@keyframes bounceDown {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  flex: 1;
+}
+.stat-num {
+  font-size: 32px;
+  font-weight: 800;
+  font-family: Georgia, serif;
+  color: var(--lime);
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.logo-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo-icon {
+  width: 40px; height: 40px;
+  background: var(--lime);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.logo-text {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.03em;
+}
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- ACT 1: Problem -->
+<div class="act active" data-act="0">
+  <div class="spring-in stagger-1 mono" style="color:var(--red);margin-bottom:16px;">Act 1 — The Problem</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:20px;">Australian boutique retail in 2025</div>
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <div class="board-row row-red spring-in stagger-3">
+      <div style="font-size:20px;margin-right:4px;">📄</div>
+      <div style="flex:1;font-size:14px;color:var(--text);">Invoice arrives — 40 products — Monday 8am</div>
+    </div>
+    <div class="board-row row-red spring-in stagger-4">
+      <div style="font-size:20px;margin-right:4px;">⏰</div>
+      <div style="flex:1;font-size:14px;color:var(--text);">Manual entry — estimated 2 hours — error-prone</div>
+    </div>
+    <div class="board-row row-red spring-in stagger-5">
+      <div style="font-size:20px;margin-right:4px;">🔍</div>
+      <div style="flex:1;font-size:14px;color:var(--text);">Google — store invisible — competitors ranking #1</div>
+    </div>
+  </div>
+</div>
+
+<!-- ACT 2: Import -->
+<div class="act" data-act="1">
+  <div class="spring-in stagger-1 mono" style="color:var(--orange);margin-bottom:16px;">Act 2 — Step 1: Import</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:16px;">Invoice → AI Parse</div>
+  <div class="board-row row-orange spring-in stagger-3">
+    <div style="font-size:20px;margin-right:4px;">📄</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">Invoice received</div>
+      <div style="font-size:12px;color:var(--muted);">Kulani Kinis · 40 products</div>
+    </div>
+    <span class="pill pill-orange">Processing</span>
+  </div>
+  <div class="flow-arrow spring-in stagger-4">↓</div>
+  <div class="board-row row-green spring-in stagger-5">
+    <div style="font-size:20px;margin-right:4px;">✓</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">AI parsed</div>
+      <div style="font-size:12px;color:var(--muted);">40 products extracted · 12 seconds</div>
+    </div>
+    <span class="pill pill-green">Done ✓</span>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:12px;text-align:right;font-size:12px;color:var(--muted);">⏱ 12 seconds</div>
+</div>
+
+<!-- ACT 3: Tag -->
+<div class="act" data-act="2">
+  <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 3 — Step 2: Tag</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:16px;">7 layers applied</div>
+  <div class="board-row row-purple spring-in stagger-3">
+    <div style="font-size:20px;margin-right:4px;">🏷</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">Auto-tagging</div>
+      <div style="font-size:12px;color:var(--muted);">7 layers applied to 40 products</div>
+    </div>
+    <span class="pill pill-purple">Running</span>
+  </div>
+  <div class="flow-arrow spring-in stagger-4">↓</div>
+  <div class="board-row row-green spring-in stagger-5">
+    <div style="font-size:20px;margin-right:4px;">✓</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">Tagged</div>
+      <div style="font-size:12px;color:var(--muted);">280 tags · brand · type · colour · season · arriving</div>
+    </div>
+    <span class="pill pill-green">Done ✓</span>
+  </div>
+  <div class="spring-in stagger-6" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+    <span class="pill pill-purple">seafolly</span>
+    <span class="pill pill-blue">bikini-top</span>
+    <span class="pill pill-orange">teal</span>
+    <span class="pill pill-green">d-g</span>
+    <span class="pill pill-teal">spring-26</span>
+    <span class="pill pill-pink">beach</span>
+    <span class="pill pill-lime">arriving-jun-2026</span>
+  </div>
+  <div class="spring-in stagger-7" style="margin-top:12px;text-align:right;font-size:12px;color:var(--muted);">⏱ 8 seconds</div>
+</div>
+
+<!-- ACT 4: Push -->
+<div class="act" data-act="3">
+  <div class="spring-in stagger-1 mono" style="color:var(--blue);margin-bottom:16px;">Act 4 — Step 3: Push</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:16px;">Live in Shopify</div>
+  <div class="board-row row-blue spring-in stagger-3">
+    <div style="font-size:20px;margin-right:4px;">🛍</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">Push to Shopify</div>
+      <div style="font-size:12px;color:var(--muted);">testing-d9eimunn.myshopify.com</div>
+    </div>
+    <span class="pill pill-blue">Uploading</span>
+  </div>
+  <div style="margin:8px 24px;">
+    <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;">
+      <div style="height:100%;width:0%;background:var(--blue);animation:uploadBar 1.5s ease-out forwards;"></div>
+    </div>
+  </div>
+  <div class="flow-arrow spring-in stagger-5">↓</div>
+  <div class="board-row row-green spring-in stagger-6">
+    <div style="font-size:20px;margin-right:4px;">✓</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">Live in Shopify</div>
+      <div style="font-size:12px;color:var(--muted);">40 products · smart collections updated · tags indexed</div>
+    </div>
+    <span class="pill pill-green">Done ✓</span>
+  </div>
+  <div class="spring-in stagger-7" style="margin-top:12px;text-align:right;font-size:12px;color:var(--muted);">⏱ 45 seconds</div>
+  <style>@keyframes uploadBar { to { width: 100%; } }</style>
+</div>
+
+<!-- ACT 5: Build Collections -->
+<div class="act" data-act="4">
+  <div class="spring-in stagger-1 mono" style="color:var(--teal);margin-bottom:16px;">Act 5 — Step 4: Build</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:16px;">SEO collections created</div>
+  <div class="board-row row-teal spring-in stagger-3">
+    <div style="font-size:20px;margin-right:4px;">📂</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">SEO collections built</div>
+      <div style="font-size:12px;color:var(--muted);">Sonic Rank engine running</div>
+    </div>
+    <span class="pill pill-teal">Building</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;margin-left:24px;">
+    <div class="board-row row-green spring-in stagger-4" style="margin-bottom:0;padding:8px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/collections/kulani-kinis</div>
+      <span class="pill pill-green" style="font-size:10px;">✓ Brand</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-5" style="margin-bottom:0;padding:8px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/collections/kulani-kinis-bikini-tops</div>
+      <span class="pill pill-green" style="font-size:10px;">✓ Brand+Type</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-6" style="margin-bottom:0;padding:8px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/collections/teal-swimwear</div>
+      <span class="pill pill-green" style="font-size:10px;">✓ Colour</span>
+    </div>
+    <div class="board-row row-green spring-in stagger-7" style="margin-bottom:0;padding:8px 12px;">
+      <div style="font-size:12px;color:var(--text);flex:1;">/collections/beach-swimwear</div>
+      <span class="pill pill-green" style="font-size:10px;">✓ Occasion</span>
+    </div>
+  </div>
+  <div class="spring-in stagger-8" style="margin-top:12px;text-align:right;font-size:12px;color:var(--muted);">4 new collections created automatically</div>
+</div>
+
+<!-- ACT 6: Generate SEO -->
+<div class="act" data-act="5">
+  <div class="spring-in stagger-1 mono" style="color:var(--pink);margin-bottom:16px;">Act 5 — Step 5: SEO</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:16px;">Content generated</div>
+  <div class="board-row row-pink spring-in stagger-3">
+    <div style="font-size:20px;margin-right:4px;">✍️</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">SEO content generated</div>
+      <div style="font-size:12px;color:var(--muted);">title · meta · description · FAQ · links</div>
+    </div>
+    <span class="pill pill-pink">Writing</span>
+  </div>
+  <div style="margin:12px 24px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Typing...</div>
+    <div style="font-size:12px;color:var(--text);line-height:1.5;">
+      Splash Swimwear is Darwin's home of Kulani Kinis — stocking the full Spring 2026 range including the Soft Knot Halter, Malibu Triangle, and mix-and-match separates...
+    </div>
+  </div>
+  <div class="flow-arrow spring-in stagger-5">↓</div>
+  <div class="board-row row-green spring-in stagger-6">
+    <div style="font-size:20px;margin-right:4px;">✓</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">SEO Score</div>
+      <div style="font-size:12px;color:var(--muted);">0/100 → 100/100</div>
+    </div>
+    <span class="pill pill-green">Done ✓</span>
+  </div>
+  <div class="spring-in stagger-7" style="margin-top:12px;text-align:right;font-size:12px;color:var(--muted);">⏱ 23 seconds · 5 elements · Google-ready</div>
+</div>
+
+<!-- ACT 7: Rank -->
+<div class="act" data-act="6">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 7 — Step 6: Rank</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:16px;">Google #1</div>
+  <div class="board-row row-lime spring-in stagger-3">
+    <div style="font-size:20px;margin-right:4px;">👑</div>
+    <div style="flex:1;">
+      <div style="font-size:14px;font-weight:600;color:var(--text);">Google ranking</div>
+      <div style="font-size:12px;color:var(--muted);">"kulani kinis swimwear darwin"</div>
+    </div>
+    <span class="pill pill-lime">Climbing</span>
+  </div>
+  <div class="spring-in stagger-4" style="text-align:center;margin:16px 0;">
+    <div style="display:inline-flex;align-items:center;gap:16px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 32px;">
+      <div style="text-align:center;">
+        <div style="font-size:14px;color:var(--muted);">Day 1</div>
+        <div style="font-size:28px;font-weight:800;color:var(--orange);font-family:Georgia,serif;">#8</div>
+      </div>
+      <div style="font-size:20px;color:var(--lime);">→</div>
+      <div style="text-align:center;">
+        <div style="font-size:14px;color:var(--muted);">Day 7</div>
+        <div style="font-size:28px;font-weight:800;color:var(--blue);font-family:Georgia,serif;">#3</div>
+      </div>
+      <div style="font-size:20px;color:var(--lime);">→</div>
+      <div style="text-align:center;">
+        <div style="font-size:14px;color:var(--muted);">Day 30</div>
+        <div style="font-size:28px;font-weight:800;color:var(--lime);font-family:Georgia,serif;">#1</div>
+      </div>
+    </div>
+  </div>
+  <div class="spring-in stagger-5" style="text-align:center;font-size:12px;color:var(--muted);">
+    Organic traffic filling upward · Darwin · Kulani Kinis
+  </div>
+</div>
+
+<!-- ACT 8: The Numbers -->
+<div class="act" data-act="7">
+  <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:16px;">Act 8 — The Numbers</div>
+  <div class="spring-in stagger-2 headline" style="font-size:28px;color:var(--text);margin-bottom:24px;text-align:center;">Invoice to Google #1</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+    <div class="stat-card spring-in stagger-3">
+      <div class="stat-num">14 min</div>
+      <div class="stat-label">vs 2 hours manual</div>
+      <div style="font-size:11px;color:var(--lime);margin-top:4px;">87% faster</div>
+    </div>
+    <div class="stat-card spring-in stagger-4">
+      <div class="stat-num">280</div>
+      <div class="stat-label">tags applied</div>
+      <div style="font-size:11px;color:var(--lime);margin-top:4px;">Automatically</div>
+    </div>
+    <div class="stat-card spring-in stagger-5">
+      <div class="stat-num">4</div>
+      <div class="stat-label">collections built</div>
+      <div style="font-size:11px;color:var(--lime);margin-top:4px;">SEO-optimised</div>
+    </div>
+    <div class="stat-card spring-in stagger-6">
+      <div class="stat-num">#1</div>
+      <div class="stat-label">Google rank</div>
+      <div style="font-size:11px;color:var(--lime);margin-top:4px;">Organic</div>
+    </div>
+  </div>
+  <div class="spring-in stagger-7" style="margin-top:32px;text-align:center;">
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+      <div style="width:32px;height:32px;background:var(--lime);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">⚡</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text);">Sonic Invoices</div>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--muted);">Import · Automate · Rank</div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="progress-wrap"><div id="progress-fill"></div></div>
+<div id="controls">
+  <button id="play-btn" onclick="togglePlay()">⏸</button>
+  <div id="dots"></div>
+</div>
+</div>
+
+<script>
+const ACT_DURATION = 15000;
+const TOTAL_ACTS = 8;
+let currentAct = 0;
+let isPlaying = true;
+let timer = null;
+let progressTimer = null;
+let progressStart = 0;
+
+const dotsContainer = document.getElementById('dots');
+for (let i = 0; i < TOTAL_ACTS; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.onclick = () => goToAct(i);
+  dotsContainer.appendChild(d);
+}
+
+function showAct(index) {
+  document.querySelectorAll('.act').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  document.querySelectorAll('.dot').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+  currentAct = index;
+  updateProgress(0);
+}
+function updateProgress(pct) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+function nextAct() {
+  if (currentAct < TOTAL_ACTS - 1) goToAct(currentAct + 1);
+  else goToAct(0);
+}
+function goToAct(index) {
+  showAct(index);
+  if (isPlaying) startTimer();
+}
+function startTimer() {
+  clearInterval(timer);
+  clearInterval(progressTimer);
+  progressStart = Date.now();
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - progressStart;
+    updateProgress(Math.min((elapsed / ACT_DURATION) * 100, 100));
+  }, 50);
+  timer = setTimeout(nextAct, ACT_DURATION);
+}
+function togglePlay() {
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) startTimer();
+  else { clearTimeout(timer); clearInterval(progressTimer); }
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') goToAct(Math.min(currentAct + 1, TOTAL_ACTS - 1));
+  if (e.key === 'ArrowLeft') goToAct(Math.max(currentAct - 1, 0));
+  if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+});
+startTimer();
+</script>
+</body>
+</html>

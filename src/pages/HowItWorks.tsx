@@ -1,154 +1,162 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import LandingNavigation from "@/components/LandingNavigation";
 import FooterSection from "@/sections/FooterSection";
 import RouteSeo from "@/components/RouteSeo";
+import VideoCard from "@/components/VideoCard";
+import VideoModal from "@/components/VideoModal";
 
-type TabId = "import" | "automate" | "rank" | "ai-agents";
+type Video = { src: string; title: string; caption: string };
 
-const TABS: { id: TabId; label: string; src: string; caption: string }[] = [
+const CORE: Video[] = [
   {
-    id: "import",
-    label: "Import",
-    src: "/how-it-works/import.html",
-    caption: "How a supplier invoice becomes live Shopify products in minutes.",
+    src: "/videos/sonic_complete_flow.html",
+    title: "Complete Journey",
+    caption: "The full Sonic story — invoice to Google #1 in 14 minutes",
   },
   {
-    id: "automate",
-    label: "Automate",
-    src: "/how-it-works/automate.html",
-    caption: "Six background systems that quietly run your store every day.",
-  },
-  {
-    id: "rank",
-    label: "Rank",
-    src: "/how-it-works/rank.html",
-    caption: "7-layer SEO tagging that gets your collections ranking on Google.",
-  },
-  {
-    id: "ai-agents",
-    label: "AI Agents",
-    src: "/how-it-works/ai-agents.html",
-    caption: "Brand Intelligence, SEO Audit, and Gap Finder — your three AI specialists.",
+    src: "/videos/sonic-video-1-import.html",
+    title: "The Import Engine",
+    caption: "How an invoice becomes 47 Shopify products in 15 minutes",
   },
 ];
 
-const STAGE = 800;
+const DEEP: Video[] = [
+  {
+    src: "/videos/sonic_tagging_flow.html",
+    title: "7-Layer Tagging",
+    caption:
+      "How every product gets tagged — brand, type, colour, size, feature, season, occasion",
+  },
+  {
+    src: "/videos/sonic_automations_flow.html",
+    title: "Silent Automations",
+    caption: "6 systems running at 2 AM while you sleep",
+  },
+  {
+    src: "/videos/sonic_rank_flow.html",
+    title: "Sonic Rank",
+    caption: "From invisible to Google #1 for your product keywords",
+  },
+  {
+    src: "/videos/sonic_agents_flow.html",
+    title: "The 3 AI Agents",
+    caption: "Brand Intel · SEO Audit · Competitor Gap — running every night",
+  },
+  {
+    src: "/videos/sonic-video-3-rank.html",
+    title: "The Rank System",
+    caption: "The SEO tagging engine and scoring system explained",
+  },
+  {
+    src: "/videos/sonic-video-2-automate.html",
+    title: "Automate",
+    caption: "Darwin-aware season switching, link mesh rebuild, Klaviyo triggers",
+  },
+  {
+    src: "/videos/sonic-video-4-ai-agents.html",
+    title: "AI Agents",
+    caption: "Brand Intelligence · SEO Audit · Gap Finder agents",
+  },
+];
+
+const TECH: Video[] = [
+  {
+    src: "/videos/sonic_mcp_flow.html",
+    title: "MCP Connector",
+    caption: "One MCP server — ask Claude or Kimi anything about your live store",
+  },
+  {
+    src: "/videos/sonic_import_flow.html",
+    title: "Import Flow",
+    caption: "Inside the AI parsing pipeline — from PDF to 40 extracted products",
+  },
+  {
+    src: "/videos/sonic_connection_map.html",
+    title: "Connection Map",
+    caption: "How every Sonic feature connects — interactive node diagram",
+  },
+];
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-lime mb-5">
+      {children}
+    </div>
+  );
+}
 
 export default function HowItWorks() {
-  const [active, setActive] = useState<TabId>("import");
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [open, setOpen] = useState<{ src: string; title: string } | null>(null);
 
-  // Scale the fixed 800x800 stage down on narrow viewports while keeping aspect ratio.
-  useEffect(() => {
-    function recalc() {
-      const w = wrapRef.current?.clientWidth ?? STAGE;
-      setScale(Math.min(1, w / STAGE));
-    }
-    recalc();
-    window.addEventListener("resize", recalc);
-    return () => window.removeEventListener("resize", recalc);
-  }, []);
-
-  const current = TABS.find((t) => t.id === active)!;
+  const onOpen = (src: string, title: string) => setOpen({ src, title });
+  const onClose = () => setOpen(null);
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen text-[#fafafa]">
+    <div className="bg-[#0a0a0a] min-h-screen text-[#f5f5f5]">
       <RouteSeo
         title="How It Works — Sonic Invoices"
-        description="Watch how Sonic Invoices imports supplier invoices, automates your store, ranks collections on Google, and runs three AI agents."
+        description="12 animated explainers — see how Sonic Invoices imports invoices, tags products, syncs Shopify, ranks on Google, and runs 3 AI agents."
         path="/how-it-works"
       />
       <LandingNavigation />
 
-      <section className="pt-28 pb-20 px-6">
-        <div className="max-w-[1100px] mx-auto">
-          <div className="text-center mb-10">
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#737373]">
-              HOW IT WORKS
-            </span>
-            <h1 className="font-serif text-[clamp(32px,4.5vw,52px)] leading-[1.05] tracking-[-0.03em] mt-4">
-              Four short videos. The whole product.
-            </h1>
-            <p className="text-base text-[#a3a3a3] max-w-[600px] mx-auto mt-5">
-              Each clip is under 90 seconds. Watch in any order.
-            </p>
-          </div>
-
-          {/* Tabs */}
-          <div
-            role="tablist"
-            aria-label="How it works sections"
-            className="flex flex-wrap items-center justify-center gap-2 mb-8"
+      <section className="pt-28 pb-16 px-6">
+        <div className="max-w-[1200px] mx-auto text-center">
+          <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#737373]">
+            ⚡ SONIC INVOICES
+          </span>
+          <h1
+            className="mt-4"
+            style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: "clamp(32px, 4.5vw, 52px)",
+              letterSpacing: "-0.03em",
+              lineHeight: 1.05,
+            }}
           >
-            {TABS.map((t) => {
-              const isActive = t.id === active;
-              return (
-                <button
-                  key={t.id}
-                  role="tab"
-                  aria-selected={isActive}
-                  aria-controls={`panel-${t.id}`}
-                  onClick={() => setActive(t.id)}
-                  className={
-                    "px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 border " +
-                    (isActive
-                      ? "bg-lime text-[#0a0a0a] border-transparent"
-                      : "bg-white/[0.03] text-[#a3a3a3] border-white/[0.08] hover:text-[#fafafa] hover:bg-white/[0.06]")
-                  }
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
+            12 ways Sonic works for your store
+          </h1>
+          <p className="text-base text-[#a3a3a3] max-w-[600px] mx-auto mt-5">
+            Animated explainers — click any to explore.
+          </p>
+        </div>
+      </section>
 
-          {/* Stage wrapper — scales the fixed 800x800 iframe down on mobile */}
-          <div
-            ref={wrapRef}
-            className="mx-auto"
-            style={{ width: "100%", maxWidth: STAGE }}
-          >
-            <div
-              id={`panel-${current.id}`}
-              role="tabpanel"
-              aria-label={current.label}
-              style={{
-                width: "100%",
-                height: STAGE * scale,
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  width: STAGE,
-                  height: STAGE,
-                  transform: `scale(${scale})`,
-                  transformOrigin: "top left",
-                }}
-              >
-                <iframe
-                  // key forces a fresh mount on tab switch → autoplays from act 1, old video stops
-                  key={current.id}
-                  src={current.src}
-                  title={`${current.label} — Sonic Invoices`}
-                  width={STAGE}
-                  height={STAGE}
-                  style={{
-                    border: "none",
-                    borderRadius: 12,
-                    display: "block",
-                    background: "#0a0a0a",
-                  }}
-                  allow="autoplay"
-                />
-              </div>
+      <section className="px-6 pb-24">
+        <div className="max-w-[1200px] mx-auto space-y-20">
+          {/* Core Story */}
+          <div>
+            <SectionLabel>CORE STORY</SectionLabel>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {CORE.map((v) => (
+                <VideoCard key={v.src} {...v} onOpen={onOpen} />
+              ))}
             </div>
           </div>
 
-          <p className="text-center text-sm text-[#737373] mt-6">{current.caption}</p>
+          {/* Deep Dives */}
+          <div>
+            <SectionLabel>DEEP DIVES</SectionLabel>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {DEEP.map((v) => (
+                <VideoCard key={v.src} {...v} onOpen={onOpen} />
+              ))}
+            </div>
+          </div>
+
+          {/* Technical */}
+          <div>
+            <SectionLabel>TECHNICAL</SectionLabel>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {TECH.map((v) => (
+                <VideoCard key={v.src} {...v} onOpen={onOpen} />
+              ))}
+            </div>
+          </div>
         </div>
       </section>
+
+      <VideoModal src={open?.src ?? null} title={open?.title ?? ""} onClose={onClose} />
 
       <FooterSection />
     </div>

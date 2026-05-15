@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { isShopifyEmbedded } from "@/lib/shopify-embedded";
 import Navigation from "@/components/LandingNavigation";
 import HeroSection from "@/sections/HeroSection";
+import ConnectionMapHero from "@/sections/ConnectionMapHero";
+import CompleteFlowSection from "@/sections/CompleteFlowSection";
 import StatBarSection from "@/sections/StatBarSection";
 import LogoTrustBar from "@/sections/LogoTrustBar";
 import HowItWorksSection from "@/sections/HowItWorksSection";
@@ -38,6 +40,8 @@ export default function Home() {
       />
       <Navigation />
       <HeroSection />
+      <ConnectionMapHero />
+      <CompleteFlowSection />
       <StatBarSection />
       <LogoTrustBar />
       <HowItWorksSection />

@@ -607,36 +607,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
         // Bond Eye–style flat lists give us RRP directly, so we surface it as both
         // `rrp` and `compare_at_price` so the Shopify CSV gets a Compare At Price
         // without needing Phase 3 price research.
-        const azProducts = azProductsRaw.map((p: Record<string, unknown>) => {
-          const cost = Number(p.unit_cost ?? p.cost ?? 0) || 0;
-          const rrp = p.rrp != null && p.rrp !== "" ? Number(p.rrp) : null;
-          const qty = Number(p.qty ?? p.quantity ?? 0) || 0;
-          // Azure flat-list output uses product_title/style_code; the rest of the
-          // pipeline (validator, UI, Shopify CSV) expects name/sku. Surface both.
-          const name = String(p.product_title ?? p.name ?? "").trim();
-          const sku = String(p.style_code ?? p.sku ?? "").trim();
-          const colour = String(p.colour ?? p.color ?? "").trim();
-          const size = String(p.size ?? "").trim();
-          const category = String(p.category ?? "").trim();
-          return {
-            ...p,
-            name,
-            product_name: name,
-            product_title: name,
-            sku,
-            style_code: sku,
-            colour,
-            size,
-            qty,
-            quantity: qty,
-            cost,
-            unit_cost: cost,
-            rrp: rrp ?? null,
-            compare_at_price: rrp ?? null,
-            // Carry section header (e.g. "Recycled", "Eco") as a tag candidate.
-            tags: category ? [category] : (Array.isArray(p.tags) ? p.tags : []),
-          };
-        });
+        const azProducts = azProductsRaw.map(normaliseAzureProduct);
         if (azProducts.length > 0) {
           console.log(`[classify-extract-validate] Azure layout returned ${azProducts.length} line items in ${azJson.azure_ms}ms (format=${azJson.format ?? "unknown"})`);
           extraction = {

@@ -237,6 +237,12 @@ const quickInserts = [
   { label: "+ Abbreviation", text: "Replace '[ABBREVIATION]' with '[FULL WORD]' in all product names." },
 ];
 
+/** Safely format a number to fixed decimals — returns "—" for null/undefined/NaN. */
+export function safeFixed(n: number | null | undefined, decimals = 2): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  return n.toFixed(decimals);
+}
+
 // ── localStorage helpers ───────────────────────────────────
 const HISTORY_KEY = 'custom_instructions_history';
 const TEMPLATES_KEY = 'invoice_templates';
@@ -1353,6 +1359,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       });
       return;
     }
+    const MAX_FILE_SIZE_MB = 25;
+    const sizeMB = file.size / (1024 * 1024);
+    if (sizeMB > MAX_FILE_SIZE_MB) {
+      toast.error(`File too large (${safeFixed(sizeMB, 1)} MB)`, {
+        description: `Maximum is ${MAX_FILE_SIZE_MB} MB. For PDFs, try splitting into pages. For photos, retake at a lower resolution.`,
+        duration: 12000,
+      });
+      return;
+    }
+    if (sizeMB > 10) {
+      toast.warning(`Large file (${safeFixed(sizeMB, 1)} MB) — extraction may take longer`, {
+        description: "Reading could take 1–2 minutes for files this size.",
+        duration: 6000,
+      });
+    }
     if (isLikelyJoorFile(file)) {
       toast("This looks like a JOOR order file", {
         description: "Open it in the JOOR importer for the best result, or parse it as an invoice anyway.",
@@ -2139,7 +2160,7 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       if (choice === "first_page") {
         try {
           const trimmed = await extractPdfPage(uploadedFile, 1);
-          toast.message("Using page 1 only", { description: `Trimmed to ${(trimmed.size / 1024).toFixed(0)} KB.` });
+          toast.message("Using page 1 only", { description: `Trimmed to ${safeFixed(trimmed.size / 1024, 0)} KB.` });
           startProcessing(trimmed);
         } catch (err) {
           console.error("[InvoiceFlow] extractPdfPage failed:", err);
@@ -5788,8 +5809,8 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                   {costChanges.filter(c => c.costChange && c.costChange.changePct !== 0).map((c, i) => (
                     <div key={i} className="flex items-center justify-between text-xs bg-muted/30 rounded px-2.5 py-1.5">
                       <span className="truncate flex-1 mr-2">{c.name}</span>
-                      <span className={`shrink-0 font-mono-data font-medium ${c.costChange!.changePct > 5 ? "text-destructive" : c.costChange!.changePct > 0 ? "text-warning" : "text-success"}`}>
-                        ${c.costChange!.prev.toFixed(2)} → ${c.price.toFixed(2)} ({c.costChange!.changePct > 0 ? "+" : ""}{c.costChange!.changePct.toFixed(1)}%)
+                      <span className={`shrink-0 font-mono-data font-medium ${(c.costChange?.changePct ?? 0) > 5 ? "text-destructive" : (c.costChange?.changePct ?? 0) > 0 ? "text-warning" : "text-success"}`}>
+                        ${safeFixed(c.costChange?.prev, 2)} → ${safeFixed(c.price, 2)} ({(c.costChange?.changePct ?? 0) > 0 ? "+" : ""}{safeFixed(c.costChange?.changePct, 1)}%)
                       </span>
                     </div>
                   ))}
@@ -5810,14 +5831,15 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
                   <p>{largePriceAlert.brand} has increased the cost of:</p>
                   <p className="font-medium text-foreground">{largePriceAlert.name} — SKU {largePriceAlert.sku}</p>
                   <div className="bg-muted/50 rounded-lg p-2.5 space-y-0.5 font-mono-data">
-                    <p>Previous cost: ${largePriceAlert.costChange!.prev.toFixed(2)} ({largePriceAlert.costChange!.prevDate})</p>
-                    <p>New cost: ${largePriceAlert.price.toFixed(2)}</p>
-                    <p className="text-destructive font-semibold">Increase: ${largePriceAlert.costChange!.changeAmount.toFixed(2)} (+{largePriceAlert.costChange!.changePct.toFixed(1)}%)</p>
+                    <p>Previous cost: ${safeFixed(largePriceAlert.costChange?.prev, 2)} ({largePriceAlert.costChange?.prevDate})</p>
+                    <p>New cost: ${safeFixed(largePriceAlert.price, 2)}</p>
+                    <p className="text-destructive font-semibold">Increase: ${safeFixed(largePriceAlert.costChange?.changeAmount, 2)} (+{safeFixed(largePriceAlert.costChange?.changePct, 1)}%)</p>
                   </div>
                   {largePriceAlert.rrp > 0 && (() => {
-                    const oldMargin = ((largePriceAlert.rrp - largePriceAlert.costChange!.prev) / largePriceAlert.rrp * 100).toFixed(0);
-                    const newMargin = ((largePriceAlert.rrp - largePriceAlert.price) / largePriceAlert.rrp * 100).toFixed(0);
-                    return <p className="text-[10px]">RRP: ${largePriceAlert.rrp.toFixed(2)} · Margin: {oldMargin}% → {newMargin}%</p>;
+                    const prev = largePriceAlert.costChange?.prev;
+                    const oldMargin = prev != null ? ((largePriceAlert.rrp - prev) / largePriceAlert.rrp * 100) : null;
+                    const newMargin = ((largePriceAlert.rrp - largePriceAlert.price) / largePriceAlert.rrp * 100);
+                    return <p className="text-[10px]">RRP: ${safeFixed(largePriceAlert.rrp, 2)} · Margin: {safeFixed(oldMargin, 0)}% → {safeFixed(newMargin, 0)}%</p>;
                   })()}
                 </div>
                 <div className="flex gap-2">
@@ -6729,11 +6751,18 @@ function LightspeedExportDownload({ exportFormat, products, supplierName, lsSett
   invoiceDate?: string;
 }) {
   const downloadFile = (content: string, filename: string, mime = 'text/csv') => {
-    const blob = new Blob([content], { type: mime });
+    // Prepend UTF-8 BOM so Excel + Shopify import preserve accents (é, ö, ñ)
+    const isCsvLike = mime.includes('csv') || mime.includes('text');
+    const payload = isCsvLike ? '\uFEFF' + content : content;
+    const blob = new Blob([payload], { type: `${mime};charset=utf-8` });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Delay revoke so the embedded Shopify iframe has time to start the download
+    setTimeout(() => URL.revokeObjectURL(url), 200);
   };
 
   const month = new Date().toLocaleString('en', { month: 'short', year: '2-digit' }).replace(' ', '');
@@ -6956,13 +6985,16 @@ function ShopifySeoUpdateSection({ products, supplierName }: {
 
   const handleDownload = () => {
     const csv = generateSeoCSV();
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const month = new Date().toLocaleString('en', { month: 'short', year: '2-digit' }).replace(' ', '');
     const tag = (supplierName || 'products').toLowerCase().replace(/\s+/g, '-');
-    a.href = url; a.download = `${tag}_seo_update_${month}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = `${tag}_seo_update_${month}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 200);
   };
 
   return (
@@ -7063,11 +7095,14 @@ function LightspeedRestockSection({ products, supplierName }: {
   };
 
   const downloadCSV = (csv: string, filename: string) => {
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 200);
     toast.success("CSV downloaded", { description: filename });
     // Auto-trigger image SEO optimization
     import("@/lib/image-seo-trigger").then(m => m.dispatchImageSeoTrigger({ source: "invoice", productCount: products.length }));
@@ -7372,7 +7407,7 @@ const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { 
               {product.brand} · {product.type}
               {product.colour && <> · <span className="text-foreground">{product.colour}</span></>}
               {product.size && <> · <span className="font-mono-data">{product.size}</span></>}
-              {" · "}${product.rrp.toFixed(2)}
+              {" · "}${safeFixed(product.rrp, 2)}
               {product.sku && <> · <span className="font-mono-data">{product.sku}</span></>}
             </p>
             {product.barcode && (
@@ -7401,7 +7436,7 @@ const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { 
                 product.costChange.changePct > 0 ? "bg-warning/15 text-warning" :
                 "bg-success/15 text-success"
               }`}>
-                {product.costChange.changePct > 0 ? "↑" : "↓"} {product.costChange.changePct > 0 ? "+" : ""}{product.costChange.changePct.toFixed(1)}% vs last order
+                {product.costChange.changePct > 0 ? "↑" : "↓"} {product.costChange.changePct > 0 ? "+" : ""}{safeFixed(product.costChange?.changePct, 1)}% vs last order
               </span>
             )}
             {product.isNew && !product.costChange && (
@@ -7409,7 +7444,7 @@ const ProductCard = ({ product, debugMode, onPreview, onEnrich, onSetImage }: { 
             )}
             {margin !== null && (
               <span className={`inline-block mt-0.5 text-[9px] ${margin < 25 ? "text-destructive" : margin < 40 ? "text-warning" : "text-muted-foreground"}`}>
-                {margin < 25 && "⚠ "}Margin: {margin.toFixed(0)}%
+                {margin < 25 && "⚠ "}Margin: {safeFixed(margin, 0)}%
               </span>
             )}
             {/* Enrichment badge */}

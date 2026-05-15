@@ -63,7 +63,9 @@ const App = () => (
               <BrowserRouter>
                 <StockyAnnouncementBar />
                 <Routes>
-                  <Route path="/" element={<Landing />} />
+                  <Route path="/" element={<Home />} />
+                  <Route path="/demo" element={<Demo />} />
+                  <Route path="/landing-old" element={<Landing />} />
                   <Route path="/dashboard" element={<Index />} />
                   <Route path="/dashboard/*" element={<Index />} />
                   <Route path="/login" element={<Login />} />

@@ -80,6 +80,7 @@ export default {
         "accent-warning": "hsl(var(--accent-warning))",
         "accent-danger": "hsl(var(--accent-danger))",
         "accent-info": "hsl(var(--accent-info))",
+        lime: { DEFAULT: "#a3e635" },
       },
       spacing: {
         "s1": "var(--space-1)",

@@ -25,6 +25,7 @@ import Support from "./pages/Support.tsx";
 import Unsubscribe from "./pages/Unsubscribe.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import BrandGuide from "./pages/BrandGuide.tsx";
+import HowItWorks from "./pages/HowItWorks.tsx";
 import { CaseStudyPage } from "./pages/CaseStudy.tsx";
 import Health from "./pages/Health.tsx";
 import AdminSecrets from "./pages/AdminSecrets.tsx";
@@ -88,6 +89,7 @@ const App = () => (
                   <Route path="/unsubscribe" element={<Unsubscribe />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/brand-guide" element={<BrandGuide />} />
+                  <Route path="/how-it-works" element={<HowItWorks />} />
                   <Route path="/case-study" element={<CaseStudyPage />} />
                   <Route path="/health" element={<Health />} />
                   <Route path="/admin/secrets" element={<AdminSecrets />} />

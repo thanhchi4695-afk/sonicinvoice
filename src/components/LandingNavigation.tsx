@@ -33,6 +33,12 @@ export default function Navigation() {
 
         <div className="hidden md:flex items-center gap-4">
           <a
+            href="/how-it-works"
+            className="text-sm text-[#a3a3a3] hover:text-[#fafafa] transition-colors duration-300"
+          >
+            Watch how it works →
+          </a>
+          <a
             href="/login"
             className="text-sm text-[#a3a3a3] hover:text-[#fafafa] transition-colors duration-300"
           >
@@ -66,6 +72,7 @@ export default function Navigation() {
             </a>
           ))}
           <div className="pt-4 border-t border-white/[0.06] flex flex-col gap-3">
+            <a href="/how-it-works" className="text-sm text-[#a3a3a3]" onClick={() => setMobileOpen(false)}>Watch how it works →</a>
             <a href="/login" className="text-sm text-[#a3a3a3]">Sign in</a>
             <a
               href="/signup"

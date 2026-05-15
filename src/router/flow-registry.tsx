@@ -114,60 +114,60 @@ const back = (ctx: FlowContext) => () => ctx.setActiveFlow(null);
 export const FLOW_REGISTRY = {
   invoice: {
     skeleton: "wizard",
-    render: (c) => <InvoiceFlow onBack={back(c)()} onNavigate={(f) => c.safeSetFlow(f)} />,
+    render: (c) => <InvoiceFlow onBack={back(c)} onNavigate={(f) => c.safeSetFlow(f)} />,
   },
   sale: {
-    render: (c) => <BulkSaleFlow onBack={back(c)()} onNavigateToGoogleFeed={() => { c.setActiveFlow(null); c.setActiveTab("tools"); }} />,
+    render: (c) => <BulkSaleFlow onBack={back(c)} onNavigateToGoogleFeed={() => { c.setActiveFlow(null); c.setActiveTab("tools"); }} />,
   },
-  restock: { render: (c) => <RestockAnalytics onBack={back(c)()} onStartFlow={c.handleStartFlow} /> },
-  price_adjust: { render: (c) => <PriceAdjustmentPanel onBack={back(c)()} /> },
-  price_lookup: { render: (c) => <PriceLookup onBack={back(c)()} /> },
-  price_match: { render: (c) => <PriceMatchPanel lineItems={[]} onBack={back(c)()} /> },
-  product_descriptions: { render: (c) => <ProductDescriptionPanel lineItems={[]} onBack={back(c)()} /> },
-  order_form: { render: (c) => <OrderFormFlow onBack={back(c)()} /> },
-  seasons: { render: (c) => <SeasonManager onBack={back(c)()} /> },
-  reorder: { render: (c) => <ReorderPanel onBack={back(c)()} onViewOrders={() => c.setActiveFlow("order_form")} /> },
-  suppliers: { render: (c) => <SupplierPanel onBack={back(c)()} onStartInvoice={() => c.setActiveFlow("invoice")} /> },
-  audit_log: { skeleton: "table", render: (c) => <AuditLogPanel onBack={back(c)()} /> },
-  purchase_orders: { render: (c) => <OutboundPurchaseOrders onBack={back(c)()} /> },
-  restock_suggestions: { render: (c) => <RestockSuggestionsPanel onBack={back(c)()} onOpenPO={() => c.setActiveFlow("purchase_orders")} /> },
-  pricing_assistant: { render: (c) => <PricingAssistantPanel onBack={back(c)()} /> },
-  quick_receive: { render: (c) => <PurchaseOrderPanel onBack={back(c)()} /> },
-  catalog_memory: { skeleton: "table", render: (c) => <CatalogMemoryPanel onBack={back(c)()} /> },
-  email_inbox: { render: (c) => <EmailInboxPanel onBack={back(c)()} onProcessInvoice={() => c.setActiveFlow("invoice")} /> },
-  collab_seo: { render: (c) => <CollabSEOFlow onBack={back(c)()} /> },
-  google_ads_setup: { skeleton: "wizard", render: (c) => <GoogleAdsSetupWizard onBack={back(c)()} /> },
-  meta_ads_setup: { skeleton: "wizard", render: (c) => <MetaAdsSetupWizard onBack={back(c)()} /> },
-  lightspeed_convert: { render: (c) => <LightspeedConverter onBack={back(c)()} /> },
-  scan_mode: { render: (c) => <ScanMode onBack={back(c)()} /> },
-  performance: { skeleton: "split", render: (c) => <PerformanceDashboard onBack={back(c)()} /> },
-  feed_optimise: { render: (c) => <AIFeedOptimisation onBack={back(c)()} /> },
-  feed_health: { render: (c) => <FeedHealthPanel onBack={back(c)()} onStartFlow={c.handleStartFlow} /> },
-  google_colour: { render: (c) => <GoogleColourFlow onBack={back(c)()} /> },
-  google_ads: { render: (c) => <GoogleAdsFlow onBack={back(c)()} /> },
-  style_grouping: { render: (c) => <StyleGroupingFlow onBack={back(c)()} /> },
-  competitor_intel: { render: (c) => <CompetitorIntelFlow onBack={back(c)()} /> },
-  collection_seo: { render: (c) => <CollectionSEOFlow onBack={back(c)()} onStartFlow={c.handleStartFlow} /> },
-  collection_decomposer: { render: (c) => <ProductCollectionDecomposer onBack={back(c)()} onOpenCollectionSEO={() => c.handleStartFlow("collection_seo")} /> },
-  collection_seo_export: { render: (c) => <CollectionSEOExport onBack={back(c)()} /> },
-  geo_agentic: { render: (c) => <GeoAgenticFlow onBack={back(c)()} /> },
-  organic_seo: { render: (c) => <OrganicSEOFlow onBack={back(c)()} /> },
-  margin_protection: { render: (c) => <MarginProtectionPanel onBack={back(c)()} /> },
-  markdown_ladder: { render: (c) => <MarkdownLadderPanel onBack={back(c)()} /> },
-  stock_monitor: { render: (c) => <StockMonitorPanel onBack={back(c)()} /> },
-  social_media: { render: (c) => <SocialMediaPanel onBack={back(c)()} onStartFlow={c.handleStartFlow} /> },
-  inventory_planning: { render: (c) => <InventoryPlanningPanel onBack={back(c)()} /> },
-  packing_slip: { render: (c) => <PackingSlipFlow onBack={back(c)()} /> },
-  joor: { render: (c) => <JoorFlow onBack={back(c)()} /> },
-  wholesale_import: { render: (c) => <WholesaleImportFlow onBack={back(c)()} /> },
-  lookbook_import: { render: (c) => <LookbookImportFlow onBack={back(c)()} /> },
-  image_seo: { render: (c) => <ImageSEOFlow onBack={back(c)()} /> },
-  accounting: { render: (c) => <AccountingIntegration onBack={back(c)()} /> },
-  profit_loss: { skeleton: "split", render: (c) => <ProfitLossPanel onBack={back(c)()} /> },
+  restock: { render: (c) => <RestockAnalytics onBack={back(c)} onStartFlow={c.handleStartFlow} /> },
+  price_adjust: { render: (c) => <PriceAdjustmentPanel onBack={back(c)} /> },
+  price_lookup: { render: (c) => <PriceLookup onBack={back(c)} /> },
+  price_match: { render: (c) => <PriceMatchPanel lineItems={[]} onBack={back(c)} /> },
+  product_descriptions: { render: (c) => <ProductDescriptionPanel lineItems={[]} onBack={back(c)} /> },
+  order_form: { render: (c) => <OrderFormFlow onBack={back(c)} /> },
+  seasons: { render: (c) => <SeasonManager onBack={back(c)} /> },
+  reorder: { render: (c) => <ReorderPanel onBack={back(c)} onViewOrders={() => c.setActiveFlow("order_form")} /> },
+  suppliers: { render: (c) => <SupplierPanel onBack={back(c)} onStartInvoice={() => c.setActiveFlow("invoice")} /> },
+  audit_log: { skeleton: "table", render: (c) => <AuditLogPanel onBack={back(c)} /> },
+  purchase_orders: { render: (c) => <OutboundPurchaseOrders onBack={back(c)} /> },
+  restock_suggestions: { render: (c) => <RestockSuggestionsPanel onBack={back(c)} onOpenPO={() => c.setActiveFlow("purchase_orders")} /> },
+  pricing_assistant: { render: (c) => <PricingAssistantPanel onBack={back(c)} /> },
+  quick_receive: { render: (c) => <PurchaseOrderPanel onBack={back(c)} /> },
+  catalog_memory: { skeleton: "table", render: (c) => <CatalogMemoryPanel onBack={back(c)} /> },
+  email_inbox: { render: (c) => <EmailInboxPanel onBack={back(c)} onProcessInvoice={() => c.setActiveFlow("invoice")} /> },
+  collab_seo: { render: (c) => <CollabSEOFlow onBack={back(c)} /> },
+  google_ads_setup: { skeleton: "wizard", render: (c) => <GoogleAdsSetupWizard onBack={back(c)} /> },
+  meta_ads_setup: { skeleton: "wizard", render: (c) => <MetaAdsSetupWizard onBack={back(c)} /> },
+  lightspeed_convert: { render: (c) => <LightspeedConverter onBack={back(c)} /> },
+  scan_mode: { render: (c) => <ScanMode onBack={back(c)} /> },
+  performance: { skeleton: "split", render: (c) => <PerformanceDashboard onBack={back(c)} /> },
+  feed_optimise: { render: (c) => <AIFeedOptimisation onBack={back(c)} /> },
+  feed_health: { render: (c) => <FeedHealthPanel onBack={back(c)} onStartFlow={c.handleStartFlow} /> },
+  google_colour: { render: (c) => <GoogleColourFlow onBack={back(c)} /> },
+  google_ads: { render: (c) => <GoogleAdsFlow onBack={back(c)} /> },
+  style_grouping: { render: (c) => <StyleGroupingFlow onBack={back(c)} /> },
+  competitor_intel: { render: (c) => <CompetitorIntelFlow onBack={back(c)} /> },
+  collection_seo: { render: (c) => <CollectionSEOFlow onBack={back(c)} onStartFlow={c.handleStartFlow} /> },
+  collection_decomposer: { render: (c) => <ProductCollectionDecomposer onBack={back(c)} onOpenCollectionSEO={() => c.handleStartFlow("collection_seo")} /> },
+  collection_seo_export: { render: (c) => <CollectionSEOExport onBack={back(c)} /> },
+  geo_agentic: { render: (c) => <GeoAgenticFlow onBack={back(c)} /> },
+  organic_seo: { render: (c) => <OrganicSEOFlow onBack={back(c)} /> },
+  margin_protection: { render: (c) => <MarginProtectionPanel onBack={back(c)} /> },
+  markdown_ladder: { render: (c) => <MarkdownLadderPanel onBack={back(c)} /> },
+  stock_monitor: { render: (c) => <StockMonitorPanel onBack={back(c)} /> },
+  social_media: { render: (c) => <SocialMediaPanel onBack={back(c)} onStartFlow={c.handleStartFlow} /> },
+  inventory_planning: { render: (c) => <InventoryPlanningPanel onBack={back(c)} /> },
+  packing_slip: { render: (c) => <PackingSlipFlow onBack={back(c)} /> },
+  joor: { render: (c) => <JoorFlow onBack={back(c)} /> },
+  wholesale_import: { render: (c) => <WholesaleImportFlow onBack={back(c)} /> },
+  lookbook_import: { render: (c) => <LookbookImportFlow onBack={back(c)} /> },
+  image_seo: { render: (c) => <ImageSEOFlow onBack={back(c)} /> },
+  accounting: { render: (c) => <AccountingIntegration onBack={back(c)} /> },
+  profit_loss: { skeleton: "split", render: (c) => <ProfitLossPanel onBack={back(c)} /> },
   stocky_hub: {
     render: (c) => (
       <StockyHub
-        onBack={back(c)()}
+        onBack={back(c)}
         onNavigate={(t) => {
           const map: Record<string, FlowKey> = {
             purchase_orders: "purchase_orders", suppliers: "suppliers", stock_monitor: "stock_monitor",
@@ -187,7 +187,7 @@ export const FLOW_REGISTRY = {
     skeleton: "wizard",
     render: (c) => (
       <StockyOnboarding
-        onBack={back(c)()}
+        onBack={back(c)}
         onComplete={() => { c.setActiveFlow(null); localStorage.setItem("stocky_onboarding_done", "true"); }}
         onStartPipeline={(id) => { c.setActivePipelineId(id); c.setActiveFlow("pipeline"); localStorage.setItem("stocky_onboarding_done", "true"); }}
         onStartFlow={(f) => { c.safeSetFlow(f); localStorage.setItem("stocky_onboarding_done", "true"); }}
@@ -197,15 +197,15 @@ export const FLOW_REGISTRY = {
   inventory_dashboard: { skeleton: "split", render: (c) => <InventoryDashboard onBack={() => c.setActiveFlow("stocky_hub")} /> },
   product_health: { skeleton: "table", render: (c) => <ProductHealthPanel onBack={() => c.setActiveFlow("stocky_hub")} /> },
   order_sync: { render: (c) => <ShopifyOrderSync onBack={() => c.setActiveFlow("stocky_hub")} /> },
-  image_optimise: { render: (c) => <ImageOptimisePanel onBack={back(c)()} /> },
-  stock_check: { render: (c) => <StockCheckFlow lineItems={[]} onBack={back(c)()} onStartFlow={c.handleStartFlow} /> },
-  stocktake_module: { render: (c) => <StocktakeModule onBack={back(c)()} /> },
-  transfer_orders: { render: (c) => <TransferOrderPanel onBack={back(c)()} /> },
-  reports_hub: { skeleton: "split", render: (c) => <ReportsHub onBack={back(c)()} /> },
-  supplier_profile_builder: { render: (c) => <SupplierProfileBuilder onBack={back(c)()} onViewLearnedRules={() => c.setActiveFlow("supplier_intelligence")} /> },
-  stock_adjustment: { render: (c) => <StockAdjustmentPanel onBack={back(c)()} /> },
-  inventory_view: { skeleton: "table", render: (c) => <InventoryView onBack={back(c)()} /> },
-  csv_seo: { render: (c) => <ShopifyCSVSEO onBack={back(c)()} /> },
+  image_optimise: { render: (c) => <ImageOptimisePanel onBack={back(c)} /> },
+  stock_check: { render: (c) => <StockCheckFlow lineItems={[]} onBack={back(c)} onStartFlow={c.handleStartFlow} /> },
+  stocktake_module: { render: (c) => <StocktakeModule onBack={back(c)} /> },
+  transfer_orders: { render: (c) => <TransferOrderPanel onBack={back(c)} /> },
+  reports_hub: { skeleton: "split", render: (c) => <ReportsHub onBack={back(c)} /> },
+  supplier_profile_builder: { render: (c) => <SupplierProfileBuilder onBack={back(c)} onViewLearnedRules={() => c.setActiveFlow("supplier_intelligence")} /> },
+  stock_adjustment: { render: (c) => <StockAdjustmentPanel onBack={back(c)} /> },
+  inventory_view: { skeleton: "table", render: (c) => <InventoryView onBack={back(c)} /> },
+  csv_seo: { render: (c) => <ShopifyCSVSEO onBack={back(c)} /> },
   stocky_dashboard: {
     skeleton: "split",
     render: (c) => (
@@ -265,14 +265,14 @@ export const FLOW_REGISTRY = {
       ),
   },
   pipeline_chooser: {
-    render: (c) => <PipelineChooser onSelect={(id) => { c.setActivePipelineId(id); c.setActiveFlow("pipeline"); }} onBack={back(c)()} />,
+    render: (c) => <PipelineChooser onSelect={(id) => { c.setActivePipelineId(id); c.setActiveFlow("pipeline"); }} onBack={back(c)} />,
   },
-  supplier_intelligence: { render: (c) => <SupplierIntelligencePanel onBack={back(c)()} onOpenInvoiceFlow={() => c.setActiveFlow("invoice")} /> },
+  supplier_intelligence: { render: (c) => <SupplierIntelligencePanel onBack={back(c)} onOpenInvoiceFlow={() => c.setActiveFlow("invoice")} /> },
   teach_invoice_tutorial: {
     skeleton: "wizard",
     render: (c) => (
       <TeachInvoiceTutorial
-        onBack={back(c)()}
+        onBack={back(c)}
         onStartInvoice={() => c.setActiveFlow("invoice")}
         onOpenSupplierIntelligence={() => c.setActiveFlow("supplier_intelligence")}
         onOpenCatalogMemory={() => c.setActiveFlow("catalog_memory")}
@@ -329,5 +329,6 @@ export function renderFlow(flow: FlowKey | null, ctx: FlowContext): ReactNode {
   if (!flow) return null;
   const entry = FLOW_REGISTRY[flow];
   if (!entry) return null;
-  return <Suspense fallback={<FlowSkeleton variant={entry.skeleton} />}>{entry.render(ctx)}</Suspense>;
+  const e = entry as FlowEntry;
+  return <Suspense fallback={<FlowSkeleton variant={e.skeleton} />}>{e.render(ctx)}</Suspense>;
 }

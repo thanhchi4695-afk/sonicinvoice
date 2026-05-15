@@ -3316,6 +3316,81 @@ export type Database = {
           },
         ]
       }
+      invoice_lines: {
+        Row: {
+          barcode: string | null
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          invoice_upload_id: string
+          line_index: number
+          line_total: number | null
+          match_status: string
+          matched_variant_id: string | null
+          quantity: number
+          raw: Json
+          size: string | null
+          sku: string | null
+          unit_cost: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          barcode?: string | null
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_upload_id: string
+          line_index?: number
+          line_total?: number | null
+          match_status?: string
+          matched_variant_id?: string | null
+          quantity?: number
+          raw?: Json
+          size?: string | null
+          sku?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          barcode?: string | null
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_upload_id?: string
+          line_index?: number
+          line_total?: number | null
+          match_status?: string
+          matched_variant_id?: string | null
+          quantity?: number
+          raw?: Json
+          size?: string | null
+          sku?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_lines_invoice_upload_id_fkey"
+            columns: ["invoice_upload_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_matched_variant_fk"
+            columns: ["matched_variant_id"]
+            isOneToOne: false
+            referencedRelation: "variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_patterns: {
         Row: {
           column_map: Json
@@ -3484,6 +3559,90 @@ export type Database = {
           result?: Json | null
           started_at?: string | null
           status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      invoice_uploads: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          currency: string | null
+          error_message: string | null
+          exported_at: string | null
+          id: string
+          invoice_date: string | null
+          invoice_number: string | null
+          line_count: number
+          matched_count: number
+          metadata: Json
+          original_filename: string | null
+          parsed_at: string | null
+          source: string
+          source_ref: string | null
+          status: string
+          storage_bucket: string | null
+          storage_path: string | null
+          subtotal: number | null
+          supplier: string | null
+          tax: number | null
+          total: number | null
+          unmatched_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          currency?: string | null
+          error_message?: string | null
+          exported_at?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
+          line_count?: number
+          matched_count?: number
+          metadata?: Json
+          original_filename?: string | null
+          parsed_at?: string | null
+          source?: string
+          source_ref?: string | null
+          status?: string
+          storage_bucket?: string | null
+          storage_path?: string | null
+          subtotal?: number | null
+          supplier?: string | null
+          tax?: number | null
+          total?: number | null
+          unmatched_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          currency?: string | null
+          error_message?: string | null
+          exported_at?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
+          line_count?: number
+          matched_count?: number
+          metadata?: Json
+          original_filename?: string | null
+          parsed_at?: string | null
+          source?: string
+          source_ref?: string | null
+          status?: string
+          storage_bucket?: string | null
+          storage_path?: string | null
+          subtotal?: number | null
+          supplier?: string | null
+          tax?: number | null
+          total?: number | null
+          unmatched_count?: number
           updated_at?: string
           user_id?: string
         }
@@ -7111,12 +7270,17 @@ export type Database = {
           cost: number
           created_at: string
           id: string
+          metadata: Json
+          price: number | null
           product_id: string
+          product_title: string | null
           quantity: number
           retail_price: number
+          shopify_product_id: string | null
           shopify_variant_id: string | null
           size: string | null
           sku: string | null
+          supplier: string | null
           updated_at: string
           user_id: string
         }
@@ -7126,12 +7290,17 @@ export type Database = {
           cost?: number
           created_at?: string
           id?: string
+          metadata?: Json
+          price?: number | null
           product_id: string
+          product_title?: string | null
           quantity?: number
           retail_price?: number
+          shopify_product_id?: string | null
           shopify_variant_id?: string | null
           size?: string | null
           sku?: string | null
+          supplier?: string | null
           updated_at?: string
           user_id: string
         }
@@ -7141,12 +7310,17 @@ export type Database = {
           cost?: number
           created_at?: string
           id?: string
+          metadata?: Json
+          price?: number | null
           product_id?: string
+          product_title?: string | null
           quantity?: number
           retail_price?: number
+          shopify_product_id?: string | null
           shopify_variant_id?: string | null
           size?: string | null
           sku?: string | null
+          supplier?: string | null
           updated_at?: string
           user_id?: string
         }

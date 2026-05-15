@@ -559,7 +559,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const renderFlow = () => {
     let flowEl: React.ReactNode = null;
     switch (activeFlow) {
-      case "invoice": flowEl = <InvoiceFlow onBack={() => setActiveFlow(null)} onNavigate={(f) => setActiveFlow(f as any)} />; break;
+      case "invoice": flowEl = <InvoiceFlow onBack={() => setActiveFlow(null)} onNavigate={(f) => safeSetFlow(f)} />; break;
       case "sale": flowEl = <BulkSaleFlow onBack={() => setActiveFlow(null)} onNavigateToGoogleFeed={() => { setActiveFlow(null); setActiveTab("tools"); }} />; break;
       case "restock": flowEl = <RestockAnalytics onBack={() => setActiveFlow(null)} onStartFlow={handleStartFlow} />; break;
       case "price_adjust": flowEl = <PriceAdjustmentPanel onBack={() => setActiveFlow(null)} />; break;
@@ -607,12 +607,12 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       case "stocky_hub": flowEl = <StockyHub onBack={() => setActiveFlow(null)} onNavigate={(t) => {
         const map: Record<string, ActiveFlow> = { purchase_orders: "purchase_orders", suppliers: "suppliers", stock_monitor: "stock_monitor", reorder: "reorder", margin_protection: "margin_protection", markdown_ladder: "markdown_ladder", restock_analytics: "restock", stocky_migration: "stocky_migration", inventory_dashboard: "inventory_dashboard", product_health: "product_health", order_sync: "order_sync", stock_adjustment: "stock_adjustment" };
         const target = map[t] ?? (t as string);
-        if ((FLOW_KEYS as Record<string, boolean>)[target]) {
-          setActiveFlow(target as ActiveFlow);
+        if (isFlowKey(target)) {
+          setActiveFlow(target);
         }
       }} />; break;
       case "stocky_migration": flowEl = <StockyMigration onBack={() => setActiveFlow("stocky_hub")} onComplete={() => setActiveFlow("stocky_hub")} />; break;
-      case "stocky_onboarding": flowEl = <StockyOnboarding onBack={() => setActiveFlow(null)} onComplete={() => { setActiveFlow(null); localStorage.setItem("stocky_onboarding_done", "true"); }} onStartPipeline={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); localStorage.setItem("stocky_onboarding_done", "true"); }} onStartFlow={(f) => { setActiveFlow(f as any); localStorage.setItem("stocky_onboarding_done", "true"); }} />; break;
+      case "stocky_onboarding": flowEl = <StockyOnboarding onBack={() => setActiveFlow(null)} onComplete={() => { setActiveFlow(null); localStorage.setItem("stocky_onboarding_done", "true"); }} onStartPipeline={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); localStorage.setItem("stocky_onboarding_done", "true"); }} onStartFlow={(f) => { safeSetFlow(f); localStorage.setItem("stocky_onboarding_done", "true"); }} />; break;
       case "inventory_dashboard": flowEl = <InventoryDashboard onBack={() => setActiveFlow("stocky_hub")} />; break;
       case "product_health": flowEl = <ProductHealthPanel onBack={() => setActiveFlow("stocky_hub")} />; break;
       case "order_sync": flowEl = <ShopifyOrderSync onBack={() => setActiveFlow("stocky_hub")} />; break;
@@ -627,7 +627,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       case "csv_seo": flowEl = <ShopifyCSVSEO onBack={() => setActiveFlow(null)} />; break;
       case "price_match": flowEl = <PriceMatchPanel lineItems={[]} onBack={() => setActiveFlow(null)} />; break;
       case "product_descriptions": flowEl = <ProductDescriptionPanel lineItems={[]} onBack={() => setActiveFlow(null)} />; break;
-      case "stocky_dashboard": flowEl = <StockyHomeDashboard onNavigate={(f) => setActiveFlow(f as any)} onSwitchToClassic={() => { setUseStockyDashboard(false); localStorage.setItem("stocky_dashboard_mode", "false"); setActiveFlow(null); }} />; break;
+      case "stocky_dashboard": flowEl = <StockyHomeDashboard onNavigate={(f) => safeSetFlow(f)} onSwitchToClassic={() => { setUseStockyDashboard(false); localStorage.setItem("stocky_dashboard_mode", "false"); setActiveFlow(null); }} />; break;
       case "pipeline": flowEl = activePipelineId ? <PipelineRunner pipelineId={activePipelineId} onRenderFlow={(flowKey, onComplete) => {
         const flowMap: Record<string, React.ReactNode> = {
           invoice: <InvoiceFlow onBack={onComplete} />,
@@ -745,7 +745,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             onOpenAgentDashboard={() => setActiveFlow("stocky_dashboard")}
             onOpenAgentGuide={() => setActiveTab("agent_guide")}
             onNavigateTab={(t) => { setActiveFlow(null); setActiveTab(t); }}
-            onNavigateFlow={(f) => setActiveFlow(f as any)}
+            onNavigateFlow={(f) => safeSetFlow(f)}
           />
         </Suspense>
       )}
@@ -815,11 +815,11 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           </Suspense>
         )}
         {activeTab === "tools" && <ToolsScreen onStartFlow={handleStartFlow} />}
-        {activeTab === "guide" && <HowToCatalog onNavigateToFeature={(f) => setActiveFlow(f as any)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
+        {activeTab === "guide" && <HowToCatalog onNavigateToFeature={(f) => safeSetFlow(f)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
         {activeTab === "google_ads" && <AdsGuideTabs />}
         {activeTab === "billing" && <BillingScreen />}
         {activeTab === "help" && <HelpCentre />}
-        {activeTab === "howto" && <HowToTabs onNavigateToFeature={(f) => setActiveFlow(f as any)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
+        {activeTab === "howto" && <HowToTabs onNavigateToFeature={(f) => safeSetFlow(f)} onNavigateToTab={(t) => { setActiveFlow(null); setActiveTab(t); }} />}
         {activeTab === "agent_guide" && <AgentGuide onBack={() => setActiveTab("home")} onOpenAutomation={() => setActiveTab("account")} />}
         {activeTab === "account" && <AccountScreen />}
       </Suspense>
@@ -833,7 +833,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         activeTab={activeFlow ? "" : activeTab}
         activeFlow={activeFlow}
         onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
-        onFlowChange={(flow) => setActiveFlow(flow as any)}
+        onFlowChange={(flow) => safeSetFlow(flow)}
       >
         <div className="pb-20 lg:pb-0">
           <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-2 border-b border-border lg:border-0">
@@ -852,8 +852,8 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               onMarkAllRead={markAllRead}
               onDismiss={dismiss}
               onNavigate={(link) => {
-                if ((FLOW_KEYS as Record<string, boolean>)[link]) {
-                  setActiveFlow(link as ActiveFlow);
+                if (isFlowKey(link)) {
+                  setActiveFlow(link);
                 } else {
                   setActiveFlow(null);
                   setActiveTab(link);
@@ -867,7 +867,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               activeFlow={activeFlow}
               onNavigate={(t) => {
                 if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-                else { setActiveFlow(t.id as any); }
+                else { safeSetFlow(t.id); }
               }}
             />
           ) : null}
@@ -892,7 +892,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
             activeTab={activeFlow ? "" : activeTab}
             activeFlow={activeFlow}
             onTabChange={(tab) => { setActiveFlow(null); setActiveTab(tab); }}
-            onFlowChange={(flow) => setActiveFlow(flow as any)}
+            onFlowChange={(flow) => safeSetFlow(flow)}
           >
             <div className="flex items-center justify-end gap-2 px-4 pt-3 pb-0">
               <NotificationBell
@@ -902,8 +902,8 @@ const Index = ({ initialTab }: IndexProps = {}) => {
                 onMarkAllRead={markAllRead}
                 onDismiss={dismiss}
                 onNavigate={(link) => {
-                  if ((FLOW_KEYS as Record<string, boolean>)[link]) {
-                    setActiveFlow(link as ActiveFlow);
+                  if (isFlowKey(link)) {
+                    setActiveFlow(link);
                   } else {
                     setActiveFlow(null);
                     setActiveTab(link);
@@ -918,7 +918,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
                 activeFlow={activeFlow}
                 onNavigate={(t) => {
                   if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-                  else { setActiveFlow(t.id as any); }
+                  else { safeSetFlow(t.id); }
                 }}
               />
             ) : null}
@@ -939,8 +939,8 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               onMarkAllRead={markAllRead}
               onDismiss={dismiss}
               onNavigate={(link) => {
-                if ((FLOW_KEYS as Record<string, boolean>)[link]) {
-                  setActiveFlow(link as ActiveFlow);
+                if (isFlowKey(link)) {
+                  setActiveFlow(link);
                 } else {
                   setActiveFlow(null);
                   setActiveTab(link);
@@ -955,7 +955,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               activeFlow={activeFlow}
               onNavigate={(t) => {
                 if (t.type === "tab") { setActiveFlow(null); setActiveTab(t.id); }
-                else { setActiveFlow(t.id as any); }
+                else { safeSetFlow(t.id); }
               }}
             />
           ) : null}

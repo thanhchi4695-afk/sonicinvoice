@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft, ChevronDown, ChevronRight, Search, History as HistoryIcon,
-  FileText, Sparkles, Brain, Fingerprint, ScrollText,
+  FileText, Sparkles, Brain, Fingerprint, ScrollText, Mail, FolderOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { formatDuration } from "@/lib/processing-timing";
 import CorrectionsLogPanel from "@/components/CorrectionsLogPanel";
+
+interface AutoIngestRow {
+  id: string;
+  source: "gmail" | "drive";
+  original_filename: string | null;
+  supplier: string | null;
+  status: string;
+  invoice_date: string | null;
+  total: number | null;
+  line_count: number | null;
+  matched_count: number | null;
+  unmatched_count: number | null;
+  created_at: string;
+}
 
 interface Props {
   onBack: () => void;

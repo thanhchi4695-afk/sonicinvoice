@@ -265,7 +265,7 @@ async function runPipeline(ctx: PipelineContext): Promise<Record<string, unknown
   // ─────── STAGE 1 — orientation ───────
   let classification: Classification | null = null;
   let usedSavedProfile = false;
-  const SAVED_PROFILE_MIN_CONFIDENCE = 20; // lowered from 70 — raise to 70 once 7+ invoices/supplier
+  const SAVED_PROFILE_MIN_CONFIDENCE = 50; // bumped from 20 — still reuses early profiles but blocks the worst guesses
 
   // First try: saved profile by supplier hint OR filename token match.
   // We track WHICH signal matched so we can later detect filename-driven

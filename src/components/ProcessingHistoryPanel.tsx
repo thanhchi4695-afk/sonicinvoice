@@ -112,6 +112,7 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }:
   const [highlightId, setHighlightId] = useState<string | null>(initialPatternId ?? null);
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const didScrollRef = useRef(false);
+  const [autoRows, setAutoRows] = useState<AutoIngestRow[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +122,7 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }:
       const userId = sess?.session?.user?.id;
       if (!userId) { setLoading(false); return; }
 
-      const [{ data: patterns }, { data: suppliers }, { data: corrections }] = await Promise.all([
+      const [{ data: patterns }, { data: suppliers }, { data: corrections }, { data: ingests }] = await Promise.all([
         supabase
           .from("invoice_patterns")
           .select("id, supplier_profile_id, original_filename, format_type, match_method, processing_quality_score, edit_count, review_duration_seconds, processing_duration_seconds, rows_added, rows_deleted, invoice_count, fields_corrected, column_map, sample_headers, field_confidence_history, created_at, updated_at")
@@ -138,6 +139,13 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }:
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
           .limit(1000),
+        supabase
+          .from("invoice_uploads")
+          .select("id, source, original_filename, supplier, status, invoice_date, total, line_count, matched_count, unmatched_count, created_at")
+          .eq("user_id", userId)
+          .in("source", ["gmail", "drive"])
+          .order("created_at", { ascending: false })
+          .limit(100),
       ]);
 
       if (cancelled) return;
@@ -154,6 +162,7 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }:
       setSupplierMap(sMap);
       setCorrByPattern(cMap);
       setRows((patterns as PatternRow[] | null) ?? []);
+      setAutoRows((ingests as AutoIngestRow[] | null) ?? []);
       setLoading(false);
     })();
     return () => { cancelled = true; };

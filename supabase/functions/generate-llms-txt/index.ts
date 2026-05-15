@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     // Store info
     const { data: conn } = await admin
       .from("shopify_connections")
-      .select("store_url, shop_name")
+      .select("store_url, shop_name, access_token, api_version")
       .eq("user_id", userId)
       .maybeSingle();
 
@@ -70,11 +70,33 @@ Deno.serve(async (req) => {
         400
       );
     }
+
+    // Fetch storefront primary domain (custom domain) from Shopify so AI crawlers
+    // can resolve either the .myshopify.com host or the merchant's branded domain.
+    const aliasSet = new Set<string>([shopDomain]);
+    let storefrontDomain = shopDomain;
+    try {
+      if (conn?.access_token) {
+        const v = conn.api_version || "2024-10";
+        const r = await fetch(`https://${shopDomain}/admin/api/${v}/shop.json`, {
+          headers: { "X-Shopify-Access-Token": conn.access_token },
+        });
+        if (r.ok) {
+          const j = await r.json();
+          const primary = normaliseDomain(j?.shop?.domain || "");
+          const myshopify = normaliseDomain(j?.shop?.myshopify_domain || "");
+          if (primary) { aliasSet.add(primary); storefrontDomain = primary; }
+          if (myshopify) aliasSet.add(myshopify);
+        }
+      }
+    } catch (_e) { /* non-fatal — alias stays as myshopify only */ }
+    const aliases = [...aliasSet];
+
     const storeName =
       conn?.shop_name?.trim() ||
-      titleCase(shopDomain.split(".")[0] || "Store");
+      titleCase(storefrontDomain.split(".")[0] || "Store");
 
-    // Top brands by product count
+    // Top brands by product count (already ranked — most products first)
     const { data: brandRows } = await admin
       .from("products")
       .select("vendor")
@@ -89,16 +111,14 @@ Deno.serve(async (req) => {
       if (!v) continue;
       brandCounts.set(v, (brandCounts.get(v) ?? 0) + 1);
     }
-    const topBrands = [...brandCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 20)
-      .map(([name]) => name);
     const totalBrands = brandCounts.size;
+    const rankedBrands = [...brandCounts.entries()].sort((a, b) => b[1] - a[1]);
+    const topBrands = rankedBrands.slice(0, 20).map(([name, count]) => ({ name, count }));
 
-    // Collections (published or approved)
+    // Collections (published or approved) — pull seo_description so the file has substance
     const { data: collections } = await admin
       .from("collection_suggestions")
-      .select("suggested_title, shopify_handle, suggested_handle, status, product_count")
+      .select("suggested_title, shopify_handle, suggested_handle, status, product_count, seo_description")
       .eq("user_id", userId)
       .in("status", ["published", "approved", "content_ready"])
       .order("product_count", { ascending: false })
@@ -110,7 +130,10 @@ Deno.serve(async (req) => {
       const handle = (c.shopify_handle || c.suggested_handle || "").trim();
       const title = (c.suggested_title || "").trim() || (handle ? titleCase(handle) : "");
       if (!title) continue;
-      collectionLines.push(`- ${title}${handle ? ` (/collections/${handle})` : ""}`);
+      const desc = ((c as any).seo_description as string | null)?.trim();
+      const path = handle ? ` (/collections/${handle})` : "";
+      const tail = desc ? ` — ${desc}` : "";
+      collectionLines.push(`- ${title}${path}${tail}`);
       if (topCategories.length < 5) topCategories.push(title);
     }
 

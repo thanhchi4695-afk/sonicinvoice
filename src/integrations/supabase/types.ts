@@ -3762,6 +3762,7 @@ export type Database = {
           generated_at: string
           id: string
           published_at: string | null
+          shop_aliases: string[]
           shop_domain: string
           user_id: string
           word_count: number | null
@@ -3771,6 +3772,7 @@ export type Database = {
           generated_at?: string
           id?: string
           published_at?: string | null
+          shop_aliases?: string[]
           shop_domain: string
           user_id: string
           word_count?: number | null
@@ -3780,6 +3782,7 @@ export type Database = {
           generated_at?: string
           id?: string
           published_at?: string | null
+          shop_aliases?: string[]
           shop_domain?: string
           user_id?: string
           word_count?: number | null

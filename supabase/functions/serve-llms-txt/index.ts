@@ -31,10 +31,12 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
+  // Match either the canonical shop_domain or any alias (myshopify + custom domain).
   const { data, error } = await admin
     .from("llms_txt_files")
     .select("content")
-    .ilike("shop_domain", domain)
+    .or(`shop_domain.ilike.${domain},shop_aliases.cs.{${domain}}`)
+    .limit(1)
     .maybeSingle();
 
   if (error || !data) {

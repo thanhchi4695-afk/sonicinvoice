@@ -240,6 +240,60 @@ const ProcessingHistoryPanel = ({ onBack, onOpenInvoiceFlow, initialPatternId }:
       </div>
 
       {tab === "corrections" ? <CorrectionsLogPanel /> : (<>
+      {autoRows.length > 0 && (
+        <Card className="bg-card border-border mb-3 overflow-hidden">
+          <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+            <div className="text-xs font-semibold flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-primary" /> Auto-ingested invoices
+              <span className="text-muted-foreground font-normal">
+                · {autoRows.filter(r => r.source === "gmail").length} Gmail
+                · {autoRows.filter(r => r.source === "drive").length} Drive
+              </span>
+            </div>
+            <span className="text-[10px] text-muted-foreground">latest 100</span>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 text-muted-foreground sticky top-0">
+                <tr className="text-left">
+                  <th className="px-3 py-1.5 font-medium w-20">Source</th>
+                  <th className="px-3 py-1.5 font-medium">File</th>
+                  <th className="px-3 py-1.5 font-medium">Supplier</th>
+                  <th className="px-3 py-1.5 font-medium text-right">Lines</th>
+                  <th className="px-3 py-1.5 font-medium">Status</th>
+                  <th className="px-3 py-1.5 font-medium text-right">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {autoRows.map(r => (
+                  <tr key={r.id} className="border-t border-border hover:bg-muted/30">
+                    <td className="px-3 py-1.5">
+                      <Badge variant="outline" className="text-[10px] gap-1 capitalize">
+                        {r.source === "gmail" ? <Mail className="w-3 h-3" /> : <FolderOpen className="w-3 h-3" />}
+                        {r.source}
+                      </Badge>
+                    </td>
+                    <td className="px-3 py-1.5 max-w-[220px] truncate" title={r.original_filename ?? ""}>
+                      {r.original_filename || <span className="text-muted-foreground italic">(unnamed)</span>}
+                    </td>
+                    <td className="px-3 py-1.5">{r.supplier || <span className="text-muted-foreground">—</span>}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">
+                      {r.line_count ? `${r.matched_count ?? 0}/${r.line_count}` : "—"}
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <Badge variant={r.status === "exported" ? "default" : r.status === "failed" ? "destructive" : "secondary"}
+                        className="text-[10px] capitalize">{r.status}</Badge>
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground whitespace-nowrap">
+                      {format(new Date(r.created_at), "d MMM")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
       <div className="relative mb-3">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input

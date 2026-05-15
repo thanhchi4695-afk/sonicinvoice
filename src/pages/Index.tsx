@@ -192,6 +192,18 @@ const FLOW_KEYS = {
 
 export type ActiveFlow = keyof typeof FLOW_KEYS;
 
+// Consume one-shot flow params stashed on window by the navigate-flow event.
+// Reading clears the value so a later flow can't pick up stale data.
+const consumeFlowParams = (): any => {
+  const p = (window as any).__sonicFlowParams;
+  delete (window as any).__sonicFlowParams;
+  return p;
+};
+// Exposed for flows that prefer reading via window helper.
+if (typeof window !== "undefined") {
+  (window as any).__sonicConsumeFlowParams = consumeFlowParams;
+}
+
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -212,7 +224,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const [activeFlow, setActiveFlow] = useState<ActiveFlow | null>(null);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [showCapture, setShowCapture] = useState(false);
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  
   const [useStockyDashboard, setUseStockyDashboard] = useState(() => localStorage.getItem("stocky_dashboard_mode") === "true");
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showQuickSearch, setShowQuickSearch] = useState(false);
@@ -278,12 +290,12 @@ const Index = ({ initialTab }: IndexProps = {}) => {
   const INVOICE_PHASE_FLOWS = new Set([
     "invoice", "scan_mode", "packing_slip", "email_inbox", "joor",
     "wholesale_import", "lookbook_import", "order_form",
-    "catalog_memory", "supplier_intelligence", "stock_check", "reconciliation",
-    "product_descriptions", "smart_naming", "image_optimise", "collection_seo",
-    "collab_seo", "organic_seo", "geo_agentic", "style_grouping", "shopify_csv_seo", "csv_seo",
+    "catalog_memory", "supplier_intelligence", "stock_check", "stock_reconciliation",
+    "product_descriptions", "image_optimise", "collection_seo",
+    "collab_seo", "organic_seo", "geo_agentic", "style_grouping", "csv_seo",
     "price_adjust", "price_lookup", "price_match", "margin_protection",
     "markdown_ladder", "competitor_intel", "sale",
-    "google_ads_setup", "meta_ads_setup", "ai_feed_optimise", "feed_health",
+    "google_ads_setup", "meta_ads_setup", "feed_optimise", "feed_health",
     "google_ads", "social_media", "lightspeed_convert",
   ]);
   const PHASE_TABS = new Set(["analytics"]);
@@ -564,8 +576,11 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       case "accounting": flowEl = <AccountingIntegration onBack={() => setActiveFlow(null)} />; break;
       case "profit_loss": flowEl = <ProfitLossPanel onBack={() => setActiveFlow(null)} />; break;
       case "stocky_hub": flowEl = <StockyHub onBack={() => setActiveFlow(null)} onNavigate={(t) => {
-        const map: Record<string, any> = { purchase_orders: "purchase_orders", suppliers: "suppliers", stock_monitor: "stock_monitor", reorder: "reorder", margin_protection: "margin_protection", markdown_ladder: "markdown_ladder", restock_analytics: "restock", stocky_migration: "stocky_migration", inventory_dashboard: "inventory_dashboard", product_health: "product_health", order_sync: "order_sync", stock_adjustment: "stock_adjustment" };
-        setActiveFlow(map[t] || t);
+        const map: Record<string, ActiveFlow> = { purchase_orders: "purchase_orders", suppliers: "suppliers", stock_monitor: "stock_monitor", reorder: "reorder", margin_protection: "margin_protection", markdown_ladder: "markdown_ladder", restock_analytics: "restock", stocky_migration: "stocky_migration", inventory_dashboard: "inventory_dashboard", product_health: "product_health", order_sync: "order_sync", stock_adjustment: "stock_adjustment" };
+        const target = map[t] ?? (t as string);
+        if ((FLOW_KEYS as Record<string, boolean>)[target]) {
+          setActiveFlow(target as ActiveFlow);
+        }
       }} />; break;
       case "stocky_migration": flowEl = <StockyMigration onBack={() => setActiveFlow("stocky_hub")} onComplete={() => setActiveFlow("stocky_hub")} />; break;
       case "stocky_onboarding": flowEl = <StockyOnboarding onBack={() => setActiveFlow(null)} onComplete={() => { setActiveFlow(null); localStorage.setItem("stocky_onboarding_done", "true"); }} onStartPipeline={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); localStorage.setItem("stocky_onboarding_done", "true"); }} onStartFlow={(f) => { setActiveFlow(f as any); localStorage.setItem("stocky_onboarding_done", "true"); }} />; break;
@@ -611,7 +626,14 @@ const Index = ({ initialTab }: IndexProps = {}) => {
           profit_loss: <ProfitLossPanel onBack={onComplete} />,
         };
         return flowMap[flowKey] || <div className="p-6 text-center text-sm text-muted-foreground">Flow "{flowKey}" — <button className="text-primary underline" onClick={onComplete}>Mark complete →</button></div>;
-      }} onExit={() => { setActiveFlow(null); setActivePipelineId(null); }} /> : null; break;
+      }} onExit={() => { setActiveFlow(null); setActivePipelineId(null); }} /> : (
+        <div className="p-6 text-center text-sm text-muted-foreground">
+          No pipeline selected.{" "}
+          <button className="text-primary underline" onClick={() => setActiveFlow("pipeline_chooser")}>
+            Choose a pipeline →
+          </button>
+        </div>
+      ); break;
       case "pipeline_chooser": flowEl = <PipelineChooser onSelect={(id) => { setActivePipelineId(id); setActiveFlow("pipeline"); }} onBack={() => setActiveFlow(null)} />; break;
       case "supplier_intelligence": flowEl = <SupplierIntelligencePanel onBack={() => setActiveFlow(null)} onOpenInvoiceFlow={() => setActiveFlow("invoice")} />; break;
       case "teach_invoice_tutorial": flowEl = <TeachInvoiceTutorial
@@ -637,8 +659,8 @@ const Index = ({ initialTab }: IndexProps = {}) => {
         flowEl = reconciliationResult ? (
           <StockReconciliationPanel
             reconciliationResult={reconciliationResult}
-            onBack={() => setActiveFlow("invoice")}
-            onExport={(sets) => handleReconciliationExport(sets)}
+            onBack={() => { setReconciliationResult(null); setActiveFlow("invoice"); }}
+            onExport={(sets) => { setReconciliationResult(null); handleReconciliationExport(sets); }}
           />
         ) : (
           <div className="p-6 text-center text-sm text-muted-foreground">
@@ -801,9 +823,10 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               onMarkAllRead={markAllRead}
               onDismiss={dismiss}
               onNavigate={(link) => {
-                if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
-                  setActiveFlow(link as any);
+                if ((FLOW_KEYS as Record<string, boolean>)[link]) {
+                  setActiveFlow(link as ActiveFlow);
                 } else {
+                  setActiveFlow(null);
                   setActiveTab(link);
                 }
               }}
@@ -850,9 +873,10 @@ const Index = ({ initialTab }: IndexProps = {}) => {
                 onMarkAllRead={markAllRead}
                 onDismiss={dismiss}
                 onNavigate={(link) => {
-                  if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
-                    setActiveFlow(link as any);
+                  if ((FLOW_KEYS as Record<string, boolean>)[link]) {
+                    setActiveFlow(link as ActiveFlow);
                   } else {
+                    setActiveFlow(null);
                     setActiveTab(link);
                   }
                 }}
@@ -886,9 +910,10 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               onMarkAllRead={markAllRead}
               onDismiss={dismiss}
               onNavigate={(link) => {
-                if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
-                  setActiveFlow(link as any);
+                if ((FLOW_KEYS as Record<string, boolean>)[link]) {
+                  setActiveFlow(link as ActiveFlow);
                 } else {
+                  setActiveFlow(null);
                   setActiveTab(link);
                 }
               }}

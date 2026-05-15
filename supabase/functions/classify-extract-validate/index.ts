@@ -1037,29 +1037,38 @@ async function runClaudePdfDirect(opts: {
   };
   const batches = chunkForClaude([docBlockWithCache], 20);
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-beta": "prompt-caching-2024-07-31",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 8000,
-      system: systemBlocks,
-      tools: [RETURN_INVOICE_TOOL],
-      tool_choice: { type: "tool", name: "return_invoice" },
-      messages: [{
-        role: "user",
-        content: [
-          ...batches[0],
-          { type: "text", text: userPrompt },
-        ],
-      }],
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithBackoff(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "prompt-caching-2024-07-31",
+        "content-type": "application/json",
+      },
+      signal: AbortSignal.timeout(60_000),
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 8000,
+        system: systemBlocks,
+        tools: [RETURN_INVOICE_TOOL],
+        tool_choice: { type: "tool", name: "return_invoice" },
+        messages: [{
+          role: "user",
+          content: [
+            ...batches[0],
+            { type: "text", text: userPrompt },
+          ],
+        }],
+      }),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      throw new Error("Anthropic API timeout after 60s — invoice may be too complex or Anthropic is slow");
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     const errText = await response.text();

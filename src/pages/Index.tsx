@@ -192,6 +192,18 @@ const FLOW_KEYS = {
 
 export type ActiveFlow = keyof typeof FLOW_KEYS;
 
+// Consume one-shot flow params stashed on window by the navigate-flow event.
+// Reading clears the value so a later flow can't pick up stale data.
+const consumeFlowParams = (): any => {
+  const p = (window as any).__sonicFlowParams;
+  delete (window as any).__sonicFlowParams;
+  return p;
+};
+// Exposed for flows that prefer reading via window helper.
+if (typeof window !== "undefined") {
+  (window as any).__sonicConsumeFlowParams = consumeFlowParams;
+}
+
 import { useStoreMode } from "@/hooks/use-store-mode";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useShopifyEmbedded } from "@/components/ShopifyEmbeddedProvider";
@@ -811,9 +823,10 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               onMarkAllRead={markAllRead}
               onDismiss={dismiss}
               onNavigate={(link) => {
-                if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
-                  setActiveFlow(link as any);
+                if ((FLOW_KEYS as Record<string, boolean>)[link]) {
+                  setActiveFlow(link as ActiveFlow);
                 } else {
+                  setActiveFlow(null);
                   setActiveTab(link);
                 }
               }}
@@ -860,9 +873,10 @@ const Index = ({ initialTab }: IndexProps = {}) => {
                 onMarkAllRead={markAllRead}
                 onDismiss={dismiss}
                 onNavigate={(link) => {
-                  if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
-                    setActiveFlow(link as any);
+                  if ((FLOW_KEYS as Record<string, boolean>)[link]) {
+                    setActiveFlow(link as ActiveFlow);
                   } else {
+                    setActiveFlow(null);
                     setActiveTab(link);
                   }
                 }}
@@ -896,9 +910,10 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               onMarkAllRead={markAllRead}
               onDismiss={dismiss}
               onNavigate={(link) => {
-                if (["invoice", "sale", "restock", "price_adjust", "price_lookup"].includes(link)) {
-                  setActiveFlow(link as any);
+                if ((FLOW_KEYS as Record<string, boolean>)[link]) {
+                  setActiveFlow(link as ActiveFlow);
                 } else {
+                  setActiveFlow(null);
                   setActiveTab(link);
                 }
               }}

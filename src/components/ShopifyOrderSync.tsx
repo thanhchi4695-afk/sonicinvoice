@@ -10,6 +10,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, subDays } from "date-fns";
+import { publishNotification } from "@/lib/notifications";
 
 interface ShopifyOrderSyncProps {
   onBack: () => void;
@@ -96,9 +97,19 @@ const ShopifyOrderSync = ({ onBack }: ShopifyOrderSyncProps) => {
       if (error) throw error;
       setResult(data);
       toast.success(data.message || "Order sync complete");
+      publishNotification({
+        severity: "success",
+        title: "Order sync complete",
+        message: data?.message || "Shopify order sync finished successfully.",
+      });
       loadStats();
     } catch (err: any) {
       toast.error(err.message || "Sync failed");
+      publishNotification({
+        severity: "urgent",
+        title: "Order sync failed",
+        message: err?.message || "Shopify order sync failed. Check your connection and retry.",
+      });
     } finally {
       setSyncing(false);
     }

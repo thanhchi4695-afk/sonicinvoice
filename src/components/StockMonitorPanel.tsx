@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { addAuditEntry } from "@/lib/audit-log";
 import { triggerStockAlertBrain } from "@/lib/stock-alert-trigger";
+import { publishNotification } from "@/lib/notifications";
 
 /* ─── Types ───────────────────────────────────────── */
 
@@ -218,6 +219,13 @@ const StockMonitorPanel = ({ onBack }: Props) => {
       setMonitored(allProducts);
       if (newAlerts.length) {
         setAlerts(prev => [...newAlerts, ...prev]);
+
+        publishNotification({
+          severity: "warning",
+          title: `${newAlerts.length} low-stock alert${newAlerts.length !== 1 ? "s" : ""}`,
+          message: `${newAlerts.length} ongoing variant${newAlerts.length !== 1 ? "s are" : " is"} below your reorder threshold.`,
+          link: "stock_monitor",
+        });
 
         // Fire-and-forget: notify Sonic so the chat surfaces a reorder suggestion.
         (async () => {

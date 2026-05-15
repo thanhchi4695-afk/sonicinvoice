@@ -1359,6 +1359,21 @@ const InvoiceFlow = ({ onBack, onNavigate }: InvoiceFlowProps) => {
       });
       return;
     }
+    const MAX_FILE_SIZE_MB = 25;
+    const sizeMB = file.size / (1024 * 1024);
+    if (sizeMB > MAX_FILE_SIZE_MB) {
+      toast.error(`File too large (${safeFixed(sizeMB, 1)} MB)`, {
+        description: `Maximum is ${MAX_FILE_SIZE_MB} MB. For PDFs, try splitting into pages. For photos, retake at a lower resolution.`,
+        duration: 12000,
+      });
+      return;
+    }
+    if (sizeMB > 10) {
+      toast.warning(`Large file (${safeFixed(sizeMB, 1)} MB) — extraction may take longer`, {
+        description: "Reading could take 1–2 minutes for files this size.",
+        duration: 6000,
+      });
+    }
     if (isLikelyJoorFile(file)) {
       toast("This looks like a JOOR order file", {
         description: "Open it in the JOOR importer for the best result, or parse it as an invoice anyway.",

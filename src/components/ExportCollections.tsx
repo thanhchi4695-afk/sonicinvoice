@@ -12,6 +12,7 @@ import {
   type ShopifyCollection
 } from "@/lib/shopify-api";
 import Papa from "papaparse";
+import { publishNotification } from "@/lib/notifications";
 
 interface Props {
   onBack: () => void;
@@ -111,6 +112,11 @@ const ExportCollections = ({ onBack }: Props) => {
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Collections exported!");
+    publishNotification({
+      severity: "success",
+      title: "CSV export ready",
+      message: `Exported ${collections.length} collection${collections.length !== 1 ? "s" : ""} to CSV.`,
+    });
   }, [collections, collectionTypes, format]);
 
   const customCount = collections.filter((c) => collectionTypes.get(c.id) === "custom").length;

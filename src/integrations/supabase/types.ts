@@ -673,6 +673,48 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_ingest_settings: {
+        Row: {
+          created_at: string
+          drive_enabled: boolean
+          drive_folder_id: string | null
+          drive_folder_name: string | null
+          drive_last_polled_at: string | null
+          gmail_enabled: boolean
+          gmail_last_history_id: string | null
+          gmail_last_polled_at: string | null
+          gmail_query: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          drive_enabled?: boolean
+          drive_folder_id?: string | null
+          drive_folder_name?: string | null
+          drive_last_polled_at?: string | null
+          gmail_enabled?: boolean
+          gmail_last_history_id?: string | null
+          gmail_last_polled_at?: string | null
+          gmail_query?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          drive_enabled?: boolean
+          drive_folder_id?: string | null
+          drive_folder_name?: string | null
+          drive_last_polled_at?: string | null
+          gmail_enabled?: boolean
+          gmail_last_history_id?: string | null
+          gmail_last_polled_at?: string | null
+          gmail_query?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       brand_database: {
         Row: {
           brand_name: string

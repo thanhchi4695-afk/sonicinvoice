@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
         const { data } = await userClient.auth.getUser();
         callerId = data?.user?.id ?? null;
       } catch { /* anonymous */ }
-      if (callerId && jobRow.user_id && callerId !== jobRow.user_id) {
+      if (!callerId || (jobRow.user_id && callerId !== jobRow.user_id)) {
         return json({ job: null }, 200);
       }
       return json({ job: jobRow }, 200);

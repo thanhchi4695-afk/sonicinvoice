@@ -123,14 +123,19 @@ body {
   height: 800px;
 }
 
-.node-label {
+/* Overlay labels for canvas nodes */
+.overlay-label {
   position: absolute;
   font-size: 12px;
   font-weight: 700;
   color: var(--text);
   text-align: center;
   pointer-events: none;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.8);
+  background: rgba(10,10,10,0.7);
+  padding: 4px 10px;
+  border-radius: 6px;
+  backdrop-filter: blur(4px);
 }
 </style>
 </head>
@@ -155,14 +160,84 @@ body {
   </div>
 </div>
 
-<!-- ACT 2: Nodes appear (handled by canvas) -->
-<div class="act" data-act="1" style="background:transparent;pointer-events:none;"></div>
+<!-- ACT 2: Nodes appear — with descriptive overlay -->
+<div class="act" data-act="1" style="background:transparent;">
+  <div style="position:absolute;top:24px;left:48px;right:48px;text-align:center;pointer-events:none;">
+    <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:8px;">Act 2 — Nodes Activate</div>
+    <div class="spring-in stagger-2 headline" style="font-size:24px;color:var(--text);">8 systems. One ecosystem.</div>
+  </div>
+  <!-- Node labels positioned over canvas -->
+  <div class="overlay-label spring-in stagger-3" style="top:55px;left:50%;transform:translateX(-50%);">📄 INVOICE</div>
+  <div class="overlay-label spring-in stagger-4" style="top:175px;right:80px;">🤖 AI PARSE</div>
+  <div class="overlay-label spring-in stagger-5" style="top:375px;right:30px;">🏷 7-LAYER TAG</div>
+  <div class="overlay-label spring-in stagger-6" style="bottom:175px;right:80px;">🛍 SHOPIFY</div>
+  <div class="overlay-label spring-in stagger-7" style="bottom:55px;left:50%;transform:translateX(-50%);">📂 SEO COLLECTIONS</div>
+  <div class="overlay-label spring-in stagger-6" style="bottom:175px;left:80px;">📊 SEO SCORE</div>
+  <div class="overlay-label spring-in stagger-5" style="top:375px;left:30px;">👑 GOOGLE</div>
+  <div class="overlay-label spring-in stagger-4" style="top:175px;left:80px;">🤖 CLAUDE/KIMI</div>
+  <div class="overlay-label spring-in stagger-8" style="top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(163,230,53,0.2);color:var(--lime);border:1px solid var(--lime);">⚡ SONIC INVOICES</div>
+</div>
 
-<!-- ACT 3: Connections draw (handled by canvas) -->
-<div class="act" data-act="2" style="background:transparent;pointer-events:none;"></div>
+<!-- ACT 3: Connections draw — with descriptive overlay -->
+<div class="act" data-act="2" style="background:transparent;">
+  <div style="position:absolute;top:24px;left:48px;right:48px;text-align:center;pointer-events:none;">
+    <div class="spring-in stagger-1 mono" style="color:var(--blue);margin-bottom:8px;">Act 3 — Connections Form</div>
+    <div class="spring-in stagger-2 headline" style="font-size:24px;color:var(--text);">Data flows between every node</div>
+    <div class="spring-in stagger-3" style="margin-top:12px;font-size:13px;color:var(--muted);">
+      Invoice → Parse → Tag → Shopify → Collections → Score → Google → Claude/Kimi
+    </div>
+  </div>
+  <!-- Keep node labels visible -->
+  <div class="overlay-label" style="top:55px;left:50%;transform:translateX(-50%);opacity:0.7;">📄 INVOICE</div>
+  <div class="overlay-label" style="top:175px;right:80px;opacity:0.7;">🤖 AI PARSE</div>
+  <div class="overlay-label" style="top:375px;right:30px;opacity:0.7;">🏷 7-LAYER TAG</div>
+  <div class="overlay-label" style="bottom:175px;right:80px;opacity:0.7;">🛍 SHOPIFY</div>
+  <div class="overlay-label" style="bottom:55px;left:50%;transform:translateX(-50%);opacity:0.7;">📂 SEO COLLECTIONS</div>
+  <div class="overlay-label" style="bottom:175px;left:80px;opacity:0.7;">📊 SEO SCORE</div>
+  <div class="overlay-label" style="top:375px;left:30px;opacity:0.7;">👑 GOOGLE</div>
+  <div class="overlay-label" style="top:175px;left:80px;opacity:0.7;">🤖 CLAUDE/KIMI</div>
+  <div class="overlay-label" style="top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(163,230,53,0.2);color:var(--lime);border:1px solid var(--lime);">⚡ SONIC INVOICES</div>
+</div>
 
-<!-- ACT 4: Flow through (handled by canvas) -->
-<div class="act" data-act="3" style="background:transparent;pointer-events:none;"></div>
+<!-- ACT 4: Flow through — with descriptive overlay -->
+<div class="act" data-act="3" style="background:transparent;">
+  <div style="position:absolute;top:24px;left:48px;right:48px;text-align:center;pointer-events:none;">
+    <div class="spring-in stagger-1 mono" style="color:var(--lime);margin-bottom:8px;">Act 4 — Live Flow</div>
+    <div class="spring-in stagger-2 headline" style="font-size:24px;color:var(--text);">One invoice. The entire system.</div>
+    <div class="spring-in stagger-3" style="margin-top:12px;font-size:13px;color:var(--muted);">
+      Watch a single invoice travel through every connected system — in real time
+    </div>
+  </div>
+  <!-- Keep node labels visible -->
+  <div class="overlay-label" style="top:55px;left:50%;transform:translateX(-50%);opacity:0.7;">📄 INVOICE</div>
+  <div class="overlay-label" style="top:175px;right:80px;opacity:0.7;">🤖 AI PARSE</div>
+  <div class="overlay-label" style="top:375px;right:30px;opacity:0.7;">🏷 7-LAYER TAG</div>
+  <div class="overlay-label" style="bottom:175px;right:80px;opacity:0.7;">🛍 SHOPIFY</div>
+  <div class="overlay-label" style="bottom:55px;left:50%;transform:translateX(-50%);opacity:0.7;">📂 SEO COLLECTIONS</div>
+  <div class="overlay-label" style="bottom:175px;left:80px;opacity:0.7;">📊 SEO SCORE</div>
+  <div class="overlay-label" style="top:375px;left:30px;opacity:0.7;">👑 GOOGLE</div>
+  <div class="overlay-label" style="top:175px;left:80px;opacity:0.7;">🤖 CLAUDE/KIMI</div>
+  <div class="overlay-label" style="top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(163,230,53,0.2);color:var(--lime);border:1px solid var(--lime);">⚡ SONIC INVOICES</div>
+  <!-- Bottom status bar -->
+  <div style="position:absolute;bottom:80px;left:48px;right:48px;text-align:center;pointer-events:none;">
+    <div class="spring-in stagger-4" style="display:inline-flex;gap:16px;align-items:center;background:rgba(10,10,10,0.8);border:1px solid var(--border);border-radius:12px;padding:12px 24px;backdrop-filter:blur(8px);">
+      <div style="text-align:center;">
+        <div style="font-size:11px;color:var(--muted);">Particles</div>
+        <div style="font-size:14px;font-weight:700;color:var(--lime);">Flowing</div>
+      </div>
+      <div style="width:1px;height:24px;background:var(--border);"></div>
+      <div style="text-align:center;">
+        <div style="font-size:11px;color:var(--muted);">Nodes</div>
+        <div style="font-size:14px;font-weight:700;color:var(--purple);">8 Active</div>
+      </div>
+      <div style="width:1px;height:24px;background:var(--border);"></div>
+      <div style="text-align:center;">
+        <div style="font-size:11px;color:var(--muted);">Status</div>
+        <div style="font-size:14px;font-weight:700;color:var(--green);">All Systems Go</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Controls -->
 <div id="progress-wrap"><div id="progress-fill"></div></div>
@@ -273,7 +348,6 @@ function drawNode(node, opacity, scale) {
   ctx.translate(node.x, node.y);
   ctx.scale(scale, scale);
 
-  // Glow
   const grad = ctx.createRadialGradient(0, 0, node.r * 0.5, 0, 0, node.r * 2);
   grad.addColorStop(0, node.color + '40');
   grad.addColorStop(1, 'transparent');
@@ -282,7 +356,6 @@ function drawNode(node, opacity, scale) {
   ctx.arc(0, 0, node.r * 2, 0, Math.PI * 2);
   ctx.fill();
 
-  // Hexagon shape
   ctx.fillStyle = '#141414';
   ctx.strokeStyle = node.color;
   ctx.lineWidth = 2;
@@ -298,7 +371,6 @@ function drawNode(node, opacity, scale) {
   ctx.fill();
   ctx.stroke();
 
-  // Label
   ctx.fillStyle = '#f5f5f5';
   ctx.font = 'bold 11px Inter, sans-serif';
   ctx.textAlign = 'center';
@@ -341,7 +413,6 @@ function drawConnection(conn, progress) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Draw particles on completed connections
   if (progress >= 1) {
     conn.particles.forEach(p => {
       ctx.fillStyle = conn.color;
@@ -365,7 +436,6 @@ function updateParticles() {
     const nx = dx / dist;
     const ny = dy / dist;
 
-    // Spawn new particle
     if (Math.random() < 0.03) {
       conn.particles.push({
         x: n1.x + nx * n1.r,
@@ -376,7 +446,6 @@ function updateParticles() {
       });
     }
 
-    // Update particles
     conn.particles = conn.particles.filter(p => {
       p.progress += p.speed;
       p.x = n1.x + nx * (n1.r + (dist - n1.r - n2.r) * p.progress);
@@ -394,14 +463,12 @@ function drawCenterPulse() {
   ctx.save();
   ctx.translate(node.x, node.y);
 
-  // Outer ring
   ctx.strokeStyle = '#a3e635' + Math.floor(pulse * 255).toString(16).padStart(2, '0');
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(0, 0, node.r + 10 + pulse * 15, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Center glow
   const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, node.r * 3);
   grad.addColorStop(0, '#a3e63530');
   grad.addColorStop(1, 'transparent');
@@ -441,7 +508,6 @@ function animate() {
   time += 16;
   ctx.clearRect(0, 0, 800, 800);
 
-  // Background grid
   ctx.strokeStyle = '#262626';
   ctx.lineWidth = 1;
   for (let i = 0; i < 800; i += 40) {
@@ -455,7 +521,6 @@ function animate() {
     ctx.stroke();
   }
 
-  // Draw connections based on act
   if (currentAct >= 1) {
     connections.forEach((conn, i) => {
       let targetProgress = 0;
@@ -467,7 +532,6 @@ function animate() {
     });
   }
 
-  // Draw nodes based on act
   if (currentAct >= 1) {
     nodes.forEach((node, i) => {
       let targetAppear = 0;
@@ -482,17 +546,14 @@ function animate() {
     });
   }
 
-  // Center pulse when all nodes visible
   if (currentAct >= 2 && nodeAppearances.every(n => n >= 1)) {
     drawCenterPulse();
   }
 
-  // Update and draw particles
   if (currentAct >= 2) {
     updateParticles();
   }
 
-  // Flow particle for act 3
   if (currentAct === 3) {
     if (!flowParticle) {
       flowParticle = { connIndex: 0, progress: 0 };
@@ -507,9 +568,7 @@ function animate() {
     flowParticle = null;
   }
 
-  // All-active radiating particles for act 3
   if (currentAct === 3) {
-    // Radiate from center to all nodes
     nodes.forEach((node, i) => {
       if (i === 8) return;
       const dx = node.x - 400;

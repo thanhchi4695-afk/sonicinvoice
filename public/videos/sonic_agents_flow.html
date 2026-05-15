@@ -190,19 +190,19 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
-.gap-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.gap-impact { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 100px; }
+.gap-name { font-size: 13px; font-weight: 700; color: var(--text); flex: 1; }
+.gap-impact { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 100px; margin: 0 12px; }
 .impact-high { background: rgba(253,171,61,0.12); color: var(--orange); }
 .impact-med { background: rgba(0,134,192,0.12); color: var(--blue); }
 .gap-btn {
-  padding: 4px 12px;
+  padding: 5px 14px;
   border-radius: 100px;
   font-size: 11px;
   font-weight: 700;
@@ -210,7 +210,9 @@ body {
   color: var(--purple);
   border: none;
   cursor: pointer;
+  transition: all 0.2s;
 }
+.gap-btn:hover { background: var(--purple); color: #fff; }
 
 .bar-chart {
   display: flex;
@@ -234,25 +236,30 @@ body {
   to { transform: scaleY(1); }
 }
 
-.timeline-node {
+.flow-arrow {
+  text-align: center;
+  font-size: 18px;
+  color: var(--purple);
+  margin: 6px 0;
+}
+
+.comp-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 4px;
+  font-size: 11px;
 }
-.timeline-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--green);
-  flex-shrink: 0;
-}
-.timeline-line {
-  position: absolute;
-  left: 4px;
-  top: 20px;
-  bottom: 0;
-  width: 2px;
+.comp-fav {
+  width: 22px; height: 22px;
+  border-radius: 4px;
   background: var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; color: var(--text);
 }
 </style>
 </head>
@@ -383,47 +390,84 @@ body {
   </div>
 </div>
 
-<!-- ACT 5: Gaps Found -->
+<!-- ACT 5: Gaps Found — POPULATED WITH REAL DATA -->
 <div class="act" data-act="4">
   <div class="spring-in stagger-1 mono" style="color:var(--orange);margin-bottom:16px;">Act 5 — Gaps Found</div>
-  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Opportunities identified</div>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:16px;">11 gaps. 3 high priority.</div>
+  <div class="spring-in stagger-3" style="font-size:12px;color:var(--muted);margin-bottom:12px;">Competitor collections you don't have — but should</div>
+
   <div class="gap-card spring-in stagger-3">
     <span class="gap-name">/womens-modest-swimwear</span>
-    <span class="gap-impact impact-high">HIGH — Swimwear Galore #3</span>
+    <span class="gap-impact impact-high">HIGH</span>
+    <span style="font-size:11px;color:var(--muted);margin:0 12px;">Swimwear Galore #3</span>
     <button class="gap-btn">+ Create</button>
   </div>
   <div class="gap-card spring-in stagger-4">
     <span class="gap-name">/maternity-swimwear</span>
-    <span class="gap-impact impact-high">HIGH — THE ICONIC #1</span>
+    <span class="gap-impact impact-high">HIGH</span>
+    <span style="font-size:11px;color:var(--muted);margin:0 12px;">THE ICONIC #1</span>
     <button class="gap-btn">+ Create</button>
   </div>
   <div class="gap-card spring-in stagger-5">
     <span class="gap-name">/teen-girls-swimwear</span>
-    <span class="gap-impact impact-med">MEDIUM — Multiple</span>
+    <span class="gap-impact impact-med">MED</span>
+    <span style="font-size:11px;color:var(--muted);margin:0 12px;">Multiple competitors</span>
     <button class="gap-btn">+ Create</button>
+  </div>
+  <div class="gap-card spring-in stagger-6" style="opacity:0.6;">
+    <span class="gap-name">/sustainable-swimwear</span>
+    <span class="gap-impact impact-high">HIGH</span>
+    <span style="font-size:11px;color:var(--muted);margin:0 12px;">THE ICONIC #2</span>
+    <button class="gap-btn">+ Create</button>
+  </div>
+
+  <div class="spring-in stagger-7" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+    <span class="pill pill-orange">11 gaps found</span>
+    <span class="pill pill-red">3 high priority</span>
+    <span class="pill pill-purple">One-click creation</span>
   </div>
 </div>
 
-<!-- ACT 6: One Click -->
+<!-- ACT 6: One Click Creation — FULL TRANSFORMATION -->
 <div class="act" data-act="5">
   <div class="spring-in stagger-1 mono" style="color:var(--purple);margin-bottom:16px;">Act 6 — One Click</div>
-  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Gap → Collection in seconds</div>
-  <div class="spring-in stagger-3" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-      <span class="pill pill-orange">Gap</span>
-      <span style="font-size:14px;color:var(--text);font-weight:600;">/womens-modest-swimwear</span>
+  <div class="spring-in stagger-2 headline" style="font-size:26px;color:var(--text);margin-bottom:20px;">Gap → Live collection in seconds</div>
+
+  <div style="max-width:520px;margin:0 auto;">
+    <!-- Before: Gap -->
+    <div class="gap-card spring-in stagger-3" style="border-color:var(--orange);">
+      <span class="gap-name">/womens-modest-swimwear</span>
+      <span class="gap-impact impact-high">GAP</span>
+      <span style="font-size:11px;color:var(--muted);margin:0 12px;">Missing from store</span>
     </div>
-    <div style="text-align:center;margin:8px 0;"><span style="color:var(--purple);font-size:20px;">↓</span></div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+
+    <div class="flow-arrow spring-in stagger-4">↓</div>
+
+    <!-- During: Creating -->
+    <div class="board-row row-purple spring-in stagger-5">
+      <div style="width:28px;height:28px;background:rgba(157,80,221,0.12);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">✍️</div>
+      <div style="flex:1;margin-left:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);">AI writing collection content</div>
+        <div style="font-size:11px;color:var(--muted);">Title · Meta · Description · FAQ · Links</div>
+      </div>
       <span class="pill pill-purple">Creating...</span>
-      <span style="font-size:14px;color:var(--text);">AI writing content</span>
     </div>
-    <div style="text-align:center;margin:8px 0;"><span style="color:var(--purple);font-size:20px;">↓</span></div>
-    <div style="display:flex;align-items:center;gap:12px;">
-      <span class="pill pill-green">✓ Live</span>
-      <span style="font-size:14px;color:var(--text);font-weight:600;">/womens-modest-swimwear</span>
-      <span style="font-size:12px;color:var(--muted);margin-left:auto;">SEO: 0/100 → needs content</span>
+
+    <div class="flow-arrow spring-in stagger-6">↓</div>
+
+    <!-- After: Live -->
+    <div class="board-row row-green spring-in stagger-7">
+      <div style="width:28px;height:28px;background:rgba(0,202,114,0.12);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">✓</div>
+      <div style="flex:1;margin-left:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);">/womens-modest-swimwear — LIVE</div>
+        <div style="font-size:11px;color:var(--muted);">SEO Score: 0/100 → needs content → Sonic Rank</div>
+      </div>
+      <span class="pill pill-green">Published</span>
     </div>
+  </div>
+
+  <div class="spring-in stagger-8" style="margin-top:16px;text-align:center;font-size:12px;color:var(--muted);">
+    Created in <span style="color:var(--purple);font-weight:700;">23 seconds</span> · 18 products matched automatically
   </div>
 </div>
 

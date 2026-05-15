@@ -15,6 +15,8 @@ import { ConfirmDialogProvider } from "@/hooks/use-confirm-dialog";
 import { PromptDialogProvider } from "@/hooks/use-prompt-dialog";
 import Index from "./pages/Index.tsx";
 import Landing from "./pages/Landing.tsx";
+import Home from "./pages/Home.tsx";
+import Demo from "./pages/Demo.tsx";
 import Login from "./pages/Login.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
 import AuthCallbackPage from "./pages/AuthCallback.tsx";

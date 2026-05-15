@@ -49,6 +49,7 @@ const SeoKeywords = lazy(() => import("./pages/SeoKeywords.tsx"));
 const SeoBlogPlans = lazy(() => import("./pages/SeoBlogPlans.tsx"));
 const SeoLinkMesh = lazy(() => import("./pages/SeoLinkMesh.tsx"));
 const AutoIngest = lazy(() => import("./pages/AutoIngest.tsx"));
+const FunctionsCatalog = lazy(() => import("./pages/FunctionsCatalog.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -107,6 +108,7 @@ const App = () => (
                   <Route path="/drive-watcher" element={<RequireAuth><DriveWatcher /></RequireAuth>} />
                   <Route path="/auto-ingest" element={<RequireAuth><Suspense fallback={null}><AutoIngest /></Suspense></RequireAuth>} />
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
+                  <Route path="/functions" element={<Suspense fallback={null}><FunctionsCatalog /></Suspense>} />
                   <Route path="/settings/claude-connector" element={<RequireAuth><ClaudeConnector /></RequireAuth>} />
                   <Route path="/settings/claude-activity" element={<RequireAuth><ClaudeActivity /></RequireAuth>} />
                   <Route

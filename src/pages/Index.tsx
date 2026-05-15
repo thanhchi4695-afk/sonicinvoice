@@ -210,7 +210,7 @@ const consumeFlowParams = (): FlowParams | undefined => {
 };
 // Exposed for flows that prefer reading via window helper.
 if (typeof window !== "undefined") {
-  (window as any).__sonicConsumeFlowParams = consumeFlowParams;
+  (window as unknown as { __sonicConsumeFlowParams: () => FlowParams | undefined }).__sonicConsumeFlowParams = consumeFlowParams;
 }
 
 import { useStoreMode } from "@/hooks/use-store-mode";
@@ -282,7 +282,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       }
     };
     const onQuickSearch = () => setShowQuickSearch(true);
-    (window as any).__sonicOpenQuickSearch = () => setShowQuickSearch(true);
+    (window as unknown as { __sonicOpenQuickSearch?: () => void }).__sonicOpenQuickSearch = () => setShowQuickSearch(true);
     window.addEventListener("sonic:reconciliation-ready", onReady as EventListener);
     window.addEventListener("sonic:navigate-flow", onNavFlow as EventListener);
     window.addEventListener("sonic:navigate-tab", onNavTab as EventListener);
@@ -292,7 +292,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
       window.removeEventListener("sonic:navigate-flow", onNavFlow as EventListener);
       window.removeEventListener("sonic:navigate-tab", onNavTab as EventListener);
       window.removeEventListener("sonic:open-quick-search", onQuickSearch);
-      delete (window as any).__sonicOpenQuickSearch;
+      delete (window as unknown as { __sonicOpenQuickSearch?: () => void }).__sonicOpenQuickSearch;
     };
   }, []);
   
@@ -386,14 +386,19 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     }
   }, []);
 
-  // Deep-link handler: /dashboard?flow=<flowId> opens that flow directly
+  // Deep-link handler: /dashboard?flow=<flowId>[&patternId=<id>] opens that flow directly
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const flowId = params.get("flow");
-    if (flowId && (FLOW_KEYS as Record<string, boolean>)[flowId]) {
-      setActiveFlow(flowId as ActiveFlow);
+    if (flowId && isFlowKey(flowId)) {
+      const patternId = params.get("patternId");
+      if (flowId === "invoice_detail" && patternId) {
+        setHistoryPatternId(patternId);
+      }
+      setActiveFlow(flowId);
       const url = new URL(window.location.href);
       url.searchParams.delete("flow");
+      url.searchParams.delete("patternId");
       window.history.replaceState({}, "", url.toString());
     }
   }, []);
@@ -436,19 +441,27 @@ const Index = ({ initialTab }: IndexProps = {}) => {
     });
   }, []);
 
-  const handleAuth = () => {
+  const handleAuth = useCallback(() => {
     setAuthed(true);
     addAuditEntry("Login", `User logged in`);
-  };
+  }, []);
+
+  // Type-safe setter — narrows arbitrary string flow keys from child callbacks.
+  // Silently ignores unknown keys (rather than coercing with `as any`).
+  const safeSetFlow = useCallback((flow: string | null) => {
+    if (flow === null) { setActiveFlow(null); return; }
+    if (isFlowKey(flow)) setActiveFlow(flow);
+    else console.warn(`[Index] Ignored unknown flow key: ${flow}`);
+  }, []);
 
   const handleStartFlow = useCallback((flow: string) => {
     if (flow.startsWith("pipeline:")) {
       setActivePipelineId(flow.replace("pipeline:", ""));
       setActiveFlow("pipeline");
     } else {
-      setActiveFlow(flow as any);
+      safeSetFlow(flow);
     }
-  }, []);
+  }, [safeSetFlow]);
 
   // ── Keyboard shortcuts ──
   const shortcuts: ShortcutDef[] = useMemo(() => [

@@ -15,6 +15,59 @@ const corsHeaders = {
 
 declare const EdgeRuntime: { waitUntil: (p: Promise<unknown>) => void } | undefined;
 
+/** Fetch with exponential backoff on 429/529/5xx. Surfaces TimeoutError immediately. */
+async function fetchWithBackoff(
+  url: string,
+  init: RequestInit,
+  maxAttempts = 3,
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if (res.status === 429 || res.status === 529 || (res.status >= 500 && res.status < 600)) {
+        if (attempt < maxAttempts) {
+          const waitMs = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+          console.warn(`[anthropic] ${res.status} on attempt ${attempt} — retrying in ${waitMs}ms`);
+          await new Promise((r) => setTimeout(r, waitMs));
+          continue;
+        }
+      }
+      return res;
+    } catch (err) {
+      lastErr = err;
+      if (err instanceof Error && err.name === "TimeoutError") throw err;
+      if (attempt < maxAttempts) {
+        const waitMs = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+        console.warn(`[anthropic] fetch threw on attempt ${attempt} — retrying in ${waitMs}ms`, err);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+    }
+  }
+  throw lastErr ?? new Error("fetchWithBackoff exhausted attempts");
+}
+
+/** Normalise an Azure-extracted product row into the internal shape used by
+ *  the validator, UI, and Shopify CSV. */
+function normaliseAzureProduct(p: Record<string, unknown>): Record<string, unknown> {
+  const cost = Number(p.unit_cost ?? p.cost ?? 0) || 0;
+  const rrp = p.rrp != null && p.rrp !== "" ? Number(p.rrp) : null;
+  const qty = Number(p.qty ?? p.quantity ?? 0) || 0;
+  const name = String(p.product_title ?? p.name ?? "").trim();
+  const sku = String(p.style_code ?? p.sku ?? "").trim();
+  const colour = String(p.colour ?? p.color ?? "").trim();
+  const size = String(p.size ?? "").trim();
+  const category = String(p.category ?? "").trim();
+  return {
+    ...p,
+    name, product_name: name, product_title: name,
+    sku, style_code: sku, colour, size, qty, quantity: qty,
+    cost, unit_cost: cost, rrp: rrp ?? null, compare_at_price: rrp ?? null,
+    tags: category ? [category] : (Array.isArray(p.tags) ? p.tags : []),
+  };
+}
+
 interface Classification {
   supplier_name: string | null;
   document_type: string;

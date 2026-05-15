@@ -3756,6 +3756,36 @@ export type Database = {
         }
         Relationships: []
       }
+      llms_txt_files: {
+        Row: {
+          content: string
+          generated_at: string
+          id: string
+          published_at: string | null
+          shop_domain: string
+          user_id: string
+          word_count: number | null
+        }
+        Insert: {
+          content: string
+          generated_at?: string
+          id?: string
+          published_at?: string | null
+          shop_domain: string
+          user_id: string
+          word_count?: number | null
+        }
+        Update: {
+          content?: string
+          generated_at?: string
+          id?: string
+          published_at?: string | null
+          shop_domain?: string
+          user_id?: string
+          word_count?: number | null
+        }
+        Relationships: []
+      }
       margin_agent_decisions: {
         Row: {
           action_taken: Json

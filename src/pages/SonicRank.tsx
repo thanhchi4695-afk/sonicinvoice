@@ -12,6 +12,7 @@ import { SeoScoreBadge } from "@/components/SeoScoreBadge";
 import { actionKind, gapCount, ringClasses } from "@/lib/seo-score";
 import { cn } from "@/lib/utils";
 import CollectionGeoDialog from "@/components/CollectionGeoDialog";
+import LlmsTxtCard from "@/components/LlmsTxtCard";
 
 interface Row {
   id: string;
@@ -144,6 +145,8 @@ function SonicRankInner() {
           </Button>
         </div>
       </div>
+
+      <LlmsTxtCard />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="Total collections" value={stats.total} />

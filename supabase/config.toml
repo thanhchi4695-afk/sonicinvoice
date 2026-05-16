@@ -80,3 +80,6 @@ verify_jwt = false
 [functions.sonic-agent-api]
 verify_jwt = false
 
+[functions.sonic-agent-proxy]
+verify_jwt = false
+

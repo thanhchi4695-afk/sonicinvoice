@@ -27,6 +27,7 @@ import Unsubscribe from "./pages/Unsubscribe.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import BrandGuide from "./pages/BrandGuide.tsx";
 import HowItWorks from "./pages/HowItWorks.tsx";
+import Workflows from "./pages/Workflows.tsx";
 import { CaseStudyPage } from "./pages/CaseStudy.tsx";
 import Health from "./pages/Health.tsx";
 import AdminSecrets from "./pages/AdminSecrets.tsx";

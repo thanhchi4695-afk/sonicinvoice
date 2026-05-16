@@ -36,7 +36,13 @@ export default function Navigation() {
             href="/how-it-works"
             className="text-sm text-[#a3a3a3] hover:text-[#fafafa] transition-colors duration-300"
           >
-            Watch how it works →
+            How it works
+          </a>
+          <a
+            href="/workflows"
+            className="text-sm text-[#a3a3a3] hover:text-[#fafafa] transition-colors duration-300"
+          >
+            Workflows
           </a>
           <a
             href="/login"

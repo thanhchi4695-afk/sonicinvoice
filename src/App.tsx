@@ -157,6 +157,7 @@ const App = () => (
                 <EmbeddedAuthHealthCheck />
                 <AskSonicAI />
                 <ClaudePopupButton />
+                </AgentNotificationsProvider>
               </BrowserRouter>
             </PromptDialogProvider>
           </ConfirmDialogProvider>

@@ -14,13 +14,6 @@ const supabasePublishableKey =
 const shopifyApiKey =
   process.env.VITE_SHOPIFY_API_KEY ?? "aebbc68f4f67197beb20489d6d2987e4";
 
-// Sonic Agent v2 (Vercel) — frontend connection
-const sonicAgentUrl =
-  process.env.VITE_SONIC_AGENT_URL ?? "https://sonic-agent-v2.vercel.app";
-const sonicAgentKey =
-  process.env.VITE_SONIC_AGENT_KEY ??
-  "73e24272edd2c62d49ac0b098702cda1c52b2d1c95a759921fbdb3c58148b3eb";
-
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -36,8 +29,6 @@ export default defineConfig(({ mode }) => ({
     "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(supabasePublishableKey),
     "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(supabasePublishableKey),
     "import.meta.env.VITE_SHOPIFY_API_KEY": JSON.stringify(shopifyApiKey),
-    "import.meta.env.VITE_SONIC_AGENT_URL": JSON.stringify(sonicAgentUrl),
-    "import.meta.env.VITE_SONIC_AGENT_KEY": JSON.stringify(sonicAgentKey),
   },
   resolve: {
     alias: {

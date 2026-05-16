@@ -31,7 +31,9 @@ interface ChatMessage {
   approval?: { approval_id: string; title: string };
 }
 
-const AGENT_URL = (import.meta.env.VITE_SONIC_AGENT_URL as string | undefined)?.replace(/\/+$/, "");
+// Sonic Agent is reached via a server-side proxy edge function so the
+// upstream API key never ships to the browser.
+const AGENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sonic-agent-proxy`;
 
 const QUICK_ACTIONS = [
   { label: "Process inbox", message: "Check my inbox and process new invoices" },

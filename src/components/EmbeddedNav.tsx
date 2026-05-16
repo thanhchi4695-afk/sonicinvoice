@@ -96,6 +96,9 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
               const Icon = item.icon;
               const isActive = item.type === "tab" && activeTab === item.id;
               const showClaudeDot = item.id === "account" && claudeBadge;
+              const badgeKey = (item as any).badge as string | undefined;
+              const showApprovalsBadge = badgeKey === "approvals-count" && pendingApprovals > 0;
+              const showAgentDot = badgeKey === "agent-active" && agentActive;
               return (
                 <button
                   key={item.id}
@@ -114,6 +117,20 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
                 >
                   <Icon className="w-4 h-4 shrink-0" />
                   <span className="truncate">{item.label}</span>
+                  {showApprovalsBadge && (
+                    <span
+                      aria-label={`${pendingApprovals} pending approvals`}
+                      className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold bg-primary text-primary-foreground"
+                    >
+                      {pendingApprovals > 99 ? "99+" : pendingApprovals}
+                    </span>
+                  )}
+                  {showAgentDot && (
+                    <span
+                      aria-label="Agent is running"
+                      className="ml-auto h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse"
+                    />
+                  )}
                   {showClaudeDot && (
                     <span
                       aria-label="New: Claude connector"

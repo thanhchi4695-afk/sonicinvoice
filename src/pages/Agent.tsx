@@ -175,7 +175,33 @@ export default function Agent() {
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
-      if (!cancelled) setShopId(membership?.shop_id ?? null);
+
+      let resolvedShopId = membership?.shop_id ?? null;
+
+      // Auto-provision a shop for users who connected Shopify but never got a
+      // shop_users row (e.g. legacy connections predating the agent feature).
+      if (!resolvedShopId) {
+        const { data: conn } = await supabase
+          .from("shopify_connections")
+          .select("store_url")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (conn?.store_url) {
+          const { data: newShop } = await supabase
+            .from("shops")
+            .insert({ name: conn.store_url, created_by: user.id })
+            .select("id")
+            .single();
+          if (newShop?.id) {
+            await supabase
+              .from("shop_users")
+              .insert({ shop_id: newShop.id, user_id: user.id, role: "owner" });
+            resolvedShopId = newShop.id;
+          }
+        }
+      }
+
+      if (!cancelled) setShopId(resolvedShopId);
     })();
     return () => { cancelled = true; };
   }, []);

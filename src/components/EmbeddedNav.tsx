@@ -1,6 +1,7 @@
-import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight, X, Users, Brain, History, Sparkles, Bot, Sparkle, HeartPulse, Shield } from "lucide-react";
+import { Home, FolderOpen, Wrench, User, BarChart3, HelpCircle, FileText, Package, Layers, BookOpen, Mail, ClipboardList, Link, Megaphone, Target, ArrowLeftRight, X, Users, Brain, History, Sparkles, Bot, Sparkle, HeartPulse, Shield, MessageSquare, CheckSquare, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import CollectionAutopilotWidget from "@/components/CollectionAutopilotWidget";
+import { useAgentNotifications } from "@/hooks/use-agent-notifications";
 
 interface EmbeddedNavProps {
   activeTab: string;
@@ -18,6 +19,14 @@ const navSections = [
       { id: "ai_agents", label: "AI Agents", icon: Bot, type: "tab" as const },
       { id: "analytics", label: "Analytics", icon: BarChart3, type: "tab" as const },
       { id: "history", label: "History", icon: FolderOpen, type: "tab" as const },
+    ],
+  },
+  {
+    title: "Agent",
+    items: [
+      { id: "agent_chat", label: "Chat", icon: MessageSquare, type: "route" as const, href: "/agent", badge: "agent-active" as const },
+      { id: "agent_approvals", label: "Approvals", icon: CheckSquare, type: "route" as const, href: "/approvals", badge: "approvals-count" as const },
+      { id: "agent_audit", label: "Audit", icon: ScrollText, type: "route" as const, href: "/audit-log" },
     ],
   },
   {
@@ -62,6 +71,7 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
   const claudeBadge = (() => {
     try { return localStorage.getItem("claude_connector_visited") !== "true"; } catch { return false; }
   })();
+  const { pendingApprovals, agentActive } = useAgentNotifications();
   return (
   <>
     <div className="px-4 py-4 flex items-center justify-between">
@@ -86,6 +96,9 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
               const Icon = item.icon;
               const isActive = item.type === "tab" && activeTab === item.id;
               const showClaudeDot = item.id === "account" && claudeBadge;
+              const badgeKey = (item as any).badge as string | undefined;
+              const showApprovalsBadge = badgeKey === "approvals-count" && pendingApprovals > 0;
+              const showAgentDot = badgeKey === "agent-active" && agentActive;
               return (
                 <button
                   key={item.id}
@@ -104,6 +117,20 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
                 >
                   <Icon className="w-4 h-4 shrink-0" />
                   <span className="truncate">{item.label}</span>
+                  {showApprovalsBadge && (
+                    <span
+                      aria-label={`${pendingApprovals} pending approvals`}
+                      className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-semibold bg-primary text-primary-foreground"
+                    >
+                      {pendingApprovals > 99 ? "99+" : pendingApprovals}
+                    </span>
+                  )}
+                  {showAgentDot && (
+                    <span
+                      aria-label="Agent is running"
+                      className="ml-auto h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse"
+                    />
+                  )}
                   {showClaudeDot && (
                     <span
                       aria-label="New: Claude connector"

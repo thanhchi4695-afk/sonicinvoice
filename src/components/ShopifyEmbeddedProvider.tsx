@@ -68,8 +68,17 @@ const ShopifyEmbeddedProvider = ({ children }: Props) => {
 
     const authenticate = async () => {
       try {
-        // Step 1: Get session token from App Bridge (waits for AB to load)
-        const token = await getSessionToken();
+        // Step 1: Get session token from App Bridge (waits for AB to load).
+        // Mobile Shopify app can be slow over cellular — retry once before
+        // surfacing the "App Bridge did not initialise" error.
+        let token = await getSessionToken();
+        if (cancelled) return;
+        if (!token) {
+          console.warn("[embedded-auth] First idToken attempt failed, retrying once…");
+          await new Promise((r) => setTimeout(r, 1500));
+          if (cancelled) return;
+          token = await getSessionToken();
+        }
         if (cancelled) return;
         if (!token) {
           setAuthError("App Bridge did not initialise — try reloading the app from Shopify Admin.");

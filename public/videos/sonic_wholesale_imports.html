@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Wholesale Imports</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a;
+  color: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.logo {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  font-size: 22px;
+  color: #a3e635;
+  font-weight: 700;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo svg { width: 20px; height: 20px; }
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 60px 40px 100px;
+}
+.act {
+  display: none;
+  width: 100%;
+  max-width: 1000px;
+  animation: springIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.act.active { display: block; }
+@keyframes springIn {
+  from { opacity: 0; transform: translateY(40px) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tagline {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  font-size: 13px;
+  color: #737373;
+  font-weight: 500;
+}
+h2 {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #f0f0f0;
+  line-height: 1.15;
+}
+.subtitle {
+  font-size: 18px;
+  color: #737373;
+  margin-bottom: 40px;
+  line-height: 1.5;
+}
+.card {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 28px;
+}
+.format-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.format-card {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+.format-card:hover { border-color: #a3e635; }
+.format-card .format-icon { font-size: 40px; margin-bottom: 12px; }
+.format-card .format-name { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.format-card .format-desc { font-size: 13px; color: #737373; }
+.joor-matrix {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 10px;
+  padding: 20px;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 12px;
+  overflow-x: auto;
+}
+.matrix-row {
+  display: grid;
+  grid-template-columns: 120px repeat(6, 60px);
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.matrix-cell {
+  background: #1a1a1a;
+  padding: 6px 8px;
+  border-radius: 4px;
+  text-align: center;
+}
+.matrix-cell.header { background: #242424; font-weight: 600; color: #737373; font-size: 10px; }
+.pdf-preview {
+  background: #fff;
+  color: #0a0a0a;
+  border-radius: 8px;
+  padding: 20px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.pdf-preview .pdf-header {
+  border-bottom: 2px solid #0a0a0a;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.pdf-preview .pdf-line {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px 80px;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid #eee;
+}
+.lookbook-page {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.lookbook-item {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+.lookbook-item .page-num {
+  font-size: 11px;
+  color: #404040;
+  margin-bottom: 8px;
+}
+.lookbook-item .page-preview {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+.lookbook-item .page-product {
+  font-size: 12px;
+  color: #737373;
+}
+.review-queue {
+  background: #0f0f0f;
+  border-radius: 10px;
+  padding: 20px;
+}
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #1a1a1a;
+}
+.queue-item:last-child { border-bottom: none; }
+.queue-icon { font-size: 24px; }
+.queue-info { flex: 1; }
+.queue-info .queue-name { font-weight: 600; font-size: 14px; }
+.queue-info .queue-meta { font-size: 12px; color: #737373; }
+.queue-status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.queue-status.ready { background: rgba(163,230,53,0.12); color: #a3e635; }
+.queue-status.review { background: rgba(253,171,61,0.12); color: #FDAB3D; }
+.packing-slip {
+  background: #fff;
+  color: #0a0a0a;
+  border-radius: 8px;
+  padding: 24px;
+  font-size: 12px;
+}
+.packing-slip .slip-header {
+  text-align: center;
+  border-bottom: 2px solid #0a0a0a;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+.packing-slip .slip-title { font-size: 16px; font-weight: 700; }
+.packing-slip .slip-subtitle { font-size: 11px; color: #666; margin-top: 4px; }
+.packing-slip .slip-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 60px 80px;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+}
+.packing-slip .slip-row.header { font-weight: 600; border-bottom: 2px solid #0a0a0a; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+.stat-box {
+  background: #0f0f0f;
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+}
+.stat-box-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #a3e635;
+}
+.stat-box-label {
+  font-size: 12px;
+  color: #737373;
+  margin-top: 4px;
+}
+.cta-panel {
+  text-align: center;
+  padding: 40px;
+}
+.cta-logo { font-size: 64px; margin-bottom: 20px; }
+.cta-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+.cta-url { font-size: 18px; color: #a3e635; margin-bottom: 32px; font-weight: 500; }
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #a3e635;
+  color: #0a0a0a;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+.cta-button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(163,230,53,0.3); }
+.progress-container {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  z-index: 50;
+}
+.progress-bar {
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #a3e635;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+.dots {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 50;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #404040;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.dot.active { background: #a3e635; transform: scale(1.3); }
+.controls-hint {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  font-size: 11px;
+  color: #404040;
+  z-index: 50;
+}
+.caption {
+  font-size: 15px;
+  color: #737373;
+  margin-top: 20px;
+  font-style: italic;
+}
+</style>
+</head>
+<body>
+<div class="logo">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+  Sonic Invoices
+</div>
+<div class="tagline">"Every wholesale format. One workflow."</div>
+
+<div class="stage">
+
+<!-- Act 1: The Problem -->
+<div class="act active" data-act="1">
+  <h2>Every supplier sends a different format. Sonic handles all of them.</h2>
+  <div class="subtitle">Three invoices. Three formats. One workflow.</div>
+  <div class="format-grid">
+    <div class="format-card">
+      <div class="format-icon">📊</div>
+      <div class="format-name">JOOR</div>
+      <div class="format-desc">Size matrix Excel<br>80 units · 12 styles</div>
+    </div>
+    <div class="format-card">
+      <div class="format-icon">📄</div>
+      <div class="format-name">Wholesale PDF</div>
+      <div class="format-desc">Line sheet<br>35 products · Baku SS26</div>
+    </div>
+    <div class="format-card">
+      <div class="format-icon">📖</div>
+      <div class="format-name">Lookbook PDF</div>
+      <div class="format-desc">48-page visual<br>62 products · Seafolly</div>
+    </div>
+  </div>
+  <div class="caption">"Every supplier sends a different format. Sonic handles all of them."</div>
+</div>
+
+<!-- Act 2: JOOR Import -->
+<div class="act" data-act="2">
+  <h2>JOOR size matrix — auto-detected.</h2>
+  <div class="subtitle">Field mapper detects size columns automatically</div>
+  <div class="card">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+      <span style="font-size:24px;">📊</span>
+      <div>
+        <div style="font-weight:600;">JOOR Export Uploaded</div>
+        <div style="font-size:12px; color:#737373;">baku-ss26-joor-export.xlsx</div>
+      </div>
+    </div>
+    <div class="joor-matrix">
+      <div class="matrix-row">
+        <div class="matrix-cell header">Style</div>
+        <div class="matrix-cell header">XS</div>
+        <div class="matrix-cell header">S</div>
+        <div class="matrix-cell header">M</div>
+        <div class="matrix-cell header">L</div>
+        <div class="matrix-cell header">XL</div>
+        <div class="matrix-cell header">Total</div>
+      </div>
+      <div class="matrix-row">
+        <div class="matrix-cell">BK001</div>
+        <div class="matrix-cell">2</div>
+        <div class="matrix-cell">4</div>
+        <div class="matrix-cell">6</div>
+        <div class="matrix-cell">4</div>
+        <div class="matrix-cell">2</div>
+        <div class="matrix-cell" style="color:#a3e635; font-weight:600;">18</div>
+      </div>
+      <div class="matrix-row">
+        <div class="matrix-cell">BK002</div>
+        <div class="matrix-cell">1</div>
+        <div class="matrix-cell">3</div>
+        <div class="matrix-cell">5</div>
+        <div class="matrix-cell">5</div>
+        <div class="matrix-cell">3</div>
+        <div class="matrix-cell" style="color:#a3e635; font-weight:600;">17</div>
+      </div>
+    </div>
+    <div style="margin-top:16px; text-align:center; font-size:13px; color:#737373;">
+      <strong style="color:#a3e635;">80 units</strong> across <strong style="color:#a3e635;">12 styles</strong> → <strong style="color:#a3e635;">240 SKU rows</strong> auto-generated
+    </div>
+  </div>
+  <div class="caption">"Size columns auto-detected. 240 SKU rows from one matrix."</div>
+</div>
+
+<!-- Act 3: Wholesale Import -->
+<div class="act" data-act="3">
+  <h2>PDF line sheet — AI reads the layout.</h2>
+  <div class="subtitle">3-column layout detected · Style code · Description · Wholesale price</div>
+  <div class="pdf-preview">
+    <div class="pdf-header">Baku SS26 — Wholesale Line Sheet</div>
+    <div class="pdf-row header">
+      <div>Code</div>
+      <div>Description</div>
+      <div>Wholesale</div>
+      <div>RRP</div>
+    </div>
+    <div class="pdf-row">
+      <div>BK001</div>
+      <div>Boardshort Classic Navy</div>
+      <div>$38.00</div>
+      <div>$89.00</div>
+    </div>
+    <div class="pdf-row">
+      <div>BK002</div>
+      <div>Boardshort Stripe Teal</div>
+      <div>$42.00</div>
+      <div>$95.00</div>
+    </div>
+    <div class="pdf-row">
+      <div>BK003</div>
+      <div>Rash Vest Long Sleeve</div>
+      <div>$35.00</div>
+      <div>$79.00</div>
+    </div>
+  </div>
+  <div style="margin-top:16px; text-align:center; font-size:13px; color:#737373;">
+    <strong style="color:#a3e635;">35 products</strong> extracted · Colour variants <strong style="color:#a3e635;">auto-split</strong>
+  </div>
+  <div class="caption">"PDF line sheet parsed. Layout learned. Products extracted."</div>
+</div>
+
+<!-- Act 4: Lookbook Import -->
+<div class="act" data-act="4">
+  <h2>48-page lookbook — AI Vision reads every page.</h2>
+  <div class="subtitle">Product name from caption · Colours from image · Price from footer</div>
+  <div class="lookbook-page">
+    <div class="lookbook-item">
+      <div class="page-num">Page 8</div>
+      <div class="page-preview">📄</div>
+      <div class="page-product">Beach Bound — Teal</div>
+    </div>
+    <div class="lookbook-item">
+      <div class="page-num">Page 12</div>
+      <div class="page-preview">📄</div>
+      <div class="page-product">Beach Bound — Black</div>
+    </div>
+    <div class="lookbook-item">
+      <div class="page-num">Page 16</div>
+      <div class="page-preview">📄</div>
+      <div class="page-product">Beach Bound — Ivory</div>
+    </div>
+    <div class="lookbook-item">
+      <div class="page-num">Page 20</div>
+      <div class="page-preview">📄</div>
+      <div class="page-product">Active One Piece</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px;">
+    <div style="font-size:13px; color:#737373; line-height:1.8;">
+      <div><strong style="color:#a3e635;">Page 12 detected:</strong> "Seafolly Beach Bound — Teal, Black, Ivory · $129 RRP"</div>
+      <div><strong style="color:#a3e635;">AI Vision:</strong> Name from caption · Colours from image analysis · Price from page footer</div>
+    </div>
+  </div>
+  <div style="margin-top:16px; text-align:center; font-size:13px; color:#737373;">
+    <strong style="color:#a3e635;">62 products</strong> from <strong style="color:#a3e635;">48 pages</strong> — zero manual entry
+  </div>
+  <div class="caption">"48 pages. 62 products. AI Vision reads them all."</div>
+</div>
+
+<!-- Act 5: All Three — Same Review -->
+<div class="act" data-act="5">
+  <h2>One review queue. All formats. Unified.</h2>
+  <div class="subtitle">JOOR · Wholesale · Lookbook — same workflow</div>
+  <div class="review-queue">
+    <div class="queue-item">
+      <div class="queue-icon">📊</div>
+      <div class="queue-info">
+        <div class="queue-name">JOOR — Baku SS26</div>
+        <div class="queue-meta">240 SKUs · Size matrix · Auto-mapped</div>
+      </div>
+      <div class="queue-status ready">✓ Ready</div>
+    </div>
+    <div class="queue-item">
+      <div class="queue-icon">📄</div>
+      <div class="queue-info">
+        <div class="queue-name">Wholesale — Baku SS26</div>
+        <div class="queue-meta">35 products · PDF line sheet · Colour variants split</div>
+      </div>
+      <div class="queue-status ready">✓ Ready</div>
+    </div>
+    <div class="queue-item">
+      <div class="queue-icon">📖</div>
+      <div class="queue-info">
+        <div class="queue-name">Lookbook — Seafolly SS26</div>
+        <div class="queue-meta">62 products · 48 pages · 8 need review</div>
+      </div>
+      <div class="queue-status review">⚠ 8 Review</div>
+    </div>
+  </div>
+  <div style="margin-top:16px; text-align:center; font-size:14px; color:#737373;">
+    One export: <strong style="color:#a3e635;">Shopify CSV</strong> with all <strong style="color:#a3e635;">337 products</strong>
+  </div>
+  <div class="caption">"One queue. One export. 337 products. Zero re-entry."</div>
+</div>
+
+<!-- Act 6: Packing Slips + Order Forms -->
+<div class="act" data-act="6">
+  <h2>Professional packing slips. Supplier order forms.</h2>
+  <div class="subtitle">Generated from the same data — no extra work</div>
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+    <div class="packing-slip">
+      <div class="slip-header">
+        <div class="slip-title">PACKING SLIP</div>
+        <div class="slip-subtitle">PO #4421 · Baku SS26 · 35 items</div>
+      </div>
+      <div class="slip-row header">
+        <div>#</div>
+        <div>Product</div>
+        <div>Qty</div>
+        <div>Check</div>
+      </div>
+      <div class="slip-row">
+        <div>1</div>
+        <div>Boardshort Classic Navy</div>
+        <div>18</div>
+        <div>☐</div>
+      </div>
+      <div class="slip-row">
+        <div>2</div>
+        <div>Boardshort Stripe Teal</div>
+        <div>17</div>
+        <div>☐</div>
+      </div>
+    </div>
+    <div class="card" style="display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+      <div style="font-size:32px; margin-bottom:12px;">📋</div>
+      <div style="font-size:16px; font-weight:600; margin-bottom:8px;">Order Form</div>
+      <div style="font-size:13px; color:#737373; margin-bottom:16px;">PDF for supplier<br>CSV for records</div>
+      <div style="display:flex; gap:8px;">
+        <span style="background:rgba(163,230,53,0.1); color:#a3e635; padding:6px 12px; border-radius:16px; font-size:11px;">📄 PDF</span>
+        <span style="background:rgba(163,230,53,0.1); color:#a3e635; padding:6px 12px; border-radius:16px; font-size:11px;">📊 CSV</span>
+      </div>
+    </div>
+  </div>
+  <div class="caption">"Packing slips and order forms — auto-generated from the same data."</div>
+</div>
+
+<!-- Act 7: The Benefit -->
+<div class="act" data-act="7">
+  <h2>Whatever format they send — Sonic reads it.</h2>
+  <div class="subtitle">The numbers across all three formats</div>
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-box-value">6</div>
+      <div class="stat-box-label">Formats handled<br>PDF · Excel · CSV · JOOR · Lookbook · Photo</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">337</div>
+      <div class="stat-box-label">Products extracted</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">0</div>
+      <div class="stat-box-label">Manual re-entry</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">22 min</div>
+      <div class="stat-box-label">Time</div>
+    </div>
+  </div>
+  <div class="caption">"Whatever format they send — Sonic reads it."</div>
+</div>
+
+<!-- Act 8: CTA -->
+<div class="act" data-act="8">
+  <div class="cta-panel">
+    <div class="cta-logo">⚡</div>
+    <div class="cta-title">Sonic Invoices</div>
+    <div class="cta-url">sonicinvoices.com</div>
+    <a href="https://sonicinvoices.com" class="cta-button">Book a free demo →</a>
+  </div>
+</div>
+
+</div>
+
+<div class="progress-container">
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="controls-hint">← → arrows · spacebar play/pause</div>
+
+<script>
+const totalActs = 8;
+let currentAct = 1;
+let isPlaying = true;
+let progress = 0;
+const actDuration = 15000;
+
+function initDots() {
+  const dotsContainer = document.getElementById('dots');
+  for (let i = 1; i <= totalActs; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 1 ? ' active' : '');
+    dot.onclick = () => goToAct(i);
+    dotsContainer.appendChild(dot);
+  }
+}
+
+function goToAct(n) {
+  if (n < 1 || n > totalActs) return;
+  document.querySelectorAll('.act').forEach(a => a.classList.remove('active'));
+  document.querySelector(`.act[data-act="${n}"]`).classList.add('active');
+  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === n));
+  currentAct = n;
+  resetProgress();
+}
+
+function nextAct() {
+  if (currentAct < totalActs) goToAct(currentAct + 1);
+  else goToAct(1);
+}
+
+function prevAct() {
+  if (currentAct > 1) goToAct(currentAct - 1);
+  else goToAct(totalActs);
+}
+
+function resetProgress() {
+  progress = 0;
+  document.getElementById('progressFill').style.width = '0%';
+}
+
+function updateProgress() {
+  if (!isPlaying) return;
+  progress += 100 / (actDuration / 100);
+  document.getElementById('progressFill').style.width = progress + '%';
+  if (progress >= 100) nextAct();
+}
+
+setInterval(updateProgress, 100);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') { nextAct(); resetProgress(); }
+  if (e.key === 'ArrowLeft') { prevAct(); resetProgress(); }
+  if (e.key === ' ') { e.preventDefault(); isPlaying = !isPlaying; }
+});
+
+initDots();
+</script>
+</body>
+</html>

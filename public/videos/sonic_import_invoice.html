@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Import Invoice</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a;
+  color: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.logo {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  font-size: 22px;
+  color: #a3e635;
+  font-weight: 700;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo svg { width: 20px; height: 20px; }
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 60px 40px 100px;
+}
+.act {
+  display: none;
+  width: 100%;
+  max-width: 1100px;
+  animation: springIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.act.active { display: block; }
+@keyframes springIn {
+  from { opacity: 0; transform: translateY(40px) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tagline {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  font-size: 13px;
+  color: #737373;
+  font-weight: 500;
+}
+h2 {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #f0f0f0;
+  line-height: 1.15;
+}
+.subtitle {
+  font-size: 18px;
+  color: #737373;
+  margin-bottom: 40px;
+  line-height: 1.5;
+}
+.card {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 28px;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.invoice-card {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.3s ease;
+}
+.invoice-card:hover { border-color: #a3e635; }
+.invoice-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(163,230,53,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.invoice-info h4 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.invoice-info p { font-size: 13px; color: #737373; }
+.timer {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 48px;
+  color: #a3e635;
+  font-weight: 700;
+  margin: 20px 0;
+}
+.timer-sad { color: #ef4444; }
+.dropzone {
+  border: 2px dashed #404040;
+  border-radius: 16px;
+  padding: 60px 40px;
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+.dropzone.active { border-color: #a3e635; background: rgba(163,230,53,0.05); }
+.dropzone-icon { font-size: 48px; margin-bottom: 16px; }
+.dropzone-text { font-size: 18px; color: #737373; margin-bottom: 8px; }
+.dropzone-formats { font-size: 13px; color: #404040; }
+.file-drop {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1a1a;
+  border: 1px solid #a3e635;
+  border-radius: 10px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  animation: dropIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes dropIn {
+  from { opacity: 0; transform: translate(-50%, -80%) scale(0.8); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.parser-log {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  padding: 16px 20px;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 13px;
+  line-height: 1.8;
+  margin-top: 20px;
+}
+.parser-log .log-line { display: flex; gap: 12px; }
+.parser-log .log-time { color: #404040; min-width: 60px; }
+.parser-log .log-msg { color: #a3e635; }
+.parser-log .log-muted { color: #737373; }
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.tag {
+  background: rgba(163,230,53,0.12);
+  color: #a3e635;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid rgba(163,230,53,0.2);
+}
+.tag.purple { background: rgba(157,80,221,0.12); color: #9D50DD; border-color: rgba(157,80,221,0.2); }
+.tag.blue { background: rgba(0,134,192,0.12); color: #0086C0; border-color: rgba(0,134,192,0.2); }
+.tag.amber { background: rgba(253,171,61,0.12); color: #FDAB3D; border-color: rgba(253,171,61,0.2); }
+.product-card {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.product-img {
+  width: 120px;
+  height: 150px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+}
+.product-details h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; line-height: 1.3; }
+.product-meta { display: flex; gap: 20px; margin: 12px 0; }
+.meta-item { text-align: center; }
+.meta-value { font-size: 22px; font-weight: 700; color: #a3e635; }
+.meta-label { font-size: 11px; color: #737373; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+.seo-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(163,230,53,0.12);
+  color: #a3e635;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.review-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.review-table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: #737373;
+  font-weight: 500;
+  border-bottom: 1px solid #242424;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.review-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #1a1a1a;
+}
+.review-table tr:hover td { background: rgba(163,230,53,0.03); }
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.green { background: #a3e635; }
+.status-dot.amber { background: #FDAB3D; }
+.export-btn {
+  background: #1a1a1a;
+  border: 1px solid #242424;
+  border-radius: 10px;
+  padding: 16px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  color: #f0f0f0;
+}
+.export-btn:hover, .export-btn.selected {
+  border-color: #a3e635;
+  background: rgba(163,230,53,0.08);
+}
+.export-btn .btn-icon { font-size: 24px; margin-bottom: 8px; display: block; }
+.export-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 24px; }
+.sync-progress {
+  background: #0f0f0f;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+}
+.sync-bar {
+  height: 6px;
+  background: #1a1a1a;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.sync-bar-fill {
+  height: 100%;
+  background: #a3e635;
+  border-radius: 3px;
+  animation: fillBar 2s ease-out forwards;
+}
+@keyframes fillBar { from { width: 0; } to { width: 100%; } }
+.sync-stats { display: flex; justify-content: space-between; font-size: 13px; }
+.sync-stat { text-align: center; }
+.sync-stat-value { font-size: 20px; font-weight: 700; color: #a3e635; }
+.sync-stat-label { font-size: 11px; color: #737373; margin-top: 4px; }
+.split-screen {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.split-panel {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 28px;
+}
+.split-panel.before { border-color: #ef4444; }
+.split-panel.after { border-color: #a3e635; }
+.split-panel h4 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+.split-panel.before h4 { color: #ef4444; }
+.split-panel.after h4 { color: #a3e635; }
+.big-number {
+  font-size: 72px;
+  font-weight: 800;
+  color: #a3e635;
+  line-height: 1;
+  margin: 16px 0;
+}
+.cta-panel {
+  text-align: center;
+  padding: 40px;
+}
+.cta-logo { font-size: 64px; margin-bottom: 20px; }
+.cta-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+.cta-url { font-size: 18px; color: #a3e635; margin-bottom: 32px; font-weight: 500; }
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #a3e635;
+  color: #0a0a0a;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+.cta-button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(163,230,53,0.3); }
+.progress-container {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  z-index: 50;
+}
+.progress-bar {
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #a3e635;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+.dots {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 50;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #404040;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.dot.active { background: #a3e635; transform: scale(1.3); }
+.controls-hint {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  font-size: 11px;
+  color: #404040;
+  z-index: 50;
+}
+.caption {
+  font-size: 15px;
+  color: #737373;
+  margin-top: 20px;
+  font-style: italic;
+}
+.spreadsheet {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 12px;
+}
+.spreadsheet-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr 1fr 80px;
+  border-bottom: 1px solid #1a1a1a;
+}
+.spreadsheet-row.header { background: #141414; font-weight: 600; color: #737373; font-size: 10px; text-transform: uppercase; }
+.spreadsheet-row div { padding: 8px 12px; }
+.spreadsheet-row:hover { background: rgba(163,230,53,0.03); }
+.formula-box {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  padding: 16px 20px;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 14px;
+  color: #a3e635;
+  margin: 16px 0;
+}
+</style>
+</head>
+<body>
+<div class="logo">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+  Sonic Invoices
+</div>
+<div class="tagline">"From supplier email to Shopify in 14 minutes"</div>
+
+<div class="stage">
+
+<!-- Act 1: The Problem -->
+<div class="act active" data-act="1">
+  <h2>Monday 8 AM. Three supplier invoices arrive.</h2>
+  <div class="subtitle">Manual entry estimate: 2 hours 14 minutes</div>
+  <div class="card-grid">
+    <div class="invoice-card">
+      <div class="invoice-icon">📄</div>
+      <div class="invoice-info">
+        <h4>Kulani Kinis</h4>
+        <p>PDF, 40 products</p>
+      </div>
+    </div>
+    <div class="invoice-card">
+      <div class="invoice-icon">📊</div>
+      <div class="invoice-info">
+        <h4>Seafolly</h4>
+        <p>Excel, 28 products</p>
+      </div>
+    </div>
+    <div class="invoice-card">
+      <div class="invoice-icon">📧</div>
+      <div class="invoice-info">
+        <h4>Baku</h4>
+        <p>Email attachment, 15 products</p>
+      </div>
+    </div>
+  </div>
+  <div class="spreadsheet" style="margin-top: 24px;">
+    <div class="spreadsheet-row header">
+      <div>#</div><div>Product</div><div>SKU</div><div>Cost</div><div>Status</div>
+    </div>
+    <div class="spreadsheet-row"><div>1</div><div>KB001 Cheeky Bottom</div><div></div><div>$28.00</div><div style="color:#FDAB3D">⏳</div></div>
+    <div class="spreadsheet-row"><div>2</div><div>KB002 One Piece</div><div></div><div>$45.00</div><div style="color:#FDAB3D">⏳</div></div>
+    <div class="spreadsheet-row"><div>3</div><div>...</div><div>...</div><div>...</div><div style="color:#404040">—</div></div>
+  </div>
+  <div class="timer timer-sad">02:14:00</div>
+  <div class="caption">"Every Monday. Every buyer. Everywhere."</div>
+</div>
+
+<!-- Act 2: Upload -->
+<div class="act" data-act="2">
+  <h2>Upload anything. Sonic figures out the rest.</h2>
+  <div class="subtitle">Drag & drop zone — accepts any format</div>
+  <div class="dropzone active">
+    <div class="dropzone-icon">📂</div>
+    <div class="dropzone-text">Drop your invoice here</div>
+    <div class="dropzone-formats">PDF · Excel · CSV · Word · Photo</div>
+    <div class="file-drop">
+      <span>📄</span>
+      <span>kulani-kinis-SS26-invoice.pdf</span>
+      <span style="color:#a3e635">✓</span>
+    </div>
+  </div>
+  <div class="caption">"Upload anything. Sonic figures out the rest."</div>
+</div>
+
+<!-- Act 3: AI Parsing -->
+<div class="act" data-act="3">
+  <h2>AI reads the invoice in 12 seconds.</h2>
+  <div class="subtitle">Real product data extracted automatically</div>
+  <div class="card">
+    <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+      <div style="width:48px;height:48px;border-radius:12px;background:rgba(163,230,53,0.1);display:flex;align-items:center;justify-content:center;font-size:24px;">🤖</div>
+      <div>
+        <div style="font-size:16px;font-weight:600;">AI Parser Active</div>
+        <div style="font-size:13px;color:#737373;">Processing kulani-kinis-SS26-invoice.pdf</div>
+      </div>
+    </div>
+    <div class="parser-log">
+      <div class="log-line"><span class="log-time">00:01</span><span class="log-msg">Supplier detected: Kulani Kinis</span></div>
+      <div class="log-line"><span class="log-time">00:03</span><span class="log-msg">Layout identified: Type B</span></div>
+      <div class="log-line"><span class="log-time">00:05</span><span class="log-msg">40 products found</span></div>
+      <div class="log-line"><span class="log-time">00:08</span><span class="log-msg">Extracting: style codes, costs, sizes, colours</span></div>
+      <div class="log-line"><span class="log-time">00:12</span><span class="log-msg">Parse complete. 40 products ready.</span></div>
+    </div>
+    <div style="margin-top:16px; padding:12px; background:rgba(163,230,53,0.05); border-radius:8px; font-size:13px;">
+      <strong style="color:#a3e635;">Product detected:</strong> "Kulani Kinis Tiny Teeny Itsy Bitsy · Cheeky Bottom · Candy Stripe · XS–L · $28 cost"
+    </div>
+  </div>
+  <div class="caption">"40 products. 12 seconds. Zero templates."</div>
+</div>
+
+<!-- Act 4: AI Classification -->
+<div class="act" data-act="4">
+  <h2>Classifier auto-tags every product.</h2>
+  <div class="subtitle">7-layer auto-tagging in real time</div>
+  <div class="card">
+    <div style="font-size:14px; color:#737373; margin-bottom:16px;">Product: <strong style="color:#f0f0f0;">Kulani Kinis Tiny Teeny Itsy Bitsy Cheeky Bottom</strong></div>
+    <div class="formula-box">[brand] + [category] + [fabric] + [season] + [occasion] + [fit] + [audience]</div>
+    <div class="tag-row">
+      <span class="tag">kulani-kinis</span>
+      <span class="tag purple">bikini-bottom</span>
+      <span class="tag blue">candy-stripe</span>
+      <span class="tag">xs-l</span>
+      <span class="tag amber">spring-26</span>
+      <span class="tag purple">beach</span>
+      <span class="tag blue">nylon-elastane</span>
+    </div>
+  </div>
+  <div class="caption">"Classifier auto-tags every product."</div>
+</div>
+
+<!-- Act 5: Enriched Product Card -->
+<div class="act" data-act="5">
+  <h2>Every product becomes a sellable listing.</h2>
+  <div class="subtitle">Auto-generated title, description, and SEO score</div>
+  <div class="product-card">
+    <div class="product-img">👙</div>
+    <div class="product-details">
+      <h3>Kulani Kinis Tiny Teeny Itsy Bitsy One Piece — Candy Stripe | D-G Cup</h3>
+      <div class="tag-row">
+        <span class="tag">kulani-kinis</span>
+        <span class="tag purple">bikini-bottom</span>
+        <span class="tag">candy-stripe</span>
+        <span class="tag amber">spring-26</span>
+      </div>
+      <div class="product-meta">
+        <div class="meta-item"><div class="meta-value">$28</div><div class="meta-label">Cost</div></div>
+        <div class="meta-item"><div class="meta-value">$79</div><div class="meta-label">RRP</div></div>
+        <div class="meta-item"><div class="meta-value">65%</div><div class="meta-label">Margin</div></div>
+        <div class="meta-item"><div class="meta-value" style="color:#a3e635;">91</div><div class="meta-label">SEO Score</div></div>
+      </div>
+      <div style="font-size:13px; color:#737373; line-height:1.6; margin-top:8px;">
+        The Tiny Teeny Itsy Bitsy Cheeky Bottom in Candy Stripe is your go-to for beach days. Chlorine resistant, mix-and-match ready, and designed for the Australian sun. Available in XS through L.
+      </div>
+    </div>
+  </div>
+  <div class="caption">"From raw invoice to customer-ready in seconds."</div>
+</div>
+
+<!-- Act 6: Review & Edit -->
+<div class="act" data-act="6">
+  <h2>You are in control. Sonic never pushes without your review.</h2>
+  <div class="subtitle">Review table — catch what matters, approve the rest</div>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table class="review-table">
+      <tr><th>Status</th><th>Product</th><th>SKU</th><th>Cost</th><th>Issue</th></tr>
+      <tr><td><span class="status-dot green"></span></td><td>KB001 Cheeky Bottom</td><td>KB001-CS</td><td>$28.00</td><td style="color:#a3e635">✓ Ready</td></tr>
+      <tr><td><span class="status-dot green"></span></td><td>KB002 One Piece</td><td>KB002-CS</td><td>$45.00</td><td style="color:#a3e635">✓ Ready</td></tr>
+      <tr><td><span class="status-dot green"></span></td><td>KB003 Triangle Top</td><td>KB003-CS</td><td>$32.00</td><td style="color:#a3e635">✓ Ready</td></tr>
+      <tr style="background:rgba(253,171,61,0.05);"><td><span class="status-dot amber"></span></td><td>KB004 Boardshort</td><td style="color:#FDAB3D;font-weight:600;">— missing —</td><td>$38.00</td><td style="color:#FDAB3D">⚠ SKU missing</td></tr>
+      <tr><td><span class="status-dot green"></span></td><td>...</td><td>...</td><td>...</td><td style="color:#a3e635">✓ Ready</td></tr>
+    </table>
+    <div style="padding:12px 20px; background:rgba(163,230,53,0.05); border-top:1px solid #242424; font-size:13px; color:#a3e635;">
+      <strong>40 rows</strong> — 39 ready · 1 needs attention
+    </div>
+  </div>
+  <div class="caption">"You are in control. Sonic never pushes without your review."</div>
+</div>
+
+<!-- Act 7: Choose Export Format -->
+<div class="act" data-act="7">
+  <h2>Export to any platform. One click.</h2>
+  <div class="subtitle">Choose your destination</div>
+  <div class="export-grid">
+    <div class="export-btn selected">
+      <span class="btn-icon">🛒</span>
+      <div>Shopify CSV</div>
+    </div>
+    <div class="export-btn">
+      <span class="btn-icon">📊</span>
+      <div>Matrixify</div>
+    </div>
+    <div class="export-btn">
+      <span class="btn-icon">⚡</span>
+      <div>Lightspeed</div>
+    </div>
+    <div class="export-btn">
+      <span class="btn-icon">🔍</span>
+      <div>Google Feed</div>
+    </div>
+    <div class="export-btn">
+      <span class="btn-icon">📋</span>
+      <div>Barcode Sheet</div>
+    </div>
+  </div>
+  <div style="margin-top:24px; text-align:center; font-size:14px; color:#737373;">
+    Downloading <strong style="color:#a3e635;">shopify-import-40-products.csv</strong>...
+  </div>
+  <div class="caption">"One file. Any platform. Zero reformatting."</div>
+</div>
+
+<!-- Act 8: Push to Shopify -->
+<div class="act" data-act="8">
+  <h2>Live sync to your store.</h2>
+  <div class="subtitle">splashswimwear.com.au — 45 seconds</div>
+  <div class="sync-progress">
+    <div class="sync-bar"><div class="sync-bar-fill" style="width:100%"></div></div>
+    <div class="sync-stats">
+      <div class="sync-stat"><div class="sync-stat-value">40</div><div class="sync-stat-label">Products Created</div></div>
+      <div class="sync-stat"><div class="sync-stat-value">3</div><div class="sync-stat-label">Collections Updated</div></div>
+      <div class="sync-stat"><div class="sync-stat-value">40</div><div class="sync-stat-label">Barcodes Synced</div></div>
+      <div class="sync-stat"><div class="sync-stat-value" style="color:#a3e635;">0</div><div class="sync-stat-label">Errors</div></div>
+      <div class="sync-stat"><div class="sync-stat-value">45s</div><div class="sync-stat-label">Total Time</div></div>
+    </div>
+  </div>
+  <div class="caption">"From invoice to live store in under a minute."</div>
+</div>
+
+<!-- Act 9: The Numbers -->
+<div class="act" data-act="9">
+  <h2>Turn Mondays from dread to done.</h2>
+  <div class="subtitle">The difference is stark</div>
+  <div class="split-screen">
+    <div class="split-panel before">
+      <h4>Before Sonic</h4>
+      <div style="font-size:15px; line-height:2; color:#737373;">
+        <div>⏱ 2 hours 14 minutes</div>
+        <div>❌ Errors guaranteed</div>
+        <div>😩 Soul-destroying</div>
+        <div>📝 Manual data entry</div>
+      </div>
+    </div>
+    <div class="split-panel after">
+      <h4>With Sonic</h4>
+      <div style="font-size:15px; line-height:2; color:#737373;">
+        <div>⚡ 14 minutes</div>
+        <div>✓ 0 errors</div>
+        <div>🎯 100% tagged</div>
+        <div>🤖 Fully automated</div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center; margin-top:32px;">
+    <div class="big-number">87%</div>
+    <div style="font-size:18px; color:#737373;">faster</div>
+  </div>
+  <div class="caption">"Turn Mondays from dread to done."</div>
+</div>
+
+<!-- Act 10: CTA -->
+<div class="act" data-act="10">
+  <div class="cta-panel">
+    <div class="cta-logo">⚡</div>
+    <div class="cta-title">Sonic Invoices</div>
+    <div class="cta-url">sonicinvoices.com</div>
+    <a href="https://sonicinvoices.com" class="cta-button">Book a free demo →</a>
+  </div>
+</div>
+
+</div>
+
+<div class="progress-container">
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="controls-hint">← → arrows · spacebar play/pause</div>
+
+<script>
+const totalActs = 10;
+let currentAct = 1;
+let isPlaying = true;
+let progress = 0;
+let progressInterval;
+const actDuration = 15000;
+
+function initDots() {
+  const dotsContainer = document.getElementById('dots');
+  for (let i = 1; i <= totalActs; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 1 ? ' active' : '');
+    dot.onclick = () => goToAct(i);
+    dotsContainer.appendChild(dot);
+  }
+}
+
+function goToAct(n) {
+  if (n < 1 || n > totalActs) return;
+  document.querySelectorAll('.act').forEach(a => a.classList.remove('active'));
+  document.querySelector(`.act[data-act="${n}"]`).classList.add('active');
+  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === n));
+  currentAct = n;
+  resetProgress();
+}
+
+function nextAct() {
+  if (currentAct < totalActs) goToAct(currentAct + 1);
+  else goToAct(1);
+}
+
+function prevAct() {
+  if (currentAct > 1) goToAct(currentAct - 1);
+  else goToAct(totalActs);
+}
+
+function resetProgress() {
+  progress = 0;
+  document.getElementById('progressFill').style.width = '0%';
+}
+
+function updateProgress() {
+  if (!isPlaying) return;
+  progress += 100 / (actDuration / 100);
+  document.getElementById('progressFill').style.width = progress + '%';
+  if (progress >= 100) {
+    nextAct();
+  }
+}
+
+setInterval(updateProgress, 100);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') { nextAct(); resetProgress(); }
+  if (e.key === 'ArrowLeft') { prevAct(); resetProgress(); }
+  if (e.key === ' ') { e.preventDefault(); isPlaying = !isPlaying; }
+});
+
+initDots();
+</script>
+</body>
+</html>

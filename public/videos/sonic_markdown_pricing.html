@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Markdown Ladder & Pricing</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a;
+  color: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.logo {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  font-size: 22px;
+  color: #a3e635;
+  font-weight: 700;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo svg { width: 20px; height: 20px; }
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 60px 40px 100px;
+}
+.act {
+  display: none;
+  width: 100%;
+  max-width: 1000px;
+  animation: springIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.act.active { display: block; }
+@keyframes springIn {
+  from { opacity: 0; transform: translateY(40px) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tagline {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  font-size: 13px;
+  color: #737373;
+  font-weight: 500;
+}
+h2 {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #f0f0f0;
+  line-height: 1.15;
+}
+.subtitle {
+  font-size: 18px;
+  color: #737373;
+  margin-bottom: 40px;
+  line-height: 1.5;
+}
+.card {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 28px;
+}
+.ladder-stages {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+}
+.stage-card {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+}
+.stage-card .stage-num { font-size: 12px; color: #737373; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.stage-card .stage-discount { font-size: 36px; font-weight: 700; margin-bottom: 4px; }
+.stage-card .stage-trigger { font-size: 13px; color: #737373; }
+.stage-card.s1 { border-color: #FDAB3D; }
+.stage-card.s1 .stage-discount { color: #FDAB3D; }
+.stage-card.s2 { border-color: #f97316; }
+.stage-card.s2 .stage-discount { color: #f97316; }
+.stage-card.s3 { border-color: #ef4444; }
+.stage-card.s3 .stage-discount { color: #ef4444; }
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+.product-item {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+.product-item .pi-img { font-size: 32px; margin-bottom: 8px; }
+.product-item .pi-name { font-size: 12px; color: #737373; margin-bottom: 4px; }
+.product-item .pi-stage { font-size: 11px; padding: 2px 8px; border-radius: 10px; display: inline-block; }
+.product-item .pi-stage.s1 { background: rgba(253,171,61,0.1); color: #FDAB3D; }
+.product-item .pi-stage.s2 { background: rgba(249,115,22,0.1); color: #f97316; }
+.product-item .pi-stage.s3 { background: rgba(239,68,68,0.1); color: #ef4444; }
+.shopify-preview {
+  background: #fff;
+  color: #0a0a0a;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.shopify-preview .preview-header {
+  background: #f5f5f5;
+  padding: 12px 20px;
+  border-bottom: 1px solid #e5e5e5;
+  font-size: 13px;
+  color: #666;
+}
+.shopify-preview .preview-body {
+  padding: 24px;
+}
+.shopify-preview .preview-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.shopify-preview .preview-price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.shopify-preview .price-sale { font-size: 24px; font-weight: 700; color: #ef4444; }
+.shopify-preview .price-compare { font-size: 16px; text-decoration: line-through; color: #999; }
+.shopify-preview .sale-badge {
+  display: inline-block;
+  background: #ef4444;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.bulk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.bulk-table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: #737373;
+  font-weight: 500;
+  border-bottom: 1px solid #242424;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.bulk-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #1a1a1a;
+}
+.bulk-table tr:hover td { background: rgba(163,230,53,0.03); }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+.stat-box {
+  background: #0f0f0f;
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+}
+.stat-box-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #a3e635;
+}
+.stat-box-label {
+  font-size: 12px;
+  color: #737373;
+  margin-top: 4px;
+}
+.cta-panel {
+  text-align: center;
+  padding: 40px;
+}
+.cta-logo { font-size: 64px; margin-bottom: 20px; }
+.cta-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+.cta-url { font-size: 18px; color: #a3e635; margin-bottom: 32px; font-weight: 500; }
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #a3e635;
+  color: #0a0a0a;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+.cta-button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(163,230,53,0.3); }
+.progress-container {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  z-index: 50;
+}
+.progress-bar {
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #a3e635;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+.dots {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 50;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #404040;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.dot.active { background: #a3e635; transform: scale(1.3); }
+.controls-hint {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  font-size: 11px;
+  color: #404040;
+  z-index: 50;
+}
+.caption {
+  font-size: 15px;
+  color: #737373;
+  margin-top: 20px;
+  font-style: italic;
+}
+</style>
+</head>
+<body>
+<div class="logo">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+  Sonic Invoices
+</div>
+<div class="tagline">"Clear old stock before it costs you"</div>
+
+<div class="stage">
+
+<!-- Act 1: The Problem -->
+<div class="act active" data-act="1">
+  <h2>Old stock at full price is a problem that gets worse every day.</h2>
+  <div class="subtitle">End of season. 47 units sitting. New stock arriving in 3 weeks.</div>
+  <div style="display:flex; justify-content:center; gap:12px; margin-top:20px; flex-wrap:wrap;">
+    <div style="background:#0f0f0f; border:1px solid #242424; border-radius:10px; padding:20px; text-align:center; width:100px;">
+      <div style="font-size:32px; margin-bottom:8px;">👙</div>
+      <div style="font-size:12px; color:#737373;">Spring-25</div>
+      <div style="font-size:11px; color:#404040; margin-top:4px;">$129</div>
+    </div>
+    <div style="background:#0f0f0f; border:1px solid #242424; border-radius:10px; padding:20px; text-align:center; width:100px;">
+      <div style="font-size:32px; margin-bottom:8px;">👙</div>
+      <div style="font-size:12px; color:#737373;">Spring-25</div>
+      <div style="font-size:11px; color:#404040; margin-top:4px;">$129</div>
+    </div>
+    <div style="background:#0f0f0f; border:1px solid #242424; border-radius:10px; padding:20px; text-align:center; width:100px;">
+      <div style="font-size:32px; margin-bottom:8px;">👙</div>
+      <div style="font-size:12px; color:#737373;">Spring-25</div>
+      <div style="font-size:11px; color:#404040; margin-top:4px;">$129</div>
+    </div>
+    <div style="background:#0f0f0f; border:1px solid #242424; border-radius:10px; padding:20px; text-align:center; width:100px;">
+      <div style="font-size:32px; margin-bottom:8px;">👙</div>
+      <div style="font-size:12px; color:#737373;">Spring-25</div>
+      <div style="font-size:11px; color:#404040; margin-top:4px;">$129</div>
+    </div>
+  </div>
+  <div style="text-align:center; margin-top:20px; font-size:14px; color:#737373;">47 units · 0 sales in 30 days · Storage cost ticking · Spring-26 arriving soon</div>
+  <div class="caption">"Old stock at full price is a problem that gets worse every day."</div>
+</div>
+
+<!-- Act 2: Create a Markdown Ladder -->
+<div class="act" data-act="2">
+  <h2>Create a Markdown Ladder. Set it. Forget it.</h2>
+  <div class="subtitle">Automatic price reductions based on days without sale</div>
+  <div class="ladder-stages">
+    <div class="stage-card s1">
+      <div class="stage-num">Stage 1</div>
+      <div class="stage-discount">20% OFF</div>
+      <div class="stage-trigger">30 days without sale</div>
+    </div>
+    <div class="stage-card s2">
+      <div class="stage-num">Stage 2</div>
+      <div class="stage-discount">30% OFF</div>
+      <div class="stage-trigger">60 days without sale</div>
+    </div>
+    <div class="stage-card s3">
+      <div class="stage-num">Stage 3</div>
+      <div class="stage-discount">50% OFF</div>
+      <div class="stage-trigger">90 days without sale</div>
+    </div>
+  </div>
+  <div style="margin-top:20px; text-align:center; font-size:13px; color:#737373;">
+    Applied to: <strong style="color:#a3e635;">Category = Swimwear</strong> · <strong style="color:#a3e635;">Season = Spring-25</strong>
+  </div>
+  <div class="caption">"20% at 30 days. 30% at 60 days. 50% at 90 days. Automatic."</div>
+</div>
+
+<!-- Act 3: Products Assigned -->
+<div class="act" data-act="3">
+  <h2>47 products. Each assigned to its stage.</h2>
+  <div class="subtitle">Visual overview of what is markdowning when</div>
+  <div class="product-grid">
+    <div class="product-item"><div class="pi-img">👙</div><div class="pi-name">Riviera Teal</div><div class="pi-stage s1">Stage 1</div></div>
+    <div class="product-item"><div class="pi-img">👙</div><div class="pi-name">Riviera Black</div><div class="pi-stage s1">Stage 1</div></div>
+    <div class="product-item"><div class="pi-img">👙</div><div class="pi-name">Beach Bound</div><div class="pi-stage s2">Stage 2</div></div>
+    <div class="product-item"><div class="pi-img">👙</div><div class="pi-name">Cheeky XS</div><div class="pi-stage s3">Stage 3</div></div>
+  </div>
+  <div style="margin-top:16px; display:flex; justify-content:center; gap:16px; font-size:13px;">
+    <span style="color:#FDAB3D;">● 12 at Stage 1</span>
+    <span style="color:#f97316;">● 8 at Stage 2</span>
+    <span style="color:#ef4444;">● 3 at Stage 3</span>
+    <span style="color:#737373;">● 24 not yet triggered</span>
+  </div>
+  <div class="caption">"12 at Stage 1. 8 at Stage 2. 3 at Stage 3. All automatic."</div>
+</div>
+
+<!-- Act 4: Auto-Price Update -->
+<div class="act" data-act="4">
+  <h2>Price updates fire automatically. Sale badge appears.</h2>
+  <div class="subtitle">Shopify updated. No manual price edits.</div>
+  <div class="shopify-preview">
+    <div class="preview-header">Shopify Preview — Auto-Updated</div>
+    <div class="preview-body">
+      <div class="preview-title">Seafolly Beach Bound One Piece — Teal</div>
+      <div class="preview-price">
+        <span class="price-sale">$103.20</span>
+        <span class="price-compare">$129.00</span>
+      </div>
+      <div class="sale-badge">SALE — 20% OFF</div>
+      <div style="margin-top:12px; font-size:12px; color:#666;">Markdown Ladder Stage 1 triggered · 32 days without sale</div>
+    </div>
+  </div>
+  <div class="caption">"Compare at $129. Sale price $103.20. Red badge. Auto-applied."</div>
+</div>
+
+<!-- Act 5: Price Adjustment (Bulk) -->
+<div class="act" data-act="5">
+  <h2>Bulk price adjustment. One click. All products.</h2>
+  <div class="subtitle">+5% for new GST rate. Preview. Confirm. Export.</div>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table class="bulk-table">
+      <tr><th>Product</th><th>Current</th><th>New</th><th>Change</th></tr>
+      <tr><td>Seafolly Riviera Teal 12</td><td>$89.00</td><td>$93.45</td><td style="color:#a3e635;">+5%</td></tr>
+      <tr><td>Seafolly Beach Bound Black 14</td><td>$89.00</td><td>$93.45</td><td style="color:#a3e635;">+5%</td></tr>
+      <tr><td>Kulani Kinis Cheeky XS</td><td>$28.00</td><td>$29.40</td><td style="color:#a3e635;">+5%</td></tr>
+      <tr><td>Baku Boardshort Navy</td><td>$38.00</td><td>$39.90</td><td style="color:#a3e635;">+5%</td></tr>
+    </table>
+    <div style="padding:12px 20px; background:rgba(163,230,53,0.05); border-top:1px solid #242424; font-size:13px; color:#a3e635;">
+      <strong>28 products</strong> selected · Preview confirmed · Export CSV ready
+    </div>
+  </div>
+  <div class="caption">"Select all Seafolly. +5%. Preview. Confirm. Done."</div>
+</div>
+
+<!-- Act 6: Bulk Sale Pricing -->
+<div class="act" data-act="6">
+  <h2>Bulk sale pricing. Upload. Filter. Apply.</h2>
+  <div class="subtitle">30% off · Round to .95 · Preview all changes</div>
+  <div class="card" style="text-align:center; padding:40px;">
+    <div style="font-size:48px; margin-bottom:16px;">🏷️</div>
+    <div style="font-size:18px; font-weight:600; margin-bottom:8px;">Bulk Sale Pricing</div>
+    <div style="font-size:13px; color:#737373; margin-bottom:24px;">Upload CSV → Filter by tag: spring-25 → Set discount</div>
+    <div style="display:flex; justify-content:center; gap:16px; margin-bottom:20px;">
+      <div style="background:#0f0f0f; border-radius:8px; padding:12px 20px;">
+        <div style="font-size:11px; color:#737373;">Discount</div>
+        <div style="font-size:20px; font-weight:700; color:#a3e635;">30%</div>
+      </div>
+      <div style="background:#0f0f0f; border-radius:8px; padding:12px 20px;">
+        <div style="font-size:11px; color:#737373;">Round to</div>
+        <div style="font-size:20px; font-weight:700; color:#a3e635;">.95</div>
+      </div>
+      <div style="background:#0f0f0f; border-radius:8px; padding:12px 20px;">
+        <div style="font-size:11px; color:#737373;">Products</div>
+        <div style="font-size:20px; font-weight:700; color:#a3e635;">47</div>
+      </div>
+    </div>
+    <button style="background:#a3e635; color:#0a0a0a; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer;">Download CSV → Import to Shopify</button>
+  </div>
+  <div class="caption">"Upload. Filter. Set 30% off. Round to .95. Import. Done."</div>
+</div>
+
+<!-- Act 7: The Benefit -->
+<div class="act" data-act="7">
+  <h2>Every markdown, timed perfectly. Automatically.</h2>
+  <div class="subtitle">Old stock cleared. Revenue recovered. Storage relieved.</div>
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-box-value">34/47</div>
+      <div class="stat-box-label">Units cleared before new stock</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">$3,900</div>
+      <div class="stat-box-label">Revenue recovered vs $0 at full price</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">✓</div>
+      <div class="stat-box-label">Storage pressure relieved</div>
+    </div>
+  </div>
+  <div class="caption">"34 of 47 units cleared. $3,900 recovered. Storage ready for Spring-26."</div>
+</div>
+
+<!-- Act 8: CTA -->
+<div class="act" data-act="8">
+  <div class="cta-panel">
+    <div class="cta-logo">⚡</div>
+    <div class="cta-title">Sonic Invoices</div>
+    <div class="cta-url">sonicinvoices.com</div>
+    <a href="https://sonicinvoices.com" class="cta-button">Book a free demo →</a>
+  </div>
+</div>
+
+</div>
+
+<div class="progress-container">
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="controls-hint">← → arrows · spacebar play/pause</div>
+
+<script>
+const totalActs = 8;
+let currentAct = 1;
+let isPlaying = true;
+let progress = 0;
+const actDuration = 15000;
+
+function initDots() {
+  const dotsContainer = document.getElementById('dots');
+  for (let i = 1; i <= totalActs; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 1 ? ' active' : '');
+    dot.onclick = () => goToAct(i);
+    dotsContainer.appendChild(dot);
+  }
+}
+
+function goToAct(n) {
+  if (n < 1 || n > totalActs) return;
+  document.querySelectorAll('.act').forEach(a => a.classList.remove('active'));
+  document.querySelector(`.act[data-act="${n}"]`).classList.add('active');
+  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === n));
+  currentAct = n;
+  resetProgress();
+}
+
+function nextAct() {
+  if (currentAct < totalActs) goToAct(currentAct + 1);
+  else goToAct(1);
+}
+
+function prevAct() {
+  if (currentAct > 1) goToAct(currentAct - 1);
+  else goToAct(totalActs);
+}
+
+function resetProgress() {
+  progress = 0;
+  document.getElementById('progressFill').style.width = '0%';
+}
+
+function updateProgress() {
+  if (!isPlaying) return;
+  progress += 100 / (actDuration / 100);
+  document.getElementById('progressFill').style.width = progress + '%';
+  if (progress >= 100) nextAct();
+}
+
+setInterval(updateProgress, 100);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') { nextAct(); resetProgress(); }
+  if (e.key === 'ArrowLeft') { prevAct(); resetProgress(); }
+  if (e.key === ' ') { e.preventDefault(); isPlaying = !isPlaying; }
+});
+
+initDots();
+</script>
+</body>
+</html>

@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Stocktake & Transfer Orders</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a;
+  color: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.logo {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  font-size: 22px;
+  color: #a3e635;
+  font-weight: 700;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo svg { width: 20px; height: 20px; }
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 60px 40px 100px;
+}
+.act {
+  display: none;
+  width: 100%;
+  max-width: 1000px;
+  animation: springIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.act.active { display: block; }
+@keyframes springIn {
+  from { opacity: 0; transform: translateY(40px) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tagline {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  font-size: 13px;
+  color: #737373;
+  font-weight: 500;
+}
+h2 {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #f0f0f0;
+  line-height: 1.15;
+}
+.subtitle {
+  font-size: 18px;
+  color: #737373;
+  margin-bottom: 40px;
+  line-height: 1.5;
+}
+.card {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 28px;
+}
+.stocktake-setup {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.setup-field {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  padding: 16px;
+}
+.setup-field .label { font-size: 11px; color: #737373; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.setup-field .value { font-size: 15px; font-weight: 500; }
+.scan-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 12px;
+}
+.scan-card .scan-icon { font-size: 32px; }
+.scan-card .scan-info { flex: 1; }
+.scan-card .scan-info .product { font-weight: 600; margin-bottom: 4px; }
+.scan-card .scan-info .meta { font-size: 13px; color: #737373; }
+.scan-card .scan-input {
+  width: 60px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #a3e635;
+  background: transparent;
+  border: none;
+}
+.scan-card .variance {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+.scan-card .variance.negative { background: rgba(253,171,61,0.1); color: #FDAB3D; }
+.variance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.variance-table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: #737373;
+  font-weight: 500;
+  border-bottom: 1px solid #242424;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.variance-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #1a1a1a;
+}
+.variance-table tr:hover td { background: rgba(163,230,53,0.03); }
+.variance-table .neg { color: #FDAB3D; font-weight: 600; }
+.transfer-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.location-card {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+}
+.location-card .loc-name { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.location-card .loc-stock { font-size: 32px; font-weight: 700; color: #a3e635; }
+.location-card .loc-status { font-size: 12px; color: #737373; margin-top: 4px; }
+.location-card.overstock { border-color: #FDAB3D; }
+.location-card.overstock .loc-stock { color: #FDAB3D; }
+.location-card.out { border-color: #ef4444; }
+.location-card.out .loc-stock { color: #ef4444; }
+.transfer-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: #a3e635;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+.stat-box {
+  background: #0f0f0f;
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+}
+.stat-box-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #a3e635;
+}
+.stat-box-label {
+  font-size: 12px;
+  color: #737373;
+  margin-top: 4px;
+}
+.cta-panel {
+  text-align: center;
+  padding: 40px;
+}
+.cta-logo { font-size: 64px; margin-bottom: 20px; }
+.cta-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+.cta-url { font-size: 18px; color: #a3e635; margin-bottom: 32px; font-weight: 500; }
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #a3e635;
+  color: #0a0a0a;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+.cta-button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(163,230,53,0.3); }
+.progress-container {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  z-index: 50;
+}
+.progress-bar {
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #a3e635;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+.dots {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 50;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #404040;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.dot.active { background: #a3e635; transform: scale(1.3); }
+.controls-hint {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  font-size: 11px;
+  color: #404040;
+  z-index: 50;
+}
+.caption {
+  font-size: 15px;
+  color: #737373;
+  margin-top: 20px;
+  font-style: italic;
+}
+</style>
+</head>
+<body>
+<div class="logo">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+  Sonic Invoices
+</div>
+<div class="tagline">"Stocktake in hours, not days"</div>
+
+<div class="stage">
+
+<!-- Act 1: The Problem -->
+<div class="act active" data-act="1">
+  <h2>The dread of stocktake Sunday.</h2>
+  <div class="subtitle">Store closed. 9 PM. Staff with clipboards and paper tally sheets.</div>
+  <div style="display:flex; justify-content:center; gap:20px; margin-top:20px;">
+    <div style="font-size:64px;">📋</div>
+    <div style="font-size:64px;">✏️</div>
+    <div style="font-size:64px;">😫</div>
+  </div>
+  <div style="text-align:center; margin-top:20px; font-size:14px; color:#737373;">
+    Manual count · Paper tallies · No variance tracking · Hours of dread
+  </div>
+  <div class="caption">"The dread of stocktake Sunday."</div>
+</div>
+
+<!-- Act 2: Start a Stocktake -->
+<div class="act" data-act="2">
+  <h2>New stocktake in seconds.</h2>
+  <div class="subtitle">Full count or partial by category — your choice</div>
+  <div class="stocktake-setup">
+    <div class="setup-field">
+      <div class="label">Location</div>
+      <div class="value">Darwin CBD Store</div>
+    </div>
+    <div class="setup-field">
+      <div class="label">Date</div>
+      <div class="value">Sunday 18 May</div>
+    </div>
+    <div class="setup-field">
+      <div class="label">Type</div>
+      <div class="value" style="color:#a3e635;">Partial — Swimwear only</div>
+    </div>
+    <div class="setup-field">
+      <div class="label">Products</div>
+      <div class="value">~847 expected</div>
+    </div>
+  </div>
+  <div style="margin-top:20px; text-align:center;">
+    <button style="background:#a3e635; color:#0a0a0a; border:none; padding:12px 24px; border-radius:8px; font-weight:600; cursor:pointer;">Start Stocktake →</button>
+  </div>
+  <div class="caption">"Full count or partial. Set up in seconds."</div>
+</div>
+
+<!-- Act 3: Scan to Count -->
+<div class="act" data-act="3">
+  <h2>Scan. Count. Variance flagged instantly.</h2>
+  <div class="subtitle">Barcode scan or manual entry — both work</div>
+  <div class="scan-card">
+    <div class="scan-icon">📱</div>
+    <div class="scan-info">
+      <div class="product">Seafolly Beach Bound Teal 14</div>
+      <div class="meta">Expected: 6 · You counted: 5</div>
+    </div>
+    <div class="scan-input">5</div>
+    <div class="variance negative">-1</div>
+  </div>
+  <div style="margin-top:12px; font-size:13px; color:#737373; padding:12px; background:rgba(253,171,61,0.05); border-radius:8px;">
+    <strong style="color:#FDAB3D;">Variance detected.</strong> Continue scanning or investigate now.
+  </div>
+  <div class="caption">"Expected 6. Counted 5. Variance flagged. Instantly."</div>
+</div>
+
+<!-- Act 4: Variance Report -->
+<div class="act" data-act="4">
+  <h2>Every variance captured. Every dollar accounted for.</h2>
+  <div class="subtitle">Summary and detailed table — exportable instantly</div>
+  <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom:20px;">
+    <div style="background:#0f0f0f; border-radius:10px; padding:20px; text-align:center;">
+      <div style="font-size:28px; font-weight:700; color:#a3e635;">847</div>
+      <div style="font-size:12px; color:#737373;">Products Counted</div>
+    </div>
+    <div style="background:#0f0f0f; border-radius:10px; padding:20px; text-align:center;">
+      <div style="font-size:28px; font-weight:700; color:#FDAB3D;">12</div>
+      <div style="font-size:12px; color:#737373;">Variances Found</div>
+    </div>
+    <div style="background:#0f0f0f; border-radius:10px; padding:20px; text-align:center;">
+      <div style="font-size:28px; font-weight:700; color:#ef4444;">$340</div>
+      <div style="font-size:12px; color:#737373;">Shrinkage Est.</div>
+    </div>
+  </div>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table class="variance-table">
+      <tr><th>Product</th><th>Expected</th><th>Actual</th><th>Diff</th><th>$ Value</th></tr>
+      <tr><td>Seafolly Beach Bound Teal 14</td><td>6</td><td>5</td><td class="neg">-1</td><td class="neg">-$89</td></tr>
+      <tr><td>Kulani Kinis Cheeky XS</td><td>8</td><td>6</td><td class="neg">-2</td><td class="neg">-$56</td></tr>
+      <tr><td>Sea Level One Piece Black 10</td><td>4</td><td>5</td><td style="color:#a3e635;">+1</td><td style="color:#a3e635;">+$45</td></tr>
+    </table>
+  </div>
+  <div class="caption">"847 counted. 12 variances. $340 shrinkage. Exportable."</div>
+</div>
+
+<!-- Act 5: Transfer Orders -->
+<div class="act" data-act="5">
+  <h2>Overstocked here? Out of stock there? Transfer it.</h2>
+  <div class="subtitle">Two-location view — create, ship, receive, done</div>
+  <div class="transfer-view">
+    <div class="location-card overstock">
+      <div class="loc-name">Darwin CBD</div>
+      <div class="loc-stock">8</div>
+      <div class="loc-status">Overstocked</div>
+    </div>
+    <div class="location-card out">
+      <div class="loc-name">Darwin Palms</div>
+      <div class="loc-stock">0</div>
+      <div class="loc-status">Out of Stock</div>
+    </div>
+  </div>
+  <div class="transfer-arrow">↓ 4 units transferred ↓</div>
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-top:12px;">
+    <div style="background:#0f0f0f; border:1px solid #242424; border-radius:10px; padding:16px; text-align:center;">
+      <div style="font-size:24px; font-weight:700; color:#a3e635;">4</div>
+      <div style="font-size:12px; color:#737373;">CBD after transfer</div>
+    </div>
+    <div style="background:#0f0f0f; border:1px solid #242424; border-radius:10px; padding:16px; text-align:center;">
+      <div style="font-size:24px; font-weight:700; color:#a3e635;">4</div>
+      <div style="font-size:12px; color:#737373;">Palms after transfer</div>
+    </div>
+  </div>
+  <div class="caption">"Create transfer. Ship. Receive. Both locations update."</div>
+</div>
+
+<!-- Act 6: The Benefit -->
+<div class="act" data-act="6">
+  <h2>Count smart. Not hard.</h2>
+  <div class="subtitle">The transformation is dramatic</div>
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-box-value">4.5 → 1.5 hrs</div>
+      <div class="stat-box-label">Stocktake time</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">100%</div>
+      <div class="stat-box-label">Variance capture</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">0</div>
+      <div class="stat-box-label">Paper used</div>
+    </div>
+  </div>
+  <div class="caption">"Count smart. Not hard."</div>
+</div>
+
+<!-- Act 7: CTA -->
+<div class="act" data-act="7">
+  <div class="cta-panel">
+    <div class="cta-logo">⚡</div>
+    <div class="cta-title">Sonic Invoices</div>
+    <div class="cta-url">sonicinvoices.com</div>
+    <a href="https://sonicinvoices.com" class="cta-button">Book a free demo →</a>
+  </div>
+</div>
+
+</div>
+
+<div class="progress-container">
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="controls-hint">← → arrows · spacebar play/pause</div>
+
+<script>
+const totalActs = 7;
+let currentAct = 1;
+let isPlaying = true;
+let progress = 0;
+const actDuration = 15000;
+
+function initDots() {
+  const dotsContainer = document.getElementById('dots');
+  for (let i = 1; i <= totalActs; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 1 ? ' active' : '');
+    dot.onclick = () => goToAct(i);
+    dotsContainer.appendChild(dot);
+  }
+}
+
+function goToAct(n) {
+  if (n < 1 || n > totalActs) return;
+  document.querySelectorAll('.act').forEach(a => a.classList.remove('active'));
+  document.querySelector(`.act[data-act="${n}"]`).classList.add('active');
+  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === n));
+  currentAct = n;
+  resetProgress();
+}
+
+function nextAct() {
+  if (currentAct < totalActs) goToAct(currentAct + 1);
+  else goToAct(1);
+}
+
+function prevAct() {
+  if (currentAct > 1) goToAct(currentAct - 1);
+  else goToAct(totalActs);
+}
+
+function resetProgress() {
+  progress = 0;
+  document.getElementById('progressFill').style.width = '0%';
+}
+
+function updateProgress() {
+  if (!isPlaying) return;
+  progress += 100 / (actDuration / 100);
+  document.getElementById('progressFill').style.width = progress + '%';
+  if (progress >= 100) nextAct();
+}
+
+setInterval(updateProgress, 100);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') { nextAct(); resetProgress(); }
+  if (e.key === 'ArrowLeft') { prevAct(); resetProgress(); }
+  if (e.key === ' ') { e.preventDefault(); isPlaying = !isPlaying; }
+});
+
+initDots();
+</script>
+</body>
+</html>

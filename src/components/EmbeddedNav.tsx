@@ -22,6 +22,14 @@ const navSections = [
     ],
   },
   {
+    title: "Agent",
+    items: [
+      { id: "agent_chat", label: "Chat", icon: MessageSquare, type: "route" as const, href: "/agent", badge: "agent-active" as const },
+      { id: "agent_approvals", label: "Approvals", icon: CheckSquare, type: "route" as const, href: "/approvals", badge: "approvals-count" as const },
+      { id: "agent_audit", label: "Audit", icon: ScrollText, type: "route" as const, href: "/audit-log" },
+    ],
+  },
+  {
     title: "Workflows",
     items: [
       { id: "invoice", label: "Process Invoice", icon: FileText, type: "flow" as const },

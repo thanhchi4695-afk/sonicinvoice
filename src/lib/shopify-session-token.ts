@@ -25,7 +25,7 @@ function getTokenFromUrl(): string | null {
  * register `window.shopify`. Calling `idToken()` before that races to undefined
  * and falsely surfaces "Embedded auth failed".
  */
-async function waitForAppBridge(timeoutMs = 8000): Promise<unknown | null> {
+async function waitForAppBridge(timeoutMs = 15000): Promise<unknown | null> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const sh = (window as unknown as { shopify?: { idToken?: () => Promise<string> } }).shopify;
@@ -58,7 +58,7 @@ export async function getSessionToken(): Promise<string | null> {
     // never want to leave the embedded auth provider stuck on "loading".
     const tokenPromise = shopify.idToken();
     const timeoutPromise = new Promise<null>((resolve) =>
-      setTimeout(() => resolve(null), 6000)
+      setTimeout(() => resolve(null), 12000)
     );
     const token = (await Promise.race([tokenPromise, timeoutPromise])) as string | null;
     if (!token) {

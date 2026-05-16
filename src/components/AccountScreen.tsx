@@ -67,6 +67,7 @@ const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"
 const MultiBrandSuppliersSection = lazy(() => import("@/components/MultiBrandSuppliersSection"));
 import SonicAssistantSettings from "@/components/SonicAssistantSettings";
 import ScheduledTasksSection from "@/components/ScheduledTasksSection";
+import AgentSettingsSection from "@/components/AgentSettingsSection";
 
 const CONNECTION_LOAD_TIMEOUT_MS = 8000;
 

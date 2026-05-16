@@ -36,6 +36,22 @@ function unauthorized() {
   return json({ error: "Unauthorized" }, 401);
 }
 
+// Constant-time string compare to avoid timing attacks.
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  // Always compare same-length buffers to avoid leaking length via early return.
+  const len = Math.max(ab.length, bb.length);
+  const pa = new Uint8Array(len);
+  const pb = new Uint8Array(len);
+  pa.set(ab);
+  pb.set(bb);
+  let diff = ab.length ^ bb.length;
+  for (let i = 0; i < len; i++) diff |= pa[i] ^ pb[i];
+  return diff === 0;
+}
+
 // ---------- Schemas ----------
 const RunCreate = z.object({
   shop_id: z.string().uuid(),
@@ -104,7 +120,7 @@ Deno.serve(async (req) => {
 
   // Auth
   const key = req.headers.get("x-sonic-agent-key") ?? "";
-  if (!AGENT_KEY || key !== AGENT_KEY) return unauthorized();
+  if (!AGENT_KEY || !timingSafeEqualStr(key, AGENT_KEY)) return unauthorized();
 
   const url = new URL(req.url);
   // Path after function name: /sonic-agent-api/<resource>/<id?>

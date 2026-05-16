@@ -272,6 +272,10 @@ export default function Agent() {
           return;
         }
 
+        if (!shopId) {
+          throw new Error("No shop is linked to your account yet. Connect a Shopify store first, then try again.");
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         const resp = await fetch(`${AGENT_URL}/chat`, {
           method: "POST",
@@ -282,7 +286,10 @@ export default function Agent() {
           },
           body: JSON.stringify({ message: trimmed, run_id: runId, shop_id: shopId, dry_run: dryRun }),
         });
-        if (!resp.ok || !resp.body) throw new Error(`Agent service returned ${resp.status}`);
+        if (!resp.ok || !resp.body) {
+          const errBody = await resp.text().catch(() => "");
+          throw new Error(`Agent service returned ${resp.status}${errBody ? `: ${errBody.slice(0, 300)}` : ""}`);
+        }
 
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();

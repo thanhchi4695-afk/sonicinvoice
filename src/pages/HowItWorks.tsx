@@ -144,10 +144,12 @@ export default function HowItWorks() {
             32 ways Sonic works for your store
           </h1>
           <p className="text-base text-[#a3a3a3] max-w-[640px] mx-auto mt-5">
-            The complete animated library — every feature, every workflow, all 58 functions
+            32 animated explainers + 6 interactive workflows — every feature covered
           </p>
         </div>
       </section>
+
+      <GuidedWorkflowsSection variant="how-it-works" />
 
       <section className="px-6 pb-24">
         <div className="max-w-[1200px] mx-auto space-y-20">

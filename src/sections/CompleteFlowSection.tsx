@@ -66,14 +66,40 @@ export default function CompleteFlowSection() {
         </div>
 
         <p className="text-sm text-[#737373] mt-6">
-          AI parsing · 7-layer tagging · Shopify sync · SEO content · Google ranking · 18 features covered
+          AI parsing · 7-layer tagging · Shopify sync · SEO content · Google ranking · 24 features covered
         </p>
-        <div className="mt-4">
+
+        {/* NEW IN OPERATIONS — Batch 2 highlight row */}
+        <div className="mt-12 text-left">
+          <div className="font-mono text-[10px] uppercase tracking-[0.07em] text-lime mb-3">
+            NEW IN OPERATIONS
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { icon: "📋", headline: "PO in 90 seconds", body: "From reorder decision to sent purchase order. Shopify syncs on receive.", hash: "purchase-orders" },
+              { icon: "📡", headline: "Never stock out again", body: "AI restock recommendations + alerts before you hit zero.", hash: "restock-monitor" },
+              { icon: "🛡️", headline: "$12,400 margin protected", body: "Blocks below-margin orders on JOOR. Slack approval in 47 seconds.", hash: "margin-guardian" },
+              { icon: "📉", headline: "34 units cleared automatically", body: "Progressive markdown pricing. Old stock gone before new stock arrives.", hash: "markdown-pricing" },
+            ].map((c) => (
+              <a
+                key={c.hash}
+                href={`/how-it-works#${c.hash}`}
+                className="block rounded-xl p-4 bg-[#141414] border border-[#242424] hover:border-lime transition-colors duration-200 no-underline"
+              >
+                <div className="text-lime text-[20px] leading-none mb-2">{c.icon}</div>
+                <div className="text-[13px] font-semibold text-[#f5f5f5]">{c.headline}</div>
+                <div className="text-[12px] text-[#737373] mt-1 leading-relaxed">{c.body}</div>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-6">
           <a
             href="/how-it-works"
             className="text-[13px] text-[#737373] no-underline hover:underline underline-offset-4"
           >
-            View all 18 explainer videos →
+            View all 24 explainer videos →
           </a>
         </div>
       </div>

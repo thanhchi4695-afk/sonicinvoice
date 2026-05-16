@@ -348,7 +348,7 @@ export default function Approvals() {
               Inbox zero. Nothing waiting for your approval right now. 🌴
             </div>
             <Link
-              to="/audit"
+              to="/audit-log"
               className="text-sm text-primary hover:underline mt-2 inline-block"
             >
               Looking for past approvals? View history →

@@ -7870,6 +7870,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      ensure_shop_for_current_user: { Args: never; Returns: string }
       get_brand_rules_text: { Args: { _supplier: string }; Returns: string }
       get_cron_secret: { Args: never; Returns: string }
       get_public_brand_guide: {

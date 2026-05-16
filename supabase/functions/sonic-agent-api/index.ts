@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
 
   // Auth
   const key = req.headers.get("x-sonic-agent-key") ?? "";
-  if (!AGENT_KEY || key !== AGENT_KEY) return unauthorized();
+  if (!AGENT_KEY || !timingSafeEqualStr(key, AGENT_KEY)) return unauthorized();
 
   const url = new URL(req.url);
   // Path after function name: /sonic-agent-api/<resource>/<id?>

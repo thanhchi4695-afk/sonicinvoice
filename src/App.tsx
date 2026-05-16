@@ -51,6 +51,7 @@ const SeoLinkMesh = lazy(() => import("./pages/SeoLinkMesh.tsx"));
 const AutoIngest = lazy(() => import("./pages/AutoIngest.tsx"));
 const FunctionsCatalog = lazy(() => import("./pages/FunctionsCatalog.tsx"));
 const Agent = lazy(() => import("./pages/Agent.tsx"));
+const Approvals = lazy(() => import("./pages/Approvals.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -111,6 +112,7 @@ const App = () => (
                   <Route path="/sonic-knowledge" element={<RequireAuth><SonicKnowledge /></RequireAuth>} />
                   <Route path="/functions" element={<Suspense fallback={null}><FunctionsCatalog /></Suspense>} />
                   <Route path="/agent" element={<RequireAuth><Suspense fallback={null}><Agent /></Suspense></RequireAuth>} />
+                  <Route path="/approvals" element={<RequireAuth><Suspense fallback={null}><Approvals /></Suspense></RequireAuth>} />
                   <Route path="/settings/claude-connector" element={<RequireAuth><ClaudeConnector /></RequireAuth>} />
                   <Route path="/settings/claude-activity" element={<RequireAuth><ClaudeActivity /></RequireAuth>} />
                   <Route

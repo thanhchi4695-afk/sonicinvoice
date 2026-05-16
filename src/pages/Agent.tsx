@@ -168,40 +168,16 @@ export default function Agent() {
       const { data: { user } } = await supabase.auth.getUser();
       if (cancelled || !user) return;
       setUserId(user.id);
-      const { data: membership } = await supabase
-        .from("shop_users")
-        .select("shop_id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      let resolvedShopId = membership?.shop_id ?? null;
-
-      // Auto-provision a shop for users who connected Shopify but never got a
-      // shop_users row (e.g. legacy connections predating the agent feature).
-      if (!resolvedShopId) {
-        const { data: conn } = await supabase
-          .from("shopify_connections")
-          .select("store_url")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (conn?.store_url) {
-          const { data: newShop } = await supabase
-            .from("shops")
-            .insert({ name: conn.store_url, created_by: user.id })
-            .select("id")
-            .single();
-          if (newShop?.id) {
-            await supabase
-              .from("shop_users")
-              .insert({ shop_id: newShop.id, user_id: user.id, role: "owner" });
-            resolvedShopId = newShop.id;
-          }
-        }
+      // Use SECURITY DEFINER RPC to atomically resolve or provision the user's
+      // shop. Client-side inserts fail RLS because shop_users INSERT requires
+      // the user to already be a member of the shop (chicken-and-egg).
+      const { data: resolvedShopId, error: rpcError } = await supabase
+        .rpc("ensure_shop_for_current_user");
+      if (rpcError) {
+        console.error("[Agent] ensure_shop_for_current_user failed", rpcError);
       }
 
-      if (!cancelled) setShopId(resolvedShopId);
+      if (!cancelled) setShopId((resolvedShopId as string | null) ?? null);
     })();
     return () => { cancelled = true; };
   }, []);

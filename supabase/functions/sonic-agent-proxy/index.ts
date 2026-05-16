@@ -72,12 +72,21 @@ Deno.serve(async (req) => {
     method: req.method,
     headers: {
       "Content-Type": req.headers.get("Content-Type") ?? "application/json",
+      "Authorization": `Bearer ${AGENT_KEY}`,
       "x-api-key": AGENT_KEY,
       "x-user-id": userId,
       ...(userEmail ? { "x-user-email": userEmail } : {}),
     },
     body: ["GET", "HEAD"].includes(req.method) ? undefined : await req.text(),
   });
+
+  if (!upstream.ok) {
+    console.warn("sonic-agent-proxy upstream failed", {
+      status: upstream.status,
+      contentType: upstream.headers.get("Content-Type"),
+      upstreamPath: subPath,
+    });
+  }
 
   // Stream the upstream response straight back (SSE-friendly).
   return new Response(upstream.body, {

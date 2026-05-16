@@ -36,6 +36,19 @@ function unauthorized() {
   return json({ error: "Unauthorized" }, 401);
 }
 
+function getPresentedAgentKey(req: Request): string {
+  const authorization = req.headers.get("authorization") ?? "";
+  const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? "";
+  return (
+    req.headers.get("x-sonic-agent-key") ??
+    req.headers.get("x-api-key") ??
+    req.headers.get("sonic-agent-api-key") ??
+    req.headers.get("sonic_agent_api_key") ??
+    bearer ??
+    ""
+  );
+}
+
 // Constant-time string compare to avoid timing attacks.
 function timingSafeEqualStr(a: string, b: string): boolean {
   const enc = new TextEncoder();
@@ -119,7 +132,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   // Auth
-  const key = req.headers.get("x-sonic-agent-key") ?? "";
+  const key = getPresentedAgentKey(req);
   if (!AGENT_KEY || !timingSafeEqualStr(key, AGENT_KEY)) return unauthorized();
 
   const url = new URL(req.url);

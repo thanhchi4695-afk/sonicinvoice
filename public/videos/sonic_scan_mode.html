@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Scan Mode</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a;
+  color: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.logo {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  font-size: 22px;
+  color: #a3e635;
+  font-weight: 700;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo svg { width: 20px; height: 20px; }
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 60px 40px 100px;
+}
+.act {
+  display: none;
+  width: 100%;
+  max-width: 900px;
+  animation: springIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.act.active { display: block; }
+@keyframes springIn {
+  from { opacity: 0; transform: translateY(40px) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tagline {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  font-size: 13px;
+  color: #737373;
+  font-weight: 500;
+}
+h2 {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #f0f0f0;
+  line-height: 1.15;
+}
+.subtitle {
+  font-size: 18px;
+  color: #737373;
+  margin-bottom: 40px;
+  line-height: 1.5;
+}
+.card {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 28px;
+}
+.phone-frame {
+  width: 320px;
+  height: 640px;
+  background: #141414;
+  border: 2px solid #242424;
+  border-radius: 40px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.phone-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 28px;
+  background: #0a0a0a;
+  border-radius: 0 0 16px 16px;
+  z-index: 10;
+}
+.phone-screen {
+  width: 100%;
+  height: 100%;
+  padding: 40px 20px 20px;
+  display: flex;
+  flex-direction: column;
+}
+.camera-view {
+  flex: 1;
+  background: #1a1a1a;
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.camera-view::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(163,230,53,0.03) 2px,
+    rgba(163,230,53,0.03) 4px
+  );
+}
+.crosshair {
+  position: absolute;
+  width: 200px;
+  height: 120px;
+  border: 2px solid rgba(163,230,53,0.5);
+  border-radius: 8px;
+}
+.crosshair::before, .crosshair::after {
+  content: '';
+  position: absolute;
+  background: #a3e635;
+}
+.crosshair::before { width: 20px; height: 2px; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.crosshair::after { width: 2px; height: 20px; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.scan-beep {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: #a3e635;
+  top: 50%;
+  animation: scanLine 2s ease-in-out infinite;
+  opacity: 0.6;
+}
+@keyframes scanLine {
+  0%, 100% { transform: translateY(-60px); opacity: 0; }
+  50% { transform: translateY(60px); opacity: 0.8; }
+}
+.barcode-box {
+  position: absolute;
+  bottom: 40%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 160px;
+  height: 80px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'SF Mono', monospace;
+  font-size: 10px;
+  color: #0a0a0a;
+  letter-spacing: 2px;
+}
+.product-popup {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  background: #1a1a1a;
+  border: 1px solid #a3e635;
+  border-radius: 12px;
+  padding: 16px;
+  animation: popupIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes popupIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.scan-counter {
+  font-size: 64px;
+  font-weight: 800;
+  color: #a3e635;
+  text-align: center;
+  margin: 20px 0;
+}
+.scan-timer {
+  font-size: 14px;
+  color: #737373;
+  text-align: center;
+  margin-bottom: 20px;
+}
+.review-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+}
+.review-stat {
+  background: #0f0f0f;
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+}
+.review-stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #a3e635;
+}
+.review-stat-label {
+  font-size: 12px;
+  color: #737373;
+  margin-top: 4px;
+}
+.review-stat.amber .review-stat-value { color: #FDAB3D; }
+.split-screen {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.split-panel {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 28px;
+}
+.split-panel.before { border-color: #ef4444; }
+.split-panel.after { border-color: #a3e635; }
+.split-panel h4 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+.split-panel.before h4 { color: #ef4444; }
+.split-panel.after h4 { color: #a3e635; }
+.cta-panel {
+  text-align: center;
+  padding: 40px;
+}
+.cta-logo { font-size: 64px; margin-bottom: 20px; }
+.cta-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+.cta-url { font-size: 18px; color: #a3e635; margin-bottom: 32px; font-weight: 500; }
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #a3e635;
+  color: #0a0a0a;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+.cta-button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(163,230,53,0.3); }
+.progress-container {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  z-index: 50;
+}
+.progress-bar {
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #a3e635;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+.dots {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 50;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #404040;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.dot.active { background: #a3e635; transform: scale(1.3); }
+.controls-hint {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  font-size: 11px;
+  color: #404040;
+  z-index: 50;
+}
+.caption {
+  font-size: 15px;
+  color: #737373;
+  margin-top: 20px;
+  font-style: italic;
+}
+.stockroom {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+.box {
+  background: #1a1a1a;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  font-size: 32px;
+}
+</style>
+</head>
+<body>
+<div class="logo">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+  Sonic Invoices
+</div>
+<div class="tagline">"Barcode to Shopify in 8 seconds"</div>
+
+<div class="stage">
+
+<!-- Act 1: The Problem -->
+<div class="act active" data-act="1">
+  <h2>What do you do when the invoice is the box itself?</h2>
+  <div class="subtitle">Stockroom. 200 items. No laptop. Just phone + boxes.</div>
+  <div class="stockroom">
+    <div class="box">📦</div><div class="box">📦</div><div class="box">📦</div><div class="box">📦</div>
+    <div class="box">📦</div><div class="box">📦</div><div class="box">📦</div><div class="box">📦</div>
+    <div class="box">📦</div><div class="box">📦</div><div class="box">📦</div><div class="box">📦</div>
+  </div>
+  <div style="text-align:center; margin-top:24px; font-size:14px; color:#737373;">200 items · no invoice · no laptop · just boxes</div>
+  <div class="caption">"What do you do when the invoice is the box itself?"</div>
+</div>
+
+<!-- Act 2: Open Scan Mode -->
+<div class="act" data-act="2">
+  <h2>Open Sonic → Scan Mode.</h2>
+  <div class="subtitle">No typing. No WiFi needed for scanning.</div>
+  <div class="phone-frame">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+        <span style="font-size:20px;">⚡</span>
+        <span style="font-size:16px; font-weight:600;">Sonic Scan</span>
+      </div>
+      <div class="camera-view">
+        <div class="crosshair"></div>
+        <div class="scan-beep"></div>
+        <div style="font-size:48px; opacity:0.3;">📷</div>
+      </div>
+      <div style="margin-top:12px; text-align:center; font-size:12px; color:#737373;">Point camera at barcode</div>
+    </div>
+  </div>
+  <div class="caption">"Open Sonic → Scan Mode. No typing. No WiFi needed for scanning."</div>
+</div>
+
+<!-- Act 3: Scan -->
+<div class="act" data-act="3">
+  <h2>Camera locks on. Beep. Done.</h2>
+  <div class="subtitle">8 seconds per item — instant product recognition</div>
+  <div class="phone-frame">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="camera-view">
+        <div class="crosshair" style="border-color:#a3e635;"></div>
+        <div class="barcode-box">9340XXX</div>
+        <div class="product-popup">
+          <div style="font-size:14px; font-weight:600; margin-bottom:4px;">Seafolly Beach Bound One Piece</div>
+          <div style="font-size:12px; color:#737373; margin-bottom:8px;">Teal · Size 14 · Barcode: 9340XXX</div>
+          <div style="display:flex; gap:16px; font-size:11px;">
+            <span style="color:#a3e635;">✓ Confidence: 98%</span>
+            <span style="color:#a3e635;">✓ Found: Yes</span>
+            <span style="color:#a3e635;">+1 unit</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="caption">"One scan. Full product card. Zero typing."</div>
+</div>
+
+<!-- Act 4: Batch Scan -->
+<div class="act" data-act="4">
+  <h2>200 items. 26 minutes. One thumb.</h2>
+  <div class="subtitle">Batch scan with live counter</div>
+  <div class="scan-counter">200</div>
+  <div class="scan-timer">~8 seconds per item · 26 minutes total</div>
+  <div style="display:flex; justify-content:center; gap:8px; margin-top:16px;">
+    <span style="background:rgba(163,230,53,0.1); color:#a3e635; padding:6px 14px; border-radius:20px; font-size:12px;">📱 Phone only</span>
+    <span style="background:rgba(163,230,53,0.1); color:#a3e635; padding:6px 14px; border-radius:20px; font-size:12px;">🔄 Auto-sync</span>
+    <span style="background:rgba(163,230,53,0.1); color:#a3e635; padding:6px 14px; border-radius:20px; font-size:12px;">⚡ Real-time</span>
+  </div>
+  <div class="caption">"200 items. 26 minutes. One thumb."</div>
+</div>
+
+<!-- Act 5: Review -->
+<div class="act" data-act="5">
+  <h2>Review before you push.</h2>
+  <div class="subtitle">Catch new colourways. Confirm matches.</div>
+  <div class="review-summary">
+    <div class="review-stat">
+      <div class="review-stat-value">200</div>
+      <div class="review-stat-label">Scanned</div>
+    </div>
+    <div class="review-stat">
+      <div class="review-stat-value">187</div>
+      <div class="review-stat-label">Matched</div>
+    </div>
+    <div class="review-stat amber">
+      <div class="review-stat-value">13</div>
+      <div class="review-stat-label">New (flagged)</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:20px; background:rgba(253,171,61,0.05); border-color:#FDAB3D;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="font-size:24px;">⚠️</span>
+      <div>
+        <div style="font-weight:600;">Seafolly new colourway detected</div>
+        <div style="font-size:13px; color:#737373;">13 items flagged for review — new variants need confirmation</div>
+      </div>
+    </div>
+  </div>
+  <div class="caption">"Review. Confirm. Push. Zero surprises."</div>
+</div>
+
+<!-- Act 6: The Benefit -->
+<div class="act" data-act="6">
+  <h2>From stockroom to Shopify — no desk required.</h2>
+  <div class="subtitle">The numbers speak for themselves</div>
+  <div class="split-screen">
+    <div class="split-panel before">
+      <h4>Before</h4>
+      <div style="font-size:15px; line-height:2; color:#737373;">
+        <div>📦 200 items</div>
+        <div>✍️ Manual entry</div>
+        <div>⏱ 4 hours</div>
+        <div>❌ Errors guaranteed</div>
+      </div>
+    </div>
+    <div class="split-panel after">
+      <h4>With Scan Mode</h4>
+      <div style="font-size:15px; line-height:2; color:#737373;">
+        <div>📦 200 items</div>
+        <div>📱 Scan mode</div>
+        <div>⚡ 26 minutes</div>
+        <div>✓ 0 miskeys</div>
+      </div>
+    </div>
+  </div>
+  <div class="caption">"From stockroom to Shopify — no desk required."</div>
+</div>
+
+<!-- Act 7: CTA -->
+<div class="act" data-act="7">
+  <div class="cta-panel">
+    <div class="cta-logo">⚡</div>
+    <div class="cta-title">Sonic Invoices</div>
+    <div class="cta-url">sonicinvoices.com</div>
+    <a href="https://sonicinvoices.com" class="cta-button">Book a free demo →</a>
+  </div>
+</div>
+
+</div>
+
+<div class="progress-container">
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="controls-hint">← → arrows · spacebar play/pause</div>
+
+<script>
+const totalActs = 7;
+let currentAct = 1;
+let isPlaying = true;
+let progress = 0;
+const actDuration = 15000;
+
+function initDots() {
+  const dotsContainer = document.getElementById('dots');
+  for (let i = 1; i <= totalActs; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 1 ? ' active' : '');
+    dot.onclick = () => goToAct(i);
+    dotsContainer.appendChild(dot);
+  }
+}
+
+function goToAct(n) {
+  if (n < 1 || n > totalActs) return;
+  document.querySelectorAll('.act').forEach(a => a.classList.remove('active'));
+  document.querySelector(`.act[data-act="${n}"]`).classList.add('active');
+  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === n));
+  currentAct = n;
+  resetProgress();
+}
+
+function nextAct() {
+  if (currentAct < totalActs) goToAct(currentAct + 1);
+  else goToAct(1);
+}
+
+function prevAct() {
+  if (currentAct > 1) goToAct(currentAct - 1);
+  else goToAct(totalActs);
+}
+
+function resetProgress() {
+  progress = 0;
+  document.getElementById('progressFill').style.width = '0%';
+}
+
+function updateProgress() {
+  if (!isPlaying) return;
+  progress += 100 / (actDuration / 100);
+  document.getElementById('progressFill').style.width = progress + '%';
+  if (progress >= 100) nextAct();
+}
+
+setInterval(updateProgress, 100);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') { nextAct(); resetProgress(); }
+  if (e.key === 'ArrowLeft') { prevAct(); resetProgress(); }
+  if (e.key === ' ') { e.preventDefault(); isPlaying = !isPlaying; }
+});
+
+initDots();
+</script>
+</body>
+</html>

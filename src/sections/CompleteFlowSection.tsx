@@ -66,8 +66,16 @@ export default function CompleteFlowSection() {
         </div>
 
         <p className="text-sm text-[#737373] mt-6">
-          AI parsing · 7-layer tagging · Shopify sync · SEO content · Google ranking
+          AI parsing · 7-layer tagging · Shopify sync · SEO content · Google ranking · 18 features covered
         </p>
+        <div className="mt-4">
+          <a
+            href="/how-it-works"
+            className="text-[13px] text-[#737373] no-underline hover:underline underline-offset-4"
+          >
+            View all 18 explainer videos →
+          </a>
+        </div>
       </div>
     </section>
   );

@@ -258,14 +258,14 @@ const InvoicesTab = (props: InvoicesTabProps) => {
             <FileText className="w-7 h-7 text-muted-foreground" />
           </div>
           <p className="text-sm font-medium mb-1">No invoices yet</p>
-          <p className="text-xs text-muted-foreground mb-4">Import your first invoice to see it listed here.</p>
+          <p className="text-xs text-muted-foreground mb-4">See 18 animated explainers for every Sonic feature</p>
           {newInvoiceMenu}
           <div className="mt-4">
             <a
               href="/how-it-works"
               className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
             >
-              Watch how it works →
+              Watch all 18 demos →
             </a>
           </div>
         </div>

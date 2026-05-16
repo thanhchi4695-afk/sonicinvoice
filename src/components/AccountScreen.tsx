@@ -397,6 +397,9 @@ const AccountScreen = () => {
 
         {/* ─── SYSTEM ────────────────────────────────────────── */}
         <TabsContent value="system" className="mt-0 space-y-0">
+          <Section title="🤖 Agent">
+            <AgentSettingsSection />
+          </Section>
           <Section title="⏰ Scheduled Tasks">
             <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
               <ScheduledTasksSection />

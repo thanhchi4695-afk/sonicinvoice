@@ -5758,6 +5758,38 @@ export type Database = {
         }
         Relationships: []
       }
+      shop_users: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["shop_role"]
+          shop_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["shop_role"]
+          shop_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["shop_role"]
+          shop_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_users_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shopify_apps: {
         Row: {
           api_key: string
@@ -6040,6 +6072,279 @@ export type Database = {
         }
         Relationships: []
       }
+      shops: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sonic_agent_actions: {
+        Row: {
+          approval_queue_id: string | null
+          autonomy_level: string
+          completed_at: string | null
+          diff_summary: string | null
+          error_message: string | null
+          flow_name: string
+          id: string
+          input_payload: Json
+          output_payload: Json | null
+          rolled_back_at: string | null
+          rolled_back_by: string | null
+          run_id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          approval_queue_id?: string | null
+          autonomy_level: string
+          completed_at?: string | null
+          diff_summary?: string | null
+          error_message?: string | null
+          flow_name: string
+          id?: string
+          input_payload?: Json
+          output_payload?: Json | null
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          run_id: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          approval_queue_id?: string | null
+          autonomy_level?: string
+          completed_at?: string | null
+          diff_summary?: string | null
+          error_message?: string | null
+          flow_name?: string
+          id?: string
+          input_payload?: Json
+          output_payload?: Json | null
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          run_id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sonic_agent_actions_approval_queue_id_fkey"
+            columns: ["approval_queue_id"]
+            isOneToOne: false
+            referencedRelation: "sonic_approval_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sonic_agent_actions_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "sonic_agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sonic_agent_runs: {
+        Row: {
+          completed_at: string | null
+          dry_run: boolean
+          error_message: string | null
+          executor_model: string | null
+          id: string
+          plan_summary: string | null
+          planner_model: string | null
+          shop_id: string
+          started_at: string
+          status: string
+          trigger_payload: Json
+          trigger_type: string
+          user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          dry_run?: boolean
+          error_message?: string | null
+          executor_model?: string | null
+          id?: string
+          plan_summary?: string | null
+          planner_model?: string | null
+          shop_id: string
+          started_at?: string
+          status?: string
+          trigger_payload?: Json
+          trigger_type: string
+          user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          dry_run?: boolean
+          error_message?: string | null
+          executor_model?: string | null
+          id?: string
+          plan_summary?: string | null
+          planner_model?: string | null
+          shop_id?: string
+          started_at?: string
+          status?: string
+          trigger_payload?: Json
+          trigger_type?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sonic_agent_runs_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sonic_approval_queue: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          category: string
+          created_at: string
+          description: string | null
+          estimated_impact: Json
+          expires_at: string | null
+          id: string
+          priority: string
+          proposed_actions: Json
+          rejection_reason: string | null
+          run_id: string | null
+          shop_id: string
+          status: string
+          title: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          estimated_impact?: Json
+          expires_at?: string | null
+          id?: string
+          priority?: string
+          proposed_actions?: Json
+          rejection_reason?: string | null
+          run_id?: string | null
+          shop_id: string
+          status?: string
+          title: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          estimated_impact?: Json
+          expires_at?: string | null
+          id?: string
+          priority?: string
+          proposed_actions?: Json
+          rejection_reason?: string | null
+          run_id?: string | null
+          shop_id?: string
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sonic_approval_queue_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "sonic_agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sonic_approval_queue_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sonic_audit_log: {
+        Row: {
+          action_id: string | null
+          actor: string
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          run_id: string | null
+          shop_id: string
+        }
+        Insert: {
+          action_id?: string | null
+          actor: string
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          run_id?: string | null
+          shop_id: string
+        }
+        Update: {
+          action_id?: string | null
+          actor?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          run_id?: string | null
+          shop_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sonic_audit_log_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "sonic_agent_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sonic_audit_log_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "sonic_agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sonic_audit_log_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sonic_mcp_tokens: {
         Row: {
           created_at: string
@@ -6069,6 +6374,59 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      sonic_scheduled_tasks: {
+        Row: {
+          created_at: string
+          cron_expression: string
+          description: string | null
+          enabled: boolean
+          id: string
+          last_run_at: string | null
+          name: string
+          next_run_at: string | null
+          shop_id: string
+          timezone: string
+          trigger_payload: Json
+          trigger_type: string
+        }
+        Insert: {
+          created_at?: string
+          cron_expression: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          last_run_at?: string | null
+          name: string
+          next_run_at?: string | null
+          shop_id: string
+          timezone?: string
+          trigger_payload?: Json
+          trigger_type: string
+        }
+        Update: {
+          created_at?: string
+          cron_expression?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          last_run_at?: string | null
+          name?: string
+          next_run_at?: string | null
+          shop_id?: string
+          timezone?: string
+          trigger_payload?: Json
+          trigger_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sonic_scheduled_tasks_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stock_adjustments: {
         Row: {
@@ -7523,6 +7881,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_shop_member: { Args: { _shop_id: string }; Returns: boolean }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -7566,6 +7925,7 @@ export type Database = {
         | "content_drift"
         | "no_internal_links"
         | "completeness_drop"
+      shop_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -7701,6 +8061,7 @@ export const Constants = {
         "no_internal_links",
         "completeness_drop",
       ],
+      shop_role: ["owner", "admin", "member"],
     },
   },
 } as const

@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
     headers: {
       "Content-Type": req.headers.get("Content-Type") ?? "application/json",
       "Authorization": `Bearer ${AGENT_KEY}`,
+      "X-Sonic-Agent-Key": AGENT_KEY,
       "x-api-key": AGENT_KEY,
       "x-user-id": userId,
       ...(userEmail ? { "x-user-email": userEmail } : {}),

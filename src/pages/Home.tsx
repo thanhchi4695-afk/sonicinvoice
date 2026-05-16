@@ -43,6 +43,7 @@ export default function Home() {
       <HeroSection />
       <ConnectionMapHero />
       <CompleteFlowSection />
+      <GuidedWorkflowsSection variant="home" />
       <StatBarSection />
       <LogoTrustBar />
       <HowItWorksSection />

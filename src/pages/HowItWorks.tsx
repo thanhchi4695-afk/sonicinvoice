@@ -4,6 +4,7 @@ import FooterSection from "@/sections/FooterSection";
 import RouteSeo from "@/components/RouteSeo";
 import VideoCard from "@/components/VideoCard";
 import VideoModal from "@/components/VideoModal";
+import GuidedWorkflowsSection from "@/sections/GuidedWorkflowsSection";
 
 type Video = { src: string; title: string; caption: string; slug: string };
 

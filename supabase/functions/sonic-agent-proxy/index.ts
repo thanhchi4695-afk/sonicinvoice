@@ -29,14 +29,34 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+  const token = authHeader.replace("Bearer ", "");
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } },
   );
-  const { data: claims, error: claimsErr } = await supabase.auth.getClaims(
-    authHeader.replace("Bearer ", ""),
-  );
-  if (claimsErr || !claims?.claims?.sub) {
+  const { data: claims, error: claimsErr } = await supabase.auth.getClaims(token);
+  let userId = claims?.claims?.sub ? String(claims.claims.sub) : "";
+  let userEmail = claims?.claims?.email ? String(claims.claims.email) : "";
+
+  if (!userId) {
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+    userId = userData?.user?.id ?? "";
+    userEmail = userData?.user?.email ?? "";
+    if (userErr || !userId) {
+      console.warn("sonic-agent-proxy auth failed", {
+        claimsError: claimsErr?.message,
+        userError: userErr?.message,
+        hasAuthorizationHeader: true,
+      });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  if (!userId) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -53,8 +73,8 @@ Deno.serve(async (req) => {
     headers: {
       "Content-Type": req.headers.get("Content-Type") ?? "application/json",
       "x-api-key": AGENT_KEY,
-      "x-user-id": String(claims.claims.sub),
-      ...(claims.claims.email ? { "x-user-email": String(claims.claims.email) } : {}),
+      "x-user-id": userId,
+      ...(userEmail ? { "x-user-email": userEmail } : {}),
     },
     body: ["GET", "HEAD"].includes(req.method) ? undefined : await req.text(),
   });

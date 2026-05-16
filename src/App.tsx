@@ -67,6 +67,7 @@ const App = () => (
               <Toaster />
               <Sonner />
               <BrowserRouter>
+                <AgentNotificationsProvider>
                 <StockyAnnouncementBar />
                 <Routes>
                   <Route path="/" element={<Home />} />

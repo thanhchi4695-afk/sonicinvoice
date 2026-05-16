@@ -76,3 +76,7 @@ verify_jwt = false
 
 [functions.serve-llms-txt]
 verify_jwt = false
+
+[functions.sonic-agent-api]
+verify_jwt = false
+

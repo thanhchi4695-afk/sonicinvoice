@@ -13,6 +13,7 @@ import AskSonicAI from "@/components/AskSonicAI";
 import ClaudePopupButton from "@/components/ClaudePopupButton";
 import { ConfirmDialogProvider } from "@/hooks/use-confirm-dialog";
 import { PromptDialogProvider } from "@/hooks/use-prompt-dialog";
+import { AgentNotificationsProvider } from "@/hooks/use-agent-notifications";
 import Index from "./pages/Index.tsx";
 import Landing from "./pages/Landing.tsx";
 import Home from "./pages/Home.tsx";

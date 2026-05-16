@@ -52,6 +52,7 @@ const AutoIngest = lazy(() => import("./pages/AutoIngest.tsx"));
 const FunctionsCatalog = lazy(() => import("./pages/FunctionsCatalog.tsx"));
 const Agent = lazy(() => import("./pages/Agent.tsx"));
 const Approvals = lazy(() => import("./pages/Approvals.tsx"));
+const AuditLog = lazy(() => import("./pages/AuditLog.tsx"));
 
 const queryClient = new QueryClient();
 

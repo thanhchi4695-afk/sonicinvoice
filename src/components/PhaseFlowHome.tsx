@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { FileText, Package, ShoppingBag, Store, Mail, Briefcase, Upload, Check, Link as LinkIcon, Code as CodeIcon, RefreshCw, Sparkles, Shuffle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HomeWizard from "@/components/HomeWizard";
+import DailyBriefing from "@/components/DailyBriefing";
 import ProductUrlImporter, { type ImportedLineItem } from "@/components/ProductUrlImporter";
 import HowToVideoButton from "@/components/HowToVideoButton";
 import { setSessionProducts } from "@/stores/invoice-session-store";

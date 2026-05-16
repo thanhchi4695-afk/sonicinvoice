@@ -6,6 +6,7 @@ import Navigation from "@/components/LandingNavigation";
 import HeroSection from "@/sections/HeroSection";
 import ConnectionMapHero from "@/sections/ConnectionMapHero";
 import CompleteFlowSection from "@/sections/CompleteFlowSection";
+import GuidedWorkflowsSection from "@/sections/GuidedWorkflowsSection";
 import StatBarSection from "@/sections/StatBarSection";
 import LogoTrustBar from "@/sections/LogoTrustBar";
 import HowItWorksSection from "@/sections/HowItWorksSection";

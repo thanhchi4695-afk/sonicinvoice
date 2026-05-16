@@ -114,6 +114,7 @@ const App = () => (
                   <Route path="/functions" element={<Suspense fallback={null}><FunctionsCatalog /></Suspense>} />
                   <Route path="/agent" element={<RequireAuth><Suspense fallback={null}><Agent /></Suspense></RequireAuth>} />
                   <Route path="/approvals" element={<RequireAuth><Suspense fallback={null}><Approvals /></Suspense></RequireAuth>} />
+                  <Route path="/audit-log" element={<RequireAuth><Suspense fallback={null}><AuditLog /></Suspense></RequireAuth>} />
                   <Route path="/settings/claude-connector" element={<RequireAuth><ClaudeConnector /></RequireAuth>} />
                   <Route path="/settings/claude-activity" element={<RequireAuth><ClaudeActivity /></RequireAuth>} />
                   <Route

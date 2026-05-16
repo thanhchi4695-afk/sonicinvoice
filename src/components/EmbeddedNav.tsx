@@ -71,6 +71,7 @@ const NavContent = ({ activeTab, onTabChange, onFlowChange, onClose }: EmbeddedN
   const claudeBadge = (() => {
     try { return localStorage.getItem("claude_connector_visited") !== "true"; } catch { return false; }
   })();
+  const { pendingApprovals, agentActive } = useAgentNotifications();
   return (
   <>
     <div className="px-4 py-4 flex items-center justify-between">

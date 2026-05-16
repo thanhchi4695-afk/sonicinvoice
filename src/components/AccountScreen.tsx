@@ -67,6 +67,7 @@ const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"
 const MultiBrandSuppliersSection = lazy(() => import("@/components/MultiBrandSuppliersSection"));
 import SonicAssistantSettings from "@/components/SonicAssistantSettings";
 import ScheduledTasksSection from "@/components/ScheduledTasksSection";
+import AgentSettingsSection from "@/components/AgentSettingsSection";
 
 const CONNECTION_LOAD_TIMEOUT_MS = 8000;
 
@@ -396,6 +397,9 @@ const AccountScreen = () => {
 
         {/* ─── SYSTEM ────────────────────────────────────────── */}
         <TabsContent value="system" className="mt-0 space-y-0">
+          <Section title="🤖 Agent">
+            <AgentSettingsSection />
+          </Section>
           <Section title="⏰ Scheduled Tasks">
             <Suspense fallback={<div className="text-xs text-muted-foreground p-2">Loading…</div>}>
               <ScheduledTasksSection />

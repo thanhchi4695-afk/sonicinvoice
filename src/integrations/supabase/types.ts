@@ -6221,6 +6221,33 @@ export type Database = {
           },
         ]
       }
+      sonic_agent_settings: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          shop_id: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          shop_id: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          shop_id?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       sonic_approval_queue: {
         Row: {
           approved_at: string | null

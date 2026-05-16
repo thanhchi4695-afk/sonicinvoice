@@ -66,6 +66,7 @@ const InvoiceParserModelSetting = lazy(() => import("@/components/InvoiceParserM
 const ClaudeSkillsLibrary = lazy(() => import("@/components/ClaudeSkillsLibrary"));
 const MultiBrandSuppliersSection = lazy(() => import("@/components/MultiBrandSuppliersSection"));
 import SonicAssistantSettings from "@/components/SonicAssistantSettings";
+import ScheduledTasksSection from "@/components/ScheduledTasksSection";
 
 const CONNECTION_LOAD_TIMEOUT_MS = 8000;
 

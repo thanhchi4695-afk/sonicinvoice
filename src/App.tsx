@@ -54,6 +54,7 @@ const FunctionsCatalog = lazy(() => import("./pages/FunctionsCatalog.tsx"));
 const Agent = lazy(() => import("./pages/Agent.tsx"));
 const Approvals = lazy(() => import("./pages/Approvals.tsx"));
 const AuditLog = lazy(() => import("./pages/AuditLog.tsx"));
+const MobileApprovals = lazy(() => import("./pages/MobileApprovals.tsx"));
 
 const queryClient = new QueryClient();
 

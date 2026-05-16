@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Competitor Intel</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a;
+  color: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.logo {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  font-size: 22px;
+  color: #a3e635;
+  font-weight: 700;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo svg { width: 20px; height: 20px; }
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 60px 40px 100px;
+}
+.act {
+  display: none;
+  width: 100%;
+  max-width: 1000px;
+  animation: springIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.act.active { display: block; }
+@keyframes springIn {
+  from { opacity: 0; transform: translateY(40px) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tagline {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  font-size: 13px;
+  color: #737373;
+  font-weight: 500;
+}
+h2 {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #f0f0f0;
+  line-height: 1.15;
+}
+.subtitle {
+  font-size: 18px;
+  color: #737373;
+  margin-bottom: 40px;
+  line-height: 1.5;
+}
+.card {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 28px;
+}
+.competitor-form {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+.competitor-form .url-input {
+  flex: 1;
+  font-size: 14px;
+  color: #a3e635;
+}
+.competitor-form .url-status {
+  font-size: 12px;
+  color: #737373;
+}
+.price-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.price-table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: #737373;
+  font-weight: 500;
+  border-bottom: 1px solid #242424;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.price-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #1a1a1a;
+}
+.price-table tr:hover td { background: rgba(163,230,53,0.03); }
+.price-table .price-win { color: #a3e635; font-weight: 600; }
+.price-table .price-lose { color: #ef4444; font-weight: 600; }
+.price-table .price-match { color: #FDAB3D; }
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.action-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+.action-btn.match { background: #a3e635; color: #0a0a0a; }
+.action-btn.beat { background: rgba(163,230,53,0.2); color: #a3e635; border: 1px solid #a3e635; }
+.action-btn.keep { background: #1a1a1a; color: #737373; }
+.gap-card {
+  background: rgba(0,134,192,0.05);
+  border: 1px solid rgba(0,134,192,0.2);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.gap-card .gap-icon { font-size: 32px; }
+.gap-card .gap-info { flex: 1; }
+.gap-card .gap-info .gap-title { font-weight: 600; margin-bottom: 4px; }
+.gap-card .gap-info .gap-desc { font-size: 13px; color: #737373; }
+.gap-card .gap-action {
+  background: #0086C0;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+.stat-box {
+  background: #0f0f0f;
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+}
+.stat-box-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #a3e635;
+}
+.stat-box-label {
+  font-size: 12px;
+  color: #737373;
+  margin-top: 4px;
+}
+.cta-panel {
+  text-align: center;
+  padding: 40px;
+}
+.cta-logo { font-size: 64px; margin-bottom: 20px; }
+.cta-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+.cta-url { font-size: 18px; color: #a3e635; margin-bottom: 32px; font-weight: 500; }
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #a3e635;
+  color: #0a0a0a;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+.cta-button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(163,230,53,0.3); }
+.progress-container {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  z-index: 50;
+}
+.progress-bar {
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #a3e635;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+.dots {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 50;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #404040;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.dot.active { background: #a3e635; transform: scale(1.3); }
+.controls-hint {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  font-size: 11px;
+  color: #404040;
+  z-index: 50;
+}
+.caption {
+  font-size: 15px;
+  color: #737373;
+  margin-top: 20px;
+  font-style: italic;
+}
+</style>
+</head>
+<body>
+<div class="logo">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+  Sonic Invoices
+</div>
+<div class="tagline">"Know what your competitors charge — in real time"</div>
+
+<div class="stage">
+
+<!-- Act 1: The Problem -->
+<div class="act active" data-act="1">
+  <h2>Guessing your competitor's prices is not a strategy.</h2>
+  <div class="subtitle">Customer: "Swimwear Galore has the Seafolly Riviera $20 cheaper." You: no idea.</div>
+  <div class="card" style="text-align:center; padding:40px;">
+    <div style="font-size:64px; margin-bottom:16px;">🤷</div>
+    <div style="font-size:18px; font-weight:600; margin-bottom:8px;">"Are we competitive?"</div>
+    <div style="font-size:14px; color:#737373;">No data. No insight. No response. Just guesswork.</div>
+  </div>
+  <div class="caption">"Guessing your competitor's prices is not a strategy."</div>
+</div>
+
+<!-- Act 2: Add Competitors -->
+<div class="act" data-act="2">
+  <h2>Add competitors. Sonic fetches their prices.</h2>
+  <div class="subtitle">Any URL. Any competitor. Automatic indexing.</div>
+  <div class="competitor-form">
+    <span>🔗</span>
+    <div class="url-input">swimweargalore.com.au</div>
+    <div class="url-status" style="color:#a3e635;">✓ Indexed</div>
+  </div>
+  <div class="competitor-form">
+    <span>🔗</span>
+    <div class="url-input">bathersboutique.com.au</div>
+    <div class="url-status" style="color:#a3e635;">✓ Indexed</div>
+  </div>
+  <div class="competitor-form">
+    <span>🔗</span>
+    <div class="url-input">theiconic.com.au</div>
+    <div class="url-status" style="color:#a3e635;">✓ Indexed</div>
+  </div>
+  <div style="margin-top:16px; text-align:center; font-size:13px; color:#737373;">
+    <strong style="color:#a3e635;">847 products</strong> indexed across 3 competitors
+  </div>
+  <div class="caption">"Three URLs. 847 products indexed. Automatic."</div>
+</div>
+
+<!-- Act 3: Price Monitor Dashboard -->
+<div class="act" data-act="3">
+  <h2>Side-by-side price comparison.</h2>
+  <div class="subtitle">Your price vs theirs — every product, every day</div>
+  <div class="card" style="padding:0; overflow:hidden;">
+    <table class="price-table">
+      <tr><th>Product</th><th>Your Price</th><th>Swimwear Galore</th><th>Bathers</th><th>Status</th></tr>
+      <tr>
+        <td>Seafolly Riviera Teal 12</td>
+        <td>$189.00</td>
+        <td class="price-lose">$169.00</td>
+        <td class="price-win">$195.00</td>
+        <td class="price-lose">$20 behind</td>
+      </tr>
+      <tr>
+        <td>Kulani Kinis Cheeky XS</td>
+        <td class="price-win">$79.00</td>
+        <td>$85.00</td>
+        <td>$82.00</td>
+        <td class="price-win">You win</td>
+      </tr>
+      <tr>
+        <td>Baku Boardshort Navy</td>
+        <td>$89.00</td>
+        <td class="price-win">$79.00</td>
+        <td class="price-lose">$95.00</td>
+        <td class="price-match">Mixed</td>
+      </tr>
+    </table>
+  </div>
+  <div class="caption">"$20 behind on Riviera. Winning on Cheeky. Data, not guesses."</div>
+</div>
+
+<!-- Act 4: One-Click Price Match -->
+<div class="act" data-act="4">
+  <h2>One click. Price matched. Instantly.</h2>
+  <div class="subtitle">Match, beat, or hold — your call</div>
+  <div class="card">
+    <div style="font-size:14px; font-weight:600; margin-bottom:12px;">Seafolly Riviera Teal 12 — Your price: $189</div>
+    <div style="font-size:13px; color:#737373; margin-bottom:16px;">Competitor: Swimwear Galore at $169 ($20 cheaper)</div>
+    <div class="action-buttons">
+      <button class="action-btn match">Match ($169)</button>
+      <button class="action-btn beat">Beat by 5% ($160.55)</button>
+      <button class="action-btn keep">Keep ($189)</button>
+    </div>
+    <div style="margin-top:16px; padding:12px; background:rgba(163,230,53,0.05); border-radius:8px; font-size:13px; color:#a3e635;">
+      ✓ Price updated to $169. Shopify synced. Margin: 52%.
+    </div>
+  </div>
+  <div class="caption">"Match at $169. Beat at $160.55. Or hold. One click."</div>
+</div>
+
+<!-- Act 5: Competitor Range Gaps -->
+<div class="act" data-act="5">
+  <h2>Find the gaps. Fill them. Rank higher.</h2>
+  <div class="subtitle">Competitors stock what you do not — opportunity found</div>
+  <div class="gap-card">
+    <div class="gap-icon">🔍</div>
+    <div class="gap-info">
+      <div class="gap-title">Gap Detected: Modest Swimwear</div>
+      <div class="gap-desc">THE ICONIC stocks /womens-modest-swimwear — you do not. Ranks #2 for "modest swimwear australia". Opportunity: 2,400 searches/month.</div>
+    </div>
+    <button class="gap-action">Create Collection →</button>
+  </div>
+  <div style="margin-top:16px; text-align:center; font-size:13px; color:#737373;">
+    Collection created + SEO content auto-generated
+  </div>
+  <div class="caption">"They stock modest swimwear. You do not. One click to close the gap."</div>
+</div>
+
+<!-- Act 6: The Benefit -->
+<div class="act" data-act="6">
+  <h2>See everything. React instantly. Win more sales.</h2>
+  <div class="subtitle">Competitor intelligence that pays off</div>
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-box-value">12</div>
+      <div class="stat-box-label">Price matches actioned this week</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">3</div>
+      <div class="stat-box-label">Gap collections created</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">2–4 hrs</div>
+      <div class="stat-box-label">Data refresh cycle</div>
+    </div>
+  </div>
+  <div class="caption">"See everything. React instantly. Win more sales."</div>
+</div>
+
+<!-- Act 7: CTA -->
+<div class="act" data-act="7">
+  <div class="cta-panel">
+    <div class="cta-logo">⚡</div>
+    <div class="cta-title">Sonic Invoices</div>
+    <div class="cta-url">sonicinvoices.com</div>
+    <a href="https://sonicinvoices.com" class="cta-button">Book a free demo →</a>
+  </div>
+</div>
+
+</div>
+
+<div class="progress-container">
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="controls-hint">← → arrows · spacebar play/pause</div>
+
+<script>
+const totalActs = 7;
+let currentAct = 1;
+let isPlaying = true;
+let progress = 0;
+const actDuration = 15000;
+
+function initDots() {
+  const dotsContainer = document.getElementById('dots');
+  for (let i = 1; i <= totalActs; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 1 ? ' active' : '');
+    dot.onclick = () => goToAct(i);
+    dotsContainer.appendChild(dot);
+  }
+}
+
+function goToAct(n) {
+  if (n < 1 || n > totalActs) return;
+  document.querySelectorAll('.act').forEach(a => a.classList.remove('active'));
+  document.querySelector(`.act[data-act="${n}"]`).classList.add('active');
+  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === n));
+  currentAct = n;
+  resetProgress();
+}
+
+function nextAct() {
+  if (currentAct < totalActs) goToAct(currentAct + 1);
+  else goToAct(1);
+}
+
+function prevAct() {
+  if (currentAct > 1) goToAct(currentAct - 1);
+  else goToAct(totalActs);
+}
+
+function resetProgress() {
+  progress = 0;
+  document.getElementById('progressFill').style.width = '0%';
+}
+
+function updateProgress() {
+  if (!isPlaying) return;
+  progress += 100 / (actDuration / 100);
+  document.getElementById('progressFill').style.width = progress + '%';
+  if (progress >= 100) nextAct();
+}
+
+setInterval(updateProgress, 100);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') { nextAct(); resetProgress(); }
+  if (e.key === 'ArrowLeft') { prevAct(); resetProgress(); }
+  if (e.key === ' ') { e.preventDefault(); isPlaying = !isPlaying; }
+});
+
+initDots();
+</script>
+</body>
+</html>

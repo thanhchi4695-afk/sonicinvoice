@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sonic Invoices — Morning Briefing & Team</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a0a;
+  color: #f0f0f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.logo {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  font-size: 22px;
+  color: #a3e635;
+  font-weight: 700;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo svg { width: 20px; height: 20px; }
+.stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 60px 40px 100px;
+}
+.act {
+  display: none;
+  width: 100%;
+  max-width: 1000px;
+  animation: springIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.act.active { display: block; }
+@keyframes springIn {
+  from { opacity: 0; transform: translateY(40px) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tagline {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  font-size: 13px;
+  color: #737373;
+  font-weight: 500;
+}
+h2 {
+  font-size: 42px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #f0f0f0;
+  line-height: 1.15;
+}
+.subtitle {
+  font-size: 18px;
+  color: #737373;
+  margin-bottom: 40px;
+  line-height: 1.5;
+}
+.card {
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 12px;
+  padding: 28px;
+}
+.phone-notification {
+  width: 300px;
+  background: #141414;
+  border: 1px solid #242424;
+  border-radius: 24px;
+  padding: 24px;
+  margin: 0 auto;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+.phone-notch {
+  width: 100px;
+  height: 24px;
+  background: #0a0a0a;
+  border-radius: 0 0 12px 12px;
+  margin: -24px auto 16px;
+}
+.briefing-card {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 12px;
+}
+.briefing-card .bc-time { font-size: 11px; color: #737373; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.briefing-card .bc-item { font-size: 13px; padding: 6px 0; border-bottom: 1px solid #1a1a1a; }
+.briefing-card .bc-item:last-child { border-bottom: none; }
+.briefing-card .bc-item .bc-icon { margin-right: 8px; }
+.rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rule-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+.rule-item .r-num { width: 24px; height: 24px; border-radius: 50%; background: rgba(163,230,53,0.1); color: #a3e635; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+.rule-item .r-text { font-size: 13px; }
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.team-card {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+}
+.team-card .tc-avatar { font-size: 32px; margin-bottom: 8px; }
+.team-card .tc-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.team-card .tc-role { font-size: 11px; color: #737373; margin-bottom: 8px; }
+.team-card .tc-perms { font-size: 11px; color: #a3e635; }
+.team-card.admin { border-color: #a3e635; }
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.settings-field {
+  background: #0f0f0f;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  padding: 16px;
+}
+.settings-field .sf-label { font-size: 11px; color: #737373; text-transform: uppercase; margin-bottom: 4px; }
+.settings-field .sf-value { font-size: 15px; font-weight: 500; }
+.billing-chart {
+  height: 100px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 16px 0;
+}
+.bill-bar {
+  flex: 1;
+  background: #1a1a1a;
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding-bottom: 4px;
+}
+.bill-bar .bb-fill { width: 100%; border-radius: 4px 4px 0 0; }
+.bill-bar .bb-label { font-size: 10px; color: #737373; margin-top: 4px; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+.stat-box {
+  background: #0f0f0f;
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+}
+.stat-box-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #a3e635;
+}
+.stat-box-label {
+  font-size: 12px;
+  color: #737373;
+  margin-top: 4px;
+}
+.cta-panel {
+  text-align: center;
+  padding: 40px;
+}
+.cta-logo { font-size: 64px; margin-bottom: 20px; }
+.cta-title { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+.cta-url { font-size: 18px; color: #a3e635; margin-bottom: 32px; font-weight: 500; }
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #a3e635;
+  color: #0a0a0a;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+}
+.cta-button:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(163,230,53,0.3); }
+.progress-container {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  z-index: 50;
+}
+.progress-bar {
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #a3e635;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+.dots {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 50;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #404040;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.dot.active { background: #a3e635; transform: scale(1.3); }
+.controls-hint {
+  position: fixed;
+  bottom: 24px;
+  right: 28px;
+  font-size: 11px;
+  color: #404040;
+  z-index: 50;
+}
+.caption {
+  font-size: 15px;
+  color: #737373;
+  margin-top: 20px;
+  font-style: italic;
+}
+</style>
+</head>
+<body>
+<div class="logo">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+  Sonic Invoices
+</div>
+<div class="tagline">"Your store briefed. Your team aligned. Every morning."</div>
+
+<div class="stage">
+
+<!-- Act 1: 7:00 AM Darwin -->
+<div class="act active" data-act="1">
+  <h2>Know your store before you open the door.</h2>
+  <div class="subtitle">7:00 AM. Phone buzzes. Your Morning Briefing is ready.</div>
+  <div style="display:flex; justify-content:center;">
+    <div class="phone-notification">
+      <div class="phone-notch"></div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span style="font-size:20px;">⚡</span>
+        <span style="font-size:14px; font-weight:600;">Sonic Morning Briefing</span>
+        <span style="margin-left:auto; font-size:11px; color:#737373;">7:00 AM</span>
+      </div>
+      <div style="font-size:13px; line-height:1.5; color:#737373;">
+        <strong style="color:#a3e635;">Your store brief is ready</strong><br><br>
+        Tap to see what happened overnight and what needs your attention today.
+      </div>
+    </div>
+  </div>
+  <div class="caption">"7 AM. Phone buzzes. Briefing ready. Know before you open."</div>
+</div>
+
+<!-- Act 2: Morning Briefing -->
+<div class="act" data-act="2">
+  <h2>Everything that matters. Nothing that does not.</h2>
+  <div class="subtitle">Last night. Today. This week. All summarised.</div>
+  <div class="briefing-card">
+    <div class="bc-time">Last Night</div>
+    <div class="bc-item"><span class="bc-icon">🤖</span>3 automations ran</div>
+    <div class="bc-item"><span class="bc-icon">📦</span>147 products scanned</div>
+    <div class="bc-item"><span class="bc-icon">🛡️</span>2 margin alerts blocked</div>
+  </div>
+  <div class="briefing-card">
+    <div class="bc-time">Today</div>
+    <div class="bc-item"><span class="bc-icon">📦</span>Seafolly restock due</div>
+    <div class="bc-item"><span class="bc-icon">⚠️</span>3 low-stock items need ordering</div>
+    <div class="bc-item"><span class="bc-icon">📋</span>1 PO awaiting confirmation</div>
+  </div>
+  <div class="briefing-card">
+    <div class="bc-time">This Week</div>
+    <div class="bc-item"><span class="bc-icon">🏇</span>Darwin Cup is 3 weeks away — race fashion stock check recommended</div>
+  </div>
+  <div class="caption">"Automations, alerts, restocks, events — all in 90 seconds."</div>
+</div>
+
+<!-- Act 3: AI Instructions -->
+<div class="act" data-act="3">
+  <h2>Natural language rules. The AI learns your preferences.</h2>
+  <div class="subtitle">Write rules in plain English. AI applies them to every invoice.</div>
+  <div class="rule-list">
+    <div class="rule-item">
+      <div class="r-num">1</div>
+      <div class="r-text">Always prefix product title with brand name</div>
+    </div>
+    <div class="rule-item">
+      <div class="r-num">2</div>
+      <div class="r-text">Map first price column to cost, second to RRP</div>
+    </div>
+    <div class="rule-item">
+      <div class="r-num">3</div>
+      <div class="r-text">Skip rows where quantity = 0</div>
+    </div>
+    <div class="rule-item" style="border-color:#a3e635;">
+      <div class="r-num" style="background:rgba(163,230,53,0.2);">+</div>
+      <div class="r-text" style="color:#a3e635;">Flag any margin below 40% as urgent</div>
+    </div>
+  </div>
+  <div style="margin-top:16px; text-align:center; font-size:13px; color:#737373;">Add new rules in plain English. No code. No syntax.</div>
+  <div class="caption">"Plain English rules. Applied to every invoice. No code."</div>
+</div>
+
+<!-- Act 4: Team Management -->
+<div class="act" data-act="4">
+  <h2>Your team. Their roles. Their permissions.</h2>
+  <div class="subtitle">Editor · Viewer · Admin — controlled access</div>
+  <div class="team-grid">
+    <div class="team-card">
+      <div class="tc-avatar">👩</div>
+      <div class="tc-name">Sarah Chen</div>
+      <div class="tc-role">Editor</div>
+      <div class="tc-perms">Parse invoices<br>Cannot push to Shopify</div>
+    </div>
+    <div class="team-card">
+      <div class="tc-avatar">👨</div>
+      <div class="tc-name">James Walsh</div>
+      <div class="tc-role">Viewer</div>
+      <div class="tc-perms">Read-only reports<br>Cannot edit anything</div>
+    </div>
+    <div class="team-card admin">
+      <div class="tc-avatar">👩</div>
+      <div class="tc-name">Chi Nguyen</div>
+      <div class="tc-role">Admin</div>
+      <div class="tc-perms">Full access<br>All features unlocked</div>
+    </div>
+  </div>
+  <div style="margin-top:16px; text-align:center; font-size:13px; color:#737373;">Invite: enter email → set role → send. Accepted in 2 clicks.</div>
+  <div class="caption">"Editor, Viewer, Admin. Right access. Right person."</div>
+</div>
+
+<!-- Act 5: Store Settings -->
+<div class="act" data-act="5">
+  <h2>Store settings tailored to your industry.</h2>
+  <div class="subtitle">Fashion/Swimwear unlocks tailored tags and SEO formulas</div>
+  <div class="settings-grid">
+    <div class="settings-field">
+      <div class="sf-label">Currency</div>
+      <div class="sf-value">AUD ($)</div>
+    </div>
+    <div class="settings-field">
+      <div class="sf-label">Timezone</div>
+      <div class="sf-value">Darwin GMT+9:30</div>
+    </div>
+    <div class="settings-field">
+      <div class="sf-label">Industry</div>
+      <div class="sf-value" style="color:#a3e635;">Fashion / Swimwear</div>
+    </div>
+    <div class="settings-field">
+      <div class="sf-label">Tax Region</div>
+      <div class="sf-value">NT, Australia</div>
+    </div>
+  </div>
+  <div style="margin-top:16px; text-align:center; font-size:13px; color:#737373;">Industry selection unlocks: <strong style="color:#a3e635;">tailored tag formulas</strong> · <strong style="color:#a3e635;">swimwear-specific SEO</strong> · <strong style="color:#a3e635;">Darwin Cup seasonal alerts</strong></div>
+  <div class="caption">"Fashion/Swimwear selected. Tailored tags. Seasonal alerts."</div>
+</div>
+
+<!-- Act 6: Billing & Plans -->
+<div class="act" data-act="6">
+  <h2>Transparent usage. No surprises.</h2>
+  <div class="subtitle">Current plan · Usage metrics · Upgrade anytime</div>
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div>
+        <div style="font-size:16px; font-weight:600;">Pro Plan</div>
+        <div style="font-size:13px; color:#737373;">500 invoices/month · Unlimited products</div>
+      </div>
+      <div style="font-size:24px; font-weight:700; color:#a3e635;">$149/mo</div>
+    </div>
+    <div class="billing-chart">
+      <div class="bill-bar"><div class="bb-fill" style="height:60%; background:rgba(163,230,53,0.4);"></div><div class="bb-label">Jan</div></div>
+      <div class="bill-bar"><div class="bb-fill" style="height:75%; background:rgba(163,230,53,0.5);"></div><div class="bb-label">Feb</div></div>
+      <div class="bill-bar"><div class="bb-fill" style="height:85%; background:rgba(163,230,53,0.6);"></div><div class="bb-label">Mar</div></div>
+      <div class="bill-bar"><div class="bb-fill" style="height:70%; background:rgba(163,230,53,0.5);"></div><div class="bb-label">Apr</div></div>
+      <div class="bill-bar"><div class="bb-fill" style="height:90%; background:rgba(253,171,61,0.5);"></div><div class="bb-label">May</div></div>
+      <div class="bill-bar"><div class="bb-fill" style="height:40%; background:#1a1a1a;"></div><div class="bb-label">Jun</div></div>
+    </div>
+    <div style="margin-top:12px; display:flex; justify-content:space-between; font-size:13px;">
+      <span style="color:#737373;">347 invoices processed this month</span>
+      <span style="color:#a3e635;">153 remaining</span>
+    </div>
+  </div>
+  <div class="caption">"347 of 500 used. Transparent. Upgrade anytime."</div>
+</div>
+
+<!-- Act 7: The Benefit -->
+<div class="act" data-act="7">
+  <h2>Sonic knows your store. Every morning. For every person.</h2>
+  <div class="stats-grid">
+    <div class="stat-box">
+      <div class="stat-box-value">2</div>
+      <div class="stat-box-label">Team members onboarded</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">90s</div>
+      <div class="stat-box-label">Briefing read time</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-box-value">6</div>
+      <div class="stat-box-label">AI rules set</div>
+    </div>
+  </div>
+  <div class="caption">"Team aligned. Rules set. Briefing read. Store ready."</div>
+</div>
+
+<!-- Act 8: CTA -->
+<div class="act" data-act="8">
+  <div class="cta-panel">
+    <div class="cta-logo">⚡</div>
+    <div class="cta-title">Sonic Invoices</div>
+    <div class="cta-url">sonicinvoices.com</div>
+    <a href="https://sonicinvoices.com" class="cta-button">Book a free demo →</a>
+  </div>
+</div>
+
+</div>
+
+<div class="progress-container">
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="controls-hint">← → arrows · spacebar play/pause</div>
+
+<script>
+const totalActs = 8;
+let currentAct = 1;
+let isPlaying = true;
+let progress = 0;
+const actDuration = 15000;
+
+function initDots() {
+  const dotsContainer = document.getElementById('dots');
+  for (let i = 1; i <= totalActs; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 1 ? ' active' : '');
+    dot.onclick = () => goToAct(i);
+    dotsContainer.appendChild(dot);
+  }
+}
+
+function goToAct(n) {
+  if (n < 1 || n > totalActs) return;
+  document.querySelectorAll('.act').forEach(a => a.classList.remove('active'));
+  document.querySelector(`.act[data-act="${n}"]`).classList.add('active');
+  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i + 1 === n));
+  currentAct = n;
+  resetProgress();
+}
+
+function nextAct() {
+  if (currentAct < totalActs) goToAct(currentAct + 1);
+  else goToAct(1);
+}
+
+function prevAct() {
+  if (currentAct > 1) goToAct(currentAct - 1);
+  else goToAct(totalActs);
+}
+
+function resetProgress() {
+  progress = 0;
+  document.getElementById('progressFill').style.width = '0%';
+}
+
+function updateProgress() {
+  if (!isPlaying) return;
+  progress += 100 / (actDuration / 100);
+  document.getElementById('progressFill').style.width = progress + '%';
+  if (progress >= 100) nextAct();
+}
+
+setInterval(updateProgress, 100);
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') { nextAct(); resetProgress(); }
+  if (e.key === 'ArrowLeft') { prevAct(); resetProgress(); }
+  if (e.key === ' ') { e.preventDefault(); isPlaying = !isPlaying; }
+});
+
+initDots();
+</script>
+</body>
+</html>

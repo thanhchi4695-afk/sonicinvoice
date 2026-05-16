@@ -81,6 +81,7 @@ const PhaseFlowHome = (props: PhaseFlowHomeProps) => {
 
   return (
     <div className="px-4 py-6 sm:py-10 max-w-4xl mx-auto">
+      <DailyBriefing />
       {/* ── Persistent 6-phase progress indicator ── */}
       <div className="mb-8">
         <ol className="flex items-center justify-between gap-1 text-[10px] sm:text-xs">

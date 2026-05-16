@@ -13,6 +13,7 @@ import AskSonicAI from "@/components/AskSonicAI";
 import ClaudePopupButton from "@/components/ClaudePopupButton";
 import { ConfirmDialogProvider } from "@/hooks/use-confirm-dialog";
 import { PromptDialogProvider } from "@/hooks/use-prompt-dialog";
+import { AgentNotificationsProvider } from "@/hooks/use-agent-notifications";
 import Index from "./pages/Index.tsx";
 import Landing from "./pages/Landing.tsx";
 import Home from "./pages/Home.tsx";
@@ -66,6 +67,7 @@ const App = () => (
               <Toaster />
               <Sonner />
               <BrowserRouter>
+                <AgentNotificationsProvider>
                 <StockyAnnouncementBar />
                 <Routes>
                   <Route path="/" element={<Home />} />
@@ -155,6 +157,7 @@ const App = () => (
                 <EmbeddedAuthHealthCheck />
                 <AskSonicAI />
                 <ClaudePopupButton />
+                </AgentNotificationsProvider>
               </BrowserRouter>
             </PromptDialogProvider>
           </ConfirmDialogProvider>

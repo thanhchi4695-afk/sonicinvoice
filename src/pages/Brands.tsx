@@ -453,6 +453,12 @@ export default function Brands() {
                       {r.manually_verified && <CheckCircle2 className="inline h-3.5 w-3.5 ml-1 text-green-600" />}
                     </td>
                     <td className="p-3 text-muted-foreground">{r.brand_domain || "—"}</td>
+                    <td className="p-3 text-muted-foreground">
+                      {r.industry_vertical
+                        ? r.industry_vertical[0] + r.industry_vertical.slice(1).toLowerCase()
+                        : "—"}
+                      {r.priority != null && <span className="ml-1 text-xs">· P{r.priority}</span>}
+                    </td>
                     <td className="p-3 space-x-1">
                       {r.crawl_status === "crawling" && <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1" /> Crawling…</Badge>}
                       {(r.crawl_status === "completed" || r.crawl_status === "crawled") && (
@@ -468,9 +474,8 @@ export default function Brands() {
                         </Badge>
                       )}
                     </td>
-                    <td className="p-3">{r.collection_structure_type || "—"}</td>
-                    <td className="p-3">{r.brand_tone || "—"}</td>
                     <td className="p-3">{r.crawl_confidence != null ? `${Math.round(r.crawl_confidence * 100)}%` : "—"}</td>
+                    <td className="p-3 text-muted-foreground">{r.collections_created ?? 0}</td>
                     <td className="p-3 text-muted-foreground">
                       {r.last_crawled_at ? new Date(r.last_crawled_at).toLocaleDateString() : "—"}
                       {stale && <Badge variant="outline" className="ml-2">Needs re-crawl</Badge>}

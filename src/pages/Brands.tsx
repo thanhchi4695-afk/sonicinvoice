@@ -78,6 +78,7 @@ export default function Brands() {
   const [killSwitch, setKillSwitch] = useState<boolean>(true);
   const [iconicRefreshingId, setIconicRefreshingId] = useState<string | null>(null);
   const [whitefoxRefreshingId, setWhitefoxRefreshingId] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number; current: string } | null>(null);
 
   async function load() {
     setLoading(true);
@@ -136,6 +137,36 @@ export default function Brands() {
   async function seedAndCrawl(b: { name: string; domain: string; vertical: Vertical }) {
     const id = await ensureSeedRow(b.name, b.domain);
     if (id) await crawl(b.name, b.domain, id, b.vertical);
+  }
+
+  async function crawlAllPriority1(storeFilter?: "Splash" | "Stomp") {
+    const targets = PRIORITY_BRANDS.filter(
+      (b) => b.tier === 1 && (!storeFilter || b.store === storeFilter)
+    );
+    if (targets.length === 0) return;
+    const label = storeFilter ? `${storeFilter} Priority 1` : "All Priority 1";
+    if (!confirm(`Crawl ${targets.length} ${label} brands sequentially? This may take several minutes.`)) return;
+
+    setBatchProgress({ done: 0, total: targets.length, current: targets[0].name });
+    let ok = 0, fail = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const b = targets[i];
+      setBatchProgress({ done: i, total: targets.length, current: b.name });
+      try {
+        const id = await ensureSeedRow(b.name, b.domain);
+        if (!id) { fail++; continue; }
+        const { data, error } = await supabase.functions.invoke("brand-intelligence-crawler", {
+          body: { brand_id: id, brand_name: b.name, brand_domain: b.domain, industry_vertical: b.vertical },
+        });
+        if (error || (data as { error?: string })?.error) { fail++; }
+        else { ok++; }
+      } catch { fail++; }
+      // Gentle pacing between Firecrawl runs
+      if (i < targets.length - 1) await new Promise((r) => setTimeout(r, 1500));
+    }
+    setBatchProgress(null);
+    await load();
+    toast.success(`${label}: ${ok} crawled, ${fail} failed`);
   }
 
   async function refreshIconic(id: string, name: string) {
@@ -290,6 +321,45 @@ export default function Brands() {
         </div>
       </Card>
 
+      <Card className="p-4 mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="font-semibold text-sm">Batch crawl</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Seeds (if missing) and crawls every Priority 1 brand sequentially with Firecrawl pacing.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={!!batchProgress || !!crawlingId} onClick={() => crawlAllPriority1("Splash")}>
+              {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+              Crawl Splash Priority 1
+            </Button>
+            <Button size="sm" variant="outline" disabled={!!batchProgress || !!crawlingId} onClick={() => crawlAllPriority1("Stomp")}>
+              {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+              Crawl Stomp Priority 1
+            </Button>
+            <Button size="sm" disabled={!!batchProgress || !!crawlingId} onClick={() => crawlAllPriority1()}>
+              {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+              Crawl all Priority 1
+            </Button>
+          </div>
+        </div>
+        {batchProgress && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+              <span>Crawling {batchProgress.current}…</span>
+              <span>{batchProgress.done} / {batchProgress.total}</span>
+            </div>
+            <div className="h-1.5 w-full rounded bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${Math.round((batchProgress.done / batchProgress.total) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </Card>
+
       {loading ? (
         <div className="flex items-center justify-center p-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
       ) : filteredRows.length === 0 ? (
@@ -323,11 +393,16 @@ export default function Brands() {
                       {r.manually_verified && <CheckCircle2 className="inline h-3.5 w-3.5 ml-1 text-green-600" />}
                     </td>
                     <td className="p-3 text-muted-foreground">{r.brand_domain || "—"}</td>
-                    <td className="p-3">
+                    <td className="p-3 space-x-1">
                       {r.crawl_status === "crawling" && <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1" /> Crawling</Badge>}
                       {r.crawl_status === "crawled" && <Badge variant="default">Crawled</Badge>}
                       {r.crawl_status === "failed" && <Badge variant="destructive" title={r.crawl_error || ""}><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>}
                       {r.crawl_status === "not_crawled" && <Badge variant="outline">Not crawled</Badge>}
+                      {r.crawl_status === "crawled" && r.crawl_confidence != null && r.crawl_confidence < 0.6 && !r.manually_verified && (
+                        <Badge variant="destructive" title="Confidence below 60% — review brand profile and re-crawl or verify manually">
+                          <AlertCircle className="h-3 w-3 mr-1" /> Needs review
+                        </Badge>
+                      )}
                     </td>
                     <td className="p-3">{r.collection_structure_type || "—"}</td>
                     <td className="p-3">{r.brand_tone || "—"}</td>

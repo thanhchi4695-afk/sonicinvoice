@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,11 +51,15 @@ interface EnrichResponse {
   error?: string;
 }
 
+type EnrichStatus = "idle" | "searching" | "found" | "failed";
+
 interface Props {
   productId?: string;
   invoiceProduct: EnrichInvoiceProduct;
   /** True when the row already has both description AND image — hides button. */
   hasDescriptionAndImage?: boolean;
+  /** Optional Shopify product image to use as fallback when web enrichment returns no image. */
+  shopifyImageUrl?: string;
   /** Called when enrichment is accepted (auto or by the user). */
   onEnriched: (fields: EnrichedFields) => void;
   className?: string;
@@ -66,13 +70,15 @@ export const EnrichProductButton = ({
   productId,
   invoiceProduct,
   hasDescriptionAndImage,
+  shopifyImageUrl,
   onEnriched,
   className,
   size = "sm",
 }: Props) => {
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<EnrichStatus>("idle");
   const [pending, setPending] = useState<EnrichedFields | null>(null);
   const [reasoning, setReasoning] = useState<string>("");
+  const loading = status === "searching";
 
   const brand = (invoiceProduct.brand || "").trim();
   const productName = (invoiceProduct.product_name || "").trim();
@@ -83,7 +89,8 @@ export const EnrichProductButton = ({
   if (hasDescriptionAndImage) return null;
 
   const handleClick = async () => {
-    setLoading(true);
+    setStatus("searching");
+    console.log("[EnrichProductButton] starting enrichment", { brand, productName, sku: invoiceProduct.sku });
     try {
       const { data, error } = await supabase.functions.invoke<EnrichResponse>("enrich", {
         body: { productId, invoiceProduct },
@@ -91,11 +98,14 @@ export const EnrichProductButton = ({
 
       if (error) {
         console.error("[EnrichProductButton] invoke error:", error);
+        setStatus("failed");
         toast.error("No enrichment found – please add manually.");
         return;
       }
 
       if (!data) {
+        console.warn("[EnrichProductButton] empty response");
+        setStatus("failed");
         toast.error("No enrichment found – please add manually.");
         return;
       }
@@ -104,14 +114,26 @@ export const EnrichProductButton = ({
       const enriched = data.enrichedProduct;
 
       if (action === "skip" || !data.success || !enriched) {
+        console.log("[EnrichProductButton] skip/no enrichment", { action, success: data.success });
+        setStatus("failed");
         toast("No enrichment found – please add manually.");
         return;
       }
 
+      // Image fallback chain: web → shopify → blank
+      let resolvedImage = enriched.imageUrl ?? "";
+      let imageOrigin: "web" | "shopify" | "none" = resolvedImage ? "web" : "none";
+      if (!resolvedImage && shopifyImageUrl) {
+        resolvedImage = shopifyImageUrl;
+        imageOrigin = "shopify";
+        console.log("[EnrichProductButton] using Shopify image fallback");
+      }
+      console.log("[EnrichProductButton] image source:", imageOrigin);
+
       const fields: EnrichedFields = {
         title: enriched.title,
         description: enriched.description ?? "",
-        imageUrl: enriched.imageUrl ?? "",
+        imageUrl: resolvedImage,
         price: enriched.price ?? "",
         sourceUrl: enriched.sourceUrl,
         confidence: data.confidence ?? enriched.confidence ?? 0,
@@ -120,8 +142,9 @@ export const EnrichProductButton = ({
 
       if (action === "auto_accept") {
         onEnriched(fields);
+        setStatus("found");
         toast.success("Enriched from web", {
-          description: `Confidence ${fields.confidence}% · ${fields.source}`,
+          description: `Confidence ${fields.confidence}% · ${fields.source}${imageOrigin === "shopify" ? " · image: Shopify" : ""}`,
         });
         return;
       }
@@ -129,11 +152,11 @@ export const EnrichProductButton = ({
       // needs_review → open confirm dialog
       setReasoning(data.reasoning || "");
       setPending(fields);
+      setStatus("found");
     } catch (e) {
       console.error("[EnrichProductButton] unexpected error:", e);
+      setStatus("failed");
       toast.error("No enrichment found – please add manually.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -145,6 +168,18 @@ export const EnrichProductButton = ({
     setPending(null);
   };
 
+  const statusIcon =
+    status === "searching" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+    status === "found" ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" aria-label="Found" /> :
+    status === "failed" ? <AlertTriangle className="w-3.5 h-3.5 text-amber-500" aria-label="Not found" /> :
+    <Sparkles className="w-3.5 h-3.5" />;
+
+  const statusLabel =
+    status === "searching" ? "Searching…" :
+    status === "found" ? "Enriched" :
+    status === "failed" ? "Not found" :
+    "Enrich from Web";
+
   return (
     <>
       <Button
@@ -155,13 +190,10 @@ export const EnrichProductButton = ({
         disabled={loading}
         className={className}
         title="Search supplier and web for product details"
+        aria-label={`Enrich product status: ${statusLabel}`}
       >
-        {loading ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <Sparkles className="w-3.5 h-3.5" />
-        )}
-        {loading ? "Enriching…" : "Enrich from Web"}
+        {statusIcon}
+        {statusLabel}
       </Button>
 
       <AlertDialog open={!!pending} onOpenChange={(o) => !o && setPending(null)}>

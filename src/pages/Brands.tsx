@@ -393,11 +393,16 @@ export default function Brands() {
                       {r.manually_verified && <CheckCircle2 className="inline h-3.5 w-3.5 ml-1 text-green-600" />}
                     </td>
                     <td className="p-3 text-muted-foreground">{r.brand_domain || "—"}</td>
-                    <td className="p-3">
+                    <td className="p-3 space-x-1">
                       {r.crawl_status === "crawling" && <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1" /> Crawling</Badge>}
                       {r.crawl_status === "crawled" && <Badge variant="default">Crawled</Badge>}
                       {r.crawl_status === "failed" && <Badge variant="destructive" title={r.crawl_error || ""}><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>}
                       {r.crawl_status === "not_crawled" && <Badge variant="outline">Not crawled</Badge>}
+                      {r.crawl_status === "crawled" && r.crawl_confidence != null && r.crawl_confidence < 0.6 && !r.manually_verified && (
+                        <Badge variant="destructive" title="Confidence below 60% — review brand profile and re-crawl or verify manually">
+                          <AlertCircle className="h-3 w-3 mr-1" /> Needs review
+                        </Badge>
+                      )}
                     </td>
                     <td className="p-3">{r.collection_structure_type || "—"}</td>
                     <td className="p-3">{r.brand_tone || "—"}</td>

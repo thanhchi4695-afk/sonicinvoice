@@ -31,7 +31,7 @@ export default function AgentStatusCard() {
       </div>
 
       <Link
-        to="/agent"
+        to="/how-it-works#ai-agent"
         className="inline-flex items-center gap-1.5 border border-lime/30 text-lime text-sm rounded-lg px-4 py-2 hover:bg-lime/10 transition-colors"
       >
         View agent log →

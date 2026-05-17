@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import CollectionGeoDialog from "@/components/CollectionGeoDialog";
 import LlmsTxtCard from "@/components/LlmsTxtCard";
 import PromptOptimizerPanel from "@/components/PromptOptimizerPanel";
+import SeoAbTesterPanel from "@/components/SeoAbTesterPanel";
 
 interface Row {
   id: string;
@@ -150,6 +151,8 @@ function SonicRankInner() {
       <LlmsTxtCard />
 
       <PromptOptimizerPanel />
+
+      <SeoAbTesterPanel />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard label="Total collections" value={stats.total} />

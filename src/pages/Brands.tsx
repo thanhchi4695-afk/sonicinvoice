@@ -139,6 +139,36 @@ export default function Brands() {
     if (id) await crawl(b.name, b.domain, id, b.vertical);
   }
 
+  async function crawlAllPriority1(storeFilter?: "Splash" | "Stomp") {
+    const targets = PRIORITY_BRANDS.filter(
+      (b) => b.tier === 1 && (!storeFilter || b.store === storeFilter)
+    );
+    if (targets.length === 0) return;
+    const label = storeFilter ? `${storeFilter} Priority 1` : "All Priority 1";
+    if (!confirm(`Crawl ${targets.length} ${label} brands sequentially? This may take several minutes.`)) return;
+
+    setBatchProgress({ done: 0, total: targets.length, current: targets[0].name });
+    let ok = 0, fail = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const b = targets[i];
+      setBatchProgress({ done: i, total: targets.length, current: b.name });
+      try {
+        const id = await ensureSeedRow(b.name, b.domain);
+        if (!id) { fail++; continue; }
+        const { data, error } = await supabase.functions.invoke("brand-intelligence-crawler", {
+          body: { brand_id: id, brand_name: b.name, brand_domain: b.domain, industry_vertical: b.vertical },
+        });
+        if (error || (data as { error?: string })?.error) { fail++; }
+        else { ok++; }
+      } catch { fail++; }
+      // Gentle pacing between Firecrawl runs
+      if (i < targets.length - 1) await new Promise((r) => setTimeout(r, 1500));
+    }
+    setBatchProgress(null);
+    await load();
+    toast.success(`${label}: ${ok} crawled, ${fail} failed`);
+  }
+
   async function refreshIconic(id: string, name: string) {
     setIconicRefreshingId(id);
     try {

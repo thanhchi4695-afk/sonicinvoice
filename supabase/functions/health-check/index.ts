@@ -4,9 +4,21 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+function base64UrlDecode(str: string): string {
+  // Convert base64url to base64
+  let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+  // Add padding
+  while (base64.length % 4) base64 += "=";
+  try {
+    return atob(base64);
+  } catch {
+    return "";
+  }
+}
+
 function decodeKeyRef(key: string): string {
   try {
-    const payload = JSON.parse(atob(key.split(".")[1]));
+    const payload = JSON.parse(base64UrlDecode(key.split(".")[1]));
     return payload?.ref ?? "unknown";
   } catch {
     return "invalid_jwt";
@@ -37,7 +49,7 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
       auth: { persistSession: false },
     });
-    const { error } = await admin.rpc("pg_health_check");
+    const { error } = await admin.from("shops").select("id").limit(1);
     dbReachable = !error;
     if (error) dbError = error.message;
   } catch (e) {

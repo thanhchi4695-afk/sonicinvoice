@@ -163,10 +163,10 @@ export default function HeroSection() {
                 </div>
                 <div className="flex items-center gap-2 py-1.5 border-b border-white/[0.06]">
                   <div className="w-6 h-6 rounded bg-[#262626] flex-shrink-0" />
-                  <span className="text-[10px] text-[#a3a3a3] flex-1 truncate">Walnut Melbourne Dress</span>
+                  <span className="text-[10px] text-[#a3a3a3] flex-1 truncate">Sea Level One Piece</span>
                   <span className="text-[10px] text-lime font-mono">$220</span>
-                  <span className="text-[9px] bg-[#f59e0b]/20 text-[#f59e0b] px-1.5 py-0.5 rounded-full font-mono">
-                    Pending
+                  <span className="text-[9px] bg-lime/20 text-lime px-1.5 py-0.5 rounded-full font-mono">
+                    Published
                   </span>
                 </div>
               </div>

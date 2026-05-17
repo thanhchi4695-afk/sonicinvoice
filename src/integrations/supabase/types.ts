@@ -119,6 +119,132 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_actions: {
+        Row: {
+          autonomy_level: string | null
+          completed_at: string | null
+          created_at: string
+          diff_summary: string | null
+          error_message: string | null
+          flow_name: string | null
+          id: string
+          input_payload: Json | null
+          output_payload: Json | null
+          run_id: string | null
+          status: string | null
+        }
+        Insert: {
+          autonomy_level?: string | null
+          completed_at?: string | null
+          created_at?: string
+          diff_summary?: string | null
+          error_message?: string | null
+          flow_name?: string | null
+          id?: string
+          input_payload?: Json | null
+          output_payload?: Json | null
+          run_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          autonomy_level?: string | null
+          completed_at?: string | null
+          created_at?: string
+          diff_summary?: string | null
+          error_message?: string | null
+          flow_name?: string | null
+          id?: string
+          input_payload?: Json | null
+          output_payload?: Json | null
+          run_id?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
+      agent_approvals: {
+        Row: {
+          approved_at: string | null
+          category: string | null
+          created_at: string
+          description: string | null
+          estimated_impact: Json | null
+          expires_at: string | null
+          id: string
+          priority: string | null
+          proposed_actions: Json | null
+          rejection_reason: string | null
+          run_id: string | null
+          shop_id: string | null
+          status: string | null
+          title: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          estimated_impact?: Json | null
+          expires_at?: string | null
+          id?: string
+          priority?: string | null
+          proposed_actions?: Json | null
+          rejection_reason?: string | null
+          run_id?: string | null
+          shop_id?: string | null
+          status?: string | null
+          title?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          estimated_impact?: Json | null
+          expires_at?: string | null
+          id?: string
+          priority?: string | null
+          proposed_actions?: Json | null
+          rejection_reason?: string | null
+          run_id?: string | null
+          shop_id?: string | null
+          status?: string | null
+          title?: string | null
+        }
+        Relationships: []
+      }
+      agent_audit: {
+        Row: {
+          action_id: string | null
+          actor: string | null
+          created_at: string
+          event_type: string | null
+          id: string
+          payload: Json | null
+          run_id: string | null
+          shop_id: string | null
+        }
+        Insert: {
+          action_id?: string | null
+          actor?: string | null
+          created_at?: string
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+          run_id?: string | null
+          shop_id?: string | null
+        }
+        Update: {
+          action_id?: string | null
+          actor?: string | null
+          created_at?: string
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+          run_id?: string | null
+          shop_id?: string | null
+        }
+        Relationships: []
+      }
       agent_budgets: {
         Row: {
           degraded: boolean

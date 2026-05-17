@@ -21,6 +21,7 @@ import QuickSearchModal from "@/components/QuickSearchModal";
 import PhaseProgressBar from "@/components/PhaseProgressBar";
 import MobileKeyboardHint from "@/components/MobileKeyboardHint";
 import InputSelector from "@/components/InputSelector";
+import AgentStatusCard from "@/components/AgentStatusCard";
 const FlywheelDashboard = lazy(() => import("@/components/FlywheelDashboard"));
 
 
@@ -455,6 +456,7 @@ const Index = ({ initialTab }: IndexProps = {}) => {
               else if (kind === "email") setActiveFlow("email_inbox");
             }}
           />
+          <AgentStatusCard />
           <PhaseFlowHome
             onStartInvoice={() => setActiveFlow("invoice")}
             onStartPackingSlip={() => setActiveFlow("packing_slip")}

@@ -58,7 +58,7 @@ const TECH: Video[] = [
 const ALL: Video[] = [...CORE, ...INTAKE, ...OPERATIONS, ...GROWTH, ...TECH];
 
 const HASH_ALIASES: Record<string, string> = {
-  "automate": "silent-automations",
+  "automate-classic": "automate",
   "rank-system": "sonic-rank",
 };
 

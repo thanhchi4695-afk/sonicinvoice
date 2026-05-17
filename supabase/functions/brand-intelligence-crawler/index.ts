@@ -516,6 +516,10 @@ Deno.serve(async (req) => {
     }
 
     const confidence = scoreConfidence(extracted);
+    const breakdown = confidenceBreakdown(extracted);
+    const needsReview = confidence < 0.6;
+    console.log(`[firecrawl-credits] ${body.brand_name}: ${pages} pages (≈${pages} credits) · confidence=${confidence} · needs_review=${needsReview}`);
+
     await supabase.from("brand_intelligence").update({
       competitor_reference_styletread: styletreadRef,
       iconic_reference: iconicRef,
@@ -536,8 +540,12 @@ Deno.serve(async (req) => {
       blog_topics_used: extracted.blog_topics_used || [],
       blog_topic_distribution: topicDist,
       blog_sample_titles: extracted.blog_sample_titles || Array.from(blogTitlesSet).slice(0, 5),
+      size_range: extracted.size_range || null,
+      key_fabric_technologies: extracted.key_fabric_technologies || [],
+      price_range_aud: extracted.price_range_aud || null,
       crawl_confidence: confidence,
-      crawl_status: "crawled",
+      crawl_status: "completed",
+      needs_manual_review: needsReview,
       crawl_error: null,
       pages_fetched: pages,
       last_crawled_at: new Date().toISOString(),
@@ -549,6 +557,8 @@ Deno.serve(async (req) => {
       domain,
       pages_fetched: pages,
       confidence,
+      needs_manual_review: needsReview,
+      confidence_breakdown: breakdown,
       extracted,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

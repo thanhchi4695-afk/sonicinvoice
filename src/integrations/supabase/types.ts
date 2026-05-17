@@ -787,18 +787,66 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_test_audit: {
+        Row: {
+          action: string
+          actor: string
+          actor_user_id: string | null
+          created_at: string
+          hypothesis_id: string
+          id: string
+          reason: string | null
+          snapshot: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          actor: string
+          actor_user_id?: string | null
+          created_at?: string
+          hypothesis_id: string
+          id?: string
+          reason?: string | null
+          snapshot?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          actor?: string
+          actor_user_id?: string | null
+          created_at?: string
+          hypothesis_id?: string
+          id?: string
+          reason?: string | null
+          snapshot?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_test_audit_hypothesis_id_fkey"
+            columns: ["hypothesis_id"]
+            isOneToOne: false
+            referencedRelation: "auto_test_hypotheses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auto_test_hypotheses: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           auto_created: boolean
           confidence: number | null
           created_at: string
           current_value: string | null
+          deployed_at: string | null
           expected_impact_pct: number | null
           experiment_id: string | null
           hypothesis_type: string
           id: string
           proposed_value: string | null
           reasoning: string | null
+          rejected_reason: string | null
           status: string
           target_id: string
           target_label: string | null
@@ -806,16 +854,20 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           auto_created?: boolean
           confidence?: number | null
           created_at?: string
           current_value?: string | null
+          deployed_at?: string | null
           expected_impact_pct?: number | null
           experiment_id?: string | null
           hypothesis_type: string
           id?: string
           proposed_value?: string | null
           reasoning?: string | null
+          rejected_reason?: string | null
           status?: string
           target_id: string
           target_label?: string | null
@@ -823,16 +875,20 @@ export type Database = {
           user_id: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           auto_created?: boolean
           confidence?: number | null
           created_at?: string
           current_value?: string | null
+          deployed_at?: string | null
           expected_impact_pct?: number | null
           experiment_id?: string | null
           hypothesis_type?: string
           id?: string
           proposed_value?: string | null
           reasoning?: string | null
+          rejected_reason?: string | null
           status?: string
           target_id?: string
           target_label?: string | null

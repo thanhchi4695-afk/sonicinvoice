@@ -454,12 +454,16 @@ export default function Brands() {
                     </td>
                     <td className="p-3 text-muted-foreground">{r.brand_domain || "—"}</td>
                     <td className="p-3 space-x-1">
-                      {r.crawl_status === "crawling" && <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1" /> Crawling</Badge>}
-                      {r.crawl_status === "crawled" && <Badge variant="default">Crawled</Badge>}
+                      {r.crawl_status === "crawling" && <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1" /> Crawling…</Badge>}
+                      {(r.crawl_status === "completed" || r.crawl_status === "crawled") && (
+                        <Badge className="bg-green-600 hover:bg-green-600 text-white">
+                          Completed{r.crawl_confidence != null ? ` (${Math.round(r.crawl_confidence * 100)}%)` : ""}
+                        </Badge>
+                      )}
                       {r.crawl_status === "failed" && <Badge variant="destructive" title={r.crawl_error || ""}><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>}
                       {r.crawl_status === "not_crawled" && <Badge variant="outline">Not crawled</Badge>}
-                      {r.crawl_status === "crawled" && r.crawl_confidence != null && r.crawl_confidence < 0.6 && !r.manually_verified && (
-                        <Badge variant="destructive" title="Confidence below 60% — review brand profile and re-crawl or verify manually">
+                      {r.needs_manual_review && !r.manually_verified && (
+                        <Badge className="bg-orange-500 hover:bg-orange-500 text-white" title="Confidence below 60% — review brand profile and re-crawl or verify manually">
                           <AlertCircle className="h-3 w-3 mr-1" /> Needs review
                         </Badge>
                       )}

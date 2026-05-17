@@ -122,6 +122,10 @@ interface ExtractedIntelligence {
   blog_topics_used: string[];
   blog_topic_distribution?: Record<string, number>;
   blog_sample_titles: string[];
+  // New spec fields
+  size_range?: string;
+  key_fabric_technologies?: string[];
+  price_range_aud?: { min?: number; max?: number };
 }
 
 const VERTICAL_CONTEXT: Record<string, string> = {

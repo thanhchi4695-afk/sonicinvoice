@@ -101,6 +101,39 @@ export default function Brands() {
 
   useEffect(() => { load(); }, []);
 
+  // Auto-seed the 13 Splash brands (and the Stomp set) per spec — runs once
+  // per visit when the signed-in user is missing any of the priority brands.
+  useEffect(() => {
+    if (loading || rows.length === 0 && !loading) {
+      // wait until first load completes (rows may legitimately be empty)
+    }
+    autoSeedPriorityBrands();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  async function autoSeedPriorityBrands() {
+    if (loading) return;
+    const seenNames = new Set(rows.map((r) => r.brand_name.toLowerCase()));
+    const missing = PRIORITY_BRANDS.filter((b) => !seenNames.has(b.name.toLowerCase()));
+    if (missing.length === 0) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const payload = missing.map((b) => ({
+      user_id: user.id,
+      brand_name: b.name,
+      brand_domain: b.domain,
+      industry_vertical: b.vertical,
+      priority: b.tier,
+      crawl_status: "not_crawled",
+    }));
+    const { error } = await supabase.from("brand_intelligence").insert(payload);
+    if (error) {
+      console.warn("auto-seed brands failed", error.message);
+      return;
+    }
+    await load();
+  }
+
   async function toggleKillSwitch() {
     const next = !killSwitch;
     setKillSwitch(next);
@@ -110,14 +143,14 @@ export default function Brands() {
   }
 
 
-  async function ensureSeedRow(name: string, domain: string) {
+  async function ensureSeedRow(name: string, domain: string, priority?: number, vertical?: Vertical) {
     const existing = rows.find((r) => r.brand_name.toLowerCase() === name.toLowerCase());
     if (existing) return existing.id;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Please sign in"); return null; }
     const { data, error } = await supabase
       .from("brand_intelligence")
-      .insert({ user_id: user.id, brand_name: name, brand_domain: domain })
+      .insert({ user_id: user.id, brand_name: name, brand_domain: domain, priority: priority ?? null, industry_vertical: vertical ?? null, crawl_status: "not_crawled" })
       .select("id")
       .single();
     if (error) { toast.error(error.message); return null; }

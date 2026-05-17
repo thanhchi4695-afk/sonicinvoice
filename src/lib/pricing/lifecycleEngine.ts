@@ -62,20 +62,42 @@ const PHASE_NAMES: Record<LifecyclePhase, string> = {
   5: "Final Cleanse",
 };
 
-/** Per-phase suggested discount band: [min, max]. */
-const PHASE_BANDS: Record<LifecyclePhase, [number, number]> = {
-  1: [0, 0],
-  2: [0.05, 0.10],
-  3: [0, 0.05],
-  4: [0.30, 0.60],
-  5: [0.70, 0.85],
+/** Tunable strategy parameters — A/B-testable by the discount optimizer.
+ *  The margin floor is NOT here on purpose: it is hard-coded in recommendPrice
+ *  and cannot be softened by any variant. */
+export interface StrategyParams {
+  /** Per-phase discount band: [min, max], 0–1. */
+  phaseBands: Record<LifecyclePhase, [number, number]>;
+  /** Day cutoffs that define each phase. */
+  phaseDays: { launch: number; firstMark: number; performance: number; clearance: number };
+  /** Score weights (must sum ~1.0). */
+  weights: { lifecycle: number; competitor: number; velocity: number; margin: number };
+  /** Competitor gap (0–1) that maps to full pressure. */
+  competitorCapGap: number;
+  /** Weeks-of-cover thresholds for velocity pressure. */
+  velocityWeeksOfCover: { low: number; high: number };
+}
+
+export const DEFAULT_STRATEGY: StrategyParams = {
+  phaseBands: {
+    1: [0, 0],
+    2: [0.05, 0.10],
+    3: [0, 0.05],
+    4: [0.30, 0.60],
+    5: [0.70, 0.85],
+  },
+  phaseDays: { launch: 14, firstMark: 30, performance: 45, clearance: 60 },
+  weights: { lifecycle: 0.4, competitor: 0.3, velocity: 0.2, margin: 0.1 },
+  competitorCapGap: 0.30,
+  velocityWeeksOfCover: { low: 4, high: 16 },
 };
 
-export function getPhase(daysInInventory: number): LifecyclePhase {
-  if (daysInInventory < 14) return 1;
-  if (daysInInventory < 30) return 2;
-  if (daysInInventory < 45) return 3;
-  if (daysInInventory < 60) return 4;
+export function getPhase(daysInInventory: number, strategy: StrategyParams = DEFAULT_STRATEGY): LifecyclePhase {
+  const d = strategy.phaseDays;
+  if (daysInInventory < d.launch) return 1;
+  if (daysInInventory < d.firstMark) return 2;
+  if (daysInInventory < d.performance) return 3;
+  if (daysInInventory < d.clearance) return 4;
   return 5;
 }
 
@@ -85,24 +107,24 @@ function lifecyclePressure(phase: LifecyclePhase): number {
 }
 
 /** Returns 0–1 — higher when competitor is materially cheaper than us. */
-function competitorPressure(currentPrice: number, competitorPrice?: number): number {
+function competitorPressure(currentPrice: number, competitorPrice: number | undefined, strategy: StrategyParams = DEFAULT_STRATEGY): number {
   if (!competitorPrice || competitorPrice <= 0) return 0;
-  const gap = (currentPrice - competitorPrice) / currentPrice; // positive = we're more expensive
+  const gap = (currentPrice - competitorPrice) / currentPrice;
   if (gap <= 0) return 0;
-  // Cap at 30% gap = full pressure
-  return Math.min(1, gap / 0.30);
+  return Math.min(1, gap / strategy.competitorCapGap);
 }
 
 /** Returns 0–1 — higher when sales are slow vs. inventory. */
-function velocityPressure(input: PricingInput): number {
+function velocityPressure(input: PricingInput, strategy: StrategyParams = DEFAULT_STRATEGY): number {
   const v = input.avgWeeklySales ?? 0;
   const stock = input.stockOnHand ?? 0;
-  if (v <= 0 && stock > 0) return 1; // zero sales but stock exists
-  if (v <= 0) return 0.5; // no data — neutral-leaning
+  if (v <= 0 && stock > 0) return 1;
+  if (v <= 0) return 0.5;
   const weeksOfCover = stock / v;
-  if (weeksOfCover <= 4) return 0;
-  if (weeksOfCover >= 16) return 1;
-  return (weeksOfCover - 4) / 12;
+  const { low, high } = strategy.velocityWeeksOfCover;
+  if (weeksOfCover <= low) return 0;
+  if (weeksOfCover >= high) return 1;
+  return (weeksOfCover - low) / (high - low);
 }
 
 /** Returns 0–1 — how much room we have above margin floor. */
@@ -112,22 +134,23 @@ function marginHeadroom(currentPrice: number, unitCost: number, minMarginPct: nu
   return Math.min(1, (currentPrice - floor) / currentPrice);
 }
 
-export function recommendPrice(input: PricingInput): Recommendation {
+export function recommendPrice(input: PricingInput, strategy: StrategyParams = DEFAULT_STRATEGY): Recommendation {
   const minMarginPct = input.minMarginPct ?? 0.15;
-  const phase = getPhase(input.daysInInventory);
+  const phase = getPhase(input.daysInInventory, strategy);
   const phaseName = PHASE_NAMES[phase];
 
   const marginFloorPrice = +(input.unitCost / (1 - minMarginPct)).toFixed(2);
 
   const lp = lifecyclePressure(phase);
-  const cp = competitorPressure(input.currentPrice, input.competitorPrice);
-  const vp = velocityPressure(input);
+  const cp = competitorPressure(input.currentPrice, input.competitorPrice, strategy);
+  const vp = velocityPressure(input, strategy);
   const mh = marginHeadroom(input.currentPrice, input.unitCost, minMarginPct);
 
-  const score = Math.round((0.4 * lp + 0.3 * cp + 0.2 * vp + 0.1 * mh) * 100);
+  const w = strategy.weights;
+  const score = Math.round((w.lifecycle * lp + w.competitor * cp + w.velocity * vp + w.margin * mh) * 100);
 
   // Pick discount within phase band, modulated by competitor + velocity pressure.
-  const [bandMin, bandMax] = PHASE_BANDS[phase];
+  const [bandMin, bandMax] = strategy.phaseBands[phase];
   const pressureBlend = (cp + vp) / 2; // 0–1
   let suggestedDiscount = bandMin + (bandMax - bandMin) * pressureBlend;
 

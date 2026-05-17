@@ -2416,6 +2416,226 @@ export type Database = {
         }
         Relationships: []
       }
+      discount_optimizer_settings: {
+        Row: {
+          auto_promote: boolean
+          enabled: boolean
+          max_margin_loss_pct: number
+          schedule_cron: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_promote?: boolean
+          enabled?: boolean
+          max_margin_loss_pct?: number
+          schedule_cron?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_promote?: boolean
+          enabled?: boolean
+          max_margin_loss_pct?: number
+          schedule_cron?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      discount_strategy_experiments: {
+        Row: {
+          blacklisted: boolean
+          created_at: string
+          efficiency_score: number | null
+          id: string
+          is_active: boolean
+          margin_loss_pct: number | null
+          notes: Json | null
+          parameters: Json
+          parent_variant_id: string | null
+          pending_human_approval: boolean
+          promoted_at: string | null
+          sample_size: number | null
+          strategy_name: string
+          test_completed_at: string | null
+          test_started_at: string | null
+          updated_at: string
+          variant_id: string
+          velocity_gain_pct: number | null
+        }
+        Insert: {
+          blacklisted?: boolean
+          created_at?: string
+          efficiency_score?: number | null
+          id?: string
+          is_active?: boolean
+          margin_loss_pct?: number | null
+          notes?: Json | null
+          parameters: Json
+          parent_variant_id?: string | null
+          pending_human_approval?: boolean
+          promoted_at?: string | null
+          sample_size?: number | null
+          strategy_name: string
+          test_completed_at?: string | null
+          test_started_at?: string | null
+          updated_at?: string
+          variant_id: string
+          velocity_gain_pct?: number | null
+        }
+        Update: {
+          blacklisted?: boolean
+          created_at?: string
+          efficiency_score?: number | null
+          id?: string
+          is_active?: boolean
+          margin_loss_pct?: number | null
+          notes?: Json | null
+          parameters?: Json
+          parent_variant_id?: string | null
+          pending_human_approval?: boolean
+          promoted_at?: string | null
+          sample_size?: number | null
+          strategy_name?: string
+          test_completed_at?: string | null
+          test_started_at?: string | null
+          updated_at?: string
+          variant_id?: string
+          velocity_gain_pct?: number | null
+        }
+        Relationships: []
+      }
+      discount_strategy_feedback: {
+        Row: {
+          baseline_velocity: number | null
+          competitor_price_at_test: number | null
+          created_at: string
+          discount_applied_pct: number | null
+          experiment_id: string | null
+          id: string
+          margin_during_test: number | null
+          observation_date: string
+          product_id: string
+          revenue_during_test: number | null
+          units_sold_during_test: number | null
+          variant_id: string
+        }
+        Insert: {
+          baseline_velocity?: number | null
+          competitor_price_at_test?: number | null
+          created_at?: string
+          discount_applied_pct?: number | null
+          experiment_id?: string | null
+          id?: string
+          margin_during_test?: number | null
+          observation_date?: string
+          product_id: string
+          revenue_during_test?: number | null
+          units_sold_during_test?: number | null
+          variant_id: string
+        }
+        Update: {
+          baseline_velocity?: number | null
+          competitor_price_at_test?: number | null
+          created_at?: string
+          discount_applied_pct?: number | null
+          experiment_id?: string | null
+          id?: string
+          margin_during_test?: number | null
+          observation_date?: string
+          product_id?: string
+          revenue_during_test?: number | null
+          units_sold_during_test?: number | null
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_strategy_feedback_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "discount_strategy_experiments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discount_strategy_log: {
+        Row: {
+          efficiency_improvement_pct: number | null
+          error_message: string | null
+          experiments_ran: number | null
+          id: string
+          notes: Json | null
+          previous_variant_id: string | null
+          promoted: boolean | null
+          run_completed_at: string | null
+          run_started_at: string
+          run_type: string
+          winning_variant_id: string | null
+        }
+        Insert: {
+          efficiency_improvement_pct?: number | null
+          error_message?: string | null
+          experiments_ran?: number | null
+          id?: string
+          notes?: Json | null
+          previous_variant_id?: string | null
+          promoted?: boolean | null
+          run_completed_at?: string | null
+          run_started_at?: string
+          run_type: string
+          winning_variant_id?: string | null
+        }
+        Update: {
+          efficiency_improvement_pct?: number | null
+          error_message?: string | null
+          experiments_ran?: number | null
+          id?: string
+          notes?: Json | null
+          previous_variant_id?: string | null
+          promoted?: boolean | null
+          run_completed_at?: string | null
+          run_started_at?: string
+          run_type?: string
+          winning_variant_id?: string | null
+        }
+        Relationships: []
+      }
+      discount_variant_assignments: {
+        Row: {
+          assigned_at: string
+          experiment_id: string | null
+          id: string
+          product_id: string
+          test_week_start: string
+          variant_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          experiment_id?: string | null
+          id?: string
+          product_id: string
+          test_week_start: string
+          variant_id: string
+        }
+        Update: {
+          assigned_at?: string
+          experiment_id?: string | null
+          id?: string
+          product_id?: string
+          test_week_start?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discount_variant_assignments_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "discount_strategy_experiments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_lines: {
         Row: {
           accounting_category: string | null
@@ -7472,6 +7692,45 @@ export type Database = {
           position?: number | null
           product_id?: string
           set_week?: string
+        }
+        Relationships: []
+      }
+      test_product_set_discount: {
+        Row: {
+          cost_price: number | null
+          created_at: string
+          current_price: number | null
+          id: string
+          inventory_quantity: number | null
+          product_id: string
+          product_title: string | null
+          test_week_end: string
+          test_week_start: string
+          weekly_velocity_baseline: number | null
+        }
+        Insert: {
+          cost_price?: number | null
+          created_at?: string
+          current_price?: number | null
+          id?: string
+          inventory_quantity?: number | null
+          product_id: string
+          product_title?: string | null
+          test_week_end: string
+          test_week_start: string
+          weekly_velocity_baseline?: number | null
+        }
+        Update: {
+          cost_price?: number | null
+          created_at?: string
+          current_price?: number | null
+          id?: string
+          inventory_quantity?: number | null
+          product_id?: string
+          product_title?: string | null
+          test_week_end?: string
+          test_week_start?: string
+          weekly_velocity_baseline?: number | null
         }
         Relationships: []
       }

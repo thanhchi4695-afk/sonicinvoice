@@ -107,12 +107,11 @@ function lifecyclePressure(phase: LifecyclePhase): number {
 }
 
 /** Returns 0–1 — higher when competitor is materially cheaper than us. */
-function competitorPressure(currentPrice: number, competitorPrice?: number): number {
+function competitorPressure(currentPrice: number, competitorPrice: number | undefined, strategy: StrategyParams = DEFAULT_STRATEGY): number {
   if (!competitorPrice || competitorPrice <= 0) return 0;
-  const gap = (currentPrice - competitorPrice) / currentPrice; // positive = we're more expensive
+  const gap = (currentPrice - competitorPrice) / currentPrice;
   if (gap <= 0) return 0;
-  // Cap at 30% gap = full pressure
-  return Math.min(1, gap / 0.30);
+  return Math.min(1, gap / strategy.competitorCapGap);
 }
 
 /** Returns 0–1 — higher when sales are slow vs. inventory. */

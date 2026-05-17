@@ -962,6 +962,7 @@ export type Database = {
           collection_nav_urls: Json | null
           collection_structure_secondary: string | null
           collection_structure_type: string | null
+          collections_created: number
           competitor_reference_styletread: Json | null
           competitor_urls: Json | null
           crawl_confidence: number | null
@@ -972,13 +973,18 @@ export type Database = {
           iconic_reference: Json | null
           id: string
           industry_vertical: string | null
+          key_fabric_technologies: Json | null
           last_crawled_at: string | null
           louenhide_megantic_reference: Json | null
           manually_verified: boolean
+          needs_manual_review: boolean
           pages_fetched: number | null
+          price_range_aud: Json | null
           print_story_names: Json | null
+          priority: number | null
           seo_primary_keyword: string | null
           seo_secondary_keywords: Json | null
+          size_range: string | null
           subcategory_list: Json | null
           updated_at: string
           user_id: string
@@ -998,6 +1004,7 @@ export type Database = {
           collection_nav_urls?: Json | null
           collection_structure_secondary?: string | null
           collection_structure_type?: string | null
+          collections_created?: number
           competitor_reference_styletread?: Json | null
           competitor_urls?: Json | null
           crawl_confidence?: number | null
@@ -1008,13 +1015,18 @@ export type Database = {
           iconic_reference?: Json | null
           id?: string
           industry_vertical?: string | null
+          key_fabric_technologies?: Json | null
           last_crawled_at?: string | null
           louenhide_megantic_reference?: Json | null
           manually_verified?: boolean
+          needs_manual_review?: boolean
           pages_fetched?: number | null
+          price_range_aud?: Json | null
           print_story_names?: Json | null
+          priority?: number | null
           seo_primary_keyword?: string | null
           seo_secondary_keywords?: Json | null
+          size_range?: string | null
           subcategory_list?: Json | null
           updated_at?: string
           user_id: string
@@ -1034,6 +1046,7 @@ export type Database = {
           collection_nav_urls?: Json | null
           collection_structure_secondary?: string | null
           collection_structure_type?: string | null
+          collections_created?: number
           competitor_reference_styletread?: Json | null
           competitor_urls?: Json | null
           crawl_confidence?: number | null
@@ -1044,13 +1057,18 @@ export type Database = {
           iconic_reference?: Json | null
           id?: string
           industry_vertical?: string | null
+          key_fabric_technologies?: Json | null
           last_crawled_at?: string | null
           louenhide_megantic_reference?: Json | null
           manually_verified?: boolean
+          needs_manual_review?: boolean
           pages_fetched?: number | null
+          price_range_aud?: Json | null
           print_story_names?: Json | null
+          priority?: number | null
           seo_primary_keyword?: string | null
           seo_secondary_keywords?: Json | null
+          size_range?: string | null
           subcategory_list?: Json | null
           updated_at?: string
           user_id?: string

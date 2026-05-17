@@ -290,7 +290,7 @@ async function runForUser(svc: any, userId: string) {
     const conflicts = await detectConflicts(svc, userId, signals, weights);
     const underperformers = await identifyUnderperformers(svc, userId);
     const hypotheses = await generateHypotheses(userId, weights, underperformers);
-    const { stored, autoCreated } = await storeAndMaybeAutoCreate(svc, userId, hypotheses);
+    const { stored, autoCreated, queuedForApproval } = await storeAndMaybeAutoCreate(svc, userId, hypotheses);
 
     await svc.from("cross_loop_run_log").insert({
       user_id: userId,
@@ -300,9 +300,9 @@ async function runForUser(svc: any, userId: string) {
       conflicts_resolved: conflicts.length,
       hypotheses_generated: stored,
       auto_tests_created: autoCreated,
-      details: { weights, underperformers: underperformers.length },
+      details: { weights, underperformers: underperformers.length, queued_for_approval: queuedForApproval },
     });
-    return { ok: true, signals: signals.length, conflicts: conflicts.length, hypotheses: stored, autoCreated };
+    return { ok: true, signals: signals.length, conflicts: conflicts.length, hypotheses: stored, queuedForApproval };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await svc.from("cross_loop_run_log").insert({

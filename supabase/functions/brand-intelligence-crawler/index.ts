@@ -122,6 +122,10 @@ interface ExtractedIntelligence {
   blog_topics_used: string[];
   blog_topic_distribution?: Record<string, number>;
   blog_sample_titles: string[];
+  // New spec fields
+  size_range?: string;
+  key_fabric_technologies?: string[];
+  price_range_aud?: { min?: number; max?: number };
 }
 
 const VERTICAL_CONTEXT: Record<string, string> = {
@@ -168,10 +172,13 @@ Return STRICT JSON (no prose, no markdown fences) with this exact shape:
   "brand_tone_sample": "60-80 word excerpt of their voice",
   "blog_topics_used": ["styling-guide" | "fit-guide" | "sizing-guide" | "sustainability" | "care-guide" | "trend-report" | "brand-story" | "destination" | "occasion-guide" | "technology-explainer" | "other"],
   "blog_topic_distribution": {"sizing-guide": 2, "care-guide": 1},
-  "blog_sample_titles": ["up to 5 of their actual titles"]
+  "blog_sample_titles": ["up to 5 of their actual titles"],
+  "size_range": "e.g. XS-3XL or 6-20 — leave empty string if not detected",
+  "key_fabric_technologies": ["e.g. chlorine-resistant", "4-way stretch", "recycled-nylon"],
+  "price_range_aud": { "min": 0, "max": 0 }
 }
 
-Identify the PRIMARY structure type (the dominant axis the brand uses to organise products) and a SECONDARY if they clearly use two axes. Pick from the listed options exactly.`;
+Identify the PRIMARY structure type (the dominant axis the brand uses to organise products) and a SECONDARY if they clearly use two axes. Pick from the listed options exactly. For price_range_aud, infer typical price points in AUD from any prices visible in the copy; use 0,0 if none visible.`;
   const resp = await callAI({
     model: "google/gemini-2.5-pro",
     messages: [{ role: "user", content: prompt }],
@@ -184,13 +191,26 @@ Identify the PRIMARY structure type (the dominant axis the brand uses to organis
 }
 
 function scoreConfidence(x: ExtractedIntelligence): number {
+  // Spec formula: vocab>3 +0.3 · structure identified +0.2 · blog>2 +0.2 · tone +0.2 · prints>1 +0.1
   let s = 0;
-  if (x.category_vocabulary && Object.keys(x.category_vocabulary).length > 0) s += 0.25;
-  if (x.collection_structure_type && x.collection_structure_type !== "unknown") s += 0.20;
-  if (x.blog_topics_used?.length > 0) s += 0.20;
-  if (x.brand_tone_sample && x.brand_tone_sample.length > 30) s += 0.20;
-  if (x.print_story_names?.length > 0) s += 0.15;
+  const vocabCount = x.category_vocabulary ? Object.keys(x.category_vocabulary).length : 0;
+  if (vocabCount > 3) s += 0.3;
+  if (x.collection_structure_type && x.collection_structure_type !== "unknown") s += 0.2;
+  if ((x.blog_topics_used?.length ?? 0) > 2) s += 0.2;
+  if (x.brand_tone_sample && x.brand_tone_sample.trim().length > 0) s += 0.2;
+  if ((x.print_story_names?.length ?? 0) > 1) s += 0.1;
   return Math.round(s * 100) / 100;
+}
+
+function confidenceBreakdown(x: ExtractedIntelligence) {
+  const vocabCount = x.category_vocabulary ? Object.keys(x.category_vocabulary).length : 0;
+  return {
+    category_vocabulary: { passed: vocabCount > 3, weight: 0.3, detail: `${vocabCount} entries` },
+    collection_structure_type: { passed: !!x.collection_structure_type && x.collection_structure_type !== "unknown", weight: 0.2, detail: x.collection_structure_type || "unknown" },
+    detected_blog_topics: { passed: (x.blog_topics_used?.length ?? 0) > 2, weight: 0.2, detail: `${x.blog_topics_used?.length ?? 0} topics` },
+    brand_tone_sample: { passed: !!x.brand_tone_sample && x.brand_tone_sample.trim().length > 0, weight: 0.2, detail: x.brand_tone_sample ? `${x.brand_tone_sample.length} chars` : "empty" },
+    detected_print_story_names: { passed: (x.print_story_names?.length ?? 0) > 1, weight: 0.1, detail: `${x.print_story_names?.length ?? 0} names` },
+  };
 }
 
 Deno.serve(async (req) => {
@@ -496,6 +516,10 @@ Deno.serve(async (req) => {
     }
 
     const confidence = scoreConfidence(extracted);
+    const breakdown = confidenceBreakdown(extracted);
+    const needsReview = confidence < 0.6;
+    console.log(`[firecrawl-credits] ${body.brand_name}: ${pages} pages (≈${pages} credits) · confidence=${confidence} · needs_review=${needsReview}`);
+
     await supabase.from("brand_intelligence").update({
       competitor_reference_styletread: styletreadRef,
       iconic_reference: iconicRef,
@@ -516,8 +540,12 @@ Deno.serve(async (req) => {
       blog_topics_used: extracted.blog_topics_used || [],
       blog_topic_distribution: topicDist,
       blog_sample_titles: extracted.blog_sample_titles || Array.from(blogTitlesSet).slice(0, 5),
+      size_range: extracted.size_range || null,
+      key_fabric_technologies: extracted.key_fabric_technologies || [],
+      price_range_aud: extracted.price_range_aud || null,
       crawl_confidence: confidence,
-      crawl_status: "crawled",
+      crawl_status: "completed",
+      needs_manual_review: needsReview,
       crawl_error: null,
       pages_fetched: pages,
       last_crawled_at: new Date().toISOString(),
@@ -529,6 +557,8 @@ Deno.serve(async (req) => {
       domain,
       pages_fetched: pages,
       confidence,
+      needs_manual_review: needsReview,
+      confidence_breakdown: breakdown,
       extracted,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

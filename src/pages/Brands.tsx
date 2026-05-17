@@ -65,6 +65,13 @@ interface BrandRow {
   manually_verified: boolean;
   iconic_reference?: any;
   whitefox_reference?: any;
+  // New spec fields
+  priority: number | null;
+  needs_manual_review: boolean | null;
+  size_range: string | null;
+  key_fabric_technologies: string[] | null;
+  price_range_aud: { min?: number; max?: number } | null;
+  collections_created: number | null;
 }
 
 export default function Brands() {
@@ -94,6 +101,39 @@ export default function Brands() {
 
   useEffect(() => { load(); }, []);
 
+  // Auto-seed the 13 Splash brands (and the Stomp set) per spec — runs once
+  // per visit when the signed-in user is missing any of the priority brands.
+  useEffect(() => {
+    if (loading || rows.length === 0 && !loading) {
+      // wait until first load completes (rows may legitimately be empty)
+    }
+    autoSeedPriorityBrands();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  async function autoSeedPriorityBrands() {
+    if (loading) return;
+    const seenNames = new Set(rows.map((r) => r.brand_name.toLowerCase()));
+    const missing = PRIORITY_BRANDS.filter((b) => !seenNames.has(b.name.toLowerCase()));
+    if (missing.length === 0) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const payload = missing.map((b) => ({
+      user_id: user.id,
+      brand_name: b.name,
+      brand_domain: b.domain,
+      industry_vertical: b.vertical,
+      priority: b.tier,
+      crawl_status: "not_crawled",
+    }));
+    const { error } = await supabase.from("brand_intelligence").insert(payload);
+    if (error) {
+      console.warn("auto-seed brands failed", error.message);
+      return;
+    }
+    await load();
+  }
+
   async function toggleKillSwitch() {
     const next = !killSwitch;
     setKillSwitch(next);
@@ -103,14 +143,14 @@ export default function Brands() {
   }
 
 
-  async function ensureSeedRow(name: string, domain: string) {
+  async function ensureSeedRow(name: string, domain: string, priority?: number, vertical?: Vertical) {
     const existing = rows.find((r) => r.brand_name.toLowerCase() === name.toLowerCase());
     if (existing) return existing.id;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { toast.error("Please sign in"); return null; }
     const { data, error } = await supabase
       .from("brand_intelligence")
-      .insert({ user_id: user.id, brand_name: name, brand_domain: domain })
+      .insert({ user_id: user.id, brand_name: name, brand_domain: domain, priority: priority ?? null, industry_vertical: vertical ?? null, crawl_status: "not_crawled" })
       .select("id")
       .single();
     if (error) { toast.error(error.message); return null; }
@@ -134,26 +174,42 @@ export default function Brands() {
     }
   }
 
-  async function seedAndCrawl(b: { name: string; domain: string; vertical: Vertical }) {
-    const id = await ensureSeedRow(b.name, b.domain);
+  async function seedAndCrawl(b: { name: string; domain: string; vertical: Vertical; tier?: 1 | 2 }) {
+    const id = await ensureSeedRow(b.name, b.domain, b.tier, b.vertical);
     if (id) await crawl(b.name, b.domain, id, b.vertical);
   }
 
   async function crawlAllPriority1(storeFilter?: "Splash" | "Stomp") {
-    const targets = PRIORITY_BRANDS.filter(
-      (b) => b.tier === 1 && (!storeFilter || b.store === storeFilter)
+    const allP1 = PRIORITY_BRANDS.filter((b) => b.tier === 1 && (!storeFilter || b.store === storeFilter));
+    // Skip brands already completed (per spec)
+    const completedNames = new Set(
+      rows.filter((r) => r.crawl_status === "completed" || r.crawl_status === "crawled").map((r) => r.brand_name.toLowerCase())
     );
-    if (targets.length === 0) return;
+    const targets = allP1.filter((b) => !completedNames.has(b.name.toLowerCase()));
+    if (targets.length === 0) {
+      toast.info(`All ${storeFilter ?? ""} Priority 1 brands already completed.`);
+      return;
+    }
     const label = storeFilter ? `${storeFilter} Priority 1` : "All Priority 1";
-    if (!confirm(`Crawl ${targets.length} ${label} brands sequentially? This may take several minutes.`)) return;
+    if (!confirm(`Crawl ${targets.length} ${label} brands sequentially (~${targets.length * 8} Firecrawl credits)? This may take several minutes.`)) return;
+    await runBatch(label, targets);
+  }
 
+  async function crawlAll() {
+    const targets = PRIORITY_BRANDS;
+    const estCredits = targets.length * 8;
+    if (!confirm(`This will use approximately ${estCredits} Firecrawl credits. Continue?`)) return;
+    await runBatch("All brands", targets);
+  }
+
+  async function runBatch(label: string, targets: typeof PRIORITY_BRANDS) {
     setBatchProgress({ done: 0, total: targets.length, current: targets[0].name });
     let ok = 0, fail = 0;
     for (let i = 0; i < targets.length; i++) {
       const b = targets[i];
       setBatchProgress({ done: i, total: targets.length, current: b.name });
       try {
-        const id = await ensureSeedRow(b.name, b.domain);
+        const id = await ensureSeedRow(b.name, b.domain, b.tier, b.vertical);
         if (!id) { fail++; continue; }
         const { data, error } = await supabase.functions.invoke("brand-intelligence-crawler", {
           body: { brand_id: id, brand_name: b.name, brand_domain: b.domain, industry_vertical: b.vertical },
@@ -338,9 +394,13 @@ export default function Brands() {
               {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
               Crawl Stomp Priority 1
             </Button>
-            <Button size="sm" disabled={!!batchProgress || !!crawlingId} onClick={() => crawlAllPriority1()}>
+            <Button size="sm" variant="default" disabled={!!batchProgress || !!crawlingId} onClick={() => crawlAllPriority1()}>
               {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
               Crawl all Priority 1
+            </Button>
+            <Button size="sm" variant="secondary" disabled={!!batchProgress || !!crawlingId} onClick={crawlAll}>
+              {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+              Crawl all
             </Button>
           </div>
         </div>
@@ -394,12 +454,16 @@ export default function Brands() {
                     </td>
                     <td className="p-3 text-muted-foreground">{r.brand_domain || "—"}</td>
                     <td className="p-3 space-x-1">
-                      {r.crawl_status === "crawling" && <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1" /> Crawling</Badge>}
-                      {r.crawl_status === "crawled" && <Badge variant="default">Crawled</Badge>}
+                      {r.crawl_status === "crawling" && <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1" /> Crawling…</Badge>}
+                      {(r.crawl_status === "completed" || r.crawl_status === "crawled") && (
+                        <Badge className="bg-green-600 hover:bg-green-600 text-white">
+                          Completed{r.crawl_confidence != null ? ` (${Math.round(r.crawl_confidence * 100)}%)` : ""}
+                        </Badge>
+                      )}
                       {r.crawl_status === "failed" && <Badge variant="destructive" title={r.crawl_error || ""}><AlertCircle className="h-3 w-3 mr-1" /> Failed</Badge>}
                       {r.crawl_status === "not_crawled" && <Badge variant="outline">Not crawled</Badge>}
-                      {r.crawl_status === "crawled" && r.crawl_confidence != null && r.crawl_confidence < 0.6 && !r.manually_verified && (
-                        <Badge variant="destructive" title="Confidence below 60% — review brand profile and re-crawl or verify manually">
+                      {r.needs_manual_review && !r.manually_verified && (
+                        <Badge className="bg-orange-500 hover:bg-orange-500 text-white" title="Confidence below 60% — review brand profile and re-crawl or verify manually">
                           <AlertCircle className="h-3 w-3 mr-1" /> Needs review
                         </Badge>
                       )}

@@ -36,6 +36,7 @@ const OPERATIONS: Video[] = [
 ];
 
 const GROWTH: Video[] = [
+  { src: "/videos/video-ai-agent.html", title: "AI Agent — Your Store On Autopilot", caption: "14 automated flows running overnight — invoice processing, restock checks, margin protection, and SEO. Powered by Claude.", slug: "ai-agent" },
   { src: "/videos/sonic_seo_tools.html", title: "SEO Writer + Collection SEO", caption: "From invisible on Google to 14/22 collections optimised — automatically", slug: "seo-tools" },
   { src: "/videos/sonic_competitor_tools.html", title: "Competitor Intel + Price Monitor", caption: "See what competitors charge. Match in one click. Find gaps worth 2,400 searches/month.", slug: "competitor-tools" },
   { src: "/videos/sonic_ads_setup.html", title: "Google + Meta Ads Setup", caption: "Margin-aware bidding. 2.8x real ROAS. $380/month wasted spend eliminated.", slug: "ads-setup" },

@@ -7,7 +7,7 @@ gsap.registerPlugin(ScrollTrigger);
 const tableData = [
   { product: 'Seafolly One Piece Navy', sku: 'SEA-OP-NVY-12', price: '$189.00', stock: '24', status: 'Published' },
   { product: 'Kulani Kinis Bikini Top', sku: 'KK-BT-FLR-8', price: '$145.00', stock: '18', status: 'Published' },
-  { product: 'Walnut Melbourne Sandal', sku: 'WM-SD-BLK-9', price: '$220.00', stock: '12', status: 'Published' },
+  { product: 'Baku Boardshort Navy', sku: 'BK-BS-NVY-S', price: '$95.00', stock: '14', status: 'Published' },
   { product: 'Bond-Eye Rash Guard', sku: 'BE-RG-TEA-10', price: '$95.00', stock: '31', status: 'Pending' },
   { product: 'Seafolly DD-Cup Bikini', sku: 'SEA-BC-DD-WHT', price: '$165.00', stock: '8', status: 'Pending' },
 ];

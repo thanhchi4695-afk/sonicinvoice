@@ -31,7 +31,7 @@ export default function CTABannerSection() {
           Ready to stop copy-pasting?
         </h2>
         <p className="text-[15px] text-[#a3a3a3] mt-4">
-          Built for Australian fashion retail. Knows Seafolly, Kulani Kinis, Baku, Walnut Melbourne, and 184 more.
+          Built for Australian fashion retail. Knows Seafolly, Kulani Kinis, Baku, Sea Level, and 184 more.
         </p>
         <a
           href="/signup"

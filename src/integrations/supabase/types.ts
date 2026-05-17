@@ -5850,6 +5850,283 @@ export type Database = {
         }
         Relationships: []
       }
+      seo_ab_experiment_log: {
+        Row: {
+          ctr_improvement_pct: number | null
+          details: Json | null
+          error_message: string | null
+          experiments_ran: number
+          id: string
+          phase: string
+          run_completed_at: string | null
+          run_started_at: string
+          user_id: string | null
+          winners_promoted: number
+        }
+        Insert: {
+          ctr_improvement_pct?: number | null
+          details?: Json | null
+          error_message?: string | null
+          experiments_ran?: number
+          id?: string
+          phase: string
+          run_completed_at?: string | null
+          run_started_at?: string
+          user_id?: string | null
+          winners_promoted?: number
+        }
+        Update: {
+          ctr_improvement_pct?: number | null
+          details?: Json | null
+          error_message?: string | null
+          experiments_ran?: number
+          id?: string
+          phase?: string
+          run_completed_at?: string | null
+          run_started_at?: string
+          user_id?: string | null
+          winners_promoted?: number
+        }
+        Relationships: []
+      }
+      seo_ab_experiments: {
+        Row: {
+          ai_rationale: string | null
+          clicks: number
+          collection_handle: string
+          collection_id: string
+          collection_title: string | null
+          collection_url: string | null
+          created_at: string
+          ctr: number
+          end_date: string | null
+          h1_tag: string | null
+          id: string
+          impressions: number
+          is_control: boolean
+          is_winner: boolean
+          meta_description: string | null
+          parent_experiment_group: string | null
+          position: number | null
+          seo_title: string | null
+          start_date: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          variant_id: string
+        }
+        Insert: {
+          ai_rationale?: string | null
+          clicks?: number
+          collection_handle: string
+          collection_id: string
+          collection_title?: string | null
+          collection_url?: string | null
+          created_at?: string
+          ctr?: number
+          end_date?: string | null
+          h1_tag?: string | null
+          id?: string
+          impressions?: number
+          is_control?: boolean
+          is_winner?: boolean
+          meta_description?: string | null
+          parent_experiment_group?: string | null
+          position?: number | null
+          seo_title?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          variant_id: string
+        }
+        Update: {
+          ai_rationale?: string | null
+          clicks?: number
+          collection_handle?: string
+          collection_id?: string
+          collection_title?: string | null
+          collection_url?: string | null
+          created_at?: string
+          ctr?: number
+          end_date?: string | null
+          h1_tag?: string | null
+          id?: string
+          impressions?: number
+          is_control?: boolean
+          is_winner?: boolean
+          meta_description?: string | null
+          parent_experiment_group?: string | null
+          position?: number | null
+          seo_title?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          variant_id?: string
+        }
+        Relationships: []
+      }
+      seo_ab_gsc_daily: {
+        Row: {
+          clicks: number
+          created_at: string
+          ctr: number
+          experiment_id: string
+          id: string
+          impressions: number
+          metric_date: string
+          position: number | null
+          user_id: string
+          variant_id: string
+        }
+        Insert: {
+          clicks?: number
+          created_at?: string
+          ctr?: number
+          experiment_id: string
+          id?: string
+          impressions?: number
+          metric_date: string
+          position?: number | null
+          user_id: string
+          variant_id: string
+        }
+        Update: {
+          clicks?: number
+          created_at?: string
+          ctr?: number
+          experiment_id?: string
+          id?: string
+          impressions?: number
+          metric_date?: string
+          position?: number | null
+          user_id?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_ab_gsc_daily_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "seo_ab_experiments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seo_ab_schedule: {
+        Row: {
+          activated_at: string | null
+          collection_handle: string
+          collection_id: string
+          completed_at: string | null
+          created_at: string
+          experiment_id: string
+          id: string
+          parent_experiment_group: string
+          previous_h1_tag: string | null
+          previous_meta_description: string | null
+          previous_seo_title: string | null
+          scheduled_end_date: string
+          scheduled_start_date: string
+          status: string
+          updated_at: string
+          user_id: string
+          variant_id: string
+        }
+        Insert: {
+          activated_at?: string | null
+          collection_handle: string
+          collection_id: string
+          completed_at?: string | null
+          created_at?: string
+          experiment_id: string
+          id?: string
+          parent_experiment_group: string
+          previous_h1_tag?: string | null
+          previous_meta_description?: string | null
+          previous_seo_title?: string | null
+          scheduled_end_date: string
+          scheduled_start_date: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          variant_id: string
+        }
+        Update: {
+          activated_at?: string | null
+          collection_handle?: string
+          collection_id?: string
+          completed_at?: string | null
+          created_at?: string
+          experiment_id?: string
+          id?: string
+          parent_experiment_group?: string
+          previous_h1_tag?: string | null
+          previous_meta_description?: string | null
+          previous_seo_title?: string | null
+          scheduled_end_date?: string
+          scheduled_start_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          variant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seo_ab_schedule_experiment_id_fkey"
+            columns: ["experiment_id"]
+            isOneToOne: false
+            referencedRelation: "seo_ab_experiments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seo_ab_settings: {
+        Row: {
+          auto_promote: boolean
+          created_at: string
+          enabled: boolean
+          excluded_collections: string[]
+          gsc_site_url: string | null
+          manual_approval_lift: number
+          max_concurrent: number
+          min_ctr_lift: number
+          min_impressions: number
+          test_window_days: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_promote?: boolean
+          created_at?: string
+          enabled?: boolean
+          excluded_collections?: string[]
+          gsc_site_url?: string | null
+          manual_approval_lift?: number
+          max_concurrent?: number
+          min_ctr_lift?: number
+          min_impressions?: number
+          test_window_days?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_promote?: boolean
+          created_at?: string
+          enabled?: boolean
+          excluded_collections?: string[]
+          gsc_site_url?: string | null
+          manual_approval_lift?: number
+          max_concurrent?: number
+          min_ctr_lift?: number
+          min_impressions?: number
+          test_window_days?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       seo_health_alerts: {
         Row: {
           alert_type: Database["public"]["Enums"]["seo_alert_type"]

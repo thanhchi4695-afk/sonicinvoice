@@ -1,118 +1,72 @@
-# Phase 2 — Discount Strategy A/B Tester (Karpathy Loop)
+# Phase 3 — SEO Content A/B Tester
 
-Weekly autonomous A/B test of pricing-engine parameters. Same architecture as Phase 1 (prompt optimizer) but feedback signal is **actual sales velocity vs margin loss**, not approval rate.
+Closes the Karpathy loop with real Google CTR data. Tests SEO title / meta description / H1 variants on high-traffic collections, measures via Google Search Console (GSC), and auto-promotes winners.
 
-## Scope
+## Approach decisions (MVP)
 
-Targets `src/lib/pricing/lifecycleEngine.ts` — the only deterministic pure-function discount engine in the codebase. The "current formula" in the brief is paraphrased; real constants (`PHASE_BANDS`, weights, velocity bands) become the v0 variant.
-
-Defaults to **dry-run / disabled** — merchants must opt in to auto-promotion. Margin floor in `lifecycleEngine` stays hard-coded and non-negotiable (variants cannot override it).
+- **Approach B — Scheduled Deployment**: 7-day control → 7-day variant rotation by writing Shopify collection SEO fields directly. Faster to ship than liquid metafield rotation; we still store full variant history in metafields under `seo_ab_test.*` for audit/rollback.
+- **GSC auth**: use the existing **Google Search Console connector** (already in the Lovable connector catalog, gateway-based, no per-user OAuth needed for MVP — uses the workspace owner's connected GSC account).
+- **AI Gateway**: Gemini 2.5 Pro for variant generation, Gemini 2.5 Flash fallback (per project doctrine).
+- **Pattern**: AUTOMATION_FLOW with bounded LLM_CALL for variant generation (no agent loop).
 
 ## Database (one migration)
 
-- **`discount_strategy_experiments`** — variant_id, strategy_name, parameters (jsonb), efficiency_score, velocity_gain_pct, margin_loss_pct, sample_size, test_started_at, test_completed_at, is_active, parent_variant_id, promoted_at, blacklisted (bool, for early-terminated variants)
-- **`discount_strategy_feedback`** — experiment_id, variant_id, product_id, units_sold_during_test, revenue_during_test, margin_during_test, discount_applied_pct, competitor_price_at_test, observation_date
-- **`discount_strategy_log`** — run_started_at, run_completed_at, run_type ('start'|'collect'), experiments_ran, winning_variant_id, previous_variant_id, efficiency_improvement_pct, promoted, notes, error_message
-- **`test_product_set_discount`** — product_id, product_title, current_price, cost_price, inventory_quantity, weekly_velocity_baseline, test_week_start, test_week_end, unique(product_id, test_week_start)
-- **`discount_variant_assignments`** — test_week_start, product_id, variant_id, experiment_id, assigned_at — what variant a given product is on for the week
-- **`discount_optimizer_settings`** — singleton row per user_id: enabled (bool, default false), auto_promote (bool, default false), schedule_cron (text), max_margin_loss_pct (default 15), updated_at
+New tables:
+- `seo_ab_experiments` — collection, variant_id, seo_title, meta_description, h1_tag, dates, impressions, clicks, ctr, position, is_winner, status
+- `seo_ab_experiment_log` — cron audit (started/completed, experiments_ran, winners, errors)
+- `seo_ab_schedule` — per-variant deployment windows (pending/active/completed/rolled_back)
+- `seo_ab_settings` — per-user toggles (enabled, min_impressions=100, min_ctr_lift=0.10, max_concurrent=3, excluded_collections[])
+- `seo_ab_gsc_daily` — daily impressions/clicks/ctr/position per (experiment_id, variant_id, date)
 
-RLS: admin-only writes on experiments/log/test set/assignments; auth read. Settings: owner read+write (user_id = auth.uid()). Feedback: admin write (populated server-side).
-
-Seed: insert v0 baseline representing current lifecycleEngine constants.
-
-## Engine changes — `src/lib/pricing/lifecycleEngine.ts`
-
-- Export a `StrategyParams` interface mirroring `PHASE_BANDS`, the four scoring weights, and velocity thresholds.
-- Add a `DEFAULT_STRATEGY: StrategyParams` constant equal to today's constants.
-- Make `recommendPrice(input, strategy?)` accept an optional second arg; default to `DEFAULT_STRATEGY`.
-- Margin floor logic stays inside `recommendPrice` and ignores `strategy` — variants cannot soften it.
-- No callers need to change; default behaviour preserved.
-
-## Lookup helper — `src/lib/pricing/strategyResolver.ts` (new)
-
-`resolveStrategyForProduct(productId, userId)` → returns `StrategyParams`:
-1. Look up `discount_variant_assignments` for current test_week_start
-2. If hit → load variant params from `discount_strategy_experiments`
-3. Else → load active strategy params (`is_active = true`)
-4. Else → `DEFAULT_STRATEGY`
-
-Cache for 60s in-memory. UI components that call `recommendPrice` can opt to pass the resolved strategy.
+RLS: user-scoped on `user_id`; service role full access for cron functions.
 
 ## Edge functions
 
-**`discount-optimizer-start`** (weekly Sun 02:00 UTC, `verify_jwt = false`, requires `CRON_SECRET`)
-1. Load active strategy params
-2. Generate 5–8 variants via Lovable AI Gateway (`google/gemini-2.5-pro`, JSON-out). Each variant mutates ONE param, all others identical
-3. Validate variants: every discount cap ≤ 0.85, weights sum to 1.0 ±0.05; reject otherwise
-4. Insert variants (is_active=false, test_started_at=now)
-5. Build new `test_product_set_discount`: 100 products from `collection_suggestions`/Shopify product source meeting: stock ≥ 10, in inventory ≥ 30 days, not currently clearance (price > floor × 1.1), not in last week's test, excluded from top 10% by revenue (heuristic — skip products with very high `avgWeeklySales`)
-6. Record baseline `weekly_velocity_baseline` per product
-7. Assign products to variants round-robin (≈12 each) → `discount_variant_assignments`
-8. Log run
+1. `gsc-fetch-performance` — accepts `{ siteUrl, page, startDate, endDate }`, calls GSC `searchanalytics/query` via the `google_search_console` connector gateway, returns aggregated + daily rows. Internal helper used by other functions.
+2. `seo-ab-optimizer-start` — picks up to N eligible collections (≥100 impressions/30d, not tested in 60d, CTR ≤ 8%, not excluded), generates 2 variants per collection via Lovable AI Gateway, writes `seo_ab_experiments` + `seo_ab_schedule` rows. Deploys control for week 1.
+3. `seo-ab-optimizer-rotate` — daily tick. Activates the next scheduled variant when its window opens (writes Shopify collection `seo.title` / `seo.description` + H1 via GraphQL, stores prior values in `seo_ab_test.*` metafields). Marks completed schedules.
+4. `seo-ab-optimizer-collect` — daily, pulls GSC data for active/recently-active experiment URLs (skips last 3 days due to GSC delay), upserts into `seo_ab_gsc_daily`, recomputes `impressions/clicks/ctr/position` on experiments.
+5. `seo-ab-optimizer-evaluate` — when an experiment's window closes + 72h buffer: compares variants vs control. If lift ≥ `min_ctr_lift` and impressions ≥ threshold → mark winner, push winner's SEO to Shopify, log to `seo_ab_experiment_log`. Safety: CTR floor (terminate if <50% of control), manual approval gate at >25% lift.
+6. `seo-ab-optimizer-run` — admin manual trigger (chains start → rotate → collect → evaluate for the requesting user only).
 
-**`discount-optimizer-collect`** (weekly Sun 01:30 UTC, BEFORE start — collects previous week's results before new round)
-1. Find experiments where `test_started_at < now() - 7 days` and `test_completed_at IS NULL`
-2. For each variant: aggregate `discount_strategy_feedback` rows from the test week
-3. Compute `velocity_gain_pct` = (avg_actual_velocity − avg_baseline_velocity) / baseline × 100
-4. Compute `margin_loss_pct` = (baseline_margin − actual_margin) / baseline_margin × 100
-5. Compute `efficiency_score = velocity_gain_pct / max(0.01, margin_loss_pct)`
-6. Mark `test_completed_at`, store all three on experiment row
-7. **Early-terminate / blacklist** any variant whose margin_loss_pct > `max_margin_loss_pct` (default 15)
-8. Promotion gate: candidate must have ≥50 feedback rows AND efficiency_score ≥ active × 1.1 AND not blacklisted AND no single param differs >50% from current (otherwise mark `pending_human_approval = true` and DON'T auto-promote unless `auto_promote=true`)
-9. **Rollback check**: if active strategy promoted < 14 days ago AND store-wide margin in feedback dropped > 10pp vs baseline, revert to parent variant + log incident
-10. Log run
+Cron (scheduled in DB after deploy):
+- `0 2 1,15 * *` → `seo-ab-optimizer-start`
+- `15 2 * * *` → `seo-ab-optimizer-rotate`
+- `0 8 * * *`  → `seo-ab-optimizer-collect`
+- `0 9 * * *`  → `seo-ab-optimizer-evaluate`
 
-**`discount-optimizer-feedback`** (auth required, called by sales sync or manually)
-- Accepts `{product_id, units_sold, revenue, margin, discount_applied_pct, competitor_price?}` for current test week
-- Looks up active assignment for product → inserts `discount_strategy_feedback` row tagged with variant_id + experiment_id
-- Idempotent on (experiment_id, product_id, observation_date::date)
+## Frontend
 
-**`discount-optimizer-run`** (admin-only manual trigger)
-- Invokes start, then collect, for smoke testing
+New component `src/components/SeoAbTesterPanel.tsx` mounted on `src/pages/SonicRank.tsx`:
+- Settings card (enabled toggle, min impressions, min lift %, max concurrent, excluded collections)
+- Active tests card (collection, current variant, days remaining, predicted completion)
+- Experiments table (collection, control CTR, variant CTRs with deltas, winner, status, details)
+- Details modal (full SEO per variant, daily CTR chart from `seo_ab_gsc_daily`, "Apply winner now", "Extend 7 days")
+- Trend chart (avg CTR over time, winning rate)
+- "Run now" admin button
 
-## Cron (via `supabase--insert`)
-- `discount-optimizer-collect-weekly` — `30 1 * * 0`
-- `discount-optimizer-start-weekly` — `0 2 * * 0`
+## Connector & secrets
 
-## UI — `src/components/DiscountOptimizerPanel.tsx`
+- Link `google_search_console` connector (prompts you to pick/create a connection). Gateway env vars `LOVABLE_API_KEY` + `GOOGLE_SEARCH_CONSOLE_API_KEY` become available to edge functions automatically.
+- Reuses existing `SHOPIFY_*` secrets for collection writes.
+- No new manual secrets needed.
 
-Admin-only panel, mounted on `src/pages/Rules.tsx` (pricing rules page):
+## Safety guardrails (encoded in evaluator)
 
-- **Settings card**: enable toggle (writes `discount_optimizer_settings.enabled`), auto-promote toggle, schedule display ("Sunday 02:00 UTC"), max margin loss slider (5–25%)
-- **Current strategy** card: active variant_id, efficiency_score, sample_size, expandable JSON of params
-- **This week's test**: count of variants, count of products under test, expected completion date, mini list of "what changed" per variant
-- **Last week's winner**: highlighted card with parameter diff vs previous, efficiency lift, "Apply now" button if `pending_human_approval`
-- **Recent experiments** table: variant_id, efficiency_score, velocity_gain_pct, margin_loss_pct, samples, status (active/blacklisted/pending)
-- **Run history**: last 10 cron runs with timestamps and lift
-- **Buttons**: "Run now" (calls `discount-optimizer-run`), "Rollback to previous" (sets parent_variant_id active)
-- **Trend chart**: simple line chart of weekly efficiency_score from log rows (Recharts, already in project)
+- Min 100 impressions per variant before scoring
+- Min 7-day / max 21-day windows
+- CTR floor: kill variant if <50% control mid-test
+- Manual approval gate for >25% lift winners
+- 14-day rollback window (keep prior SEO snapshot)
+- Per-user concurrent test cap (default 3)
 
-Uses the existing dark theme, Syne headings, IBM Plex Mono for numbers, teal/amber accents.
+## Order of execution
 
-## Safety guardrails (recap)
+1. Migration (5 tables + RLS + seed default `seo_ab_settings` row trigger)
+2. Link `google_search_console` connector
+3. Write all 6 edge functions
+4. Build `SeoAbTesterPanel.tsx` + mount on `SonicRank`
+5. Schedule the 4 cron jobs via `supabase--insert` (user-specific URLs/anon key)
+6. Update `mem://index.md` with a Phase 3 entry
 
-1. Margin floor: hard-coded in `recommendPrice`, never overridable by variants
-2. Max margin loss: 15pp default per variant per week → blacklist
-3. Large change gate: param delta > 50% requires human approval
-4. Min samples: 50 feedback rows
-5. 14-day rollback window with auto-revert on store-wide regression
-6. Test set excludes best-sellers (top 10% by velocity)
-7. **Default OFF**: merchants must opt in via settings toggle
-
-## Out of scope (Phase 3+)
-
-- Real Shopify sales-data ingestion into `discount_strategy_feedback` — Phase 2 ships the endpoint; wiring it into the existing sales sync is a follow-up
-- Multivariate testing (Thompson sampling) — pure winner-takes-all this phase
-- Per-segment strategy (by collection, brand, season)
-- Dry-run "what-would-have-happened" simulation card
-
-## Build order
-
-1. Migration (6 tables + RLS + seed v0)
-2. `lifecycleEngine.ts` — accept optional StrategyParams
-3. `strategyResolver.ts` helper
-4. Three edge functions: start, collect, feedback (+ run trigger)
-5. UI panel + mount on Rules page
-6. Cron schedules via `supabase--insert`
-7. Smoke test via "Run now"
+Confirm to proceed and I'll run the migration first.

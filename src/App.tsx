@@ -56,6 +56,7 @@ const Agent = lazy(() => import("./pages/Agent.tsx"));
 const Approvals = lazy(() => import("./pages/Approvals.tsx"));
 const AuditLog = lazy(() => import("./pages/AuditLog.tsx"));
 const MobileApprovals = lazy(() => import("./pages/MobileApprovals.tsx"));
+const AiBrain = lazy(() => import("./pages/AiBrain.tsx"));
 
 const queryClient = new QueryClient();
 
@@ -108,6 +109,7 @@ const App = () => (
                   <Route path="/rules/setup" element={<RulesSetup />} />
                   <Route path="/collections" element={<Suspense fallback={null}><Collections /></Suspense>} />
                   <Route path="/rank" element={<Suspense fallback={null}><SonicRank /></Suspense>} />
+                  <Route path="/ai-brain" element={<RequireAuth><Suspense fallback={null}><AiBrain /></Suspense></RequireAuth>} />
                   <Route path="/brands" element={<Suspense fallback={null}><Brands /></Suspense>} />
                   <Route path="/seo-engine" element={<RequireAuth><Suspense fallback={null}><SeoEngine /></Suspense></RequireAuth>} />
                   <Route path="/seo-keywords" element={<RequireAuth><Suspense fallback={null}><SeoKeywords /></Suspense></RequireAuth>} />

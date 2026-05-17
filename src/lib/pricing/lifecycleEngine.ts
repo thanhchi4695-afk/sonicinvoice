@@ -62,20 +62,42 @@ const PHASE_NAMES: Record<LifecyclePhase, string> = {
   5: "Final Cleanse",
 };
 
-/** Per-phase suggested discount band: [min, max]. */
-const PHASE_BANDS: Record<LifecyclePhase, [number, number]> = {
-  1: [0, 0],
-  2: [0.05, 0.10],
-  3: [0, 0.05],
-  4: [0.30, 0.60],
-  5: [0.70, 0.85],
+/** Tunable strategy parameters — A/B-testable by the discount optimizer.
+ *  The margin floor is NOT here on purpose: it is hard-coded in recommendPrice
+ *  and cannot be softened by any variant. */
+export interface StrategyParams {
+  /** Per-phase discount band: [min, max], 0–1. */
+  phaseBands: Record<LifecyclePhase, [number, number]>;
+  /** Day cutoffs that define each phase. */
+  phaseDays: { launch: number; firstMark: number; performance: number; clearance: number };
+  /** Score weights (must sum ~1.0). */
+  weights: { lifecycle: number; competitor: number; velocity: number; margin: number };
+  /** Competitor gap (0–1) that maps to full pressure. */
+  competitorCapGap: number;
+  /** Weeks-of-cover thresholds for velocity pressure. */
+  velocityWeeksOfCover: { low: number; high: number };
+}
+
+export const DEFAULT_STRATEGY: StrategyParams = {
+  phaseBands: {
+    1: [0, 0],
+    2: [0.05, 0.10],
+    3: [0, 0.05],
+    4: [0.30, 0.60],
+    5: [0.70, 0.85],
+  },
+  phaseDays: { launch: 14, firstMark: 30, performance: 45, clearance: 60 },
+  weights: { lifecycle: 0.4, competitor: 0.3, velocity: 0.2, margin: 0.1 },
+  competitorCapGap: 0.30,
+  velocityWeeksOfCover: { low: 4, high: 16 },
 };
 
-export function getPhase(daysInInventory: number): LifecyclePhase {
-  if (daysInInventory < 14) return 1;
-  if (daysInInventory < 30) return 2;
-  if (daysInInventory < 45) return 3;
-  if (daysInInventory < 60) return 4;
+export function getPhase(daysInInventory: number, strategy: StrategyParams = DEFAULT_STRATEGY): LifecyclePhase {
+  const d = strategy.phaseDays;
+  if (daysInInventory < d.launch) return 1;
+  if (daysInInventory < d.firstMark) return 2;
+  if (daysInInventory < d.performance) return 3;
+  if (daysInInventory < d.clearance) return 4;
   return 5;
 }
 

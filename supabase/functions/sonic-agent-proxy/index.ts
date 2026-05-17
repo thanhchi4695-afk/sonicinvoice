@@ -68,6 +68,26 @@ Deno.serve(async (req) => {
   const subPath = url.pathname.replace(/^.*\/sonic-agent-proxy/, "") || "/";
   const upstreamUrl = `${AGENT_URL}${subPath}${url.search}`;
 
+  let upstreamBody: string | undefined;
+  if (!["GET", "HEAD"].includes(req.method)) {
+    const rawBody = await req.text();
+    const contentType = req.headers.get("Content-Type") ?? "application/json";
+    if (contentType.includes("application/json")) {
+      try {
+        upstreamBody = JSON.stringify({
+          ...(rawBody ? JSON.parse(rawBody) : {}),
+          user_id: userId,
+          userId,
+          user_email: userEmail || undefined,
+        });
+      } catch {
+        upstreamBody = rawBody;
+      }
+    } else {
+      upstreamBody = rawBody;
+    }
+  }
+
   const upstream = await fetch(upstreamUrl, {
     method: req.method,
     headers: {
@@ -76,9 +96,10 @@ Deno.serve(async (req) => {
       "X-Sonic-Agent-Key": AGENT_KEY,
       "x-api-key": AGENT_KEY,
       "x-user-id": userId,
+      "x-supabase-user-id": userId,
       ...(userEmail ? { "x-user-email": userEmail } : {}),
     },
-    body: ["GET", "HEAD"].includes(req.method) ? undefined : await req.text(),
+    body: upstreamBody,
   });
 
   if (!upstream.ok) {

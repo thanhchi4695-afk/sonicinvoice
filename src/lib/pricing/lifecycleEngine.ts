@@ -116,15 +116,16 @@ function competitorPressure(currentPrice: number, competitorPrice?: number): num
 }
 
 /** Returns 0–1 — higher when sales are slow vs. inventory. */
-function velocityPressure(input: PricingInput): number {
+function velocityPressure(input: PricingInput, strategy: StrategyParams = DEFAULT_STRATEGY): number {
   const v = input.avgWeeklySales ?? 0;
   const stock = input.stockOnHand ?? 0;
-  if (v <= 0 && stock > 0) return 1; // zero sales but stock exists
-  if (v <= 0) return 0.5; // no data — neutral-leaning
+  if (v <= 0 && stock > 0) return 1;
+  if (v <= 0) return 0.5;
   const weeksOfCover = stock / v;
-  if (weeksOfCover <= 4) return 0;
-  if (weeksOfCover >= 16) return 1;
-  return (weeksOfCover - 4) / 12;
+  const { low, high } = strategy.velocityWeeksOfCover;
+  if (weeksOfCover <= low) return 0;
+  if (weeksOfCover >= high) return 1;
+  return (weeksOfCover - low) / (high - low);
 }
 
 /** Returns 0–1 — how much room we have above margin floor. */
@@ -134,22 +135,23 @@ function marginHeadroom(currentPrice: number, unitCost: number, minMarginPct: nu
   return Math.min(1, (currentPrice - floor) / currentPrice);
 }
 
-export function recommendPrice(input: PricingInput): Recommendation {
+export function recommendPrice(input: PricingInput, strategy: StrategyParams = DEFAULT_STRATEGY): Recommendation {
   const minMarginPct = input.minMarginPct ?? 0.15;
-  const phase = getPhase(input.daysInInventory);
+  const phase = getPhase(input.daysInInventory, strategy);
   const phaseName = PHASE_NAMES[phase];
 
   const marginFloorPrice = +(input.unitCost / (1 - minMarginPct)).toFixed(2);
 
   const lp = lifecyclePressure(phase);
-  const cp = competitorPressure(input.currentPrice, input.competitorPrice);
-  const vp = velocityPressure(input);
+  const cp = competitorPressure(input.currentPrice, input.competitorPrice, strategy);
+  const vp = velocityPressure(input, strategy);
   const mh = marginHeadroom(input.currentPrice, input.unitCost, minMarginPct);
 
-  const score = Math.round((0.4 * lp + 0.3 * cp + 0.2 * vp + 0.1 * mh) * 100);
+  const w = strategy.weights;
+  const score = Math.round((w.lifecycle * lp + w.competitor * cp + w.velocity * vp + w.margin * mh) * 100);
 
   // Pick discount within phase band, modulated by competitor + velocity pressure.
-  const [bandMin, bandMax] = PHASE_BANDS[phase];
+  const [bandMin, bandMax] = strategy.phaseBands[phase];
   const pressureBlend = (cp + vp) / 2; // 0–1
   let suggestedDiscount = bandMin + (bandMax - bandMin) * pressureBlend;
 

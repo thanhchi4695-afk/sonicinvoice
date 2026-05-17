@@ -78,6 +78,7 @@ export default function Brands() {
   const [killSwitch, setKillSwitch] = useState<boolean>(true);
   const [iconicRefreshingId, setIconicRefreshingId] = useState<string | null>(null);
   const [whitefoxRefreshingId, setWhitefoxRefreshingId] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number; current: string } | null>(null);
 
   async function load() {
     setLoading(true);

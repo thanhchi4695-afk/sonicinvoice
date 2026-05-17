@@ -394,9 +394,13 @@ export default function Brands() {
               {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
               Crawl Stomp Priority 1
             </Button>
-            <Button size="sm" disabled={!!batchProgress || !!crawlingId} onClick={() => crawlAllPriority1()}>
+            <Button size="sm" variant="default" disabled={!!batchProgress || !!crawlingId} onClick={() => crawlAllPriority1()}>
               {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
               Crawl all Priority 1
+            </Button>
+            <Button size="sm" variant="secondary" disabled={!!batchProgress || !!crawlingId} onClick={crawlAll}>
+              {batchProgress ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Zap className="h-3 w-3 mr-1" />}
+              Crawl all
             </Button>
           </div>
         </div>

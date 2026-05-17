@@ -191,13 +191,26 @@ Identify the PRIMARY structure type (the dominant axis the brand uses to organis
 }
 
 function scoreConfidence(x: ExtractedIntelligence): number {
+  // Spec formula: vocab>3 +0.3 · structure identified +0.2 · blog>2 +0.2 · tone +0.2 · prints>1 +0.1
   let s = 0;
-  if (x.category_vocabulary && Object.keys(x.category_vocabulary).length > 0) s += 0.25;
-  if (x.collection_structure_type && x.collection_structure_type !== "unknown") s += 0.20;
-  if (x.blog_topics_used?.length > 0) s += 0.20;
-  if (x.brand_tone_sample && x.brand_tone_sample.length > 30) s += 0.20;
-  if (x.print_story_names?.length > 0) s += 0.15;
+  const vocabCount = x.category_vocabulary ? Object.keys(x.category_vocabulary).length : 0;
+  if (vocabCount > 3) s += 0.3;
+  if (x.collection_structure_type && x.collection_structure_type !== "unknown") s += 0.2;
+  if ((x.blog_topics_used?.length ?? 0) > 2) s += 0.2;
+  if (x.brand_tone_sample && x.brand_tone_sample.trim().length > 0) s += 0.2;
+  if ((x.print_story_names?.length ?? 0) > 1) s += 0.1;
   return Math.round(s * 100) / 100;
+}
+
+function confidenceBreakdown(x: ExtractedIntelligence) {
+  const vocabCount = x.category_vocabulary ? Object.keys(x.category_vocabulary).length : 0;
+  return {
+    category_vocabulary: { passed: vocabCount > 3, weight: 0.3, detail: `${vocabCount} entries` },
+    collection_structure_type: { passed: !!x.collection_structure_type && x.collection_structure_type !== "unknown", weight: 0.2, detail: x.collection_structure_type || "unknown" },
+    detected_blog_topics: { passed: (x.blog_topics_used?.length ?? 0) > 2, weight: 0.2, detail: `${x.blog_topics_used?.length ?? 0} topics` },
+    brand_tone_sample: { passed: !!x.brand_tone_sample && x.brand_tone_sample.trim().length > 0, weight: 0.2, detail: x.brand_tone_sample ? `${x.brand_tone_sample.length} chars` : "empty" },
+    detected_print_story_names: { passed: (x.print_story_names?.length ?? 0) > 1, weight: 0.1, detail: `${x.print_story_names?.length ?? 0} names` },
+  };
 }
 
 Deno.serve(async (req) => {

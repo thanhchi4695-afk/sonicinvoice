@@ -25,6 +25,7 @@ import {
 import { RuleListPage } from "@/components/guardian/RuleListPage";
 import { ExtensionTokensPanel } from "@/components/guardian/ExtensionTokensPanel";
 import { BackButton } from "@/components/BackButton";
+import DiscountOptimizerPanel from "@/components/DiscountOptimizerPanel";
 
 interface DecisionRow {
   id: string;

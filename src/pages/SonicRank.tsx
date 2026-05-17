@@ -13,6 +13,7 @@ import { actionKind, gapCount, ringClasses } from "@/lib/seo-score";
 import { cn } from "@/lib/utils";
 import CollectionGeoDialog from "@/components/CollectionGeoDialog";
 import LlmsTxtCard from "@/components/LlmsTxtCard";
+import PromptOptimizerPanel from "@/components/PromptOptimizerPanel";
 
 interface Row {
   id: string;

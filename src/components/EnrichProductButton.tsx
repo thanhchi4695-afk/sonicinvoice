@@ -51,11 +51,15 @@ interface EnrichResponse {
   error?: string;
 }
 
+type EnrichStatus = "idle" | "searching" | "found" | "failed";
+
 interface Props {
   productId?: string;
   invoiceProduct: EnrichInvoiceProduct;
   /** True when the row already has both description AND image — hides button. */
   hasDescriptionAndImage?: boolean;
+  /** Optional Shopify product image to use as fallback when web enrichment returns no image. */
+  shopifyImageUrl?: string;
   /** Called when enrichment is accepted (auto or by the user). */
   onEnriched: (fields: EnrichedFields) => void;
   className?: string;
@@ -66,13 +70,15 @@ export const EnrichProductButton = ({
   productId,
   invoiceProduct,
   hasDescriptionAndImage,
+  shopifyImageUrl,
   onEnriched,
   className,
   size = "sm",
 }: Props) => {
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<EnrichStatus>("idle");
   const [pending, setPending] = useState<EnrichedFields | null>(null);
   const [reasoning, setReasoning] = useState<string>("");
+  const loading = status === "searching";
 
   const brand = (invoiceProduct.brand || "").trim();
   const productName = (invoiceProduct.product_name || "").trim();

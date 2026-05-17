@@ -66,7 +66,7 @@ const SECTIONS: { id: string; label: string; description: string; videos: Video[
   { id: "core", label: "CORE STORY", description: "The complete Sonic story — from invoice to ranked store", videos: CORE },
   { id: "intake", label: "INTAKE", description: "How invoices, emails, scans, wholesale files, and supplier data enter Sonic", videos: INTAKE },
   { id: "operations", label: "OPERATIONS", description: "Inventory, pricing, margin protection, and stock management", videos: OPERATIONS },
-  { id: "growth", label: "GROWTH", description: "SEO, ads, competitor intelligence, and visibility tools", videos: GROWTH },
+  { id: "growth", label: "GROWTH", description: "SEO, ads, competitor intelligence, AI agent, and visibility tools", videos: GROWTH },
   { id: "technical", label: "TECHNICAL", description: "Architecture, MCP integration, and developer deep dives", videos: TECH },
 ];
 

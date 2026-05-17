@@ -79,6 +79,9 @@ export default function Brands() {
   const [loading, setLoading] = useState(true);
   const [crawlingId, setCrawlingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<BrandRow | null>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editDraft, setEditDraft] = useState<Partial<BrandRow>>({});
+  const [savingEdit, setSavingEdit] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDomain, setNewDomain] = useState("");
   const [verticalFilter, setVerticalFilter] = useState<"ALL" | Vertical>("ALL");
@@ -289,6 +292,32 @@ export default function Brands() {
     await load();
   }
 
+  function startEdit(row: BrandRow) {
+    setEditDraft({
+      brand_tone: row.brand_tone,
+      brand_tone_sample: row.brand_tone_sample,
+      collection_structure_type: row.collection_structure_type,
+      seo_primary_keyword: row.seo_primary_keyword,
+      size_range: row.size_range,
+    });
+    setEditMode(true);
+  }
+
+  async function saveEdit() {
+    if (!selected) return;
+    setSavingEdit(true);
+    const { error } = await supabase
+      .from("brand_intelligence")
+      .update({ ...editDraft, manually_verified: true, verified_at: new Date().toISOString() })
+      .eq("id", selected.id);
+    setSavingEdit(false);
+    if (error) return toast.error(error.message);
+    toast.success("Saved manually");
+    setEditMode(false);
+    await load();
+    setSelected({ ...selected, ...editDraft, manually_verified: true } as BrandRow);
+  }
+
   const seeded = new Set(rows.map((r) => r.brand_name.toLowerCase()));
   const unseededAll = PRIORITY_BRANDS.filter((b) => !seeded.has(b.name.toLowerCase()));
   const matchesVertical = (v: string | null | undefined) =>
@@ -433,12 +462,12 @@ export default function Brands() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr className="text-left">
-                <th className="p-3">Brand</th>
+                <th className="p-3">Brand name</th>
                 <th className="p-3">Domain</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Structure</th>
-                <th className="p-3">Tone</th>
+                <th className="p-3">Industry vertical</th>
+                <th className="p-3">Crawl status</th>
                 <th className="p-3">Confidence</th>
+                <th className="p-3">Collections created</th>
                 <th className="p-3">Last crawled</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
@@ -453,6 +482,12 @@ export default function Brands() {
                       {r.manually_verified && <CheckCircle2 className="inline h-3.5 w-3.5 ml-1 text-green-600" />}
                     </td>
                     <td className="p-3 text-muted-foreground">{r.brand_domain || "—"}</td>
+                    <td className="p-3 text-muted-foreground">
+                      {r.industry_vertical
+                        ? r.industry_vertical[0] + r.industry_vertical.slice(1).toLowerCase()
+                        : "—"}
+                      {r.priority != null && <span className="ml-1 text-xs">· P{r.priority}</span>}
+                    </td>
                     <td className="p-3 space-x-1">
                       {r.crawl_status === "crawling" && <Badge variant="secondary"><Loader2 className="h-3 w-3 animate-spin mr-1" /> Crawling…</Badge>}
                       {(r.crawl_status === "completed" || r.crawl_status === "crawled") && (
@@ -468,9 +503,8 @@ export default function Brands() {
                         </Badge>
                       )}
                     </td>
-                    <td className="p-3">{r.collection_structure_type || "—"}</td>
-                    <td className="p-3">{r.brand_tone || "—"}</td>
                     <td className="p-3">{r.crawl_confidence != null ? `${Math.round(r.crawl_confidence * 100)}%` : "—"}</td>
+                    <td className="p-3 text-muted-foreground">{r.collections_created ?? 0}</td>
                     <td className="p-3 text-muted-foreground">
                       {r.last_crawled_at ? new Date(r.last_crawled_at).toLocaleDateString() : "—"}
                       {stale && <Badge variant="outline" className="ml-2">Needs re-crawl</Badge>}
@@ -635,24 +669,42 @@ export default function Brands() {
                   {selected.pages_fetched ?? 0} pages •
                   Last crawled: {selected.last_crawled_at ? new Date(selected.last_crawled_at).toLocaleString() : "never"}
                 </div>
-                <div className="flex gap-2 pt-2">
-                  <Button onClick={() => crawl(selected.brand_name, selected.brand_domain, selected.id)} disabled={crawlingId === selected.id}>
-                    {crawlingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-                    Re-crawl
-                  </Button>
-                  {selected.industry_vertical === "FOOTWEAR" && (
-                    <Button variant="secondary" onClick={() => refreshIconic(selected.id, selected.brand_name)} disabled={iconicRefreshingId === selected.id}>
-                      {iconicRefreshingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
-                      Refresh ICONIC
+                {editMode ? (
+                  <div className="border-t pt-3 space-y-2">
+                    <div className="text-xs uppercase text-muted-foreground">Edit manually</div>
+                    <Input placeholder="Brand tone" value={editDraft.brand_tone ?? ""} onChange={(e) => setEditDraft({ ...editDraft, brand_tone: e.target.value })} />
+                    <Input placeholder="Brand tone sample" value={editDraft.brand_tone_sample ?? ""} onChange={(e) => setEditDraft({ ...editDraft, brand_tone_sample: e.target.value })} />
+                    <Input placeholder="Collection structure (silhouette | print | function | mixed)" value={editDraft.collection_structure_type ?? ""} onChange={(e) => setEditDraft({ ...editDraft, collection_structure_type: e.target.value })} />
+                    <Input placeholder="Primary SEO keyword" value={editDraft.seo_primary_keyword ?? ""} onChange={(e) => setEditDraft({ ...editDraft, seo_primary_keyword: e.target.value })} />
+                    <Input placeholder="Size range (e.g. XS-3XL)" value={editDraft.size_range ?? ""} onChange={(e) => setEditDraft({ ...editDraft, size_range: e.target.value })} />
+                    <div className="flex gap-2 pt-1">
+                      <Button onClick={saveEdit} disabled={savingEdit}>
+                        {savingEdit && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Save
+                      </Button>
+                      <Button variant="ghost" onClick={() => setEditMode(false)}>Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 pt-2 flex-wrap">
+                    <Button onClick={() => crawl(selected.brand_name, selected.brand_domain, selected.id)} disabled={crawlingId === selected.id}>
+                      {crawlingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+                      Re-crawl
                     </Button>
-                  )}
-                  <Button variant="outline" onClick={() => toggleVerified(selected)}>
-                    {selected.manually_verified ? "Unverify" : "Mark verified"}
-                  </Button>
-                  <Button variant="ghost" className="text-destructive ml-auto" onClick={() => { removeBrand(selected); setSelected(null); }}>
-                    Remove
-                  </Button>
-                </div>
+                    <Button variant="secondary" onClick={() => startEdit(selected)}>Edit manually</Button>
+                    {selected.industry_vertical === "FOOTWEAR" && (
+                      <Button variant="secondary" onClick={() => refreshIconic(selected.id, selected.brand_name)} disabled={iconicRefreshingId === selected.id}>
+                        {iconicRefreshingId === selected.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+                        Refresh ICONIC
+                      </Button>
+                    )}
+                    <Button variant="outline" onClick={() => toggleVerified(selected)}>
+                      {selected.manually_verified ? "Unverify" : "Mark verified"}
+                    </Button>
+                    <Button variant="ghost" className="text-destructive ml-auto" onClick={() => { removeBrand(selected); setSelected(null); }}>
+                      Remove
+                    </Button>
+                  </div>
+                )}
                 {selected.iconic_reference && (
                   <div className="border-t pt-3 mt-2">
                     <div className="text-xs uppercase text-muted-foreground mb-2 flex items-center gap-1">

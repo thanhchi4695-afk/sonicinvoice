@@ -598,6 +598,78 @@ export type Database = {
           },
         ]
       }
+      ai_brain_insights: {
+        Row: {
+          category: string | null
+          confidence: number | null
+          created_at: string
+          dismissed: boolean
+          evidence: Json | null
+          id: string
+          insight_text: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          confidence?: number | null
+          created_at?: string
+          dismissed?: boolean
+          evidence?: Json | null
+          id?: string
+          insight_text: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          confidence?: number | null
+          created_at?: string
+          dismissed?: boolean
+          evidence?: Json | null
+          id?: string
+          insight_text?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_brain_settings: {
+        Row: {
+          auto_rollback_enabled: boolean
+          autonomous_enabled: boolean
+          created_at: string
+          excluded_targets: string[]
+          max_concurrent_auto_tests: number
+          min_confidence_for_auto: number
+          notify_email: boolean
+          revenue_drop_floor_pct: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_rollback_enabled?: boolean
+          autonomous_enabled?: boolean
+          created_at?: string
+          excluded_targets?: string[]
+          max_concurrent_auto_tests?: number
+          min_confidence_for_auto?: number
+          notify_email?: boolean
+          revenue_drop_floor_pct?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_rollback_enabled?: boolean
+          autonomous_enabled?: boolean
+          created_at?: string
+          excluded_targets?: string[]
+          max_concurrent_auto_tests?: number
+          min_confidence_for_auto?: number
+          notify_email?: boolean
+          revenue_drop_floor_pct?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_model_overrides: {
         Row: {
           created_at: string
@@ -710,6 +782,60 @@ export type Database = {
           gmail_last_history_id?: string | null
           gmail_last_polled_at?: string | null
           gmail_query?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      auto_test_hypotheses: {
+        Row: {
+          auto_created: boolean
+          confidence: number | null
+          created_at: string
+          current_value: string | null
+          expected_impact_pct: number | null
+          experiment_id: string | null
+          hypothesis_type: string
+          id: string
+          proposed_value: string | null
+          reasoning: string | null
+          status: string
+          target_id: string
+          target_label: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_created?: boolean
+          confidence?: number | null
+          created_at?: string
+          current_value?: string | null
+          expected_impact_pct?: number | null
+          experiment_id?: string | null
+          hypothesis_type: string
+          id?: string
+          proposed_value?: string | null
+          reasoning?: string | null
+          status?: string
+          target_id: string
+          target_label?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_created?: boolean
+          confidence?: number | null
+          created_at?: string
+          current_value?: string | null
+          expected_impact_pct?: number | null
+          experiment_id?: string | null
+          hypothesis_type?: string
+          id?: string
+          proposed_value?: string | null
+          reasoning?: string | null
+          status?: string
+          target_id?: string
+          target_label?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1233,6 +1359,33 @@ export type Database = {
           use_google_auto_pricing?: boolean
           user_id?: string
           variants_snapshot?: Json
+        }
+        Relationships: []
+      }
+      business_impact_weights: {
+        Row: {
+          id: string
+          last_updated: string
+          metric_name: string
+          sample_size: number
+          user_id: string
+          weight: number
+        }
+        Insert: {
+          id?: string
+          last_updated?: string
+          metric_name: string
+          sample_size?: number
+          user_id: string
+          weight?: number
+        }
+        Update: {
+          id?: string
+          last_updated?: string
+          metric_name?: string
+          sample_size?: number
+          user_id?: string
+          weight?: number
         }
         Relationships: []
       }
@@ -2413,6 +2566,126 @@ export type Database = {
           key?: string
           updated_at?: string
           value?: string
+        }
+        Relationships: []
+      }
+      cross_loop_resolutions: {
+        Row: {
+          conflict_summary: string | null
+          conflicting_optimizers: string[]
+          created_at: string
+          details: Json | null
+          id: string
+          net_impact_score: number | null
+          resolution_action: string
+          target_id: string
+          target_type: string
+          user_id: string
+        }
+        Insert: {
+          conflict_summary?: string | null
+          conflicting_optimizers: string[]
+          created_at?: string
+          details?: Json | null
+          id?: string
+          net_impact_score?: number | null
+          resolution_action: string
+          target_id: string
+          target_type: string
+          user_id: string
+        }
+        Update: {
+          conflict_summary?: string | null
+          conflicting_optimizers?: string[]
+          created_at?: string
+          details?: Json | null
+          id?: string
+          net_impact_score?: number | null
+          resolution_action?: string
+          target_id?: string
+          target_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cross_loop_run_log: {
+        Row: {
+          auto_tests_created: number | null
+          completed_at: string | null
+          conflicts_resolved: number | null
+          details: Json | null
+          error_message: string | null
+          hypotheses_generated: number | null
+          id: string
+          signals_collected: number | null
+          started_at: string
+          user_id: string | null
+        }
+        Insert: {
+          auto_tests_created?: number | null
+          completed_at?: string | null
+          conflicts_resolved?: number | null
+          details?: Json | null
+          error_message?: string | null
+          hypotheses_generated?: number | null
+          id?: string
+          signals_collected?: number | null
+          started_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          auto_tests_created?: number | null
+          completed_at?: string | null
+          conflicts_resolved?: number | null
+          details?: Json | null
+          error_message?: string | null
+          hypotheses_generated?: number | null
+          id?: string
+          signals_collected?: number | null
+          started_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      cross_loop_signals: {
+        Row: {
+          collection_id: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          product_id: string | null
+          revenue_impact_estimate: number | null
+          signal_type: string
+          signal_value: number | null
+          source_optimizer: string
+          user_id: string
+          variant_id: string | null
+        }
+        Insert: {
+          collection_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          product_id?: string | null
+          revenue_impact_estimate?: number | null
+          signal_type: string
+          signal_value?: number | null
+          source_optimizer: string
+          user_id: string
+          variant_id?: string | null
+        }
+        Update: {
+          collection_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          product_id?: string | null
+          revenue_impact_estimate?: number | null
+          signal_type?: string
+          signal_value?: number | null
+          source_optimizer?: string
+          user_id?: string
+          variant_id?: string | null
         }
         Relationships: []
       }

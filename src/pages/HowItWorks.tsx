@@ -23,28 +23,28 @@ const INTAKE: Video[] = [
 ];
 
 const OPERATIONS: Video[] = [
-  { src: "/videos/sonic_purchase_orders.html", title: "Purchase Orders", caption: "From reorder decision to a sent PO in 90 seconds — with auto Shopify sync on receive", slug: "purchase-orders" },
+  { src: "/videos/sonic_purchase_orders.html", title: "Purchase Orders", caption: "From reorder decision to a sent PO in 90 seconds — auto Shopify sync on receive", slug: "purchase-orders" },
   { src: "/videos/sonic_restock_monitor.html", title: "Restock Check + Stock Monitor", caption: "Know what to reorder before the customer asks and walks out", slug: "restock-monitor" },
-  { src: "/videos/sonic_stocktake_transfers.html", title: "Stocktake + Transfer Orders", caption: "Stocktake in 1.5 hours, not 4.5 — with dual-location transfers", slug: "stocktake-transfers" },
-  { src: "/videos/sonic_refill_planning.html", title: "Refill Stock + Planning", caption: "Close size holes before they cost sales — with Darwin Cup demand forecasting", slug: "refill-planning" },
-  { src: "/videos/sonic_margin_guardian.html", title: "Margin Guardian + Slack", caption: "Block below-margin orders on JOOR and Faire — with Slack approval in 47 seconds", slug: "margin-guardian" },
+  { src: "/videos/sonic_stocktake_transfers.html", title: "Stocktake + Transfer Orders", caption: "Stocktake in 1.5 hours not 4.5 — with dual-location transfers", slug: "stocktake-transfers" },
+  { src: "/videos/sonic_refill_planning.html", title: "Refill Stock + Planning", caption: "Close size holes before they cost sales — Darwin Cup demand forecasting", slug: "refill-planning" },
+  { src: "/videos/sonic_margin_guardian.html", title: "Margin Guardian + Slack", caption: "Block below-margin orders on JOOR — Slack approval in 47 seconds", slug: "margin-guardian" },
   { src: "/videos/sonic_markdown_pricing.html", title: "Markdown + Price + Bulk Sale", caption: "Clear old stock automatically — 34 of 47 units cleared, $3,900 recovered", slug: "markdown-pricing" },
   { src: "/videos/sonic_ai_agents_watchdog.html", title: "Watchdog + Learning Agent", caption: "The AI that blocks bad prices and gets smarter with every invoice", slug: "watchdog-learning" },
-  { src: "/videos/sonic_automations_flow.html", title: "Silent Automations", caption: "6 systems running at 2 AM — nightly scan, season switch, SEO updater, Klaviyo", slug: "silent-automations" },
-  { src: "/videos/sonic_agents_flow.html", title: "The 3 AI Agents", caption: "Brand Intelligence, SEO Audit, and Competitor Gap — running every night", slug: "ai-agents" },
-  { src: "/videos/sonic-video-2-automate.html", title: "Automate (classic)", caption: "The original automations overview — Darwin season switching and Klaviyo triggers", slug: "automate-classic" },
+  { src: "/videos/sonic_automations_flow.html", title: "Silent Automations", caption: "6 systems running at 2 AM — nightly scan, season switch, SEO updater", slug: "silent-automations" },
+  { src: "/videos/sonic_agents_flow.html", title: "The 3 AI Agents", caption: "Brand Intelligence, SEO Audit, and Competitor Gap — every night", slug: "ai-agents" },
+  { src: "/videos/sonic-video-2-automate.html", title: "Automate (classic)", caption: "The original automations — Darwin season switching and Klaviyo triggers", slug: "automate" },
 ];
 
 const GROWTH: Video[] = [
-  { src: "/videos/video-ai-agent.html", title: "AI Agent — Your Store On Autopilot", caption: "14 automated flows running overnight — invoice processing, restock checks, margin protection, and SEO. Powered by Claude.", slug: "ai-agent" },
+  { src: "/videos/video-ai-agent.html", title: "AI Agent — Autopilot", caption: "14 automated flows overnight — invoice processing, restock, margin, SEO. Powered by Claude.", slug: "ai-agent" },
   { src: "/videos/sonic_seo_tools.html", title: "SEO Writer + Collection SEO", caption: "From invisible on Google to 14/22 collections optimised — automatically", slug: "seo-tools" },
   { src: "/videos/sonic_competitor_tools.html", title: "Competitor Intel + Price Monitor", caption: "See what competitors charge. Match in one click. Find gaps worth 2,400 searches/month.", slug: "competitor-tools" },
   { src: "/videos/sonic_ads_setup.html", title: "Google + Meta Ads Setup", caption: "Margin-aware bidding. 2.8x real ROAS. $380/month wasted spend eliminated.", slug: "ads-setup" },
   { src: "/videos/sonic_google_feed.html", title: "Google Feed Health", caption: "234 disapproved products → 0. 72% visibility → 100%. One click.", slug: "google-feed" },
   { src: "/videos/sonic_image_csv_tools.html", title: "Image AI + CSV SEO", caption: "+340% Google Images indexed. Page speed 61→84. SEO completeness 38%→97%.", slug: "image-csv-tools" },
+  { src: "/videos/sonic_accounting_local_seo.html", title: "Accounting + Local SEO", caption: "47 invoices into Xero in 8 seconds. +4 local search positions.", slug: "accounting-seo" },
+  { src: "/videos/sonic_briefing_team_settings.html", title: "Morning Briefing + Team", caption: "Know your store before you open the door. Every morning. For your whole team.", slug: "briefing-team" },
   { src: "/videos/sonic_rank_flow.html", title: "Sonic Rank", caption: "The SEO scoring engine — collections ranked 0–100 with AI content generation", slug: "sonic-rank" },
-  { src: "/videos/sonic_accounting_local_seo.html", title: "Accounting + Local SEO", caption: "47 invoices into Xero in 8 seconds. +4 local search positions. Books and rankings handled.", slug: "accounting-seo" },
-  { src: "/videos/sonic_briefing_team_settings.html", title: "Morning Briefing + Team", caption: "Know your store before you open the door. Every morning. For everyone on your team.", slug: "briefing-team" },
 ];
 
 const TECH: Video[] = [
@@ -58,7 +58,7 @@ const TECH: Video[] = [
 const ALL: Video[] = [...CORE, ...INTAKE, ...OPERATIONS, ...GROWTH, ...TECH];
 
 const HASH_ALIASES: Record<string, string> = {
-  "automate": "silent-automations",
+  "automate-classic": "automate",
   "rank-system": "sonic-rank",
 };
 
@@ -66,7 +66,7 @@ const SECTIONS: { id: string; label: string; description: string; videos: Video[
   { id: "core", label: "CORE STORY", description: "The complete Sonic story — from invoice to ranked store", videos: CORE },
   { id: "intake", label: "INTAKE", description: "How invoices, emails, scans, wholesale files, and supplier data enter Sonic", videos: INTAKE },
   { id: "operations", label: "OPERATIONS", description: "Inventory, pricing, margin protection, and stock management", videos: OPERATIONS },
-  { id: "growth", label: "GROWTH", description: "SEO, ads, competitor intelligence, and visibility tools", videos: GROWTH },
+  { id: "growth", label: "GROWTH", description: "SEO, ads, competitor intelligence, AI agent, and visibility tools", videos: GROWTH },
   { id: "technical", label: "TECHNICAL", description: "Architecture, MCP integration, and developer deep dives", videos: TECH },
 ];
 
@@ -145,7 +145,7 @@ export default function HowItWorks() {
             33 ways Sonic works for your store
           </h1>
           <p className="text-base text-[#a3a3a3] max-w-[640px] mx-auto mt-5">
-            The complete animated library — every feature, every workflow, all 58 functions + the live AI Agent
+            The complete animated library — every feature, every workflow, all 58 functions
           </p>
         </div>
       </section>

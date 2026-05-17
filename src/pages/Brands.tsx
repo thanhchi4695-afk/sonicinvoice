@@ -292,6 +292,32 @@ export default function Brands() {
     await load();
   }
 
+  function startEdit(row: BrandRow) {
+    setEditDraft({
+      brand_tone: row.brand_tone,
+      brand_tone_sample: row.brand_tone_sample,
+      collection_structure_type: row.collection_structure_type,
+      seo_primary_keyword: row.seo_primary_keyword,
+      size_range: row.size_range,
+    });
+    setEditMode(true);
+  }
+
+  async function saveEdit() {
+    if (!selected) return;
+    setSavingEdit(true);
+    const { error } = await supabase
+      .from("brand_intelligence")
+      .update({ ...editDraft, manually_verified: true, verified_at: new Date().toISOString() })
+      .eq("id", selected.id);
+    setSavingEdit(false);
+    if (error) return toast.error(error.message);
+    toast.success("Saved manually");
+    setEditMode(false);
+    await load();
+    setSelected({ ...selected, ...editDraft, manually_verified: true } as BrandRow);
+  }
+
   const seeded = new Set(rows.map((r) => r.brand_name.toLowerCase()));
   const unseededAll = PRIORITY_BRANDS.filter((b) => !seeded.has(b.name.toLowerCase()));
   const matchesVertical = (v: string | null | undefined) =>

@@ -5,12 +5,16 @@ import "./index.css";
 import "./i18n/config";
 
 const PRIMARY_SHOPIFY_API_KEY = "aebbc68f4f67197beb20489d6d2987e4";
-const KNOWN_SHOPIFY_API_KEYS = [PRIMARY_SHOPIFY_API_KEY, "8277057587c9b97483827190f085fe6d"];
+const SHOP_TO_API_KEY: Record<string, string> = {
+  "splashswimweardarwin.myshopify.com": "8277057587c9b97483827190f085fe6d",
+  "testing-d9eimunn.myshopify.com": "3f44206b5d064558111c0f6c9f4fdf76",
+};
+const KNOWN_SHOPIFY_API_KEYS = [PRIMARY_SHOPIFY_API_KEY, ...Object.values(SHOP_TO_API_KEY)];
 
 function resolveShopifyApiKey() {
   const params = new URLSearchParams(window.location.search);
   const shop = params.get("shop")?.toLowerCase();
-  if (shop === "splashswimweardarwin.myshopify.com") return "8277057587c9b97483827190f085fe6d";
+  if (shop && SHOP_TO_API_KEY[shop]) return SHOP_TO_API_KEY[shop];
 
   const explicitKey = params.get("client_id") || params.get("api_key") || params.get("app_key");
   if (explicitKey && KNOWN_SHOPIFY_API_KEYS.includes(explicitKey)) return explicitKey;
